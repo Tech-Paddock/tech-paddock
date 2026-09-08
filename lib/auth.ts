@@ -1,5 +1,3 @@
-import bcrypt from "bcryptjs";
-
 const SESSION_COOKIE = "paddock_session";
 const ATTEMPTS_COOKIE = "paddock_attempts";
 const MAX_ATTEMPTS = 5;
@@ -66,10 +64,6 @@ export async function recordFailure(attempts: Attempts): Promise<{
 
 export async function clearAttemptsCookieValue() {
   return pack({ count: 0, lockUntil: null } satisfies Attempts);
-}
-
-export async function verifyPassword(candidate: string) {
-  return bcrypt.compare(candidate, secret());
 }
 
 export async function createSessionCookieValue() {

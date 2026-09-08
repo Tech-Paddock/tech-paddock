@@ -8,8 +8,8 @@ import {
   isLockedOut,
   readAttempts,
   recordFailure,
-  verifyPassword,
 } from "@/lib/auth";
+import { verifyPassword } from "@/lib/password";
 
 export async function POST(request: NextRequest) {
   const attempts = await readAttempts(request.cookies.get(COOKIES.ATTEMPTS)?.value);
