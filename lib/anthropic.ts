@@ -27,10 +27,9 @@ export async function draftMessage(params: {
     max_tokens: 1024,
     system: params.systemPrompt,
     messages: [{ role: "user", content: params.userPrompt }],
-    // Thinking is adaptive/default on this model. `effort` steers response
-    // depth without a separate extended-thinking toggle.
-    // @ts-expect-error -- effort is a supported request field on claude-sonnet-5
-    effort: params.effort,
+    // Thinking is adaptive/default on this model; `effort` (inside
+    // output_config, not top-level) steers response depth instead.
+    output_config: { effort: params.effort },
   });
 
   const textBlock = response.content.find((block) => block.type === "text");
