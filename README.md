@@ -30,9 +30,11 @@ npm run dev
 - Style guide training endpoint (`/api/style-guide`) — folds new writing samples into the rules
 - Contact CRUD (`/api/contacts`) against the shared `contacts` table
 - Single-page UI: Draft mode (toggles + free text → draft) and Train mode (paste samples → refined guide)
+- Deployed on Vercel (`editor-paddock` project, linked to this repo's `main` branch) with all
+  four environment variables set
 
 ## Not yet built
 
-- Deploy to Vercel (this repo isn't linked to a Vercel project yet)
 - `message_history` isn't written to automatically after a send — currently read-only from the draft endpoint
 - No UI for editing/adding contacts yet (API supports it, page doesn't)
+- `editor.paddock.app` domain isn't wired up yet — still on the default `.vercel.app` URL
