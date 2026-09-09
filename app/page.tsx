@@ -70,6 +70,7 @@ export default function HomePage() {
   const [samples, setSamples] = useState("");
   const [styleGuide, setStyleGuide] = useState<{ version: number; content: string } | null>(null);
   const [training, setTraining] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     fetch("/api/contacts")
@@ -176,9 +177,34 @@ export default function HomePage() {
       return;
     }
 
-    const data = await res.json();
-    setStyleGuide(data.style_guide);
     setCommitted(true);
+  }
+
+  async function handleLoadHistory() {
+    setLoadingHistory(true);
+    setError(null);
+
+    const res = await fetch("/api/message-history");
+
+    setLoadingHistory(false);
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? "Something went wrong");
+      return;
+    }
+
+    const data = await res.json();
+    const formatted = (data.messages as { medium: string; purpose: string | null; tone: string | null; content: string }[])
+      .map((m) => {
+        const tag = [`medium: ${m.medium}`, m.purpose ? `purpose: ${m.purpose}` : null, m.tone ? `tone: ${m.tone}` : null]
+          .filter(Boolean)
+          .join(", ");
+        return `[${tag}]\n${m.content}`;
+      })
+      .join("\n\n");
+
+    setSamples(formatted);
   }
 
   async function handleTrain() {
@@ -436,11 +462,12 @@ export default function HomePage() {
                   disabled={committing || committed || !draft.trim()}
                   className="self-start bg-ink text-white rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
                 >
-                  {committing ? "Saving…" : committed ? "Saved to training ✓" : "Sent this — commit to training"}
+                  {committing ? "Saving…" : committed ? "Logged ✓" : "Sent this — log it"}
                 </button>
                 <p className="text-xs text-ink/50">
-                  Edit the draft above to match exactly what you sent, then commit it — it's logged to this
-                  contact's history and folded into the style guide.
+                  Edit the draft above to match exactly what you sent, then log it — it's appended to history
+                  (used as context for future drafts to this contact) without touching the style guide. Refine
+                  the guide itself, in batches, from the Train tab whenever you want.
                 </p>
               </div>
             </div>
@@ -457,16 +484,24 @@ export default function HomePage() {
             </pre>
           </div>
 
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Paste writing samples or past sent messages</span>
-            <textarea
-              value={samples}
-              onChange={(e) => setSamples(e.target.value)}
-              rows={8}
-              placeholder="Paste a few messages you've actually sent — the more, the better it learns your voice."
-              className="border border-line rounded-lg px-3 py-2 bg-white resize-none"
-            />
-          </label>
+          <div className="flex items-center justify-between">
+            <span className="font-medium text-sm">Writing samples or past sent messages</span>
+            <button
+              type="button"
+              onClick={handleLoadHistory}
+              disabled={loadingHistory}
+              className="text-sm font-medium text-accent disabled:opacity-60"
+            >
+              {loadingHistory ? "Loading…" : "Load from logged history →"}
+            </button>
+          </div>
+          <textarea
+            value={samples}
+            onChange={(e) => setSamples(e.target.value)}
+            rows={10}
+            placeholder="Paste a few messages you've actually sent, or load from logged history above — the more, the better it learns your voice."
+            className="border border-line rounded-lg px-3 py-2 bg-white resize-none"
+          />
 
           <button
             onClick={handleTrain}
@@ -477,8 +512,9 @@ export default function HomePage() {
           </button>
 
           <p className="text-xs text-ink/50">
-            Prefer committing one message at a time instead? Draft one on the Draft tab, edit it to match what
-            you actually sent, and use "Sent this — commit to training" there.
+            Refining is deliberate and batched on purpose — it rewrites the whole guide via Claude, so doing it
+            per-message would drift the rules based on a sample size of one. Log messages from the Draft tab as
+            you send them, then come back here occasionally to fold a real batch in at once.
           </p>
         </div>
       )}

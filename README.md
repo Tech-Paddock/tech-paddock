@@ -28,13 +28,17 @@ npm run dev
 - Password gate with lockout (5 failed attempts → 15 minute lock)
 - Draft endpoint (`/api/draft`) — pulls style guide + contact + message history, calls Claude
 - Style guide training endpoint (`/api/style-guide`) — folds new writing samples into the rules
-- Commit endpoint (`/api/commit`) — logs a final (edited) draft to `message_history` for that
-  contact and folds it into the style guide as a tagged sample (medium/purpose/tone, not the
-  original prompt or contact identity)
+- Commit endpoint (`/api/commit`) — pure append of a final (edited) draft to `message_history`
+  (with medium/purpose/tone), tagged as sent. No LLM call — logging is cheap and instant.
+- Message history endpoint (`/api/message-history`) — read-only feed of the last 30 logged
+  messages, used to build a refinement batch in the Train tab
+- Style guide training endpoint (`/api/style-guide`) — folds a batch of samples into the rules.
+  Deliberately manual/batched rather than triggered per-message: rewriting the whole guide from
+  one message every time you hit send would drift the rules on a sample size of one
 - Contact CRUD (`/api/contacts`) against the shared `contacts` table, plus a searchable
   contact lookup and inline "+ New contact" form in the UI
 - Single-page UI: Draft mode (contact search, channel, purpose, tone, effort, free text →
-  editable draft → commit to training) and Train mode (paste a batch of samples → refined guide)
+  editable draft → log as sent) and Train mode (load logged history or paste samples → refined guide)
 - Deployed on Vercel (`editor-paddock` project, linked to this repo's `main` branch) with all
   four environment variables set
 - Live at **editor.techpaddock.io**, DNS via Cloudflare
