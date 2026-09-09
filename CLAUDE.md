@@ -1,37 +1,40 @@
 # Paddock — Project Brief
 
-paddock.app is a personal command center — one shared foundation supporting multiple standalone tools. This brief covers the first three: **Message Editor**, **Pipeline Tracker**, and **Resume Formatter**.
+techpaddock.io is a personal command center — one shared foundation supporting multiple standalone tools. This brief covers the first three: **Message Editor**, **Pipeline Tracker**, and **Resume Formatter**.
 
 Don't re-litigate the stack choices below without a specific reason — they were chosen deliberately for cost, hand-holding needs, and consistency across tools. Ask before assuming scope beyond what's listed here.
+
+This is a single-user tool. Simplicity beats the multi-team defaults that show up in most infra advice — see the notes on repo layout and training below, both revised down from an earlier, more elaborate first pass once it became clear the extra structure had no one to serve.
 
 ---
 
 ## Core Architecture Principles
 
-- Each tool is its own repo, its own Vercel project, its own subdomain off `paddock.app`.
+- **One repo, one monorepo layout**: `apps/editor`, `apps/tracker`, `apps/resume`, each with its own `package.json` and each pointed at by its own Vercel project (via that project's Root Directory setting) — so deploys, subdomains, and env vars all stay independent per tool without needing three separate repos, three separate PRs for a shared fix, or three places to remember to look. A `packages/shared` folder holds anything genuinely reused across tools (e.g. the password-gate/session logic) instead of copy-pasting it three times.
 - All three share **one Supabase project**, each tool in its own Postgres schema (never the default `public` schema), so table names never collide.
 - One deliberately shared table across tools: `contacts` (see Shared Data Model).
-- Agent isolation: never point two Claude Code sessions at the same working directory at the same time. One repo at a time, or genuinely separate folders/branches if truly parallel.
+- Agent isolation: never point two Claude Code sessions at the same working directory at the same time. One app folder at a time, or genuinely separate worktrees/branches if truly parallel.
 - No secrets ever reach the browser. Every Supabase read/write and every Anthropic API call happens through this app's own server-side API routes. The client only ever talks to this app.
 - Row Level Security enabled on every table, deny-by-default, even though this is single-user. The server uses Supabase's service role key (which bypasses RLS) for all operations — RLS exists purely as a fallback if a key ever leaks.
-- Every deployed app sits behind a real generated password (not a memorable phrase), with lockout after repeated failed attempts.
+- Every deployed app sits behind a password, with lockout after repeated failed attempts. A fully random generated password is the default recommendation; a memorable phrase is an acceptable tradeoff here given the low stakes and the lockout backstop — it's the user's call, not a hard rule.
+- **Prefer append over rewrite for anything that accumulates.** When a feature involves a growing body of history (sent messages, logs, past output), the default write path should be a plain insert — cheap, instant, no AI call — with any AI-driven synthesis (like refining a style guide) kept as a separate, deliberately-triggered, batched step. Don't reach for "call the model to regenerate the whole artifact" as the per-event write path; see the Message Editor's training design below for the concrete example.
 
 ## Tech Stack
 
 - **Framework:** Next.js, hosted on Vercel
 - **Database:** Supabase (Postgres) — one project, multiple schemas
 - **AI:** Anthropic API, model `claude-sonnet-5`, own API key, server-side only
-- **Domain:** paddock.app via Cloudflare Registrar; subdomains via DNS + separate Vercel projects
+- **Domain:** techpaddock.io via Cloudflare Registrar; subdomains via DNS + separate Vercel projects (one per app folder, see Core Architecture Principles)
 - **Docx generation** (Resume Formatter only): `docx` npm package, server-side
 
 ## Domain Map
 
 | Subdomain | Tool |
 |---|---|
-| `paddock.app` (root) | Command center hub — minimal for now |
-| `editor.paddock.app` | Message Editor |
-| `tracker.paddock.app` | Pipeline Tracker |
-| `resume.paddock.app` | Resume Formatter |
+| `techpaddock.io` (root) | Command center hub — minimal for now |
+| `editor.techpaddock.io` | Message Editor |
+| `tracker.techpaddock.io` | Pipeline Tracker |
+| `resume.techpaddock.io` | Resume Formatter |
 
 ## Environment Variables Needed
 
@@ -66,19 +69,22 @@ Written to and read by both the Message Editor and the Pipeline Tracker, so a pe
 
 ## Tool 1: Message Editor (`editor` schema)
 
-Drafts outreach messages (text, email, LinkedIn, Slack) in Joel's own voice, using stored contact context.
+Drafts outreach messages (email, Slack, LinkedIn, text) in Joel's own voice, using stored contact context. Has a searchable contact lookup with inline "+ New contact" creation — there's no separate contacts CRUD page; contacts are created and found from right inside the drafting flow.
 
 **Toggles**
-- Medium: Text / Email / LinkedIn / Slack
-- Context: warm/cold, ask / follow-up / decline, tone
-- Effort: Quick → Sonnet 5 `effort: low/medium` · Thorough → `effort: high`
+- Contact: type-to-search lookup over the shared `contacts` table, or leave unlinked
+- Channel: Email / Slack / LinkedIn / Text Message (in that order)
+- Purpose: Ask / Follow-up / Decline / Networking / Job outreach / Other
+- Tone: free text, optional
+- Effort: Quick → Sonnet 5 `effort: low` · Quick+ → `effort: medium` · Thorough → `effort: high`
 - Model is Sonnet 5 only. Thinking is adaptive/default on this model — no separate thinking toggle. Hide the reasoning trace from output; return the draft only.
 
 **Modes**
-- Training mode: upload writing samples / past sent messages → refines a persistent style guide.
-- Output mode: generate a draft from the current style guide + toggles + contact context + free-text/structured input.
+- Output mode: generate a draft from the current style guide + toggles + contact context + free-text input. The draft renders as an editable textarea, not read-only — edit it to match what you actually sent before logging it.
+- Logging: "Sent this — log it" appends the edited draft to `message_history` (medium, purpose, tone, content) — a plain insert, no AI call, works with or without a contact linked.
+- Training mode: refining the style guide is a separate, deliberate, batched action, not something that runs per logged message (see the append-over-rewrite principle above — folding one message into the guide via an LLM call every time you hit send would drift the rules on a sample size of one). The Train tab has a "Load from logged history" shortcut that pulls the last 30 logged messages into the samples box, or you can paste samples by hand; either way, one Claude call folds the whole batch into the next style-guide version at once.
 
-**Seed style guide rules** (refine over time from uploaded samples):
+**Seed style guide rules** (refine over time from logged/uploaded samples):
 - Declarative language, not hedged phrasing
 - One ask per message, never stacked
 - No em dashes
@@ -87,8 +93,8 @@ Drafts outreach messages (text, email, LinkedIn, Slack) in Joel's own voice, usi
 - Odd-time scheduled sends read more human than round numbers
 
 **Tables**
-- `message_history`: id, contact_id (FK), medium, content, sent_at
-- `style_guide`: id, version, content, updated_at
+- `message_history`: id, contact_id (FK, nullable), medium, purpose, tone (nullable), content, sent_at
+- `style_guide`: id, version, content, updated_at — each refine inserts a new version rather than overwriting, so past guides stay recoverable
 
 ---
 
@@ -154,11 +160,16 @@ id, name, is_active (boolean — exactly one true at a time; switching is delibe
 
 ## Build Order
 
-1. Repo/project scaffolding for all three tools + shared Supabase project and schemas
-2. Message Editor core loop: toggles, drafting call, style guide, contact CRUD
+1. ~~Monorepo scaffolding + shared Supabase project and schemas~~ — done, though the single Message
+   Editor app currently sits at the repo root rather than under `apps/editor` yet; move it under the
+   monorepo layout above when Pipeline Tracker scaffolding starts, rather than as a separate step
+2. ~~Message Editor core loop: toggles, drafting call, style guide, contact lookup/creation~~ — done,
+   live at editor.techpaddock.io
 3. Pipeline Tracker: thread CRUD, stale-sort view, draft-follow-up integration
 4. Resume Formatter: structured content CRUD, template CRUD, docx generation
 5. Google Tasks integration for the tracker (OAuth setup + Vercel Cron)
-6. Domain wiring: Cloudflare DNS → Vercel for each subdomain
-7. Password gate + RLS hardening pass across all three
+6. ~~Domain wiring: Cloudflare DNS → Vercel~~ — done for Message Editor; repeat per subdomain as each
+   tool goes live
+7. ~~Password gate~~ — done for Message Editor; RLS is already on deny-by-default across every table
+   in every schema from step 1, so this is really just "repeat the password gate" per tool now
 8. Real-device testing (add to iPhone home screen via each subdomain)
