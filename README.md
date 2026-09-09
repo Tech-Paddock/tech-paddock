@@ -32,9 +32,12 @@ npm run dev
 - Single-page UI: Draft mode (toggles + free text → draft) and Train mode (paste samples → refined guide)
 - Deployed on Vercel (`editor-paddock` project, linked to this repo's `main` branch) with all
   four environment variables set
+- Live at **editor.techpaddock.io**, DNS via Cloudflare
 
 ## Not yet built
 
 - `message_history` isn't written to automatically after a send — currently read-only from the draft endpoint
 - No UI for editing/adding contacts yet (API supports it, page doesn't)
-- `editor.paddock.app` domain isn't wired up yet — still on the default `.vercel.app` URL
+- No seed contacts or writing samples loaded yet — style guide is still the generic seed rules from CLAUDE.md
+- Pipeline Tracker and Resume Formatter (the other two Paddock tools) haven't been started
+- Google Tasks integration — not applicable to this tool; belongs to Pipeline Tracker
