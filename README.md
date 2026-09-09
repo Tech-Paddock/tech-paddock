@@ -28,16 +28,19 @@ npm run dev
 - Password gate with lockout (5 failed attempts → 15 minute lock)
 - Draft endpoint (`/api/draft`) — pulls style guide + contact + message history, calls Claude
 - Style guide training endpoint (`/api/style-guide`) — folds new writing samples into the rules
-- Contact CRUD (`/api/contacts`) against the shared `contacts` table
-- Single-page UI: Draft mode (toggles + free text → draft) and Train mode (paste samples → refined guide)
+- Commit endpoint (`/api/commit`) — logs a final (edited) draft to `message_history` for that
+  contact and folds it into the style guide as a tagged sample (medium/purpose/tone, not the
+  original prompt or contact identity)
+- Contact CRUD (`/api/contacts`) against the shared `contacts` table, plus a searchable
+  contact lookup and inline "+ New contact" form in the UI
+- Single-page UI: Draft mode (contact search, channel, purpose, tone, effort, free text →
+  editable draft → commit to training) and Train mode (paste a batch of samples → refined guide)
 - Deployed on Vercel (`editor-paddock` project, linked to this repo's `main` branch) with all
   four environment variables set
 - Live at **editor.techpaddock.io**, DNS via Cloudflare
 
 ## Not yet built
 
-- `message_history` isn't written to automatically after a send — currently read-only from the draft endpoint
-- No UI for editing/adding contacts yet (API supports it, page doesn't)
 - No seed contacts or writing samples loaded yet — style guide is still the generic seed rules from CLAUDE.md
 - Pipeline Tracker and Resume Formatter (the other two Paddock tools) haven't been started
 - Google Tasks integration — not applicable to this tool; belongs to Pipeline Tracker
