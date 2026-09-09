@@ -14,7 +14,7 @@ subfolder via that project's Root Directory setting).
 apps/
   home/      → Command center hub → techpaddock.io            (scaffolded, not deployed)
   editor/    → Message Editor      → editor.techpaddock.io    (live)
-  tracker/   → Pipeline Tracker    → tracker.techpaddock.io   (not started)
+  tracker/   → Pipeline Tracker    → tracker.techpaddock.io   (scaffolded, not deployed)
   resume/    → Resume Formatter    → resume.techpaddock.io    (scaffolded, not deployed)
 ```
 
