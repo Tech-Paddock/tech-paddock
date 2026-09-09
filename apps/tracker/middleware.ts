@@ -13,18 +13,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Server-to-server calls from other Paddock tools (currently: Pipeline
-  // Tracker's draft-follow-up button) carry a shared secret instead of a
-  // browser session cookie. Scoped to /api/draft only — never a blanket
-  // bypass for the rest of the API.
-  if (pathname === "/api/draft") {
-    const internalSecret = process.env.INTERNAL_API_SECRET;
-    const provided = request.headers.get("x-internal-secret");
-    if (internalSecret && provided === internalSecret) {
-      return NextResponse.next();
-    }
-  }
-
   const session = request.cookies.get(COOKIES.SESSION)?.value;
   if (await hasValidSession(session)) {
     return NextResponse.next();

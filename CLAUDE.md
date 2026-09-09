@@ -164,7 +164,11 @@ id, name, is_active (boolean — exactly one true at a time; switching is delibe
    under `apps/editor`, Resume Formatter under `apps/resume`, matching the layout above
 2. ~~Message Editor core loop: toggles, drafting call, style guide, contact lookup/creation~~ — done,
    live at editor.techpaddock.io
-3. Pipeline Tracker: thread CRUD, stale-sort view, draft-follow-up integration
+3. ~~Pipeline Tracker: thread CRUD, stale-sort view, draft-follow-up integration~~ — code done
+   (`apps/tracker`), not yet deployed. Draft-follow-up calls Message Editor's `/api/draft`
+   server-to-server using a shared `INTERNAL_API_SECRET` header (set identically on both apps),
+   since it's a cross-app call with no browser session to carry — scoped tightly to that one
+   route in editor's middleware, never a blanket auth bypass
 4. ~~Resume Formatter: structured content CRUD, template CRUD, docx generation~~ — code done
    (`apps/resume`), not yet deployed — needs its own Vercel project (Root Directory `apps/resume`),
    env vars, and the `resume.techpaddock.io` DNS record; hasn't been run through a free
