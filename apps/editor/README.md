@@ -3,7 +3,7 @@
 Drafts outreach messages (text, email, LinkedIn, Slack) in your own voice, using stored
 contact context and a style guide that refines itself from writing samples you upload.
 
-Part of [Paddock](./CLAUDE.md) — see that file for the full system architecture,
+Part of [Paddock](../../CLAUDE.md) — see that file for the full system architecture,
 shared Supabase project, and the other two tools (Pipeline Tracker, Resume Formatter).
 
 ## Local setup
@@ -27,7 +27,6 @@ npm run dev
 
 - Password gate with lockout (5 failed attempts → 15 minute lock)
 - Draft endpoint (`/api/draft`) — pulls style guide + contact + message history, calls Claude
-- Style guide training endpoint (`/api/style-guide`) — folds new writing samples into the rules
 - Commit endpoint (`/api/commit`) — pure append of a final (edited) draft to `message_history`
   (with medium/purpose/tone), tagged as sent. No LLM call — logging is cheap and instant.
 - Message history endpoint (`/api/message-history`) — read-only feed of the last 30 logged
@@ -39,8 +38,8 @@ npm run dev
   contact lookup and inline "+ New contact" form in the UI
 - Single-page UI: Draft mode (contact search, channel, purpose, tone, effort, free text →
   editable draft → log as sent) and Train mode (load logged history or paste samples → refined guide)
-- Deployed on Vercel (`editor-paddock` project, linked to this repo's `main` branch) with all
-  four environment variables set
+- Deployed on Vercel (`tech-paddock` project, Root Directory set to `apps/editor`, linked to
+  this repo's `main` branch) with all four environment variables set
 - Live at **editor.techpaddock.io**, DNS via Cloudflare
 
 ## Not yet built
