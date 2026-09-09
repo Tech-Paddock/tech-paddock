@@ -14,7 +14,7 @@ subfolder via that project's Root Directory setting).
 apps/
   editor/    → Message Editor      → editor.techpaddock.io    (live)
   tracker/   → Pipeline Tracker    → tracker.techpaddock.io   (not started)
-  resume/    → Resume Formatter    → resume.techpaddock.io    (not started)
+  resume/    → Resume Formatter    → resume.techpaddock.io    (scaffolded, not deployed)
 ```
 
 Each app's own README covers its local setup and environment variables. There's no root
