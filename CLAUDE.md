@@ -160,13 +160,15 @@ id, name, is_active (boolean — exactly one true at a time; switching is delibe
 
 ## Build Order
 
-1. ~~Monorepo scaffolding + shared Supabase project and schemas~~ — done, though the single Message
-   Editor app currently sits at the repo root rather than under `apps/editor` yet; move it under the
-   monorepo layout above when Pipeline Tracker scaffolding starts, rather than as a separate step
+1. ~~Monorepo scaffolding + shared Supabase project and schemas~~ — done; Message Editor lives
+   under `apps/editor`, Resume Formatter under `apps/resume`, matching the layout above
 2. ~~Message Editor core loop: toggles, drafting call, style guide, contact lookup/creation~~ — done,
    live at editor.techpaddock.io
 3. Pipeline Tracker: thread CRUD, stale-sort view, draft-follow-up integration
-4. Resume Formatter: structured content CRUD, template CRUD, docx generation
+4. ~~Resume Formatter: structured content CRUD, template CRUD, docx generation~~ — code done
+   (`apps/resume`), not yet deployed — needs its own Vercel project (Root Directory `apps/resume`),
+   env vars, and the `resume.techpaddock.io` DNS record; hasn't been run through a free
+   ATS-checker against a real generated output yet either
 5. Google Tasks integration for the tracker (OAuth setup + Vercel Cron)
 6. ~~Domain wiring: Cloudflare DNS → Vercel~~ — done for Message Editor; repeat per subdomain as each
    tool goes live
