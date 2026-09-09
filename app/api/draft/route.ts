@@ -5,7 +5,7 @@ import { draftMessage, type Effort } from "@/lib/anthropic";
 type DraftRequest = {
   contactId?: string;
   medium: "text" | "email" | "linkedin" | "slack";
-  purpose: "ask" | "follow-up" | "decline";
+  purpose: "ask" | "follow-up" | "decline" | "networking" | "job-outreach" | "other";
   tone?: string;
   effort: Effort;
   input: string; // free-text: what the message needs to say
