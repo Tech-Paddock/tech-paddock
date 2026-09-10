@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import AppShell from "@/components/AppShell";
 
 type Contact = { id: string; name: string; org: string | null; preferred_channel: string | null };
 
@@ -111,17 +112,25 @@ export default function HomePage() {
   }
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-10 flex flex-col gap-6">
-      <header className="flex items-center justify-between">
+    <AppShell
+      active="tracker"
+      icon="📊"
+      title="Pipeline Tracker"
+      sidebarExtra={
+        <>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink/40 px-2 mt-4 mb-1">
+            View
+          </p>
+          <span className="px-2 py-1.5 rounded-md bg-ink text-white font-bold">All Threads</span>
+        </>
+      }
+    >
+      <div className="flex items-center justify-between">
         <div>
-          <a
-            href="https://techpaddock.io"
-            target="_top"
-            className="text-sm text-accent font-medium hover:underline"
-          >
-            ← Paddock
-          </a>
-          <h1 className="text-2xl font-semibold">Pipeline Tracker</h1>
+          <h1 className="text-2xl font-bold">Pipeline Tracker</h1>
+          <p className="text-sm text-ink/50">
+            Sorted by days since last touch — stale threads are flagged.
+          </p>
         </div>
         <button
           onClick={() => setNewOpen((v) => !v)}
@@ -129,7 +138,7 @@ export default function HomePage() {
         >
           + New thread
         </button>
-      </header>
+      </div>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg px-4 py-3">
@@ -267,6 +276,6 @@ export default function HomePage() {
         })}
         {sorted.length === 0 && <p className="text-sm text-ink/50">No threads yet.</p>}
       </div>
-    </main>
+    </AppShell>
   );
 }
