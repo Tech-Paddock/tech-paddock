@@ -3,9 +3,9 @@
 import { useState } from "react";
 
 const APPS = [
-  { name: "Message Editor", href: "https://editor.techpaddock.io" },
-  { name: "Pipeline Tracker", href: "https://tracker.techpaddock.io" },
-  { name: "Resume Formatter", href: "https://resume.techpaddock.io" },
+  { name: "Message Editor", href: "https://editor.techpaddock.io", team: "ferrari" },
+  { name: "Pipeline Tracker", href: "https://tracker.techpaddock.io", team: "mercedes" },
+  { name: "Resume Formatter", href: "https://resume.techpaddock.io", team: "astonmartin" },
 ];
 
 export default function HomePage() {
@@ -18,7 +18,7 @@ export default function HomePage() {
         {APPS.map((a, i) => (
           <button
             key={a.name}
-            className={`nav-item ${i === selected ? "active" : ""}`}
+            className={`nav-item team-${a.team} ${i === selected ? "active" : ""}`}
             onClick={() => setSelected(i)}
           >
             {a.name}
@@ -33,7 +33,11 @@ export default function HomePage() {
             <p className="description">Select one to open it here.</p>
             <div className="app-buttons">
               {APPS.map((a, i) => (
-                <button key={a.name} className="app-button" onClick={() => setSelected(i)}>
+                <button
+                  key={a.name}
+                  className={`app-button team-${a.team}`}
+                  onClick={() => setSelected(i)}
+                >
                   {a.name}
                 </button>
               ))}

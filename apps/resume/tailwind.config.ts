@@ -5,11 +5,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Oracle Red Bull Racing
-        paper: "#EEF1FB",
-        ink: "#10132B",
-        accent: "#1E3A8A",
-        line: "#C9D0EC",
+        // Aston Martin — racing green
+        paper: "#EDF3F0",
+        ink: "#0A1F1A",
+        accent: "#00352F",
+        line: "#C6D9D0",
       },
     },
   },
