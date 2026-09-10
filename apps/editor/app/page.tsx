@@ -65,6 +65,8 @@ export default function HomePage() {
   const [training, setTraining] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  const [modelDrift, setModelDrift] = useState<{ newly_detected: string[] } | null>(null);
+
   useEffect(() => {
     fetch("/api/contacts")
       .then((r) => r.json())
@@ -73,6 +75,12 @@ export default function HomePage() {
     fetch("/api/style-guide")
       .then((r) => r.json())
       .then((d) => setStyleGuide(d.style_guide))
+      .catch(() => {});
+    fetch("/api/model-check")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.status?.drift_detected) setModelDrift(d.status);
+      })
       .catch(() => {});
   }, []);
 
@@ -249,6 +257,14 @@ export default function HomePage() {
           </button>
         </div>
       </header>
+
+      {modelDrift && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-lg px-4 py-3">
+          New Sonnet model{modelDrift.newly_detected.length > 1 ? "s" : ""} detected:{" "}
+          <span className="font-medium">{modelDrift.newly_detected.join(", ")}</span> — still
+          drafting on Sonnet 5 until this is reviewed.
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg px-4 py-3">

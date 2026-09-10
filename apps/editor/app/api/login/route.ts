@@ -10,6 +10,7 @@ import {
   recordFailure,
 } from "@/lib/auth";
 import { verifyPassword } from "@/lib/password";
+import { runModelDriftCheck } from "@/lib/modelCheck";
 
 export async function POST(request: NextRequest) {
   const attempts = await readAttempts(request.cookies.get(COOKIES.ATTEMPTS)?.value);
@@ -38,6 +39,8 @@ export async function POST(request: NextRequest) {
     });
     return res;
   }
+
+  await runModelDriftCheck().catch(() => {});
 
   const res = NextResponse.json({ ok: true });
   res.cookies.set(COOKIES.SESSION, await createSessionCookieValue(), {
