@@ -235,7 +235,13 @@ export default function HomePage() {
     <main className="max-w-3xl mx-auto px-4 py-10 flex flex-col gap-8">
       <header className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-accent font-medium">Paddock</p>
+          <a
+            href="https://techpaddock.io"
+            target="_top"
+            className="text-sm text-accent font-medium hover:underline"
+          >
+            ← Paddock
+          </a>
           <h1 className="text-2xl font-semibold">Message Editor</h1>
         </div>
         <div className="flex gap-1 bg-white border border-line rounded-lg p-1">
