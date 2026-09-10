@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
+      domain: ".techpaddock.io",
       maxAge: LOCKOUT_MAX_AGE_SECONDS,
       path: "/",
     });
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
+    domain: ".techpaddock.io",
     maxAge: SESSION_MAX_AGE_SECONDS,
     path: "/",
   });
@@ -50,6 +52,7 @@ export async function POST(request: NextRequest) {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
+    domain: ".techpaddock.io",
     maxAge: 0,
     path: "/",
   });

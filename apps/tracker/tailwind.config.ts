@@ -5,10 +5,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        paper: "#F1F3EE",
-        ink: "#1D231B",
-        accent: "#55643A",
-        line: "#C7CDBE",
+        // Mercedes-AMG Petronas
+        paper: "#EEF6F5",
+        ink: "#0B1211",
+        accent: "#00A19C",
+        line: "#C7E0DD",
       },
     },
   },
