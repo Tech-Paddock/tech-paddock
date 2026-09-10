@@ -422,13 +422,19 @@ export default function HomePage() {
             </label>
           </div>
 
-          <p className="text-xs text-ink/50">
-            Drafting runs on Sonnet 5 at high effort — no toggle needed, it's always the most
-            thorough setting.
-          </p>
-
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">What does this message need to say?</span>
+            <span className="font-medium flex items-center gap-1.5">
+              What does this message need to say?
+              <span className="inline-flex items-center gap-1.5 text-xs font-normal text-ink/60">
+                — Model: Sonnet 5
+                <span
+                  className={`inline-block w-2 h-2 rounded-full ${
+                    modelDrift ? "bg-red-500" : "bg-green-500"
+                  }`}
+                />
+                {modelDrift ? "- Model out of sync" : "- Model is current"}
+              </span>
+            </span>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
