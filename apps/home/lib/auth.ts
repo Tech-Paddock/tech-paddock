@@ -5,14 +5,18 @@ const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 function secret() {
-  const s = process.env.APP_PASSWORD_HASH;
-  if (!s) throw new Error("APP_PASSWORD_HASH must be set");
+  // Deliberately separate from APP_PASSWORD_HASH: that value differs per app
+  // (bcrypt salts randomly), but this signing secret must be byte-identical
+  // on every Paddock app for the shared .techpaddock.io cookie to validate
+  // across subdomains. Set the same SESSION_SECRET everywhere — any random
+  // string works, it's never compared to anything but itself.
+  const s = process.env.SESSION_SECRET;
+  if (!s) throw new Error("SESSION_SECRET must be set");
   return s;
 }
 
 // Web Crypto (not node:crypto) so this also works in the Edge runtime, where
-// middleware.ts runs. Same secret across every Paddock app so the session
-// cookie (scoped to .techpaddock.io) validates everywhere — log in once.
+// middleware.ts runs.
 async function sign(payload: string) {
   const key = await crypto.subtle.importKey(
     "raw",
