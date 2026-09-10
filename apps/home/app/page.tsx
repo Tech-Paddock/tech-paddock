@@ -3,29 +3,13 @@
 import { useState } from "react";
 
 const APPS = [
-  {
-    name: "Message Editor",
-    href: "https://editor.techpaddock.io",
-    status: "live" as const,
-    description: "Drafts outreach messages in your own voice, using stored contact context.",
-  },
-  {
-    name: "Pipeline Tracker",
-    href: "https://tracker.techpaddock.io",
-    status: "live" as const,
-    description: "Single view of every active job-search thread, sorted to surface what's gone cold.",
-  },
-  {
-    name: "Resume Formatter",
-    href: "https://resume.techpaddock.io",
-    status: "live" as const,
-    description: "Single source of truth for resume content — pure formatting, no AI judgment calls.",
-  },
+  { name: "Message Editor", href: "https://editor.techpaddock.io" },
+  { name: "Pipeline Tracker", href: "https://tracker.techpaddock.io" },
+  { name: "Resume Formatter", href: "https://resume.techpaddock.io" },
 ];
 
 export default function HomePage() {
-  const [selected, setSelected] = useState(0);
-  const app = APPS[selected];
+  const [selected, setSelected] = useState<number | null>(null);
 
   return (
     <main className="shell">
@@ -38,16 +22,24 @@ export default function HomePage() {
             onClick={() => setSelected(i)}
           >
             {a.name}
-            <span className="status live">{a.status}</span>
           </button>
         ))}
       </nav>
       <section className="content">
-        <h1>{app.name}</h1>
-        <p className="description">{app.description}</p>
-        <a href={app.href} className="open-button">
-          Open {app.name} →
-        </a>
+        {selected === null ? (
+          <div className="placeholder">
+            <p className="eyebrow">Paddock</p>
+            <h1>Pick a tool</h1>
+            <p className="description">Select one from the left to open it here.</p>
+          </div>
+        ) : (
+          <iframe
+            key={APPS[selected].href}
+            src={APPS[selected].href}
+            title={APPS[selected].name}
+            className="app-frame"
+          />
+        )}
       </section>
     </main>
   );
