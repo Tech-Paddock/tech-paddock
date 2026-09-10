@@ -432,13 +432,13 @@ export default function HomePage() {
             <span className="font-medium flex items-center gap-1.5">
               What does this message need to say?
               <span className="inline-flex items-center gap-1.5 text-xs font-normal text-ink/60">
-                — Model: Sonnet 5
+                Model: Sonnet 5
                 <span
                   className={`inline-block w-2 h-2 rounded-full ${
                     modelDrift ? "bg-red-500" : "bg-green-500"
                   }`}
                 />
-                {modelDrift ? "- Model out of sync" : "- Model is current"}
+                {modelDrift ? "Using Outdated Model" : "Using Latest Model"}
               </span>
             </span>
             <textarea
