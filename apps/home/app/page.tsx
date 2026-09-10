@@ -28,29 +28,37 @@ function HomeShell() {
   }
 
   return (
-    <main className="shell">
-      <nav className="sidebar">
-        <p className="eyebrow">Paddock</p>
-        <button
-          className={`nav-item ${selected === null ? "active" : ""}`}
-          onClick={() => router.replace("/")}
-        >
-          🏠 Home
-        </button>
-        {APPS.map((a, i) => (
+    <main className="page">
+      <header className="topbar">
+        <div className="topbar-brand">
+          <span className="topbar-badge">🏁</span>
+          <span className="topbar-title">Paddock</span>
+        </div>
+      </header>
+      <div className="shell">
+        <nav className="sidebar">
+          <p className="sidebar-label">Navigate</p>
           <button
-            key={a.name}
-            className={`nav-item ${i === selected ? "active" : ""}`}
-            onClick={() => select(i)}
+            className={`nav-item ${selected === null ? "active" : ""}`}
+            onClick={() => router.replace("/")}
           >
-            {a.icon} {a.name}
+            🏠 Home
           </button>
-        ))}
-        <button className="nav-item logout-item" onClick={logout} disabled={loggingOut}>
-          🚪 {loggingOut ? "Logging out…" : "Log out"}
-        </button>
-      </nav>
-      <section className="content">
+          {APPS.map((a, i) => (
+            <button
+              key={a.name}
+              className={`nav-item ${i === selected ? "active" : ""}`}
+              onClick={() => select(i)}
+            >
+              {a.icon} {a.name}
+            </button>
+          ))}
+          <p className="sidebar-label">Account</p>
+          <button className="nav-item logout-item" onClick={logout} disabled={loggingOut}>
+            🚪 {loggingOut ? "Logging out…" : "Log out"}
+          </button>
+        </nav>
+        <section className="content">
         {selected === null ? (
           <div className="placeholder">
             <p className="eyebrow">Paddock</p>
@@ -77,7 +85,8 @@ function HomeShell() {
             className="app-frame"
           />
         )}
-      </section>
+        </section>
+      </div>
     </main>
   );
 }

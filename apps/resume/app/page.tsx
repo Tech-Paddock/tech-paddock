@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AppShell from "@/components/AppShell";
 
 type Entry = {
   id: string;
@@ -166,17 +167,33 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen px-6 py-10 max-w-3xl mx-auto flex flex-col gap-10">
-      <header className="flex items-center justify-between">
-        <div>
-          <a
-            href="https://techpaddock.io"
-            target="_top"
-            className="text-sm text-accent font-medium hover:underline"
-          >
-            ← Paddock
+    <AppShell
+      active="resume"
+      icon="📄"
+      title="Resume Formatter"
+      sidebarExtra={
+        <>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink/40 px-2 mt-4 mb-1">
+            Sections
+          </p>
+          <a href="#experience" className="px-2 py-1.5 rounded-md text-ink hover:bg-paper">
+            Experience
           </a>
-          <h1 className="text-2xl font-semibold">Resume Formatter</h1>
+          <a href="#highlights" className="px-2 py-1.5 rounded-md text-ink hover:bg-paper">
+            Career Highlights
+          </a>
+          <a href="#templates" className="px-2 py-1.5 rounded-md text-ink hover:bg-paper">
+            Templates
+          </a>
+        </>
+      }
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Resume Formatter</h1>
+          <p className="text-sm text-ink/50">
+            Pure formatting — structured content in, a matching .docx out.
+          </p>
         </div>
         <button
           onClick={generate}
@@ -185,11 +202,11 @@ export default function Home() {
         >
           {generating ? "Generating…" : "Generate .docx"}
         </button>
-      </header>
+      </div>
 
       {error && <p className="text-sm text-red-700">{error}</p>}
 
-      <section className="flex flex-col gap-4">
+      <section id="experience" className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Experience</h2>
           <button onClick={addEntry} className="text-sm text-accent underline">
@@ -239,7 +256,7 @@ export default function Home() {
         ))}
       </section>
 
-      <section className="flex flex-col gap-4">
+      <section id="highlights" className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Career Highlights</h2>
           <button onClick={addHighlight} className="text-sm text-accent underline">
@@ -262,7 +279,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-4">
+      <section id="templates" className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Templates</h2>
           <button onClick={addTemplate} className="text-sm text-accent underline">
@@ -284,6 +301,6 @@ export default function Home() {
           ))}
         </div>
       </section>
-    </main>
+    </AppShell>
   );
 }
