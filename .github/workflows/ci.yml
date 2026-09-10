@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [home, editor, resume]
+        app: [home, editor, resume, tracker]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -35,3 +35,5 @@ jobs:
           SUPABASE_URL: https://example.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: dummy
           APP_PASSWORD_HASH: dummy
+          EDITOR_BASE_URL: https://editor.techpaddock.io
+          INTERNAL_API_SECRET: dummy
