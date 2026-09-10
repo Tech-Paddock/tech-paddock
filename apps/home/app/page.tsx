@@ -30,7 +30,14 @@ export default function HomePage() {
           <div className="placeholder">
             <p className="eyebrow">Paddock</p>
             <h1>Pick a tool</h1>
-            <p className="description">Select one from the left to open it here.</p>
+            <p className="description">Select one to open it here.</p>
+            <div className="app-buttons">
+              {APPS.map((a, i) => (
+                <button key={a.name} className="app-button" onClick={() => setSelected(i)}>
+                  {a.name}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           <iframe
