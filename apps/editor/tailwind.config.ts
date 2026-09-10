@@ -5,10 +5,10 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Scuderia Ferrari
+        // Scuderia Ferrari — deep red
         paper: "#F7EFEC",
         ink: "#1A1512",
-        accent: "#DC0000",
+        accent: "#A6051A",
         line: "#E3CFC7",
       },
     },
