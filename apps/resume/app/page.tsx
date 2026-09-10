@@ -168,7 +168,16 @@ export default function Home() {
   return (
     <main className="min-h-screen px-6 py-10 max-w-3xl mx-auto flex flex-col gap-10">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Resume Formatter</h1>
+        <div>
+          <a
+            href="https://techpaddock.io"
+            target="_top"
+            className="text-sm text-accent font-medium hover:underline"
+          >
+            ← Paddock
+          </a>
+          <h1 className="text-2xl font-semibold">Resume Formatter</h1>
+        </div>
         <button
           onClick={generate}
           disabled={generating}
