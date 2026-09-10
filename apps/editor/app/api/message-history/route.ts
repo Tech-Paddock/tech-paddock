@@ -3,6 +3,8 @@ import { getServiceClient } from "@/lib/supabase";
 
 const HISTORY_LIMIT = 30;
 
+export const dynamic = "force-dynamic";
+
 // Read-only: the accumulated log of committed sent messages. The Train tab
 // uses this to build a refinement batch instead of requiring samples to be
 // pasted in by hand every time.
