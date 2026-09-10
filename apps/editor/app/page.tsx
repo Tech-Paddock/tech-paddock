@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import AppShell from "@/components/AppShell";
 
 type Contact = {
   id: string;
@@ -233,43 +232,30 @@ export default function HomePage() {
   }
 
   return (
-    <AppShell
-      active="editor"
-      icon="✉️"
-      title="Message Editor"
-      sidebarExtra={
-        <>
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-ink/40 px-2 mt-4 mb-1">
-            Mode
-          </p>
+    <main className="max-w-3xl mx-auto px-4 py-10 flex flex-col gap-8">
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Message Editor</h1>
+        </div>
+        <div className="flex gap-1 bg-white border border-line rounded-lg p-1">
           <button
             onClick={() => setMode("draft")}
-            className={`text-left px-2 py-1.5 rounded-md ${
-              mode === "draft" ? "bg-ink text-white font-bold" : "text-ink font-normal hover:bg-paper"
+            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+              mode === "draft" ? "bg-accent text-white" : "text-ink/70"
             }`}
           >
             Draft
           </button>
           <button
             onClick={() => setMode("train")}
-            className={`text-left px-2 py-1.5 rounded-md ${
-              mode === "train" ? "bg-ink text-white font-bold" : "text-ink font-normal hover:bg-paper"
+            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+              mode === "train" ? "bg-accent text-white" : "text-ink/70"
             }`}
           >
             Train
           </button>
-        </>
-      }
-    >
-      <div className="max-w-2xl w-full flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold">{mode === "draft" ? "Draft" : "Train"}</h1>
-        <p className="text-sm text-ink/50">
-          {mode === "draft"
-            ? "Compose a new outreach message using your style guide and contact context."
-            : "Refine the style guide from real sent messages, in batches."}
-        </p>
-      </div>
+        </div>
+      </header>
 
       {modelDrift && (
         <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-lg px-4 py-3">
@@ -539,7 +525,6 @@ export default function HomePage() {
           </p>
         </div>
       )}
-      </div>
-    </AppShell>
+    </main>
   );
 }

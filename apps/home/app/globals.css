@@ -13,6 +13,10 @@
   box-sizing: border-box;
 }
 
+.icon {
+  filter: grayscale(1);
+}
+
 body {
   margin: 0;
   background: var(--paper);
