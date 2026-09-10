@@ -31,7 +31,7 @@ function HomeShell() {
     <main className="page">
       <header className="topbar">
         <div className="topbar-brand">
-          <span className="topbar-badge">🏁</span>
+          <span className="topbar-badge icon">🏁</span>
           <span className="topbar-title">Paddock</span>
         </div>
       </header>
@@ -42,7 +42,7 @@ function HomeShell() {
             className={`nav-item ${selected === null ? "active" : ""}`}
             onClick={() => router.replace("/")}
           >
-            🏠 Home
+            <span className="icon">🏁</span> Paddock
           </button>
           {APPS.map((a, i) => (
             <button
@@ -50,12 +50,12 @@ function HomeShell() {
               className={`nav-item ${i === selected ? "active" : ""}`}
               onClick={() => select(i)}
             >
-              {a.icon} {a.name}
+              <span className="icon">{a.icon}</span> {a.name}
             </button>
           ))}
           <p className="sidebar-label">Account</p>
           <button className="nav-item logout-item" onClick={logout} disabled={loggingOut}>
-            🚪 {loggingOut ? "Logging out…" : "Log out"}
+            <span className="icon">🚪</span> {loggingOut ? "Logging out…" : "Log out"}
           </button>
         </nav>
         <section className="content">
@@ -71,7 +71,7 @@ function HomeShell() {
                   className={`app-button team-${a.team}`}
                   onClick={() => select(i)}
                 >
-                  <span className="app-button-icon">{a.icon}</span>
+                  <span className="app-button-icon icon">{a.icon}</span>
                   {a.name}
                 </button>
               ))}
