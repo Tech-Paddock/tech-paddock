@@ -1,15 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const APPS = [
-  { name: "Message Editor", href: "https://editor.techpaddock.io", team: "ferrari" },
-  { name: "Pipeline Tracker", href: "https://tracker.techpaddock.io", team: "mercedes" },
-  { name: "Resume Formatter", href: "https://resume.techpaddock.io", team: "astonmartin" },
+  { slug: "editor", name: "Message Editor", href: "https://editor.techpaddock.io", team: "ferrari" },
+  { slug: "tracker", name: "Pipeline Tracker", href: "https://tracker.techpaddock.io", team: "mercedes" },
+  { slug: "resume", name: "Resume Formatter", href: "https://resume.techpaddock.io", team: "astonmartin" },
 ];
 
-export default function HomePage() {
-  const [selected, setSelected] = useState<number | null>(null);
+function HomeShell() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const slugParam = params.get("app");
+  const selectedIndex = APPS.findIndex((a) => a.slug === slugParam);
+  const selected = selectedIndex === -1 ? null : selectedIndex;
+
+  function select(i: number) {
+    router.replace(`/?app=${APPS[i].slug}`);
+  }
 
   return (
     <main className="shell">
@@ -19,7 +28,7 @@ export default function HomePage() {
           <button
             key={a.name}
             className={`nav-item team-${a.team} ${i === selected ? "active" : ""}`}
-            onClick={() => setSelected(i)}
+            onClick={() => select(i)}
           >
             {a.name}
           </button>
@@ -36,7 +45,7 @@ export default function HomePage() {
                 <button
                   key={a.name}
                   className={`app-button team-${a.team}`}
-                  onClick={() => setSelected(i)}
+                  onClick={() => select(i)}
                 >
                   {a.name}
                 </button>
@@ -53,5 +62,13 @@ export default function HomePage() {
         )}
       </section>
     </main>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <HomeShell />
+    </Suspense>
   );
 }

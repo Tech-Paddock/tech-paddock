@@ -33,12 +33,6 @@ const RELATIONSHIP_TYPES = [
   "Personal · Cold",
 ];
 
-const EFFORTS = [
-  { value: "low", label: "Quick" },
-  { value: "medium", label: "Quick+" },
-  { value: "high", label: "Thorough" },
-] as const;
-
 export default function HomePage() {
   const [mode, setMode] = useState<"draft" | "train">("draft");
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -55,10 +49,9 @@ export default function HomePage() {
   });
   const [savingContact, setSavingContact] = useState(false);
 
-  const [channel, setChannel] = useState<(typeof CHANNELS)[number]["value"]>("text");
-  const [purpose, setPurpose] = useState<(typeof PURPOSES)[number]["value"]>("ask");
+  const [channel, setChannel] = useState<(typeof CHANNELS)[number]["value"] | "">("");
+  const [purpose, setPurpose] = useState<(typeof PURPOSES)[number]["value"] | "">("");
   const [tone, setTone] = useState("");
-  const [effort, setEffort] = useState<(typeof EFFORTS)[number]["value"]>("medium");
   const [input, setInput] = useState("");
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
@@ -136,7 +129,7 @@ export default function HomePage() {
         medium: channel,
         purpose,
         tone: tone || undefined,
-        effort,
+        effort: "high",
         input,
       }),
     });
@@ -367,12 +360,15 @@ export default function HomePage() {
             )}
 
             <label className="flex flex-col gap-1.5 text-sm">
-              <span className="font-medium">Channel</span>
+              <span className="font-medium">Channel *</span>
               <select
                 value={channel}
                 onChange={(e) => setChannel(e.target.value as typeof channel)}
                 className="border border-line rounded-lg px-3 py-2 bg-white"
               >
+                <option value="" disabled>
+                  Select…
+                </option>
                 {CHANNELS.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.label}
@@ -382,12 +378,15 @@ export default function HomePage() {
             </label>
 
             <label className="flex flex-col gap-1.5 text-sm">
-              <span className="font-medium">Purpose</span>
+              <span className="font-medium">Purpose *</span>
               <select
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value as typeof purpose)}
                 className="border border-line rounded-lg px-3 py-2 bg-white"
               >
+                <option value="" disabled>
+                  Select…
+                </option>
                 {PURPOSES.map((p) => (
                   <option key={p.value} value={p.value}>
                     {p.label}
@@ -407,24 +406,10 @@ export default function HomePage() {
             </label>
           </div>
 
-          <div className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Effort</span>
-            <div className="flex gap-2">
-              {EFFORTS.map((e) => (
-                <button
-                  key={e.value}
-                  onClick={() => setEffort(e.value)}
-                  className={`px-3 py-1.5 rounded-lg text-sm border ${
-                    effort === e.value
-                      ? "bg-accent text-white border-accent"
-                      : "bg-white border-line text-ink/70"
-                  }`}
-                >
-                  {e.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <p className="text-xs text-ink/50">
+            Drafting runs on Sonnet 5 at high effort — no toggle needed, it's always the most
+            thorough setting.
+          </p>
 
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="font-medium">What does this message need to say?</span>
@@ -439,7 +424,7 @@ export default function HomePage() {
 
           <button
             onClick={handleDraft}
-            disabled={loading || !input}
+            disabled={loading || !input || !channel || !purpose}
             className="self-start bg-accent text-white rounded-lg px-4 py-2 font-medium disabled:opacity-60"
           >
             {loading ? "Drafting…" : "Draft message"}
