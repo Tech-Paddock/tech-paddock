@@ -24,10 +24,16 @@ function HomeShell() {
     <main className="shell">
       <nav className="sidebar">
         <p className="eyebrow">Paddock</p>
+        <button
+          className={`nav-item ${selected === null ? "active" : ""}`}
+          onClick={() => router.replace("/")}
+        >
+          Home
+        </button>
         {APPS.map((a, i) => (
           <button
             key={a.name}
-            className={`nav-item team-${a.team} ${i === selected ? "active" : ""}`}
+            className={`nav-item ${i === selected ? "active" : ""}`}
             onClick={() => select(i)}
           >
             {a.name}

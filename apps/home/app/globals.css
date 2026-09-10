@@ -34,7 +34,7 @@ body {
   padding: 16px 8px;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
 }
 
 .eyebrow {
@@ -49,36 +49,23 @@ body {
 
 .nav-item {
   display: block;
-  padding: 6px 8px;
+  padding: 4px 8px;
   border-radius: 6px;
   border: 1px solid transparent;
   background: transparent;
   text-align: left;
-  color: var(--ink);
+  color: #000;
   font-size: 11px;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
-  line-height: 1.25;
+  line-height: 1.15;
 }
 
 .nav-item.active {
   background: var(--paper);
-  border-color: var(--accent);
-  color: var(--accent-ink);
+  color: #000;
   font-weight: 600;
-}
-
-.nav-item.team-ferrari {
-  border-left: 3px solid #a6051a;
-}
-
-.nav-item.team-mercedes {
-  border-left: 3px solid #6e7175;
-}
-
-.nav-item.team-astonmartin {
-  border-left: 3px solid #00352f;
 }
 
 .content {
