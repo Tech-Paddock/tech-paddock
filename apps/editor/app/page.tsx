@@ -441,11 +441,12 @@ export default function HomePage() {
               <span className="inline-flex items-center gap-1.5 text-xs font-normal text-ink/60">
                 Model: Sonnet 5
                 <span
-                  className={`inline-block w-2 h-2 rounded-full ${
+                  className={`px-2 py-0.5 rounded-full text-white font-medium ${
                     modelDrift ? "bg-red-500" : "bg-green-500"
                   }`}
-                />
-                {modelDrift ? "Using Outdated Model" : "Using Latest Model"}
+                >
+                  {modelDrift ? "Outdated" : "Current"}
+                </span>
               </span>
             </span>
             <textarea
