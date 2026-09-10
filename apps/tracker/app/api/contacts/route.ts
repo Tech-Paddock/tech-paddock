@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSharedClient } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 // Read-only here — contact creation/editing happens in Message Editor.
 // Tracker just needs the list to link threads to.
 export async function GET() {

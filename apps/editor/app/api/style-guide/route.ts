@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { SEED_STYLE_GUIDE, refineStyleGuide } from "@/lib/styleGuide";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const supabase = getServiceClient();
   const { data, error } = await supabase
