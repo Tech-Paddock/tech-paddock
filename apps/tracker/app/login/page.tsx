@@ -37,7 +37,7 @@ function LoginForm() {
       onSubmit={handleSubmit}
       className="w-full max-w-sm bg-white border border-line rounded-2xl p-8 flex flex-col gap-4"
     >
-      <h1 className="text-xl font-semibold">Resume Formatter</h1>
+      <h1 className="text-xl font-semibold">Pipeline Tracker</h1>
       <p className="text-sm text-ink/70">Enter the password to continue.</p>
       <input
         type="password"
