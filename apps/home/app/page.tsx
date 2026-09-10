@@ -4,9 +4,9 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const APPS = [
-  { slug: "editor", name: "Message Editor", href: "https://editor.techpaddock.io", team: "ferrari" },
-  { slug: "tracker", name: "Pipeline Tracker", href: "https://tracker.techpaddock.io", team: "mercedes" },
-  { slug: "resume", name: "Resume Formatter", href: "https://resume.techpaddock.io", team: "astonmartin" },
+  { slug: "editor", name: "Message Editor", href: "https://editor.techpaddock.io", team: "ferrari", icon: "✉️" },
+  { slug: "tracker", name: "Pipeline Tracker", href: "https://tracker.techpaddock.io", team: "mercedes", icon: "📊" },
+  { slug: "resume", name: "Resume Formatter", href: "https://resume.techpaddock.io", team: "astonmartin", icon: "📄" },
 ];
 
 function HomeShell() {
@@ -15,9 +15,16 @@ function HomeShell() {
   const slugParam = params.get("app");
   const selectedIndex = APPS.findIndex((a) => a.slug === slugParam);
   const selected = selectedIndex === -1 ? null : selectedIndex;
+  const [loggingOut, setLoggingOut] = useState(false);
 
   function select(i: number) {
     router.replace(`/?app=${APPS[i].slug}`);
+  }
+
+  async function logout() {
+    setLoggingOut(true);
+    await fetch("/api/logout", { method: "POST" }).catch(() => {});
+    window.location.href = "/login";
   }
 
   return (
@@ -28,7 +35,7 @@ function HomeShell() {
           className={`nav-item ${selected === null ? "active" : ""}`}
           onClick={() => router.replace("/")}
         >
-          Home
+          🏠 Home
         </button>
         {APPS.map((a, i) => (
           <button
@@ -36,9 +43,12 @@ function HomeShell() {
             className={`nav-item ${i === selected ? "active" : ""}`}
             onClick={() => select(i)}
           >
-            {a.name}
+            {a.icon} {a.name}
           </button>
         ))}
+        <button className="nav-item logout-item" onClick={logout} disabled={loggingOut}>
+          🚪 {loggingOut ? "Logging out…" : "Log out"}
+        </button>
       </nav>
       <section className="content">
         {selected === null ? (
@@ -53,6 +63,7 @@ function HomeShell() {
                   className={`app-button team-${a.team}`}
                   onClick={() => select(i)}
                 >
+                  <span className="app-button-icon">{a.icon}</span>
                   {a.name}
                 </button>
               ))}
