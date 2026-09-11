@@ -13,6 +13,11 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 - **One repo, one monorepo layout**: `apps/editor`, `apps/tracker`, `apps/resume`, each with its own `package.json` and each pointed at by its own Vercel project (via that project's Root Directory setting) — so deploys, subdomains, and env vars all stay independent per tool without needing three separate repos, three separate PRs for a shared fix, or three places to remember to look. A `packages/shared` folder holds anything genuinely reused across tools (e.g. the password-gate/session logic) instead of copy-pasting it three times.
 - All three share **one Supabase project**, each tool in its own Postgres schema (never the default `public` schema), so table names never collide.
 - One deliberately shared table across tools: `contacts` (see Shared Data Model).
+- **Never commit personal information.** No names, addresses, phone numbers, email addresses,
+  employers, schools, or resume content in the repo — test fixtures are scrubbed copies with
+  synthetic substitutes, and that includes hyperlink targets in `.rels` parts and the author
+  fields in `docProps/`. Scan every part of a `.docx` before committing it, not just
+  `document.xml`.
 - Agent isolation: never point two Claude Code sessions at the same working directory at the same time. One app folder at a time, or genuinely separate worktrees/branches if truly parallel.
 - No secrets ever reach the browser. Every Supabase read/write and every Anthropic API call happens through this app's own server-side API routes. The client only ever talks to this app.
 - Row Level Security enabled on every table, deny-by-default, even though this is single-user. The server uses Supabase's service role key (which bypasses RLS) for all operations — RLS exists purely as a fallback if a key ever leaks.
@@ -181,6 +186,10 @@ the source docx; the model only assigns each paragraph a role. Content loss is t
 structurally impossible rather than something to verify after the fact — which matters because
 Jobright's specific wording *is* the ATS optimization, and a silently dropped line is lost keyword
 coverage.
+
+**Parser note:** content is not always a direct child of `<w:body>` — the template keeps its
+Core Competencies inside a `<w:sdt>` content control, and Career Highlights inside a table cell.
+Walk the tree, never just the body's direct children, or whole sections read as empty.
 
 **Coverage report** — surfaced in the UI after every render, not just in tests: percentage of
 source paragraphs placed, any dropped text quoted in full, unrecognized headers, and the map from
