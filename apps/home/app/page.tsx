@@ -32,9 +32,21 @@ function HomeShell() {
       <header className="topbar">
         <div className="topbar-brand">
           <span className="topbar-badge icon">🏁</span>
-          <span className="topbar-title">Paddock</span>
+          <div className="topbar-text">
+            <span className="topbar-title">Paddock</span>
+            <span className="topbar-subtitle">
+              {selected === null
+                ? "Your command center — pick a tool to get started"
+                : `Working in ${APPS[selected].name}`}
+            </span>
+          </div>
         </div>
       </header>
+      <div className="logout-bar">
+        <button className="logout-link" onClick={logout} disabled={loggingOut}>
+          <span className="icon">🚪</span> {loggingOut ? "Logging out…" : "Log out"}
+        </button>
+      </div>
       <div className="shell">
         <nav className="sidebar">
           <p className="sidebar-label">Navigate</p>
@@ -54,9 +66,6 @@ function HomeShell() {
             </button>
           ))}
           <p className="sidebar-label">Account</p>
-          <button className="nav-item logout-item" onClick={logout} disabled={loggingOut}>
-            <span className="icon">🚪</span> {loggingOut ? "Logging out…" : "Log out"}
-          </button>
         </nav>
         <section className="content">
         {selected === null ? (
