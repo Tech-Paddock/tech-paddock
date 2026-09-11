@@ -65,7 +65,9 @@ export async function POST(request: NextRequest) {
     `Purpose: ${body.purpose}`,
     body.tone ? `Tone: ${body.tone}` : null,
     contact
-      ? `Contact: ${contact.name}${contact.org ? ` at ${contact.org}` : ""} (${contact.relationship_type ?? "relationship unknown"})`
+      ? `Contact: ${contact.name}${contact.position ? `, ${contact.position}` : ""}${
+          contact.org ? ` at ${contact.org}` : ""
+        } (${contact.relationship_type ?? "relationship unknown"})`
       : null,
     history.length
       ? `Recent message history:\n${history.map((h) => `- [${h.medium}, ${h.sent_at}] ${h.content}`).join("\n")}`

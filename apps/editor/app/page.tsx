@@ -7,6 +7,7 @@ type Contact = {
   id: string;
   name: string;
   org: string | null;
+  position: string | null;
   relationship_type: string | null;
   preferred_channel: string | null;
 };
@@ -45,6 +46,7 @@ function DraftShell() {
   const [newContact, setNewContact] = useState({
     name: "",
     org: "",
+    position: "",
     relationship_type: RELATIONSHIP_TYPES[0],
     preferred_channel: "email",
   });
@@ -139,7 +141,13 @@ function DraftShell() {
     setContacts((prev) => [...prev, data.contact]);
     selectContact(data.contact);
     setNewContactOpen(false);
-    setNewContact({ name: "", org: "", relationship_type: RELATIONSHIP_TYPES[0], preferred_channel: "email" });
+    setNewContact({
+      name: "",
+      org: "",
+      position: "",
+      relationship_type: RELATIONSHIP_TYPES[0],
+      preferred_channel: "email",
+    });
   }
 
   async function handleDraft() {
@@ -359,6 +367,12 @@ function DraftShell() {
                     placeholder="Org (optional)"
                     className="border border-line rounded-lg px-3 py-2 text-sm"
                   />
+                  <input
+                    value={newContact.position}
+                    onChange={(e) => setNewContact({ ...newContact, position: e.target.value })}
+                    placeholder="Position (optional)"
+                    className="col-span-2 border border-line rounded-lg px-3 py-2 text-sm"
+                  />
                   <select
                     value={newContact.relationship_type}
                     onChange={(e) => setNewContact({ ...newContact, relationship_type: e.target.value })}
@@ -459,7 +473,7 @@ function DraftShell() {
               onChange={(e) => setInput(e.target.value)}
               rows={4}
               placeholder="e.g. Following up on our call last week, asking if there's an update on the role."
-              className="border border-line rounded-lg px-3 py-2 bg-white resize-none"
+              className="border border-line rounded-lg px-3 py-2 bg-white resize-y min-h-24"
             />
           </label>
 
