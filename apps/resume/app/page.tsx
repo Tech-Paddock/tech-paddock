@@ -3,152 +3,290 @@
 import { useRef, useState } from "react";
 
 type Finding = { code: string; severity: "blocking" | "warning"; message: string };
-type Section = { heading: string; lines: number; bullets: number };
-type Report = {
+type Coverage = { totalParagraphs: number; placed: number; dropped: string[]; percent: number };
+type SectionSummary = { label: string; kind: string; count: number };
+
+type Reformatted = {
+  filename: string;
+  coverage: Coverage;
+  findings: Finding[];
+  summary: { name: string | null; contact: string | null; sections: SectionSummary[] };
+  docxBase64: string;
+};
+
+type Inspection = {
   filename: string;
   sizeBytes: number;
   paragraphCount: number;
   namedStyles: number;
-  outline: { title: string | null; sections: Section[]; preamble: string[] };
+  outline: { title: string | null; sections: { heading: string; lines: number; bullets: number }[]; preamble: string[] };
   findings: Finding[];
 };
 
-const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+const DOCX = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+function FilePick({ label, hint, file, onPick }: { label: string; hint: string; file: File | null; onPick: (f: File) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div className="flex flex-col gap-1">
+      <input
+        ref={ref}
+        type="file"
+        accept={DOCX}
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onPick(f);
+          e.target.value = "";
+        }}
+      />
+      <button
+        onClick={() => ref.current?.click()}
+        className="w-full text-left bg-white border border-line rounded-xl px-4 py-3 flex flex-col gap-0.5"
+      >
+        <span className="text-xs uppercase tracking-wide opacity-60">{label}</span>
+        <span className={`text-sm break-all ${file ? "font-medium" : "opacity-50"}`}>{file ? file.name : hint}</span>
+      </button>
+    </div>
+  );
+}
+
+function Findings({ findings }: { findings: Finding[] }) {
+  const blocking = findings.filter((f) => f.severity === "blocking");
+  const warnings = findings.filter((f) => f.severity === "warning");
+  if (findings.length === 0) {
+    return (
+      <p className="text-sm bg-white border border-line rounded-xl px-4 py-3">
+        No structural problems. Single column, contact details in the body, no stray tables.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      {[...blocking, ...warnings].map((f) => (
+        <div
+          key={f.code}
+          className={`rounded-xl px-4 py-3 border text-sm ${
+            f.severity === "blocking" ? "bg-red-50 border-red-200 text-red-900" : "bg-amber-50 border-amber-200 text-amber-900"
+          }`}
+        >
+          <p className="font-medium mb-1">
+            {f.severity === "blocking" ? "Blocking" : "Warning"} · {f.code.replace(/_/g, " ")}
+          </p>
+          <p>{f.message}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function Home() {
-  const [report, setReport] = useState<Report | null>(null);
+  const [tab, setTab] = useState<"reformat" | "check">("reformat");
+  const [template, setTemplate] = useState<File | null>(null);
+  const [source, setSource] = useState<File | null>(null);
+  const [single, setSingle] = useState<File | null>(null);
+  const [result, setResult] = useState<Reformatted | null>(null);
+  const [inspection, setInspection] = useState<Inspection | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
-  async function inspect(file: File) {
-    setBusy(true);
+  async function post<T>(url: string, body: FormData, stage: string): Promise<T> {
+    setBusy(stage);
     setError(null);
-    setReport(null);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      const res = await fetch("/api/inspect", { method: "POST", body });
+      const res = await fetch(url, { method: "POST", body });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? `Upload failed (${res.status}).`);
-      setReport(data as Report);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong reading that file.");
+      if (!res.ok) throw new Error(data?.error ?? `Request failed (${res.status}).`);
+      return data as T;
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
-  const blocking = report?.findings.filter((f) => f.severity === "blocking") ?? [];
-  const warnings = report?.findings.filter((f) => f.severity === "warning") ?? [];
+  async function reformat() {
+    if (!template || !source) return;
+    setResult(null);
+    const body = new FormData();
+    body.append("template", template);
+    body.append("source", source);
+    try {
+      setResult(await post<Reformatted>("/api/reformat", body, "Reading both documents…"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Reformatting failed.");
+    }
+  }
+
+  async function check(file: File) {
+    setSingle(file);
+    setInspection(null);
+    const body = new FormData();
+    body.append("file", file);
+    try {
+      setInspection(await post<Inspection>("/api/inspect", body, "Reading document…"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't read that file.");
+    }
+  }
+
+  function download() {
+    if (!result) return;
+    const bytes = Uint8Array.from(atob(result.docxBase64), (c) => c.charCodeAt(0));
+    const url = URL.createObjectURL(
+      new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = result.filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
-    <main className="min-h-screen px-5 py-8 max-w-3xl mx-auto flex flex-col gap-7">
+    <main className="min-h-screen px-5 py-8 max-w-3xl mx-auto flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">Resume Formatter</h1>
         <p className="text-sm opacity-70">
-          Drop in a .docx to see how a parser reads it, and what would cost you in an ATS.
+          Put a tailored resume into your own template, without losing a word of it.
         </p>
       </header>
 
-      <section className="flex flex-col gap-3">
-        <input
-          ref={input}
-          type="file"
-          accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) inspect(file);
-            e.target.value = "";
-          }}
-        />
-        <button
-          onClick={() => input.current?.click()}
-          disabled={busy}
-          className="w-full bg-accent text-white rounded-xl px-5 py-4 text-base font-medium disabled:opacity-60"
-        >
-          {busy ? "Reading…" : "Choose a .docx"}
-        </button>
-        <p className="text-xs opacity-60">
-          Works on a Jobright export or your own template. Nothing is stored — the file is read and discarded.
-        </p>
-      </section>
+      <nav className="flex gap-1 bg-white border border-line rounded-xl p-1">
+        {(["reformat", "check"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => {
+              setTab(t);
+              setError(null);
+            }}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${
+              tab === t ? "bg-accent text-white" : "opacity-70"
+            }`}
+          >
+            {t === "reformat" ? "Reformat" : "ATS check"}
+          </button>
+        ))}
+      </nav>
 
-      {error && (
-        <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>
-      )}
+      {error && <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>}
 
-      {report && (
+      {tab === "reformat" ? (
         <>
-          <section className="bg-white border border-line rounded-xl p-4 flex flex-col gap-1">
-            <p className="font-medium break-all">{report.filename}</p>
-            <p className="text-sm opacity-70">
-              {mb(report.sizeBytes)} · {report.paragraphCount} paragraphs ·{" "}
-              {report.namedStyles === 0 ? "no named styles" : `${report.namedStyles} named styles`}
+          <section className="flex flex-col gap-3">
+            <FilePick label="Template" hint="Your resume, whose formatting to copy" file={template} onPick={setTemplate} />
+            <FilePick label="Tailored resume" hint="The Jobright export to reformat" file={source} onPick={setSource} />
+            <button
+              onClick={reformat}
+              disabled={!template || !source || busy !== null}
+              className="w-full bg-accent text-white rounded-xl px-5 py-4 text-base font-medium disabled:opacity-50"
+            >
+              {busy ?? "Reformat"}
+            </button>
+            <p className="text-xs opacity-60">
+              Nothing is stored yet — both files are read and discarded, so pick them each time for now.
             </p>
           </section>
 
-          <section className="flex flex-col gap-3">
-            <h2 className="text-lg font-semibold">
-              ATS check{" "}
-              <span className="text-sm font-normal opacity-70">
-                {blocking.length === 0 && warnings.length === 0
-                  ? "— nothing found"
-                  : `— ${blocking.length} blocking, ${warnings.length} warning${warnings.length === 1 ? "" : "s"}`}
-              </span>
-            </h2>
-            {blocking.length === 0 && warnings.length === 0 && (
-              <p className="text-sm bg-white border border-line rounded-xl px-4 py-3">
-                No structural problems found. Single column, no tables beyond the permitted one, contact details in
-                the body.
-              </p>
-            )}
-            {[...blocking, ...warnings].map((f) => (
-              <div
-                key={f.code}
+          {result && (
+            <>
+              <section
                 className={`rounded-xl px-4 py-3 border text-sm ${
-                  f.severity === "blocking"
-                    ? "bg-red-50 border-red-200 text-red-900"
+                  result.coverage.percent === 100
+                    ? "bg-white border-line"
                     : "bg-amber-50 border-amber-200 text-amber-900"
                 }`}
               >
-                <p className="font-medium mb-1">
-                  {f.severity === "blocking" ? "Blocking" : "Warning"} · {f.code.replace(/_/g, " ")}
+                <p className="font-medium">
+                  {result.coverage.percent}% of the source placed ({result.coverage.placed} of{" "}
+                  {result.coverage.totalParagraphs} paragraphs)
                 </p>
-                <p>{f.message}</p>
-              </div>
-            ))}
+                {result.coverage.dropped.length > 0 ? (
+                  <div className="mt-2 flex flex-col gap-1">
+                    <p>Not carried across — check these before you send it:</p>
+                    <ul className="list-disc pl-5">
+                      {result.coverage.dropped.map((d, i) => (
+                        <li key={i} className="break-words">{d}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="opacity-70 mt-1">Every line made it across. Wording is untouched.</p>
+                )}
+              </section>
+
+              <section className="flex flex-col gap-3">
+                <h2 className="text-lg font-semibold">ATS check on the output</h2>
+                <Findings findings={result.findings} />
+              </section>
+
+              <section className="flex flex-col gap-3">
+                <h2 className="text-lg font-semibold">What went in</h2>
+                <div className="bg-white border border-line rounded-xl p-4 flex flex-col gap-2">
+                  <p className="text-sm">
+                    <span className="opacity-60">Name:</span> <span className="font-medium">{result.summary.name ?? "not found"}</span>
+                  </p>
+                  <ul className="flex flex-col divide-y divide-line">
+                    {result.summary.sections.map((s) => (
+                      <li key={s.label} className="py-2 flex items-baseline justify-between gap-3">
+                        <span className="font-medium">{s.label}</span>
+                        <span className="text-sm opacity-60 whitespace-nowrap">
+                          {s.count} {s.kind === "entries" ? "role" : s.kind === "prose" ? "paragraph" : "item"}
+                          {s.count === 1 ? "" : "s"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+
+              <button onClick={download} className="w-full bg-accent text-white rounded-xl px-5 py-4 text-base font-medium">
+                Download {result.filename}
+              </button>
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <section className="flex flex-col gap-3">
+            <FilePick label="Any .docx" hint="See how a parser reads it" file={single} onPick={check} />
           </section>
 
-          <section className="flex flex-col gap-3">
-            <h2 className="text-lg font-semibold">What the parser read</h2>
-            <div className="bg-white border border-line rounded-xl p-4 flex flex-col gap-3">
-              <p className="text-sm">
-                <span className="opacity-60">Name detected:</span>{" "}
-                <span className="font-medium">{report.outline.title ?? "none"}</span>
-              </p>
-              {report.outline.preamble.length > 0 && (
-                <p className="text-sm opacity-70 break-words">
-                  <span className="opacity-80">Before the first heading:</span> {report.outline.preamble[0]}
+          {inspection && (
+            <>
+              <section className="bg-white border border-line rounded-xl p-4 flex flex-col gap-1">
+                <p className="font-medium break-all">{inspection.filename}</p>
+                <p className="text-sm opacity-70">
+                  {(inspection.sizeBytes / 1024 / 1024).toFixed(2)} MB · {inspection.paragraphCount} paragraphs ·{" "}
+                  {inspection.namedStyles === 0 ? "no named styles" : `${inspection.namedStyles} named styles`}
                 </p>
-              )}
-              <ul className="flex flex-col divide-y divide-line">
-                {report.outline.sections.map((s) => (
-                  <li key={s.heading} className="py-2 flex items-baseline justify-between gap-3">
-                    <span className="font-medium">{s.heading}</span>
-                    <span className="text-sm opacity-60 whitespace-nowrap">
-                      {s.lines} line{s.lines === 1 ? "" : "s"}
-                      {s.bullets > 0 && ` · ${s.bullets} bullet${s.bullets === 1 ? "" : "s"}`}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {report.outline.sections.length === 0 && (
-                <p className="text-sm opacity-70">No section headings recognised in this document.</p>
-              )}
-            </div>
-          </section>
+              </section>
+
+              <section className="flex flex-col gap-3">
+                <h2 className="text-lg font-semibold">ATS check</h2>
+                <Findings findings={inspection.findings} />
+              </section>
+
+              <section className="flex flex-col gap-3">
+                <h2 className="text-lg font-semibold">What the parser read</h2>
+                <div className="bg-white border border-line rounded-xl p-4 flex flex-col gap-2">
+                  <p className="text-sm">
+                    <span className="opacity-60">Name detected:</span>{" "}
+                    <span className="font-medium">{inspection.outline.title ?? "none"}</span>
+                  </p>
+                  <ul className="flex flex-col divide-y divide-line">
+                    {inspection.outline.sections.map((s) => (
+                      <li key={s.heading} className="py-2 flex items-baseline justify-between gap-3">
+                        <span className="font-medium">{s.heading}</span>
+                        <span className="text-sm opacity-60 whitespace-nowrap">
+                          {s.lines} line{s.lines === 1 ? "" : "s"}
+                          {s.bullets > 0 && ` · ${s.bullets} bullet${s.bullets === 1 ? "" : "s"}`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </section>
+            </>
+          )}
         </>
       )}
     </main>
