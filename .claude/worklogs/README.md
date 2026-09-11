@@ -41,6 +41,17 @@ Need from TD: a question, a decision, or nothing
 Claim at the start of a session, hand off at the end. Add entries in between when something
 changes that another agent would want to know before it reaches a pull request.
 
+## A worklog dies with its branch
+
+When a branch is merged and deleted, delete its worklog too. `read-all.sh` exists so a live agent
+can see what another live agent has claimed right now; a worklog for a branch that no longer exists
+dilutes exactly that signal.
+
+Nothing is lost, because a worklog was never the archive. What outlives the branch — a decision that
+affects someone else, a trap worth knowing about, the state of an area — belongs in that agent's
+`.claude/agents/<agent>/HANDOFF.md`, which is read at the start of every session. Move it there
+before you delete.
+
 ## Files that are not agent worklogs
 
 - `_open-items.md` — the technical director's ledger. Read it; do not edit it.

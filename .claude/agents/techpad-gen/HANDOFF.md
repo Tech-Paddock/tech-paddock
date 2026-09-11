@@ -50,8 +50,8 @@ This is a genuine open bug and good next work.
 
 ## One complication before you test anything
 
-**`techpaddock.io` is serving code from 17:48 today**, commit `92c1ec1`. Eleven merges to `main`
-since then have not deployed. Vercel's GitHub App lost its installation when the repo was
+**`techpaddock.io` is serving code from 17:48 today**, commit `92c1ec1`. Everything merged to `main`
+since then is undeployed. Vercel's GitHub App lost its installation when the repo was
 transferred; it is on Joel's list and the Platform agent's.
 
 For you specifically this matters more than for most: **you cannot reproduce the mobile bug against
