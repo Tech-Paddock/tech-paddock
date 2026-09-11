@@ -2,7 +2,12 @@ const SESSION_COOKIE = "paddock_session";
 const ATTEMPTS_COOKIE = "paddock_attempts";
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
-const SESSION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const SESSION_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+// Slide the expiry once a session is past its halfway point, so regular use
+// keeps you signed in. Without this a session dies a fixed SESSION_MS after
+// login however often you visit, and a device you use rarely starts asking for
+// the password while a daily-driver browser never does.
+const RENEW_AFTER_MS = SESSION_MS / 2;
 
 function secret() {
   // Deliberately separate from APP_PASSWORD_HASH: that value differs per app
@@ -78,6 +83,36 @@ export async function createSessionCookieValue() {
 export async function hasValidSession(cookieValue: string | undefined) {
   const session = await unpack<{ exp: number }>(cookieValue);
   return !!session && session.exp > Date.now();
+}
+
+export async function readSession(cookieValue: string | undefined) {
+  const session = await unpack<{ exp: number }>(cookieValue);
+  return session && session.exp > Date.now() ? session : null;
+}
+
+export function shouldRenewSession(session: { exp: number }) {
+  return session.exp - Date.now() < RENEW_AFTER_MS;
+}
+
+function isLocalHost(host: string | null | undefined) {
+  return !!host && /^(localhost|127\.0\.0\.1)(:|$)/.test(host);
+}
+
+// One login covers every subdomain because the cookie is scoped to
+// .techpaddock.io. A host can only set a cookie for a domain it belongs to, so
+// hardcoding that domain meant localhost and *.vercel.app preview deployments
+// set no cookie at all and looped back to the login screen forever. Off those
+// hosts we fall back to a host-only cookie instead.
+export function sessionCookieOptions(host: string | null | undefined, maxAge: number) {
+  const shared = !!host && (host === "techpaddock.io" || host.endsWith(".techpaddock.io"));
+  return {
+    httpOnly: true,
+    secure: !isLocalHost(host),
+    sameSite: "lax" as const,
+    ...(shared ? { domain: ".techpaddock.io" } : {}),
+    maxAge,
+    path: "/",
+  };
 }
 
 export const COOKIES = {
