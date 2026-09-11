@@ -117,14 +117,18 @@ cannot.
 
 Rules in `CLAUDE.md` are written, not enforced. Only three things enforce:
 
-1. **Branch protection** — now configured and Active on `main`, bypass list empty. Requires a PR,
-   zero approvals, four green build checks, linear history, squash-only merges, conversation
-   resolution. Blocks force pushes and deletions.
-2. **CI** — four matrix jobs, one per app. The matrix is hardcoded; a fifth app is silently
+1. **Branch protection** — configured correctly (PR required, zero approvals, build checks, linear
+   history, squash-only, no bypass list) but **probably inert**: the repo sits on a personal
+   account, where protecting a private branch generally needs a paid plan. Assume `main` is
+   unprotected until proven otherwise.
+2. **CI** — five matrix jobs, one per app. The matrix is hardcoded; a sixth app is silently
    untested until added.
-3. **Claude Code hooks** — none exist. Two kinds were proposed and neither is approved: blocking
-   `PreToolUse` hooks, and a benign `SessionStart` hook that would print the ledger automatically.
-   Both are still open questions for Joel.
+3. **Claude Code hooks** — three exist, in `.claude/settings.json`, and they are currently doing
+   the real work. A `SessionStart` hook prints the ledger into every session. Two `PreToolUse`
+   guards refuse a push to `main` and refuse `supabase migration repair`. They travel with the repo
+   and work regardless of GitHub plan, which matters while branch protection is inert.
+   Deliberately narrow: PII regex and Vercel/DNS guards were considered and rejected, because a
+   hook that fires on the wrong thing teaches agents to route around hooks.
 
 ## Things that are true and non-obvious
 
@@ -141,8 +145,7 @@ Rules in `CLAUDE.md` are written, not enforced. Only three things enforce:
 - **Vercel project names carry a `tp-` prefix** and do not match their folders or subdomains. This
   is correct and deliberate; the brief was corrected to match rather than the projects renamed.
 
-## If the rules are not on `main` yet
+## The rules are on `main`
 
-They land in PR #17. If that is unmerged, `CLAUDE.md` on `main` will not have the Rules of
-Engagement, and the worklog directory will not exist. Everything is on branch
-`claude/integrations-agent-architecture-2wcbpw`. Merging #17 is the first thing to do.
+They landed in PR #17 on 2026-09-11. `CLAUDE.md` on `main` carries the Rules of Engagement, the
+worklog directory exists, and the hooks are live. Nothing here is pending.

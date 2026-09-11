@@ -1,6 +1,6 @@
 # Paddock — Project Brief
 
-techpaddock.io is a personal command center — one shared foundation supporting multiple standalone tools. This brief covers the first three: **Message Editor**, **Pipeline Tracker**, and **Resume Formatter**.
+techpaddock.io is a personal command center — one shared foundation supporting multiple standalone tools. Five apps are live or built: the **hub** at the root domain, plus **Message Editor**, **Pipeline Tracker**, **Resume Formatter** and **Coffee**.
 
 Don't re-litigate the stack choices below without a specific reason — they were chosen deliberately for cost, hand-holding needs, and consistency across tools. Ask before assuming scope beyond what's listed here.
 
@@ -10,9 +10,9 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 
 ## Core Architecture Principles
 
-- **One repo, one monorepo layout**: `apps/editor`, `apps/tracker`, `apps/resume`, and `apps/home`
-  (the hub at the root domain), each with its own `package.json` and each pointed at by its own Vercel project (via that project's Root Directory setting) — so deploys, subdomains, and env vars all stay independent per tool without needing three separate repos, three separate PRs for a shared fix, or three places to remember to look. **`packages/shared` was never created.** `lib/auth.ts` and `lib/password.ts` are
-  byte-identical copies in all four apps, and `lib/supabase.ts` is a per-app variant. That is a
+- **One repo, one monorepo layout**: `apps/editor`, `apps/tracker`, `apps/resume`, `apps/coffee`, and
+  `apps/home` (the hub at the root domain), each with its own `package.json` and each pointed at by its own Vercel project (via that project's Root Directory setting) — so deploys, subdomains, and env vars all stay independent per tool without needing three separate repos, three separate PRs for a shared fix, or three places to remember to look. **`packages/shared` was never created.** `lib/auth.ts` and `lib/password.ts` are
+  byte-identical copies in all five apps, and `lib/supabase.ts` is a per-app variant. That is a
   deliberate-looking outcome of building app by app, not a decision anyone recorded — the cost is
   that a session or lockout fix needs the same edit four times. Worth consolidating before the
   auth logic changes again; not worth churn otherwise.
@@ -28,7 +28,7 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 - Row Level Security enabled on every table, deny-by-default, even though this is single-user. The server uses Supabase's service role key (which bypasses RLS) for all operations — RLS exists purely as a fallback if a key ever leaks.
 - **One login covers every subdomain.** The session cookie is scoped to `.techpaddock.io`, so
   signing in on any app signs you in on all of them, and `/api/logout` on the hub clears it
-  everywhere. This requires `SESSION_SECRET` to be byte-identical across all four Vercel
+  everywhere. This requires `SESSION_SECRET` to be byte-identical across all five Vercel
   projects — a mismatch makes the other apps silently reject a valid session. The three tools
   also send `frame-ancestors 'self' https://techpaddock.io https://*.techpaddock.io` so only the
   hub can embed them.
@@ -64,13 +64,13 @@ need from the technical director. If an entry could have been a commit message, 
 
 - **Push to `main`.** Every change goes through a pull request, including small ones.
 - **Create or delete a Vercel project, add or remove a domain, or change a DNS record.** These have
-  no undo and no test catches them. A wrong DNS record takes all four subdomains down and you find
+  no undo and no test catches them. A wrong DNS record takes every subdomain down and you find
   out from a browser.
 - **Apply a schema change without its migration file in the same pull request.** The database is
   not allowed to be the only record of its own shape again. See `supabase/README.md`.
 - **Edit the shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, or
   anything touching `SESSION_SECRET` and the shared cookie. These are byte-identical copies in four
-  apps, and a mismatch does not throw. It silently rejects valid sessions on the other three.
+  apps, and a mismatch does not throw. It silently rejects valid sessions on the others.
 - **Edit this file.** If your change contradicts the brief, say so in the pull request and stop.
   The brief is approved before it is updated, never quietly alongside the code that outdated it.
 - **Commit personal information or secrets.** Names, employers, schools, addresses, contact
@@ -90,7 +90,7 @@ between configuring something that exists and creating, destroying, or re-pointi
   never treat one as a permanent working branch.
 - State your blast radius in the pull request: which apps, which shared files.
 - Add any new app under `apps/` to the CI matrix in `.github/workflows/ci.yml` in the same pull
-  request. The matrix is hardcoded to four names and silently skips anything else, so a new app
+  request. The matrix is hardcoded to five names and silently skips anything else, so a new app
   ships untested and nothing tells you.
 
 ### When you think the instruction is wrong
@@ -106,7 +106,7 @@ Relitigating a settled decision is out; asking how to do it properly is expected
 
 - **Squash merge, always.** One commit on `main` per change. Branch-level history stays in the pull
   request if it is ever wanted. Merge commits and rebase merges are off.
-- **CI green before merge** — all four matrix jobs. A red build does not get merged on the
+- **CI green before merge** — all five matrix jobs. A red build does not get merged on the
   assumption that the failure is unrelated. Establish that it is, or fix it.
 - **Delete the branch after merge**, so the branch list stays a list of live work rather than an
   archive.
@@ -127,7 +127,7 @@ merging), set the squash commit message default to "Pull request title and descr
 on "Automatically delete head branches".
 
 Then protect `main` (Settings → Rules → Rulesets, or Settings → Branches): require a pull request
-before merging, require the four CI checks to pass, and block force pushes.
+before merging, require the five CI checks to pass, and block force pushes.
 
 **Until that second half is done, every rule above is convention rather than enforcement** — an
 agent that ignores "never push to `main`" will simply succeed. This repo is private on a personal
@@ -175,8 +175,8 @@ Root Directory at `apps/coffee`, set the framework to Next.js, add the env vars,
 ```
 SUPABASE_URL=                 # all apps that talk to Postgres
 SUPABASE_SERVICE_ROLE_KEY=    # ditto
-APP_PASSWORD_HASH=            # bcrypt hash of the login password — all four apps
-SESSION_SECRET=               # all four apps, and MUST be byte-identical across them
+APP_PASSWORD_HASH=            # bcrypt hash of the login password — all five apps
+SESSION_SECRET=               # all five apps, and MUST be byte-identical across them
 ANTHROPIC_API_KEY=            # editor + coffee — the resume app makes no model calls
 INTERNAL_API_SECRET=          # editor + tracker only (server-to-server draft call)
 EDITOR_BASE_URL=              # tracker only
@@ -395,6 +395,61 @@ the foreign keys are only ever exercised against the real project:
 
 ---
 
+## Tool 4: Coffee (`coffee` schema)
+
+Photograph a bag, get the roaster's own brewing instructions for that coffee, keep a searchable
+library. Lives at `coffee.techpaddock.io`.
+
+**Flow:** photograph the bag → downscale in the browser → Claude reads roaster and coffee name off
+the label → **you confirm** → Claude searches for brewing instructions → save.
+
+The confirm step is not ceremony. A misread roaster name sends the search somewhere useless, and it
+doubles as the manual-entry path when a photo cannot be read at all.
+
+**Three search tiers**, and which one answered is stored and shown:
+
+1. `coffee_specific` — instructions published for this exact coffee, on its product page
+2. `roaster_generic` — the roaster's general brew guide, **from their own site only**
+3. `none` — neither exists. A correct answer, and a recorded one
+
+A house pour-over ratio is useful, but it is not what the roaster decided about this particular lot,
+so the distinction is kept rather than flattened.
+
+**No invented recipes, and the rule is enforced in code.** A model with web search will happily
+produce a plausible 1:16 / 205F / 3:00 recipe for a page that says nothing about brewing — and
+unlike a bad message draft, you would actually brew it. So nothing is stored unless the model also
+produced the sentence it came from and the URL that sentence was on.
+
+That is enforced in `lib/guide.ts`, not in the prompt, because a prompt can only ask. `validateGuide`
+drops any parameter without a backing quote, rejects quotes citing pages the model never reported
+reading, refuses anything read off a site that is not the roaster's, and demotes a `coffee_specific`
+claim to `roaster_generic` unless the instructions were genuinely read on the product page. The
+quotes render next to the parsed values, so a misparse is visible rather than silent.
+
+**The roaster's values stay separate from yours.** `guide_*` holds what was published; `my_*` holds
+what you dialled in. `my_method` defaults to `guide_method` when a guide was found but stays
+editable — brewing their filter coffee as espresso should record what you did without erasing what
+they suggested.
+
+### `bags`
+id, roaster, coffee_name, origin, process, varietal, roast_date, photo_path, `product_url`,
+`guide_url`, `guide_status`, the `guide_*` parameters, `guide_quotes` (jsonb — the verbatim
+sentences and their URLs), `guide_fetched_at`, the `my_*` fields, my_rating, created_at, updated_at
+
+Two URLs rather than one: they are the same page at tier 1 and different pages at tier 2, so a
+single column would lose which you are looking at.
+
+**Storage:** bag photos live in the private `coffee-files` bucket.
+
+**Not built, deliberately:** a brew log, a timer, inventory, and a brew-method lookup table are all
+expected eventually. None is pre-empted in the schema; each would arrive as its own table.
+
+**Local limitation:** the search step cannot be exercised from a Claude Code sandbox — roaster
+domains are blocked by the egress proxy. Tests cover the validation logic against recorded response
+shapes; the search itself has to be verified on a deploy preview with a real bag.
+
+---
+
 ## Build Order
 
 1. ~~Monorepo scaffolding + shared Supabase project and schemas~~ — done; Message Editor lives
@@ -422,7 +477,11 @@ the foreign keys are only ever exercised against the real project:
 5. ~~Task integration for the tracker~~ — done as **Microsoft To Do via Graph**, not Google Tasks;
    see Tool 2. Vercel Cron sweeps daily. Still needs the Azure registration and the `MS_GRAPH_*`
    env vars set on the tracker's Vercel project before it does anything.
-6. ~~Domain wiring: Cloudflare DNS → Vercel~~ — done for all four subdomains
-7. ~~Password gate~~ — done on all four apps, now with the shared-cookie SSO described above. RLS is
+6. ~~Domain wiring: Cloudflare DNS → Vercel~~ — done for the four original subdomains;
+   `coffee.techpaddock.io` is not attached yet
+7. ~~Password gate~~ — done on all five apps, now with the shared-cookie SSO described above. RLS is
    on deny-by-default across every table in every schema from step 1
 8. Real-device testing (add to iPhone home screen via each subdomain)
+9. **Coffee — built, not yet deployed.** `apps/coffee` is on `main` with its schema applied and 16
+   tests passing. Outstanding: point the `tp-coffee-app` Vercel project at `apps/coffee`, set its
+   env vars, and attach `coffee.techpaddock.io`. Until then it is code without a home.

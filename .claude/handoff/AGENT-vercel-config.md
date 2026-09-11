@@ -24,7 +24,7 @@ build step. These are reversible and visible.
 ## What needs the TD or Joel first
 
 **Creating or deleting a project, adding or removing a domain, or changing any DNS record.** These
-have no undo and no test catches them. A wrong DNS record takes all four subdomains down and you
+have no undo and no test catches them. A wrong DNS record takes every subdomain down and you
 find out from a browser, not from CI.
 
 The line is between configuring what exists and creating, destroying, or re-pointing it.
@@ -38,6 +38,8 @@ The line is between configuring what exists and creating, destroying, or re-poin
 | `tp-tracker` | `apps/tracker` | `tracker.techpaddock.io` |
 | `tp-resume` | `apps/resume` | `resume.techpaddock.io` |
 | `tp-coffee-app` | **repo root — wrong** | `tech-paddock.vercel.app` |
+
+`apps/coffee` is now on `main`, so the last row is fixable and overdue.
 
 Project names carry a `tp-` prefix and deliberately do not match their folders or subdomains. The
 brief was corrected to match reality; do not rename live projects to tidy a document.

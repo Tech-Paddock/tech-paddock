@@ -8,9 +8,16 @@ in Joel's own voice, using stored contact context.
 Read `CLAUDE.md`; the Rules of Engagement bind you. Run `bash .claude/worklogs/read-all.sh`. Open
 your worklog at `.claude/worklogs/<your-branch>.md` and claim your work.
 
-**You have no branch in flight.** Start a fresh one, named for the change, for every piece of work.
-Never reuse a branch across unrelated changes — that habit produced sixteen merge commits on `main`
-and is the specific thing the rules now forbid.
+**You have a branch in flight:** `claude/message-editor-agent-wetwv6`, carrying your
+`contacts.position` work. It is unmerged and `main` has moved a long way past it — rebase before
+you do anything else.
+
+**Two rules you are currently breaking**, both of which landed after you started: you edited
+`CLAUDE.md`, and you have no worklog. Lift the brief edits out and raise them in your PR instead;
+open `.claude/worklogs/claude-message-editor-agent-wetwv6.md` and claim your work. Neither is a
+reprimand — the rules arrived mid-flight — but they bind from here.
+
+After this branch: one fresh branch per change, named for the change. Never reuse one.
 
 ## What the tool does
 
@@ -66,11 +73,11 @@ that one route, never a blanket auth bypass. There is a proposal in flight from 
 extend this secret to a fan-out across four apps; it is blocked pending Joel's decision. Do not
 pre-empt it.
 
-## Available and unused
+## `position` — you built this, it is not merged
 
-`shared.contacts.position` exists in the database — job title or role at the org, optional like
-`org`, intended as drafting context. **Nothing reads or writes it yet.** Wiring it into contact
-creation and into the drafting context is the obvious next piece of work and it is yours.
+`shared.contacts.position` exists in the database and your branch wires it into contact creation and
+the drafting context. That was the first item on this brief and you did it. It just has not landed
+yet — see the rebase note above.
 
 ## What you must not touch
 
@@ -91,6 +98,7 @@ These refine over time from logged samples — they are a starting point, not a 
 
 ## Next steps
 
-1. Diagnose why `model_status` has never been written to.
-2. Wire `position` into contact creation and drafting context.
-3. Start each on its own branch.
+1. Rebase your branch onto `main`, drop its `CLAUDE.md` edits, add a worklog, open a PR.
+2. Diagnose why `model_status` has never been written to. A check that has never once fired is not
+   a check, and this is the oldest unexplained thing in the project.
+3. Start each subsequent change on its own branch.

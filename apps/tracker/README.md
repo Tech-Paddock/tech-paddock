@@ -36,10 +36,21 @@ npm run dev
   this thread's notes automatically. Purpose is always "follow-up"; medium defaults to the
   contact's `preferred_channel` or email
 
-## Not yet built
+## Built since, and what is still missing
 
-- Google Tasks integration (Vercel Cron + OAuth) — needs Google Cloud Console setup, which is a
-  manual step outside what code alone can do
-- Manual "create a task" button, independent of the stale check
-- Not yet deployed — needs its own Vercel project (Root Directory `apps/tracker`), env vars
-  (including `INTERNAL_API_SECRET` matching the editor app), and the `tracker.techpaddock.io` DNS record
+**Microsoft To Do via Graph**, not Google Tasks — one app registration serves both Outlook calendar
+and tasks, where Google would have meant a second OAuth setup for no extra capability. A daily
+Vercel Cron sweeps stale threads and creates a task per match; the manual button exists too and
+overrides the open-task guard.
+
+**It is inert.** `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET`, `MS_GRAPH_REFRESH_TOKEN` and
+`CRON_SECRET` are unset on the Vercel project, and the code degrades quietly by design — correct at
+runtime, and it means nothing will tell you the cron is doing nothing. Needs a one-time Azure
+registration against a personal Microsoft account.
+
+Still missing:
+
+- Syncing a completed task back to auto-reset `last_touch_date` — deferred until the base loop has
+  actually run against real credentials
+- Deployed and live at **tracker.techpaddock.io**; this app also exposes `/api/summary` for the
+  hub's glance

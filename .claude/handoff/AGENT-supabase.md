@@ -38,8 +38,8 @@ schemas. So a table you create gets `anon` SELECT, INSERT, UPDATE, DELETE — an
 or not your migration mentions grants.
 
 **This means RLS is the only control** between a leaked publishable key and the data. Enable RLS in
-the same migration that creates a table, every time. Supabase's advisor reporting seven
-`rls_enabled_no_policy` notices is the design working, not a warning to fix — deny-by-default with
+the same migration that creates a table, every time. Supabase's advisor reporting one
+`rls_enabled_no_policy` notice per table is the design working, not a warning to fix — deny-by-default with
 zero policies is intentional, because the server uses the service role key which bypasses RLS
 entirely.
 
@@ -52,27 +52,42 @@ name makes the CLI try to re-apply.
 
 ## Current state
 
-Seven migrations applied, six checked in. Tables:
+Nine migrations applied, eight checked in. Tables:
 
 | Schema | Tables |
 |---|---|
-| `shared` | `contacts` (7 rows) |
+| `shared` | `contacts` |
 | `editor` | `message_history`, `style_guide`, `model_status` |
 | `tracker` | `pipeline_threads` |
 | `resume` | `templates`, `renders` |
+| `coffee` | `bags` |
 
-Storage: one private bucket, `resume-files`.
+Storage: two private buckets, `resume-files` and `coffee-files`.
+
+## The trap that already caught someone
+
+**A new schema inherits no grants at all.** `20260910051549` granted USAGE by naming four schemas
+explicitly and cannot cover a schema that did not exist when it ran. The `coffee` app shipped with a
+correct, RLS-enabled migration and was still unreadable by `service_role` — it would have deployed
+clean, passed CI, and failed at runtime on permissions, with nothing in its own code to explain why.
+
+**Adding a schema is three steps, not one:** the schema and its tables, then a grants migration
+(copy `20260911203100`), then add it to `[api] schemas` in `config.toml`. All three are in
+`supabase/README.md`.
 
 ## Open items
 
 - **`editor.model_status` has zero rows.** The model drift check runs inside `/api/login` and writes
   there. It has never successfully written. Either nobody has logged in since it shipped, or it is
   failing silently. Worth diagnosing — it is your table.
-- **`shared.contacts.position`** exists and is intended for contact creation. It is ahead of the
-  code, not orphaned; the Message Editor agent will use it.
+- **`shared.contacts.position`** is now wired up by the Message Editor agent, on an unmerged
+  branch. No longer ahead of the code.
 - **`supabase link` has never been run** against the remote from any agent session. It needs an
   access token no agent should hold, so Joel runs it locally. Until then, nothing has verified the
   local migration files against remote history by CLI — though they were verified by hash.
+- **`supabase migration repair` is now blocked by a hook**, deliberately. `migration list` will
+  always show `20260908235234` as remote-only, and a future agent would reasonably try to "fix"
+  that. It is not broken; that migration is withheld because it contains personal data.
 
 ## How you verify
 

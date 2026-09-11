@@ -25,37 +25,25 @@ middleware lets it through **for `/api/draft` only** — scoped tightly, never a
 saving a render creates or updates a thread here. You keep your own ad-hoc thread creation for
 applications and networking that never involve a resume.
 
-## Your branch: `claude/tracker-dashboard-concept-r6p9up`
+## Your work landed as #22; the branch is gone
 
-Seven commits ahead, three behind. Fourth in the merge queue. It touches `apps/editor`,
-`apps/home`, `apps/resume`, `apps/tracker` and `CLAUDE.md` — a wide blast radius, so declare it.
+`claude/tracker-dashboard-concept-r6p9up` has been deleted. All of it merged: the hub glance
+fan-out, the Microsoft Graph integration, the Vercel Cron sweep, meeting matching, and this app's
+**first 38 tests**.
 
-### The part that is blocked
+**The `/api/summary` concern was withdrawn, and the TD was wrong to raise it.** It was flagged as
+widening `INTERNAL_API_SECRET` into a shared key across four apps — a reading taken from the design
+notes rather than the code. The carve-out is `pathname === "/api/summary"` exactly, mirroring the
+editor's existing `/api/draft` precedent, read-only, failing closed without the secret, with a
+four-second timeout. It followed the blessed pattern. Your narrow-shape discipline — counts and
+singles, never rows; rich lists behind `loadDashboard` — is what made it reviewable, and it stands.
 
-**Your `/api/summary` fan-out is not approved and must not merge without Joel's decision.**
+**Google Tasks → Microsoft To Do was approved.** One app registration serving both calendar and
+tasks, where Google would have meant a second OAuth setup for no extra capability. The brief was
+updated by the TD to match; you were right not to assume that edit would stand on its own.
 
-The design: every tool exposes `/api/summary`, and the hub fans out server-side over
-`INTERNAL_API_SECRET`. The concern is specific and it is not about code quality. Today that secret
-unlocks exactly one route. The brief says it is "scoped tightly to that one route in editor's
-middleware, never a blanket auth bypass." Your change turns it into a shared key across routes on
-four apps.
-
-It may well be the right call. But it is an architecture change to the authentication story, not a
-feature, and it gets reviewed as one. **Green CI is not sufficient for this branch.** Put the case
-to Joel — what the alternative would cost, why the fan-out shape is right — and let him decide.
-
-The narrow-shape discipline in your own design notes is good and worth keeping in the pitch: counts
-and singles, never rows; the rich lists stay behind `loadDashboard`, which only the tracker calls.
-
-### The conflict you will cause
-
-You rewrite `apps/home/app/page.tsx` from a client component to a server component (`HomeShell` +
-`loadGlance`). The `this-n2kl8y` branch adds a topbar subtitle to the version you are deleting.
-Your structure wins, but **tell TechPad Gen rather than letting their change vanish** — their
-subtitle needs re-applying on top of your rewrite.
-
-You also edit `CLAUDE.md`. Under the current rules you may not: flag the contradiction in the PR and
-stop. The brief is approved before it is updated, not alongside the code.
+**Your `CLAUDE.md` edits were dropped**, not because they were wrong but because agents do not edit
+the brief. Flag contradictions in the PR and stop.
 
 ## What you must not touch
 
@@ -66,21 +54,23 @@ stop. The brief is approved before it is updated, not alongside the code.
 
 ## Next steps
 
-1. Make the case for `/api/summary` to Joel. That is the gate on your branch.
-2. Coordinate the `page.tsx` rewrite with TechPad Gen.
-3. Remove your `CLAUDE.md` edits from the branch and raise them as a flag instead.
+1. **The Microsoft integration is inert.** `MS_GRAPH_*` and `CRON_SECRET` are unset on the tracker's
+   Vercel project, and the code degrades quietly by design — correct at runtime, and it means
+   nothing will tell you the cron is doing nothing. Joel holds the Azure registration; chase it
+   before building further on top.
+2. Verify the daily sweep once those exist. It has never run against real credentials.
+3. The deferred piece below — syncing a completed task back to reset `last_touch_date`.
 
-## Not built yet — build order step 5
+## Built, per build order step 5
 
-**Google Tasks integration.** Vercel Cron runs daily, finds threads past the stale threshold with
-`open_task_id` still null, creates a Google Task per match (title `Follow up — [Contact]
-([Company])`, notes carrying the last note and next action, due today), and stores the returned ID
-so the same thread is not re-flagged. `open_task_id` clears when a thread is updated. A manual
-"create a task" button exists independently of the stale check.
+**Microsoft To Do, via Graph.** Vercel Cron runs daily, finds threads past the stale threshold with
+`open_task_id` still null, creates a task per match (title `Follow up — [Contact] ([Company])`,
+notes carrying the last note and next action, due today), and stores the returned ID so the same
+thread is not re-flagged. `open_task_id` clears when a thread is updated. The manual button
+overrides that guard — the guard exists to stop the sweep repeating itself, not to stop you asking.
 
-One-time setup — register the app in Google Cloud Console, complete OAuth consent, store the refresh
-token server-side — is Joel's, not yours. `GOOGLE_TASKS_*` env vars are named in the brief but not
-referenced in code yet.
+One-time setup — register the app in Azure against a personal Microsoft account, complete consent,
+store the refresh token server-side — is Joel's, not yours.
 
 Deferred deliberately: syncing a completed Google Task back to reset `last_touch_date`. Add it once
 the base loop is solid.

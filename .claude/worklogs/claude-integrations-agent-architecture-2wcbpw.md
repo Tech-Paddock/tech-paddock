@@ -39,3 +39,24 @@ Both branches edit `CLAUDE.md`, and so did this one. Rebase before you assume yo
 still where you left it. `coffee` additionally proposes renaming the Vercel projects to bare names
 — that was declined, the `tp-` prefix stays, and the table has been corrected to match the live
 account. Drop that section before merging.
+
+## 2026-09-11 21:00 — final handoff
+
+Landed nine PRs, #16 through #25. `main` now carries five apps, five CI jobs, eight checked-in
+migrations, the Rules of Engagement, this worklog channel, nine agent briefs, and three hooks that
+enforce rather than ask.
+
+The two finds worth remembering, neither of which would have surfaced on its own:
+
+- The database was the only record of its own shape. Six of seven migrations existed nowhere else.
+- A new Postgres schema inherits no grants, so `coffee` would have deployed clean, passed CI, and
+  failed at runtime on permissions. The trap was set by a migration written before that app existed.
+
+The mistake worth remembering: I blocked the `/api/summary` branch on a concern formed from reading
+design notes rather than code, and I was wrong. It is recorded as wrong in the ledger rather than
+quietly dropped.
+
+Open: nothing of mine. Everything left is Joel's — `tp-coffee-app` repointing, the Microsoft env
+vars, `build (coffee)` in the required checks, and `supabase link`. All in `_open-items.md`.
+
+Need from TD: nothing. This was the TD's branch.
