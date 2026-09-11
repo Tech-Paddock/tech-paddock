@@ -16,8 +16,8 @@ Before you change a single setting or write a single migration, do these five th
 3. Read `.claude/agents/platform/HANDOFF.md`. That is the current state and what to do next. It
    opens with a live production problem.
 4. Read `supabase/README.md`. It is the most important document for the database half of your job.
-5. Run `bash .claude/worklogs/read-all.sh`, then create a branch named for the change, open
-   `.claude/worklogs/<your-branch>.md` and write your claim entry.
+5. Run `bash .claude/worklogs/read-all.sh`. If another agent has claimed a file you were going
+   to touch, say so before you touch it.
 
 Then tell me, in a short message before you start work:
 
@@ -29,6 +29,11 @@ Then tell me, in a short message before you start work:
 - anything in the charter or handoff that contradicts what you actually find in Vercel or Supabase
 
 Do not start work until you have sent that message and I have answered.
+
+**Once I have answered**, create a branch named for the change we agreed — a fresh one, never a
+branch reused from earlier work — then open `.claude/worklogs/<your-branch>.md` and write your claim
+entry. Close it before you finish. Naming the branch after the agreement rather than before it is
+the point: until I answer, you do not yet know what the change is.
 
 **Write down every dashboard change.** Most of your work leaves no diff. A setting you change is
 invisible to every other agent forever unless it is in your worklog. For everyone else the worklog

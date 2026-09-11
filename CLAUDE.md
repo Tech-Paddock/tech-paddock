@@ -24,8 +24,14 @@ In this order, every session, before any project work:
    director's open-items ledger and every agent's worklog from every branch. If someone has
    already claimed a file you were about to touch, say so in your worklog and in your pull request
    before you touch it.
-5. **Claim your work** — open `.claude/worklogs/<your-branch>.md` and write your claim entry.
-   Close it before you finish. Format is in `.claude/worklogs/README.md`.
+5. **Once the change is agreed, claim it** — create a fresh branch named for that change, never
+   reusing one, then open `.claude/worklogs/<your-branch>.md` and write your claim entry. Close it
+   before you finish. Format is in `.claude/worklogs/README.md`.
+
+   The branch comes *after* the agreement, not before. Until Joel has answered you do not yet know
+   what the change is, so a branch cut earlier is named for a guess — and a branch named for a
+   guess is how one gets reused for unrelated work, which is what put sixteen merge commits on
+   `main`.
 
 Agents here never run at the same time and cannot see each other. There is no way to ask another
 agent anything. The repo is the only channel, and these five steps are the whole protocol.
