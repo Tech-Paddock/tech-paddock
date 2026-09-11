@@ -29,7 +29,22 @@ with no app has no gate.
 
 Needed on that project: Root Directory → `apps/coffee`, framework → Next.js, five environment
 variables (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_PASSWORD_HASH`, `SESSION_SECRET`,
-`ANTHROPIC_API_KEY`), then attach `coffee.techpaddock.io`.
+`ANTHROPIC_API_KEY`), then attach `coffee.techpaddock.io` in Vercel.
+
+**The Cloudflare half is already done.** `coffee.techpaddock.io` has a real A record at
+`76.76.21.21` — confirmed not a wildcard, because a nonsense subdomain on the same zone does not
+resolve. Only the Vercel-side attachment remains, and it should take effect immediately.
+
+**As of 23:31 the project is partly configured.** Its `updatedAt` moved, so something was changed,
+but the framework preset is still `null` and the domain is still not attached. Root Directory and
+the environment variables are not exposed by the Vercel API, so no session can confirm them — which
+is what the health check below is for.
+
+**You have `GET /api/health`** (#31). Once you can log in, it names which dependency is unhappy: the
+`coffee` schema, the `coffee-files` bucket, or a missing `ANTHROPIC_API_KEY`. Reaching it at all
+proves `APP_PASSWORD_HASH` and `SESSION_SECRET` are right, because it sits behind the gate. The
+Anthropic check is presence and shape only and reports "set", never "working" — a live call would
+cost money and could fail for unrelated reasons.
 
 Two things follow for you:
 
@@ -63,7 +78,9 @@ The recommendation on the ledger is to close #28 and delete the branch.
 
 ## Next steps
 
-1. Wait for `tp-coffee-app` to be configured. Nothing you can do moves that.
+1. Wait for `tp-coffee-app` to be configured. Nothing you can do moves that. When it is, hit
+   `/api/health` before anything else — a green build says nothing about whether the five
+   environment variables are right, because they are read per request rather than at build time.
 2. Once there is a preview URL: run a real bag through the whole flow. Photograph, confirm, search,
    save. That is the first genuine test of `validateGuide` against a live roaster site and the
    first chance to see which tier actually answers in practice.

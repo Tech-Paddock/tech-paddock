@@ -12,8 +12,10 @@ automatically, so it should already be there.
 
 ## The largest live problem
 
-**Production has not deployed since 17:48 today.** Eleven pull requests merged to `main` after that
-and none of them shipped. `editor.techpaddock.io` and the rest are serving commit `92c1ec1`.
+**Production has not deployed since 17:48 today.** `editor.techpaddock.io` and the rest serve commit
+`92c1ec1`, and everything merged since is undeployed — check the commit, not a count, because the
+count grows on every merge. Verified at 23:45: zero deployments on any of the five projects since
+17:54, across three merged pull requests.
 
 Diagnosis, evidence and fix are in `.claude/agents/platform/HANDOFF.md` — it is that agent's to
 carry, and Joel's to unblock, because it needs a GitHub App installation only he can restore. Your
@@ -23,30 +25,28 @@ live URL in the meantime. **What is deployed is not what is on `main`.**
 The PII scrub (#21) is in that backlog. A real company name is still being served in the resume
 app's live UI, behind the password gate.
 
-## The queue
+## The queue is empty
 
-Nothing is in flight. `main` is at `fdbc4bf`.
+Zero open pull requests. `main` carries the full agent documentation restructure (#29, #30), the
+Coffee health check (#31), and Joel's two direct commits deleting the orphaned worklogs.
 
-**Open on this branch:** the agent documentation restructure — `CLAUDE.md` cut to routing and
-universal rules, seven agent folders each carrying charter, handoff and kickoff. The nine
-superseded briefs it replaces have been deleted in the same change. Not merged as of this writing.
+PR #28 was closed as superseded, with the reasoning posted on the pull request rather than only in
+this file, and every dead branch has been deleted.
 
-**PR #28 is open and should be closed.** It is the superseded original of the Coffee app, 7 ahead
-and 14 behind, already conflicting. Details in `.claude/agents/coffee/HANDOFF.md`. Closing it needs
-a comment explaining that #23 superseded it, so its author is not left guessing.
-
-**Three branches are dead** and need deleting in the GitHub UI — the git proxy returns 403 on
-`--delete` while permitting pushes: `coffee-brewing-assistant-hmvffw`,
-`tracker-dashboard-concept-r6p9up`, `resume-editor-design-wccfly` (already fully merged, 0 ahead).
+**Branch deletion is not something you can do.** The git proxy returns 403 on `--delete` while
+permitting pushes, and no GitHub tool in this session exposes it. It is a GitHub UI job, so say so
+rather than promising it.
 
 ## Waiting on Joel
 
 Live infrastructure and one-time credentials. None of it is yours.
 
 1. **Reconnect Vercel's GitHub App.** Unblocks everything else. `github.com/settings/installations`.
-2. **Repoint `tp-coffee-app`** — Root Directory `apps/coffee`, framework Next.js, five env vars,
-   attach `coffee.techpaddock.io`. **The only publicly exposed thing in the project** until it is
-   done: `tech-paddock.vercel.app` serves an empty page outside the password gate.
+2. **Finish `tp-coffee-app`. Partly done.** Verifiably outstanding: framework preset is still
+   `null`, and `coffee.techpaddock.io` is not in its domain list. Root Directory and the five
+   env vars are not API-visible, so `GET /api/health` on the deployed app is how to check them.
+   The Cloudflare DNS record already exists. **Still the only publicly exposed thing in the
+   project** until Root Directory points at a real app.
 3. **Verify the new `SESSION_SECRET` landed on all five projects** and that all five redeployed. It
    was rotated today. A partial rollout is the silent-SSO failure.
 4. **Set `MS_GRAPH_*` and `CRON_SECRET`** on `tp-tracker`. The Microsoft To Do integration and daily

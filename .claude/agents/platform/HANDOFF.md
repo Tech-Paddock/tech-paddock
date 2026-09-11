@@ -11,8 +11,12 @@ Read `RULES.md` first. This file is only what is true right now.
 **This is the biggest live problem in the project and it is yours.**
 
 Every one of the five Vercel projects last deployed production at **17:48 UTC**, commit `92c1ec1`
-(PR #16). The last deployment of any kind was a preview at 17:54. Since then **eleven pull requests
-have merged to `main` and none has deployed.**
+(PR #16). The last deployment of any kind was a preview at 17:54. Everything merged to `main` since
+then is undeployed — check the commit rather than a count, because the count grows on every merge.
+
+**Re-verified at 23:45, hours after the diagnosis below: still zero deployments on any of the five
+projects.** Three more pull requests merged in between and produced nothing. The GitHub App has not
+been reconnected.
 
 The evidence, so you do not re-derive it:
 
@@ -78,21 +82,30 @@ Merging this is also the cleanest way to clear the backlog — it touches all fi
 files, so every project rebuilds and `VERCEL_GIT_PREVIOUS_SHA` still points at `92c1ec1`, meaning
 each project sees the full accumulated diff.
 
-## `tp-coffee-app` is still wrong, and it is the only public exposure
+## `tp-coffee-app` is partly configured, and it is the only public exposure
 
-Root Directory points at the **repo root** rather than `apps/coffee`. It builds nothing and serves
-an empty page publicly at `tech-paddock.vercel.app`, **outside the password gate** — the gate lives
-in each app's middleware, so a project with no app has no gate.
+Joel worked on it at **23:31** — the project's `updatedAt` moved. Two things are **verifiably still
+outstanding**, and two cannot be checked from a session at all:
 
-`apps/coffee` has been on `main` since #23, so nothing blocks this any more. Joel's decision stands:
-**fix in place, do not delete.**
+| Setting | State at 23:45 |
+|---|---|
+| `framework` | still `null` — not set to Next.js |
+| domains | `coffee.techpaddock.io` **not attached**; only the three `.vercel.app` names |
+| Root Directory | **not exposed by the Vercel API** — unknowable from here |
+| the five env vars | **not exposed by the Vercel API** — unknowable from here |
 
-Needed: Root Directory → `apps/coffee`; framework → Next.js (currently `null`); five environment
-variables (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_PASSWORD_HASH`, `SESSION_SECRET`,
-`ANTHROPIC_API_KEY`); then attach `coffee.techpaddock.io`.
+For the last two, `GET /api/health` on the deployed app is the check — it landed in #31 and names
+which dependency is unhappy. A green build proves nothing, because the variables are read per
+request rather than at build time.
 
-The moment Root Directory points at a real app, that URL starts running the app's middleware and the
-public exposure closes. That is the reason this is first on the list.
+**The Cloudflare DNS is already done.** `coffee.techpaddock.io` resolves to `76.76.21.21`, a real A
+record rather than a wildcard — confirmed because a nonsense subdomain on the same zone does not
+resolve. Only the Vercel-side attachment remains.
+
+Until Root Directory points at a real app, `tech-paddock.vercel.app` serves an empty page
+**outside the password gate** — the gate lives in each app's middleware, so a project with no app
+has no gate. That is why this is first on the list. Joel's decision stands: **fix in place, do not
+delete.**
 
 Note: `tp-message-editor` also shows `framework: null`, though it has been deploying correctly via
 its own `vercel.json`. Worth setting for consistency; not urgent.
