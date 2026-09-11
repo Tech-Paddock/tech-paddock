@@ -173,7 +173,10 @@ details when rendering a resume creates or updates the thread here. The tracker 
 and keeps its own ad-hoc thread creation for applications and networking threads that never
 involve a resume.
 
-**Seed contacts/threads to load once built:** Cloud for Good, SaltClick, Growth Heroes, Attain, RedPoint, Christine Pallen, Elisa Salina.
+**Seed contacts/threads:** loaded directly into the project on 2026-09-08 — five org-linked threads
+and two named contacts. The names stay out of the repo under the no-personal-information rule
+above, which covers migrations and briefs as much as it covers docx fixtures; that seed migration
+is deliberately not checked in. See `supabase/README.md`.
 
 ---
 
