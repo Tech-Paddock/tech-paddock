@@ -39,9 +39,11 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 
 - **Framework:** Next.js, hosted on Vercel
 - **Database:** Supabase (Postgres) — one project, multiple schemas
-- **AI:** Anthropic API, model `claude-sonnet-5`, own API key, server-side only. One exception:
-  the Resume Formatter's paragraph-labeling call uses `claude-opus-5` at effort `high` — it is the
-  accuracy-critical step in that tool and a mislabel silently corrupts a submitted resume
+- **AI:** Anthropic API, model `claude-sonnet-5`, own API key, server-side only. **The Resume
+  Formatter makes no model calls at all** — the SDK is not even a dependency there. Labelling turned
+  out to be fully deterministic on both document families (see Tool 3), so `claude-opus-5` at effort
+  `high` is reserved for the escalation path rather than in use. Adding a call would also cost the
+  reproducibility that makes a saved render a trustworthy record, so it stays an exception path
 - **Domain:** techpaddock.io via Cloudflare Registrar; subdomains via DNS + separate Vercel projects (one per app folder, see Core Architecture Principles)
 - **Docx generation** (Resume Formatter only): `docx` npm package, server-side
 - **Docx reading** (Resume Formatter only): `jszip` + `fast-xml-parser` — the `docx` package only
@@ -210,11 +212,20 @@ once written. Application metadata stays editable, since a resume is usually ren
 it is submitted, and `submitted_at` stays null until it actually goes out. Job details (company,
 role, posting URL, contact) live on the linked tracker thread and are never duplicated here.
 
-**Lossless rule:** the model labels paragraphs, it never transcribes them. Text always comes from
-the source docx; the model only assigns each paragraph a role. Content loss is therefore
-structurally impossible rather than something to verify after the fact — which matters because
-Jobright's specific wording *is* the ATS optimization, and a silently dropped line is lost keyword
-coverage.
+**Lossless rule:** labelling moves text, it never rewrites it. Every string comes from the source
+docx; labelling only assigns each paragraph a role. Content loss is therefore structurally
+impossible rather than something to verify after the fact — which matters because Jobright's
+specific wording *is* the ATS optimization, and a silently dropped line is lost keyword coverage.
+
+**Labelling is deterministic, and the model is not wired up.** Jobright's export is machine
+generated and highly regular — run size alone separates the name, headings, entry lines and body,
+since its `styles.xml` defines no named styles whatsoever. Sizes are *ranked* rather than
+hardcoded, because the template's scale is completely different and it sets its Career Highlights
+metrics larger than its own headings. Both fixtures label at 100% coverage, so a model call would
+have nothing to decide. The escalation trigger already exists and is already measured — coverage
+below 100%, or an `unknown_heading` finding — and only the call itself is missing. Wire it when a
+real document defeats the rules, not before: a model call is also non-deterministic, and
+determinism is what makes a saved render reproducible.
 
 **Parser note:** content is not always a direct child of `<w:body>` — the template keeps its
 Core Competencies inside a `<w:sdt>` content control, and Career Highlights inside a table cell.
@@ -243,7 +254,14 @@ the ATS lint test below: exactly one table is permitted, and one anywhere else f
 `templates/`, `sources/` and `renders/`. Files are written before the row that points at them, so a
 row never references an object that was never created.
 
-**Testing** — CI runs `npm run test --if-present` before each build:
+**Health check:** `GET /api/health` probes the database, the storage bucket, the tracker schema and
+the active template, and names whichever is unhappy. A missing template reports as not-ok but keeps
+the endpoint at 200 — that is a setup step, not a broken dependency.
+
+**Testing** — CI runs `npm run test --if-present` before each build. Database and Storage calls are
+covered with a query-builder double (`tests/helpers/fakeSupabase.ts`), which tests write ordering,
+branch selection and error mapping but deliberately not SQL semantics; the partial unique index and
+the foreign keys are only ever exercised against the real project:
 - Golden file: fixed content + fixed spec renders byte-identical twice (this is what makes a saved
   render trustworthy as a record of what was actually sent)
 - ATS lint: unzip the generated docx and assert the rules above mechanically
