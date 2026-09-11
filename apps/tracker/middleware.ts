@@ -20,6 +20,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // The hub renders its landing glance server-side, so its request for the
+  // roll-up carries a shared secret rather than a browser session cookie.
+  // Scoped to /api/summary only — never a blanket bypass for the rest of the
+  // API — mirroring the editor's bypass for /api/draft.
+  if (pathname === "/api/summary") {
+    const internalSecret = process.env.INTERNAL_API_SECRET;
+    const provided = request.headers.get("x-internal-secret");
+    if (internalSecret && provided === internalSecret) {
+      return NextResponse.next();
+    }
+  }
+
   const session = await readSession(request.cookies.get(COOKIES.SESSION)?.value);
   if (session) {
     const res = NextResponse.next();
