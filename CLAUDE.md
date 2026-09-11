@@ -156,17 +156,19 @@ it is the single most load-bearing open question on the ledger.
 | `editor.techpaddock.io` | Message Editor | `tp-message-editor` | live |
 | `tracker.techpaddock.io` | Pipeline Tracker | `tp-tracker` | live |
 | `resume.techpaddock.io` | Resume Formatter | `tp-resume` | live |
+| `coffee.techpaddock.io` | Coffee | `tp-coffee-app` | built, not yet deployed |
 
 All four deploy from this one repo, separated by Root Directory. Project names carry a `tp-` prefix
 and do not match their folder or subdomain — verified against the Vercel account on 2026-09-11, and
 the prefix stays. Renaming five live projects to make a table tidier is backwards; the table gets
 corrected instead.
 
-There is a fifth project, **`tp-coffee-app`**, created by Vercel's import-suggestion flow and
-pointed at the repo root rather than at an app. It builds nothing and serves an empty page publicly
-at `tech-paddock.vercel.app`, outside the password gate — the gate lives in each app's middleware,
-so a project with no app has no gate. It is to be fixed in place, not deleted: Root Directory to
-`apps/coffee`, framework Next.js, env vars added. Blocked until `apps/coffee` exists on `main`.
+The fifth project, **`tp-coffee-app`**, was created by Vercel's import-suggestion flow and points
+at the repo root rather than at an app. It builds nothing and serves an empty page publicly at
+`tech-paddock.vercel.app`, outside the password gate — the gate lives in each app's middleware, so a
+project with no app has no gate. **`apps/coffee` now exists on `main`, so this is unblocked:** point
+Root Directory at `apps/coffee`, set the framework to Next.js, add the env vars, and attach
+`coffee.techpaddock.io`. Fixed in place, not deleted.
 
 ## Environment Variables Needed
 
@@ -175,7 +177,7 @@ SUPABASE_URL=                 # all apps that talk to Postgres
 SUPABASE_SERVICE_ROLE_KEY=    # ditto
 APP_PASSWORD_HASH=            # bcrypt hash of the login password — all four apps
 SESSION_SECRET=               # all four apps, and MUST be byte-identical across them
-ANTHROPIC_API_KEY=            # editor only — the resume app makes no model calls
+ANTHROPIC_API_KEY=            # editor + coffee — the resume app makes no model calls
 INTERNAL_API_SECRET=          # editor + tracker only (server-to-server draft call)
 EDITOR_BASE_URL=              # tracker only
 MS_GRAPH_CLIENT_ID=           # tracker only — Outlook calendar + To Do, one registration
