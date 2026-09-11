@@ -60,3 +60,23 @@ Open: nothing of mine. Everything left is Joel's — `tp-coffee-app` repointing,
 vars, `build (coffee)` in the required checks, and `supabase link`. All in `_open-items.md`.
 
 Need from TD: nothing. This was the TD's branch.
+
+## 2026-09-11 21:45 — claim
+
+Working on: restructuring the agent documentation. `CLAUDE.md` becomes highest-level only — how to
+interact, universal rules, and routing. Each of the eight agents gets `RULES.md` (charter and
+guardrails), `HANDOFF.md` (current state) and `KICKOFF.md` (the prompt that starts the session).
+Touching: `CLAUDE.md`, `.claude/agents/`, and eventually `.claude/handoff/` which this replaces.
+Depends on: nothing. Joel approved the `CLAUDE.md` restructure directly.
+
+Partial as committed: foundation plus `message-editor` only. Seven agents still to write, and the
+old `.claude/handoff/` briefs are still in place — `CLAUDE.md` currently routes to charters that do
+not exist yet. **Not mergeable in this state.**
+
+Decision affecting others: universal rules stay in `CLAUDE.md` alone and are not copied into eight
+charters. Eight copies would drift silently, which is the same failure as `lib/auth.ts` being
+byte-identical in five apps. Each charter carries only what is specific to it.
+
+Need from TD: Joel to ratify three Message Editor brief changes the agent raised rather than made —
+tone as a picklist, the Effort toggle never built, and the new Context input. All three are merged
+and live; none is approved. Recorded in that agent's handoff as pending, not as settled.
