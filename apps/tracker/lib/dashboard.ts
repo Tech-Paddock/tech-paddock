@@ -73,7 +73,9 @@ export async function loadDashboard(now = new Date()): Promise<DashboardData> {
     await Promise.all([
       getServiceClient()
         .from("pipeline_threads")
-        .select("id, contact_id, company, stage, last_touch_date, next_action, notes, created_at"),
+        .select(
+          "id, contact_id, company, stage, last_touch_date, next_action, notes, open_task_id, created_at"
+        ),
       getSharedClient().from("contacts").select("id, name, org, preferred_channel"),
       getEditorClient()
         .from("message_history")

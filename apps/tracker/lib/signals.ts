@@ -17,6 +17,7 @@ export type ThreadRow = {
   last_touch_date: string;
   next_action: string | null;
   notes: string | null;
+  open_task_id: string | null;
   created_at: string;
 };
 
