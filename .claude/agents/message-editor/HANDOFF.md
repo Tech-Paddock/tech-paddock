@@ -69,8 +69,8 @@ fails on permissions, shape, or an unhandled rejection that is being swallowed.
 
 ## Your app is live but stale
 
-`editor.techpaddock.io` is serving code from **17:48 today** — commit `92c1ec1`. Eleven merges to
-`main` since then have not deployed, yours included.
+`editor.techpaddock.io` is serving code from **17:48 today** — commit `92c1ec1`. Everything merged to
+`main` since then is undeployed, yours included.
 
 This is not your bug and not yours to fix. Vercel's GitHub App lost its installation when the repo
 was transferred, so pushes stopped triggering builds. It is on Joel's list and the Vercel Config

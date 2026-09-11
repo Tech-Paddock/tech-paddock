@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-11 22:30 UTC.**
+**Last reviewed: 2026-09-11 23:45 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -15,8 +15,10 @@ and the things that belong to nobody else.
 
 ## Blocking everything else
 
-- **2026-09-11 — PRODUCTION HAS NOT DEPLOYED SINCE 17:48.** Eleven pull requests merged to `main`
-  after that and none shipped. Every app serves commit `92c1ec1`. Cause: Vercel's GitHub App lost
+- **2026-09-11 — PRODUCTION HAS NOT DEPLOYED SINCE 17:48.** Every app serves commit `92c1ec1`, and
+  everything merged since is undeployed — the count only grows, so check the commit rather than a
+  number. Verified at 23:45: zero deployments on **any** of the five projects since 17:54, across
+  three merged pull requests. Cause: Vercel's GitHub App lost
   its installation when the repo was transferred to the org and back — a GitHub App is installed on
   an *account*, not a repository. Pushes succeed, CI runs, Vercel never hears. Ruled out: the Hobby
   daily deploy cap (no banner) and `git.deploymentEnabled` (set in none of the five `vercel.json`).
@@ -28,10 +30,17 @@ and the things that belong to nobody else.
 
 ## Waiting on Joel
 
-1. **2026-09-11 — Repoint `tp-coffee-app`.** Root Directory → `apps/coffee`, framework → Next.js,
-   five env vars, attach `coffee.techpaddock.io`. **The only publicly exposed thing in the project**
-   until it is done: `tech-paddock.vercel.app` serves an empty page outside the password gate,
-   because the gate lives in each app's middleware and a project with no app has no gate.
+1. **2026-09-11 — Finish `tp-coffee-app`. Partly done as of 23:31.** The project's `updatedAt` moved,
+   so something was changed, but two settings are verifiably still outstanding: **framework preset is
+   still `null`** and **`coffee.techpaddock.io` is not in its domain list**. Root Directory and the
+   five environment variables are not exposed by the Vercel API, so they cannot be confirmed from a
+   session either way — `GET /api/health` on the deployed app is the way to check them.
+   **The Cloudflare DNS is already done**: `coffee.techpaddock.io` has a real A record at
+   `76.76.21.21`, confirmed not a wildcard because a nonsense subdomain on the same zone does not
+   resolve. Only the Vercel-side attachment remains.
+   **This is still the only publicly exposed thing in the project** until Root Directory points at a
+   real app: `tech-paddock.vercel.app` serves an empty page outside the password gate, because the
+   gate lives in each app's middleware and a project with no app has no gate.
 2. **2026-09-11 — Verify the new `SESSION_SECRET` on all five projects.** It was rotated today
    because the old value could not be read back out of the dashboard. Nobody has confirmed it landed
    everywhere, and with deploys broken it is likely no project has picked it up. A partial rollout is
@@ -45,10 +54,17 @@ and the things that belong to nobody else.
 5. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
-6. **2026-09-11 — Close PR #28 and delete three dead branches.** #28 is the superseded original of
-   the Coffee app, already conflicting. Branches: `coffee-brewing-assistant-hmvffw`,
-   `tracker-dashboard-concept-r6p9up`, `resume-editor-design-wccfly`. The git proxy returns 403 on
-   `--delete`, so this is a GitHub UI job.
+## Done since this ledger was last written
+
+- **2026-09-11 — PR #28 closed and all dead branches deleted.** The queue is empty: zero open pull
+  requests, and `main` plus one docs branch is the whole branch list.
+- **2026-09-11 — Coffee has `GET /api/health`** (#31). Reachable after login, it names which
+  dependency is unhappy — the `coffee` schema, the `coffee-files` bucket, or a missing
+  `ANTHROPIC_API_KEY`. It exists because the build succeeds whether or not the five environment
+  variables are right, so a green deploy proves nothing about the configuration. The Anthropic check
+  is presence and shape only and reports "set", never "working".
+- **2026-09-11 — The two orphaned worklogs were deleted**, by Joel, directly on `main`. The rule is
+  now written down in `.claude/worklogs/README.md`: a worklog dies with its branch.
 
 ## Decisions made, so they are not reopened
 

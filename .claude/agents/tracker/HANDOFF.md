@@ -42,8 +42,8 @@ about it is a claim about code that has not executed.
 
 ## Your app is live but stale
 
-`tracker.techpaddock.io` is serving code from **17:48 today**, commit `92c1ec1`. Eleven merges to
-`main` since then have not deployed, #22 included.
+`tracker.techpaddock.io` is serving code from **17:48 today**, commit `92c1ec1`. Everything merged to
+`main` since then is undeployed, #22 included.
 
 Not your bug and not yours to fix — Vercel's GitHub App lost its installation when the repo was
 transferred. It is on Joel's list and the Platform agent's. **But it means the live site is not
