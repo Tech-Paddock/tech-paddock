@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchBrewGuide } from "@/lib/anthropic";
+import { findRoasterDomain } from "@/lib/bags";
 
 export const dynamic = "force-dynamic";
 // Three tiers of search and fetch at high effort runs well past the default.
@@ -15,11 +16,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const guide = await searchBrewGuide({
-      roaster,
-      coffeeName,
-      roasterDomain: typeof body.roaster_domain === "string" && body.roaster_domain.trim() ? body.roaster_domain.trim() : null,
-    });
+    // Prefer a domain a previous search already verified for this roaster over
+    // one the caller supplied, and fall back to neither rather than a guess.
+    const roasterDomain =
+      (await findRoasterDomain(roaster)) ??
+      (typeof body.roaster_domain === "string" && body.roaster_domain.trim() ? body.roaster_domain.trim() : null);
+
+    const guide = await searchBrewGuide({ roaster, coffeeName, roasterDomain });
     return NextResponse.json({ guide });
   } catch (error) {
     return NextResponse.json(

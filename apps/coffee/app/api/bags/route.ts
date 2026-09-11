@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { uploadPhoto, signedPhotoUrl, StorageError, IMAGE_TYPES } from "@/lib/storage";
 import { isBrewMethod } from "@/lib/methods";
+import { findPreviousBag } from "@/lib/bags";
 import type { Guide } from "@/lib/guide";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,17 @@ export const dynamic = "force-dynamic";
 const MAX_BYTES = 4 * 1024 * 1024;
 
 export async function GET(request: NextRequest) {
-  const q = request.nextUrl.searchParams.get("q")?.trim();
+  const params = request.nextUrl.searchParams;
+
+  // Asking about one specific coffee is a different question from searching
+  // the library: it's "have I bought this before, and what did I land on".
+  const roaster = params.get("roaster")?.trim();
+  const coffeeName = params.get("coffee_name")?.trim();
+  if (roaster && coffeeName) {
+    return NextResponse.json({ previous: await findPreviousBag(roaster, coffeeName) });
+  }
+
+  const q = params.get("q")?.trim();
   const supabase = getServiceClient();
 
   let query = supabase.from("bags").select("*").order("created_at", { ascending: false });

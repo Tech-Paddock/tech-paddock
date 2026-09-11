@@ -36,6 +36,14 @@ type Bag = Identity & {
   created_at: string;
 };
 
+type PreviousBag = {
+  id: string;
+  my_method: string | null;
+  my_grinder: string | null;
+  my_grind_setting: string | null;
+  created_at: string;
+};
+
 const EMPTY: Identity = {
   roaster: "",
   coffee_name: "",
@@ -112,6 +120,9 @@ function Scan({ onSaved }: { onSaved: () => void }) {
   const [myMethod, setMyMethod] = useState<BrewMethod | "">("");
   const [stage, setStage] = useState<"idle" | "reading" | "confirm" | "searching" | "review" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [previous, setPrevious] = useState<PreviousBag | null>(null);
+  const [carried, setCarried] = useState(false);
+  const [dialIn, setDialIn] = useState({ my_grinder: "", my_grind_setting: "" });
 
   async function pick(file: File) {
     setError(null);
@@ -145,6 +156,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
     }
     setError(null);
     setStage("searching");
+    void lookForPrevious(identity.roaster, identity.coffee_name);
     try {
       const res = await fetch("/api/search", {
         method: "POST",
@@ -162,6 +174,24 @@ function Scan({ onSaved }: { onSaved: () => void }) {
     }
   }
 
+  async function lookForPrevious(roaster: string, coffeeName: string) {
+    const res = await fetch(
+      `/api/bags?roaster=${encodeURIComponent(roaster)}&coffee_name=${encodeURIComponent(coffeeName)}`
+    );
+    if (!res.ok) return;
+    setPrevious(((await res.json()).previous as PreviousBag) ?? null);
+  }
+
+  function carryForward() {
+    if (!previous) return;
+    if (previous.my_method) setMyMethod(previous.my_method as BrewMethod);
+    setDialIn({
+      my_grinder: previous.my_grinder ?? "",
+      my_grind_setting: previous.my_grind_setting ?? "",
+    });
+    setCarried(true);
+  }
+
   async function save() {
     if (!identity) return;
     setStage("saving");
@@ -172,6 +202,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
       if (photo) body.append("photo", photo);
       if (guide) body.append("guide", JSON.stringify(guide));
       if (myMethod) body.append("my_method", myMethod);
+      for (const [k, v] of Object.entries(dialIn)) if (v) body.append(k, v);
 
       const res = await fetch("/api/bags", { method: "POST", body });
       const data = await res.json();
@@ -262,6 +293,30 @@ function Scan({ onSaved }: { onSaved: () => void }) {
 
       {stage !== "confirm" && guide && <GuideCard guide={guide} />}
 
+      {stage !== "confirm" && previous && (
+        <section className="bg-white border border-accent rounded-2xl p-4 flex flex-col gap-2">
+          <h2 className="font-medium">You&apos;ve had this before</h2>
+          <p className="text-sm text-ink/70">
+            Bought {new Date(previous.created_at).toLocaleDateString()}, dialled in on{" "}
+            {[
+              previous.my_method ? METHOD_LABELS[previous.my_method as BrewMethod] : null,
+              previous.my_grinder,
+              previous.my_grind_setting,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+            .
+          </p>
+          {carried ? (
+            <p className="text-sm text-ink/60">Carried over. Edit anything below.</p>
+          ) : (
+            <button onClick={carryForward} className="self-start text-sm text-accent underline">
+              Start from that
+            </button>
+          )}
+        </section>
+      )}
+
       {stage !== "confirm" && (
         <section className="bg-white border border-line rounded-2xl p-4 flex flex-col gap-3">
           <h2 className="font-medium">How you&apos;ll brew it</h2>
@@ -280,9 +335,19 @@ function Scan({ onSaved }: { onSaved: () => void }) {
               ))}
             </select>
           </label>
-          {guide?.method && myMethod === guide.method && (
+          {guide?.method && myMethod === guide.method && !carried && (
             <p className="text-xs text-ink/50">Pre-filled from the roaster&apos;s recommendation. Change it freely.</p>
           )}
+          <Field
+            label="grinder"
+            value={dialIn.my_grinder}
+            onChange={(v) => setDialIn({ ...dialIn, my_grinder: v })}
+          />
+          <Field
+            label="grind setting"
+            value={dialIn.my_grind_setting}
+            onChange={(v) => setDialIn({ ...dialIn, my_grind_setting: v })}
+          />
         </section>
       )}
 
