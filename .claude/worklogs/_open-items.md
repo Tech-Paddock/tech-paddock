@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-Last reviewed: 2026-09-11
+Last reviewed: 2026-09-11 (post-transfer, access restored)
 
 **Pit Wall board:** https://claude.ai/code/artifact/9cac3618-1a51-4d5e-82fb-339e96657bf4 — the same
 state as this file, plus deployments, CI and branches, as a page. It does not poll anything; it is
@@ -17,10 +17,17 @@ readout is amber or red, check Vercel and GitHub directly rather than trusting i
 
 ## Waiting on Joel
 
-- **2026-09-11 — Is branch protection available on this account?** Settings → Branches. This is the
-  hinge for everything else: without it, "no pushing to `main`" is a convention that an agent
-  ignoring it will succeed at. The repo is private on a personal account, which may require a paid
-  plan. Unverified — the API does not expose the plan.
+- **2026-09-11 — Branch protection is configured but almost certainly NOT ACTIVE right now.**
+  Answered and then undone by circumstance. A correct ruleset was built while the repo sat in the
+  `Tech-Paddock` org — Active, empty bypass list, PR required, 0 approvals, four build checks,
+  linear history, squash-only, conversation resolution, force-push and deletion blocked. The repo
+  has since been transferred **back to `joelb-401`**, and protection on a private repo under a
+  personal account generally needs a paid plan, so the ruleset is likely gone or inert.
+  **Assume `main` is unprotected until proven otherwise.** Every rule in `CLAUDE.md` is convention
+  again in the meantime. Plan of record: agents finish their current work, then the repo moves back
+  to the org and protection is re-enabled.
+  **Do not re-transfer without warning every running session** — the move breaks GitHub access for
+  any session already running, and it cannot be repaired mid-session (see the note at the bottom).
 - **2026-09-11 — Blocking hooks: yes or no.** `PreToolUse` hooks that refuse pushes to `main`,
   Vercel/DNS mutations, migrations with no checked-in file, and commits matching PII patterns. The
   only enforcement that works regardless of GitHub plan. Answer after the branch-protection
@@ -40,10 +47,30 @@ readout is amber or red, check Vercel and GitHub directly rather than trusting i
 - **2026-09-11 — PII scrub.** `"Proseware"`, a real target company, sits in a UI placeholder at
   `apps/resume/app/page.tsx:389` and in five fixtures in `apps/resume/tests/persistence.test.ts`.
   Approved for removal. Follow-on PR, not yet opened.
-- **2026-09-11 — Branch queue.** Merge order established and partly executed:
-  `devops-merge-commits` (PR #16) → this ruleset → `this-n2kl8y` → `tracker-dashboard` → `coffee`.
-  Delete `resume-formatter` (three days cold, 51 behind, conflicts) and `resume-editor-design-wccfly`
-  (already fully merged, nothing on it).
+- **2026-09-11 — Branch queue.** PR #16 and PR #17 both merged; the rules, the worklog channel and
+  the migration backfill are on `main`. Remaining order: `this-n2kl8y` → `tracker-dashboard`
+  (blocked, see below) → `coffee`. Delete `resume-formatter` (53 behind, conflicts),
+  `resume-editor-design-wccfly` (0 ahead) and `devops-merge-commits-ts7ohz` (squash-merged as #16).
+
+## Read this before transferring the repo again
+
+**2026-09-11 — A repo transfer breaks every running agent session, irreversibly for that session.**
+Moving `tech-paddock` to the `Tech-Paddock` org cost roughly two hours. What happened, so the next
+move is cheaper:
+
+- A session's authorized repository set is **fixed when the session starts**. When the repo moved,
+  the running TD session lost `git fetch` and every GitHub API call, and could not be repaired —
+  `add_repo` refuses cross-owner additions, so there was no way back in.
+- **GitHub App installations do not transfer with a repository.** The new org started with zero
+  apps. That is why Claude could not see the repo in its picker, and reconnecting the GitHub
+  connector did not help: reconnecting re-authorizes an identity, it does not create an installation
+  on an org that has none. The app has to be installed on the org explicitly.
+- **Vercel's app is subject to exactly the same thing.** If it is not installed on the org, pushes
+  stop triggering deployments and nothing announces it — the projects and custom domains survive,
+  the git trigger quietly does not.
+
+Before the next transfer: install both apps on the org first, stop all running sessions, move the
+repo, then start fresh sessions. In that order.
 
 ## Known and deliberately not fixed
 
