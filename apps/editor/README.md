@@ -38,7 +38,7 @@ npm run dev
   contact lookup and inline "+ New contact" form in the UI
 - Single-page UI: Draft mode (contact search, channel, purpose, tone, effort, free text →
   editable draft → log as sent) and Train mode (load logged history or paste samples → refined guide)
-- Deployed on Vercel (`tech-paddock` project, Root Directory set to `apps/editor`, linked to
+- Deployed on Vercel (`editor` project, Root Directory set to `apps/editor`, linked to
   this repo's `main` branch) with all four environment variables set
 - Live at **editor.techpaddock.io**, DNS via Cloudflare
 

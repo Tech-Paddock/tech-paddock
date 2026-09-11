@@ -52,13 +52,24 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 | Subdomain | Tool | Vercel project | Status |
 |---|---|---|---|
 | `techpaddock.io` (root) | Command center hub (`apps/home`) | `home` | live |
-| `editor.techpaddock.io` | Message Editor | `tech-paddock` | live |
+| `editor.techpaddock.io` | Message Editor | `editor` | live |
 | `tracker.techpaddock.io` | Pipeline Tracker | `tracker` | live |
 | `resume.techpaddock.io` | Resume Formatter | `resume` | live, rebuild in progress |
 | `coffee.techpaddock.io` | Coffee | `coffee` | planned — build order step 5 |
 
-Note the editor's Vercel project is named `tech-paddock`, not `editor` — it was the first project
-created. All four deploy from this one repo, separated by Root Directory.
+All of them deploy from this one repo, separated by Root Directory.
+
+**Naming: one bare tool name at every layer.** App folder, subdomain, Vercel project and Postgres
+schema all use the same word — `apps/editor`, `editor.techpaddock.io`, Vercel `editor`, schema
+`editor`. No prefix. The Vercel account holds nothing but Paddock and its team slug is already
+`tech-paddock`, so a `tp-` prefix would namespace these against nothing and say "tech paddock"
+twice before reaching the word that identifies anything.
+
+The editor's Vercel project was called `tech-paddock` until it was renamed to `editor` — Vercel had
+auto-named it after the repo, being the first project created, which left three different things
+(the repo, the Vercel team slug, and one project) sharing that name. Renaming cost nothing because
+custom domains, env vars, the Git connection and deployment history all survive a Vercel rename;
+only the unused `.vercel.app` address changed.
 
 ## Environment Variables Needed
 
