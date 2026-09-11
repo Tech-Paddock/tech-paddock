@@ -7,6 +7,7 @@ type Contact = {
   id: string;
   name: string;
   org: string | null;
+  position: string | null;
   relationship_type: string | null;
   preferred_channel: string | null;
 };
@@ -27,6 +28,21 @@ const PURPOSES = [
   { value: "other", label: "Other" },
 ] as const;
 
+// A picklist rather than free text so the same word reaches the model every
+// time — "warm", "Warm" and "warmish" were all producing different drafts.
+// Other keeps the escape hatch for a one-off tone worth spelling out.
+const TONES = [
+  "Warm",
+  "Direct",
+  "Brief",
+  "Formal",
+  "Casual",
+  "Enthusiastic",
+  "Apologetic",
+] as const;
+
+const TONE_OTHER = "__other__";
+
 const RELATIONSHIP_TYPES = [
   "Professional · Warm",
   "Professional · Cold",
@@ -45,6 +61,7 @@ function DraftShell() {
   const [newContact, setNewContact] = useState({
     name: "",
     org: "",
+    position: "",
     relationship_type: RELATIONSHIP_TYPES[0],
     preferred_channel: "email",
   });
@@ -52,7 +69,9 @@ function DraftShell() {
 
   const [channel, setChannel] = useState<(typeof CHANNELS)[number]["value"] | "">("");
   const [purpose, setPurpose] = useState<(typeof PURPOSES)[number]["value"] | "">("");
-  const [tone, setTone] = useState("");
+  const [toneChoice, setToneChoice] = useState("");
+  const [toneOther, setToneOther] = useState("");
+  const [context, setContext] = useState("");
   const [input, setInput] = useState("");
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
@@ -103,6 +122,10 @@ function DraftShell() {
       .catch(() => {});
   }, [linkedContactId]);
 
+  // What actually goes over the wire and into message_history: the picked
+  // tone, or whatever was typed under Other. Empty means no tone specified.
+  const tone = (toneChoice === TONE_OTHER ? toneOther : toneChoice).trim();
+
   const filteredContacts = useMemo(() => {
     const q = contactQuery.trim().toLowerCase();
     if (!q) return contacts;
@@ -139,7 +162,13 @@ function DraftShell() {
     setContacts((prev) => [...prev, data.contact]);
     selectContact(data.contact);
     setNewContactOpen(false);
-    setNewContact({ name: "", org: "", relationship_type: RELATIONSHIP_TYPES[0], preferred_channel: "email" });
+    setNewContact({
+      name: "",
+      org: "",
+      position: "",
+      relationship_type: RELATIONSHIP_TYPES[0],
+      preferred_channel: "email",
+    });
   }
 
   async function handleDraft() {
@@ -157,6 +186,7 @@ function DraftShell() {
         purpose,
         tone: tone || undefined,
         effort: "high",
+        context: context.trim() || undefined,
         input,
       }),
     });
@@ -359,6 +389,12 @@ function DraftShell() {
                     placeholder="Org (optional)"
                     className="border border-line rounded-lg px-3 py-2 text-sm"
                   />
+                  <input
+                    value={newContact.position}
+                    onChange={(e) => setNewContact({ ...newContact, position: e.target.value })}
+                    placeholder="Position (optional)"
+                    className="col-span-2 border border-line rounded-lg px-3 py-2 text-sm"
+                  />
                   <select
                     value={newContact.relationship_type}
                     onChange={(e) => setNewContact({ ...newContact, relationship_type: e.target.value })}
@@ -429,16 +465,51 @@ function DraftShell() {
               </select>
             </label>
 
-            <label className="col-span-2 flex flex-col gap-1.5 text-sm">
+            <label className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Tone (optional)</span>
-              <input
-                value={tone}
-                onChange={(e) => setTone(e.target.value)}
-                placeholder="e.g. warm, direct, brief"
+              <select
+                value={toneChoice}
+                onChange={(e) => setToneChoice(e.target.value)}
                 className="border border-line rounded-lg px-3 py-2 bg-white"
-              />
+              >
+                <option value="">No particular tone</option>
+                {TONES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+                <option value={TONE_OTHER}>Other…</option>
+              </select>
             </label>
+
+            {toneChoice === TONE_OTHER && (
+              <label className="flex flex-col gap-1.5 text-sm">
+                <span className="font-medium">Describe the tone</span>
+                <input
+                  value={toneOther}
+                  onChange={(e) => setToneOther(e.target.value)}
+                  autoFocus
+                  placeholder="e.g. rueful but not grovelling"
+                  className="border border-line rounded-lg px-3 py-2 bg-white"
+                />
+              </label>
+            )}
           </div>
+
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium">Context (optional)</span>
+            <span className="text-xs text-ink/60 -mt-1">
+              Background to read before drafting — what has already happened, what they said last,
+              anything that should shape the message without necessarily appearing in it.
+            </span>
+            <textarea
+              value={context}
+              onChange={(e) => setContext(e.target.value)}
+              rows={3}
+              placeholder="e.g. We met at a conference panel in March. They offered to make an intro and never followed up."
+              className="border border-line rounded-lg px-3 py-2 bg-white resize-y min-h-20"
+            />
+          </label>
 
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="font-medium flex items-center gap-1.5">
@@ -459,7 +530,7 @@ function DraftShell() {
               onChange={(e) => setInput(e.target.value)}
               rows={4}
               placeholder="e.g. Following up on our call last week, asking if there's an update on the role."
-              className="border border-line rounded-lg px-3 py-2 bg-white resize-none"
+              className="border border-line rounded-lg px-3 py-2 bg-white resize-y min-h-24"
             />
           </label>
 

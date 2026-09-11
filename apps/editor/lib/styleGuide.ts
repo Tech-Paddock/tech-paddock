@@ -9,8 +9,9 @@ export const SEED_STYLE_GUIDE = `- Declarative language, not hedged phrasing
 - Odd-time scheduled sends read more human than round numbers`;
 
 // Folds new writing samples into the existing style guide via Claude, then
-// stores the result as the next version. Shared by the bulk upload endpoint
-// (/api/style-guide) and single-message commits (/api/commit).
+// stores the result as the next version. Called only from /api/style-guide,
+// the deliberate batched refine — logging a sent message (/api/commit) is a
+// pure append and never touches the guide.
 export async function refineStyleGuide(samples: string) {
   const supabase = getServiceClient();
   const { data: current } = await supabase
