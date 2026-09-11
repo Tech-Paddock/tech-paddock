@@ -35,6 +35,74 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 - Every deployed app sits behind a password, with lockout after repeated failed attempts. A fully random generated password is the default recommendation; a memorable phrase is an acceptable tradeoff here given the low stakes and the lockout backstop — it's the user's call, not a hard rule.
 - **Prefer append over rewrite for anything that accumulates.** When a feature involves a growing body of history (sent messages, logs, past output), the default write path should be a plain insert — cheap, instant, no AI call — with any AI-driven synthesis (like refining a style guide) kept as a separate, deliberately-triggered, batched step. Don't reach for "call the model to regenerate the whole artifact" as the per-event write path; see the Message Editor's training design below for the concrete example.
 
+---
+
+## Rules of Engagement
+
+Several agents build here in parallel and none of them can see each other. They are never running
+at the same time, so there is no way to ask another agent anything. Every rule below exists because
+something already went wrong when an agent acted reasonably without knowing what another agent
+knew: three branches editing this file at once, six schema migrations that lived only in the
+database, a Vercel project pointed at the repo root and serving an unprotected page to the public,
+and real contact names committed to the file that forbids committing names.
+
+### Before you write anything
+
+**Run `bash .claude/worklogs/read-all.sh`.** It prints the open-items ledger and every agent's
+worklog from every branch. If someone has already claimed a file you were about to touch, say so in
+your own worklog and in your pull request before you touch it.
+
+Then open your own worklog at `.claude/worklogs/<your-branch>.md` and claim your work. Close it
+before you finish. The format is in `.claude/worklogs/README.md` and is deliberately short.
+
+Your worklog is not a second commit message. Commits here already explain what was done and why, at
+length, and they do it well. The worklog carries only what a commit cannot: what you are working on
+*right now*, what you are blocked on, what you decided that affects somebody else, and what you
+need from the technical director. If an entry could have been a commit message, make it one.
+
+### Never, without the technical director
+
+- **Push to `main`.** Every change goes through a pull request, including small ones.
+- **Create or delete a Vercel project, add or remove a domain, or change a DNS record.** These have
+  no undo and no test catches them. A wrong DNS record takes all four subdomains down and you find
+  out from a browser.
+- **Apply a schema change without its migration file in the same pull request.** The database is
+  not allowed to be the only record of its own shape again. See `supabase/README.md`.
+- **Edit the shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, or
+  anything touching `SESSION_SECRET` and the shared cookie. These are byte-identical copies in four
+  apps, and a mismatch does not throw. It silently rejects valid sessions on the other three.
+- **Edit this file.** If your change contradicts the brief, say so in the pull request and stop.
+  The brief is approved before it is updated, never quietly alongside the code that outdated it.
+- **Commit personal information or secrets.** Names, employers, schools, addresses, contact
+  details, resume content. For a `.docx` that means every part of the archive, not just
+  `document.xml` — hyperlink targets in `.rels` and the author fields in `docProps/` too.
+- **Make a check pass by weakening it.** No skipping or disabling a test, no loosening an
+  assertion, no `supabase migration repair`, no empty commit to re-trigger CI. When something is
+  red, either the code is wrong or the check is wrong. Say which one, and fix that.
+
+Allowed without asking: changing build settings on a Vercel project that already exists — Node
+version, environment variables, ignored build step. Those are reversible and visible. The line is
+between configuring something that exists and creating, destroying, or re-pointing it.
+
+### Always
+
+- One branch per change, named for the change. Never reuse a branch across unrelated work, and
+  never treat one as a permanent working branch.
+- State your blast radius in the pull request: which apps, which shared files.
+- Add any new app under `apps/` to the CI matrix in `.github/workflows/ci.yml` in the same pull
+  request. The matrix is hardcoded to four names and silently skips anything else, so a new app
+  ships untested and nothing tells you.
+
+### When you think the instruction is wrong
+
+Say so, at a high level, and **stop**. Do not flag a concern and proceed anyway — a warning
+attached to work already done is not a warning, it is a receipt.
+
+If the answer is "go anyway", go fully, and do not relitigate the decision three commits later.
+
+Going fully is not going blindly. Ask whatever you need in order to execute it correctly.
+Relitigating a settled decision is out; asking how to do it properly is expected.
+
 ## Tech Stack
 
 - **Framework:** Next.js, hosted on Vercel
@@ -53,13 +121,21 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 
 | Subdomain | Tool | Vercel project | Status |
 |---|---|---|---|
-| `techpaddock.io` (root) | Command center hub (`apps/home`) | `home` | live |
-| `editor.techpaddock.io` | Message Editor | `tech-paddock` | live |
-| `tracker.techpaddock.io` | Pipeline Tracker | `tracker` | live |
-| `resume.techpaddock.io` | Resume Formatter | `resume` | live, rebuild in progress |
+| `techpaddock.io` (root) | Command center hub (`apps/home`) | `tp-home` | live |
+| `editor.techpaddock.io` | Message Editor | `tp-message-editor` | live |
+| `tracker.techpaddock.io` | Pipeline Tracker | `tp-tracker` | live |
+| `resume.techpaddock.io` | Resume Formatter | `tp-resume` | live |
 
-Note the editor's Vercel project is named `tech-paddock`, not `editor` — it was the first project
-created. All four deploy from this one repo, separated by Root Directory.
+All four deploy from this one repo, separated by Root Directory. Project names carry a `tp-` prefix
+and do not match their folder or subdomain — verified against the Vercel account on 2026-09-11, and
+the prefix stays. Renaming five live projects to make a table tidier is backwards; the table gets
+corrected instead.
+
+There is a fifth project, **`tp-coffee-app`**, created by Vercel's import-suggestion flow and
+pointed at the repo root rather than at an app. It builds nothing and serves an empty page publicly
+at `tech-paddock.vercel.app`, outside the password gate — the gate lives in each app's middleware,
+so a project with no app has no gate. It is to be fixed in place, not deleted: Root Directory to
+`apps/coffee`, framework Next.js, env vars added. Blocked until `apps/coffee` exists on `main`.
 
 ## Environment Variables Needed
 
@@ -90,6 +166,7 @@ key. Every app throws on startup if `SESSION_SECRET` is unset.
 | id | |
 | name | |
 | org | |
+| position | job title / role at org — optional, like org. Drafting context for the Message Editor |
 | relationship_type | professional / personal, warm / cold |
 | preferred_channel | text / email / linkedin / slack |
 | notes | freeform |
