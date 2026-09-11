@@ -86,7 +86,7 @@ branch should drop its naming section before merging.
 - **Node runtime drift.** CI pins Node 20; all five Vercel projects run 24; no `engines` field
   anywhere. CI can go green on a runtime that never ships. Fix: CI matrix → 24, add `engines` to the
   four `package.json` files. PR not opened.
-- **PII scrub.** `"Attain"`, a real target company, sits in a UI placeholder at
+- **PII scrub.** A real target company name sat in a UI placeholder at
   `apps/resume/app/page.tsx:389` and in five fixtures in `apps/resume/tests/persistence.test.ts`.
   Approved for removal. PR not opened.
 - **Three branches to delete** once the queue clears.

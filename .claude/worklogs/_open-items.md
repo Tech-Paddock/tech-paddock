@@ -41,12 +41,14 @@ readout is amber or red, check Vercel and GitHub directly rather than trusting i
 
 ## Committed, not done
 
-- **2026-09-11 — Node runtime drift.** CI pins 20, all five Vercel projects run 24, no `engines`
-  field anywhere. CI can go green on a runtime that never ships. Fix is CI → 24 plus `engines`.
-  Follow-on PR, not yet opened.
-- **2026-09-11 — PII scrub.** `"Attain"`, a real target company, sits in a UI placeholder at
-  `apps/resume/app/page.tsx:389` and in five fixtures in `apps/resume/tests/persistence.test.ts`.
-  Approved for removal. Follow-on PR, not yet opened.
+- **2026-09-11 — Node runtime drift. PR #20 open.** CI pinned 20 while all five Vercel projects run
+  24, with no `engines` field anywhere, so CI could go green on a runtime that never ships. CI moves
+  to 24 and `engines: >=24` is declared. Verified on Node 22 that the constraint warns rather than
+  breaks.
+- **2026-09-11 — PII scrub. PR #21 open.** A real target company name sat in a UI placeholder in
+  `apps/resume/app/page.tsx` and in five fixtures in `apps/resume/tests/persistence.test.ts`,
+  replaced with a synthetic one. It was also named three times in this repo's own handoff docs —
+  including the document explaining the rule — and has been removed from those too.
 - **2026-09-11 — Branch queue.** PR #16 and PR #17 both merged; the rules, the worklog channel and
   the migration backfill are on `main`. Remaining order: `this-n2kl8y` → `tracker-dashboard`
   (blocked, see below) → `coffee`. Delete `resume-formatter` (53 behind, conflicts),

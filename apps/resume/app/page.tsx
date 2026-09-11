@@ -386,7 +386,7 @@ export default function Home() {
                         this yet — it stays in history either way.
                       </p>
                       {([
-                        ["company", "Company", "Attain"],
+                        ["company", "Company", "Northwind"],
                         ["role", "Role", "Product Analyst II"],
                         ["jobUrl", "Posting URL", "https://…"],
                       ] as const).map(([key, label, placeholder]) => (

@@ -175,11 +175,11 @@ describe("recording where a render went", () => {
     mockModules({ resume, tracker });
 
     const { PATCH } = await import("../app/api/renders/[id]/route");
-    const res = await PATCH(patch({ company: "Attain", role: "Product Analyst II" }), { params: { id: "r1" } });
+    const res = await PATCH(patch({ company: "Northwind", role: "Product Analyst II" }), { params: { id: "r1" } });
 
     expect(res.status).toBe(200);
     const insert = trackerCalls.find((c) => c.op === "insert");
-    expect(insert?.payload).toMatchObject({ company: "Attain", stage: "Applied" });
+    expect(insert?.payload).toMatchObject({ company: "Northwind", stage: "Applied" });
     expect((insert?.payload as { notes: string }).notes).toContain("Product Analyst II");
   });
 
@@ -194,7 +194,7 @@ describe("recording where a render went", () => {
     mockModules({ resume, tracker });
 
     const { PATCH } = await import("../app/api/renders/[id]/route");
-    await PATCH(patch({ company: "Attain" }), { params: { id: "r1" } });
+    await PATCH(patch({ company: "Northwind" }), { params: { id: "r1" } });
 
     expect(trackerCalls.some((c) => c.op === "insert")).toBe(false);
     const update = trackerCalls.find((c) => c.op === "update");
@@ -213,7 +213,7 @@ describe("recording where a render went", () => {
     mockModules({ resume, tracker });
 
     const { PATCH } = await import("../app/api/renders/[id]/route");
-    await PATCH(patch({ company: "Attain", role: "Product Analyst II" }), { params: { id: "r1" } });
+    await PATCH(patch({ company: "Northwind", role: "Product Analyst II" }), { params: { id: "r1" } });
 
     const payload = trackerCalls.find((c) => c.op === "update")?.payload as {
       notes: string;
@@ -246,7 +246,7 @@ describe("recording where a render went", () => {
     mockModules({ resume, tracker: resume });
 
     const { PATCH } = await import("../app/api/renders/[id]/route");
-    const res = await PATCH(patch({ company: "Attain" }), { params: { id: "nope" } });
+    const res = await PATCH(patch({ company: "Northwind" }), { params: { id: "nope" } });
     expect(res.status).toBe(404);
   });
 });
