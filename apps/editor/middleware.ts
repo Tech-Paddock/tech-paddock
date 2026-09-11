@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { COOKIES, hasValidSession } from "@/lib/auth";
+import {
+  COOKIES,
+  SESSION_MAX_AGE_SECONDS,
+  createSessionCookieValue,
+  readSession,
+  sessionCookieOptions,
+  shouldRenewSession,
+} from "@/lib/auth";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -25,9 +32,17 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const session = request.cookies.get(COOKIES.SESSION)?.value;
-  if (await hasValidSession(session)) {
-    return NextResponse.next();
+  const session = await readSession(request.cookies.get(COOKIES.SESSION)?.value);
+  if (session) {
+    const res = NextResponse.next();
+    if (shouldRenewSession(session)) {
+      res.cookies.set(
+        COOKIES.SESSION,
+        await createSessionCookieValue(),
+        sessionCookieOptions(request.headers.get("host"), SESSION_MAX_AGE_SECONDS)
+      );
+    }
+    return res;
   }
 
   if (pathname.startsWith("/api")) {

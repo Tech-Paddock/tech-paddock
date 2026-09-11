@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   COOKIES,
+  sessionCookieOptions,
   LOCKOUT_MAX_AGE_SECONDS,
   SESSION_MAX_AGE_SECONDS,
   clearAttemptsCookieValue,
@@ -28,33 +29,12 @@ export async function POST(request: NextRequest) {
   if (!valid) {
     const { cookieValue } = await recordFailure(attempts);
     const res = NextResponse.json({ error: "Incorrect password" }, { status: 401 });
-    res.cookies.set(COOKIES.ATTEMPTS, cookieValue, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      domain: ".techpaddock.io",
-      maxAge: LOCKOUT_MAX_AGE_SECONDS,
-      path: "/",
-    });
+    res.cookies.set(COOKIES.ATTEMPTS, cookieValue, sessionCookieOptions(request.headers.get("host"), LOCKOUT_MAX_AGE_SECONDS));
     return res;
   }
 
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIES.SESSION, await createSessionCookieValue(), {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    domain: ".techpaddock.io",
-    maxAge: SESSION_MAX_AGE_SECONDS,
-    path: "/",
-  });
-  res.cookies.set(COOKIES.ATTEMPTS, await clearAttemptsCookieValue(), {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    domain: ".techpaddock.io",
-    maxAge: 0,
-    path: "/",
-  });
+  res.cookies.set(COOKIES.SESSION, await createSessionCookieValue(), sessionCookieOptions(request.headers.get("host"), SESSION_MAX_AGE_SECONDS));
+  res.cookies.set(COOKIES.ATTEMPTS, await clearAttemptsCookieValue(), sessionCookieOptions(request.headers.get("host"), 0));
   return res;
 }
