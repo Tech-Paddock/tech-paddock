@@ -55,6 +55,8 @@ function HomeShell() {
   const [draftFor, setDraftFor] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
   const [draftLoading, setDraftLoading] = useState(false);
+  const [taskFor, setTaskFor] = useState<string | null>(null);
+  const [taskNote, setTaskNote] = useState<{ id: string; text: string } | null>(null);
   const focusedThread = useSearchParams().get("thread");
   const focusedRef = useRef<HTMLDivElement | null>(null);
 
@@ -120,6 +122,23 @@ function HomeShell() {
       setNewOpen(false);
       refresh();
     }
+  }
+
+  async function createTask(id: string) {
+    setTaskFor(id);
+    setTaskNote(null);
+    setError(null);
+
+    const res = await fetch(`/api/threads/${id}/task`, { method: "POST" });
+    setTaskFor(null);
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error ?? "Couldn't create the task");
+      return;
+    }
+    setTaskNote({ id, text: `Filed in To Do: ${data.title}` });
+    refresh();
   }
 
   async function draftFollowUp(id: string) {
@@ -294,14 +313,26 @@ function HomeShell() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => draftFollowUp(t.id)}
-                  disabled={!t.contact_id || draftLoading}
-                  className="self-start text-sm font-medium text-accent disabled:opacity-40"
-                  title={t.contact_id ? undefined : "Link a contact to draft a follow-up"}
-                >
-                  {draftLoading && draftFor === t.id ? "Drafting…" : "Draft follow-up →"}
-                </button>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => draftFollowUp(t.id)}
+                    disabled={!t.contact_id || draftLoading}
+                    className="text-sm font-medium text-accent disabled:opacity-40"
+                    title={t.contact_id ? undefined : "Link a contact to draft a follow-up"}
+                  >
+                    {draftLoading && draftFor === t.id ? "Drafting…" : "Draft follow-up →"}
+                  </button>
+                  <button
+                    onClick={() => createTask(t.id)}
+                    disabled={taskFor === t.id}
+                    className="text-sm font-medium text-ink/60 disabled:opacity-40"
+                  >
+                    {taskFor === t.id ? "Filing…" : "Add to To Do"}
+                  </button>
+                </div>
+                {taskNote?.id === t.id && (
+                  <p className="text-xs text-ink/50">{taskNote.text}</p>
+                )}
                 {draftFor === t.id && draftText && (
                   <div className="bg-paper border border-line rounded-lg p-3 text-sm whitespace-pre-wrap">
                     {draftText}

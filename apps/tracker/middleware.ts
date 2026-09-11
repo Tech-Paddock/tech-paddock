@@ -20,6 +20,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Vercel Cron invokes the stale sweep with no browser session. The route
+  // checks CRON_SECRET itself; the middleware only steps out of its way.
+  if (pathname.startsWith("/api/cron/")) {
+    return NextResponse.next();
+  }
+
   // The hub renders its landing glance server-side, so its request for the
   // roll-up carries a shared secret rather than a browser session cookie.
   // Scoped to /api/summary only — never a blanket bypass for the rest of the
