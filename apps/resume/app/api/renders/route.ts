@@ -20,10 +20,18 @@ export async function GET() {
   // render is only self-describing once joined back to it.
   let threads: Record<string, { company: string; stage: string }> = {};
   if (threadIds.length > 0) {
-    const { data: rows } = await getTrackerClient()
+    const { data: rows, error: threadError } = await getTrackerClient()
       .from("pipeline_threads")
       .select("id, company, stage")
       .in("id", threadIds);
+    // Swallowing this would render every row as "No job recorded", which looks
+    // like missing data rather than a broken cross-schema read.
+    if (threadError) {
+      return NextResponse.json(
+        { code: "tracker_error", error: `Couldn't read tracker threads: ${threadError.message}` },
+        { status: 502 }
+      );
+    }
     threads = Object.fromEntries((rows ?? []).map((t) => [t.id as string, { company: t.company, stage: t.stage }]));
   }
 

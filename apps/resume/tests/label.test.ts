@@ -56,3 +56,29 @@ describe("labelling a Jobright export", () => {
     }
   });
 });
+
+describe("coverage tells the truth", () => {
+  it("reports a bullet that arrives before any employer line", async () => {
+    const { labelParagraphs } = await import("../lib/docx/label");
+    const para = (index: number, text: string, extra: Partial<Record<string, unknown>> = {}) => ({
+      index, text, size: 20, bold: false, italic: false, listId: null, styleId: null,
+      hasImage: false, inTable: false, inContentControl: false, ...extra,
+    });
+    // Name, heading, then a stray bullet before the first employer line.
+    const paras = [
+      para(0, "Jordan Rivers", { size: 50 }),
+      para(1, "Professional Experience", { size: 22 }),
+      para(2, "Orphaned bullet with nowhere to go", { listId: "1" }),
+      para(3, "Northwind Athletics Jan 2026 - Present", { size: 21 }),
+      para(4, "A bullet that does have a home", { listId: "1" }),
+    ] as Parameters<typeof labelParagraphs>[0];
+
+    const { content, coverage } = labelParagraphs(paras);
+    expect(coverage.dropped).toContain("Orphaned bullet with nowhere to go");
+    expect(coverage.percent).toBeLessThan(100);
+
+    const section = content.sections[0];
+    if (section.kind !== "entries") throw new Error("expected entries");
+    expect(section.entries[0].bullets).toEqual(["A bullet that does have a home"]);
+  });
+});

@@ -44,12 +44,27 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const touch = (body.submittedAt ?? new Date().toISOString()).slice(0, 10);
 
     if (threadId) {
+      const { data: existing, error: readError } = await tracker
+        .from("pipeline_threads")
+        .select("notes")
+        .eq("id", threadId)
+        .maybeSingle();
+      if (readError) return fail(502, "tracker_error", `Couldn't read the tracker thread: ${readError.message}`);
+
+      // notes is a running log, so append rather than overwrite.
+      const entry = [`${touch} — resume sent`, notes].filter(Boolean).join("\n");
+      const merged = [existing?.notes, entry].filter(Boolean).join("\n\n");
+
       const { error } = await tracker
         .from("pipeline_threads")
         .update({
           company: body.company.trim(),
           last_touch_date: touch,
-          ...(notes ? { notes } : {}),
+          notes: merged,
+          // Touching a thread clears its open Google Task, so the stale check can
+          // raise a fresh one next time it goes cold. The tracker's own edit path
+          // does the same.
+          open_task_id: null,
           ...(body.contactId !== undefined ? { contact_id: body.contactId } : {}),
           updated_at: new Date().toISOString(),
         })
@@ -63,7 +78,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
           stage: "Applied",
           last_touch_date: touch,
           next_action: "Follow up",
-          notes: notes || null,
+          notes: [`${touch} — resume sent`, notes].filter(Boolean).join("\n"),
           contact_id: body.contactId ?? null,
         })
         .select("id")

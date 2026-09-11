@@ -62,16 +62,27 @@ export async function POST(request: NextRequest) {
     // files that were never written.
     const path = await uploadDocx("templates", file.name, bytes);
 
+    // Insert inactive first. Clearing the current active before the insert would
+    // leave nothing active at all if the insert then failed, and /api/reformat
+    // refuses to run without an active template.
+    const { data: inserted, error } = await supabase
+      .from("templates")
+      .insert({ version, name: file.name, file_path: path, spec, is_active: false })
+      .select("id, version, name, spec, is_active, created_at")
+      .single();
+    if (error) return fail(500, "db_error", error.message);
+
     // Only one row may be active, enforced by a partial unique index.
     const { error: clearError } = await supabase.from("templates").update({ is_active: false }).eq("is_active", true);
     if (clearError) return fail(500, "db_error", clearError.message);
 
-    const { data, error } = await supabase
+    const { data, error: activateError } = await supabase
       .from("templates")
-      .insert({ version, name: file.name, file_path: path, spec, is_active: true })
+      .update({ is_active: true })
+      .eq("id", inserted.id)
       .select("id, version, name, spec, is_active, created_at")
       .single();
-    if (error) return fail(500, "db_error", error.message);
+    if (activateError) return fail(500, "db_error", activateError.message);
 
     // Findings describe the uploaded template, not the output. Worth seeing:
     // formatting is copied from this file, but its structural problems are not.

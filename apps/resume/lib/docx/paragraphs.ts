@@ -73,6 +73,15 @@ function textOf(nodes: Node[]): string {
   return out;
 }
 
+/** `<w:b/>` means on, but `<w:b w:val="0"/>` means explicitly off — a template
+ *  that un-bolds a heading would otherwise read as bold. */
+function toggleOn(kids: Node[], tag: string): boolean {
+  const node = kids.find((n) => tagOf(n) === tag);
+  if (!node) return false;
+  const val = attrsOf(node)["w:val"];
+  return val === undefined || !["0", "false", "off"].includes(val);
+}
+
 function describe(paragraph: Node, index: number, inTable: boolean, inContentControl: boolean): Para {
   const body = kidsOf(paragraph, "w:p");
   const pPr = body.find((n) => tagOf(n) === "w:pPr");
@@ -95,8 +104,8 @@ function describe(paragraph: Node, index: number, inTable: boolean, inContentCon
     index,
     text: textOf(body),
     size: Number.isFinite(rawSize) ? rawSize : null,
-    bold: rPrKids.some((n) => tagOf(n) === "w:b"),
-    italic: rPrKids.some((n) => tagOf(n) === "w:i"),
+    bold: toggleOn(rPrKids, "w:b"),
+    italic: toggleOn(rPrKids, "w:i"),
     listId: numId ? attrsOf(numId)["w:val"] ?? null : null,
     styleId: pStyle ? attrsOf(pStyle)["w:val"] ?? null : null,
     hasImage: hasTag(body, "w:drawing") || hasTag(body, "w:pict"),

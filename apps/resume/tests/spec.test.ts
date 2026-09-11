@@ -35,3 +35,25 @@ describe("template spec extraction", () => {
     expect(s.font.length).toBeGreaterThan(0);
   });
 });
+
+describe("bullet glyph selection", () => {
+  it("falls back to a plain bullet rather than a hyphen or a Symbol-font glyph", async () => {
+    const { pickBulletGlyph } = await import("../lib/docx/spec");
+    expect(pickBulletGlyph('<w:lvlText w:val="-"/>')).toBe("•");
+    // U+F0B7 is Word's Symbol-font bullet: a private-use codepoint that renders
+    // as a missing-glyph box outside Word.
+    expect(pickBulletGlyph('<w:lvlText w:val=""/>')).toBe("•");
+    expect(pickBulletGlyph('<w:lvlText w:val="%1."/>')).toBe("•");
+    expect(pickBulletGlyph(null)).toBe("•");
+  });
+
+  it("keeps a safe glyph the template actually chose", async () => {
+    const { pickBulletGlyph } = await import("../lib/docx/spec");
+    expect(pickBulletGlyph('<w:lvlText w:val="-"/><w:lvlText w:val="◦"/>')).toBe("◦");
+  });
+
+  it("never gives the real fixtures anything but a safe glyph", async () => {
+    const s = await spec("template-sample.docx");
+    expect(["•", "◦", "▪", "‣"]).toContain(s.bulletGlyph);
+  });
+});
