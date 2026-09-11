@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Resume Formatter — Paddock",
-  description: "Single source of truth for resume content, formatted to docx on demand.",
+  description: "Reformat a Jobright-tailored resume into your own template, optimized for ATS readability.",
 };
 
 export default function RootLayout({
