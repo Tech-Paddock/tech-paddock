@@ -35,33 +35,92 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 - Every deployed app sits behind a password, with lockout after repeated failed attempts. A fully random generated password is the default recommendation; a memorable phrase is an acceptable tradeoff here given the low stakes and the lockout backstop — it's the user's call, not a hard rule.
 - **Prefer append over rewrite for anything that accumulates.** When a feature involves a growing body of history (sent messages, logs, past output), the default write path should be a plain insert — cheap, instant, no AI call — with any AI-driven synthesis (like refining a style guide) kept as a separate, deliberately-triggered, batched step. Don't reach for "call the model to regenerate the whole artifact" as the per-event write path; see the Message Editor's training design below for the concrete example.
 
-## Merge & Branch Policy
+---
 
-Main collected sixteen merge commits from a single long-lived branch before any of this was
-written down. The rules below exist to stop that recurring. They are process, not architecture,
-and they are deliberately short because there is one person here.
+## Rules of Engagement
 
-- **One branch per change.** Name it for the change (`claude/<slug>`). Never reuse a branch across
-  unrelated changes, and never treat one as a permanent working branch — that is what produced the
-  sixteen merges from `claude/this-n2kl8y`, and it leaves main's history useless for working out
-  when something actually landed.
-- **Every change lands through a pull request**, including small ones. CI already runs on
-  `pull_request`; with nothing opening PRs it has never actually gated anything.
-- **Squash merge, always.** One commit on main per change. Branch-level history stays in the PR if
-  it is ever wanted. Merge commits and rebase merges are off.
+Several agents build here in parallel and none of them can see each other. They are never running
+at the same time, so there is no way to ask another agent anything. Every rule below exists because
+something already went wrong when an agent acted reasonably without knowing what another agent
+knew: three branches editing this file at once, six schema migrations that lived only in the
+database, a Vercel project pointed at the repo root and serving an unprotected page to the public,
+and real contact names committed to the file that forbids committing names.
+
+### Before you write anything
+
+**Run `bash .claude/worklogs/read-all.sh`.** It prints the open-items ledger and every agent's
+worklog from every branch. If someone has already claimed a file you were about to touch, say so in
+your own worklog and in your pull request before you touch it.
+
+Then open your own worklog at `.claude/worklogs/<your-branch>.md` and claim your work. Close it
+before you finish. The format is in `.claude/worklogs/README.md` and is deliberately short.
+
+Your worklog is not a second commit message. Commits here already explain what was done and why, at
+length, and they do it well. The worklog carries only what a commit cannot: what you are working on
+*right now*, what you are blocked on, what you decided that affects somebody else, and what you
+need from the technical director. If an entry could have been a commit message, make it one.
+
+### Never, without the technical director
+
+- **Push to `main`.** Every change goes through a pull request, including small ones.
+- **Create or delete a Vercel project, add or remove a domain, or change a DNS record.** These have
+  no undo and no test catches them. A wrong DNS record takes all four subdomains down and you find
+  out from a browser.
+- **Apply a schema change without its migration file in the same pull request.** The database is
+  not allowed to be the only record of its own shape again. See `supabase/README.md`.
+- **Edit the shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, or
+  anything touching `SESSION_SECRET` and the shared cookie. These are byte-identical copies in four
+  apps, and a mismatch does not throw. It silently rejects valid sessions on the other three.
+- **Edit this file.** If your change contradicts the brief, say so in the pull request and stop.
+  The brief is approved before it is updated, never quietly alongside the code that outdated it.
+- **Commit personal information or secrets.** Names, employers, schools, addresses, contact
+  details, resume content. For a `.docx` that means every part of the archive, not just
+  `document.xml` — hyperlink targets in `.rels` and the author fields in `docProps/` too.
+- **Make a check pass by weakening it.** No skipping or disabling a test, no loosening an
+  assertion, no `supabase migration repair`, no empty commit to re-trigger CI. When something is
+  red, either the code is wrong or the check is wrong. Say which one, and fix that.
+
+Allowed without asking: changing build settings on a Vercel project that already exists — Node
+version, environment variables, ignored build step. Those are reversible and visible. The line is
+between configuring something that exists and creating, destroying, or re-pointing it.
+
+### Always
+
+- One branch per change, named for the change. Never reuse a branch across unrelated work, and
+  never treat one as a permanent working branch.
+- State your blast radius in the pull request: which apps, which shared files.
+- Add any new app under `apps/` to the CI matrix in `.github/workflows/ci.yml` in the same pull
+  request. The matrix is hardcoded to four names and silently skips anything else, so a new app
+  ships untested and nothing tells you.
+
+### When you think the instruction is wrong
+
+Say so, at a high level, and **stop**. Do not flag a concern and proceed anyway — a warning
+attached to work already done is not a warning, it is a receipt.
+
+If the answer is "go anyway", go fully, and do not relitigate the decision three commits later.
+
+Going fully is not going blindly. Ask whatever you need in order to execute it correctly.
+Relitigating a settled decision is out; asking how to do it properly is expected.
+### Merging
+
+- **Squash merge, always.** One commit on `main` per change. Branch-level history stays in the pull
+  request if it is ever wanted. Merge commits and rebase merges are off.
 - **CI green before merge** — all four matrix jobs. A red build does not get merged on the
-  assumption that the failure is unrelated; establish that it is, or fix it.
+  assumption that the failure is unrelated. Establish that it is, or fix it.
 - **Delete the branch after merge**, so the branch list stays a list of live work rather than an
   archive.
-- **The CI matrix is hardcoded** to `[home, editor, resume, tracker]`. A new app under `apps/` is
-  silently untested until it is added there — add it in the same PR that adds the app.
-- **Update this brief in the same PR.** If a change contradicts anything stated here — the domain
-  map, env vars, build order, a tool's design — fix it in that PR rather than leaving the brief to
-  drift behind what is deployed.
+
+Main collected sixteen merge commits from a single reused branch before any of this was written
+down. To be precise about what went wrong, because the fix depends on it: fifteen pull requests
+were merged, #1 through #15, so it is not that pull requests were never used. They all reused the
+one branch `claude/this-n2kl8y`, and several merged within six to ten seconds of opening — #11
+opened at 01:35:23 and merged at 01:35:29 — far too fast for CI to have reported. The gate existed
+and was walked straight through. Everything after 2026-09-10 skipped pull requests altogether.
 
 ### One-time GitHub settings
 
-These live in the GitHub UI, not the repo, so they have to be set by hand once.
+These live in the GitHub UI rather than the repo, so they have to be set by hand, once.
 
 Settings → General → Pull Requests: allow squash merging only (uncheck merge commits and rebase
 merging), set the squash commit message default to "Pull request title and description", and turn
@@ -70,9 +129,10 @@ on "Automatically delete head branches".
 Then protect `main` (Settings → Rules → Rulesets, or Settings → Branches): require a pull request
 before merging, require the four CI checks to pass, and block force pushes.
 
-This repo is private on a personal account, which matters for the second half: the squash and
-auto-delete settings work on any plan, but protecting a branch on a *private* repo needs GitHub
-Pro. Without it, everything above is convention rather than something enforced.
+**Until that second half is done, every rule above is convention rather than enforcement** — an
+agent that ignores "never push to `main`" will simply succeed. This repo is private on a personal
+account, and protecting a branch on a private repo may require a paid plan; that is unverified, and
+it is the single most load-bearing open question on the ledger.
 
 ## Tech Stack
 
@@ -92,13 +152,21 @@ Pro. Without it, everything above is convention rather than something enforced.
 
 | Subdomain | Tool | Vercel project | Status |
 |---|---|---|---|
-| `techpaddock.io` (root) | Command center hub (`apps/home`) | `home` | live |
-| `editor.techpaddock.io` | Message Editor | `tech-paddock` | live |
-| `tracker.techpaddock.io` | Pipeline Tracker | `tracker` | live |
-| `resume.techpaddock.io` | Resume Formatter | `resume` | live, rebuild in progress |
+| `techpaddock.io` (root) | Command center hub (`apps/home`) | `tp-home` | live |
+| `editor.techpaddock.io` | Message Editor | `tp-message-editor` | live |
+| `tracker.techpaddock.io` | Pipeline Tracker | `tp-tracker` | live |
+| `resume.techpaddock.io` | Resume Formatter | `tp-resume` | live |
 
-Note the editor's Vercel project is named `tech-paddock`, not `editor` — it was the first project
-created. All four deploy from this one repo, separated by Root Directory.
+All four deploy from this one repo, separated by Root Directory. Project names carry a `tp-` prefix
+and do not match their folder or subdomain — verified against the Vercel account on 2026-09-11, and
+the prefix stays. Renaming five live projects to make a table tidier is backwards; the table gets
+corrected instead.
+
+There is a fifth project, **`tp-coffee-app`**, created by Vercel's import-suggestion flow and
+pointed at the repo root rather than at an app. It builds nothing and serves an empty page publicly
+at `tech-paddock.vercel.app`, outside the password gate — the gate lives in each app's middleware,
+so a project with no app has no gate. It is to be fixed in place, not deleted: Root Directory to
+`apps/coffee`, framework Next.js, env vars added. Blocked until `apps/coffee` exists on `main`.
 
 ## Environment Variables Needed
 
@@ -129,6 +197,7 @@ key. Every app throws on startup if `SESSION_SECRET` is unset.
 | id | |
 | name | |
 | org | |
+| position | job title / role at org — optional, like org. Drafting context for the Message Editor |
 | relationship_type | professional / personal, warm / cold |
 | preferred_channel | text / email / linkedin / slack |
 | notes | freeform |
@@ -212,7 +281,10 @@ details when rendering a resume creates or updates the thread here. The tracker 
 and keeps its own ad-hoc thread creation for applications and networking threads that never
 involve a resume.
 
-**Seed contacts/threads to load once built:** Cloud for Good, SaltClick, Growth Heroes, Attain, RedPoint, Christine Pallen, Elisa Salina.
+**Seed contacts/threads:** loaded directly into the project on 2026-09-08 — five org-linked threads
+and two named contacts. The names stay out of the repo under the no-personal-information rule
+above, which covers migrations and briefs as much as it covers docx fixtures; that seed migration
+is deliberately not checked in. See `supabase/README.md`.
 
 ---
 
