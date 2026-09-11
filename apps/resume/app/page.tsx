@@ -200,6 +200,9 @@ export default function Home() {
   async function reformat() {
     if (!source || (!template && !active)) return;
     setResult(null);
+    // Without this the previous render's confirmation sticks around and hides
+    // the job form for the new one.
+    setSaved(null);
     const body = new FormData();
     // A one-off template overrides the stored one and saves nothing.
     if (template) body.append("template", template);

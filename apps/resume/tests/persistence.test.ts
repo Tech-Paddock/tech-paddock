@@ -22,10 +22,10 @@ describe("template upload", () => {
     const order: string[] = [];
     const { client, calls } = fakeSupabase({
       "templates.select": { data: { version: 2 }, error: null },
-      "templates.update": { data: null, error: null },
+      "templates.update": { data: { id: "t1", version: 3, is_active: true }, error: null },
       "templates.insert": () => {
         order.push("row");
-        return { data: { id: "t1", version: 3, is_active: true }, error: null };
+        return { data: { id: "t1", version: 3, is_active: false }, error: null };
       },
     });
     mockModules({
@@ -42,7 +42,8 @@ describe("template upload", () => {
     expect(res.status).toBe(201);
     expect(order).toEqual(["file", "row"]);
     // The new version follows the highest existing one.
-    expect(calls.find((c) => c.op === "insert")?.payload).toMatchObject({ version: 3, is_active: true });
+    // Inserted inactive, then activated — see the ordering test below.
+    expect(calls.find((c) => c.op === "insert")?.payload).toMatchObject({ version: 3, is_active: false });
   });
 
   it("inserts nothing when the upload fails", async () => {
@@ -62,10 +63,10 @@ describe("template upload", () => {
     expect(calls.some((c) => c.op === "insert")).toBe(false);
   });
 
-  it("clears the previous active template before activating the new one", async () => {
+  it("inserts before deactivating, so a failed insert never leaves nothing active", async () => {
     const { client, calls } = fakeSupabase({
       "templates.select": { data: { version: 1 }, error: null },
-      "templates.update": { data: null, error: null },
+      "templates.update": { data: { id: "t2", is_active: true }, error: null },
       "templates.insert": { data: { id: "t2" }, error: null },
     });
     mockModules({ resume: client });
@@ -73,11 +74,35 @@ describe("template upload", () => {
     const { POST } = await import("../app/api/templates/route");
     await POST(upload("template.docx", fixture("template-sample.docx")));
 
-    const update = calls.findIndex((c) => c.op === "update");
     const insert = calls.findIndex((c) => c.op === "insert");
-    expect(update).toBeGreaterThanOrEqual(0);
-    expect(update).toBeLessThan(insert);
-    expect(calls[update].payload).toEqual({ is_active: false });
+    const updates = calls.map((c, i) => [c, i] as const).filter(([c]) => c.op === "update");
+    expect(insert).toBeGreaterThanOrEqual(0);
+    expect(updates).toHaveLength(2);
+
+    const [[clearCall, clearIndex], [activateCall, activateIndex]] = updates;
+    expect(insert).toBeLessThan(clearIndex);
+    expect(clearCall.payload).toEqual({ is_active: false });
+    expect(activateCall.payload).toEqual({ is_active: true });
+    expect(activateCall.filters).toContainEqual(["id", "t2"]);
+    expect(clearIndex).toBeLessThan(activateIndex);
+  });
+
+  it("deactivates nothing when activating an id that does not exist", async () => {
+    const { client, calls } = fakeSupabase({ "templates.select": { data: null, error: null } });
+    mockModules({ resume: client });
+
+    const { PATCH } = await import("../app/api/templates/[id]/route");
+    const res = await PATCH(
+      new NextRequest("http://localhost/x", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: true }),
+      }),
+      { params: { id: "ghost" } }
+    );
+
+    expect(res.status).toBe(404);
+    expect(calls.some((c) => c.op === "update")).toBe(false);
   });
 });
 
@@ -174,6 +199,31 @@ describe("recording where a render went", () => {
     expect(trackerCalls.some((c) => c.op === "insert")).toBe(false);
     const update = trackerCalls.find((c) => c.op === "update");
     expect(update?.filters).toContainEqual(["id", "th9"]);
+  });
+
+  it("appends to the running log and clears the stale-task flag", async () => {
+    const { client: resume } = fakeSupabase({
+      "renders.select": { data: { id: "r1", thread_id: "th9" }, error: null },
+      "renders.update": { data: { id: "r1" }, error: null },
+    });
+    const { client: tracker, calls: trackerCalls } = fakeSupabase({
+      "pipeline_threads.select": { data: { notes: "Earlier note worth keeping" }, error: null },
+      "pipeline_threads.update": { data: null, error: null },
+    });
+    mockModules({ resume, tracker });
+
+    const { PATCH } = await import("../app/api/renders/[id]/route");
+    await PATCH(patch({ company: "Proseware", role: "Product Analyst II" }), { params: { id: "r1" } });
+
+    const payload = trackerCalls.find((c) => c.op === "update")?.payload as {
+      notes: string;
+      open_task_id: string | null;
+    };
+    // notes is a running log — the earlier entry survives.
+    expect(payload.notes).toContain("Earlier note worth keeping");
+    expect(payload.notes).toContain("Product Analyst II");
+    // Touching a thread frees the stale check to raise a fresh Google Task.
+    expect(payload.open_task_id).toBeNull();
   });
 
   it("touches no thread when no company is named — rendered but not sent is valid", async () => {

@@ -73,37 +73,51 @@ export function labelParagraphs(paras: Para[]): { content: ResumeContent; covera
     }
   }
 
-  content.sections = groups.map((g) => toSection(g.label, g.members, entrySize));
+  const orphans: string[] = [];
+  content.sections = groups.map((g) => {
+    const { section, unplaced } = toSection(g.label, g.members, entrySize);
+    orphans.push(...unplaced);
+    return section;
+  });
 
-  const dropped = withText.filter((p) => !placed.has(p.index)).map((p) => p.text.trim());
+  // Paragraphs a section accepted but could not render count as dropped too.
+  // Reporting them as placed would claim full coverage over text the output
+  // does not contain, which is the one failure this whole design exists to
+  // prevent.
+  const dropped = [...withText.filter((p) => !placed.has(p.index)).map((p) => p.text.trim()), ...orphans];
+  // Orphans were marked placed on the first pass, so discount them here — the
+  // percentage and the dropped list have to describe the same document.
+  const reallyPlaced = placed.size - orphans.length;
   return {
     content,
     coverage: {
       totalParagraphs: withText.length,
-      placed: placed.size,
+      placed: reallyPlaced,
       dropped,
-      percent: withText.length === 0 ? 100 : Math.round((placed.size / withText.length) * 1000) / 10,
+      percent: withText.length === 0 ? 100 : Math.round((reallyPlaced / withText.length) * 1000) / 10,
     },
   };
 }
 
-function toSection(label: string, members: Para[], entrySize: number | undefined): Section {
+function toSection(
+  label: string,
+  members: Para[],
+  entrySize: number | undefined
+): { section: Section; unplaced: string[] } {
   if (/highlight/i.test(label)) {
-    return { kind: "highlights", label, items: toHighlights(members) };
+    return { section: { kind: "highlights", label, items: toHighlights(members) }, unplaced: [] };
   }
 
   const entryLines = members.filter((p) => !p.listId && (DATE_RANGE.test(p.text) || p.size === entrySize));
   if (entryLines.length > 0 && members.some((p) => p.listId)) {
-    return { kind: "entries", label, entries: toEntries(members, entrySize) };
+    const { entries, unplaced } = toEntries(members, entrySize);
+    return { section: { kind: "entries", label, entries }, unplaced };
   }
 
-  if (members.every((p) => p.listId)) {
-    return { kind: "bullets", label, items: members.map((p) => p.text.trim()) };
+  if (members.length === 1 && !members[0].listId) {
+    return { section: { kind: "prose", label, body: members[0].text.trim() }, unplaced: [] };
   }
-  if (members.length === 1) {
-    return { kind: "prose", label, body: members[0].text.trim() };
-  }
-  return { kind: "bullets", label, items: members.map((p) => p.text.trim()) };
+  return { section: { kind: "bullets", label, items: members.map((p) => p.text.trim()) }, unplaced: [] };
 }
 
 /** Highlights arrive either as "metric: description" in one paragraph, or as a
@@ -128,14 +142,22 @@ function toHighlights(members: Para[]): Highlight[] {
   return out;
 }
 
-function toEntries(members: Para[], entrySize: number | undefined): Entry[] {
+function toEntries(
+  members: Para[],
+  entrySize: number | undefined
+): { entries: Entry[]; unplaced: string[] } {
   const entries: Entry[] = [];
+  const unplaced: string[] = [];
   let current: Entry | null = null;
 
   for (const p of members) {
     const text = p.text.trim();
     if (p.listId) {
+      // A bullet before any employer line has nothing to attach to. Report it
+      // rather than swallowing it — the section's shape is wrong and you want
+      // to see that before sending the document.
       if (current) current.bullets.push(text);
+      else unplaced.push(text);
       continue;
     }
 
@@ -172,5 +194,5 @@ function toEntries(members: Para[], entrySize: number | undefined): Entry[] {
     // Anything else still belongs to the reader: render it rather than lose it.
     current.bullets.push(text);
   }
-  return entries;
+  return { entries, unplaced };
 }

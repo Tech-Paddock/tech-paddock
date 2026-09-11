@@ -93,8 +93,7 @@ export function extractSpec(parts: DocxParts, paras: Para[]): TemplateSpec {
     left: inches("w:left", spec.margins.left),
   };
 
-  const glyph = attr(parts.numbering ?? "", "w:lvlText", "w:val");
-  if (glyph && glyph.length <= 2 && glyph !== "%1.") spec.bulletGlyph = glyph;
+  spec.bulletGlyph = pickBulletGlyph(parts.numbering);
 
   spec.highlightsStyle = /<w:tbl>/.test(parts.document) ? "table" : "list";
 
@@ -102,4 +101,18 @@ export function extractSpec(parts: DocxParts, paras: Para[]): TemplateSpec {
   if (spacing) spec.spacing = { ...spec.spacing, after: Number(spacing[1]) };
 
   return spec;
+}
+
+// Only plain, universally available bullet characters. Word templates commonly
+// carry a Symbol-font U+F0B7 or a numbering placeholder here, and a private-use
+// codepoint renders as a missing-glyph box in anything but Word. The ATS rule
+// asks for a plain bullet, so anything unrecognised falls back to one.
+const SAFE_GLYPHS = new Set(["\u2022", "\u25E6", "\u25AA", "\u2023"]);
+
+export function pickBulletGlyph(numberingXml: string | null): string {
+  if (!numberingXml) return "\u2022";
+  for (const match of numberingXml.matchAll(/<w:lvlText\b[^>]*w:val="([^"]*)"/g)) {
+    if (SAFE_GLYPHS.has(match[1])) return match[1];
+  }
+  return "\u2022";
 }
