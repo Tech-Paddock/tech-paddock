@@ -30,28 +30,27 @@ that survives scrutiny.
 - **`CLAUDE.md`.** If your change contradicts the brief, say so in the PR and stop. The brief is
   approved before it is updated.
 
-## Your branch: `claude/this-n2kl8y`
+## Your work landed; the branch is gone
 
-Four commits ahead of `main`, one behind. Third in the merge queue.
+`claude/this-n2kl8y` has been deleted. Its UI work — team-colored banner, relocated logout, header
+subtitle, Paddock-led tab titles — merged as **#19**, and the subtitle was re-applied on top of the
+dashboard's rewrite of `apps/home/app/page.tsx` rather than being dropped.
 
-**Careful — this branch has history.** It is the branch that produced sixteen merge commits on
-`main` by being reused across fifteen unrelated pull requests. That is the specific failure the
-one-branch-per-change rule exists to prevent. **Do not keep using it.** Land what is on it, then
-start a fresh branch per change.
+That branch is also the cautionary tale behind the one-branch-per-change rule: it was reused across
+fifteen unrelated pull requests and put sixteen merge commits on `main`. Start fresh every time.
 
-What is on it: a team-colored home banner, a relocated logout, a header subtitle, and a note in
-`CLAUDE.md` recording a mobile login bug.
+**The hub is now a dashboard.** `apps/home/app/page.tsx` is a thin server component; the real shell
+is `HomeShell.tsx`, fed by `lib/glance.ts`, which fans out to each tool's `/api/summary`. If you are
+adding a tile or changing the chrome, that is where it lives now.
 
-**A conflict you will hit.** The `tracker-dashboard` branch merges before yours is fully settled and
-it *rewrites* `apps/home/app/page.tsx` from a client component into a server component
-(`HomeShell` + `loadGlance`). Your topbar subtitle is an edit to the version being deleted. The
-dashboard's structure wins; re-apply the subtitle on top of it. This is not your work being
-discarded — it is being moved.
+**One brief edit is still unapproved.** Your Known Issues note about the mobile login bug was held
+back from #19 deliberately — agents do not edit `CLAUDE.md`. It is still worth landing; put it to
+the TD.
 
 ## The known issue recorded on your branch
 
 Opening a tool from the hub's iframe-embedded tiles re-triggers that app's own login screen on
-mobile, even though the session cookie is domain-wide and one login is meant to cover all four apps.
+mobile, even though the session cookie is domain-wide and one login is meant to cover every app.
 
 **It was reported on mobile Chrome, not just Safari** — so the obvious explanation (Safari/WebKit
 third-party cookie partitioning, ITP) does not fit on its own and needs re-diagnosing rather than
@@ -62,7 +61,7 @@ That is a genuine open bug and a good next piece of work once the queue clears.
 
 ## Next steps
 
-1. Wait for the queue: PR #17, then your branch, then `tracker-dashboard`.
-2. Re-apply the subtitle on the dashboard's rewritten page.
-3. Diagnose the mobile login bug properly, starting with what URL the iframe actually loads.
-4. Start every subsequent change on its own branch.
+1. **Diagnose the mobile login bug**, starting with what URL the iframe actually loads. It was
+   reported on mobile Chrome, so the obvious Safari/ITP explanation does not fit on its own.
+2. Put the Known Issues note to the TD for approval, rather than editing the brief.
+3. Start every change on its own branch.

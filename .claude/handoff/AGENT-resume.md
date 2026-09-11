@@ -9,8 +9,8 @@ submission.
 Read `CLAUDE.md`; the Rules of Engagement bind you. Run `bash .claude/worklogs/read-all.sh`. Open
 your worklog at `.claude/worklogs/<your-branch>.md`.
 
-**You have no branch in flight.** `claude/resume-formatter` is dead — three days cold, 52 commits
-behind, conflicts on `CLAUDE.md` — and is being deleted. Start fresh, one branch per change.
+**You have no branch in flight.** `claude/resume-formatter` held the pre-monorepo scaffold and has
+been deleted. Start fresh, one branch per change.
 
 This app is the only one with tests: 60 of them, `npm test` in `apps/resume`. CI runs
 `npm run test --if-present`, so those tests are the reason CI means anything at all here.
@@ -70,13 +70,12 @@ Job details live on the linked tracker thread and are **never duplicated** here.
 
 ## Known work
 
-**PII scrub — approved, not done.** A real target company name sat in a
-UI placeholder at `apps/resume/app/page.tsx:389` and in five fixtures in
-`tests/persistence.test.ts`. Replace it with a synthetic name. This is app code and tests, so run
-the suite rather than just grepping.
+**PII scrub — done (#21).** A real target company name had been sitting in a UI placeholder and in
+five test fixtures, and in the handoff docs describing the rule. All replaced or removed.
 
 **Still open from the rebuild:** linking a render to a shared contact, and a run through a free
-ATS-checker against real generated output. Neither has been done.
+ATS-checker against real generated output. Neither has been done, and the second one is the only
+test of whether this tool achieves its actual purpose.
 
 ## What you must not touch
 
@@ -92,9 +91,9 @@ ATS-checker against real generated output. Neither has been done.
 
 ## Next steps
 
-1. The PII scrub. Smallest, approved, unblocked.
-2. Diagnose whether `/api/health` should be reachable by an external monitor — it currently sits
-   behind the password gate, which is fine for human use and a blocker for uptime checks.
-3. Link a render to a shared contact.
-4. Run real generated output through a free ATS checker. Nobody has done this, and it is the only
-   test of whether the whole tool achieves its purpose.
+1. **Run real generated output through a free ATS checker.** Nobody has done this. Every other
+   check in this app verifies that it does what it was designed to do; none verifies the design
+   was right.
+2. Link a render to a shared contact.
+3. Decide whether `/api/health` should be reachable by an external monitor — it currently sits
+   behind the password gate, fine for human use and a blocker for uptime checks.
