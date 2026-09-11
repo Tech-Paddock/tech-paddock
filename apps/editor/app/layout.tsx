@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Message Editor — Paddock",
+  title: "Paddock — Message Editor",
   description: "Draft outreach messages in your own voice.",
 };
 
