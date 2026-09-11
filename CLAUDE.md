@@ -23,9 +23,13 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 
 - **Framework:** Next.js, hosted on Vercel
 - **Database:** Supabase (Postgres) — one project, multiple schemas
-- **AI:** Anthropic API, model `claude-sonnet-5`, own API key, server-side only
+- **AI:** Anthropic API, model `claude-sonnet-5`, own API key, server-side only. One exception:
+  the Resume Formatter's paragraph-labeling call uses `claude-opus-5` at effort `high` — it is the
+  accuracy-critical step in that tool and a mislabel silently corrupts a submitted resume
 - **Domain:** techpaddock.io via Cloudflare Registrar; subdomains via DNS + separate Vercel projects (one per app folder, see Core Architecture Principles)
 - **Docx generation** (Resume Formatter only): `docx` npm package, server-side
+- **Docx reading** (Resume Formatter only): `jszip` + `fast-xml-parser` — the `docx` package only
+  writes, and both the template and the Jobright upload have to be read back
 
 ## Domain Map
 
@@ -128,33 +132,81 @@ Single view of every active job-search thread, sorted to surface what's gone col
 - One-time setup: register app in Google Cloud Console, complete OAuth consent once, store refresh token server-side
 - **Deferred:** syncing a completed Google Task back to auto-reset `last_touch_date` — add once the base loop is solid
 
+**Where threads come from:** the Resume Formatter is the submission layer — filling in the job
+details when rendering a resume creates or updates the thread here. The tracker is the dashboard,
+and keeps its own ad-hoc thread creation for applications and networking threads that never
+involve a resume.
+
 **Seed contacts/threads to load once built:** Contoso Cloud, Fabrikam, Litware Growth, Proseware, Tailspin, Dana Whitfield, Robin Marsh.
 
 ---
 
 ## Tool 3: Resume Formatter (`resume` schema)
 
-Single source of truth for resume content, decoupled from any one saved docx file. **Pure formatting — no AI judgment calls on phrasing or grammar.**
+Reformats a Jobright-tailored resume into Joel's own template, optimized for ATS readability, and
+records the submission. **Not a content store** — Jobright authors and tailors the content; this
+tool owns formatting, history, and the application record. **Pure formatting — no AI judgment
+calls on phrasing or grammar.** Both inputs are `.docx`, output is `.docx`; there is no
+copy-paste path.
 
-### `resume_entries` (jobs/roles)
-id, company, title, start_date, end_date (or "Present"), display_order
+**Why it exists:** Jobright does the tailoring and the ATS keyword work, but its output formatting
+is unusable — every run bold+italic, section rules rendered as images, a mangled Education
+section, and ~900KB of direct formatting on a two-page resume.
 
-### `resume_bullets`
-id, entry_id (FK), content, display_order
-
-### `resume_highlights` (Career Highlights section)
-id, content, display_order
+**Pipeline:** upload a Jobright `.docx` → extract paragraphs deterministically → label them →
+render into the active template → review the coverage report → save, with the application details
+written through to the tracker.
 
 ### `resume_templates`
-id, name, is_active (boolean — exactly one true at a time; switching is deliberate, never automatic; old templates are never deleted), font, font_size, margins, section_order, spacing, `highlights_style` (enum: `table` | `list`, defaults to `list`)
+id, version, name, `file_path` (original docx in Supabase Storage), `spec` (jsonb — extracted
+formatting), is_active, created_at
+
+Append-only; templates are never deleted. `is_active` auto-points at the newest upload, and
+pinning an older one is deliberate — it raises a persistent banner on the render screen naming
+both versions. The template file is itself a deliverable: it doubles as the general-purpose resume
+to hand someone when there is no specific job, so the original bytes are kept, not just the spec.
+
+### `resume_renders`
+id, template_id, template_snapshot, `source_file_path` (the Jobright upload), `parsed_content`
+(jsonb), `coverage` (jsonb), `output_file_path`, content_hash, `thread_id` (FK →
+`tracker.pipeline_threads`, nullable), `submitted_at` (nullable), created_at
+
+Document artifacts are append-only — parsed content, coverage, and the rendered file never change
+once written. Application metadata stays editable, since a resume is usually rendered days before
+it is submitted, and `submitted_at` stays null until it actually goes out. Job details (company,
+role, posting URL, contact) live on the linked tracker thread and are never duplicated here.
+
+**Lossless rule:** the model labels paragraphs, it never transcribes them. Text always comes from
+the source docx; the model only assigns each paragraph a role. Content loss is therefore
+structurally impossible rather than something to verify after the fact — which matters because
+Jobright's specific wording *is* the ATS optimization, and a silently dropped line is lost keyword
+coverage.
+
+**Coverage report** — surfaced in the UI after every render, not just in tests: percentage of
+source paragraphs placed, any dropped text quoted in full, unrecognized headers, and the map from
+source header to rendered section.
 
 **Generation logic:**
-- Pull whichever template has `is_active = true`, plus current entries/bullets/highlights
+- Pull whichever template has `is_active = true`, plus the labeled content from the upload
 - Build the `.docx` server-side with the `docx` npm package, following the active template's rules
 
-**ATS-safety rule:** avoid tables generally — many ATS parsers read raw XML order, not visual order, and content inside table cells gets scrambled or dropped.
+**ATS-safety rule:** avoid tables generally — many ATS parsers read raw XML order, not visual
+order, and content inside table cells gets scrambled or dropped. Also: no text boxes, no images
+(Jobright draws its section rules as images — use real paragraph borders instead), contact details
+in the document body and never in a Word header or footer, section headings from a known
+vocabulary, and a plain `•` bullet glyph.
 
-**Exception:** Career Highlights may render as a table when `highlights_style = 'table'`, since that content is intentionally repeated in the body bullets — a parser losing that specific table loses nothing new. Keep it structurally simple if used: flat rows/columns, no merged cells, no nesting. Run one generated output through a free ATS-checker before trusting it on live applications.
+**Exception:** Career Highlights renders as a table. That content is intentionally repeated in the
+body bullets, so a parser losing that specific table loses nothing new, and the content is
+natively two-column (`metric: description`). Flat rows, no merged cells, no nesting. Enforced by
+the ATS lint test below: exactly one table is permitted, and one anywhere else fails.
+
+**Testing** — the first real tests in this repo; CI currently only checks that each app compiles:
+- Golden file: fixed content + fixed spec renders byte-identical twice (this is what makes a saved
+  render trustworthy as a record of what was actually sent)
+- ATS lint: unzip the generated docx and assert the rules above mechanically
+- Parse fixtures: real Jobright exports in, expected sections and 100% coverage out
+- Spec fixtures: real template docx in, expected font/margins/spacing out
 
 ---
 
@@ -169,10 +221,12 @@ id, name, is_active (boolean — exactly one true at a time; switching is delibe
    server-to-server using a shared `INTERNAL_API_SECRET` header (set identically on both apps),
    since it's a cross-app call with no browser session to carry — scoped tightly to that one
    route in editor's middleware, never a blanket auth bypass
-4. ~~Resume Formatter: structured content CRUD, template CRUD, docx generation~~ — code done
-   (`apps/resume`), not yet deployed — needs its own Vercel project (Root Directory `apps/resume`),
-   env vars, and the `resume.techpaddock.io` DNS record; hasn't been run through a free
-   ATS-checker against a real generated output yet either
+4. **Resume Formatter — being rebuilt.** The original build (structured content CRUD + template
+   CRUD + docx generation) was the wrong shape: it assumed the app authored resume content. It
+   doesn't — Jobright does. Rebuilding as a reformatter per the section above; the auth, password,
+   and Supabase plumbing survive, the content schema and its CRUD do not. Still needs its own
+   Vercel project (Root Directory `apps/resume`), env vars, the `resume.techpaddock.io` DNS
+   record, and a run through a free ATS-checker against real generated output.
 5. Google Tasks integration for the tracker (OAuth setup + Vercel Cron)
 6. ~~Domain wiring: Cloudflare DNS → Vercel~~ — done for Message Editor; repeat per subdomain as each
    tool goes live
