@@ -52,12 +52,13 @@ No `ANTHROPIC_API_KEY` — this app makes no model calls (see below).
 
 ## No model calls
 
-The Anthropic SDK is not a dependency here. Labelling is fully deterministic and hits 100%
-coverage on both document families, so a model call would have nothing to decide — and it would
+The Anthropic SDK is not a dependency here, deliberately. Labelling is fully deterministic and hits
+100% coverage on both document families, so a model would have nothing to decide — and it would
 cost the reproducibility that makes a saved render a trustworthy record of what was sent.
 
-`claude-opus-5` is reserved for an escalation path that is measured but not wired: coverage below
-100%, or an `unknown_heading` finding. Wire it when a real document defeats the rules.
+A model escalation was designed and dropped. The signal that would have triggered it is still
+measured — coverage below 100%, or an `unknown_heading` finding — but it surfaces in the UI for a
+human instead.
 
 ## Testing
 

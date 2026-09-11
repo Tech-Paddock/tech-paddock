@@ -10,16 +10,46 @@ export type DocxParts = {
 };
 
 /**
- * A .docx is a zip of XML parts. `docx` (npm) only writes, so reading one back
- * means unzipping it ourselves — both for the template's formatting and for the
- * Jobright upload's content.
+ * A .docx is a few hundred KB expanded - the checked-in fixtures total 900KB,
+ * at roughly 40x compression. This ceiling leaves generous headroom while
+ * refusing an archive that is small on disk and enormous once inflated, which
+ * would otherwise be read into memory before anything could object.
  */
-export async function readDocxParts(data: ArrayBuffer | Uint8Array | Buffer): Promise<DocxParts> {
+export const MAX_INFLATED_BYTES = 64 * 1024 * 1024;
+
+export function inflatedSize(zip: JSZip): number | null {
+  let total = 0;
+  for (const name of Object.keys(zip.files)) {
+    const entry = zip.files[name];
+    // Directory entries carry no size. Counting them as "unknown" made this
+    // return null for every real archive, which silently disabled the check.
+    if (entry.dir) continue;
+    // Not public API, so treat a genuinely missing size as unknown rather than
+    // as zero — better to skip the check than to under-count and allow a bomb.
+    const size = (entry as { _data?: { uncompressedSize?: number } })?._data?.uncompressedSize;
+    if (typeof size !== "number") return null;
+    total += size;
+  }
+  return total;
+}
+
+export async function readDocxParts(
+  data: ArrayBuffer | Uint8Array | Buffer,
+  maxInflatedBytes = MAX_INFLATED_BYTES
+): Promise<DocxParts> {
   let zip: JSZip;
   try {
     zip = await JSZip.loadAsync(data);
   } catch {
     throw new DocxReadError("not_a_docx", "That file isn't a readable .docx — a PDF or Word 97 .doc renamed to .docx will land here too.");
+  }
+
+  const inflated = inflatedSize(zip);
+  if (inflated !== null && inflated > maxInflatedBytes) {
+    throw new DocxReadError(
+      "inflated_too_large",
+      `That archive expands to ${(inflated / 1024 / 1024).toFixed(0)}MB, far larger than any resume. Refusing to read it.`
+    );
   }
 
   const document = await zip.file("word/document.xml")?.async("string");

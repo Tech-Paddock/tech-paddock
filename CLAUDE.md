@@ -39,11 +39,11 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 
 - **Framework:** Next.js, hosted on Vercel
 - **Database:** Supabase (Postgres) — one project, multiple schemas
-- **AI:** Anthropic API, model `claude-sonnet-5`, own API key, server-side only. **The Resume
-  Formatter makes no model calls at all** — the SDK is not even a dependency there. Labelling turned
-  out to be fully deterministic on both document families (see Tool 3), so `claude-opus-5` at effort
-  `high` is reserved for the escalation path rather than in use. Adding a call would also cost the
-  reproducibility that makes a saved render a trustworthy record, so it stays an exception path
+- **AI:** Anthropic API, model `claude-sonnet-5`, own API key, server-side only — Message Editor
+  only. **The Resume Formatter makes no model calls and is not going to.** Labelling is fully
+  deterministic on both document families (see Tool 3), so there is nothing for a model to decide,
+  and a call would cost the reproducibility that makes a saved render a trustworthy record of what
+  was sent. When a document defeats the rules the coverage report says so and you fix it by hand.
 - **Domain:** techpaddock.io via Cloudflare Registrar; subdomains via DNS + separate Vercel projects (one per app folder, see Core Architecture Principles)
 - **Docx generation** (Resume Formatter only): `docx` npm package, server-side
 - **Docx reading** (Resume Formatter only): `jszip` + `fast-xml-parser` — the `docx` package only
@@ -68,7 +68,7 @@ SUPABASE_URL=                 # all apps that talk to Postgres
 SUPABASE_SERVICE_ROLE_KEY=    # ditto
 APP_PASSWORD_HASH=            # bcrypt hash of the login password — all four apps
 SESSION_SECRET=               # all four apps, and MUST be byte-identical across them
-ANTHROPIC_API_KEY=            # editor, and resume once the labeling call lands
+ANTHROPIC_API_KEY=            # editor only — the resume app makes no model calls
 INTERNAL_API_SECRET=          # editor + tracker only (server-to-server draft call)
 EDITOR_BASE_URL=              # tracker only
 GOOGLE_TASKS_CLIENT_ID=       # not referenced in code yet — build order step 5
@@ -217,15 +217,17 @@ docx; labelling only assigns each paragraph a role. Content loss is therefore st
 impossible rather than something to verify after the fact — which matters because Jobright's
 specific wording *is* the ATS optimization, and a silently dropped line is lost keyword coverage.
 
-**Labelling is deterministic, and the model is not wired up.** Jobright's export is machine
+**Labelling is deterministic, and there is no model in this tool.** Jobright's export is machine
 generated and highly regular — run size alone separates the name, headings, entry lines and body,
 since its `styles.xml` defines no named styles whatsoever. Sizes are *ranked* rather than
 hardcoded, because the template's scale is completely different and it sets its Career Highlights
-metrics larger than its own headings. Both fixtures label at 100% coverage, so a model call would
-have nothing to decide. The escalation trigger already exists and is already measured — coverage
-below 100%, or an `unknown_heading` finding — and only the call itself is missing. Wire it when a
-real document defeats the rules, not before: a model call is also non-deterministic, and
-determinism is what makes a saved render reproducible.
+metrics larger than its own headings. Both fixtures label at 100% coverage.
+
+A model escalation was designed and then dropped. It would have had nothing to decide, and it would
+have made output non-deterministic, which is exactly what a saved render must not be. The signal
+that would have triggered it is still worth having and still measured — coverage below 100%, or an
+`unknown_heading` finding — but it now surfaces in the UI for a human rather than routing to a
+model. If a document defeats the rules, the coverage report names what it could not place.
 
 **Parser note:** content is not always a direct child of `<w:body>` — the template keeps its
 Core Competencies inside a `<w:sdt>` content control, and Career Highlights inside a table cell.
@@ -285,8 +287,8 @@ the foreign keys are only ever exercised against the real project:
    Templates (upload, version, activate), History (past renders, redownload what was actually
    sent, log a submission) and an ATS check for any single file. Renders persist to
    `resume.renders`, and naming a company writes the thread through to Pipeline Tracker. Still
-   open: the Opus escalation for documents the deterministic labeller cannot parse, linking a
-   render to a shared contact, and a run through a free ATS-checker against real generated output.
+   open: linking a render to a shared contact, and a run through a free ATS-checker against real
+   generated output. The model escalation was considered and dropped — see Tool 3.
    Original note kept for context — **it was being rebuilt because** The original build (structured content CRUD + template
    CRUD + docx generation) was the wrong shape: it assumed the app authored resume content. It
    doesn't — Jobright does. Rebuilding as a reformatter per the section above; the auth, password,

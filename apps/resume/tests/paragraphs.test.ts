@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readDocxParts, DocxReadError } from "../lib/docx/read";
+import { readDocxParts, inflatedSize, MAX_INFLATED_BYTES, DocxReadError } from "../lib/docx/read";
 import { extractParagraphs } from "../lib/docx/paragraphs";
 
 const fixture = (name: string) => readFileSync(join(__dirname, "fixtures", name));
@@ -63,5 +63,40 @@ describe("error handling", () => {
     const JSZip = (await import("jszip")).default;
     const zip = await new JSZip().file("hello.txt", "hi").generateAsync({ type: "nodebuffer" });
     await expect(readDocxParts(zip)).rejects.toMatchObject({ code: "no_document_part" });
+  });
+});
+
+describe("malicious input", () => {
+  it("refuses an archive that inflates past the ceiling", async () => {
+    const JSZip = (await import("jszip")).default;
+    // A megabyte of one repeated byte compresses to almost nothing, which is
+    // the shape of a decompression bomb. Checked against a lowered ceiling so
+    // the test stays fast; production uses MAX_INFLATED_BYTES.
+    const padding = new Uint8Array(1024 * 1024).fill(32);
+    const bomb = await new JSZip()
+      .file("word/document.xml", padding)
+      .generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+
+    expect(bomb.length).toBeLessThan(64 * 1024);
+
+    // Catch by hand rather than with .rejects: if this ever regresses, the
+    // resolved value holds a megabyte-long string and vitest spends minutes
+    // rendering it into the failure diff.
+    const outcome = await readDocxParts(bomb, 64 * 1024).then(
+      () => "resolved",
+      (err: { code?: string }) => err.code
+    );
+    expect(outcome).toBe("inflated_too_large");
+  }, 30000);
+
+  it("reports the real fixtures as far below the production ceiling", async () => {
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(fixture("jobright-sample.docx"));
+    const size = inflatedSize(zip);
+    // Null would mean the guard is disabled, which is how it shipped the first
+    // time: directory entries have no size and were poisoning the total.
+    expect(size).not.toBeNull();
+    expect(size!).toBeLessThan(MAX_INFLATED_BYTES / 10);
+    await expect(readDocxParts(fixture("jobright-sample.docx"))).resolves.toBeTruthy();
   });
 });
