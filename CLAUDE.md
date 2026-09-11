@@ -178,9 +178,13 @@ SESSION_SECRET=               # all four apps, and MUST be byte-identical across
 ANTHROPIC_API_KEY=            # editor only — the resume app makes no model calls
 INTERNAL_API_SECRET=          # editor + tracker only (server-to-server draft call)
 EDITOR_BASE_URL=              # tracker only
-GOOGLE_TASKS_CLIENT_ID=       # not referenced in code yet — build order step 5
-GOOGLE_TASKS_CLIENT_SECRET=
-GOOGLE_TASKS_REFRESH_TOKEN=
+MS_GRAPH_CLIENT_ID=           # tracker only — Outlook calendar + To Do, one registration
+MS_GRAPH_CLIENT_SECRET=
+MS_GRAPH_REFRESH_TOKEN=
+MS_TODO_LIST_NAME=            # tracker only, optional — defaults to "Paddock"
+PADDOCK_TIMEZONE=             # tracker only, optional — for due dates and the daily sweep
+CRON_SECRET=                  # tracker only — guards the Vercel Cron route
+RESUME_BASE_URL=              # tracker only — the hub's glance fans out to the resume app too
 ```
 
 `SESSION_SECRET` is separate from `APP_PASSWORD_HASH` on purpose: bcrypt salts randomly per app, so
@@ -260,21 +264,27 @@ Single view of every active job-search thread, sorted to surface what's gone col
 | last_touch_date | |
 | next_action | freeform |
 | notes | running log |
-| open_task_id | nullable — Google Task ID, see below |
+| open_task_id | nullable — Microsoft To Do task ID, see below |
 | created_at / updated_at | |
 
 **Primary view:** sorted by days since `last_touch_date`, descending. Threads past the stale threshold (default 10 days, adjustable) are visually flagged.
 
 **Draft-follow-up integration:** a button on each thread calls the Message Editor's drafting endpoint directly, passing the linked contact's full context (contact record + message_history + this thread's notes) — no re-entering anything.
 
-**Google Tasks integration** (direct API call, no middleman automation platform):
+**Microsoft To Do integration** (direct Graph call, no middleman automation platform):
 - Vercel Cron runs daily, checks `pipeline_threads` for anything past the stale threshold with `open_task_id` still null
-- For each match: creates a Google Task — title `Follow up — [Contact] ([Company])`, notes include the thread's last note + next_action, due today
+- For each match: creates a To Do task — title `Follow up — [Contact] ([Company])`, notes include the thread's last note + next_action, due today
 - Stores the returned task ID in `open_task_id` so the same thread isn't re-flagged daily
 - `open_task_id` clears when the thread is updated, so a fresh task can fire next time it goes stale
-- Manual "create a task" button also available on any thread, independent of the stale check
-- One-time setup: register app in Google Cloud Console, complete OAuth consent once, store refresh token server-side
-- **Deferred:** syncing a completed Google Task back to auto-reset `last_touch_date` — add once the base loop is solid
+- Manual "create a task" button also available on any thread, and it overrides the open-task guard — that guard exists to stop the daily sweep repeating itself, not to stop you asking
+- One-time setup: register the app in Azure against a personal Microsoft account, complete consent once, store the refresh token server-side
+- **Deferred:** syncing a completed task back to auto-reset `last_touch_date` — add once the base loop is solid
+
+**This replaced the originally planned Google Tasks integration**, approved 2026-09-11. The calendar
+half had to be Outlook regardless, and one Microsoft app registration serves both calendar and To Do
+where Google would have meant a second OAuth setup for no additional capability. Leaving the
+`MS_GRAPH_*` vars unset is safe — the features degrade quietly rather than erroring, which is right
+at runtime and worth knowing during setup, because nothing will tell you they are missing.
 
 **Where threads come from:** the Resume Formatter is the submission layer — filling in the job
 details when rendering a resume creates or updates the thread here. The tracker is the dashboard,
@@ -407,7 +417,9 @@ the foreign keys are only ever exercised against the real project:
    vars, and DNS are all already in place and the old build is live — so this is a replacement in
    place, not a first deploy. Still needs a run through a free ATS-checker against real generated
    output.
-5. Google Tasks integration for the tracker (OAuth setup + Vercel Cron)
+5. ~~Task integration for the tracker~~ — done as **Microsoft To Do via Graph**, not Google Tasks;
+   see Tool 2. Vercel Cron sweeps daily. Still needs the Azure registration and the `MS_GRAPH_*`
+   env vars set on the tracker's Vercel project before it does anything.
 6. ~~Domain wiring: Cloudflare DNS → Vercel~~ — done for all four subdomains
 7. ~~Password gate~~ — done on all four apps, now with the shared-cookie SSO described above. RLS is
    on deny-by-default across every table in every schema from step 1

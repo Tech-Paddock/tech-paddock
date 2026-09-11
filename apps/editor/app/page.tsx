@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 type Contact = {
   id: string;
@@ -33,7 +34,7 @@ const RELATIONSHIP_TYPES = [
   "Personal · Cold",
 ];
 
-export default function HomePage() {
+function DraftShell() {
   const [mode, setMode] = useState<"draft" | "train">("draft");
   const [contacts, setContacts] = useState<Contact[]>([]);
 
@@ -67,10 +68,28 @@ export default function HomePage() {
 
   const [modelDrift, setModelDrift] = useState<{ newly_detected: string[] } | null>(null);
 
+  // Arriving from a dashboard or hub link that already knows who this is for.
+  const linkedContactId = useSearchParams().get("contact");
+
   useEffect(() => {
     fetch("/api/contacts")
       .then((r) => r.json())
-      .then((d) => setContacts(d.contacts ?? []))
+      .then((d) => {
+        const loaded: Contact[] = d.contacts ?? [];
+        setContacts(loaded);
+
+        if (linkedContactId) {
+          const match = loaded.find((c) => c.id === linkedContactId);
+          if (match) {
+            setContactId(match.id);
+            setContactQuery(`${match.name}${match.org ? ` — ${match.org}` : ""}`);
+            // Their stored preference is the whole point of linking a contact.
+            if (match.preferred_channel) {
+              setChannel(match.preferred_channel as typeof channel);
+            }
+          }
+        }
+      })
       .catch(() => {});
     fetch("/api/style-guide")
       .then((r) => r.json())
@@ -82,7 +101,7 @@ export default function HomePage() {
         if (d.status?.drift_detected) setModelDrift(d.status);
       })
       .catch(() => {});
-  }, []);
+  }, [linkedContactId]);
 
   const filteredContacts = useMemo(() => {
     const q = contactQuery.trim().toLowerCase();
@@ -526,5 +545,13 @@ export default function HomePage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <DraftShell />
+    </Suspense>
   );
 }

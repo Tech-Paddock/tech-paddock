@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 type Contact = { id: string; name: string; org: string | null; preferred_channel: string | null };
+
+type Touch = {
+  at: string;
+  source: "recorded" | "message" | "render" | "meeting";
+  aheadOfRecord: boolean;
+};
 
 type Thread = {
   id: string;
@@ -13,18 +21,32 @@ type Thread = {
   next_action: string | null;
   notes: string | null;
   open_task_id: string | null;
+  /** Derived server-side from messages, submissions and meetings. */
+  effective_touch: Touch | null;
+  decay_threshold: number;
 };
 
 const STAGES = ["Applied", "Networking", "Interviewing", "Offer", "Cooling", "Closed"] as const;
-const STALE_THRESHOLD_DAYS = 10;
+
+const TOUCH_LABEL: Record<Touch["source"], string> = {
+  recorded: "recorded by hand",
+  message: "from a message you sent",
+  render: "from a resume you submitted",
+  meeting: "from a meeting that happened",
+};
 
 function daysSince(dateStr: string) {
-  const then = new Date(dateStr + "T00:00:00");
+  const then = dateStr.length <= 10 ? new Date(dateStr + "T00:00:00") : new Date(dateStr);
   const now = new Date();
   return Math.floor((now.getTime() - then.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export default function HomePage() {
+/** Days since the real last touch, which is rarely the date on the record. */
+function quietDays(t: Thread) {
+  return daysSince(t.effective_touch?.at ?? t.last_touch_date);
+}
+
+function HomeShell() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +55,10 @@ export default function HomePage() {
   const [draftFor, setDraftFor] = useState<string | null>(null);
   const [draftText, setDraftText] = useState("");
   const [draftLoading, setDraftLoading] = useState(false);
+  const [taskFor, setTaskFor] = useState<string | null>(null);
+  const [taskNote, setTaskNote] = useState<{ id: string; text: string } | null>(null);
+  const focusedThread = useSearchParams().get("thread");
+  const focusedRef = useRef<HTMLDivElement | null>(null);
 
   async function refresh() {
     const [t, c] = await Promise.all([
@@ -53,9 +79,17 @@ export default function HomePage() {
   }, [contacts]);
 
   const sorted = useMemo(
-    () => [...threads].sort((a, b) => daysSince(b.last_touch_date) - daysSince(a.last_touch_date)),
+    () => [...threads].sort((a, b) => quietDays(b) - quietDays(a)),
     [threads]
   );
+
+  // Arriving from a dashboard or hub link: bring the named thread into view
+  // rather than leaving it to be hunted for in the list.
+  useEffect(() => {
+    if (focusedThread && focusedRef.current) {
+      focusedRef.current.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [focusedThread, threads.length]);
 
   async function updateThread(id: string, patch: Partial<Thread>) {
     const res = await fetch(`/api/threads/${id}`, {
@@ -90,6 +124,23 @@ export default function HomePage() {
     }
   }
 
+  async function createTask(id: string) {
+    setTaskFor(id);
+    setTaskNote(null);
+    setError(null);
+
+    const res = await fetch(`/api/threads/${id}/task`, { method: "POST" });
+    setTaskFor(null);
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error ?? "Couldn't create the task");
+      return;
+    }
+    setTaskNote({ id, text: `Filed in To Do: ${data.title}` });
+    refresh();
+  }
+
   async function draftFollowUp(id: string) {
     setDraftFor(id);
     setDraftLoading(true);
@@ -116,12 +167,20 @@ export default function HomePage() {
         <div>
           <h1 className="text-2xl font-semibold">Pipeline Tracker</h1>
         </div>
-        <button
-          onClick={() => setNewOpen((v) => !v)}
-          className="px-3 py-2 rounded-lg border border-line bg-white text-sm font-medium"
-        >
-          + New thread
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard"
+            className="px-3 py-2 rounded-lg border border-line bg-white text-sm font-medium"
+          >
+            Dashboard
+          </Link>
+          <button
+            onClick={() => setNewOpen((v) => !v)}
+            className="px-3 py-2 rounded-lg border border-line bg-white text-sm font-medium"
+          >
+            + New thread
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -182,13 +241,16 @@ export default function HomePage() {
 
       <div className="flex flex-col gap-3">
         {sorted.map((t) => {
-          const stale = daysSince(t.last_touch_date) >= STALE_THRESHOLD_DAYS;
+          const quiet = quietDays(t);
+          const stale = t.stage !== "Closed" && quiet >= t.decay_threshold;
+          const focused = t.id === focusedThread;
           return (
             <div
               key={t.id}
+              ref={focused ? focusedRef : undefined}
               className={`border rounded-xl p-4 bg-white flex flex-col gap-3 ${
                 stale ? "border-red-300" : "border-line"
-              }`}
+              } ${focused ? "ring-2 ring-accent ring-offset-2" : ""}`}
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -197,8 +259,11 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {stale && (
-                    <span className="text-xs font-medium text-red-700 bg-red-50 px-2 py-1 rounded-full">
-                      {daysSince(t.last_touch_date)}d stale
+                    <span
+                      className="text-xs font-medium text-red-700 bg-red-50 px-2 py-1 rounded-full"
+                      title={`Past the ${t.decay_threshold}-day threshold for ${t.stage}`}
+                    >
+                      {quiet}d quiet
                     </span>
                   )}
                   <button onClick={() => deleteThread(t.id)} className="text-xs text-red-700">
@@ -219,12 +284,19 @@ export default function HomePage() {
                     </option>
                   ))}
                 </select>
-                <input
-                  type="date"
-                  defaultValue={t.last_touch_date}
-                  onBlur={(e) => updateThread(t.id, { last_touch_date: e.target.value })}
-                  className="border border-line rounded-lg px-2 py-1.5"
-                />
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="date"
+                    defaultValue={t.last_touch_date}
+                    onBlur={(e) => updateThread(t.id, { last_touch_date: e.target.value })}
+                    className="border border-line rounded-lg px-2 py-1.5"
+                  />
+                  {t.effective_touch?.aheadOfRecord && (
+                    <p className="text-xs text-ink/45">
+                      Counting {quiet}d {TOUCH_LABEL[t.effective_touch.source]}, not this date.
+                    </p>
+                  )}
+                </div>
                 <input
                   defaultValue={t.next_action ?? ""}
                   placeholder="Next action"
@@ -241,14 +313,26 @@ export default function HomePage() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => draftFollowUp(t.id)}
-                  disabled={!t.contact_id || draftLoading}
-                  className="self-start text-sm font-medium text-accent disabled:opacity-40"
-                  title={t.contact_id ? undefined : "Link a contact to draft a follow-up"}
-                >
-                  {draftLoading && draftFor === t.id ? "Drafting…" : "Draft follow-up →"}
-                </button>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => draftFollowUp(t.id)}
+                    disabled={!t.contact_id || draftLoading}
+                    className="text-sm font-medium text-accent disabled:opacity-40"
+                    title={t.contact_id ? undefined : "Link a contact to draft a follow-up"}
+                  >
+                    {draftLoading && draftFor === t.id ? "Drafting…" : "Draft follow-up →"}
+                  </button>
+                  <button
+                    onClick={() => createTask(t.id)}
+                    disabled={taskFor === t.id}
+                    className="text-sm font-medium text-ink/60 disabled:opacity-40"
+                  >
+                    {taskFor === t.id ? "Filing…" : "Add to To Do"}
+                  </button>
+                </div>
+                {taskNote?.id === t.id && (
+                  <p className="text-xs text-ink/50">{taskNote.text}</p>
+                )}
                 {draftFor === t.id && draftText && (
                   <div className="bg-paper border border-line rounded-lg p-3 text-sm whitespace-pre-wrap">
                     {draftText}
@@ -261,5 +345,13 @@ export default function HomePage() {
         {sorted.length === 0 && <p className="text-sm text-ink/50">No threads yet.</p>}
       </div>
     </main>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <HomeShell />
+    </Suspense>
   );
 }
