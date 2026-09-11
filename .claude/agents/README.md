@@ -1,6 +1,6 @@
 # Agents
 
-Eight agents build here. They never run at the same time and cannot see each other, so everything
+Seven agents build here. They never run at the same time and cannot see each other, so everything
 one needs from another has to be written down.
 
 Each agent gets a folder holding three files. They are deliberately separate because they change at
@@ -22,8 +22,7 @@ different speeds and are read at different moments.
 | `tracker/` | Pipeline Tracker | `apps/tracker` |
 | `resume/` | Resume Formatter | `apps/resume` |
 | `coffee/` | Coffee | `apps/coffee` |
-| `supabase/` | Supabase | Schemas, migrations, RLS, storage |
-| `vercel-config/` | Vercel Config | Vercel projects, env vars, domains, DNS, CI |
+| `platform/` | Platform Config | Postgres, Vercel, DNS, CI — the layer under every app |
 
 ## How a session starts
 

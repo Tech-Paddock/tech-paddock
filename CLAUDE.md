@@ -42,8 +42,7 @@ agent anything. The repo is the only channel, and these five steps are the whole
 | Pipeline Tracker | `apps/tracker` | `.claude/agents/tracker/` |
 | Resume Formatter | `apps/resume` | `.claude/agents/resume/` |
 | Coffee | `apps/coffee` | `.claude/agents/coffee/` |
-| Supabase | schemas, migrations, RLS, storage | `.claude/agents/supabase/` |
-| Vercel Config | projects, env vars, domains, DNS, CI | `.claude/agents/vercel-config/` |
+| Platform Config | Postgres, Vercel, DNS, CI — the layer under every app | `.claude/agents/platform/` |
 
 Each folder holds `RULES.md` (your job and guardrails), `HANDOFF.md` (current state) and
 `KICKOFF.md` (the prompt that starts you). `.claude/agents/README.md` is the map.
@@ -56,7 +55,7 @@ was not given to you.
 ## Universal rules
 
 These bind every agent. Your charter adds to them; it never overrides them. They live here once,
-in the file every session loads, so that they cannot drift the way eight copies would.
+in the file every session loads, so that they cannot drift the way seven copies would.
 
 ### Never, without the technical director
 
