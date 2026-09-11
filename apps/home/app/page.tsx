@@ -7,6 +7,7 @@ const APPS = [
   { slug: "editor", name: "Message Editor", href: "https://editor.techpaddock.io", team: "ferrari", icon: "✉️" },
   { slug: "tracker", name: "Pipeline Tracker", href: "https://tracker.techpaddock.io", team: "mercedes", icon: "📊" },
   { slug: "resume", name: "Resume Formatter", href: "https://resume.techpaddock.io", team: "astonmartin", icon: "📄" },
+  { slug: "coffee", name: "Coffee", href: "https://coffee.techpaddock.io", team: "mclaren", icon: "☕" },
 ];
 
 function HomeShell() {
