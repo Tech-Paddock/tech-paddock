@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Finding = { code: string; severity: "blocking" | "warning"; message: string };
 type Coverage = { totalParagraphs: number; placed: number; dropped: string[]; percent: number };
@@ -8,10 +8,21 @@ type SectionSummary = { label: string; kind: string; count: number };
 
 type Reformatted = {
   filename: string;
+  renderId: string | null;
+  templateLabel: string;
   coverage: Coverage;
   findings: Finding[];
   summary: { name: string | null; contact: string | null; sections: SectionSummary[] };
   docxBase64: string;
+};
+
+type Template = {
+  id: string;
+  version: number;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  spec: { font: string; bodySize: number; headingSize: number; margins: { left: number; top: number } };
 };
 
 type Inspection = {
@@ -81,7 +92,8 @@ function Findings({ findings }: { findings: Finding[] }) {
 }
 
 export default function Home() {
-  const [tab, setTab] = useState<"reformat" | "check">("reformat");
+  const [tab, setTab] = useState<"reformat" | "templates" | "check">("reformat");
+  const [templates, setTemplates] = useState<Template[] | null>(null);
   const [template, setTemplate] = useState<File | null>(null);
   const [source, setSource] = useState<File | null>(null);
   const [single, setSingle] = useState<File | null>(null);
@@ -89,6 +101,46 @@ export default function Home() {
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    refreshTemplates();
+  }, []);
+
+  async function refreshTemplates() {
+    try {
+      const res = await fetch("/api/templates");
+      const data = await res.json();
+      if (res.ok) setTemplates(data.templates as Template[]);
+    } catch {
+      // The tab shows its own empty state; a failed refresh is not worth a banner.
+    }
+  }
+
+  async function uploadTemplate(file: File) {
+    const body = new FormData();
+    body.append("file", file);
+    try {
+      await post<unknown>("/api/templates", body, "Reading template…");
+      await refreshTemplates();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save that template.");
+    }
+  }
+
+  async function activate(id: string) {
+    setError(null);
+    try {
+      const res = await fetch(`/api/templates/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: true }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Couldn't switch template.");
+      await refreshTemplates();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't switch template.");
+    }
+  }
 
   async function post<T>(url: string, body: FormData, stage: string): Promise<T> {
     setBusy(stage);
@@ -104,10 +156,11 @@ export default function Home() {
   }
 
   async function reformat() {
-    if (!template || !source) return;
+    if (!source || (!template && !active)) return;
     setResult(null);
     const body = new FormData();
-    body.append("template", template);
+    // A one-off template overrides the stored one and saves nothing.
+    if (template) body.append("template", template);
     body.append("source", source);
     try {
       setResult(await post<Reformatted>("/api/reformat", body, "Reading both documents…"));
@@ -141,6 +194,10 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }
 
+  const active = templates?.find((t) => t.is_active) ?? null;
+  const newest = templates && templates.length > 0 ? templates[0] : null;
+  const pinnedOlder = active && newest && active.id !== newest.id ? { active, newest } : null;
+
   return (
     <main className="min-h-screen px-5 py-8 max-w-3xl mx-auto flex flex-col gap-6">
       <header className="flex flex-col gap-1">
@@ -151,7 +208,7 @@ export default function Home() {
       </header>
 
       <nav className="flex gap-1 bg-white border border-line rounded-xl p-1">
-        {(["reformat", "check"] as const).map((t) => (
+        {(["reformat", "templates", "check"] as const).map((t) => (
           <button
             key={t}
             onClick={() => {
@@ -162,7 +219,7 @@ export default function Home() {
               tab === t ? "bg-accent text-white" : "opacity-70"
             }`}
           >
-            {t === "reformat" ? "Reformat" : "ATS check"}
+            {t === "reformat" ? "Reformat" : t === "templates" ? "Templates" : "ATS check"}
           </button>
         ))}
       </nav>
@@ -172,17 +229,41 @@ export default function Home() {
       {tab === "reformat" ? (
         <>
           <section className="flex flex-col gap-3">
-            <FilePick label="Template" hint="Your resume, whose formatting to copy" file={template} onPick={setTemplate} />
+            {active ? (
+              <div className="bg-white border border-line rounded-xl px-4 py-3">
+                <p className="text-xs uppercase tracking-wide opacity-60">Template</p>
+                <p className="text-sm font-medium">
+                  {active.name} <span className="opacity-60 font-normal">v{active.version}</span>
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3">
+                No template saved yet. Add one on the Templates tab, or attach a one-off below.
+              </p>
+            )}
+            {pinnedOlder && (
+              <p className="text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3">
+                Rendering with v{pinnedOlder.active.version} ({pinnedOlder.active.name}). Your most recent is v
+                {pinnedOlder.newest.version}.
+              </p>
+            )}
             <FilePick label="Tailored resume" hint="The Jobright export to reformat" file={source} onPick={setSource} />
+            <FilePick
+              label={active ? "One-off template (optional)" : "Template"}
+              hint={active ? "Overrides the saved template, saves nothing" : "Your resume, whose formatting to copy"}
+              file={template}
+              onPick={setTemplate}
+            />
             <button
               onClick={reformat}
-              disabled={!template || !source || busy !== null}
+              disabled={!source || (!template && !active) || busy !== null}
               className="w-full bg-accent text-white rounded-xl px-5 py-4 text-base font-medium disabled:opacity-50"
             >
               {busy ?? "Reformat"}
             </button>
             <p className="text-xs opacity-60">
-              Nothing is stored yet — both files are read and discarded, so pick them each time for now.
+              Saved renders keep the source, the output, and the template as it was — so what you sent stays
+              reproducible. A one-off template renders a preview and saves nothing.
             </p>
           </section>
 
@@ -238,11 +319,72 @@ export default function Home() {
                 </div>
               </section>
 
-              <button onClick={download} className="w-full bg-accent text-white rounded-xl px-5 py-4 text-base font-medium">
-                Download {result.filename}
-              </button>
+              <div className="flex flex-col gap-2">
+                <button onClick={download} className="w-full bg-accent text-white rounded-xl px-5 py-4 text-base font-medium">
+                  Download {result.filename}
+                </button>
+                <p className="text-xs opacity-60">
+                  Rendered with {result.templateLabel}.{" "}
+                  {result.renderId ? "Saved to your render history." : "Preview only — nothing was saved."}
+                </p>
+              </div>
             </>
           )}
+        </>
+      ) : tab === "templates" ? (
+        <>
+          <section className="flex flex-col gap-3">
+            <FilePick
+              label="Add a template"
+              hint="A .docx whose formatting becomes the house style"
+              file={null}
+              onPick={uploadTemplate}
+            />
+            <p className="text-xs opacity-60">
+              Every upload is a new version and becomes active. Templates are never deleted, so an older one is
+              always one tap away.
+            </p>
+          </section>
+
+          {pinnedOlder && (
+            <p className="text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3">
+              v{pinnedOlder.active.version} is pinned active, but v{pinnedOlder.newest.version} is newer.
+            </p>
+          )}
+
+          <section className="flex flex-col gap-2">
+            {templates === null && <p className="text-sm opacity-60">Loading…</p>}
+            {templates?.length === 0 && (
+              <p className="text-sm bg-white border border-line rounded-xl px-4 py-3">
+                No templates yet. Add the resume whose look you want everything to match.
+              </p>
+            )}
+            {templates?.map((t) => (
+              <div key={t.id} className="bg-white border border-line rounded-xl px-4 py-3 flex flex-col gap-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium break-all">
+                      {t.name} <span className="opacity-60 font-normal">v{t.version}</span>
+                    </p>
+                    <p className="text-xs opacity-60 mt-0.5">
+                      {t.spec.font} {t.spec.bodySize}pt · headings {t.spec.headingSize}pt · margins{" "}
+                      {t.spec.margins.left}&quot; · {new Date(t.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {t.is_active ? (
+                    <span className="text-xs bg-accent text-white rounded-full px-2.5 py-1 whitespace-nowrap">Active</span>
+                  ) : (
+                    <button
+                      onClick={() => activate(t.id)}
+                      className="text-xs underline whitespace-nowrap opacity-80"
+                    >
+                      Make active
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </section>
         </>
       ) : (
         <>

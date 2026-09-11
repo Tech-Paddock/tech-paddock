@@ -54,7 +54,7 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 | `techpaddock.io` (root) | Command center hub (`apps/home`) | `home` | live |
 | `editor.techpaddock.io` | Message Editor | `tech-paddock` | live |
 | `tracker.techpaddock.io` | Pipeline Tracker | `tracker` | live |
-| `resume.techpaddock.io` | Resume Formatter | `resume` | live, but running the pre-rebuild build |
+| `resume.techpaddock.io` | Resume Formatter | `resume` | live, rebuild in progress |
 
 Note the editor's Vercel project is named `tech-paddock`, not `editor` — it was the first project
 created. All four deploy from this one repo, separated by Root Directory.
@@ -191,7 +191,7 @@ section, and ~900KB of direct formatting on a two-page resume.
 render into the active template → review the coverage report → save, with the application details
 written through to the tracker.
 
-### `resume_templates`
+### `templates`
 id, version, name, `file_path` (original docx in Supabase Storage), `spec` (jsonb — extracted
 formatting), is_active, created_at
 
@@ -200,7 +200,7 @@ pinning an older one is deliberate — it raises a persistent banner on the rend
 both versions. The template file is itself a deliverable: it doubles as the general-purpose resume
 to hand someone when there is no specific job, so the original bytes are kept, not just the spec.
 
-### `resume_renders`
+### `renders`
 id, template_id, template_snapshot, `source_file_path` (the Jobright upload), `parsed_content`
 (jsonb), `coverage` (jsonb), `output_file_path`, content_hash, `thread_id` (FK →
 `tracker.pipeline_threads`, nullable), `submitted_at` (nullable), created_at
@@ -239,7 +239,11 @@ body bullets, so a parser losing that specific table loses nothing new, and the 
 natively two-column (`metric: description`). Flat rows, no merged cells, no nesting. Enforced by
 the ATS lint test below: exactly one table is permitted, and one anywhere else fails.
 
-**Testing** — the first real tests in this repo; CI currently only checks that each app compiles:
+**Storage:** originals, uploads and rendered output live in the private `resume-files` bucket, under
+`templates/`, `sources/` and `renders/`. Files are written before the row that points at them, so a
+row never references an object that was never created.
+
+**Testing** — CI runs `npm run test --if-present` before each build:
 - Golden file: fixed content + fixed spec renders byte-identical twice (this is what makes a saved
   render trustworthy as a record of what was actually sent)
 - ATS lint: unzip the generated docx and assert the rules above mechanically
