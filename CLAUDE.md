@@ -102,6 +102,37 @@ If the answer is "go anyway", go fully, and do not relitigate the decision three
 
 Going fully is not going blindly. Ask whatever you need in order to execute it correctly.
 Relitigating a settled decision is out; asking how to do it properly is expected.
+### Merging
+
+- **Squash merge, always.** One commit on `main` per change. Branch-level history stays in the pull
+  request if it is ever wanted. Merge commits and rebase merges are off.
+- **CI green before merge** — all four matrix jobs. A red build does not get merged on the
+  assumption that the failure is unrelated. Establish that it is, or fix it.
+- **Delete the branch after merge**, so the branch list stays a list of live work rather than an
+  archive.
+
+Main collected sixteen merge commits from a single reused branch before any of this was written
+down. To be precise about what went wrong, because the fix depends on it: fifteen pull requests
+were merged, #1 through #15, so it is not that pull requests were never used. They all reused the
+one branch `claude/this-n2kl8y`, and several merged within six to ten seconds of opening — #11
+opened at 01:35:23 and merged at 01:35:29 — far too fast for CI to have reported. The gate existed
+and was walked straight through. Everything after 2026-09-10 skipped pull requests altogether.
+
+### One-time GitHub settings
+
+These live in the GitHub UI rather than the repo, so they have to be set by hand, once.
+
+Settings → General → Pull Requests: allow squash merging only (uncheck merge commits and rebase
+merging), set the squash commit message default to "Pull request title and description", and turn
+on "Automatically delete head branches".
+
+Then protect `main` (Settings → Rules → Rulesets, or Settings → Branches): require a pull request
+before merging, require the four CI checks to pass, and block force pushes.
+
+**Until that second half is done, every rule above is convention rather than enforcement** — an
+agent that ignores "never push to `main`" will simply succeed. This repo is private on a personal
+account, and protecting a branch on a private repo may require a paid plan; that is unverified, and
+it is the single most load-bearing open question on the ledger.
 
 ## Tech Stack
 
