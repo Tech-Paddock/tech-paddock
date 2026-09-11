@@ -68,9 +68,12 @@ in the file every session loads, so that they cannot drift the way seven copies 
 - **Edit the shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, or
   anything touching `SESSION_SECRET` and the shared cookie. These are byte-identical copies in five
   apps and a mismatch does not throw. It silently rejects valid sessions on the other four.
-- **Edit this file, or any charter but your own.** If your change contradicts either, say so in the
-  pull request and stop. Both are approved before they are updated, never quietly alongside the
-  code that outdated them.
+- **Edit this file, or any charter but your own.** Both are approved before they are updated, never
+  quietly alongside the code that outdated them. **If what you are about to build contradicts
+  either, stop and ask before you build it** — in your worklog and to Joel. Raising it in the pull
+  request is the backstop for a contradiction you only discover late, not the normal path. Code
+  that is already written applies pressure to approve it, which is exactly what this rule exists
+  to prevent.
 - **Commit personal information or secrets.** Names, employers, schools, addresses, contact
   details, resume content. For a `.docx` that means every part of the archive, not just
   `document.xml` — hyperlink targets in `.rels` and the author fields in `docProps/` too.
@@ -99,6 +102,26 @@ between configuring something that exists and creating, destroying, or re-pointi
 - **CI green before merge** — all five matrix jobs, on the current head. A red build does not get
   merged on the assumption that the failure is unrelated. Establish that it is, or fix it.
 - **Delete the branch after merge.**
+
+### Ask the second-order questions first
+
+Before a change is agreed — not after it is built, and not at the pull request. Answer these out
+loud, in your worklog and in whatever you send back before starting:
+
+1. **What does this contradict?** The brief, another charter, or a decision already settled.
+2. **Who else depends on it?** Shared files, cross-app contracts, schema, environment variables.
+3. **What becomes true afterwards that is not true now?** A new environment variable somebody has
+   to set, a new deploy dependency, a new public surface.
+4. **What does this make harder to change later?** A schema shape, an API contract, a name.
+5. **Who decides this — the technical director or Joel?** If you cannot tell, it is Joel.
+
+This exists because a change can pass every first-order check and still be the wrong thing to
+merge. One did: rebased cleanly, worklog opened, brief left untouched, CI green on the head — and
+it quietly contradicted three settled decisions, which nobody asked about until after it was on
+`main`. The first-order questions ask whether the work is good. These ask what the work makes true.
+
+Any answer that lands on "this contradicts something settled" stops the work and goes to Joel, at
+the point where changing course is still free.
 
 ### When you think the instruction is wrong
 

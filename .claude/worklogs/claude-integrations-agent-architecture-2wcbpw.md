@@ -80,3 +80,29 @@ byte-identical in five apps. Each charter carries only what is specific to it.
 Need from TD: Joel to ratify three Message Editor brief changes the agent raised rather than made —
 tone as a picklist, the Effort toggle never built, and the new Context input. All three are merged
 and live; none is approved. Recorded in that agent's handoff as pending, not as settled.
+
+## 2026-09-11 22:30 — handoff
+
+Landed: the restructure is complete. `CLAUDE.md` is routing and universal rules only; seven agents
+each have `RULES.md`, `HANDOFF.md` and `KICKOFF.md` under `.claude/agents/`; the nine superseded
+briefs in `.claude/handoff/` are deleted; the ledger is rewritten around the deployment outage.
+
+Decisions affecting others:
+
+- Supabase and Vercel Config merged into one **Platform Config** agent. Named `platform`, not
+  `middleware`, because `middleware.ts` is a real file on that agent's own never-touch list.
+- Two new universal rules in `CLAUDE.md`: **ask before you build** when a change contradicts
+  something settled, and **answer the second-order questions** before a change is agreed. Both came
+  from merging #27 when it should have been held.
+- A tool's specification now lives in its owning agent's charter rather than in `CLAUDE.md`. Agents
+  may propose changes to their own charter in a pull request. The approval gate stays; the dead end
+  where an agent could not touch its own outdated spec is gone.
+
+Corrected while writing, by reading the code rather than the notes: the hub's `SOURCES` holds **one**
+entry (Pipeline Tracker), not two or four, and `RESUME_BASE_URL` belongs to the tracker's deep links
+rather than the hub's fan-out.
+
+Open: nothing of mine. Everything left is Joel's and is in `_open-items.md`, led by the Vercel
+GitHub App installation that has stopped all deployments.
+
+Need from TD: nothing. This was the TD's branch.

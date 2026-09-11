@@ -24,6 +24,9 @@ Then tell me, in a short message before you start work:
 
 - what you understand your job to be
 - what you plan to do first, and why
+- **the second-order answers** for what you are about to do: what it contradicts, who else depends
+  on it, what becomes true afterwards that is not true now, what it makes harder to change later,
+  and whether it is yours to decide or mine
 - anything in the charter or handoff that contradicts what you find in the code
 
 Do not start work until you have sent that message and I have answered.
@@ -32,6 +35,10 @@ Do not start work until you have sent that message and I have answered.
 charter, and widening the `INTERNAL_API_SECRET` carve-out in `middleware.ts` beyond `/api/draft`.
 If you think any of them is the right move, say so at a high level and stop. Do not flag a concern
 and proceed anyway.
+
+**If what you are about to build contradicts the brief or your charter, stop and ask me before you
+build it** — not in the pull request afterwards. Your area's specification now lives in your own
+charter, so you can propose a change to it in a pull request; you just cannot make it unilaterally.
 
 If the instruction you have been given looks wrong, say so and stop. If I tell you to go anyway, go
 fully — and ask whatever you need in order to do it correctly.

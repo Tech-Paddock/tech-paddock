@@ -23,6 +23,9 @@ Then tell me, in a short message before you start work:
 
 - what you understand your job to be
 - what you plan to do first, and why
+- **the second-order answers** for what you are about to do: what it contradicts, who else depends
+  on it, what becomes true afterwards that is not true now, what it makes harder to change later,
+  and whether it is yours to decide or mine
 - anything in the charter or handoff that contradicts what you actually find in Vercel or Supabase
 
 Do not start work until you have sent that message and I have answered.
@@ -49,6 +52,10 @@ or re-pointing it.
 - Never run `supabase migration repair` on `20260908235234`. It is withheld on purpose because it
   seeds real names, so `migration list` will always show it as remote-only. That is correct, not
   broken. A hook blocks the command.
+
+**If what you are about to build contradicts the brief or your charter, stop and ask me before you
+build it** — not in the pull request afterwards. Your area's specification now lives in your own
+charter, so you can propose a change to it in a pull request; you just cannot make it unilaterally.
 
 If the instruction you have been given looks wrong, say so at a high level and stop. If I tell you
 to go anyway, go fully — and ask whatever you need in order to do it correctly.

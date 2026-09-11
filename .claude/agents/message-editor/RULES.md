@@ -69,6 +69,15 @@ write, you have taken a wrong turn.
 - **Tone** — a picklist.
 - **Context** — a free-text box for anything the contact record does not carry.
 
+**Three settled decisions, approved by Joel on 2026-09-11.** The original brief said otherwise on
+all three, so they are recorded here rather than left to be rediscovered and "corrected" back:
+
+1. **Tone is a picklist, not free text.** Free text produced unusable one-off values.
+2. **There is no Effort toggle and there will not be one.** The brief specified Quick / Quick+ /
+   Thorough mapping to `effort: low/medium/high`. It was never built and is not wanted — thinking is
+   adaptive on Sonnet 5, which makes the control redundant. **Do not add it back.**
+3. **Context is a supported input**, passed to the model alongside the contact record.
+
 ### The model
 
 Sonnet 5 only. Thinking is adaptive on this model, so there is no separate toggle, and the

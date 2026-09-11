@@ -27,22 +27,30 @@ under you.
 
 ---
 
-## Three brief changes you raised, still waiting on Joel
+## The three brief changes you raised: all ratified
 
-You correctly refused to make these yourself. They are now recorded here and on the TD ledger:
+Joel approved all three on 2026-09-11. They are settled and now live in `RULES.md` as the
+specification rather than as open questions: tone is a picklist, there is no Effort toggle and there
+will not be one, and Context is a supported input.
 
-1. **Tone is a picklist, not free text.** The brief specified free text. Your code ships a
-   picklist. The picklist is better — free text produced unusable one-off values — but the brief
-   said otherwise and has not formally been changed.
-2. **The Effort toggle was never built and is not wanted.** The brief specifies Quick / Quick+ /
-   Thorough mapping to `effort: low/medium/high`. It does not exist in the code and you judged it
-   unnecessary. Nobody has confirmed that.
-3. **Context is a new input the brief never mentioned.** It ships and it is useful. Also
-   unratified.
+You were right to raise them rather than make them. **The handling afterwards was wrong, and that
+is worth knowing** because it changed the rules you work under: the TD merged #27 first and asked
+for ratification second. Code already written applies pressure to approve it, so the brief ends up
+following the code. Joel's correction was that the pull request should have been held and sent back
+to you with the question put to him.
 
-This charter describes the code as it actually is, because that is what you need to work. But the
-three deltas above are **decided by Joel, not by the charter**. Do not treat their presence here as
-approval. If he rules against any of them, the code changes, not the doc.
+Two rules came out of that, both now in `CLAUDE.md`:
+
+- **Ask before you build**, when what you are about to build contradicts the brief or your charter.
+  Raising it in the pull request is the backstop for something you only discover late, not the
+  normal path.
+- **Answer the second-order questions** before a change is agreed — what does it contradict, who
+  depends on it, what becomes true afterwards, what does it make harder to change, who decides.
+
+The structural fix is in your favour: your tool's specification now lives in `RULES.md`, in your own
+folder, which you may **propose** changes to in a pull request. Under the old layout the spec sat in
+`CLAUDE.md`, which you were forbidden to touch — so an agent finding its spec outdated had no move
+except to build the contradiction and flag it afterwards. That dead end is gone.
 
 ---
 
