@@ -1,18 +1,20 @@
 # Supabase
 
 One Supabase project (`qyclakzsupyxgnqfgpiq`, `tech-paddock`) backs every app in this repo, with
-each tool in its own Postgres schema — `shared`, `editor`, `tracker`, `resume` — and never the
-default `public` schema.
+each tool in its own Postgres schema — `shared`, `editor`, `tracker`, `resume`, `coffee` — and
+never the default `public` schema.
 
 The migration history lives here, at the repo root, rather than under any one app. One project
 means one history; splitting it per app is exactly how it drifted in the first place.
 
 ## History
 
-Six of these seven migrations were applied directly to the project and only checked in afterwards,
-on 2026-09-11. Their contents are copied verbatim out of `supabase_migrations.schema_migrations`,
-so the files match what actually ran, not what someone remembers running. File timestamps are
-therefore much later than the migration versions — that is expected.
+Six of the first seven migrations were applied directly to the project and only checked in
+afterwards, on 2026-09-11. Their contents are copied verbatim out of
+`supabase_migrations.schema_migrations`, so the files match what actually ran, not what someone
+remembers running. File timestamps are therefore much later than the migration versions — that is
+expected. Everything from `20260911203000` onward was written first and applied second, which is
+the order this directory exists to enforce.
 
 | Version | What it does |
 |---|---|
@@ -23,6 +25,8 @@ therefore much later than the migration versions — that is expected.
 | `20260910215015` | `editor.model_status`, the model drift check's singleton row |
 | `20260911034533` | Resume Formatter rebuild; drops the four original content tables |
 | `20260911144519` | `position` on `shared.contacts` |
+| `20260911203000` | The `coffee` schema and `coffee.bags`, plus the private `coffee-files` bucket |
+| `20260911203100` | Grants for the `coffee` schema — see below, this one is not optional |
 
 ### The deliberate gap
 
@@ -58,8 +62,9 @@ is gitignored.
 If you change the database first, `db pull` it back immediately — the whole point of this directory
 is that the database stops being the only record of its own shape.
 
-`config.toml` is the generated default with one edit: `[api] schemas` lists the four custom schemas
-alongside `public`, so a local stack exposes them. Without it, `supabase start` would serve an API
+`config.toml` is the generated default with one edit: `[api] schemas` lists the custom schemas
+alongside `public`, so a local stack exposes them. **Add a new schema there too** — it is easy to
+miss, and a local stack will simply not see the tables. Without it, `supabase start` would serve an API
 that cannot see any of this project's tables.
 
 ## A new schema does not inherit anything
@@ -74,7 +79,10 @@ affects tables created *after* it runs, so a schema's existing tables need `GRAN
 as well.
 
 **Adding a schema means two migrations, not one:** the schema and its tables, then its grants. Copy
-`20260911203100_grant_coffee_schema_usage.sql` and change the schema name.
+`20260911203100_grant_coffee_schema_usage.sql` and change the schema name. Then add it to
+`[api] schemas` in `config.toml`.
+
+
 
 ## Why the grants look alarming
 
@@ -88,9 +96,9 @@ So every table created in these schemas is automatically granted to `anon` — i
 TRUNCATE — whether or not the migration that creates it says anything about grants.
 
 That is intended, but it means **Row Level Security is the only control between a leaked
-publishable key and this data.** RLS is enabled on all seven tables with zero policies, which is
-deny-by-default and is why Supabase's advisor reports seven `rls_enabled_no_policy` notices: those
-are the design working, not a warning to fix.
+publishable key and this data.** RLS is enabled on all eight tables with zero policies, which is
+deny-by-default and is why Supabase's advisor reports one `rls_enabled_no_policy` notice per table:
+those are the design working, not a warning to fix.
 
 The practical rule: adding a table here grants `anon` full access to it by default. Enable RLS in
 the same migration. Never assume a new table is protected by anything else.

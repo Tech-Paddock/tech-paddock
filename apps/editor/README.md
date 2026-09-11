@@ -39,11 +39,15 @@ npm run dev
 - Single-page UI: Draft mode (contact search, channel, purpose, tone, effort, free text →
   editable draft → log as sent) and Train mode (load logged history or paste samples → refined guide)
 - Deployed on Vercel (`editor` project, Root Directory set to `apps/editor`, linked to
-  this repo's `main` branch) with all four environment variables set
+  this repo's `main` branch) with its environment variables set
 - Live at **editor.techpaddock.io**, DNS via Cloudflare
 
 ## Not yet built
 
-- No seed contacts or writing samples loaded yet — style guide is still the generic seed rules from CLAUDE.md
-- Pipeline Tracker and Resume Formatter (the other two Paddock tools) haven't been started
-- Google Tasks integration — not applicable to this tool; belongs to Pipeline Tracker
+- No writing samples loaded yet — the style guide is still the generic seed rules from CLAUDE.md,
+  so Train mode has never folded a real batch
+- **`editor.model_status` has zero rows.** The model drift check runs inside `/api/login` and has
+  never successfully written. A check that has never once fired is not a check; this is the oldest
+  unexplained thing in the project
+- `shared.contacts.position` is wired up on an unmerged branch, not on `main` yet
+- No tests. CI runs `npm run test --if-present`, so adding a `test` script is enough to opt in

@@ -23,7 +23,7 @@ npm test                     # 52 tests, no database needed
 | `SUPABASE_URL` | already filled in `.env.example` — the shared `tech-paddock` project |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase dashboard → tech-paddock → Settings → API → `service_role` secret |
 | `APP_PASSWORD_HASH` | a bcrypt hash of your chosen password — see command in `.env.example` |
-| `SESSION_SECRET` | any random string, but **byte-identical across all four apps** or the shared login breaks |
+| `SESSION_SECRET` | any random string, but **byte-identical across all five apps** or the shared login breaks |
 
 No `ANTHROPIC_API_KEY` — this app makes no model calls (see below).
 

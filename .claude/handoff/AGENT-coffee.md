@@ -3,45 +3,54 @@
 You own `apps/coffee` — a bag scanner and brewing library. Photograph a bag, confirm what was read
 off the label, find the roaster's own brewing instructions, save it to a searchable library.
 
-**This app is not merged yet.** It exists only on `claude/coffee-brewing-assistant-hmvffw`, seven
-commits ahead of `main`, and it is last in the merge queue.
+**Your app is on `main`**, merged as #23. `claude/coffee-brewing-assistant-hmvffw` has been deleted.
+`apps/coffee` builds, its 16 tests pass, and `build (coffee)` is the fifth CI matrix job.
 
 ## Before you write anything
 
 Read `CLAUDE.md`; the Rules of Engagement bind you. Run `bash .claude/worklogs/read-all.sh`. Open
 your worklog at `.claude/worklogs/<your-branch>.md`.
 
-## Three things to fix before this branch can merge
+## What changed on the way in — worth knowing, since none of it is in your branch
 
-**1. Drop your naming proposal from `CLAUDE.md`.** Your branch rewrites the Domain Map to bare names
+**1. Your naming proposal was declined.** Your branch rewrites the Domain Map to bare names
 (`editor`, `coffee`) and states a convention that the live Vercel account contradicts — the real
 projects are `tp-home`, `tp-message-editor`, `tp-tracker`, `tp-resume`. The decision is made: the
 `tp-` prefix stays, and the brief has already been corrected to match reality. Renaming five live
 projects to satisfy a document is backwards.
 
-**2. You may not edit `CLAUDE.md` at all** under the current rules. Flag contradictions in the PR
-and stop; the brief is approved before it is updated. Your branch's other `CLAUDE.md` edits need
-lifting out and raising as flags.
+Your branch rewrote the Domain Map to bare names (`editor`, `coffee`), but the live Vercel account
+uses a `tp-` prefix. Renaming five live projects to satisfy a document is backwards, so the table
+was corrected to match reality instead. **Agents do not edit `CLAUDE.md`** — flag contradictions in
+the PR and stop.
 
-**3. Add `coffee` to the CI matrix.** `.github/workflows/ci.yml` hardcodes
-`[home, editor, resume, tracker]`. A fifth app under `apps/` is **silently untested** — it does not
-fail, it simply never runs, and nothing tells you. Your branch already touches that file; make sure
-it actually adds the entry, and that branch protection's required checks are updated to include
-`build (coffee)` afterwards (that part is the TD's, but remind them).
+**2. Your schema needed a second migration.** `20260910051549` granted schema USAGE by naming four
+schemas explicitly, and it predates coffee — so `coffee` arrived with none at all and
+`service_role` could not read `coffee.bags`. Your migration was correct and RLS-enabled; the gap was
+a trap set before your app existed. Fixed by `20260911203100`. **Adding a schema means two
+migrations**, and `supabase/README.md` now says so.
 
-## The Vercel project waiting for you
+Your migration also moved from `apps/coffee/supabase/` to the root `supabase/migrations/` — one
+project, one history.
 
-`tp-coffee-app` already exists. It was created by Vercel's import-suggestion flow with its Root
-Directory pointed at the **repo root** rather than at an app, so it builds nothing and currently
-serves an empty page publicly at `tech-paddock.vercel.app` — **outside the password gate**, because
-the gate lives in each app's middleware and a project with no app has no middleware.
+**3. You added `coffee` to the CI matrix yourself.** That is the thing most likely to be forgotten,
+and a fifth app would otherwise have shipped silently untested. Credit where due.
 
-Joel's decision: fix in place, do not delete. It unblocks the moment `apps/coffee` lands on `main`.
-Then the Vercel config agent points Root Directory at `apps/coffee`, sets the framework, and adds
-env vars. Your merge is what unblocks it.
+`build (coffee)` still needs adding to branch protection's required checks — the rule names four
+jobs and the matrix runs five. That one is the TD's.
 
-Your app will need `ANTHROPIC_API_KEY`, which until now was editor-only. Say so explicitly in your
-PR — it changes the env var table in the brief, which is a flag, not an edit you make.
+## Your app has no home yet
+
+`tp-coffee-app` exists but points at the **repo root** rather than at an app, so it builds nothing
+and serves an empty page publicly at `tech-paddock.vercel.app` — **outside the password gate**,
+because the gate lives in each app's middleware and a project with no app has no middleware.
+
+Your merge unblocked the fix; the fix itself is Joel's, since it is live infrastructure: Root
+Directory → `apps/coffee`, framework → Next.js, env vars including `ANTHROPIC_API_KEY` (no longer
+editor-only — the brief records that now), and attach `coffee.techpaddock.io`.
+
+**Until that happens your app is code without a deploy.** Worth chasing rather than building more
+on top of it.
 
 ## What your design got right — keep it
 
@@ -71,9 +80,10 @@ adjustment never overwrites what the roaster actually said. Keep that.
 
 ## Next steps
 
-1. Lift the `CLAUDE.md` edits out; raise them as flags in the PR instead.
-2. Confirm `coffee` is in the CI matrix.
-3. Get the `coffee` schema migration written and checked in, with RLS enabled in the same migration
-   — every new table is granted to `anon` automatically, so RLS is the only thing protecting it.
-4. Rebase once the three branches ahead of you land.
-5. After merge, hand off to the Vercel config agent to repoint `tp-coffee-app`.
+1. **Chase the Vercel setup.** Nothing you build reaches anyone until `tp-coffee-app` points at
+   `apps/coffee`.
+2. **Verify the search step on a deploy preview with a real bag.** It cannot be exercised from a
+   Claude Code sandbox — roaster domains are blocked by the egress proxy — so the tiering and the
+   quote validation have never run against a live page. The tests cover the logic, not the reality.
+3. Only then consider the deferred tables: brew log, timer, inventory, method lookup. The schema
+   deliberately pre-empts none of them.
