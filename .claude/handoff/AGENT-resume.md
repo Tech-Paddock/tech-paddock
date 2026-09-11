@@ -70,7 +70,7 @@ Job details live on the linked tracker thread and are **never duplicated** here.
 
 ## Known work
 
-**PII scrub — approved, not done.** `"Proseware"` is a real company Joel is applying to. It sits in a
+**PII scrub — approved, not done.** A real target company name sat in a
 UI placeholder at `apps/resume/app/page.tsx:389` and in five fixtures in
 `tests/persistence.test.ts`. Replace it with a synthetic name. This is app code and tests, so run
 the suite rather than just grepping.
