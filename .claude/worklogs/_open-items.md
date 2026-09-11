@@ -28,13 +28,16 @@ readout is amber or red, check Vercel and GitHub directly rather than trusting i
   to the org and protection is re-enabled.
   **Do not re-transfer without warning every running session** — the move breaks GitHub access for
   any session already running, and it cannot be repaired mid-session (see the note at the bottom).
-- **2026-09-11 — Blocking hooks: yes or no.** `PreToolUse` hooks that refuse pushes to `main`,
-  Vercel/DNS mutations, migrations with no checked-in file, and commits matching PII patterns. The
-  only enforcement that works regardless of GitHub plan. Answer after the branch-protection
-  question above, since that changes how many are needed.
-- **2026-09-11 — `SessionStart` hook: yes or no.** Would print this ledger into every session
-  automatically instead of relying on an agent honoring a `CLAUDE.md` instruction. Blocks nothing,
-  only surfaces. Recommended.
+- **2026-09-11 — Hooks: DONE.** `.claude/settings.json` now carries three, deliberately few. A
+  `SessionStart` hook prints this ledger into every session, so leading with open items no longer
+  depends on an agent remembering to look. Two narrow `PreToolUse` guards refuse a push to `main`
+  and refuse `supabase migration repair`. Both were verified against real command shapes before
+  landing, including that `claude/main-thing` is not mistaken for `main`.
+  **These are the only enforcement that does not depend on an agent choosing to comply**, and they
+  work regardless of GitHub plan — which matters while branch protection is inert.
+  Deliberately NOT added: PII pattern matching (regex on prose is noisy and would cry wolf) and
+  Vercel/DNS guards (those go through MCP tools, not Bash, so a Bash matcher would not see them).
+  A hook that fires on the wrong thing teaches agents to route around hooks.
 - **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET`, `MS_GRAPH_REFRESH_TOKEN` and
   `CRON_SECRET` on `tp-tracker`.** The Microsoft To Do integration and the daily cron shipped in #22
   and are **inert** until these exist. The code degrades quietly by design, which is right at
