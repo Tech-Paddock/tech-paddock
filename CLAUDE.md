@@ -10,7 +10,12 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 
 ## Core Architecture Principles
 
-- **One repo, one monorepo layout**: `apps/editor`, `apps/tracker`, `apps/resume`, each with its own `package.json` and each pointed at by its own Vercel project (via that project's Root Directory setting) — so deploys, subdomains, and env vars all stay independent per tool without needing three separate repos, three separate PRs for a shared fix, or three places to remember to look. A `packages/shared` folder holds anything genuinely reused across tools (e.g. the password-gate/session logic) instead of copy-pasting it three times.
+- **One repo, one monorepo layout**: `apps/editor`, `apps/tracker`, `apps/resume`, and `apps/home`
+  (the hub at the root domain), each with its own `package.json` and each pointed at by its own Vercel project (via that project's Root Directory setting) — so deploys, subdomains, and env vars all stay independent per tool without needing three separate repos, three separate PRs for a shared fix, or three places to remember to look. **`packages/shared` was never created.** `lib/auth.ts` and `lib/password.ts` are
+  byte-identical copies in all four apps, and `lib/supabase.ts` is a per-app variant. That is a
+  deliberate-looking outcome of building app by app, not a decision anyone recorded — the cost is
+  that a session or lockout fix needs the same edit four times. Worth consolidating before the
+  auth logic changes again; not worth churn otherwise.
 - All three share **one Supabase project**, each tool in its own Postgres schema (never the default `public` schema), so table names never collide.
 - One deliberately shared table across tools: `contacts` (see Shared Data Model).
 - **Never commit personal information.** No names, addresses, phone numbers, email addresses,
@@ -21,6 +26,12 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 - Agent isolation: never point two Claude Code sessions at the same working directory at the same time. One app folder at a time, or genuinely separate worktrees/branches if truly parallel.
 - No secrets ever reach the browser. Every Supabase read/write and every Anthropic API call happens through this app's own server-side API routes. The client only ever talks to this app.
 - Row Level Security enabled on every table, deny-by-default, even though this is single-user. The server uses Supabase's service role key (which bypasses RLS) for all operations — RLS exists purely as a fallback if a key ever leaks.
+- **One login covers every subdomain.** The session cookie is scoped to `.techpaddock.io`, so
+  signing in on any app signs you in on all of them, and `/api/logout` on the hub clears it
+  everywhere. This requires `SESSION_SECRET` to be byte-identical across all four Vercel
+  projects — a mismatch makes the other apps silently reject a valid session. The three tools
+  also send `frame-ancestors 'self' https://techpaddock.io https://*.techpaddock.io` so only the
+  hub can embed them.
 - Every deployed app sits behind a password, with lockout after repeated failed attempts. A fully random generated password is the default recommendation; a memorable phrase is an acceptable tradeoff here given the low stakes and the lockout backstop — it's the user's call, not a hard rule.
 - **Prefer append over rewrite for anything that accumulates.** When a feature involves a growing body of history (sent messages, logs, past output), the default write path should be a plain insert — cheap, instant, no AI call — with any AI-driven synthesis (like refining a style guide) kept as a separate, deliberately-triggered, batched step. Don't reach for "call the model to regenerate the whole artifact" as the per-event write path; see the Message Editor's training design below for the concrete example.
 
@@ -38,24 +49,34 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 
 ## Domain Map
 
-| Subdomain | Tool |
-|---|---|
-| `techpaddock.io` (root) | Command center hub — minimal for now |
-| `editor.techpaddock.io` | Message Editor |
-| `tracker.techpaddock.io` | Pipeline Tracker |
-| `resume.techpaddock.io` | Resume Formatter |
+| Subdomain | Tool | Vercel project | Status |
+|---|---|---|---|
+| `techpaddock.io` (root) | Command center hub (`apps/home`) | `home` | live |
+| `editor.techpaddock.io` | Message Editor | `tech-paddock` | live |
+| `tracker.techpaddock.io` | Pipeline Tracker | `tracker` | live |
+| `resume.techpaddock.io` | Resume Formatter | `resume` | live, but running the pre-rebuild build |
+
+Note the editor's Vercel project is named `tech-paddock`, not `editor` — it was the first project
+created. All four deploy from this one repo, separated by Root Directory.
 
 ## Environment Variables Needed
 
 ```
-ANTHROPIC_API_KEY=
-SUPABASE_URL=
-SUPABASE_SERVICE_ROLE_KEY=
-GOOGLE_TASKS_CLIENT_ID=
+SUPABASE_URL=                 # all apps that talk to Postgres
+SUPABASE_SERVICE_ROLE_KEY=    # ditto
+APP_PASSWORD_HASH=            # bcrypt hash of the login password — all four apps
+SESSION_SECRET=               # all four apps, and MUST be byte-identical across them
+ANTHROPIC_API_KEY=            # editor, and resume once the labeling call lands
+INTERNAL_API_SECRET=          # editor + tracker only (server-to-server draft call)
+EDITOR_BASE_URL=              # tracker only
+GOOGLE_TASKS_CLIENT_ID=       # not referenced in code yet — build order step 5
 GOOGLE_TASKS_CLIENT_SECRET=
 GOOGLE_TASKS_REFRESH_TOKEN=
-APP_PASSWORD_HASH=
 ```
+
+`SESSION_SECRET` is separate from `APP_PASSWORD_HASH` on purpose: bcrypt salts randomly per app, so
+the same password produces a different hash in each project and the hash can't double as a signing
+key. Every app throws on startup if `SESSION_SECRET` is unset.
 
 ---
 
@@ -101,8 +122,16 @@ Drafts outreach messages (email, Slack, LinkedIn, text) in Joel's own voice, usi
 - Warm contacts → text; cold professional contacts → LinkedIn DM; email when a direct address exists
 - Odd-time scheduled sends read more human than round numbers
 
+**Model drift check:** `lib/modelCheck.ts` runs inside `/api/login` after a successful password
+check — there is no scheduled-job infrastructure, and login is a fine cadence for a personal tool.
+It compares the Sonnet-family model IDs returned by Anthropic's Models API against the last-seen
+set in `editor.model_status` and flags newly-appeared IDs in an amber banner on the Draft page. It
+never swaps the pinned model automatically: a new model can carry API-shape changes worth reading
+first (exactly what happened when `effort` moved under `output_config`).
+
 **Tables**
 - `message_history`: id, contact_id (FK, nullable), medium, purpose, tone (nullable), content, sent_at
+- `model_status`: last-seen model IDs + `pinned_model`, written by the drift check above
 - `style_guide`: id, version, content, updated_at — each refine inserts a new version rather than overwriting, so past guides stay recoverable
 
 ---
@@ -225,20 +254,20 @@ the ATS lint test below: exactly one table is permitted, and one anywhere else f
    under `apps/editor`, Resume Formatter under `apps/resume`, matching the layout above
 2. ~~Message Editor core loop: toggles, drafting call, style guide, contact lookup/creation~~ — done,
    live at editor.techpaddock.io
-3. ~~Pipeline Tracker: thread CRUD, stale-sort view, draft-follow-up integration~~ — code done
-   (`apps/tracker`), not yet deployed. Draft-follow-up calls Message Editor's `/api/draft`
+3. ~~Pipeline Tracker: thread CRUD, stale-sort view, draft-follow-up integration~~ — done and
+   deployed at tracker.techpaddock.io. Draft-follow-up calls Message Editor's `/api/draft`
    server-to-server using a shared `INTERNAL_API_SECRET` header (set identically on both apps),
    since it's a cross-app call with no browser session to carry — scoped tightly to that one
    route in editor's middleware, never a blanket auth bypass
 4. **Resume Formatter — being rebuilt.** The original build (structured content CRUD + template
    CRUD + docx generation) was the wrong shape: it assumed the app authored resume content. It
    doesn't — Jobright does. Rebuilding as a reformatter per the section above; the auth, password,
-   and Supabase plumbing survive, the content schema and its CRUD do not. Still needs its own
-   Vercel project (Root Directory `apps/resume`), env vars, the `resume.techpaddock.io` DNS
-   record, and a run through a free ATS-checker against real generated output.
+   and Supabase plumbing survive, the content schema and its CRUD do not. The Vercel project, env
+   vars, and DNS are all already in place and the old build is live — so this is a replacement in
+   place, not a first deploy. Still needs a run through a free ATS-checker against real generated
+   output.
 5. Google Tasks integration for the tracker (OAuth setup + Vercel Cron)
-6. ~~Domain wiring: Cloudflare DNS → Vercel~~ — done for Message Editor; repeat per subdomain as each
-   tool goes live
-7. ~~Password gate~~ — done for Message Editor; RLS is already on deny-by-default across every table
-   in every schema from step 1, so this is really just "repeat the password gate" per tool now
+6. ~~Domain wiring: Cloudflare DNS → Vercel~~ — done for all four subdomains
+7. ~~Password gate~~ — done on all four apps, now with the shared-cookie SSO described above. RLS is
+   on deny-by-default across every table in every schema from step 1
 8. Real-device testing (add to iPhone home screen via each subdomain)
