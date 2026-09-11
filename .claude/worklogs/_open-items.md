@@ -6,128 +6,116 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-Last reviewed: 2026-09-11 20:35 UTC — queue cleared, eight PRs merged
+**Last reviewed: 2026-09-11 22:30 UTC.**
 
-**Pit Wall board:** https://claude.ai/code/artifact/9cac3618-1a51-4d5e-82fb-339e96657bf4 — the same
-state as this file, plus deployments, CI and branches, as a page. It does not poll anything; it is
-exactly as fresh as the last time the TD wrote to it, and it says so on its face. When its age
-readout is amber or red, check Vercel and GitHub directly rather than trusting it.
+Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
+and the things that belong to nobody else.
 
 ---
 
+## Blocking everything else
+
+- **2026-09-11 — PRODUCTION HAS NOT DEPLOYED SINCE 17:48.** Eleven pull requests merged to `main`
+  after that and none shipped. Every app serves commit `92c1ec1`. Cause: Vercel's GitHub App lost
+  its installation when the repo was transferred to the org and back — a GitHub App is installed on
+  an *account*, not a repository. Pushes succeed, CI runs, Vercel never hears. Ruled out: the Hobby
+  daily deploy cap (no banner) and `git.deploymentEnabled` (set in none of the five `vercel.json`).
+  **Fix is Joel's:** `github.com/settings/installations` → Vercel → confirm `tech-paddock` is in its
+  repository list. Then a *new push* against current `main` — not the dashboard Redeploy button,
+  which rebuilds the stale commit. Evidence and timestamps in `.claude/agents/platform/HANDOFF.md`.
+  **Until this is fixed, nothing can be verified on a live URL.** What is deployed is not what is on
+  `main`.
+
 ## Waiting on Joel
 
-- **2026-09-11 — Branch protection is configured but almost certainly NOT ACTIVE right now.**
-  Answered and then undone by circumstance. A correct ruleset was built while the repo sat in the
-  `Tech-Paddock` org — Active, empty bypass list, PR required, 0 approvals, four build checks,
-  linear history, squash-only, conversation resolution, force-push and deletion blocked. The repo
-  has since been transferred **back to `joelb-401`**, and protection on a private repo under a
-  personal account generally needs a paid plan, so the ruleset is likely gone or inert.
-  **Assume `main` is unprotected until proven otherwise.** Every rule in `CLAUDE.md` is convention
-  again in the meantime. Plan of record: agents finish their current work, then the repo moves back
-  to the org and protection is re-enabled.
-  **Do not re-transfer without warning every running session** — the move breaks GitHub access for
-  any session already running, and it cannot be repaired mid-session (see the note at the bottom).
-- **2026-09-11 — Hooks: DONE.** `.claude/settings.json` now carries three, deliberately few. A
-  `SessionStart` hook prints this ledger into every session, so leading with open items no longer
-  depends on an agent remembering to look. Two narrow `PreToolUse` guards refuse a push to `main`
-  and refuse `supabase migration repair`. Both were verified against real command shapes before
-  landing, including that `claude/main-thing` is not mistaken for `main`.
-  **These are the only enforcement that does not depend on an agent choosing to comply**, and they
-  work regardless of GitHub plan — which matters while branch protection is inert.
-  Deliberately NOT added: PII pattern matching (regex on prose is noisy and would cry wolf) and
-  Vercel/DNS guards (those go through MCP tools, not Bash, so a Bash matcher would not see them).
-  A hook that fires on the wrong thing teaches agents to route around hooks.
-- **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET`, `MS_GRAPH_REFRESH_TOKEN` and
-  `CRON_SECRET` on `tp-tracker`.** The Microsoft To Do integration and the daily cron shipped in #22
-  and are **inert** until these exist. The code degrades quietly by design, which is right at
-  runtime and means **nothing will tell you it is doing nothing**. Needs a one-time Azure app
-  registration against a personal Microsoft account.
-- **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
-  jobs now. The rule still lists four, so the new one is not actually required.
-- **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token
-  no agent should hold. Three commands, in `supabase/README.md`. Expect eight local files matching remote, with
-  `20260908235234` showing remote-only; that gap is deliberate. Do not `migration repair` it.
+1. **2026-09-11 — Repoint `tp-coffee-app`.** Root Directory → `apps/coffee`, framework → Next.js,
+   five env vars, attach `coffee.techpaddock.io`. **The only publicly exposed thing in the project**
+   until it is done: `tech-paddock.vercel.app` serves an empty page outside the password gate,
+   because the gate lives in each app's middleware and a project with no app has no gate.
+2. **2026-09-11 — Verify the new `SESSION_SECRET` on all five projects.** It was rotated today
+   because the old value could not be read back out of the dashboard. Nobody has confirmed it landed
+   everywhere, and with deploys broken it is likely no project has picked it up. A partial rollout is
+   the silent-SSO failure: no error anywhere, just a login loop.
+3. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
+   `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
+   will tell you they are doing nothing. Needs a one-time Azure registration against a personal
+   Microsoft account.
+4. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
+   jobs; the rule names four.
+5. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
+   agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
+   is deliberate. Do not repair it — a hook blocks the command.
+6. **2026-09-11 — Close PR #28 and delete three dead branches.** #28 is the superseded original of
+   the Coffee app, already conflicting. Branches: `coffee-brewing-assistant-hmvffw`,
+   `tracker-dashboard-concept-r6p9up`, `resume-editor-design-wccfly`. The git proxy returns 403 on
+   `--delete`, so this is a GitHub UI job.
 
-## Committed, not done
+## Decisions made, so they are not reopened
 
-- **2026-09-11 — Node runtime drift. DONE, #20.** CI pinned 20 while all five Vercel projects run
-  24, with no `engines` field anywhere, so CI could go green on a runtime that never ships. CI moves
-  to 24 and `engines: >=24` is declared. Verified on Node 22 that the constraint warns rather than
-  breaks.
-- **2026-09-11 — PII scrub. DONE, #21.** A real target company name sat in a UI placeholder in
-  `apps/resume/app/page.tsx` and in five fixtures in `apps/resume/tests/persistence.test.ts`,
-  replaced with a synthetic one. It was also named three times in this repo's own handoff docs —
-  including the document explaining the rule — and has been removed from those too.
-- **2026-09-11 — Branch queue: CLEARED.** #16 through #23 are on `main`. Everything that was in
-  flight has landed: the rules, the worklog channel, the migration backfill, the agent briefs, the
-  UI polish, the Node alignment, the PII scrub, the hub dashboard with Microsoft To Do, and the
-  Coffee app as a fifth app with five CI matrix jobs.
-- **2026-09-11 — Six superseded branches need deleting**, and the git proxy refuses `--delete`
-  (403 on deletion while permitting pushes), so this is a GitHub UI job:
-  `this-n2kl8y`, `tracker-dashboard-concept-r6p9up`, `coffee-brewing-assistant-hmvffw`,
-  `resume-formatter`, `resume-editor-design-wccfly`, `devops-merge-commits-ts7ohz`.
-- **2026-09-11 — The Message Editor agent is live** on
-  `claude/message-editor-agent-wetwv6` and has wired up `contacts.position` — correctly, and it was
-  the first item in its brief. It also edits `CLAUDE.md` and keeps no worklog, both now forbidden.
-  Worth a word to that agent rather than a fix by the TD; do not rewrite a live agent's branch.
+- **2026-09-11 — Google Tasks → Microsoft To Do: APPROVED.** One Azure registration serves both
+  calendar and tasks; Google would have meant a second OAuth setup for no extra capability.
+- **2026-09-11 — The `tp-` prefix on Vercel project names STAYS.** A proposal to rename live
+  projects to bare names was declined. The table was corrected instead.
+- **2026-09-11 — Supabase + Vercel Config agents MERGED into Platform Config.** The seam between
+  them leaked: the database's credentials live in Vercel.
+- **2026-09-11 — PR #27's three brief contradictions: RATIFIED.** Tone as a picklist, the Effort
+  toggle deliberately not built, the Context input. Settled; recorded in the Message Editor charter.
+
+## Mistakes, recorded so they are not repeated
+
+- **2026-09-11 — PR #27 was merged when it should have been held.** It contradicted three settled
+  decisions in the brief. Every first-order check passed — clean rebase, worklog opened, `CLAUDE.md`
+  untouched, CI green on the head — and it was merged on that basis, with ratification asked for
+  afterwards. Joel's correction: reject it and kick it back to the agent to ask him. The outcome was
+  approval; the handling was still wrong, because code already written applies pressure to approve
+  it and the brief ends up following the code. **Two rules came out of this**, both now in
+  `CLAUDE.md`: ask before you build when a change contradicts something settled, and answer the
+  second-order questions before a change is agreed.
+- **2026-09-11 — The `/api/summary` flag was wrong, and it was the TD's error.** Raised as widening
+  `INTERNAL_API_SECRET` across four apps, from reading design notes rather than the route. The
+  carve-out is one exact path, mirrors the editor's `/api/draft` precedent, is read-only and fails
+  closed. Recorded as mistaken rather than quietly dropped. **Verify from the code.**
+
+## Known, deliberately not fixed
+
+- **2026-09-11 — Every push rebuilds every Vercel project.** No Ignored Build Step. The change is
+  written and agreed — one `ignoreCommand` line per app's `vercel.json`, in the Platform handoff —
+  and not landed. Merging it is also the cleanest way to clear the deploy backlog.
+- **2026-09-11 — DNS is wired two ways.** `editor` resolves through `vercel-dns-017.com`; the others
+  use the legacy `76.76.21.21` A record. Both work. If switching, take each target from that
+  project's own Domains tab — they are not interchangeable.
+- **2026-09-11 — `/api/health` sits behind the password gate**, so no external monitor can reach it.
+- **2026-09-11 — `editor.model_status` has zero rows.** The login-time drift check has never
+  successfully written. Not diagnosed, and the oldest unexplained thing here.
+- **2026-09-11 — The hub's mobile login bug.** Opening a tool from an embedded tile re-triggers that
+  app's login on mobile. Reported on mobile Chrome, so the Safari/ITP explanation does not fit.
+  Check what URL the iframe actually loads first.
 
 ## Read this before transferring the repo again
 
-**2026-09-11 — A repo transfer breaks every running agent session, irreversibly for that session.**
-Moving `tech-paddock` to the `Tech-Paddock` org cost roughly two hours. What happened, so the next
-move is cheaper:
+**A repo transfer breaks every running agent session, irreversibly for that session**, and it is
+what broke deployments today.
 
 - A session's authorized repository set is **fixed when the session starts**. When the repo moved,
-  the running TD session lost `git fetch` and every GitHub API call, and could not be repaired —
-  `add_repo` refuses cross-owner additions, so there was no way back in.
-- **GitHub App installations do not transfer with a repository.** The new org started with zero
-  apps. That is why Claude could not see the repo in its picker, and reconnecting the GitHub
-  connector did not help: reconnecting re-authorizes an identity, it does not create an installation
-  on an org that has none. The app has to be installed on the org explicitly.
-- **Vercel's app is subject to exactly the same thing.** If it is not installed on the org, pushes
-  stop triggering deployments and nothing announces it — the projects and custom domains survive,
-  the git trigger quietly does not.
+  the running TD session lost `git fetch` and every GitHub API call and could not be repaired —
+  `add_repo` refuses cross-owner additions.
+- **GitHub App installations do not transfer with a repository.** Reconnecting the connector does
+  not help: it re-authorizes an identity, it does not create an installation on an org that has
+  none.
+- **Vercel's app is subject to exactly the same thing**, which is this morning's lesson arriving
+  again this evening as a three-hour deployment outage.
 
-Before the next transfer: install both apps on the org first, stop all running sessions, move the
-repo, then start fresh sessions. In that order.
+Before the next transfer: install Claude's **and** Vercel's GitHub Apps on `Tech-Paddock` first,
+with "only select repositories" — the org already holds three unrelated repos. Then stop every
+running session. Then move. In that order.
 
-## Known and deliberately not fixed
+## Enforcement status
 
-- **2026-09-11 — `tp-coffee-app` is UNBLOCKED and still wrong.** `apps/coffee` is now on `main`, so
-  the reason to wait is gone. Root Directory → `apps/coffee`, framework → Next.js, env vars
-  including `ANTHROPIC_API_KEY`, attach `coffee.techpaddock.io`. Until then it still serves an empty
-  page publicly, outside the password gate. Live infrastructure, so it is Joel's, not the TD's.
-- **2026-09-11 — A new Postgres schema inherits no grants at all.** `20260910051549` granted USAGE
-  by naming four schemas explicitly, so `coffee` arrived unreadable even by `service_role` — the app
-  would have deployed and failed on permissions, with nothing in its own code to explain why. Fixed
-  by `20260911203100`, and `supabase/README.md` now states the rule: adding a schema means two
-  migrations, not one.
-- **2026-09-11 — Every push rebuilds every Vercel project.** No Ignored Build Step on any of the
-  five, so a resume-only commit rebuilds the editor. Five builds per push on a hobby plan. Cheap to
-  fix, not urgent.
-- **2026-09-11 — DNS is wired two ways.** `editor` resolves through `vercel-dns-017.com`; the other
-  three use the legacy `76.76.21.21` A record. Both work. Switching the two subdomains to CNAMEs is
-  hygiene, not a problem.
-- **2026-09-11 — `/api/health` sits behind the password gate**, so no external uptime monitor can
-  reach it. Fine if it is for human use; a blocker if it is ever meant for monitoring.
-- **2026-09-11 — `editor.model_status` has zero rows.** The login-time model drift check has never
-  successfully written. Either nobody has logged in since it shipped, or it is failing quietly.
-  Not diagnosed.
+Rules in `CLAUDE.md` are written, not enforced. Only three things enforce:
 
-## Flagged and stood down
-
-- **2026-09-11 — `/api/summary`: CONCERN WITHDRAWN, and it was the TD's error.** It was flagged as
-  widening `INTERNAL_API_SECRET` into a shared key across four apps. Reading the code rather than
-  the design notes: the carve-out is `pathname === "/api/summary"` exactly, mirroring the editor's
-  existing `/api/draft` precedent, read-only, failing closed without the secret, four-second
-  timeout, and `SOURCES` held two entries rather than four. It followed the blessed pattern rather
-  than breaking it. Merged in #22. Recorded because the next TD should know the flag was wrong, not
-  just that it was lifted.
-- **2026-09-11 — Google Tasks → Microsoft To Do: APPROVED.** A stack change the brief named
-  explicitly, so it needed the author's sign-off and got it. The calendar half had to be Outlook
-  regardless, and one registration serves both. The brief was updated by the TD, not by the branch.
-- **2026-09-11 — The `coffee` branch's naming proposal.** It rewrites the Domain Map to bare names
-  (`editor`, `coffee`) and states a convention the live account contradicts. Decision: the `tp-`
-  prefix stays, the table was corrected instead, and that branch should drop its naming section
-  before merging.
+1. **Branch protection** — configured, but probably inert while the repo sits on a personal account.
+   **Assume `main` is unprotected.**
+2. **CI** — five matrix jobs. Hardcoded; a sixth app is silently untested until added.
+3. **Hooks** — three in `.claude/settings.json`, currently doing the real work. `SessionStart`
+   prints this ledger into every session; two `PreToolUse` guards refuse a push to `main` and refuse
+   `supabase migration repair`. They work regardless of GitHub plan.
