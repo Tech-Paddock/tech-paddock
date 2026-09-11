@@ -263,7 +263,7 @@ log and dial-in history, a live brew timer for the kitchen, inventory and days-o
 profiles — but none of that is being built yet, and the v1 schema does not pre-empt it. Recorded
 here only so a later session doesn't re-derive the list.
 
-**Structure: one app, tabs — not one Vercel project per sub-app.** The other three tools are
+**Structure: one app, tabs — not one Vercel project per sub-app.** Decided. The other three tools are
 separate projects because they have independent deploy cadences and audiences. Coffee's sub-apps
 would share one dataset and one flow (scan a bag, then immediately log a brew of it), so splitting
 them across subdomains makes the common path a cross-domain hop, and embedding them in the hub
@@ -294,14 +294,32 @@ coffee's brew guide → save the bag.
   server tools. No search API key and no HTML parser: the model finds the product page and reads
   it. `web_fetch` only fetches URLs already in the conversation, so search and fetch go in one call.
 
+**The search is a three-tier fallback, and which tier answered is recorded.**
+
+1. **Coffee-specific.** Instructions published for this exact coffee, normally on its product page.
+   Sweet Bloom dial each coffee in for their cafés and publish it under "Recommended Preparation",
+   so this tier does hit.
+2. **Roaster-generic.** If the coffee has no recipe of its own, search *the roaster's own domain
+   only* for their general brew guide. Pin this with `web_search`'s `allowed_domains` set to the
+   roaster's hostname rather than asking the prompt nicely — the point is that a third party's
+   opinion about how to brew this coffee can never be reached, only what the roaster themselves
+   published.
+3. **None.** Record `no instructions`. Do not synthesize one from tier 2's absence, and do not
+   substitute general coffee knowledge.
+
+A tier-2 result is stored labelled as the roaster's house method, not as this coffee's recipe, and
+the UI says so. The distinction is the whole reason the tiers are recorded: a house pour-over ratio
+is useful, but it is not what Sweet Bloom decided about this particular lot.
+
 **No invented recipes.** This is the rule the tool lives or dies on. A model with web search will
 happily produce a plausible 1:16 / 205°F / 3:00 recipe for a page that says nothing about brewing,
 and a fabricated recipe is worse than no recipe — you'd brew it. So:
 
 - Every `guide_*` value must be accompanied by the verbatim sentence it came from and the URL it
   was read on. A parameter with no quote backing it is dropped, not kept.
-- "This roaster publishes no guide for this coffee" is a first-class, recorded outcome — not a gap
-  to fill. Linking their general brew guide is a valid result; inferring numbers from it is not.
+- Exhausting all three tiers with nothing found is a first-class, recorded outcome — not a gap to
+  fill. Tier 2's numbers are real and storable because the roaster published them; what is never
+  storable is a number no tier produced.
 - The verbatim quotes render alongside the parsed fields in the UI, so a misparse is visible rather
   than silent. Same instinct as the Resume Formatter's lossless rule: the model's job is to locate
   and label text, not to author it.
@@ -323,8 +341,9 @@ adjustment silently overwrites what the roaster actually said.
 | roaster / coffee_name | identity; also the duplicate check |
 | origin / process / varietal / roast_date | from the bag, nullable — not every bag says |
 | photo_path | Supabase Storage, private `coffee-files` bucket |
-| product_url | the page the guide was read from, nullable |
-| guide_status | `found` / `no_guide_published` / `not_searched` |
+| product_url | the bag's own page on the roaster's site, nullable |
+| guide_url | where the instructions were actually read — equals `product_url` at tier 1, a general brew-guide page at tier 2, null at tier 3 |
+| guide_status | `coffee_specific` / `roaster_generic` / `none` / `not_searched` |
 | guide_method / guide_ratio / guide_dose / guide_water / guide_temp / guide_grind / guide_time | the roaster's, each nullable |
 | guide_quotes | jsonb — verbatim source sentences backing the above |
 | guide_fetched_at | |
