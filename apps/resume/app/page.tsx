@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+
+type Tab = "reformat" | "templates" | "history" | "check";
+const TABS: Tab[] = ["reformat", "templates", "history", "check"];
 
 type Finding = { code: string; severity: "blocking" | "warning"; message: string };
 type Coverage = { totalParagraphs: number; placed: number; dropped: string[]; percent: number };
@@ -100,8 +104,16 @@ function Findings({ findings }: { findings: Finding[] }) {
   );
 }
 
-export default function Home() {
-  const [tab, setTab] = useState<"reformat" | "templates" | "history" | "check">("reformat");
+function ReformatShell() {
+  // Deep links from the dashboard point at a specific tab, usually history —
+  // "the resume you never sent" is only actionable if it opens where it lives.
+  const params = useSearchParams();
+  const requestedTab = params.get("tab");
+  const highlightRender = params.get("render");
+
+  const [tab, setTab] = useState<Tab>(
+    TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : "reformat"
+  );
   const [renders, setRenders] = useState<RenderRow[] | null>(null);
   const [job, setJob] = useState({ company: "", role: "", jobUrl: "" });
   const [saved, setSaved] = useState<string | null>(null);
@@ -478,7 +490,12 @@ export default function Home() {
             </p>
           )}
           {renders?.map((r) => (
-            <div key={r.id} className="bg-white border border-line rounded-xl px-4 py-3 flex flex-col gap-1">
+            <div
+              key={r.id}
+              className={`bg-white border rounded-xl px-4 py-3 flex flex-col gap-1 ${
+                r.id === highlightRender ? "border-accent ring-2 ring-accent/30" : "border-line"
+              }`}
+            >
               <div className="flex items-start justify-between gap-3">
                 <p className="font-medium">{r.thread?.company ?? "No job recorded"}</p>
                 <span className="text-xs opacity-60 whitespace-nowrap">
@@ -541,5 +558,13 @@ export default function Home() {
         </>
       )}
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <ReformatShell />
+    </Suspense>
   );
 }
