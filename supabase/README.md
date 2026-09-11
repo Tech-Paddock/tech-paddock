@@ -1,0 +1,82 @@
+# Supabase
+
+One Supabase project (`qyclakzsupyxgnqfgpiq`, `tech-paddock`) backs every app in this repo, with
+each tool in its own Postgres schema — `shared`, `editor`, `tracker`, `resume` — and never the
+default `public` schema.
+
+The migration history lives here, at the repo root, rather than under any one app. One project
+means one history; splitting it per app is exactly how it drifted in the first place.
+
+## History
+
+Six of these seven migrations were applied directly to the project and only checked in afterwards,
+on 2026-09-11. Their contents are copied verbatim out of `supabase_migrations.schema_migrations`,
+so the files match what actually ran, not what someone remembers running. File timestamps are
+therefore much later than the migration versions — that is expected.
+
+| Version | What it does |
+|---|---|
+| `20260906152749` | Schemas, `shared.contacts`, editor and tracker tables, the original resume content tables |
+| `20260908235234` | **Absent by design — see below** |
+| `20260909004741` | `purpose` and `tone` on `editor.message_history` |
+| `20260910051549` | Schema USAGE and default privileges for the API roles |
+| `20260910215015` | `editor.model_status`, the model drift check's singleton row |
+| `20260911034533` | Resume Formatter rebuild; drops the four original content tables |
+| `20260911144519` | `position` on `shared.contacts` |
+
+### The deliberate gap
+
+`20260908235234_seed_contacts_threads_style_guide` is **not in this directory and should not be
+added.** It is data, not schema, and the data is seven real contacts — named people and named
+companies. The repo's no-personal-information rule applies to migrations exactly as it applies to
+docx fixtures.
+
+Consequences to expect:
+
+- `supabase migration list` will always show `20260908235234` as present remotely and missing
+  locally. That is correct and permanent.
+- **Do not run `supabase migration repair` on it.** Repairing would edit the remote history to
+  match the repo, falsifying the record of what was actually applied in order to silence a gap we
+  chose on purpose.
+- A rebuild from these files produces the correct schema with an empty `shared.contacts`. Seed data
+  is re-entered through the apps.
+
+## Working with it
+
+There is no root `package.json` in this repo by design, so the CLI runs through `npx`:
+
+```bash
+npx supabase@latest link --project-ref qyclakzsupyxgnqfgpiq   # one time, needs an access token
+npx supabase@latest migration list                            # local vs remote
+npx supabase@latest db pull -f <name>                         # capture remote drift as a new file
+```
+
+The remote project ref is not stored in `config.toml`; `link` writes it to `supabase/.temp/`, which
+is gitignored.
+
+**Any schema change from here on gets a file in this directory and goes through a pull request.**
+If you change the database first, `db pull` it back immediately — the whole point of this directory
+is that the database stops being the only record of its own shape.
+
+`config.toml` is the generated default with one edit: `[api] schemas` lists the four custom schemas
+alongside `public`, so a local stack exposes them. Without it, `supabase start` would serve an API
+that cannot see any of this project's tables.
+
+## Why the grants look alarming
+
+`20260910051549` sets:
+
+```sql
+ALTER DEFAULT PRIVILEGES IN SCHEMA <each> GRANT ALL ON TABLES TO anon, authenticated, service_role;
+```
+
+So every table created in these schemas is automatically granted to `anon` — including DELETE and
+TRUNCATE — whether or not the migration that creates it says anything about grants.
+
+That is intended, but it means **Row Level Security is the only control between a leaked
+publishable key and this data.** RLS is enabled on all seven tables with zero policies, which is
+deny-by-default and is why Supabase's advisor reports seven `rls_enabled_no_policy` notices: those
+are the design working, not a warning to fix.
+
+The practical rule: adding a table here grants `anon` full access to it by default. Enable RLS in
+the same migration. Never assume a new table is protected by anything else.
