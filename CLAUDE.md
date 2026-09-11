@@ -55,7 +55,7 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 | `editor.techpaddock.io` | Message Editor | `editor` | live |
 | `tracker.techpaddock.io` | Pipeline Tracker | `tracker` | live |
 | `resume.techpaddock.io` | Resume Formatter | `resume` | live, rebuild in progress |
-| `coffee.techpaddock.io` | Coffee | `coffee` | planned — build order step 5 |
+| `coffee.techpaddock.io` | Coffee | `coffee` | built, not yet deployed |
 
 All of them deploy from this one repo, separated by Root Directory.
 
@@ -423,10 +423,21 @@ this tool that cannot be developed locally.
    vars, and DNS are all already in place and the old build is live — so this is a replacement in
    place, not a first deploy. Still needs a run through a free ATS-checker against real generated
    output.
-5. **Coffee — not started.** New `apps/coffee`, new `coffee` Vercel project and schema, per the
-   section above. Scope is the bag scanner and library only. Shipping it also means: a row in
-   `apps/home`'s `APPS` list, `coffee` added to the CI matrix in `.github/workflows/ci.yml`, the
-   `coffee.techpaddock.io` DNS record, and updating the "four apps" counts throughout this brief.
+5. **Coffee — built, not yet deployed.** `apps/coffee` is written and passing: photograph a bag,
+   confirm what was read off it, three-tier search, save to a searchable library, edit the `my_*`
+   fields after. A repeat purchase offers to carry the previous dial-in forward. The hub tile and
+   the CI matrix entry are in.
+
+   Outstanding, all of it outside the repo: run `apps/coffee/supabase/migrations/0001_coffee_schema.sql`
+   against the shared Supabase project; create the `coffee` Vercel project with Root Directory
+   `apps/coffee`; set its env vars (`SESSION_SECRET` byte-identical to the others); add the
+   `coffee.techpaddock.io` DNS record; and update the "four apps" counts throughout this brief once
+   it is live.
+
+   **Unverified:** the search step has never run. Roaster domains are unreachable from the Claude
+   Code sandbox, so the tests cover the validation logic against recorded response shapes and
+   nothing has exercised a live `web_search`. A real bag through the deployed app is the acceptance
+   test, and it is the most likely place to find a problem.
 6. Google Tasks integration for the tracker (OAuth setup + Vercel Cron)
 7. ~~Domain wiring: Cloudflare DNS → Vercel~~ — done for all four subdomains
 8. ~~Password gate~~ — done on all four apps, now with the shared-cookie SSO described above. RLS is
