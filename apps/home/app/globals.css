@@ -354,6 +354,10 @@ a.slot:hover {
   background: #00352f;
 }
 
+.team-mclaren {
+  background: #ff8000;
+}
+
 @media (max-width: 640px) {
   .app-buttons {
     grid-template-columns: repeat(2, 1fr);

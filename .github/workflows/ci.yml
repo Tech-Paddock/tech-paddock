@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [home, editor, resume, tracker]
+        app: [home, editor, resume, tracker, coffee]
     runs-on: ubuntu-latest
     defaults:
       run:
