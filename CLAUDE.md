@@ -263,7 +263,13 @@ row never references an object that was never created.
    server-to-server using a shared `INTERNAL_API_SECRET` header (set identically on both apps),
    since it's a cross-app call with no browser session to carry — scoped tightly to that one
    route in editor's middleware, never a blanket auth bypass
-4. **Resume Formatter — being rebuilt.** The original build (structured content CRUD + template
+4. **Resume Formatter — rebuilt and live.** Reformat (template + tailored resume → .docx),
+   Templates (upload, version, activate), History (past renders, redownload what was actually
+   sent, log a submission) and an ATS check for any single file. Renders persist to
+   `resume.renders`, and naming a company writes the thread through to Pipeline Tracker. Still
+   open: the Opus escalation for documents the deterministic labeller cannot parse, linking a
+   render to a shared contact, and a run through a free ATS-checker against real generated output.
+   Original note kept for context — **it was being rebuilt because** The original build (structured content CRUD + template
    CRUD + docx generation) was the wrong shape: it assumed the app authored resume content. It
    doesn't — Jobright does. Rebuilding as a reformatter per the section above; the auth, password,
    and Supabase plumbing survive, the content schema and its CRUD do not. The Vercel project, env
