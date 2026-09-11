@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.claude/worklogs/_open-items.md\"; [ -f \"$f\" ] && jq -Rs \"{hookSpecificOutput:{hookEventName:\\\"SessionStart\\\",additionalContext:(\\\"TECHNICAL DIRECTOR OPEN ITEMS — lead your first message with these, then run: bash .claude/worklogs/read-all.sh\\n\\n\\\" + .)}}\" < \"$f\" || true",
+            "timeout": 10,
+            "statusMessage": "Loading open items…"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "command": "c=$(jq -r \".tool_input.command\"); if printf \"%s\" \"$c\" | grep -qE \"git[[:space:]]+push([[:space:]]+[^[:space:]]+)*[[:space:]]+(HEAD:)?main([[:space:]]|$)|git[[:space:]]+push[[:space:]]+.*:main([[:space:]]|$)\"; then jq -n \"{hookSpecificOutput:{hookEventName:\\\"PreToolUse\\\",permissionDecision:\\\"deny\\\",permissionDecisionReason:\\\"Pushing to main is forbidden by the Rules of Engagement in CLAUDE.md. Every change goes through a pull request. Push your branch and open one.\\\"}}\"; fi",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "if": "Bash(*supabase*)",
+            "command": "c=$(jq -r \".tool_input.command\"); if printf \"%s\" \"$c\" | grep -qE \"supabase[[:space:]]+migration[[:space:]]+repair\"; then jq -n \"{hookSpecificOutput:{hookEventName:\\\"PreToolUse\\\",permissionDecision:\\\"deny\\\",permissionDecisionReason:\\\"migration repair rewrites the database's own record of what was applied. The gap it would close is deliberate — migration 20260908235234 is withheld because it contains personal data. See supabase/README.md.\\\"}}\"; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
