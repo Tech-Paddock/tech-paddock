@@ -1,282 +1,156 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 
-type Entry = {
-  id: string;
-  company: string;
-  title: string;
-  start_date: string | null;
-  end_date: string | null;
-  display_order: number;
+type Finding = { code: string; severity: "blocking" | "warning"; message: string };
+type Section = { heading: string; lines: number; bullets: number };
+type Report = {
+  filename: string;
+  sizeBytes: number;
+  paragraphCount: number;
+  namedStyles: number;
+  outline: { title: string | null; sections: Section[]; preamble: string[] };
+  findings: Finding[];
 };
 
-type Bullet = {
-  id: string;
-  entry_id: string;
-  content: string;
-  display_order: number;
-};
-
-type Highlight = {
-  id: string;
-  content: string;
-  display_order: number;
-};
-
-type Template = {
-  id: string;
-  name: string;
-  is_active: boolean;
-  font: string | null;
-  font_size: number | null;
-  highlights_style: "table" | "list";
-};
-
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error ?? "Request failed");
-  }
-  return res.json();
-}
+const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 
 export default function Home() {
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [bullets, setBullets] = useState<Bullet[]>([]);
-  const [highlights, setHighlights] = useState<Highlight[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
 
-  async function refresh() {
-    try {
-      const [e, b, h, t] = await Promise.all([
-        api<{ entries: Entry[] }>("/api/entries"),
-        api<{ bullets: Bullet[] }>("/api/bullets"),
-        api<{ highlights: Highlight[] }>("/api/highlights"),
-        api<{ templates: Template[] }>("/api/templates"),
-      ]);
-      setEntries(e.entries);
-      setBullets(b.bullets);
-      setHighlights(h.highlights);
-      setTemplates(t.templates);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    }
-  }
-
-  useEffect(() => {
-    refresh();
-  }, []);
-
-  async function addEntry() {
-    await api("/api/entries", {
-      method: "POST",
-      body: JSON.stringify({ company: "New Company", title: "New Title", display_order: entries.length }),
-    });
-    refresh();
-  }
-
-  async function updateEntry(id: string, field: keyof Entry, value: string) {
-    await api(`/api/entries/${id}`, { method: "PATCH", body: JSON.stringify({ [field]: value }) });
-    refresh();
-  }
-
-  async function deleteEntry(id: string) {
-    await api(`/api/entries/${id}`, { method: "DELETE" });
-    refresh();
-  }
-
-  async function addBullet(entryId: string) {
-    const count = bullets.filter((b) => b.entry_id === entryId).length;
-    await api("/api/bullets", {
-      method: "POST",
-      body: JSON.stringify({ entry_id: entryId, content: "New bullet", display_order: count }),
-    });
-    refresh();
-  }
-
-  async function updateBullet(id: string, content: string) {
-    await api(`/api/bullets/${id}`, { method: "PATCH", body: JSON.stringify({ content }) });
-    refresh();
-  }
-
-  async function deleteBullet(id: string) {
-    await api(`/api/bullets/${id}`, { method: "DELETE" });
-    refresh();
-  }
-
-  async function addHighlight() {
-    await api("/api/highlights", {
-      method: "POST",
-      body: JSON.stringify({ content: "New highlight", display_order: highlights.length }),
-    });
-    refresh();
-  }
-
-  async function updateHighlight(id: string, content: string) {
-    await api(`/api/highlights/${id}`, { method: "PATCH", body: JSON.stringify({ content }) });
-    refresh();
-  }
-
-  async function deleteHighlight(id: string) {
-    await api(`/api/highlights/${id}`, { method: "DELETE" });
-    refresh();
-  }
-
-  async function setActiveTemplate(id: string) {
-    await api(`/api/templates/${id}`, { method: "PATCH", body: JSON.stringify({ is_active: true }) });
-    refresh();
-  }
-
-  async function addTemplate() {
-    await api("/api/templates", {
-      method: "POST",
-      body: JSON.stringify({ name: `Template ${templates.length + 1}`, highlights_style: "list" }),
-    });
-    refresh();
-  }
-
-  async function generate() {
-    setGenerating(true);
+  async function inspect(file: File) {
+    setBusy(true);
     setError(null);
+    setReport(null);
     try {
-      const res = await fetch("/api/generate");
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Generation failed");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "resume.docx";
-      a.click();
-      URL.revokeObjectURL(url);
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/inspect", { method: "POST", body });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? `Upload failed (${res.status}).`);
+      setReport(data as Report);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Generation failed");
+      setError(err instanceof Error ? err.message : "Something went wrong reading that file.");
     } finally {
-      setGenerating(false);
+      setBusy(false);
     }
   }
+
+  const blocking = report?.findings.filter((f) => f.severity === "blocking") ?? [];
+  const warnings = report?.findings.filter((f) => f.severity === "warning") ?? [];
 
   return (
-    <main className="min-h-screen px-6 py-10 max-w-3xl mx-auto flex flex-col gap-10">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Resume Formatter</h1>
-        </div>
-        <button
-          onClick={generate}
-          disabled={generating}
-          className="bg-accent text-white rounded-lg px-4 py-2 font-medium disabled:opacity-60"
-        >
-          {generating ? "Generating…" : "Generate .docx"}
-        </button>
+    <main className="min-h-screen px-5 py-8 max-w-3xl mx-auto flex flex-col gap-7">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold">Resume Formatter</h1>
+        <p className="text-sm opacity-70">
+          Drop in a .docx to see how a parser reads it, and what would cost you in an ATS.
+        </p>
       </header>
 
-      {error && <p className="text-sm text-red-700">{error}</p>}
-
-      <section className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Experience</h2>
-          <button onClick={addEntry} className="text-sm text-accent underline">
-            + Add role
-          </button>
-        </div>
-        {entries.map((entry) => (
-          <div key={entry.id} className="bg-white border border-line rounded-xl p-4 flex flex-col gap-2">
-            <div className="flex gap-2">
-              <input
-                defaultValue={entry.company}
-                onBlur={(e) => updateEntry(entry.id, "company", e.target.value)}
-                className="border border-line rounded-lg px-2 py-1 flex-1"
-                placeholder="Company"
-              />
-              <input
-                defaultValue={entry.title}
-                onBlur={(e) => updateEntry(entry.id, "title", e.target.value)}
-                className="border border-line rounded-lg px-2 py-1 flex-1"
-                placeholder="Title"
-              />
-              <button onClick={() => deleteEntry(entry.id)} className="text-sm text-red-700">
-                Remove
-              </button>
-            </div>
-            <div className="flex flex-col gap-1 pl-2">
-              {bullets
-                .filter((b) => b.entry_id === entry.id)
-                .map((bullet) => (
-                  <div key={bullet.id} className="flex gap-2 items-center">
-                    <span>•</span>
-                    <input
-                      defaultValue={bullet.content}
-                      onBlur={(e) => updateBullet(bullet.id, e.target.value)}
-                      className="border border-line rounded-lg px-2 py-1 flex-1 text-sm"
-                    />
-                    <button onClick={() => deleteBullet(bullet.id)} className="text-xs text-red-700">
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              <button onClick={() => addBullet(entry.id)} className="text-xs text-accent underline self-start">
-                + Add bullet
-              </button>
-            </div>
-          </div>
-        ))}
+      <section className="flex flex-col gap-3">
+        <input
+          ref={input}
+          type="file"
+          accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) inspect(file);
+            e.target.value = "";
+          }}
+        />
+        <button
+          onClick={() => input.current?.click()}
+          disabled={busy}
+          className="w-full bg-accent text-white rounded-xl px-5 py-4 text-base font-medium disabled:opacity-60"
+        >
+          {busy ? "Reading…" : "Choose a .docx"}
+        </button>
+        <p className="text-xs opacity-60">
+          Works on a Jobright export or your own template. Nothing is stored — the file is read and discarded.
+        </p>
       </section>
 
-      <section className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Career Highlights</h2>
-          <button onClick={addHighlight} className="text-sm text-accent underline">
-            + Add highlight
-          </button>
-        </div>
-        <div className="bg-white border border-line rounded-xl p-4 flex flex-col gap-2">
-          {highlights.map((h) => (
-            <div key={h.id} className="flex gap-2 items-center">
-              <input
-                defaultValue={h.content}
-                onBlur={(e) => updateHighlight(h.id, e.target.value)}
-                className="border border-line rounded-lg px-2 py-1 flex-1 text-sm"
-              />
-              <button onClick={() => deleteHighlight(h.id)} className="text-xs text-red-700">
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
+      {error && (
+        <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>
+      )}
 
-      <section className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Templates</h2>
-          <button onClick={addTemplate} className="text-sm text-accent underline">
-            + Add template
-          </button>
-        </div>
-        <div className="bg-white border border-line rounded-xl p-4 flex flex-col gap-2">
-          {templates.map((t) => (
-            <div key={t.id} className="flex items-center justify-between">
-              <span>
-                {t.name} {t.is_active && <span className="text-accent font-medium">(active)</span>}
+      {report && (
+        <>
+          <section className="bg-white border border-line rounded-xl p-4 flex flex-col gap-1">
+            <p className="font-medium break-all">{report.filename}</p>
+            <p className="text-sm opacity-70">
+              {mb(report.sizeBytes)} · {report.paragraphCount} paragraphs ·{" "}
+              {report.namedStyles === 0 ? "no named styles" : `${report.namedStyles} named styles`}
+            </p>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">
+              ATS check{" "}
+              <span className="text-sm font-normal opacity-70">
+                {blocking.length === 0 && warnings.length === 0
+                  ? "— nothing found"
+                  : `— ${blocking.length} blocking, ${warnings.length} warning${warnings.length === 1 ? "" : "s"}`}
               </span>
-              {!t.is_active && (
-                <button onClick={() => setActiveTemplate(t.id)} className="text-sm text-accent underline">
-                  Make active
-                </button>
+            </h2>
+            {blocking.length === 0 && warnings.length === 0 && (
+              <p className="text-sm bg-white border border-line rounded-xl px-4 py-3">
+                No structural problems found. Single column, no tables beyond the permitted one, contact details in
+                the body.
+              </p>
+            )}
+            {[...blocking, ...warnings].map((f) => (
+              <div
+                key={f.code}
+                className={`rounded-xl px-4 py-3 border text-sm ${
+                  f.severity === "blocking"
+                    ? "bg-red-50 border-red-200 text-red-900"
+                    : "bg-amber-50 border-amber-200 text-amber-900"
+                }`}
+              >
+                <p className="font-medium mb-1">
+                  {f.severity === "blocking" ? "Blocking" : "Warning"} · {f.code.replace(/_/g, " ")}
+                </p>
+                <p>{f.message}</p>
+              </div>
+            ))}
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">What the parser read</h2>
+            <div className="bg-white border border-line rounded-xl p-4 flex flex-col gap-3">
+              <p className="text-sm">
+                <span className="opacity-60">Name detected:</span>{" "}
+                <span className="font-medium">{report.outline.title ?? "none"}</span>
+              </p>
+              {report.outline.preamble.length > 0 && (
+                <p className="text-sm opacity-70 break-words">
+                  <span className="opacity-80">Before the first heading:</span> {report.outline.preamble[0]}
+                </p>
+              )}
+              <ul className="flex flex-col divide-y divide-line">
+                {report.outline.sections.map((s) => (
+                  <li key={s.heading} className="py-2 flex items-baseline justify-between gap-3">
+                    <span className="font-medium">{s.heading}</span>
+                    <span className="text-sm opacity-60 whitespace-nowrap">
+                      {s.lines} line{s.lines === 1 ? "" : "s"}
+                      {s.bullets > 0 && ` · ${s.bullets} bullet${s.bullets === 1 ? "" : "s"}`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {report.outline.sections.length === 0 && (
+                <p className="text-sm opacity-70">No section headings recognised in this document.</p>
               )}
             </div>
-          ))}
-        </div>
-      </section>
+          </section>
+        </>
+      )}
     </main>
   );
 }
