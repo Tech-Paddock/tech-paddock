@@ -26,6 +26,14 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 - Agent isolation: never point two Claude Code sessions at the same working directory at the same time. One app folder at a time, or genuinely separate worktrees/branches if truly parallel.
 - No secrets ever reach the browser. Every Supabase read/write and every Anthropic API call happens through this app's own server-side API routes. The client only ever talks to this app.
 - Row Level Security enabled on every table, deny-by-default, even though this is single-user. The server uses Supabase's service role key (which bypasses RLS) for all operations — RLS exists purely as a fallback if a key ever leaks.
+- **The hub is a dashboard, and holds no keys.** `techpaddock.io` opens on what is live rather
+  than on a list of tools. It reads no schema directly: each tool exposes `/api/summary` and the
+  hub fans out server-side over the existing `INTERNAL_API_SECRET` channel, so adding a tool to
+  the glance is a URL in `SOURCES`, not new knowledge in the hub. That roll-up carries **counts
+  and singles, never rows** — the hub is the three seconds before you click into a tool, and one
+  handed thread arrays becomes a worse copy of the tracker. The narrow shape is what enforces
+  the rule; the rich lists stay behind `loadDashboard`, which only the tracker calls. The glance
+  is fetched on the server: a dashboard you watch load is one you stop opening.
 - **One login covers every subdomain.** The session cookie is scoped to `.techpaddock.io`, so
   signing in on any app signs you in on all of them, and `/api/logout` on the hub clears it
   everywhere. This requires `SESSION_SECRET` to be byte-identical across all four Vercel
@@ -53,7 +61,7 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 
 | Subdomain | Tool | Vercel project | Status |
 |---|---|---|---|
-| `techpaddock.io` (root) | Command center hub (`apps/home`) | `home` | live |
+| `techpaddock.io` (root) | Command center hub + top-level dashboard (`apps/home`) | `home` | live |
 | `editor.techpaddock.io` | Message Editor | `tech-paddock` | live |
 | `tracker.techpaddock.io` | Pipeline Tracker | `tracker` | live |
 | `resume.techpaddock.io` | Resume Formatter | `resume` | live, rebuild in progress |
@@ -69,12 +77,23 @@ SUPABASE_SERVICE_ROLE_KEY=    # ditto
 APP_PASSWORD_HASH=            # bcrypt hash of the login password — all four apps
 SESSION_SECRET=               # all four apps, and MUST be byte-identical across them
 ANTHROPIC_API_KEY=            # editor, and resume once the labeling call lands
-INTERNAL_API_SECRET=          # editor + tracker only (server-to-server draft call)
+INTERNAL_API_SECRET=          # editor + tracker + home (server-to-server draft and summary calls)
 EDITOR_BASE_URL=              # tracker only
-GOOGLE_TASKS_CLIENT_ID=       # not referenced in code yet — build order step 5
-GOOGLE_TASKS_CLIENT_SECRET=
-GOOGLE_TASKS_REFRESH_TOKEN=
+TRACKER_BASE_URL=             # home only, optional — defaults to the live subdomain
+RESUME_BASE_URL=              # tracker only, optional — deep links into render history
+MS_GRAPH_CLIENT_ID=           # tracker only — Outlook calendar + To Do, one registration
+MS_GRAPH_CLIENT_SECRET=
+MS_GRAPH_REFRESH_TOKEN=
+MS_TODO_LIST_NAME=            # tracker only, optional — defaults to "Paddock"
+PADDOCK_TIMEZONE=             # tracker only, optional — defaults to America/New_York
+CRON_SECRET=                  # tracker only — bearer token on the daily stale sweep
 ```
+
+Microsoft Graph replaced the planned Google Tasks integration. The calendar had to be
+Outlook anyway, and a personal Microsoft account serves calendar and To Do from one
+registration, one consent and one refresh token — two OAuth setups for a single follow-up
+loop was the worse trade. Leaving the `MS_GRAPH_*` vars unset is safe: the dashboard
+reports Outlook as not connected and every other signal keeps working.
 
 `SESSION_SECRET` is separate from `APP_PASSWORD_HASH` on purpose: bcrypt salts randomly per app, so
 the same password produces a different hash in each project and the hash can't double as a signing
@@ -155,18 +174,61 @@ Single view of every active job-search thread, sorted to surface what's gone col
 | open_task_id | nullable — Google Task ID, see below |
 | created_at / updated_at | |
 
-**Primary view:** sorted by days since `last_touch_date`, descending. Threads past the stale threshold (default 10 days, adjustable) are visually flagged.
+**Primary view:** the dashboard at `/dashboard`; the thread list at `/` remains the CRUD
+surface. Both sort on the *derived* last touch, never on `last_touch_date` alone.
+
+**Last touch is derived, not typed.** `last_touch_date` is only ever set by hand, so the one
+number the staleness sort depends on was the one least likely to be current — the list could
+report a thread two weeks cold on the day you emailed them. `lib/signals.ts` takes the latest
+of the recorded date, a message to the linked contact (`editor.message_history`), a submitted
+render (`resume.renders`) and a matched calendar event. The recorded date is a floor, never a
+ceiling, and where evidence wins the UI says which evidence.
+
+**Decay thresholds are per-stage**, not a flat 10 days: Offer 3, Interviewing 7, Applied and
+Networking 10, Cooling 21, Closed never. An untouched application and an interview that went
+quiet are not the same problem. A thread with a meeting already booked does not decay at all.
+
+**Dashboard sections**, in priority order: what is on the clock (next 48h), stage suggestions
+from the calendar, what is going quiet, loose ends, this week's rhythm, and anything needing
+setup. Loose ends is the category nothing surfaced before and where the cost is invisible — a
+resume tailored and never sent, a meeting held with no follow-up logged, a live thread with no
+next action. Rhythm counts effort, not outcomes: conversion rates over a few dozen threads are
+noise.
+
+**Outlook is read as an input, never written as an output.** An interview invite is the
+strongest "this thread moved" signal in the system and it arrives without anyone recording
+anything. It is also the *only* inbound signal Paddock has — `message_history` records only
+what you sent — so without it there is no way to separate a thread that went cold because you
+went quiet from one that went cold because they were not interested.
+
+Matching events to threads is deterministic and explainable, for the same reasons the resume
+labeller is (`lib/matchMeetings.ts`): the attendee's email domain carries most of the signal,
+subject/contact-name/location corroborate, free-mail domains are ignored, and every match
+records why it matched. Two threads scoring equally — two open roles at one employer — leaves
+the event unattached rather than guessing; it still shows as a commitment, just without thread
+context. A meeting that implies a stage change raises a **suggestion with a confirm button,
+never an automatic edit**, matching how the model drift check flags a new model without
+swapping the pinned one.
 
 **Draft-follow-up integration:** a button on each thread calls the Message Editor's drafting endpoint directly, passing the linked contact's full context (contact record + message_history + this thread's notes) — no re-entering anything.
 
-**Google Tasks integration** (direct API call, no middleman automation platform):
-- Vercel Cron runs daily, checks `pipeline_threads` for anything past the stale threshold with `open_task_id` still null
-- For each match: creates a Google Task — title `Follow up — [Contact] ([Company])`, notes include the thread's last note + next_action, due today
+**Microsoft To Do integration** (direct Graph call, no middleman automation platform):
+- Vercel Cron runs daily, taking the dashboard's decay list rather than re-querying on
+  `last_touch_date`, so the sweep and the dashboard cannot disagree about what is stale
+- For each match with `open_task_id` still null: creates a To Do task — title
+  `Follow up — [Contact] ([Company])`, notes include the thread's last note + next_action, due
+  today. The task is created before the row that points at it, so a row never references a task
+  that was never made
 - Stores the returned task ID in `open_task_id` so the same thread isn't re-flagged daily
 - `open_task_id` clears when the thread is updated, so a fresh task can fire next time it goes stale
 - Manual "create a task" button also available on any thread, independent of the stale check
-- One-time setup: register app in Google Cloud Console, complete OAuth consent once, store refresh token server-side
-- **Deferred:** syncing a completed Google Task back to auto-reset `last_touch_date` — add once the base loop is solid
+- Manual button overrides the open-task guard; that guard exists to stop the sweep repeating
+  itself, not to stop you
+- One-time setup: register the app in Azure (personal Microsoft account, so the `consumers`
+  authority), scopes `offline_access Calendars.Read Tasks.ReadWrite`, complete consent once,
+  store the refresh token server-side
+- **Deferred:** syncing a completed To Do task back to auto-reset `last_touch_date` — less
+  pressing now that touch is derived from evidence rather than from that field alone
 
 **Where threads come from:** the Resume Formatter is the submission layer — filling in the job
 details when rendering a resume creates or updates the thread here. The tracker is the dashboard,
@@ -294,8 +356,13 @@ the foreign keys are only ever exercised against the real project:
    vars, and DNS are all already in place and the old build is live — so this is a replacement in
    place, not a first deploy. Still needs a run through a free ATS-checker against real generated
    output.
-5. Google Tasks integration for the tracker (OAuth setup + Vercel Cron)
+5. ~~Follow-up tasks for the tracker~~ — done, on Microsoft To Do rather than Google Tasks
+   (see Tool 2). Still needs the one-time Azure registration and consent before it does
+   anything; until then the dashboard reports Outlook as not connected
 6. ~~Domain wiring: Cloudflare DNS → Vercel~~ — done for all four subdomains
 7. ~~Password gate~~ — done on all four apps, now with the shared-cookie SSO described above. RLS is
    on deny-by-default across every table in every schema from step 1
 8. Real-device testing (add to iPhone home screen via each subdomain)
+9. One-time Microsoft Graph setup: Azure app registration, OAuth consent, refresh token into
+   the tracker's Vercel project. Everything downstream of it is built and degrades cleanly
+   until it lands.
