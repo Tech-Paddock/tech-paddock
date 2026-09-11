@@ -55,6 +55,7 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 | `editor.techpaddock.io` | Message Editor | `tech-paddock` | live |
 | `tracker.techpaddock.io` | Pipeline Tracker | `tracker` | live |
 | `resume.techpaddock.io` | Resume Formatter | `resume` | live, rebuild in progress |
+| `coffee.techpaddock.io` | Coffee | `coffee` | planned — build order step 5 |
 
 Note the editor's Vercel project is named `tech-paddock`, not `editor` — it was the first project
 created. All four deploy from this one repo, separated by Root Directory.
@@ -66,10 +67,10 @@ SUPABASE_URL=                 # all apps that talk to Postgres
 SUPABASE_SERVICE_ROLE_KEY=    # ditto
 APP_PASSWORD_HASH=            # bcrypt hash of the login password — all four apps
 SESSION_SECRET=               # all four apps, and MUST be byte-identical across them
-ANTHROPIC_API_KEY=            # editor, and resume once the labeling call lands
+ANTHROPIC_API_KEY=            # editor, coffee, and resume once the labeling call lands
 INTERNAL_API_SECRET=          # editor + tracker only (server-to-server draft call)
 EDITOR_BASE_URL=              # tracker only
-GOOGLE_TASKS_CLIENT_ID=       # not referenced in code yet — build order step 5
+GOOGLE_TASKS_CLIENT_ID=       # not referenced in code yet — build order step 6
 GOOGLE_TASKS_CLIENT_SECRET=
 GOOGLE_TASKS_REFRESH_TOKEN=
 ```
@@ -252,6 +253,102 @@ row never references an object that was never created.
 
 ---
 
+## Tool 4: Coffee (`coffee` schema)
+
+Photograph a bag, get back the roaster's own brewing instructions for that specific coffee, and
+keep a searchable library of everything you've bought.
+
+**Scope is deliberately one thing.** Coffee is expected to grow into a group of sub-apps — a brew
+log and dial-in history, a live brew timer for the kitchen, inventory and days-off-roast, grinder
+profiles — but none of that is being built yet, and the v1 schema does not pre-empt it. Recorded
+here only so a later session doesn't re-derive the list.
+
+**Structure: one app, tabs — not one Vercel project per sub-app.** The other three tools are
+separate projects because they have independent deploy cadences and audiences. Coffee's sub-apps
+would share one dataset and one flow (scan a bag, then immediately log a brew of it), so splitting
+them across subdomains makes the common path a cross-domain hop, and embedding them in the hub
+means an iframe inside an iframe on a phone. Sub-apps arrive as tabs and their own tables in the
+`coffee` schema; if one ever earns its own deploy, it's a folder move. This also means Coffee is a
+fifth byte-identical copy of `lib/auth.ts` and `lib/password.ts` — consistent with the recorded
+stance (consolidate before the auth logic changes again, not on app count alone), but it moves
+`packages/shared` closer to worth doing.
+
+**Phone-first.** Unlike the other three, the primary device is an iPhone standing in a kitchen.
+
+**Pipeline:** photograph the bag → identify roaster and coffee → confirm → search the web for that
+coffee's brew guide → save the bag.
+
+- **Photograph.** `<input type="file" accept="image/*">` without `capture`, so the photo library
+  stays available. Downscale client-side on a canvas to 1568px on the long edge before upload:
+  an iPhone shot is 3-5MB of HEIC, the API accepts only jpeg/png/gif/webp, and Vercel caps request
+  bodies around 4.5MB. 1568px is also Claude's optimal image size, so the downscale costs no
+  accuracy. The canvas re-encode converts HEIC to JPEG as a side effect.
+- **Identify.** Sonnet 5 vision call, `effort: low`, strict JSON out: roaster, coffee name, and any
+  other legible text on the bag (origin, process, varietal, roast date). Cheap and fast — this step
+  is reading, not reasoning.
+- **Confirm.** The identification renders as editable fields before anything is searched. A wrong
+  roaster name sends the search somewhere useless, and a search costs about a cent; confirming is
+  cheaper than re-running. This is also the manual-entry path: a bag whose photo can't be read is
+  typed in here and proceeds normally.
+- **Search.** Sonnet 5, `effort: high`, with the `web_search_20260209` and `web_fetch_20260209`
+  server tools. No search API key and no HTML parser: the model finds the product page and reads
+  it. `web_fetch` only fetches URLs already in the conversation, so search and fetch go in one call.
+
+**No invented recipes.** This is the rule the tool lives or dies on. A model with web search will
+happily produce a plausible 1:16 / 205°F / 3:00 recipe for a page that says nothing about brewing,
+and a fabricated recipe is worse than no recipe — you'd brew it. So:
+
+- Every `guide_*` value must be accompanied by the verbatim sentence it came from and the URL it
+  was read on. A parameter with no quote backing it is dropped, not kept.
+- "This roaster publishes no guide for this coffee" is a first-class, recorded outcome — not a gap
+  to fill. Linking their general brew guide is a valid result; inferring numbers from it is not.
+- The verbatim quotes render alongside the parsed fields in the UI, so a misparse is visible rather
+  than silent. Same instinct as the Resume Formatter's lossless rule: the model's job is to locate
+  and label text, not to author it.
+
+**Grind settings are meaningless without a grinder.** 18 on a Comandante is nothing like 18 on an
+Ode, and roaster guides quote clicks on their own grinder or a micron range. `my_grinder` is stored
+next to `my_grind_setting`, and the roaster's grind text is kept as text rather than parsed to a
+number.
+
+### `bags`
+
+One flat, editable row per bag. Two groups of fields that must not be merged: `guide_*` is what the
+roaster published, `my_*` is yours. Sharing one `grind_setting` column would mean your first
+adjustment silently overwrites what the roaster actually said.
+
+| Field | Notes |
+|---|---|
+| id | |
+| roaster / coffee_name | identity; also the duplicate check |
+| origin / process / varietal / roast_date | from the bag, nullable — not every bag says |
+| photo_path | Supabase Storage, private `coffee-files` bucket |
+| product_url | the page the guide was read from, nullable |
+| guide_status | `found` / `no_guide_published` / `not_searched` |
+| guide_method / guide_ratio / guide_dose / guide_water / guide_temp / guide_grind / guide_time | the roaster's, each nullable |
+| guide_quotes | jsonb — verbatim source sentences backing the above |
+| guide_fetched_at | |
+| my_method / my_grinder / my_grind_setting / my_notes / my_rating | yours, editable, all nullable |
+| created_at / updated_at | |
+
+Searchable over roaster, coffee name, origin, and notes. Buying the same coffee twice creates a new
+bag row; a match on (roaster, coffee_name) offers to carry the previous `my_*` values forward, since
+the dial-in is the part worth keeping.
+
+**Storage:** the bag photo lives in a private `coffee-files` bucket under `bags/`, written before
+the row that points at it, as in the Resume Formatter.
+
+**Shares nothing with the other tools** but the Supabase project and the session cookie. No
+`contacts` link — there's no person in this data.
+
+**Note for whoever builds this:** roaster sites are unreachable from the Claude Code sandbox (the
+egress proxy blocks them; sweetbloomcoffee, onyxcoffeelab, counterculture and blackwhite all fail).
+Vercel has no such restriction, so the search step can only be exercised on a deploy preview, or
+against fixtures made from page source pasted in by hand. Budget for that — it is the one part of
+this tool that cannot be developed locally.
+
+---
+
 ## Build Order
 
 1. ~~Monorepo scaffolding + shared Supabase project and schemas~~ — done; Message Editor lives
@@ -276,8 +373,12 @@ row never references an object that was never created.
    vars, and DNS are all already in place and the old build is live — so this is a replacement in
    place, not a first deploy. Still needs a run through a free ATS-checker against real generated
    output.
-5. Google Tasks integration for the tracker (OAuth setup + Vercel Cron)
-6. ~~Domain wiring: Cloudflare DNS → Vercel~~ — done for all four subdomains
-7. ~~Password gate~~ — done on all four apps, now with the shared-cookie SSO described above. RLS is
+5. **Coffee — not started.** New `apps/coffee`, new `coffee` Vercel project and schema, per the
+   section above. Scope is the bag scanner and library only. Shipping it also means: a row in
+   `apps/home`'s `APPS` list, `coffee` added to the CI matrix in `.github/workflows/ci.yml`, the
+   `coffee.techpaddock.io` DNS record, and updating the "four apps" counts throughout this brief.
+6. Google Tasks integration for the tracker (OAuth setup + Vercel Cron)
+7. ~~Domain wiring: Cloudflare DNS → Vercel~~ — done for all four subdomains
+8. ~~Password gate~~ — done on all four apps, now with the shared-cookie SSO described above. RLS is
    on deny-by-default across every table in every schema from step 1
-8. Real-device testing (add to iPhone home screen via each subdomain)
+9. Real-device testing (add to iPhone home screen via each subdomain)
