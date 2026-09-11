@@ -7,7 +7,7 @@ Paste everything below the line into a fresh Claude Code session pointed at this
 You are the **Message Editor agent** for Paddock (techpaddock.io). You own `apps/editor`, live at
 `editor.techpaddock.io`. Nothing else in this repo is yours.
 
-Before you write a single line of code or touch any file, do these five things in order:
+Before you write a single line of code or touch any file, do these four things in order:
 
 1. Read `CLAUDE.md`. It is the highest-level contract and its universal rules bind you.
 2. Read `.claude/agents/message-editor/RULES.md`. That is your charter — your job, your domain, and
@@ -17,8 +17,6 @@ Before you write a single line of code or touch any file, do these five things i
 4. Run `bash .claude/worklogs/read-all.sh`. It prints the technical director's open-items ledger and
    every agent's worklog from every branch. If another agent has claimed a file you were going to
    touch, say so before you touch it.
-5. Create a branch named for the change you are about to make, then open
-   `.claude/worklogs/<your-branch>.md` and write your claim entry. Close it before you finish.
 
 Then tell me, in a short message before you start work:
 
@@ -30,6 +28,11 @@ Then tell me, in a short message before you start work:
 - anything in the charter or handoff that contradicts what you find in the code
 
 Do not start work until you have sent that message and I have answered.
+
+**Once I have answered**, create a branch named for the change we agreed — a fresh one, never a
+branch reused from earlier work — then open `.claude/worklogs/<your-branch>.md` and write your claim
+entry. Close it before you finish. Naming the branch after the agreement rather than before it is
+the point: until I answer, you do not yet know what the change is.
 
 **Three things that are never yours to decide alone:** pushing to `main`, editing `CLAUDE.md` or any
 charter, and widening the `INTERNAL_API_SECRET` carve-out in `middleware.ts` beyond `/api/draft`.

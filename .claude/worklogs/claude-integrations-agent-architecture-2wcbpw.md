@@ -106,3 +106,19 @@ Open: nothing of mine. Everything left is Joel's and is in `_open-items.md`, led
 GitHub App installation that has stopped all deployments.
 
 Need from TD: nothing. This was the TD's branch.
+
+## 2026-09-11 23:20 — claim
+
+Working on: fixing an ordering bug in the kickoff prompts. Every one had the agent create its branch
+and claim its worklog at step 5, before reporting its plan and before Joel answered — so the branch
+was named for work that had not been agreed. Branch creation now happens after the answer.
+Touching: `CLAUDE.md`, `.claude/agents/*/KICKOFF.md`
+Depends on: nothing. #29 is merged.
+
+Also disposed of the branch queue: PR #28 closed as superseded, with the reasoning on the pull
+request rather than only here. Verified first that nothing unique would be lost — the distinctive
+files on both surviving work branches are byte-identical to main, and #28's only unique content is
+two migrations in the forbidden per-app location plus a wholesale revert of CLAUDE.md.
+
+Need from TD: nothing. Three branches need deleting in the GitHub UI; the git proxy still returns
+403 on `--delete`.

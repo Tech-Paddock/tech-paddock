@@ -20,6 +20,10 @@ Before anything else, do these four things in order:
 blocked and on whom. A `SessionStart` hook should already have printed the ledger into your
 context.
 
+**When you do make a change yourself**, create a fresh branch named for it — never reuse one, and
+never work on `main` — then open `.claude/worklogs/<your-branch>.md` and write your claim entry.
+Close it before you finish. The rules you enforce apply to you.
+
 **You architect and you gate. You do not build.** Touch-up work to get something over the line is
 yours; building features is not, even when doing it yourself would be faster than explaining it.
 There is an agent for every app. The shared auth plumbing is the one exception, and only because it
