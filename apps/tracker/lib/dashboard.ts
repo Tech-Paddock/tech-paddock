@@ -4,6 +4,8 @@ import {
   getServiceClient,
   getSharedClient,
 } from "@/lib/supabase";
+import { GraphEvent, fetchCalendar, graphConfigured } from "@/lib/graph";
+import { MeetingMatch, matchMeetings } from "@/lib/matchMeetings";
 import {
   Commitment,
   ContactRow,
@@ -34,9 +36,24 @@ export type HealthItem = {
   href?: string;
 };
 
+/**
+ * A calendar event says a thread moved before you get round to saying so.
+ * Surfaced as a suggestion with one-click confirm, never applied automatically
+ * — the same posture as the model drift check, which flags a new model and
+ * refuses to swap the pinned one for you.
+ */
+export type StageSuggestion = {
+  threadId: string;
+  company: string;
+  currentStage: string;
+  suggestedStage: string;
+  because: string;
+};
+
 export type DashboardData = {
   generatedAt: string;
   commitments: Commitment[];
+  suggestions: StageSuggestion[];
   decay: DecayedThread[];
   looseEnds: LooseEnd[];
   rhythm: Rhythm;
@@ -53,15 +70,68 @@ export type DashboardData = {
 };
 
 /**
- * Calendar events matched to threads.
+ * The raw calendar, before it knows anything about threads.
  *
- * Returns nothing until Microsoft Graph is wired, but every consumer is already
- * meeting-aware — commitments, the follow-up gap, and decay suppression for
- * threads with something already booked all read this. Wiring Graph is then a
- * change to this one function rather than a change to the dashboard.
+ * An unconfigured Outlook is a setup step, not a failure — it reports as health
+ * and leaves the rest of the dashboard intact. A configured Outlook that errors
+ * is a real problem and degrades loudly.
  */
-async function loadMeetings(): Promise<{ meetings: MeetingRow[]; degraded: string[] }> {
-  return { meetings: [], degraded: [] };
+async function loadCalendar(
+  now: Date
+): Promise<{ events: GraphEvent[]; degraded: string[]; health: HealthItem[] }> {
+  if (!graphConfigured()) {
+    return {
+      events: [],
+      degraded: [],
+      health: [
+        {
+          kind: "outlook_not_connected",
+          label: "Outlook is not connected",
+          detail:
+            "Interviews, the follow-up gap and stage suggestions stay empty until Graph credentials are set.",
+          severity: "info",
+        },
+      ],
+    };
+  }
+
+  try {
+    return { events: await fetchCalendar(now), degraded: [], health: [] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return { events: [], degraded: [`calendar: ${message}`], health: [] };
+  }
+}
+
+/** Stages a booked meeting is evidence of having moved past. */
+const PRE_INTERVIEW_STAGES = new Set(["Applied", "Networking"]);
+
+function suggestStages(
+  matches: MeetingMatch[],
+  threads: ThreadRow[],
+  now: Date
+): StageSuggestion[] {
+  const threadsById = new Map(threads.map((t) => [t.id, t]));
+  const seen = new Set<string>();
+  const out: StageSuggestion[] = [];
+
+  for (const match of matches) {
+    if (!match.threadId || seen.has(match.threadId)) continue;
+    const thread = threadsById.get(match.threadId);
+    if (!thread || !PRE_INTERVIEW_STAGES.has(thread.stage)) continue;
+
+    seen.add(match.threadId);
+    const when = new Date(match.meeting.starts_at) > now ? "is booked" : "happened";
+    out.push({
+      threadId: thread.id,
+      company: thread.company,
+      currentStage: thread.stage,
+      suggestedStage: "Interviewing",
+      because: `A meeting ${when}${match.reason ? ` — ${match.reason}` : ""}.`,
+    });
+  }
+
+  return out;
 }
 
 export async function loadDashboard(now = new Date()): Promise<DashboardData> {
@@ -69,7 +139,7 @@ export async function loadDashboard(now = new Date()): Promise<DashboardData> {
 
   const since = new Date(now.getTime() - MESSAGE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
 
-  const [threadsRes, contactsRes, messagesRes, rendersRes, templateRes, meetingsRes] =
+  const [threadsRes, contactsRes, messagesRes, rendersRes, templateRes, calendarRes] =
     await Promise.all([
       getServiceClient()
         .from("pipeline_threads")
@@ -87,22 +157,27 @@ export async function loadDashboard(now = new Date()): Promise<DashboardData> {
         .order("created_at", { ascending: false })
         .limit(RENDER_LIMIT),
       getResumeClient().from("templates").select("id, name, version").eq("is_active", true),
-      loadMeetings(),
+      loadCalendar(now),
     ]);
 
   if (threadsRes.error) degraded.push(`threads: ${threadsRes.error.message}`);
   if (contactsRes.error) degraded.push(`contacts: ${contactsRes.error.message}`);
   if (messagesRes.error) degraded.push(`messages: ${messagesRes.error.message}`);
   if (rendersRes.error) degraded.push(`renders: ${rendersRes.error.message}`);
-  degraded.push(...meetingsRes.degraded);
+  degraded.push(...calendarRes.degraded);
 
   const threads = (threadsRes.data ?? []) as ThreadRow[];
   const contactRows = (contactsRes.data ?? []) as ContactRow[];
   const messages = (messagesRes.data ?? []) as MessageRow[];
   const renders = (rendersRes.data ?? []) as RenderRow[];
-  const meetings = meetingsRes.meetings;
 
   const contacts = new Map(contactRows.map((c) => [c.id, c]));
+
+  // Matching needs the threads, so it happens after the fan-out rather than
+  // inside it. An event that matches nothing stays in the list unattached: it
+  // is still a commitment, it just has no thread context to show alongside.
+  const matches = matchMeetings(calendarRes.events, threads, contacts);
+  const meetings = matches.map((m) => m.meeting);
 
   const touches = new Map<string, Touch>(
     threads.map((t) => [t.id, effectiveTouch(t, messages, renders, meetings, now)])
@@ -113,7 +188,7 @@ export async function loadDashboard(now = new Date()): Promise<DashboardData> {
     commitments.map((c) => c.threadId).filter((id): id is string => !!id)
   );
 
-  const health: HealthItem[] = [];
+  const health: HealthItem[] = [...calendarRes.health];
   if (!templateRes.error && (templateRes.data ?? []).length === 0) {
     health.push({
       kind: "no_active_template",
@@ -127,6 +202,7 @@ export async function loadDashboard(now = new Date()): Promise<DashboardData> {
   return {
     generatedAt: now.toISOString(),
     commitments,
+    suggestions: suggestStages(matches, threads, now),
     decay: findDecayed(threads, touches, upcomingThreadIds, now),
     looseEnds: findLooseEnds(threads, contacts, messages, renders, meetings, now),
     rhythm: computeRhythm(threads, messages, renders, meetings, now),

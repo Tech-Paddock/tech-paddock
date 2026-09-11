@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { loadDashboard } from "@/lib/dashboard";
+import StageSuggestions from "./StageSuggestions";
 import { links } from "@/lib/links";
 import type { Severity, TouchSource } from "@/lib/signals";
 
@@ -87,11 +88,12 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      <StageSuggestions suggestions={data.suggestions} />
+
       <Section title="On the clock" hint="next 48 hours">
         {data.commitments.length === 0 ? (
           <Empty>
-            Nothing booked. Once Outlook is connected, interviews and calls land here with the
-            resume they have and your last message attached.
+            Nothing booked in the next 48 hours.
           </Empty>
         ) : (
           <div className="flex flex-col gap-2">
