@@ -8,6 +8,7 @@ type DraftRequest = {
   purpose: "ask" | "follow-up" | "decline" | "networking" | "job-outreach" | "other";
   tone?: string;
   effort: Effort;
+  context?: string; // background to read before drafting; may not appear in the message
   input: string; // free-text: what the message needs to say
   threadNotes?: string; // passed by Pipeline Tracker
 };
@@ -73,6 +74,10 @@ export async function POST(request: NextRequest) {
       ? `Recent message history:\n${history.map((h) => `- [${h.medium}, ${h.sent_at}] ${h.content}`).join("\n")}`
       : null,
     body.threadNotes ? `Pipeline thread notes: ${body.threadNotes}` : null,
+    // Background goes before the ask, so the model has read the situation by
+    // the time it reaches what the message has to do. Not everything here
+    // belongs in the message itself.
+    body.context ? `Context to take into account:\n${body.context}` : null,
     `What this message needs to say: ${body.input}`,
   ].filter(Boolean);
 

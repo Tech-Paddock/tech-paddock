@@ -27,7 +27,8 @@ npm run dev
 ## What's built
 
 - Password gate with lockout (5 failed attempts → 15 minute lock)
-- Draft endpoint (`/api/draft`) — pulls style guide + contact + message history, calls Claude
+- Draft endpoint (`/api/draft`) — pulls style guide + contact + message history, folds in the
+  optional context box, calls Claude
 - Commit endpoint (`/api/commit`) — pure append of a final (edited) draft to `message_history`
   (with medium/purpose/tone), tagged as sent. No LLM call — logging is cheap and instant.
 - Message history endpoint (`/api/message-history`) — read-only feed of the last 30 logged
@@ -38,9 +39,10 @@ npm run dev
 - Contact CRUD (`/api/contacts`) against the shared `contacts` table, plus a searchable
   contact lookup and inline "+ New contact" form in the UI. Name, org, position, relationship
   type and preferred channel; name is the only required field
-- Single-page UI: Draft mode (contact search, channel, purpose, tone, effort, free text →
-  editable draft → log as sent) and Train mode (load logged history or paste samples → refined guide)
-- Deployed on Vercel (`editor` project, Root Directory set to `apps/editor`, linked to
+- Single-page UI: Draft mode (contact search, channel, purpose, tone picklist, context, free text
+  → editable draft → log as sent) and Train mode (load logged history or paste samples → refined
+  guide). There is no effort control — drafting is always `effort: high`
+- Deployed on Vercel (`tp-message-editor` project, Root Directory set to `apps/editor`, linked to
   this repo's `main` branch) with its environment variables set
 - Live at **editor.techpaddock.io**, DNS via Cloudflare
 
