@@ -62,6 +62,20 @@ is that the database stops being the only record of its own shape.
 alongside `public`, so a local stack exposes them. Without it, `supabase start` would serve an API
 that cannot see any of this project's tables.
 
+## A new schema does not inherit anything
+
+`20260910051549` granted schema USAGE by naming four schemas explicitly. It cannot cover a schema
+that did not exist when it ran, so **every new schema arrives with no USAGE for the API roles** and
+every query against it fails on permissions — not on anything visible in the application code.
+
+This already bit once: `coffee` was created with a correct, RLS-enabled migration and was still
+unreachable until `20260911203100` granted it. Note also that `ALTER DEFAULT PRIVILEGES` only
+affects tables created *after* it runs, so a schema's existing tables need `GRANT ALL ON ALL TABLES`
+as well.
+
+**Adding a schema means two migrations, not one:** the schema and its tables, then its grants. Copy
+`20260911203100_grant_coffee_schema_usage.sql` and change the schema name.
+
 ## Why the grants look alarming
 
 `20260910051549` sets:
