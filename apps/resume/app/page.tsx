@@ -25,6 +25,15 @@ type Template = {
   spec: { font: string; bodySize: number; headingSize: number; margins: { left: number; top: number } };
 };
 
+type RenderRow = {
+  id: string;
+  created_at: string;
+  submitted_at: string | null;
+  thread_id: string | null;
+  coverage: Coverage;
+  thread: { company: string; stage: string } | null;
+};
+
 type Inspection = {
   filename: string;
   sizeBytes: number;
@@ -92,7 +101,10 @@ function Findings({ findings }: { findings: Finding[] }) {
 }
 
 export default function Home() {
-  const [tab, setTab] = useState<"reformat" | "templates" | "check">("reformat");
+  const [tab, setTab] = useState<"reformat" | "templates" | "history" | "check">("reformat");
+  const [renders, setRenders] = useState<RenderRow[] | null>(null);
+  const [job, setJob] = useState({ company: "", role: "", jobUrl: "" });
+  const [saved, setSaved] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [template, setTemplate] = useState<File | null>(null);
   const [source, setSource] = useState<File | null>(null);
@@ -104,7 +116,37 @@ export default function Home() {
 
   useEffect(() => {
     refreshTemplates();
+    refreshRenders();
   }, []);
+
+  async function refreshRenders() {
+    try {
+      const res = await fetch("/api/renders");
+      const data = await res.json();
+      if (res.ok) setRenders(data.renders as RenderRow[]);
+    } catch {
+      // The tab shows its own empty state.
+    }
+  }
+
+  async function recordJob() {
+    if (!result?.renderId || !job.company.trim()) return;
+    setError(null);
+    try {
+      const res = await fetch(`/api/renders/${result.renderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...job, submittedAt: new Date().toISOString() }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Couldn't record that.");
+      setSaved(`Logged against ${job.company.trim()} and added to the tracker.`);
+      setJob({ company: "", role: "", jobUrl: "" });
+      await refreshRenders();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't record that.");
+    }
+  }
 
   async function refreshTemplates() {
     try {
@@ -208,18 +250,18 @@ export default function Home() {
       </header>
 
       <nav className="flex gap-1 bg-white border border-line rounded-xl p-1">
-        {(["reformat", "templates", "check"] as const).map((t) => (
+        {(["reformat", "templates", "history", "check"] as const).map((t) => (
           <button
             key={t}
             onClick={() => {
               setTab(t);
               setError(null);
             }}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${
+            className={`flex-1 rounded-lg px-2 py-2 text-xs sm:text-sm font-medium ${
               tab === t ? "bg-accent text-white" : "opacity-70"
             }`}
           >
-            {t === "reformat" ? "Reformat" : t === "templates" ? "Templates" : "ATS check"}
+            {t === "reformat" ? "Reformat" : t === "templates" ? "Templates" : t === "history" ? "History" : "Check"}
           </button>
         ))}
       </nav>
@@ -328,6 +370,44 @@ export default function Home() {
                   {result.renderId ? "Saved to your render history." : "Preview only — nothing was saved."}
                 </p>
               </div>
+
+              {result.renderId && (
+                <section className="flex flex-col gap-3">
+                  <h2 className="text-lg font-semibold">Where did this go?</h2>
+                  {saved ? (
+                    <p className="text-sm bg-white border border-line rounded-xl px-4 py-3">{saved}</p>
+                  ) : (
+                    <div className="bg-white border border-line rounded-xl p-4 flex flex-col gap-3">
+                      <p className="text-xs opacity-60">
+                        Naming a company creates the thread in Pipeline Tracker. Leave it blank if you have not sent
+                        this yet — it stays in history either way.
+                      </p>
+                      {([
+                        ["company", "Company", "Proseware"],
+                        ["role", "Role", "Product Analyst II"],
+                        ["jobUrl", "Posting URL", "https://…"],
+                      ] as const).map(([key, label, placeholder]) => (
+                        <label key={key} className="flex flex-col gap-1">
+                          <span className="text-xs uppercase tracking-wide opacity-60">{label}</span>
+                          <input
+                            value={job[key]}
+                            onChange={(e) => setJob({ ...job, [key]: e.target.value })}
+                            placeholder={placeholder}
+                            className="border border-line rounded-lg px-3 py-2 text-sm"
+                          />
+                        </label>
+                      ))}
+                      <button
+                        onClick={recordJob}
+                        disabled={!job.company.trim()}
+                        className="w-full bg-accent text-white rounded-xl px-5 py-3 text-sm font-medium disabled:opacity-50"
+                      >
+                        Log as submitted
+                      </button>
+                    </div>
+                  )}
+                </section>
+              )}
             </>
           )}
         </>
@@ -386,6 +466,32 @@ export default function Home() {
             ))}
           </section>
         </>
+      ) : tab === "history" ? (
+        <section className="flex flex-col gap-2">
+          {renders === null && <p className="text-sm opacity-60">Loading…</p>}
+          {renders?.length === 0 && (
+            <p className="text-sm bg-white border border-line rounded-xl px-4 py-3">
+              No renders yet. Reformat a resume and it lands here.
+            </p>
+          )}
+          {renders?.map((r) => (
+            <div key={r.id} className="bg-white border border-line rounded-xl px-4 py-3 flex flex-col gap-1">
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-medium">{r.thread?.company ?? "No job recorded"}</p>
+                <span className="text-xs opacity-60 whitespace-nowrap">
+                  {new Date(r.created_at).toLocaleDateString()}
+                </span>
+              </div>
+              <p className="text-xs opacity-60">
+                {r.submitted_at ? `Submitted ${new Date(r.submitted_at).toLocaleDateString()}` : "Rendered, not sent"}
+                {r.thread?.stage ? ` · ${r.thread.stage}` : ""} · {r.coverage.percent}% coverage
+              </p>
+              <a href={`/api/renders/${r.id}/file`} className="text-sm underline w-fit mt-1">
+                Download what was sent
+              </a>
+            </div>
+          ))}
+        </section>
       ) : (
         <>
           <section className="flex flex-col gap-3">
