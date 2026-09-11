@@ -324,6 +324,24 @@ and a fabricated recipe is worse than no recipe — you'd brew it. So:
   than silent. Same instinct as the Resume Formatter's lossless rule: the model's job is to locate
   and label text, not to author it.
 
+**Brew method is a pick list, not free text.** A fixed vocabulary — V60, Chemex, Kalita Wave,
+AeroPress, French press, espresso, moka pot, cold brew, batch brew, other — held in code, not in a
+table. Free text would make "V60", "v60" and "Hario V60" three different values and quietly break
+grouping and filtering in the library; same instinct as the Resume Formatter's known-vocabulary
+section headings.
+
+Picking a method pre-populates the bag's `my_method`. When a guide is found, its method is the
+roaster's recommendation and lands in `guide_method`, with `my_method` defaulting to it and staying
+editable — you can brew their filter coffee as espresso and the record will say so without losing
+what they suggested. The roaster's wording is normalized onto the vocabulary (their "pourover"
+becomes `v60` where the quote supports it, otherwise `other`); the verbatim quote is stored either
+way, so the normalization is auditable rather than lossy.
+
+A lookup table of methods — one row per method carrying your standard technique and grinder — is
+the obvious next step and is deliberately **not** being built. The enum is the placeholder until the
+shape of the sub-apps is clear; promoting it to a table later is an additive migration, not a
+rewrite.
+
 **Grind settings are meaningless without a grinder.** 18 on a Comandante is nothing like 18 on an
 Ode, and roaster guides quote clicks on their own grinder or a micron range. `my_grinder` is stored
 next to `my_grind_setting`, and the roaster's grind text is kept as text rather than parsed to a
@@ -344,10 +362,12 @@ adjustment silently overwrites what the roaster actually said.
 | product_url | the bag's own page on the roaster's site, nullable |
 | guide_url | where the instructions were actually read — equals `product_url` at tier 1, a general brew-guide page at tier 2, null at tier 3 |
 | guide_status | `coffee_specific` / `roaster_generic` / `none` / `not_searched` |
-| guide_method / guide_ratio / guide_dose / guide_water / guide_temp / guide_grind / guide_time | the roaster's, each nullable |
+| guide_method | the roaster's recommended method, normalized onto the pick-list vocabulary |
+| guide_ratio / guide_dose / guide_water / guide_temp / guide_grind / guide_time | the roaster's, each nullable |
 | guide_quotes | jsonb — verbatim source sentences backing the above |
 | guide_fetched_at | |
-| my_method / my_grinder / my_grind_setting / my_notes / my_rating | yours, editable, all nullable |
+| my_method | from the pick-list vocabulary; defaults to `guide_method` when a guide was found |
+| my_grinder / my_grind_setting / my_notes / my_rating | yours, editable, all nullable |
 | created_at / updated_at | |
 
 Searchable over roaster, coffee name, origin, and notes. Buying the same coffee twice creates a new
