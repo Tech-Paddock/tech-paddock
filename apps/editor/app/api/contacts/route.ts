@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     .insert({
       name: body.name,
       org: body.org ?? null,
+      position: body.position ?? null,
       relationship_type: body.relationship_type ?? null,
       preferred_channel: body.preferred_channel ?? null,
       notes: body.notes ?? null,
