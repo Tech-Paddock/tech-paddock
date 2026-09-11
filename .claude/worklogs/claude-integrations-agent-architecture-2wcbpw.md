@@ -14,12 +14,24 @@ resume migration up from `apps/resume/` — one project, one history. The seed m
 deliberately absent because it contains real names; `supabase/README.md` explains why and says not
 to "repair" the gap it leaves.
 
-## 2026-09-11 18:00 — handoff
-Landed: Rules of Engagement in `CLAUDE.md`, this worklog channel, the TD ledger, Domain Map
-corrected to the real Vercel project names, `position` added to the contacts table in the brief.
-Open: the status board artifact is next. Two follow-on PRs not yet opened — Node runtime drift,
-and the `"Attain"` PII scrub in the resume app.
-Need from TD: nothing — this is the TD's own branch. Items needing Joel are in `_open-items.md`.
+## 2026-09-11 18:00 — landed
+Rules of Engagement in `CLAUDE.md`, this worklog channel, the TD ledger, Domain Map corrected to
+the real Vercel project names, `position` added to the contacts table. Merged #16 first so its
+policy text could be superseded rather than land on top of these rules.
+
+## 2026-09-11 18:15 — handoff
+Landed: the Pit Wall board, at
+https://claude.ai/code/artifact/9cac3618-1a51-4d5e-82fb-339e96657bf4 — deployments, CI, branches
+and the ledger on one page, fed from the artifact's datastore. It cannot poll anything; it is as
+fresh as the TD's last write and reports its own age for exactly that reason.
+Open: two follow-on PRs not yet opened — Node runtime drift, and the PII scrub in the resume app.
+Three branches to delete once their queue position passes.
+Need from TD: nothing. Items needing Joel are in `_open-items.md`.
+
+## Note on this branch's own PR
+
+Opened but deliberately not self-merged. These are the rules that constrain the technical
+director, and the TD approving them alone is the wrong shape regardless of green CI.
 
 ## Note for whoever picks up `tracker-dashboard` or `coffee`
 

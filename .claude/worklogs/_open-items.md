@@ -8,6 +8,11 @@ Agents: read this, do not edit it. If you need something on this list, say so in
 
 Last reviewed: 2026-09-11
 
+**Pit Wall board:** https://claude.ai/code/artifact/9cac3618-1a51-4d5e-82fb-339e96657bf4 — the same
+state as this file, plus deployments, CI and branches, as a page. It does not poll anything; it is
+exactly as fresh as the last time the TD wrote to it, and it says so on its face. When its age
+readout is amber or red, check Vercel and GitHub directly rather than trusting it.
+
 ---
 
 ## Waiting on Joel
