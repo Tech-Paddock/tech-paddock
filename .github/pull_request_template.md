@@ -8,19 +8,24 @@
 ## Verification
 - [ ] `npm run test --if-present` passes in every touched app
 - [ ] `npm run build` passes in every touched app
-- [ ] CI is green (all four matrix jobs), and any new app under `apps/` was added to the matrix in `.github/workflows/ci.yml`
+- [ ] CI is green (all five matrix jobs), and any new app under `apps/` was added to the matrix in `.github/workflows/ci.yml`
 - [ ] No personal information anywhere in the diff — names, addresses, phone numbers, emails, employers, schools, resume content. For any `.docx`, that includes hyperlink targets in `.rels` parts and the author fields in `docProps/`, not just `document.xml`.
 - [ ] Worklog updated at `.claude/worklogs/<branch>.md`
+- [ ] Second-order questions answered before this was built, not after — see `CLAUDE.md`
 - [ ] Any schema change has its migration file in this PR
 
 ## Brief impact
 <!--
-Does this change contradict anything CLAUDE.md states — the domain map, env vars,
-build order, a tool's design, or a stated decision?
+Does this change contradict anything settled — CLAUDE.md, your own charter at
+.claude/agents/<you>/RULES.md, the domain map, env vars, or a stated decision?
 
-If so, say what it contradicts and STOP. Do not edit CLAUDE.md in this PR: the
-brief is approved before it is updated, never quietly alongside the code that
-outdated it. Flagging it here is the whole job.
+If so it should already have been raised with Joel BEFORE the work, not here.
+Flagging it at this point is the backstop for something you only discovered
+late, not the normal path — code already written applies pressure to approve it,
+which is what the rule exists to prevent.
 
-Write "none" if nothing in the brief is affected.
+Never edit CLAUDE.md or another agent's charter in this PR. You may propose a
+change to your OWN charter here; Joel approves it.
+
+Write "none" if nothing settled is affected.
 -->
