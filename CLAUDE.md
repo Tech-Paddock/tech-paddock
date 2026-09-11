@@ -35,6 +35,45 @@ This is a single-user tool. Simplicity beats the multi-team defaults that show u
 - Every deployed app sits behind a password, with lockout after repeated failed attempts. A fully random generated password is the default recommendation; a memorable phrase is an acceptable tradeoff here given the low stakes and the lockout backstop — it's the user's call, not a hard rule.
 - **Prefer append over rewrite for anything that accumulates.** When a feature involves a growing body of history (sent messages, logs, past output), the default write path should be a plain insert — cheap, instant, no AI call — with any AI-driven synthesis (like refining a style guide) kept as a separate, deliberately-triggered, batched step. Don't reach for "call the model to regenerate the whole artifact" as the per-event write path; see the Message Editor's training design below for the concrete example.
 
+## Merge & Branch Policy
+
+Main collected sixteen merge commits from a single long-lived branch before any of this was
+written down. The rules below exist to stop that recurring. They are process, not architecture,
+and they are deliberately short because there is one person here.
+
+- **One branch per change.** Name it for the change (`claude/<slug>`). Never reuse a branch across
+  unrelated changes, and never treat one as a permanent working branch — that is what produced the
+  sixteen merges from `claude/this-n2kl8y`, and it leaves main's history useless for working out
+  when something actually landed.
+- **Every change lands through a pull request**, including small ones. CI already runs on
+  `pull_request`; with nothing opening PRs it has never actually gated anything.
+- **Squash merge, always.** One commit on main per change. Branch-level history stays in the PR if
+  it is ever wanted. Merge commits and rebase merges are off.
+- **CI green before merge** — all four matrix jobs. A red build does not get merged on the
+  assumption that the failure is unrelated; establish that it is, or fix it.
+- **Delete the branch after merge**, so the branch list stays a list of live work rather than an
+  archive.
+- **The CI matrix is hardcoded** to `[home, editor, resume, tracker]`. A new app under `apps/` is
+  silently untested until it is added there — add it in the same PR that adds the app.
+- **Update this brief in the same PR.** If a change contradicts anything stated here — the domain
+  map, env vars, build order, a tool's design — fix it in that PR rather than leaving the brief to
+  drift behind what is deployed.
+
+### One-time GitHub settings
+
+These live in the GitHub UI, not the repo, so they have to be set by hand once.
+
+Settings → General → Pull Requests: allow squash merging only (uncheck merge commits and rebase
+merging), set the squash commit message default to "Pull request title and description", and turn
+on "Automatically delete head branches".
+
+Then protect `main` (Settings → Rules → Rulesets, or Settings → Branches): require a pull request
+before merging, require the four CI checks to pass, and block force pushes.
+
+This repo is private on a personal account, which matters for the second half: the squash and
+auto-delete settings work on any plan, but protecting a branch on a *private* repo needs GitHub
+Pro. Without it, everything above is convention rather than something enforced.
+
 ## Tech Stack
 
 - **Framework:** Next.js, hosted on Vercel
