@@ -173,11 +173,19 @@ Every agent needs these. Per-tool detail lives in that tool's charter.
 - **Prefer append over rewrite for anything that accumulates.** When a feature involves growing
   history, the default write path is a plain insert — cheap, instant, no model call — with any
   model-driven synthesis kept as a separate, deliberately triggered, batched step.
+- **Model choice is per task.** No model is mandated repo-wide. Pick what the job needs —
+  capability where judgment matters, something cheaper and faster where it does not — and record
+  the choice and the reason at the call site, because the next reader cannot infer either. Apps are
+  not required to agree with each other, so "which model are we on" now has one answer per app.
+  **Two things the old `claude-sonnet-5` pin was protecting still hold.** Every call stays
+  server-side. And a new model can carry API-shape changes — `effort` moving under `output_config`
+  caught this project once already — so moving an app to a different model is a deliberate change
+  with a test behind it, never a string swap.
 - **Agent isolation.** Never point two Claude Code sessions at the same working directory at the
   same time. One app folder at a time, or genuinely separate worktrees.
 
-**Stack:** Next.js on Vercel · Supabase Postgres · Anthropic API, `claude-sonnet-5`, server-side
-only · techpaddock.io via Cloudflare Registrar.
+**Stack:** Next.js on Vercel · Supabase Postgres · Anthropic API, server-side only ·
+techpaddock.io via Cloudflare Registrar.
 
 **Domain map** — project names carry a `tp-` prefix and do not match their folder or subdomain.
 That is verified against the live account and the prefix stays; the table gets corrected, not the
