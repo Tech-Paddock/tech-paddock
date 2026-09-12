@@ -33,15 +33,7 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    Once deployed: log in at `techpaddock.io`, then open a tool from a hub tile, on desktop and on
    mobile. A loop on both points at the secret; a loop on mobile only points at the iframe, which is
    the separate known bug. No agent can read the values — this one is Joel's eyes only.
-2. **2026-09-12 — A sixth Vercel project called `tuning` exists. Did you create it?** Created
-   18:02 UTC today, three minutes before a TechPad Gen preview, `framework: null`, one READY
-   production deployment, Node 24.x. **It is not publicly exposed** — Vercel SSO covers all three
-   `*.vercel.app` domains and no custom domain is attached, so it redirects to `sso-api` and carries
-   `x-robots-tag: noindex`. Checked, because a project pointed at the repo root serving an unprotected
-   page is an incident this project has already had. So it is contained, not urgent — but creating a
-   project is on the never-without-the-TD list and I did not authorize it. If it is yours, say so and
-   I will record it. If it is not, it should be deleted, and that is your click, not mine.
-3. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
+2. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
    `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
    will tell you they are doing nothing. Needs a one-time Azure registration against a personal
    Microsoft account — the `consumers` authority, scopes `offline_access Calendars.Read
@@ -54,12 +46,23 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
    endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
    first, or in the same save. Never after.**
-4. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
+3. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
    jobs; the rule names four.
-5. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
+4. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
+
+- **2026-09-12 — The `tuning` Vercel project is gone. Joel deleted it; verified against the account,
+  not taken on report.** Five projects remain — `tp-home`, `tp-message-editor`, `tp-tracker`,
+  `tp-resume`, `tp-coffee-app` — and every one still reads `link.org: "Tech-Paddock"`, so the
+  re-linking that closed the deploy outage is holding.
+  Worth keeping for the next time one appears: it was created 18:02, carried a READY production
+  deployment, and **was never publicly reachable** — Vercel SSO covered all three `*.vercel.app`
+  domains and no custom domain was attached, so it answered a redirect to `sso-api` and
+  `x-robots-tag: noindex`. That is the check to run first, because the incident this project already
+  has on record is a Vercel project pointed at the repo root serving an unprotected page. Contained
+  is not the same as authorized, which is why it went to Joel rather than being noted and dropped.
 
 - **2026-09-12 — `middleware.ts` is three versions, not five copies, and the brief now says so.**
   Joel's call, delegated. The rule was always right; the reason printed under it was false, and a
