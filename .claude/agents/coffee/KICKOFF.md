@@ -41,8 +41,9 @@ prompt, and do not add a write path that goes around it. A model with web search
 plausible recipe for a page that says nothing about brewing, and unlike a bad message draft you
 would actually brew it.
 
-**Do not touch** `lib/auth.ts`, `lib/password.ts` or `middleware.ts` — byte-identical in five apps,
-and a mismatch fails silently on the other four. **Do not merge or mine PR #28**; it is the
+**Do not touch** `lib/auth.ts`, `lib/password.ts` or `middleware.ts` — the first two are
+byte-identical in five apps and a mismatch fails silently on the other four; `middleware.ts` is the
+password gate itself. **Do not merge or mine PR #28**; it is the
 superseded version of your own app and carries a declined rename, a misplaced migration, and no
 grants migration at all.
 

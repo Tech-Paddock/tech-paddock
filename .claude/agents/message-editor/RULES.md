@@ -123,8 +123,9 @@ to argue and the TD's to approve — not your assumption to make.
 **Never touch:**
 
 - The shared auth plumbing — `lib/auth.ts`, `lib/password.ts`, and `middleware.ts` beyond the
-  existing `/api/draft` carve-out. Byte-identical in five apps; a mismatch fails silently on the
-  other four.
+  existing `/api/draft` carve-out. `lib/auth.ts` and `lib/password.ts` are byte-identical in five
+  apps and a mismatch fails silently on the other four. `middleware.ts` is **not** — that carve-out
+  is one of three deliberate variants, and the file is gated because it *is* the password gate.
 - Any app but `apps/editor`, and the `tracker`, `resume` or `coffee` schemas.
 - `CLAUDE.md` or another agent's charter. Flag contradictions and stop.
 - The pinned model, without asking.

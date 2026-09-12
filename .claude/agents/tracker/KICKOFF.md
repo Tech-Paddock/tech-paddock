@@ -39,8 +39,9 @@ threads into your table. Keep `/api/summary` narrow — counts and singles, neve
 `INTERNAL_API_SECRET` carve-out in any app.
 
 **Do not touch** `lib/auth.ts`, `lib/password.ts`, or `middleware.ts` beyond the existing
-`/api/summary` carve-out — byte-identical in five apps, and a mismatch fails silently on the other
-four.
+`/api/summary` carve-out. The first two are byte-identical in five apps and a mismatch fails
+silently on the other four; this app's `middleware.ts` is the most divergent of three variants and
+is the password gate itself.
 
 **If what you are about to build contradicts the brief or your charter, stop and ask me before you
 build it** — not in the pull request afterwards. Your tool's specification now lives in your own

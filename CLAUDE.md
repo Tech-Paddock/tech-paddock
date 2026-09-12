@@ -72,8 +72,18 @@ in the file every session loads, so that they cannot drift the way seven copies 
 - **Apply a schema change without its migration file in the same pull request.** The database is
   not allowed to be the only record of its own shape again.
 - **Edit the shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, or
-  anything touching `SESSION_SECRET` and the shared cookie. These are byte-identical copies in five
-  apps and a mismatch does not throw. It silently rejects valid sessions on the other four.
+  anything touching `SESSION_SECRET` and the shared cookie. **These are gated for two different
+  reasons, and merging them is how the rule gets talked past.**
+  `lib/auth.ts` and `lib/password.ts` genuinely are byte-identical in all five apps — checksummed,
+  not assumed — and a mismatch does not throw. It silently rejects valid sessions on the other four.
+  `middleware.ts` is **three distinct versions**: `home`, `resume` and `coffee` share one, `editor`
+  adds a scoped `/api/draft` bypass, `tracker` adds `/api/summary` and waves `/api/cron/*` through.
+  That divergence is deliberate, so "they are all the same" is not the reason to leave it alone —
+  and an agent who checks, finds three, and concludes the rule is wrong has been handed that
+  conclusion by the rule itself. **It is gated because it *is* the password gate.** A bad edit here
+  does not break a login; it publishes an endpoint. `tracker` already shows the shape: `/api/cron/*`
+  skips the gate entirely and the route's own `if (secret && …)` check fails **open** when
+  `CRON_SECRET` is unset — harmless today only because Graph is unconfigured.
 - **Edit this file, or any charter but your own.** Both are approved before they are updated, never
   quietly alongside the code that outdated them. **If what you are about to build contradicts
   either, stop and ask before you build it** — in your worklog and to Joel. Raising it in the pull
@@ -207,7 +217,7 @@ Every agent needs these. Per-tool detail lives in that tool's charter.
   installed: open it in Safari once, add it, and the installed app is its own thing afterwards. The
   intended path, not a workaround to design away. So do not add a web app manifest to make an app
   Chrome-installable on the strength of this rule alone — that means editing `middleware.ts`, which
-  is five copies and TechPad Gen's call, and it is not what this rule asks for.
+  is the password gate in every app and TechPad Gen's call, and it is not what this rule asks for.
 
   **On iOS every browser is WebKit, Chrome included**, so a WebKit rendering or decoding quirk still
   applies on the phone whichever browser is in front of it. The `<img>` fallback in
