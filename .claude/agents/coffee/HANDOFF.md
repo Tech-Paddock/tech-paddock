@@ -20,44 +20,25 @@ Verified today, directly, not inferred:
   Vercel will build this successfully before it is configured, and then throw at runtime on a
   missing `SESSION_SECRET`. **A green build will not tell you the config is right.**
 
-## It is live
+## It is live and working
 
-**Deployed and reachable as of 2026-09-12, 02:00.** `coffee.techpaddock.io` returns 200 and serves
-your login page. Root Directory is `apps/coffee`, the domain is attached, DNS resolves through the
-shared CNAME target, and the build log shows dependencies installed and `next build` run — against
-the 153ms `no files were prepared` it produced while still pointed at the repo root.
+**Green as of 2026-09-12 03:00.** `GET /api/health` returns `{"ok":true}` — `coffee schema
+reachable`, `bucket coffee-files reachable`, `ANTHROPIC_API_KEY` set. `coffee.techpaddock.io` serves
+your login. All five environment variables are correct and the app can reach everything it needs.
 
-`tech-paddock.vercel.app` also points at this project and now serves the same gated login, so the
-ungated page this file used to warn about is gone.
+`tech-paddock.vercel.app` also points here and now serves the same gated login, so the ungated page
+this file used to warn about is gone.
 
-**One check is still unrun and it is the one that matters: `GET /api/health`, behind the login.**
-The five environment variables are invisible to every API, are read per request rather than at build
-time, and a green build proves nothing about them. The route names whichever of the `coffee` schema,
-the `coffee-files` bucket, or `ANTHROPIC_API_KEY` is unhappy. Run it before trusting a bag scan.
+**Two things worth knowing before you build on it.**
 
-The framework preset still reads `Other`, and that is cosmetic: your `vercel.json` declares `nextjs`
-and overrides the dashboard, which is why the build succeeded with the preset unset.
+The health check's Anthropic line says *set*, never *working* — presence and prefix only, by design.
+The first bag scan is the first real test of that key.
 
-**As of 23:31 the project is partly configured.** Its `updatedAt` moved, so something was changed,
-but the framework preset is still `null` and the domain is still not attached. Root Directory and
-the environment variables are not exposed by the Vercel API, so no session can confirm them — which
-is what the health check below is for.
-
-**You have `GET /api/health`** (#31). Once you can log in, it names which dependency is unhappy: the
-`coffee` schema, the `coffee-files` bucket, or a missing `ANTHROPIC_API_KEY`. Reaching it at all
-proves `APP_PASSWORD_HASH` and `SESSION_SECRET` are right, because it sits behind the gate. The
-Anthropic check is presence and shape only and reports "set", never "working" — a live call would
-cost money and could fail for unrelated reasons.
-
-Two things follow for you:
-
-1. **You cannot verify the search step yet.** It is the one part of this tool that no test covers
-   and no sandbox can exercise, because roaster domains are blocked by the egress proxy. It needs
-   a deploy preview and a real bag. Until that has happened, treat the three-tier search as
-   **unproven**, not working.
-2. **Deployments are broken repo-wide right now.** Vercel's GitHub App lost its installation when
-   the repo was transferred, so no push has triggered a build since 17:48 today. Even once
-   `tp-coffee-app` is configured, nothing ships until that is reconnected.
+And standing this up hit a trap that is not in your code and will hit the next new schema too:
+`coffee` had a correct migration, correct grants, and was listed in `config.toml`, and PostgREST
+still answered `Invalid schema: coffee` — because the hosted project's **exposed schemas** list is a
+dashboard setting that lives nowhere in this repo. `supabase/README.md` now documents it as step
+three of three.
 
 ## A branch you should not touch
 
