@@ -68,6 +68,18 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
 
+- **2026-09-12 — `CLAUDE.md` now says the browser is Chrome, and that Safari is not an
+  explanation.** Joel asked for it directly. Written as a diagnosis rule rather than a word ban,
+  because a blanket ban would have caused a bug: on iOS every browser is WebKit, Chrome included, so
+  the `<img>` decode fallback in `apps/coffee/lib/image.ts` protects the phone Joel actually uses —
+  an agent told only "we use Chrome" would delete it as dead code. The note names that and the iOS
+  home-screen install as the two places the platform forces WebKit, and forbids Safari everywhere
+  else.
+  **Two stale references left for their owners.** `.claude/agents/techpad-gen/HANDOFF.md` still
+  carries the Safari/ITP theory for the mobile bug — that file is the open conflict in #43 and is
+  theirs to rewrite. `apps/coffee/app/globals.css` has a comment reading "In Safari these insets are
+  zero", which is true of any browser tab and should say so; Coffee's to fix, cosmetic, not urgent.
+
 - **2026-09-12 — #42 merged: Coffee installs on the iPhone home screen.** `apple-touch-icon` and
   the `apple-mobile-web-app-*` tags, safe-area insets, a favicon. Deliberately iOS-only: a manifest
   is fetched without credentials, so the gate returns the login redirect and the install silently
@@ -186,8 +198,10 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 - **2026-09-11 — `editor.model_status` has zero rows.** The login-time drift check has never
   successfully written. Not diagnosed, and the oldest unexplained thing here.
 - **2026-09-11 — The hub's mobile login bug.** Opening a tool from an embedded tile re-triggers that
-  app's login on mobile. Reported on mobile Chrome, so the Safari/ITP explanation does not fit.
-  Check what URL the iframe actually loads first.
+  app's login on mobile. **Reported on Chrome, which is the only browser used here** — so a
+  cookie-partitioning explanation borrowed from another engine is not the diagnosis, and reaching for
+  one cost a round already. Check what URL the iframe actually loads first; that is still unchecked.
+  `CLAUDE.md` now says this once, under the shared foundation, so it stops being re-litigated.
 
 ## Read this before transferring the repo again
 
