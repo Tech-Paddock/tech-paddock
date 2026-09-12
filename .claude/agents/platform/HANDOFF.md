@@ -75,39 +75,40 @@ files, so every project rebuilds. Note the backlog argument that used to sit her
 outage is fixed and all five have deployed `0c7d882`, so this change is now worth landing on its own
 merits — five full Next.js builds per docs-only commit — rather than as a way to clear a backlog.
 
-## `tp-coffee-app` is up, and the public exposure is closed
+## Coffee is fully working, and the schema trap that cost an hour
 
-**Resolved 2026-09-12 at 02:00.** Root Directory is `apps/coffee`, `coffee.techpaddock.io` is
-attached and returns 200 serving the Coffee login, and the build log carries the proof:
+**Green as of 2026-09-12 03:00.** `GET /api/health` returns `{"ok":true}` on all three checks, at
+`coffee.techpaddock.io`, behind the password gate, on current `main`. Root Directory is
+`apps/coffee`; the build log shows dependencies installed and `next build` run, where it used to
+exit in 153ms having prepared no files. `tech-paddock.vercel.app` belongs to this project and now
+serves the same gated login, so the ungated surface this file used to warn about is gone.
 
-```
-Installing dependencies...
-Detected Next.js version: 14.2.35
-Running "npm run build"
-> coffee@0.1.0 build
-```
+**The part worth carrying forward.** Standing it up produced three failures in three different
+systems, and only one was where it appeared to be:
 
-against the `Build Completed in /vercel/output [153ms]` / `no files were prepared` it produced while
-still pointed at the repo root.
+| Symptom | Actually |
+|---|---|
+| `database: Invalid API key` | `SUPABASE_SERVICE_ROLE_KEY` held a non-JWT value |
+| `storage: Invalid Compact JWS` | same key — Storage failing to *parse* it as a JWT |
+| `anthropic_key: not set` | a blank Vercel field |
+| `database: Invalid schema: coffee` | **the schema was never exposed to the hosted Data API** |
 
-**The `tech-paddock.vercel.app` exposure is closed by the same change.** That hostname now serves
-the Coffee login rather than an ungated page — the gate lives in each app's middleware, and the
-project finally has an app, so it finally has middleware. It was never a leak (a bare 84-byte 404,
-checked), but it is now gated like everything else.
+The first is the shape to remember: **Supabase's value living in a Vercel field.** The project has
+both key systems enabled — legacy `eyJ…` JWTs and modern `sb_secret_…` — and the code needs the
+legacy `service_role` JWT. `Invalid Compact JWS` is the decisive tell, because a merely *wrong* JWT
+parses fine and fails differently.
 
-**Root Directory is checkable from a session: read the build log.** A correct build installs
-dependencies and runs `next build`; a repo-root build finds no `package.json` and exits in
-milliseconds. An earlier version of this file called that unknowable and was wrong, which left the
-most consequential of four settings unverified while two cosmetic ones were tracked as blockers.
+The last one is the trap. `coffee` had a correct migration, correct grants — verified directly
+against Postgres, `service_role` had USAGE and SELECT — and was already listed in `config.toml`.
+PostgREST still refused it, because the hosted project's **exposed schemas** list is a dashboard
+setting that is not in this repo and that `config.toml` does not touch. Adding it there fixed it
+with no code, no migration and no redeploy.
 
-**Still unrun:** `GET /api/health` behind the login. It is the only check on the five environment
-variables — `ANTHROPIC_API_KEY`, `APP_PASSWORD_HASH`, `SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`,
-`SUPABASE_URL` — which stay API-invisible. A green build proves nothing about them, since they are
-read per request.
+**`supabase/README.md` said two migrations plus `config.toml` and is now corrected to three steps.**
 
-The framework preset still reads `Other` and is genuinely cosmetic: `apps/coffee/vercel.json`
-declares `nextjs` and overrides the dashboard, which is exactly why this build succeeded with the
-preset unset. `tp-message-editor` has run the same way for weeks.
+**Verifying it without dashboard access:** `postgrest_logs` prints a relation count on every reload.
+Count the tables across the schemas that should be exposed and compare. Here the log read
+`Schema cache loaded 8 Relations` — 8 rather than 7 is `coffee.bags` arriving.
 
 ## `SESSION_SECRET` was rotated today — verify parity
 

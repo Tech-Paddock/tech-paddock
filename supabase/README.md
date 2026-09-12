@@ -78,9 +78,31 @@ unreachable until `20260911203100` granted it. Note also that `ALTER DEFAULT PRI
 affects tables created *after* it runs, so a schema's existing tables need `GRANT ALL ON ALL TABLES`
 as well.
 
-**Adding a schema means two migrations, not one:** the schema and its tables, then its grants. Copy
-`20260911203100_grant_coffee_schema_usage.sql` and change the schema name. Then add it to
-`[api] schemas` in `config.toml`.
+**Adding a schema means two migrations and one dashboard setting — three steps, not two.**
+
+1. The schema and its tables.
+2. Its grants. Copy `20260911203100_grant_coffee_schema_usage.sql` and change the schema name.
+3. **Add it to the hosted project's exposed schemas, in the Supabase dashboard**: Project Settings →
+   API → Exposed schemas. PostgREST only answers for schemas on that list, and it is not in this
+   repo. Adding the schema to `[api] schemas` in `config.toml` is *also* worth doing, but it
+   configures the **local** stack only and does nothing to the hosted project.
+
+Step 3 is the one that is easy to miss, and it fails in a way that looks like a credentials problem.
+**This bit on 2026-09-12.** `coffee` had a correct migration, correct grants — verified directly:
+`service_role` had USAGE on the schema and SELECT on `coffee.bags` — and `coffee` was already listed
+in `config.toml`. The app still answered:
+
+```
+{"name":"database","ok":false,"detail":"Invalid schema: coffee"}
+```
+
+for about an hour, while the key was suspected instead. Adding `coffee` in the dashboard fixed it
+with no code change, no migration and no redeploy: PostgREST restarted and logged
+`Schema cache loaded 8 Relations` — 8 rather than 7, which is `coffee.bags` arriving.
+
+**How to check it from a session without dashboard access:** `postgrest_logs` reports the relation
+count on every reload. Count the tables across the schemas you expect to be exposed; if the log's
+number is short, one of them is not on the list.
 
 
 
