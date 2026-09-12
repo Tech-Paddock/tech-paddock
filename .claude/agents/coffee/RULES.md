@@ -154,8 +154,7 @@ or better, Haiku 4.5 rejects `output_config.effort` outright so its list of leve
 degraded result, so a level the model does not take is refused by the route and never offered by
 the page — absent rather than greyed out, because a disabled control implies a setting that
 exists. Reading a label is transcription, is
-already fast, and stays on `claude-sonnet-5`. **This needs an explicit exception to the
-`claude-sonnet-5` pin in `CLAUDE.md` and does not stand without one.**
+already fast, and stays on `claude-sonnet-5`.
 
 Lowering the model does not lower the guard. `validateGuide` enforces quote-backing in code, so a
 weaker model cannot invent a recipe — it can only fail to find one and report `none`. That is what
