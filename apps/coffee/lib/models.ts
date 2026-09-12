@@ -52,7 +52,17 @@ export function isEffortFor(model: SearchModel, value: unknown): value is Effort
 
 export type SearchModel = keyof typeof SEARCH_MODELS;
 
-/** Start at the cheapest and work up; which one holds up is the open question. */
+/**
+ * Start at the cheapest and work up; which one retrieves well enough is the
+ * open question this registry exists to answer.
+ *
+ * Haiku is a safe place to start specifically because the guard is not in the
+ * model. `validateGuide` enforces quote-backing in code, so a weaker model
+ * cannot invent a brewing recipe — it can only fail to find one and report
+ * `none`. The risk of going cheap here is degraded recall, not a wrong recipe
+ * you would actually brew. That would not be true of a tool whose correctness
+ * depended on the model's judgement, and it is why this dial exists at all.
+ */
 export const DEFAULT_SEARCH_MODEL: SearchModel = "claude-haiku-4-5";
 
 export const MODEL_LABELS: Record<SearchModel, string> = {
