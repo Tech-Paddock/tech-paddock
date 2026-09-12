@@ -1,93 +1,96 @@
 # Coffee — handoff
 
-State as of 2026-09-11, end of day.
+State as of 2026-09-12, 15:10 UTC.
 
 Read `RULES.md` first. This file is only what is true right now.
 
-> ## ⚠️ This file predates #40 and is wrong about the flow
->
-> **#40 moved the save ahead of the search.** The bag row is now written first and the search
-> updates it, with the page polling the row — so a dropped connection no longer loses an answer the
-> server already produced. It also made the search model and its effort selectable, recorded per
-> bag, and added five columns to `coffee.bags`. `RULES.md` describes all of this correctly; the
-> sections below still describe the old order.
->
-> **Coffee agent: rewriting this is yours and it is the first thing to do.** The technical director
-> deliberately did not backfill it — a handoff written by the TD is the TD's second-hand reading of
-> your work, which is the thing these files exist to replace. The rule that would have caught this
-> before the merge landed in the same change as this note.
->
-> One thing worth carrying into the rewrite, from #40's own commit history rather than from me: the
-> search defaults to Haiku because `validateGuide` enforces quote-backing in code, so a cheaper
-> model costs recall, never an invented recipe. Also note `RULES.md` still says the model toggle
-> "needs an explicit exception to the `claude-sonnet-5` pin in `CLAUDE.md`" — #38 removed that pin,
-> so the sentence is stale and should go when you next touch that file.
-
 ---
 
-## Built and merged, not deployed
+## It is live, and the whole flow has run
 
-`apps/coffee` landed on `main` as **#23**. It is complete, tested and it builds. It has never run
-anywhere.
+`coffee.techpaddock.io` serves the app behind the password gate. `GET /api/health` returned
+`{"ok":true}` at 03:00 — `coffee` schema reachable, `coffee-files` bucket reachable,
+`ANTHROPIC_API_KEY` set. All five environment variables are right.
 
-Verified today, directly, not inferred:
+The flow has been exercised end to end against a real bag: `POST /api/identify` 200,
+`POST /api/search` 200. The three-tier retrieval has run against a live roaster site. What has
+**not** happened is a comparison worth reading — see "What to do next".
 
-- **16/16 tests pass** — `guide.test.ts` (9), `methods.test.ts` (5), `bags.test.ts` (2)
-- **`npm run build` succeeds clean** — 6 routes, 5 API routes, middleware at 27kB, no type errors
-- **`coffee.bags` exists in Postgres with RLS enabled**, zero rows
-- **The build needs no environment variables.** They are read per request, not at build time. So
-  Vercel will build this successfully before it is configured, and then throw at runtime on a
-  missing `SESSION_SECRET`. **A green build will not tell you the config is right.**
+## The flow, as the code now has it
 
-## It is live and working
+**Save comes before the search.** Confirm the label → the bag row is written → the search runs
+against that row and updates it → the page polls the row. `guide_status` stays `not_searched` while
+it is in flight.
 
-**Green as of 2026-09-12 03:00.** `GET /api/health` returns `{"ok":true}` — `coffee schema
-reachable`, `bucket coffee-files reachable`, `ANTHROPIC_API_KEY` set. `coffee.techpaddock.io` serves
-your login. All five environment variables are correct and the app can reach everything it needs.
+This is the opposite of the original order and it is deliberate. The search reads real roaster pages
+and takes thirty seconds to a few minutes with nothing travelling on the connection, so a phone
+concludes the request is dead. That happened on the first live run: two searches returned 200 and
+the browser showed "load failed" both times. The answer was correct and unreachable. Now it lands in
+a row rather than in a response, so a dropped connection costs nothing and the tab can be closed
+mid-search.
 
-`tech-paddock.vercel.app` also points here and now serves the same gated login, so the ungated page
-this file used to warn about is gone.
+## The search is a comparison harness
 
-**Two things worth knowing before you build on it.**
+The model and its effort are selectable per search and recorded on the bag — `guide_model` and
+`guide_effort`. Default is **Haiku 4.5**.
 
-The health check's Anthropic line says *set*, never *working* — presence and prefix only, by design.
-The first bag scan is the first real test of that key.
+Haiku is a safe default for a specific reason, and it is the reason to trust the whole idea:
+`validateGuide` enforces quote-backing **in code**, so a weaker model cannot invent a recipe. It can
+only fail to find one and report `none`. Going cheap costs recall, never a wrong recipe you would
+brew.
 
-And standing this up hit a trap that is not in your code and will hit the next new schema too:
-`coffee` had a correct migration, correct grants, and was listed in `config.toml`, and PostgREST
-still answered `Invalid schema: coffee` — because the hosted project's **exposed schemas** list is a
-dashboard setting that lives nowhere in this repo. `supabase/README.md` now documents it as step
-three of three.
+The three models do not take the same request, which is why `lib/models.ts` is a registry rather
+than a list of names: the dynamic-filtering web tools need Sonnet 4.6 or better, Haiku 4.5 rejects
+`output_config.effort` outright, and `xhigh` exists on Sonnet 5 but not Sonnet 4.6. Every one of
+those is a 400 rather than a degraded result. The route refuses a level the chosen model cannot
+take rather than dropping it — a silently ignored setting would report a comparison that never ran.
 
-## A branch you should not touch
+## Columns added since #23
 
-`claude/coffee-brewing-assistant-hmvffw` and its **PR #28** are the original version of this work,
-superseded by #23. It is 7 ahead and 14 behind `main`, and GitHub already reports it as
-conflicting.
+`guide_search_started_at`, `guide_search_error`, `guide_model`, `guide_effort`, `guide_dropped`.
+All five are live in Postgres, verified directly. `guide_dropped` is not bookkeeping: dropped
+values used to live only in the search response, and backgrounding would have discarded them
+silently — which is the thing `RULES.md` says they exist to prevent.
 
-Do not merge it, do not rebase it, do not mine it for ideas without checking against `main` first.
-It carries three things that were deliberately fixed on the way in:
+## Failures are legible now
 
-- a proposal to rename the Vercel projects to bare names, which **was declined** — the `tp-` prefix
-  stays
-- its migration at `apps/coffee/supabase/migrations/0001_coffee_schema.sql`, the wrong place; one
-  project means one history at the repo root, and `main` carries it correctly as
-  `20260911203000_coffee_schema.sql`
-- no grants migration at all. `main` has `20260911203100_grant_coffee_schema_usage.sql`, without
-  which the `coffee` schema is unreadable **even by `service_role`** and every query fails on
-  permissions with nothing in the app's own code to explain why
+`findPreviousBag` and `findRoasterDomain` used to destructure only `data` and throw the error away.
+Both answer `null` legitimately, so an unreachable database was indistinguishable from "no previous
+purchase" and "no verified domain yet" — and an hour of debugging went to the Anthropic key because
+two call sites reported success while only the library list told the truth. Both now throw
+`LookupError` carrying the Postgres message.
 
-The recommendation on the ledger is to close #28 and delete the branch.
+**The trap that caused it is not in this app's code and will hit the next new schema too:** `coffee`
+had a correct migration, correct grants, and was listed in `config.toml`, and PostgREST still
+answered `Invalid schema: coffee`, because the hosted project's **exposed schemas** list is a
+dashboard setting that lives nowhere in this repo. `supabase/README.md` documents it as step three
+of three.
 
-## Next steps
+## In flight
 
-1. Wait for `tp-coffee-app` to be configured. Nothing you can do moves that. When it is, hit
-   `/api/health` before anything else — a green build says nothing about whether the five
-   environment variables are right, because they are read per request rather than at build time.
-2. Once there is a preview URL: run a real bag through the whole flow. Photograph, confirm, search,
-   save. That is the first genuine test of `validateGuide` against a live roaster site and the
-   first chance to see which tier actually answers in practice.
-3. Expect `normalizeMethod` to need alias tuning after that run. The vocabulary is right; the
-   regexes were written against how roasters *tend* to word things, not against a real sample.
-4. Nothing else is queued. The deliberately-unbuilt list — brew log, timer, inventory, method
-   lookup table — stays unbuilt until asked for.
+**#42 — installable on the iPhone home screen.** Add to Home Screen in Safari gives it an icon,
+full screen and no browser chrome. An installed iOS app has **its own cookie jar**, so signing in
+once inside it is expected rather than a session bug, and it is reached directly rather than
+through the hub's iframe. iOS only, on purpose: a web app manifest is
+fetched without credentials, so the password gate returns the login redirect and the install
+silently never offers itself. Allowing it through means editing `middleware.ts`, which is
+byte-identical in five apps and not Coffee's. If every tool should be installable, that pattern is
+TechPad Gen's.
+
+## What to do next
+
+1. **Run the same coffee twice — Haiku, then Sonnet 5 at `high`** — and compare which tier each
+   reports. That is the open question the harness was built to answer and nothing in the repo can
+   answer it. `guide_model` and `guide_effort` are on the row so the comparison stays readable
+   afterwards.
+2. **Expect `normalizeMethod` to need alias tuning** once there are real guides to look at. The
+   vocabulary is right; the regexes were written against how roasters *tend* to word things, not
+   against a sample.
+3. **Seeding roaster domains is proposed and not started.** It would let the first search for a
+   known roaster pin `allowed_domains` instead of running unpinned. It needs its own table — `bags`
+   rows are purchases and phantom rows would break that — and the domains must be verified through
+   the deployed app, where `web_fetch` has real egress. **No agent in the sandbox can verify one:**
+   roaster domains are blocked by the egress proxy, so a list produced here would be recalled from
+   training, which is the exact guess `findRoasterDomain` refuses.
+4. Nothing else is queued. The deliberately-unbuilt list — brew log, timer, inventory, method lookup
+   table — stays unbuilt until asked for.
