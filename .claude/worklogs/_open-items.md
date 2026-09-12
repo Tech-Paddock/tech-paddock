@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-12 04:00 UTC.**
+**Last reviewed: 2026-09-12 18:40 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -33,7 +33,22 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    Once deployed: log in at `techpaddock.io`, then open a tool from a hub tile, on desktop and on
    mobile. A loop on both points at the secret; a loop on mobile only points at the iframe, which is
    the separate known bug. No agent can read the values — this one is Joel's eyes only.
-3. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
+2. **2026-09-12 — A sixth Vercel project called `tuning` exists. Did you create it?** Created
+   18:02 UTC today, three minutes before a TechPad Gen preview, `framework: null`, one READY
+   production deployment, Node 24.x. **It is not publicly exposed** — Vercel SSO covers all three
+   `*.vercel.app` domains and no custom domain is attached, so it redirects to `sso-api` and carries
+   `x-robots-tag: noindex`. Checked, because a project pointed at the repo root serving an unprotected
+   page is an incident this project has already had. So it is contained, not urgent — but creating a
+   project is on the never-without-the-TD list and I did not authorize it. If it is yours, say so and
+   I will record it. If it is not, it should be deleted, and that is your click, not mine.
+3. **2026-09-12 — `CLAUDE.md` is wrong about `middleware.ts`, and it is your call to fix.** The brief
+   says it is byte-identical in five apps. It is not: there are **three** distinct versions, because
+   `editor` and `tracker` carry deliberate carve-outs. `lib/auth.ts` and `lib/password.ts` genuinely
+   are identical — TechPad Gen checksummed all three and is right. **The rule still holds** — a
+   mismatch in the auth plumbing still fails silently — but its stated reason is stale, and a rule
+   defended by a wrong fact is one somebody talks themselves past. Brief change, so it is yours; I
+   will not touch it without your word.
+4. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
    `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
    will tell you they are doing nothing. Needs a one-time Azure registration against a personal
    Microsoft account — the `consumers` authority, scopes `offline_access Calendars.Read
@@ -46,12 +61,29 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
    endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
    first, or in the same save. Never after.**
-4. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
+5. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
    jobs; the rule names four.
-5. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
+6. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
+
+- **2026-09-12 — #42 merged: Coffee installs on the iPhone home screen.** `apple-touch-icon` and
+  the `apple-mobile-web-app-*` tags, safe-area insets, a favicon. Deliberately iOS-only: a manifest
+  is fetched without credentials, so the gate returns the login redirect and the install silently
+  never offers itself, and letting it through means editing `middleware.ts` — five copies, not
+  Coffee's to change. The icon is a static import so it serves from `/_next/static`, the one prefix
+  the matcher excludes; Next's own `app/apple-icon.png` convention sits behind the gate, where iOS
+  falls back to a screenshot of the login page as the icon. Verified at the gate: matcher confirmed,
+  `middleware.ts` untouched, both binaries scanned for metadata and clean, all five matrix jobs
+  green. **It also carried the handoff rewrite #41 asked for** — the new rule working in the
+  direction it was meant to, one pull request after it landed.
+- **2026-09-12 — #43 sent back, and the handoff rule is why.** TechPad Gen's hub re-theme and
+  `/admin` page: good work on a base that was never brought current. Conflict in its own handoff,
+  CI never ran at all (GitHub cannot build a merge ref while a PR conflicts), and both the handoff
+  and the body assert production serves `92c1ec1` when `tp-home` has served `f06ff0c` since 03:57.
+  Not backfilled by me, deliberately — the conflict is inside the handoff, so fixing it would mean
+  writing it. Detail in `.claude/agents/td/HANDOFF.md`.
 
 - **2026-09-12 — Handoffs are now part of the gate, and #40 is why.** Agents update their
   `HANDOFF.md` when they open or change a pull request; the TD reads every handoff a change touches

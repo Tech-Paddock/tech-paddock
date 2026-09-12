@@ -33,3 +33,46 @@ banner on Coffee's handoff, and the ledger entry.
 Open: Coffee's handoff rewrite, which is that agent's. RULES.md there also still claims the model
 toggle needs an exception to a CLAUDE.md pin that #38 removed — stale, flagged, not mine to edit.
 Need from TD: nothing. Joel authorized this directly.
+
+---
+
+## 2026-09-12 18:40 — claim: gate the two open pull requests
+
+Branch reset onto `main` after #41 merged rather than stacked on merged history, so this entry sits
+under the same name on a fresh base. Nothing here is code; it is the ledger, my own handoff, and this
+worklog.
+
+**#42 merged.** Coffee's iOS install. The two claims worth checking were both checkable: the
+middleware matcher really is `/((?!_next/static|_next/image).*)`, so a static-imported icon does land
+outside the gate, and `middleware.ts` is untouched in the diff. Both new binaries scanned for
+metadata — a 180x180 PNG and a 32x32 ico, no text chunks, no author fields. All five matrix jobs
+green on `8aaea373`. It also carried the handoff rewrite #41 asked for, which is the first evidence
+that rule works in the direction intended.
+
+One imperfection noted and not blocked: `app/favicon.ico` is served from a gated route, so signed out
+it answers a redirect rather than an icon. That is still an improvement on the 404 it replaces, and
+the load-bearing icon — `apple-touch-icon` — is correctly static.
+
+**#43 sent back.** TechPad Gen's hub re-theme and `/admin`. The change is good and the base is not:
+behind `main`, conflicted in its own handoff, CI never ran, and both the handoff and the body assert
+production serves `92c1ec1` when `tp-home` has served `f06ff0c` since 03:57 today. I checked that
+against the Vercel account rather than against the ledger, because the ledger asserting a deployment
+state nobody re-verified is one of the two recorded mistakes here.
+
+The conflict is inside their handoff. Resolving it would mean writing their handoff, which #41
+forbids me. So it goes back whole rather than half-fixed — the first live test of that rule, on a
+pull request opened an hour after it landed.
+
+**Raised for Joel, not acted on:** a sixth Vercel project called `tuning`, created 18:02 today and
+not by me. Checked for exposure first, since a repo-root project serving an unprotected page is an
+incident already on the mistakes list — it is behind Vercel SSO with no custom domain, so it is
+contained. Creating a project is still never-without-the-TD, so the question of whose it is goes to
+Joel. Also his: `CLAUDE.md` says `middleware.ts` is byte-identical in five apps and it is three
+distinct versions. The rule holds; the reason printed under it is false.
+
+## 2026-09-12 18:40 — handoff
+Landed: #42 on `main`, #43 sent back with reasoning on the pull request, ledger and TD handoff
+current, ledger numbering fixed where it skipped 2.
+Open: #43 awaiting TechPad Gen. Two questions with Joel — the `tuning` project and the
+`middleware.ts` sentence in `CLAUDE.md`.
+Need from TD: nothing, this is the TD.
