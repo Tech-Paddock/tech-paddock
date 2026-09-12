@@ -127,7 +127,7 @@ phone in a kitchen, so the tool is installed rather than opened in a tab: `apple
 the `apple-mobile-web-app-*` tags, which is all iOS needs. There is deliberately no web app
 manifest. A manifest is fetched without credentials, so the password gate would return the login
 redirect and the install would silently never offer itself; allowing it through means editing
-`middleware.ts`, which is byte-identical in five apps and is not Coffee's to change. If every tool
+`middleware.ts`, which is the password gate and is not Coffee's to change. If every tool
 should be installable, that pattern belongs to TechPad Gen, not here.
 
 The icon is a static import so it is served from `/_next/static`, the one prefix the middleware
@@ -170,8 +170,10 @@ system prompt forbids guessing a roaster from the design or completing a partial
 
 **Never touch:**
 
-- The shared auth plumbing — `lib/auth.ts`, `lib/password.ts`, `middleware.ts`. Byte-identical in
-  five apps; a mismatch fails silently on the other four.
+- The shared auth plumbing — `lib/auth.ts`, `lib/password.ts`, `middleware.ts`. The first two are
+  byte-identical in five apps and a mismatch fails silently on the other four; `middleware.ts` is
+  three deliberate variants, gated because it *is* the password gate — a bad edit publishes an
+  endpoint rather than breaking a login.
 - Any app but `apps/coffee`, or any schema but `coffee`.
 - `CLAUDE.md` or another agent's charter.
 

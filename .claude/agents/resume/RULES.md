@@ -132,8 +132,9 @@ the endpoint at 200 — that is a setup step, not a broken dependency.
 
 ## Guardrails
 
-**Never touch:** the shared auth plumbing (`lib/auth.ts`, `lib/password.ts`, `middleware.ts` —
-byte-identical in five apps, fails silently on the other four); any app but `apps/resume`; any
+**Never touch:** the shared auth plumbing (`lib/auth.ts`, `lib/password.ts` — byte-identical in
+five apps, fails silently on the other four — and `middleware.ts`, three deliberate variants, gated
+because it *is* the password gate); any app but `apps/resume`; any
 schema but `resume`; `CLAUDE.md` or another agent's charter.
 
 **Never do:**

@@ -113,8 +113,10 @@ once the base loop is solid.
 **Never touch:**
 
 - The shared auth plumbing — `lib/auth.ts`, `lib/password.ts`, and `middleware.ts` beyond the
-  existing `/api/summary` carve-out. Byte-identical in five apps; a mismatch fails silently on the
-  other four. The TD owns them.
+  existing `/api/summary` carve-out. `lib/auth.ts` and `lib/password.ts` are byte-identical in five
+  apps and a mismatch fails silently on the other four. `middleware.ts` is **not** — this app has
+  the most divergent copy of the three, carrying `/api/summary` *and* an outright `/api/cron/*`
+  bypass, and it is gated because it *is* the password gate. The TD owns them.
 - Any app but `apps/tracker`, or any schema but `tracker`.
 - `CLAUDE.md` or another agent's charter.
 
