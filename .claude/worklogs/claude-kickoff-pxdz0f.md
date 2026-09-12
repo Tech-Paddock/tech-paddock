@@ -209,3 +209,40 @@ Landed: ledger item closed, Waiting-on-Joel renumbered to four.
 Open: #43 with TechPad Gen, and a new Coffee branch `claude/coffee-surface-library-errors` with no PR
 yet. Nothing waiting on me.
 Need from TD: nothing, this is the TD.
+
+---
+
+## 2026-09-12 20:15 — claim: every pull request opens as a draft
+
+Joel's change. I asked two questions first rather than assuming, because both readings led to
+materially different rules: whether it binds the TD as well, and who performs the promotion. Answers:
+everyone including me, and the agent says it is ready, Joel approves in chat, then it is promoted.
+
+**The second answer has a consequence he did not have to spell out, and I built it in.** Agents cannot
+see each other, and they cannot see Joel's chat. So a pull request that is merely out of draft carries
+no evidence of approval — the next TD session cannot tell an approved promotion from an agent that
+promoted itself. The rule therefore requires the approval be recorded on the pull request, quoting it.
+This follows from something already in the brief: the repo is the only channel. An approval that lives
+only in a conversation did not happen.
+
+**Checked before writing, not assumed:** `ci.yml` triggers on bare `pull_request:` with no `types:`
+filter and nothing anywhere keys on draft state, so drafts get all five matrix jobs. And GitHub's
+merge API refuses a draft outright. That makes this the first rule in `CLAUDE.md` with actual
+enforcement behind it rather than an agent's compliance — the file's closing line says the hooks were
+the only such part, and that is now one item out of date in the right direction.
+
+**Said plainly rather than left implied:** Joel's reason was "so you don't accidentally merge them."
+Today's merges of #42 and #48 were neither accidental nor against the rules — the brief made the TD
+gate and merge, with no approval step available to skip. This adds a checkpoint that did not exist
+rather than repairing one that was ignored. I record that because a rule written against carelessness
+and a rule written to add oversight are different rules, and the second is the one that was asked for.
+
+**This pull request is a draft**, which is the rule applying to itself on the first opportunity, the
+way #41 did. I will not promote it. #43 I converted *to* draft — the safe direction, and not the
+promoting-for-someone-else the rule forbids.
+
+## 2026-09-12 20:15 — handoff
+Landed (pending approval): the draft rule in `CLAUDE.md` Always and Merging, and as the first
+first-order check in the TD charter.
+Open: this PR awaiting Joel's promotion. #43 now a draft with TechPad Gen.
+Need from TD: nothing, this is the TD.

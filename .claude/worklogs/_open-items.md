@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-12 18:40 UTC.**
+**Last reviewed: 2026-09-12 20:15 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -52,6 +52,28 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
+
+- **2026-09-12 — Every pull request now opens as a draft, and Joel promotes it.** His call, and it
+  binds every agent **including the technical director** — his words: "nothing wrong with a sanity
+  check before deployment." The agent says it is ready, Joel approves in chat, and only then is it
+  marked ready for review.
+  **The promotion has to be recorded on the pull request, quoting the approval.** That is the part
+  that makes it work rather than decorative: no agent can see the chat where Joel approved, so a
+  pull request that is merely out of draft is indistinguishable from one an agent promoted itself.
+  This repo is the only channel between agents, so an approval that lives only in a conversation
+  did not happen.
+  **This is the first rule here with real enforcement rather than good intentions.** GitHub refuses
+  to merge a draft outright — checked, and CI still runs all five jobs on drafts, so waiting costs
+  nothing. Until now the file's own closing line was true: every rule was convention except the
+  hooks.
+  For the record, and because it changes what the rule is for rather than excusing anything: today's
+  merges of #42 and #48 were not accidents or rule-breaking — the brief as written made the TD both
+  gate and merge, with no approval step to skip. This adds a step that did not exist; it does not
+  repair one that was ignored. Worth knowing because a rule written to stop carelessness reads
+  differently from one written to add a checkpoint, and this is the second.
+  **#43 converted to draft** — it was open, unapproved and failing the gate, which is exactly the
+  accident this rule removes. Converting toward draft is the safe direction and is not promoting on
+  an author's behalf, which the rule forbids.
 
 - **2026-09-12 — The `tuning` Vercel project is gone. Joel deleted it; verified against the account,
   not taken on report.** Five projects remain — `tp-home`, `tp-message-editor`, `tp-tracker`,

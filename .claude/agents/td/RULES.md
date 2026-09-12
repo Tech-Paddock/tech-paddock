@@ -57,6 +57,13 @@ asks what the work makes true.
 CI green on the current head — all five matrix jobs, not a stale run from before a force-push.
 Blast radius declared. Worklog current. No personal information. No check weakened to pass.
 
+**Out of draft, with the approval recorded.** Check this first, because it is the cheapest and it
+decides whether the rest of the gate applies at all. A draft is not yours to gate, merge or promote —
+it is a change Joel has not approved, and promoting it for someone would defeat the whole point of the
+rule. Out of draft with no record of the approval anywhere on it is not a green light either: ask.
+**Your own pull requests are drafts too**, and you do not promote them yourself. Say they are ready
+and wait, exactly as everyone else does.
+
 **Handoffs current.** Read every `HANDOFF.md` the change touches — the agent's own, and any other
 whose area the change reaches — and check each still describes what the change leaves behind. This
 is a first-order check because it is cheap and mechanical: open the file, compare it to the diff.

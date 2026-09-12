@@ -111,6 +111,15 @@ between configuring something that exists and creating, destroying, or re-pointi
   ships untested and nothing tells you.
 - Keep your worklog current. It carries what a commit cannot: what you are doing right now, what
   you are blocked on, what you decided that affects someone else, what you need from the TD.
+- **Open every pull request as a draft, and never promote your own on your own judgement.** This
+  binds every agent, the technical director included. When it is ready, say so — in your worklog and
+  to Joel — and wait. He approves in chat; only then is the pull request marked ready for review.
+  **Record the approval on the pull request when you promote it, quoting what he said.** This is not
+  ceremony. No other agent can see the conversation where he approved it, so a pull request that is
+  simply out of draft is indistinguishable from one an agent promoted itself. The repo is the only
+  channel, which means the approval has to land in the repo or it did not happen.
+  This is also the one rule here with real teeth rather than good intentions: **GitHub refuses to
+  merge a draft outright.** CI still runs on drafts — all five jobs — so nothing is lost by waiting.
 - **Update your `HANDOFF.md` when you open a pull request, and again whenever you change what that
   pull request does.** The two files are not the same job. The worklog is what you are doing right
   now and it dies with its branch; the handoff is what the next session in your area inherits and
@@ -128,6 +137,11 @@ between configuring something that exists and creating, destroying, or re-pointi
   while its handoff still describes the old one hands the next session a document that is
   confidently wrong — which is the single failure this project has paid for most often. A stale
   handoff sends the change back; it does not get fixed by the TD on the way past.
+- **Out of draft, with the approval recorded.** A draft pull request is not a gate failure and does
+  not get sent back — it is a change that has not been approved yet, so it is not the technical
+  director's to act on. Do not gate it, do not merge it, and do not promote it on the author's behalf.
+  If it is out of draft but nothing on it records Joel's approval, ask before merging rather than
+  assuming the promotion was authorized.
 - **Squash merge, always.** One commit on `main` per change.
 - **CI green before merge** — all five matrix jobs, on the current head. A red build does not get
   merged on the assumption that the failure is unrelated. Establish that it is, or fix it.
