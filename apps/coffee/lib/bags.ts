@@ -8,7 +8,7 @@ import { getServiceClient } from "./supabase";
  * constraint.
  */
 export async function findPreviousBag(roaster: string, coffeeName: string) {
-  const { data } = await getServiceClient()
+  const { data, error } = await getServiceClient()
     .from("bags")
     .select("id, my_method, my_grinder, my_grind_setting, created_at")
     .ilike("roaster", roaster)
@@ -17,6 +17,10 @@ export async function findPreviousBag(roaster: string, coffeeName: string) {
     .limit(1)
     .maybeSingle();
 
+  // "No previous purchase" and "the lookup failed" are both a null row, and
+  // only one of them is an answer. Swallowing the error made an unreachable
+  // database look like a first-time coffee.
+  if (error) throw new LookupError(`Couldn't check for a previous purchase: ${error.message}`);
   if (!data) return null;
   // Only the dial-in carries over. A rating or tasting note describes a lot
   // you have actually drunk, and this bag is not that lot.
@@ -33,7 +37,7 @@ export async function findPreviousBag(roaster: string, coffeeName: string) {
  * roaster's name is exactly the kind of invention this tool refuses.
  */
 export async function findRoasterDomain(roaster: string): Promise<string | null> {
-  const { data } = await getServiceClient()
+  const { data, error } = await getServiceClient()
     .from("bags")
     .select("product_url, guide_url")
     .ilike("roaster", roaster)
@@ -42,7 +46,20 @@ export async function findRoasterDomain(roaster: string): Promise<string | null>
     .limit(1)
     .maybeSingle();
 
+  // A failed lookup is not the same as a roaster we have never seen. Both
+  // leave the search unpinned, but the second is the documented first-search
+  // behaviour and the first is a broken database worth stopping for.
+  if (error) throw new LookupError(`Couldn't look up a verified domain for ${roaster}: ${error.message}`);
+
   return hostOf(data?.product_url) ?? hostOf(data?.guide_url);
+}
+
+/** A library lookup that could not be answered, as against one that answered "no". */
+export class LookupError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LookupError";
+  }
 }
 
 export function hostOf(url: string | null | undefined): string | null {
