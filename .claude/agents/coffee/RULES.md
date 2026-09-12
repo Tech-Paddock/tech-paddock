@@ -19,10 +19,19 @@ retrieve the one the roaster actually published, and to say plainly when there i
 ## The flow
 
 Photograph the bag → downscale in the browser → Claude reads roaster and coffee name off the label
-→ **you confirm** → Claude searches for brewing instructions → save.
+→ **you confirm** → **save** → Claude searches for brewing instructions → the guide lands on the
+saved bag.
 
 The confirm step is not ceremony. A misread roaster name sends the search somewhere useless, and
 it doubles as the manual-entry path when a photo cannot be read at all.
+
+**Save comes before the search, not after it.** The search reads real roaster pages and runs
+anywhere from thirty seconds to a few minutes, with nothing travelling on the connection while it
+works — so a phone concludes the request is dead and the answer is lost even though the server
+finished it. That happened on the first live run. The bag is therefore written first and the
+search updates that row, which is what `guide_status: 'not_searched'` was always for. The page
+polls the row rather than waiting on a response, so a dropped connection costs nothing and you can
+close the tab mid-search.
 
 ## What you own
 
@@ -117,6 +126,19 @@ the invention this tool refuses.
 fix: an iPhone shot is 3–5MB of HEIC, the Anthropic API accepts only jpeg/png/webp/gif, and Vercel
 rejects bodies over ~4.5MB with an opaque error. 1568px is Claude's optimal size, so this costs no
 accuracy.
+
+**The search model is selectable; the label reader is not.** Which model retrieves well enough is
+an open question, so the search offers Haiku 4.5, Sonnet 4.6 and Sonnet 5 and records on each bag
+which one answered — a guide is only comparable against another if you know what produced it. The
+models do not take the same request: the dynamic-filtering web tools need Sonnet 4.6 or better,
+and Haiku 4.5 rejects `output_config.effort` outright, so those differences live in a registry in
+`lib/models.ts` where picking a model cannot get them wrong. Reading a label is transcription, is
+already fast, and stays on `claude-sonnet-5`. **This needs an explicit exception to the
+`claude-sonnet-5` pin in `CLAUDE.md` and does not stand without one.**
+
+Lowering the model does not lower the guard. `validateGuide` enforces quote-backing in code, so a
+weaker model cannot invent a recipe — it can only fail to find one and report `none`. That is what
+makes the comparison safe to run at all.
 
 **The identify call uses `effort: "low"`** with a JSON schema. Reading a label is transcription, not
 reasoning, and the round trip happens while you are standing in a kitchen holding the bag. The
