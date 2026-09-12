@@ -68,18 +68,24 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
 
-- **2026-09-12 — `CLAUDE.md` now says the browser is Chrome, and that Safari is not an
-  explanation.** Joel asked for it directly. Written as a diagnosis rule rather than a word ban,
-  because a blanket ban would have caused a bug: on iOS every browser is WebKit, Chrome included, so
-  the `<img>` decode fallback in `apps/coffee/lib/image.ts` protects the phone Joel actually uses —
-  an agent told only "we use Chrome" would delete it as dead code. The note names that and the iOS
-  home-screen install as the two places the platform forces WebKit, and forbids Safari everywhere
-  else.
+- **2026-09-12 — `CLAUDE.md` now says Chrome is the default and Safari is a utility.** Joel asked
+  for a browser note, then amended it the same hour once the consequence surfaced: **Chrome is the
+  default, on desktop and phone; Safari is a utility browser, used only where Chrome cannot do the
+  job.** Safari is still never the explanation for a bug — reports come from Chrome unless stated,
+  and the mobile login bug already lost a round to an ITP theory about a browser that was not in the
+  loop.
+  Written as a diagnosis rule rather than a word ban, because a ban would have caused a bug: on iOS
+  every browser is WebKit, Chrome included, so the `<img>` decode fallback in
+  `apps/coffee/lib/image.ts` protects the phone Joel actually uses, and an agent told only "we use
+  Chrome" would have deleted it as dead code.
+  **This also settles #42.** Installing Coffee through Safari is the intended path, not a defect —
+  iOS allows no other route to a standalone home-screen app. The rule says so explicitly, and says
+  it is *not* grounds for adding a manifest to make apps Chrome-installable, because that means
+  editing `middleware.ts` — five copies, TechPad Gen's call.
   **Two stale references left for their owners.** `.claude/agents/techpad-gen/HANDOFF.md` still
   carries the Safari/ITP theory for the mobile bug — that file is the open conflict in #43 and is
   theirs to rewrite. `apps/coffee/app/globals.css` has a comment reading "In Safari these insets are
   zero", which is true of any browser tab and should say so; Coffee's to fix, cosmetic, not urgent.
-
 - **2026-09-12 — #42 merged: Coffee installs on the iPhone home screen.** `apple-touch-icon` and
   the `apple-mobile-web-app-*` tags, safe-area insets, a favicon. Deliberately iOS-only: a manifest
   is fetched without credentials, so the gate returns the login redirect and the install silently
