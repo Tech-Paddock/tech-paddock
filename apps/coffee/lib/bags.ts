@@ -103,3 +103,25 @@ export function guideColumns(guide: Guide | null, model: string | null = null, e
     guide_effort: answered ? effort : null,
   };
 }
+
+/**
+ * A library search term as a PostgREST `ilike` pattern.
+ *
+ * The term goes into an `or=(...)` filter, where a comma separates terms and
+ * parentheses group them. So an unescaped comma in "Sweet Bloom, Colombia"
+ * does not search for a comma — it produces a malformed filter, a Postgres
+ * error, and a 500 on a query that looks perfectly reasonable to type.
+ *
+ * The fix is PostgREST's own: wrap the value in double quotes, which makes its
+ * delimiters ordinary characters, and escape what quoting cannot cover.
+ */
+export function searchPattern(q: string): string {
+  const escaped = q
+    // Backslash first, or it doubles the escapes added below.
+    .replace(/\\/g, "\\\\")
+    // Would otherwise close the quoted value early.
+    .replace(/"/g, '\\"')
+    // % and _ are LIKE wildcards; PostgREST maps * onto % as well.
+    .replace(/[%_*]/g, (m) => `\\${m}`);
+  return `"%${escaped}%"`;
+}

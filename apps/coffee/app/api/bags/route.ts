@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { uploadPhoto, signedPhotoUrl, StorageError, IMAGE_TYPES } from "@/lib/storage";
 import { isBrewMethod } from "@/lib/methods";
-import { findPreviousBag, guideColumns } from "@/lib/bags";
+import { findPreviousBag, guideColumns, searchPattern } from "@/lib/bags";
 import type { Guide } from "@/lib/guide";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabase.from("bags").select("*").order("created_at", { ascending: false });
   if (q) {
-    const like = `%${q.replace(/[%_]/g, (m) => `\\${m}`)}%`;
+    const like = searchPattern(q);
     query = query.or(
       ["roaster", "coffee_name", "origin", "process", "varietal", "my_notes"]
         .map((c) => `${c}.ilike.${like}`)

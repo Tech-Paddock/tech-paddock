@@ -68,6 +68,18 @@ of three.
 
 ## In flight
 
+**Library load failures are now visible (branch `claude/coffee-surface-library-errors`).** The
+library tab rendered "No bags yet. Scan one." whenever `GET /api/bags` failed, because the loader
+only assigned on `res.ok` and silently kept an empty list — a confident statement about data it had
+never read. Joel hit it with two bags saved. It also fixes the cause: a search term went into a
+PostgREST `or=(...)` filter unquoted, so a comma in "Sweet Bloom, Colombia" started a new filter
+term rather than being searched for, and returned a 500.
+
+**This is the same defect three times in one app** — `findPreviousBag`, `findRoasterDomain`, and now
+the library loader all turned a failure into a plausible empty answer. If you are adding a read
+path here, that is the thing to check first: an empty result and an unread result must not render
+the same.
+
 **#42 — installable on the iPhone home screen.** Add to Home Screen in Safari gives it an icon,
 full screen and no browser chrome. An installed iOS app has **its own cookie jar**, so signing in
 once inside it is expected rather than a session bug, and it is reached directly rather than
