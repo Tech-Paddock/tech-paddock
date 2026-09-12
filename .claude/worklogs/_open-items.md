@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-11 23:45 UTC.**
+**Last reviewed: 2026-09-12 00:11 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -15,26 +15,37 @@ and the things that belong to nobody else.
 
 ## Blocking everything else
 
-- **2026-09-11 — PRODUCTION HAS NOT DEPLOYED SINCE 17:48.** Every app serves commit `92c1ec1`, and
-  everything merged since is undeployed — the count only grows, so check the commit rather than a
-  number. Verified at 23:45: zero deployments on **any** of the five projects since 17:54, across
-  three merged pull requests. Cause: Vercel's GitHub App lost
-  its installation when the repo was transferred to the org and back — a GitHub App is installed on
-  an *account*, not a repository. Pushes succeed, CI runs, Vercel never hears. Ruled out: the Hobby
-  daily deploy cap (no banner) and `git.deploymentEnabled` (set in none of the five `vercel.json`).
-  **Fix is Joel's:** `github.com/settings/installations` → Vercel → confirm `tech-paddock` is in its
-  repository list. Then a *new push* against current `main` — not the dashboard Redeploy button,
-  which rebuilds the stale commit. Evidence and timestamps in `.claude/agents/platform/HANDOFF.md`.
-  **Until this is fixed, nothing can be verified on a live URL.** What is deployed is not what is on
-  `main`.
+- **2026-09-11 — PRODUCTION HAS NOT DEPLOYED SINCE 17:48** (updated 2026-09-12). Every app serves
+  commit `92c1ec1`, and everything merged since is undeployed — the count only grows, so check the
+  commit rather than a number. Verified at 23:45 and again at 23:58: zero deployments on **any** of
+  the five projects since 17:54. Cause: Vercel's GitHub App lost its installation when the repo was
+  transferred — a GitHub App is installed on an *account*, not a repository. Pushes succeed, CI runs,
+  Vercel never hears. Ruled out, read from the files rather than from a summary of them: the Hobby
+  daily deploy cap (no banner), and both `git.deploymentEnabled` and the legacy `github.enabled` —
+  neither appears in any of the five `vercel.json`, and there is no root `vercel.json`.
+  **The repo is owned by the `Tech-Paddock` org right now** — id `1358809705`, owner type
+  Organization — so the installation belongs on the *org*:
+  `github.com/organizations/Tech-Paddock/settings/installations`. An earlier version of this entry
+  sent people to `github.com/settings/installations`, which is the personal account and cannot reach
+  an org-owned repo. **Joel installed it on the org on 2026-09-12.**
+  What remains is a *new push* against current `main` — not the dashboard Redeploy button, which
+  rebuilds the stale commit. All five projects still record `link.org: "joelb-401"`; whether that
+  re-resolves by repo id or needs five disconnect/reconnects is unknown until a push is tried.
+  Evidence and timestamps in `.claude/agents/platform/HANDOFF.md`.
+  **Until a push actually deploys, nothing can be verified on a live URL.** What is deployed is not
+  what is on `main`.
 
 ## Waiting on Joel
 
 1. **2026-09-11 — Finish `tp-coffee-app`. Partly done as of 23:31.** The project's `updatedAt` moved,
    so something was changed, but two settings are verifiably still outstanding: **framework preset is
-   still `null`** and **`coffee.techpaddock.io` is not in its domain list**. Root Directory and the
-   five environment variables are not exposed by the Vercel API, so they cannot be confirmed from a
-   session either way — `GET /api/health` on the deployed app is the way to check them.
+   still `null`** and **`coffee.techpaddock.io` is not in its domain list**. **Root Directory is also
+   wrong** — verified 2026-09-12 from the build log, which is a check earlier entries wrongly called
+   impossible: the project built the repo root in 310ms and prepared no files, where `tp-home` on the
+   same push installed 31 packages and ran `next build`. It must be `apps/coffee`, and it only takes
+   effect on the next build. The framework preset is near-cosmetic by comparison, since
+   `apps/coffee/vercel.json` already declares `nextjs`. The five environment variables remain
+   API-invisible; `GET /api/health` on the deployed app is the way to check those.
    **The Cloudflare DNS is already done**: `coffee.techpaddock.io` has a real A record at
    `76.76.21.21`, confirmed not a wildcard because a nonsense subdomain on the same zone does not
    resolve. Only the Vercel-side attachment remains.
@@ -48,7 +59,16 @@ and the things that belong to nobody else.
 3. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
    `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
    will tell you they are doing nothing. Needs a one-time Azure registration against a personal
-   Microsoft account.
+   Microsoft account — the `consumers` authority, scopes `offline_access Calendars.Read
+   Tasks.ReadWrite`, and one by-hand authorization-code exchange to mint the refresh token, since the
+   code only ever does `grant_type=refresh_token`.
+   **Order matters, and it is a trap** (found 2026-09-12 by reading the route). The tracker's
+   middleware exempts `/api/cron/*` from the password gate outright, and the route guards itself with
+   `if (secret && ...)` — which fails **open** when `CRON_SECRET` is unset. That is harmless today
+   only because `graphConfigured()` is false and the route answers "Outlook is not connected". Set
+   the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
+   endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
+   first, or in the same save. Never after.**
 4. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
    jobs; the rule names four.
 5. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
@@ -129,8 +149,10 @@ running session. Then move. In that order.
 
 Rules in `CLAUDE.md` are written, not enforced. Only three things enforce:
 
-1. **Branch protection** — configured, but probably inert while the repo sits on a personal account.
-   **Assume `main` is unprotected.**
+1. **Branch protection** — the GitHub API now reports `main` as `protected: true`, checked
+   2026-09-12. That supersedes the previous standing instruction to assume it is inert. No agent can
+   read rulesets, so *which* checks are required is still unverifiable from a session — including
+   whether `build (coffee)` is among them.
 2. **CI** — five matrix jobs. Hardcoded; a sixth app is silently untested until added.
 3. **Hooks** — three in `.claude/settings.json`, currently doing the real work. `SessionStart`
    prints this ledger into every session; two `PreToolUse` guards refuse a push to `main` and refuse
