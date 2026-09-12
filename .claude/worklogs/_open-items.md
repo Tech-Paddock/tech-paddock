@@ -65,6 +65,17 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
 
+- **2026-09-12 — Merge order is now a gate check, and it had a live case the hour it was written.**
+  Joel's addition. When more than one change is mergeable the order is a decision even if nobody makes
+  it, and the default — whichever got gated first — is the one with no reasoning behind it. Four
+  failure modes, each with a case this project already produced: a rule change invalidating pull
+  requests already open, two branches on one file, a correction others are waiting on, and a merge that
+  turns another pull request red.
+  **The live case: #43 and the `requested-by-joel` rule.** #43 was opened before that rule existed and
+  its body carries no request line, so merging the rule first turns an in-flight pull request red for a
+  rule that did not exist when it was written — which reads as the author's mistake. **So #43 merges
+  first.** Recorded here rather than only decided, which is the point of the check.
+
 - **2026-09-12 — Agents commit and push. A pull request exists only when Joel asks for one.**
   His call, arrived at over three passes in one evening: first every pull request as a draft, then no
   agent promoting its own, then this — which replaces both. **The checkpoint moved earlier.** Rather

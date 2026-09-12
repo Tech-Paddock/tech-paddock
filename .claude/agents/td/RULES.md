@@ -57,6 +57,26 @@ asks what the work makes true.
 CI green on the current head — all five matrix jobs, not a stale run from before a force-push.
 Blast radius declared. Worklog current. No personal information. No check weakened to pass.
 
+**Merge order, when more than one thing is mergeable.** Decide it before merging any of them, and
+record it. Order is a decision even when nobody makes it, and the default — whichever you happened to
+gate first — is the one with no reasoning behind it.
+
+What to look for, each with a case this project has already produced:
+
+- **A rule or format change invalidates pull requests already open.** `requested-by-joel` and #43:
+  merging the rule first would have turned an in-flight pull request red for a rule that did not exist
+  when it was opened. Merge the rule after them, or grandfather them in writing. Retroactively failing
+  somebody's finished work is the worst of the four because it looks like their mistake.
+- **Two branches on one file.** #39 and #40 both touched `bags.test.ts`; whoever merged second paid
+  the conflict. Let that fall on the branch still being worked, not the one that is finished.
+- **A correction others are waiting on goes first.** #47 corrected `middleware.ts` in the brief;
+  every branch opened after it inherited the truth instead of rediscovering it.
+- **A merge that turns another open pull request red.** Say so before merging, on the pull request it
+  affects. Finding out from a red check is finding out from the worst possible source.
+
+Then re-gate what is left. After a merge the others are behind, and a gate result taken before it is
+stale — #48 was clean, then needed its branch updated once #42 landed.
+
 **The request recorded, and the deployment steps stated.** Check this first, because it is the
 cheapest and it decides whether the rest of the gate applies at all. A pull request exists only
 because Joel asked for one, and its body has to say so — `requested-by-joel` is red if it does not.

@@ -382,3 +382,38 @@ hooks removed.
 Open: this branch awaiting Joel's decision to have a pull request opened. #43 with TechPad Gen — it is
 a draft, which under this rule is simply a pull request that exists; its three blockers are unchanged.
 Need from TD: nothing, this is the TD.
+
+## 2026-09-12 22:00 — merge order as a gate check, with its own live case
+
+Joel's addition, and a good one: consider merge order when several merges are on the table. Written
+with four failure modes rather than as a principle, because "consider the order" without cases is
+advice nobody acts on.
+
+**It had a live instance within the hour, which is why the rule earns its place.** #43 is now clean and
+green — TechPad Gen brought `main` in, and all five matrix jobs passed on `8cf161f`, the first time CI
+has ever run on that branch. Its body carries no `Requested by Joel` line, because it was opened days
+before that rule existed. So merging my rule branch first would turn a finished, in-flight pull request
+red for a rule that did not exist when it was written — and a retroactive failure reads as the author's
+mistake, not the rule's.
+
+**Order: #43 first, then this branch.** Recorded rather than merely decided.
+
+Checked rather than assumed that the order is otherwise free: #43 touches `apps/home` plus its own
+handoff and worklog; this branch touches `CLAUDE.md`, the TD charter, `settings.json`, two workflows,
+the ledger and this worklog. No overlap, so nothing conflicts in either direction — the ordering is
+purely about who gets failed by a rule they never saw.
+
+**TechPad Gen corrected me and is right, recorded because it should not be silent.** I had suggested
+`/admin` was the tool for deriving which commit production serves. It is not: the page names that as an
+explicit blind spot, because Vercel exposes the deployed SHA to an app but never to a sibling. The
+Vercel API answers it, which is what they used. Their handling of the original error is also better than
+what I asked for — four documents each named a different production commit, every one correct when
+written, so rather than writing a fifth they recorded **where the answer is derivable**. That is the
+right fix and I would not have specified it.
+
+## 2026-09-12 22:00 — handoff
+Landed on the branch, still no pull request: the merge-order check in `CLAUDE.md` Merging and in the TD
+charter, above the request/deployment check so it is read first.
+Open: this branch awaiting Joel's decision to have a pull request opened, and it merges **after** #43.
+#43 itself is gate-clean and awaiting his word.
+Need from TD: nothing, this is the TD.

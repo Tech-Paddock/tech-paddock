@@ -170,6 +170,18 @@ between configuring something that exists and creating, destroying, or re-pointi
   ask him rather than merging, because the alternative is a pull request nobody asked for going live.
   Check the **Deployment** section is filled in too. Merging is not deploying, and a change that
   merges green and never becomes real is the most repeated failure in this project's history.
+- **Decide the order when more than one change is mergeable, before merging any of them.** Order is
+  a decision even when nobody makes it, and the one nobody makes is usually wrong. Say what the order
+  is and why, in the ledger.
+  Four ways it bites. **A rule or format change invalidates pull requests already open** — merge it
+  after them, or grandfather them explicitly, because landing it first makes finished work fail a
+  check for a rule that did not exist when it was written. **Two branches touching one file** — the
+  second to merge pays the conflict, so let it fall on the branch still being worked rather than the
+  one that is done. **A correction others are waiting on goes first**, so they inherit it instead of
+  each rediscovering it. And **a merge that turns another open pull request red** is said out loud
+  before, not explained after.
+  After each merge the rest are behind. Re-check them; do not merge a second change on a gate result
+  taken before the first.
 - **Squash merge, always.** One commit on `main` per change.
 - **CI green before merge** — all five matrix jobs, on the current head. A red build does not get
   merged on the assumption that the failure is unrelated. Establish that it is, or fix it.
