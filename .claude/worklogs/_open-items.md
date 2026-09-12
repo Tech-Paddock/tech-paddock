@@ -46,8 +46,13 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
    endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
    first, or in the same save. Never after.**
-3. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
-   jobs; the rule names four.
+3. **2026-09-11 — Add `build (coffee)` and `Promotion / approval-recorded` to branch protection's
+   required checks.** The matrix is five jobs and the rule names four — confirmed today the hard way,
+   when #48's merge was refused with "4 of 4 required status checks are expected", so `build (coffee)`
+   is currently protecting nothing.
+   `Promotion / approval-recorded` is new in the same change as this note. It fails a pull request
+   promoted without your approval recorded on it, but **a failing check only blocks a merge if it is
+   required** — until you add it, it is a red X the technical director reads rather than a gate.
 4. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
@@ -57,15 +62,22 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
   binds every agent **including the technical director** — his words: "nothing wrong with a sanity
   check before deployment." The agent says it is ready, Joel approves in chat, and only then is it
   marked ready for review.
-  **The promotion has to be recorded on the pull request, quoting the approval.** That is the part
-  that makes it work rather than decorative: no agent can see the chat where Joel approved, so a
-  pull request that is merely out of draft is indistinguishable from one an agent promoted itself.
-  This repo is the only channel between agents, so an approval that lives only in a conversation
-  did not happen.
-  **This is the first rule here with real enforcement rather than good intentions.** GitHub refuses
-  to merge a draft outright — checked, and CI still runs all five jobs on drafts, so waiting costs
-  nothing. Until now the file's own closing line was true: every rule was convention except the
-  hooks.
+  **Agents promote their own**, and post the approval note first: one line reading
+  `Approved by Joel on YYYY-MM-DD — "what he said"` in a comment on the pull request.
+  That note is the part that makes it work rather than decorative: no agent can see the chat where
+  Joel approved, so a pull request merely out of draft is indistinguishable from one an agent
+  promoted itself. This repo is the only channel between agents, so an approval living only in a
+  conversation did not happen.
+  **And the note is checked, not trusted.** `.github/workflows/promotion.yml` fails a promoted pull
+  request that carries no note. A draft passes trivially; a comment posted late heals the check
+  rather than leaving it red. Its one honest limit: every agent comments as the same GitHub account,
+  so it catches an approval somebody forgot to get, never one they invented. That residue closes by
+  honesty and is not worth machinery here.
+  **So enforcement went from one mechanism to four** — branch protection, the hooks, GitHub refusing
+  to merge a draft, and this check. The file's closing line said the hooks were the only part not
+  depending on an agent choosing to comply; it is corrected in the same change.
+  **A promoted pull request with no note is not a question.** The TD converts it back to draft and
+  says why, rather than asking — the check has already made the decision.
   **#43 converted to draft** — it was open, unapproved and failing the gate, which is exactly the
   accident this rule removes. Converting toward draft is the safe direction and is not promoting on
   an author's behalf, which the rule forbids.

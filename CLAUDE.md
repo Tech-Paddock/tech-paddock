@@ -111,15 +111,28 @@ between configuring something that exists and creating, destroying, or re-pointi
   ships untested and nothing tells you.
 - Keep your worklog current. It carries what a commit cannot: what you are doing right now, what
   you are blocked on, what you decided that affects someone else, what you need from the TD.
-- **Open every pull request as a draft, and never promote your own on your own judgement.** This
-  binds every agent, the technical director included. When it is ready, say so — in your worklog and
-  to Joel — and wait. He approves in chat; only then is the pull request marked ready for review.
-  **Record the approval on the pull request when you promote it, quoting what he said.** This is not
-  ceremony. No other agent can see the conversation where he approved it, so a pull request that is
-  simply out of draft is indistinguishable from one an agent promoted itself. The repo is the only
-  channel, which means the approval has to land in the repo or it did not happen.
-  This is also the one rule here with real teeth rather than good intentions: **GitHub refuses to
-  merge a draft outright.** CI still runs on drafts — all five jobs — so nothing is lost by waiting.
+- **Open every pull request as a draft.** This binds every agent, the technical director included.
+  When it is ready, say so — in your worklog and to Joel — and wait. He approves in chat. CI runs on
+  drafts, all five jobs, so nothing is lost by waiting.
+  **Then promote it yourself — but post the approval note first.** One line, in a comment on the
+  pull request:
+
+  ```
+  Approved by Joel on YYYY-MM-DD — "what he said"
+  ```
+
+  Note, then promote, in that order. The check below reads the note when the pull request is
+  promoted, so promoting first leaves it red until the note lands.
+  The note is not for Joel's benefit and it is not ceremony. **No other agent can see the
+  conversation where he approved it**, so a pull request that is merely out of draft is
+  indistinguishable from one an agent promoted on its own initiative. The repo is the only channel
+  between agents, which means the approval lands in the repo or it did not happen.
+  **What is enforced, and what is not.** Two things hold without anyone choosing to comply: GitHub
+  refuses to merge a draft outright, and `Promotion / approval-recorded` fails on a promoted pull
+  request with no note. What no check can see is whether the quote is real — every agent comments as
+  the same GitHub account, so authorship proves nothing. It catches the approval you forgot to get,
+  not one you invented. That last gap closes by someone being honest, and there is no machinery for
+  it worth building here.
 - **Update your `HANDOFF.md` when you open a pull request, and again whenever you change what that
   pull request does.** The two files are not the same job. The worklog is what you are doing right
   now and it dies with its branch; the handoff is what the next session in your area inherits and
@@ -137,11 +150,12 @@ between configuring something that exists and creating, destroying, or re-pointi
   while its handoff still describes the old one hands the next session a document that is
   confidently wrong — which is the single failure this project has paid for most often. A stale
   handoff sends the change back; it does not get fixed by the TD on the way past.
-- **Out of draft, with the approval recorded.** A draft pull request is not a gate failure and does
-  not get sent back — it is a change that has not been approved yet, so it is not the technical
-  director's to act on. Do not gate it, do not merge it, and do not promote it on the author's behalf.
-  If it is out of draft but nothing on it records Joel's approval, ask before merging rather than
-  assuming the promotion was authorized.
+- **Out of draft, with the approval note present.** A draft is not a gate failure and does not get
+  sent back — it is a change Joel has not approved yet, so it is not the technical director's to act
+  on. Do not gate it, do not merge it, and never promote it for its author.
+  Out of draft with no approval note is different, and it has a defined answer rather than a
+  judgement call: **convert it back to draft and say why.** Demoting is the safe direction, the fix
+  is one line for whoever promoted it, and `Promotion / approval-recorded` will already be red.
 - **Squash merge, always.** One commit on `main` per change.
 - **CI green before merge** — all five matrix jobs, on the current head. A red build does not get
   merged on the assumption that the failure is unrelated. Establish that it is, or fix it.
@@ -267,6 +281,8 @@ committing names, and sixteen merge commits from a single reused branch — fift
 several merged within ten seconds of opening, far too fast for CI to have reported. The gate
 existed and was walked straight through.
 
-Until `main` is protected in the GitHub UI, every rule here is convention rather than enforcement.
-The `.claude/settings.json` hooks are the only part that does not depend on an agent choosing to
-comply.
+Most rules here are convention: they hold because an agent chooses to comply. Four things do not.
+`main` is protected in the GitHub UI. The `.claude/settings.json` hooks run whether or not anyone
+wants them to. GitHub refuses to merge a draft pull request outright. And
+`Promotion / approval-recorded` fails a pull request promoted without Joel's approval recorded on it.
+Everything else is a convention that has held so far, which is not the same thing.

@@ -240,3 +240,48 @@ Landed (pending approval): the draft rule in `CLAUDE.md` Always and Merging, and
 first-order check in the TD charter.
 Open: this PR awaiting Joel's promotion. #43 now a draft with TechPad Gen.
 Need from TD: nothing, this is the TD.
+
+## 2026-09-12 20:45 — fill the enforcement gap, and let agents promote their own
+
+Joel: "Fill the gap. Write it so that they can promote their own." Those go together — self-promotion
+is only safe if the record is checked by something other than an agent's good intentions.
+
+**The gap, precisely.** GitHub refuses to merge a draft, which is real enforcement. Nothing stopped an
+agent promoting its own pull request and asserting an approval that never happened. The note I had
+already required was convention, in the same class as everything else here.
+
+**The fill is a check, not a prohibition.** `.github/workflows/promotion.yml` reads the pull request on
+promotion and fails it if no comment carries
+`Approved by Joel on YYYY-MM-DD — "what he said"`. Server-side, so it does not depend on compliance.
+
+Built and tested rather than written and hoped:
+
+- YAML parses; the `on:` key becomes boolean `True`, which is the usual gotcha and is what `ci.yml`
+  already does, so it is fine.
+- The inline script is valid as `github-script` wraps it — `node --check` rejects it bare because of
+  top-level `await`, which is a property of the checker, not the script.
+- The regex was run against eight cases: em dash, en dash and hyphen all pass, a note buried
+  mid-comment passes, and missing date, missing quote, empty quote and plain prose all fail.
+- The four logic paths were dry-run against fake payloads: draft passes, promoted-without-note fails,
+  promoted-with-note passes, comment-on-a-plain-issue is ignored.
+- `issue_comment` is a trigger so a note posted after promotion heals the check instead of leaving it
+  stuck red.
+
+**Its one honest limit, written into the file and the rule rather than buried.** Every agent comments
+as the same GitHub account, so authorship proves nothing. The check catches an approval somebody forgot
+to get, never one they invented. I did not pretend otherwise, and there is no machinery worth building
+for the difference in a single-user project.
+
+**A consequence for Joel's list:** a failing check only blocks a merge if it is required, and branch
+protection currently names four of five. So this is a red X the TD reads until he adds it — recorded
+alongside `build (coffee)`, which today proved it is protecting nothing when #48's merge was refused
+with "4 of 4 required status checks are expected".
+
+**Also corrected the file's closing line**, which claimed the hooks were the only enforcement. That was
+true when written and is now wrong in four places rather than one.
+
+## 2026-09-12 20:45 — handoff
+Landed (pending approval): self-promotion with a mandatory note, the check that verifies it, the
+matching TD gate action of demoting rather than asking, and a corrected enforcement summary.
+Open: this PR still a draft awaiting Joel. #43 draft with TechPad Gen.
+Need from TD: nothing, this is the TD.

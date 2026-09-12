@@ -57,12 +57,15 @@ asks what the work makes true.
 CI green on the current head — all five matrix jobs, not a stale run from before a force-push.
 Blast radius declared. Worklog current. No personal information. No check weakened to pass.
 
-**Out of draft, with the approval recorded.** Check this first, because it is the cheapest and it
-decides whether the rest of the gate applies at all. A draft is not yours to gate, merge or promote —
-it is a change Joel has not approved, and promoting it for someone would defeat the whole point of the
-rule. Out of draft with no record of the approval anywhere on it is not a green light either: ask.
-**Your own pull requests are drafts too**, and you do not promote them yourself. Say they are ready
-and wait, exactly as everyone else does.
+**Out of draft, with the approval note present.** Check this first, because it is the cheapest and
+it decides whether the rest of the gate applies at all. A draft is not yours to gate, merge or
+promote — it is a change Joel has not approved, and promoting it for someone would defeat the point
+of the rule.
+Out of draft with no note is not a green light and not a question: **convert it back to draft and say
+why.** `Promotion / approval-recorded` will already be red, so you are recording a decision the check
+has made rather than making one.
+**Your own pull requests are drafts too.** You promote them yourself once Joel approves, note first,
+exactly as everyone else does — the rule has no exemption for the agent that enforces it.
 
 **Handoffs current.** Read every `HANDOFF.md` the change touches — the agent's own, and any other
 whose area the change reaches — and check each still describes what the change leaves behind. This
