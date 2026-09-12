@@ -188,3 +188,24 @@ kickoffs; ledger item closed and the two stale ledger references fixed.
 Open: #43 still with TechPad Gen. One question with Joel — the `tuning` project, which he has said he
 will delete.
 Need from TD: nothing, this is the TD.
+
+---
+
+## 2026-09-12 20:00 — claim: close the tuning project item
+
+Joel deleted it. Verified against the Vercel account rather than recorded on his word — five projects
+remain, all `tp-` prefixed, and every one still reads `link.org: "Tech-Paddock"`, so the re-linking
+that closed this morning's deploy outage is still holding. That second fact is the one worth having
+checked; the deletion was never in doubt.
+
+Kept the exposure finding in the Done entry rather than deleting it with the item. The next unexplained
+project is the case it is for: check SSO coverage and custom domains first, because the recorded
+incident here is a project pointed at the repo root serving an unprotected page. `tuning` was behind
+SSO with no custom domain, so it was contained — which is not the same as authorized, and is why it
+went to Joel instead of being noted and dropped.
+
+## 2026-09-12 20:00 — handoff
+Landed: ledger item closed, Waiting-on-Joel renumbered to four.
+Open: #43 with TechPad Gen, and a new Coffee branch `claude/coffee-surface-library-errors` with no PR
+yet. Nothing waiting on me.
+Need from TD: nothing, this is the TD.
