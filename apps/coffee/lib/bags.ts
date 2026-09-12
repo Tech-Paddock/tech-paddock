@@ -1,4 +1,5 @@
 import { getServiceClient } from "./supabase";
+import type { Guide } from "./guide";
 
 /**
  * The bag you bought last time, if this is a repeat purchase. Matched on
@@ -69,4 +70,36 @@ export function hostOf(url: string | null | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * A validated guide as bag columns. Shared by the save path and the search
+ * path because both write it, and two copies of this mapping would drift the
+ * moment a guide field is added — the stored quotes would still be right and
+ * the parsed values silently would not.
+ */
+export function guideColumns(guide: Guide | null, model: string | null = null, effort: string | null = null) {
+  const answered = !!guide && guide.status !== "not_searched";
+  return {
+    product_url: guide?.product_url ?? null,
+    guide_url: guide?.guide_url ?? null,
+    guide_status: guide?.status ?? "not_searched",
+    guide_method: guide?.method ?? null,
+    guide_ratio: guide?.params.ratio ?? null,
+    guide_dose: guide?.params.dose ?? null,
+    guide_water: guide?.params.water ?? null,
+    guide_temp: guide?.params.temp ?? null,
+    guide_grind: guide?.params.grind ?? null,
+    guide_time: guide?.params.time ?? null,
+    guide_quotes: guide?.quotes ?? [],
+    // Stored, not just returned. A value the model could not back belongs
+    // beside what was kept, and the search no longer hands this to the page.
+    guide_dropped: guide?.dropped ?? [],
+    guide_fetched_at: answered ? new Date().toISOString() : null,
+    // What answered, recorded only when something did. A guide is comparable
+    // against another guide only if you know what produced it, and the effort
+    // level is as much a part of that as the model.
+    guide_model: answered ? model : null,
+    guide_effort: answered ? effort : null,
+  };
 }
