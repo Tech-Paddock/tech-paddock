@@ -4,6 +4,25 @@ State as of 2026-09-11, end of day.
 
 Read `RULES.md` first. This file is only what is true right now.
 
+> ## ⚠️ This file predates #40 and is wrong about the flow
+>
+> **#40 moved the save ahead of the search.** The bag row is now written first and the search
+> updates it, with the page polling the row — so a dropped connection no longer loses an answer the
+> server already produced. It also made the search model and its effort selectable, recorded per
+> bag, and added five columns to `coffee.bags`. `RULES.md` describes all of this correctly; the
+> sections below still describe the old order.
+>
+> **Coffee agent: rewriting this is yours and it is the first thing to do.** The technical director
+> deliberately did not backfill it — a handoff written by the TD is the TD's second-hand reading of
+> your work, which is the thing these files exist to replace. The rule that would have caught this
+> before the merge landed in the same change as this note.
+>
+> One thing worth carrying into the rewrite, from #40's own commit history rather than from me: the
+> search defaults to Haiku because `validateGuide` enforces quote-backing in code, so a cheaper
+> model costs recall, never an invented recipe. Also note `RULES.md` still says the model toggle
+> "needs an explicit exception to the `claude-sonnet-5` pin in `CLAUDE.md`" — #38 removed that pin,
+> so the sentence is stale and should go when you next touch that file.
+
 ---
 
 ## Built and merged, not deployed

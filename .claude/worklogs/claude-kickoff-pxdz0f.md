@@ -1,35 +1,35 @@
 # claude-kickoff-pxdz0f
 agent: technical director · apps: none · shared files: CLAUDE.md
-authorized by: Joel, directly, in session — "remove restriction on model usage, this will be task
-dependant."
+authorized by: Joel, directly, in session — "part of your rules should be to check handoffs before
+deploying and agents should update it when finishing creating or updating a pr"
 
-## 2026-09-12 03:15 — claim
-Working on: the CLAUDE.md amendment Joel asked for — removing the repo-wide `claude-sonnet-5` pin
-and making model choice per task.
-Touching: CLAUDE.md
+## 2026-09-12 04:00 — claim
+Working on: adding handoffs to the merge gate, both halves — the agent's obligation and the TD's
+check.
+Touching: CLAUDE.md, .claude/agents/td/RULES.md, .claude/agents/coffee/HANDOFF.md,
+.claude/worklogs/_open-items.md
 Depends on: nothing
 
-## 2026-09-12 03:15 — for the Message Editor agent, and it is not optional reading
-The amendment changes a premise your drift check is built on.
+## 2026-09-12 04:00 — why this rule has teeth, and where it bit immediately
+#40 is the evidence. It moved Coffee's save ahead of its search — the app's central flow — added
+five columns to coffee.bags, and made the search model selectable. It updated RULES.md and its own
+worklog. It touched no HANDOFF.md at all, and I merged it, so Coffee's handoff now describes an
+order the code no longer follows.
 
-`apps/editor/lib/modelCheck.ts` filters the model list with `model.id.includes("sonnet")` and
-compares against a `PINNED_MODEL` constant. That was exactly right while the repo mandated one
-Sonnet model. With model choice now per task, **that check monitors one family and silently ignores
-every other** — if any app moves to Opus or Haiku, drift in that app is invisible to it. The
-`pinned_model` column it writes also presupposes a pin that no longer exists repo-wide.
+That is the failure this project keeps paying for: not a missing document, a confident wrong one.
 
-Not changed here, because it is your code and because the right fix is a design decision rather than
-a rename. The options worth weighing: filter on the set of models the repo actually uses rather than
-a hardcoded family, or scope the check per app, or retire it. Worth doing alongside diagnosing why
-`editor.model_status` has never successfully written a row — the two are the same file.
+The rule is deliberately two-sided. Agents write the handoff at pull-request time rather than at
+session end, because a session may not get an end. The TD reads every handoff a change touches and
+sends back a stale one rather than fixing it in passing — a handoff the TD writes is the TD's
+second-hand reading of another agent's work, which is precisely what these files exist to replace.
 
-Also still true and unchanged by this: three files pin `claude-sonnet-5` in code
-(`apps/editor/lib/anthropic.ts`, `apps/editor/lib/modelCheck.ts`, `apps/coffee/lib/anthropic.ts`).
-The amendment stops mandating a model; it does not move anything. Each app's agent decides.
+I applied that to myself here. Coffee's handoff gets a staleness banner naming what changed and
+pointing at RULES.md, which is correct; the rewrite is the Coffee agent's. Backfilling it would
+have been the comfortable thing and would have made the new rule decorative on the day it landed.
 
-## 2026-09-12 03:15 — handoff
-Landed: CLAUDE.md only. Model choice is per task; the two protections the pin was carrying —
-server-side only, and treating a model change as a deliberate change with a test — are kept
-explicitly so they do not get lost with the pin.
-Open: the drift-check question above, for the Message Editor agent.
-Need from TD: nothing. Joel authorized the amendment directly.
+## 2026-09-12 04:00 — handoff
+Landed: the rule in CLAUDE.md (both halves), the first-order check in the TD charter, a staleness
+banner on Coffee's handoff, and the ledger entry.
+Open: Coffee's handoff rewrite, which is that agent's. RULES.md there also still claims the model
+toggle needs an exception to a CLAUDE.md pin that #38 removed — stale, flagged, not mine to edit.
+Need from TD: nothing. Joel authorized this directly.
