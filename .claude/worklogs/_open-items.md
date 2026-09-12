@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-12 02:05 UTC.**
+**Last reviewed: 2026-09-12 03:05 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -19,20 +19,7 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
-1. **2026-09-12 — Coffee is up. Only the framework preset is left, and it is cosmetic.** Verified
-   at 02:04: `coffee.techpaddock.io` returns 200 serving `Coffee — Paddock` at `/login`, with
-   `frame-ancestors` intact. The build log is the proof Root Directory took —
-   `Installing dependencies` / `Detected Next.js version: 14.2.35` / `Running "npm run build"`,
-   against the 153ms `no files were prepared` it produced at 00:48. Zero runtime errors in two hours.
-   **`GET /api/health` behind the login is still unrun**, and it is the only check for the five
-   environment variables, which stay API-invisible: `ANTHROPIC_API_KEY`, `APP_PASSWORD_HASH`,
-   `SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`. A green build proves none of them.
-   The framework preset reads `Other`. It is genuinely near-cosmetic — `apps/coffee/vercel.json`
-   declares `nextjs` and overrides the dashboard, which is why this build succeeded with the preset
-   still unset, and why `tp-message-editor` has run the same way for weeks.
-   **Root Directory is checkable from a session — read the build log.** Earlier entries called that
-   impossible and were wrong.
-2. **2026-09-12 — Verify `SESSION_SECRET` parity. Rotated again at 01:39, live only after this
+1. **2026-09-12 — Verify `SESSION_SECRET` parity. Rotated again at 01:39, live only after this
    push.** Rotating is the right move rather than churn: the existing values cannot be read back out
    of the dashboard, so parity cannot be confirmed by inspection — setting one fresh known value on
    all five is the only way to guarantee it.
@@ -65,6 +52,19 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
+
+- **2026-09-12 — COFFEE IS FULLY UP.** `GET /api/health` returns `{"ok":true}`: `coffee schema
+  reachable`, `bucket coffee-files reachable`, `ANTHROPIC_API_KEY` set. It is deployed at
+  `coffee.techpaddock.io`, behind the password gate, on current `main`.
+  **Three separate failures, in three different systems, and only one was where it looked.** The
+  `SUPABASE_SERVICE_ROLE_KEY` held a non-JWT value — Supabase's value in a Vercel field, diagnosed
+  from `Invalid Compact JWS`, which is Storage failing to parse it as a JWT. `ANTHROPIC_API_KEY` was
+  simply blank. And the last one was neither: **the `coffee` schema was never added to the hosted
+  project's exposed schemas**, so PostgREST refused it with `Invalid schema: coffee` while the grants
+  were perfect all along. Fixed in the Supabase dashboard with no code, no migration and no redeploy.
+  **`supabase/README.md` was wrong about this and is corrected.** It said adding a schema means two
+  migrations plus `config.toml` — but `config.toml` configures only the local stack, and `coffee` was
+  already listed there while the hosted project still refused it. Three steps, not two.
 
 - **2026-09-12 — THE DEPLOY OUTAGE IS CLOSED.** Production had not deployed since 17:48 on 09-11.
   All five projects now serve `0c7d882` (#33); `techpaddock.io` returns 200 from that deployment

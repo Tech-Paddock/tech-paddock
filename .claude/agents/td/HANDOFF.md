@@ -44,13 +44,7 @@ rather than promising it.
 
 Live infrastructure and one-time credentials. None of it is yours.
 
-1. **Coffee is up; run its health check.** Verified 02:04 — `coffee.techpaddock.io` returns 200
-   serving the Coffee login, and the build log shows dependencies installed and `next build` run,
-   against the 153ms `no files were prepared` from 00:48. What remains is `GET /api/health` behind
-   the login, the only check for the five environment variables, which stay API-invisible. The
-   framework preset reads `Other` and is genuinely cosmetic: `vercel.json` declares `nextjs` and
-   overrides it, which is why this build succeeded anyway.
-2. **Verify `SESSION_SECRET` parity across all five.** Rotated again at 01:39 on 09-12 and live
+1. **Verify `SESSION_SECRET` parity across all five.** Rotated again at 01:39 on 09-12 and live
    since the 01:59 deployments — a dashboard change does not reach a running deployment, because
    Vercel bakes the environment in at deploy time. All five have now rebuilt, so this is testable.
    Then log in at `techpaddock.io` and open a tool from a tile, on desktop and mobile: a loop on both
