@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-12 01:45 UTC.**
+**Last reviewed: 2026-09-12 02:05 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -19,29 +19,19 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
-1. **2026-09-12 — Verify `tp-coffee-app` came up. Configured at 01:39; this push is its first
-   build.** Joel set Root Directory to `apps/coffee` and attached `coffee.techpaddock.io` at 01:39,
-   and the domain resolves through the shared CNAME target. Neither had been built at the time this
-   was written: the project's last build was 00:48:24 and read `Build Completed [153ms]` with
-   *no files were prepared*, a repo-root build, so `coffee.techpaddock.io` answered 404.
-   **Redeploy it from the dashboard rather than relying on a push.** The project has *Skip
-   deployments when there are no changes to the root directory or its dependencies* enabled, so a
-   commit touching only `.claude/` — including the one carrying this entry — skips this project's
-   build entirely. That toggle is the built-in equivalent of the `ignoreCommand` change the Platform
-   handoff has been proposing, so it is worth keeping; it just means docs pushes no longer rebuild
-   anything and configuration changes need an explicit Redeploy.
-   **How to check, in order:** read the build log — a correct build installs dependencies and runs
-   `next build`, a repo-root build exits in milliseconds. Then `GET /api/health` behind the login,
-   which names whichever of the `coffee` schema, the `coffee-files` bucket or `ANTHROPIC_API_KEY` is
-   unhappy. The five variables the app actually reads, from the source rather than CI's dummy list:
-   `ANTHROPIC_API_KEY`, `APP_PASSWORD_HASH`, `SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `SUPABASE_URL`. Environment values stay API-invisible; Root Directory does not — read the log.
-   Still outstanding and near-cosmetic: the framework preset is `null`. `apps/coffee/vercel.json`
-   already declares `nextjs`, and `tp-message-editor` has deployed correctly for weeks with the same
-   `null`, so this was never the blocker earlier entries implied.
-   **This is still the only publicly exposed thing in the project** until Root Directory points at a
-   real app: `tech-paddock.vercel.app` serves an empty page outside the password gate, because the
-   gate lives in each app's middleware and a project with no app has no gate.
+1. **2026-09-12 — Coffee is up. Only the framework preset is left, and it is cosmetic.** Verified
+   at 02:04: `coffee.techpaddock.io` returns 200 serving `Coffee — Paddock` at `/login`, with
+   `frame-ancestors` intact. The build log is the proof Root Directory took —
+   `Installing dependencies` / `Detected Next.js version: 14.2.35` / `Running "npm run build"`,
+   against the 153ms `no files were prepared` it produced at 00:48. Zero runtime errors in two hours.
+   **`GET /api/health` behind the login is still unrun**, and it is the only check for the five
+   environment variables, which stay API-invisible: `ANTHROPIC_API_KEY`, `APP_PASSWORD_HASH`,
+   `SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`. A green build proves none of them.
+   The framework preset reads `Other`. It is genuinely near-cosmetic — `apps/coffee/vercel.json`
+   declares `nextjs` and overrides the dashboard, which is why this build succeeded with the preset
+   still unset, and why `tp-message-editor` has run the same way for weeks.
+   **Root Directory is checkable from a session — read the build log.** Earlier entries called that
+   impossible and were wrong.
 2. **2026-09-12 — Verify `SESSION_SECRET` parity. Rotated again at 01:39, live only after this
    push.** Rotating is the right move rather than churn: the existing values cannot be read back out
    of the dashboard, so parity cannot be confirmed by inspection — setting one fresh known value on
@@ -129,14 +119,16 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Known, deliberately not fixed
 
-- **2026-09-12 — Vercel's own skip toggle may have superseded the `ignoreCommand` plan.**
-  `tp-coffee-app` shows *Skip deployments when there are no changes to the root directory or its
-  dependencies* **enabled** — the built-in equivalent of the one-line `ignoreCommand` per
-  `vercel.json` that the Platform handoff proposes. Whether the other four have it is not visible
-  from the API and has not been checked. **Consequence either way: a docs-only push no longer
-  reliably rebuilds anything**, so a configuration change now needs an explicit Redeploy rather than
-  a push riding along behind it. Check the other four before landing `ignoreCommand`, which may now
-  be redundant.
+- **2026-09-12 — Every push still rebuilds every Vercel project, including `tp-coffee-app`.**
+  `tp-coffee-app` has *Skip deployments when there are no changes to the root directory or its
+  dependencies* **enabled**, and it still rebuilt twice from #35 — a commit touching only `.claude/`,
+  nothing under `apps/coffee`. **So the toggle does not behave as its label suggests, at least not
+  here, and a previous version of this entry asserted the opposite. Do not plan around it.** Why it
+  did not skip is not understood; the plausible readings are that it does not apply to the first
+  build after a Root Directory change, or that "dependencies" is broader than it sounds. Establish
+  the behaviour before relying on it either way.
+  That leaves the `ignoreCommand` change in the Platform handoff still unlanded and still arguably
+  wanted — a docs-only commit currently triggers five full Next.js builds.
 - **2026-09-12 — DNS is now uniform, and that entry is retired.** All four subdomains — `editor`,
   `tracker`, `resume`, `coffee` — are CNAMEs to `d1317e1174061c29.vercel-dns-017.com`, changed by Joel
   at 01:39 and verified resolving. The apex `techpaddock.io` stays an A record at `76.76.21.21`
