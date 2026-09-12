@@ -125,6 +125,26 @@ worth storing — keep that distinction.
 **Two URLs, not one.** `product_url` and `guide_url` are the same page at tier 1 and different
 pages at tier 2. One column would lose which you are looking at.
 
+**A bag is a purchase; a brew is one thing you did with it.** One bag, many brews. The bag holds
+what is fixed the moment you buy it — identity, purchased date, photo, and the whole `guide_*`
+block — and `my_notes`, which describes the coffee and outlives any one attempt at it. Everything
+variable is a brew: brewer, brew method, grinder, grind setting, dose, beverage mass, TDS, rating,
+and notes about that cup.
+
+The dial-in used to live on the bag, as a single set of columns. One dial-in per bag can only
+record the last thing you tried, which is the opposite of what dialling in is — a sequence of
+attempts whose whole value is comparing them. This is the repo's "prefer append over rewrite for
+anything that accumulates", applied to the thing that was accumulating.
+
+**Deleting a bag deletes its brews**, by cascade, and its photo. The confirm names the brew count
+for that reason: losing a dial-in history silently is worse than losing the photo.
+
+**TDS is stored once, in percent.** A refractometer reads percent; everything else quotes ppm; they
+are the same number and `1% = 10,000 ppm`. ppm is derived at display and never stored, because two
+columns for one measurement is two things that can disagree. **Extraction yield is a generated
+column**, not an input — it is a function of dose, beverage mass and TDS, and an editable copy
+would be free to drift from the brew it claims to describe.
+
 **Each purchase is its own row.** Roasters re-release the same coffee each crop, so "have I had
 this before" is a lookup on `(lower(roaster), lower(coffee_name))`, not a uniqueness constraint.
 `findPreviousBag` carries forward **only the dial-in** — method, grinder, grind setting. A rating

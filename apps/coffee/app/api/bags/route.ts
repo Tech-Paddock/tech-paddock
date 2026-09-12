@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { uploadPhoto, signedPhotoUrl, StorageError, IMAGE_TYPES } from "@/lib/storage";
-import { isBrewMethod } from "@/lib/methods";
 import { findPreviousBag, guideColumns, searchPattern } from "@/lib/bags";
 import type { Guide } from "@/lib/guide";
 
@@ -33,6 +32,7 @@ export async function GET(request: NextRequest) {
   const supabase = getServiceClient();
 
   let query = supabase.from("bags").select("*").order("created_at", { ascending: false });
+
   if (q) {
     const like = searchPattern(q);
     query = query.or(
@@ -86,15 +86,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const myMethod = field("my_method");
-  if (myMethod && !isBrewMethod(myMethod)) {
-    return NextResponse.json({ error: `"${myMethod}" isn't one of the brew methods.` }, { status: 400 });
-  }
-
-  const rating = field("my_rating");
-  const ratingValue = rating ? Number(rating) : null;
-  if (ratingValue !== null && (!Number.isInteger(ratingValue) || ratingValue < 1 || ratingValue > 5)) {
-    return NextResponse.json({ error: "Rating must be a whole number from 1 to 5." }, { status: 400 });
+  const purchasedDate = field("purchased_date");
+  if (purchasedDate && !/^\d{4}-\d{2}-\d{2}$/.test(purchasedDate)) {
+    return NextResponse.json({ error: "Purchased date must be YYYY-MM-DD." }, { status: 400 });
   }
 
   try {
@@ -123,13 +117,8 @@ export async function POST(request: NextRequest) {
         roast_date: field("roast_date"),
         photo_path: photoPath,
         ...guideColumns(guide, field("guide_model"), field("guide_effort")),
-        // Picking a method pre-populates the bag's; when a guide was found its
-        // method is the roaster's recommendation and seeds this.
-        my_method: myMethod ?? guide?.method ?? null,
-        my_grinder: field("my_grinder"),
-        my_grind_setting: field("my_grind_setting"),
+        purchased_date: purchasedDate,
         my_notes: field("my_notes"),
-        my_rating: ratingValue,
       })
       .select()
       .single();

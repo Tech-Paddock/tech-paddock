@@ -88,6 +88,19 @@ file before the row that points at it, so deleting in the same order means a row
 an object that is gone. A leftover object is the lesser failure and the delete is best-effort about
 it. Deleting an id that matches no row is a 404, not a success.
 
+## The shape of the data
+
+`coffee.bags` 1 ──< `coffee.brews`. A bag is a purchase and what the roaster published; a brew is
+one attempt at it. The dial-in — brewer, brew method, grinder, grind setting — moved off the bag
+entirely, because one set of columns can only hold the last thing you tried.
+
+Two things on `coffee.brews` are deliberately not writable and should stay that way:
+`extraction_yield` is a generated column, and ppm is never stored at all. Both exist to stop one
+measurement being recorded twice in forms that can disagree. If you add a field here, ask first
+whether it is a measurement or a function of measurements.
+
+`findPreviousBag` reads the most recent brew of the previous bag, not columns on the bag.
+
 ## In flight
 
 **Library load failures are now visible (branch `claude/coffee-surface-library-errors`).** The

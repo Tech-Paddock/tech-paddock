@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { signedPhotoUrl, deletePhoto } from "@/lib/storage";
-import { isBrewMethod } from "@/lib/methods";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +9,9 @@ export const dynamic = "force-dynamic";
 // would make the stored quotes stop matching the stored numbers, which is
 // exactly the thing the quotes exist to prevent. Re-run the search to change
 // them.
-const EDITABLE = ["my_method", "my_grinder", "my_grind_setting", "my_notes", "my_rating"] as const;
+// The dial-in moved to coffee.brews, so what remains editable on a bag is
+// what belongs to the purchase rather than to any one attempt at brewing it.
+const EDITABLE = ["my_notes", "purchased_date"] as const;
 
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await getServiceClient().from("bags").select("*").eq("id", params.id).maybeSingle();
@@ -38,17 +39,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       continue;
     }
 
-    if (key === "my_rating") {
-      const n = Number(value);
-      if (!Number.isInteger(n) || n < 1 || n > 5) {
-        return NextResponse.json({ error: "Rating must be a whole number from 1 to 5." }, { status: 400 });
-      }
-      update[key] = n;
-      continue;
-    }
-
-    if (key === "my_method" && !isBrewMethod(value)) {
-      return NextResponse.json({ error: `"${String(value)}" isn't one of the brew methods.` }, { status: 400 });
+    if (key === "purchased_date" && !/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+      return NextResponse.json({ error: "Purchased date must be YYYY-MM-DD." }, { status: 400 });
     }
 
     update[key] = String(value);
