@@ -9,9 +9,11 @@ import type { Guide } from "./guide";
  * constraint.
  */
 export async function findPreviousBag(roaster: string, coffeeName: string) {
-  const { data, error } = await getServiceClient()
+  const supabase = getServiceClient();
+
+  const { data: bag, error } = await supabase
     .from("bags")
-    .select("id, my_method, my_grinder, my_grind_setting, created_at")
+    .select("id, created_at")
     .ilike("roaster", roaster)
     .ilike("coffee_name", coffeeName)
     .order("created_at", { ascending: false })
@@ -22,11 +24,25 @@ export async function findPreviousBag(roaster: string, coffeeName: string) {
   // only one of them is an answer. Swallowing the error made an unreachable
   // database look like a first-time coffee.
   if (error) throw new LookupError(`Couldn't check for a previous purchase: ${error.message}`);
-  if (!data) return null;
-  // Only the dial-in carries over. A rating or tasting note describes a lot
-  // you have actually drunk, and this bag is not that lot.
-  if (!data.my_method && !data.my_grinder && !data.my_grind_setting) return null;
-  return data;
+  if (!bag) return null;
+
+  // The dial-in lives on brews now, so the thing worth carrying forward is the
+  // last brew of that bag rather than anything on the bag itself.
+  const { data: brew, error: brewError } = await supabase
+    .from("brews")
+    .select("brewer, brew_method, grinder, grind_setting")
+    .eq("bag_id", bag.id)
+    .order("brewed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (brewError) throw new LookupError(`Couldn't read the last brew of that bag: ${brewError.message}`);
+  if (!brew) return null;
+  if (!brew.brewer && !brew.brew_method && !brew.grinder && !brew.grind_setting) return null;
+
+  // A rating or a tasting note describes a lot you actually drank, and this
+  // bag is not that lot. Only the dial-in carries.
+  return { id: bag.id, created_at: bag.created_at, ...brew };
 }
 
 /**

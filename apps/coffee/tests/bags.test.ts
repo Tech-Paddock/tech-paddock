@@ -4,20 +4,38 @@ import type { Guide } from "@/lib/guide";
 
 // The Supabase query builder is chainable and only resolves at the end, so the
 // stub returns itself from every link and hands back a fixed result at the tip.
-const stub = vi.hoisted(() => ({ result: { data: null as unknown, error: null as unknown } }));
+// findPreviousBag makes two queries now — the bag, then its most recent brew —
+// so the stub answers per table rather than once.
+const stub = vi.hoisted(() => ({
+  result: { data: null as unknown, error: null as unknown },
+  byTable: {} as Record<string, { data: unknown; error: unknown }>,
+}));
 
 vi.mock("@/lib/supabase", () => {
-  const chain: Record<string, unknown> = {};
-  for (const link of ["from", "select", "ilike", "order", "limit", "not"]) chain[link] = () => chain;
-  chain.maybeSingle = async () => stub.result;
-  return { getServiceClient: () => chain };
+  const make = (table: string) => {
+    const chain: Record<string, unknown> = {};
+    for (const link of ["select", "ilike", "order", "limit", "not", "eq"]) chain[link] = () => chain;
+    chain.maybeSingle = async () => stub.byTable[table] ?? stub.result;
+    return chain;
+  };
+  return { getServiceClient: () => ({ from: (table: string) => make(table) }) };
 });
 
 function answers(data: unknown) {
   stub.result = { data, error: null };
+  stub.byTable = {};
 }
 function fails(message: string) {
   stub.result = { data: null, error: { message } };
+  stub.byTable = {};
+}
+/** A bag exists; its most recent brew is whatever is given. */
+function bagWithBrew(brew: unknown) {
+  stub.result = { data: null, error: null };
+  stub.byTable = {
+    bags: { data: { id: "bag-1", created_at: "2026-09-01T00:00:00Z" }, error: null },
+    brews: { data: brew, error: null },
+  };
 }
 
 describe("hostOf", () => {
@@ -44,14 +62,24 @@ describe("findPreviousBag", () => {
     await expect(findPreviousBag("Sweet Bloom", "Maria Gutierrez")).resolves.toBeNull();
   });
 
-  it("answers null when the previous bag was never dialled in", async () => {
-    answers({ id: "1", my_method: null, my_grinder: null, my_grind_setting: null });
+  it("answers null when the previous bag was bought but never brewed", async () => {
+    bagWithBrew(null);
     await expect(findPreviousBag("Sweet Bloom", "Maria Gutierrez")).resolves.toBeNull();
   });
 
-  it("carries the dial-in forward when there is one", async () => {
-    answers({ id: "1", my_method: "v60", my_grinder: "Ode", my_grind_setting: "7" });
-    await expect(findPreviousBag("Sweet Bloom", "Maria Gutierrez")).resolves.toMatchObject({ my_method: "v60" });
+  it("answers null when the last brew recorded no dial-in at all", async () => {
+    bagWithBrew({ brewer: null, brew_method: null, grinder: null, grind_setting: null });
+    await expect(findPreviousBag("Sweet Bloom", "Maria Gutierrez")).resolves.toBeNull();
+  });
+
+  it("carries the last brew's dial-in forward", async () => {
+    // The dial-in belongs to a brew now, so this reads the most recent one
+    // rather than anything stored on the bag.
+    bagWithBrew({ brewer: "v60-02", brew_method: "3 pours", grinder: "Fellow Ode 2", grind_setting: "7" });
+    await expect(findPreviousBag("Sweet Bloom", "Maria Gutierrez")).resolves.toMatchObject({
+      brewer: "v60-02",
+      grind_setting: "7",
+    });
   });
 
   it("throws rather than pass a failed lookup off as a first purchase", async () => {
