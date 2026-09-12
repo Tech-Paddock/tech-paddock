@@ -3,14 +3,29 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Glance } from "@/lib/glance";
+import { TOOLS, type ToolSlug } from "@/lib/platform";
 import GlancePanel from "./GlancePanel";
 
-const APPS = [
-  { slug: "editor", name: "Message Editor", href: "https://editor.techpaddock.io", team: "ferrari", icon: "✉️" },
-  { slug: "tracker", name: "Pipeline Tracker", href: "https://tracker.techpaddock.io", team: "mercedes", icon: "📊" },
-  { slug: "resume", name: "Resume Formatter", href: "https://resume.techpaddock.io", team: "astonmartin", icon: "📄" },
-  { slug: "coffee", name: "Coffee", href: "https://coffee.techpaddock.io", team: "mclaren", icon: "☕" },
-];
+/** A step on the hub's gold ramp. Each has a `.tone-*` rule in globals.css. */
+type Tone = "champagne" | "gold" | "brass" | "bronze";
+
+// Names and URLs come from lib/platform.ts so the shell and the admin page
+// cannot drift apart; only presentation lives here. Typing this as a Record
+// over ToolSlug means adding a tool to that file breaks this build until it is
+// given a colour and an icon — rather than rendering an unstyled tile.
+const PRESENTATION: Record<ToolSlug, { tone: Tone; icon: string }> = {
+  editor: { tone: "champagne", icon: "✉️" },
+  tracker: { tone: "gold", icon: "📊" },
+  resume: { tone: "brass", icon: "📄" },
+  coffee: { tone: "bronze", icon: "☕" },
+};
+
+const APPS = TOOLS.map((tool) => ({
+  slug: tool.slug,
+  name: tool.name,
+  href: tool.url,
+  ...PRESENTATION[tool.slug],
+}));
 
 function Shell({ glance }: { glance: Glance }) {
   const router = useRouter();
@@ -64,6 +79,9 @@ function Shell({ glance }: { glance: Glance }) {
             </button>
           ))}
           <p className="sidebar-label">Account</p>
+          <a className="nav-item" href="/admin">
+            <span className="icon">🔧</span> Admin
+          </a>
           <button className="nav-item logout-item" onClick={logout} disabled={loggingOut}>
             <span className="icon">🚪</span> {loggingOut ? "Logging out…" : "Log out"}
           </button>
@@ -76,7 +94,7 @@ function Shell({ glance }: { glance: Glance }) {
                 {APPS.map((a, i) => (
                   <button
                     key={a.name}
-                    className={`app-button team-${a.team}`}
+                    className={`app-button tone-${a.tone}`}
                     onClick={() => select(i)}
                   >
                     <span className="app-button-icon icon">{a.icon}</span>
