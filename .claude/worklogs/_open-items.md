@@ -46,13 +46,18 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
    endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
    first, or in the same save. Never after.**
-3. **2026-09-11 — Add `build (coffee)` and `Promotion / approval-recorded` to branch protection's
+3. **2026-09-11 — Add `build (coffee)` and `approval-recorded` to branch protection's
    required checks.** The matrix is five jobs and the rule names four — confirmed today the hard way,
    when #48's merge was refused with "4 of 4 required status checks are expected", so `build (coffee)`
    is currently protecting nothing.
-   `Promotion / approval-recorded` is new in the same change as this note. It fails a pull request
-   promoted without your approval recorded on it, but **a failing check only blocks a merge if it is
-   required** — until you add it, it is a red X the technical director reads rather than a gate.
+   `approval-recorded` is new in the same change as this note — the job in
+   `.github/workflows/promotion.yml`. It fails a pull request promoted without your approval recorded
+   on it, but **a failing check only blocks a merge if it is required** — until you add it, it is a
+   red X the technical director reads rather than a gate.
+   **Add it by the exact name `approval-recorded`.** That is the context GitHub reports, verified
+   against a live run. The workflow is called Promotion, so `Promotion / approval-recorded` is the
+   plausible guess and it is wrong — a required check whose name matches nothing is never satisfied,
+   which would block every merge in the repo until it was removed again.
 4. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.

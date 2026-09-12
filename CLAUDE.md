@@ -128,7 +128,7 @@ between configuring something that exists and creating, destroying, or re-pointi
   indistinguishable from one an agent promoted on its own initiative. The repo is the only channel
   between agents, which means the approval lands in the repo or it did not happen.
   **What is enforced, and what is not.** Two things hold without anyone choosing to comply: GitHub
-  refuses to merge a draft outright, and `Promotion / approval-recorded` fails on a promoted pull
+  refuses to merge a draft outright, and `approval-recorded` fails on a promoted pull
   request with no note. What no check can see is whether the quote is real — every agent comments as
   the same GitHub account, so authorship proves nothing. It catches the approval you forgot to get,
   not one you invented. That last gap closes by someone being honest, and there is no machinery for
@@ -155,7 +155,7 @@ between configuring something that exists and creating, destroying, or re-pointi
   on. Do not gate it, do not merge it, and never promote it for its author.
   Out of draft with no approval note is different, and it has a defined answer rather than a
   judgement call: **convert it back to draft and say why.** Demoting is the safe direction, the fix
-  is one line for whoever promoted it, and `Promotion / approval-recorded` will already be red.
+  is one line for whoever promoted it, and `approval-recorded` will already be red.
 - **Squash merge, always.** One commit on `main` per change.
 - **CI green before merge** — all five matrix jobs, on the current head. A red build does not get
   merged on the assumption that the failure is unrelated. Establish that it is, or fix it.
@@ -284,5 +284,5 @@ existed and was walked straight through.
 Most rules here are convention: they hold because an agent chooses to comply. Four things do not.
 `main` is protected in the GitHub UI. The `.claude/settings.json` hooks run whether or not anyone
 wants them to. GitHub refuses to merge a draft pull request outright. And
-`Promotion / approval-recorded` fails a pull request promoted without Joel's approval recorded on it.
+`approval-recorded` fails a pull request promoted without Joel's approval recorded on it.
 Everything else is a convention that has held so far, which is not the same thing.

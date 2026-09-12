@@ -285,3 +285,19 @@ Landed (pending approval): self-promotion with a mandatory note, the check that 
 matching TD gate action of demoting rather than asking, and a corrected enforcement summary.
 Open: this PR still a draft awaiting Joel. #43 draft with TechPad Gen.
 Need from TD: nothing, this is the TD.
+
+**Correction before it could bite.** I had written the check as `Promotion / approval-recorded` in six
+places — the workflow name plus the job name, which is how some CI surfaces label a check. GitHub
+reports this one as plain `approval-recorded`, verified against the live run. Left alone, Joel would
+have added the wrong name to required checks, and a required check matching nothing is never satisfied:
+it would have blocked every merge in the repo until removed. Corrected everywhere, with the exact name
+and that warning written into the ledger item asking him to add it.
+
+**What the live run does and does not prove.** It proves the workflow is wired, runs on a draft, and
+completes green. It cannot prove the failing path, because this pull request is a draft and the draft
+branch is the only one reachable — and the Actions log API refuses this token, so I cannot read which
+branch executed. The negative cases are covered by local dry-run only: promoted-without-note fails,
+promoted-with-note passes, comment-on-a-plain-issue is ignored. **First real proof comes the first time
+someone promotes without a note**, and that is worth confirming when it happens rather than assuming.
+I did not promote anything to test it: doing that would be an agent promoting without approval on the
+day the rule forbidding it landed.

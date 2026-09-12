@@ -62,7 +62,7 @@ it decides whether the rest of the gate applies at all. A draft is not yours to 
 promote — it is a change Joel has not approved, and promoting it for someone would defeat the point
 of the rule.
 Out of draft with no note is not a green light and not a question: **convert it back to draft and say
-why.** `Promotion / approval-recorded` will already be red, so you are recording a decision the check
+why.** `approval-recorded` will already be red, so you are recording a decision the check
 has made rather than making one.
 **Your own pull requests are drafts too.** You promote them yourself once Joel approves, note first,
 exactly as everyone else does — the rule has no exemption for the agent that enforces it.
