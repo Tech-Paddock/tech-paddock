@@ -2,7 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { downscale } from "@/lib/image";
-import { BREW_METHODS, METHOD_LABELS, type BrewMethod } from "@/lib/methods";
+import { METHOD_LABELS, type BrewMethod } from "@/lib/methods";
+import {
+  extractionYield,
+  percentToPpm,
+  ppmToPercent,
+  readBrew,
+  band,
+  TDS_TARGET,
+  YIELD_TARGET,
+} from "@/lib/brews";
+import {
+  MY_BREWERS,
+  MY_BREWER_LABELS,
+  GRINDERS,
+  DEFAULT_GRINDER,
+  myBrewerFor,
+  type MyBrewer,
+} from "@/lib/brewers";
 import type { Guide, GuideStatus } from "@/lib/guide";
 import { MODEL_LABELS, DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT, effortsFor, isEffortFor, type SearchModel } from "@/lib/models";
 
@@ -33,19 +50,33 @@ type Bag = Identity & {
   guide_model: string | null;
   guide_effort: string | null;
   guide_search_error: string | null;
-  my_method: string | null;
-  my_grinder: string | null;
-  my_grind_setting: string | null;
   my_notes: string | null;
-  my_rating: number | null;
+  purchased_date: string | null;
   created_at: string;
+};
+
+type Brew = {
+  id: string;
+  bag_id: string;
+  brewed_at: string;
+  brewer: string | null;
+  brew_method: string | null;
+  grinder: string | null;
+  grind_setting: string | null;
+  dose_g: string | number | null;
+  beverage_g: string | number | null;
+  tds_percent: string | number | null;
+  extraction_yield: string | number | null;
+  rating: number | null;
+  notes: string | null;
 };
 
 type PreviousBag = {
   id: string;
-  my_method: string | null;
-  my_grinder: string | null;
-  my_grind_setting: string | null;
+  brewer: string | null;
+  brew_method: string | null;
+  grinder: string | null;
+  grind_setting: string | null;
   created_at: string;
 };
 
@@ -66,7 +97,10 @@ const GUIDE_LABELS: Record<GuideStatus, string> = {
 };
 
 export default function CoffeePage() {
-  const [tab, setTab] = useState<"scan" | "library">("scan");
+  // Scanning is an action you take occasionally; the library is the thing you
+  // come back to. Two tabs gave them equal weight and hid one behind the
+  // other — so the library is now the page, and scanning opens above it.
+  const [scanning, setScanning] = useState(false);
   const [bags, setBags] = useState<Bag[]>([]);
   const [query, setQuery] = useState("");
   const [libraryError, setLibraryError] = useState<string | null>(null);
@@ -99,31 +133,38 @@ export default function CoffeePage() {
         <h1 className="font-semibold">Coffee</h1>
       </header>
 
-      <nav className="flex border-b border-line bg-white">
-        {(["scan", "library"] as const).map((t) => (
+      <div className="px-4 py-5 max-w-2xl mx-auto flex flex-col gap-5">
+        <section className="bg-white border border-line rounded-2xl overflow-hidden">
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 px-4 py-3 text-sm font-medium capitalize ${
-              tab === t ? "text-accent border-b-2 border-accent" : "text-ink/60"
-            }`}
+            onClick={() => setScanning((open) => !open)}
+            aria-expanded={scanning}
+            className="w-full flex items-center justify-between px-4 py-3 text-left font-medium"
           >
-            {t === "scan" ? "Scan a bag" : `Library${bags.length ? ` (${bags.length})` : ""}`}
+            Scan a bag
+            <span aria-hidden className="text-accent text-xl leading-none">{scanning ? "−" : "+"}</span>
           </button>
-        ))}
-      </nav>
+          {scanning && (
+            <div className="px-4 pb-4 border-t border-line pt-4">
+              <Scan
+                onSaved={() => {
+                  setScanning(false);
+                  void loadBags(query);
+                }}
+              />
+            </div>
+          )}
+        </section>
 
-      <div className="px-4 py-5 max-w-2xl mx-auto">
-        {tab === "scan" ? (
-          <Scan
-            onSaved={() => {
-              setTab("library");
-              void loadBags(query);
-            }}
+        <section className="flex flex-col gap-3">
+          <h2 className="font-medium">Shelf{bags.length ? ` (${bags.length})` : ""}</h2>
+          <Library
+            bags={bags}
+            query={query}
+            setQuery={setQuery}
+            error={libraryError}
+            onChanged={() => void loadBags(query)}
           />
-        ) : (
-          <Library bags={bags} query={query} setQuery={setQuery} error={libraryError} onChanged={() => void loadBags(query)} />
-        )}
+        </section>
       </div>
     </main>
   );
@@ -134,12 +175,11 @@ function Scan({ onSaved }: { onSaved: () => void }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [guide, setGuide] = useState<Guide | null>(null);
-  const [myMethod, setMyMethod] = useState<BrewMethod | "">("");
+  const [purchased, setPurchased] = useState("");
   const [stage, setStage] = useState<"idle" | "reading" | "confirm" | "searching" | "review" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
   const [previous, setPrevious] = useState<PreviousBag | null>(null);
   const [carried, setCarried] = useState(false);
-  const [dialIn, setDialIn] = useState({ my_grinder: "", my_grind_setting: "" });
   const [model, setModel] = useState<SearchModel>(DEFAULT_SEARCH_MODEL);
   const [effort, setEffort] = useState<string>(DEFAULT_EFFORT);
   const [bagId, setBagId] = useState<string | null>(null);
@@ -250,7 +290,6 @@ function Scan({ onSaved }: { onSaved: () => void }) {
 
       const found = guideFromBag(bag);
       setGuide(found);
-      if (found.method) setMyMethod(found.method as BrewMethod);
       setStage("review");
     };
 
@@ -258,16 +297,9 @@ function Scan({ onSaved }: { onSaved: () => void }) {
     return () => clearInterval(timer);
   }, [stage, bagId]);
 
-  function carryForward() {
-    if (!previous) return;
-    if (previous.my_method) setMyMethod(previous.my_method as BrewMethod);
-    setDialIn({
-      my_grinder: previous.my_grinder ?? "",
-      my_grind_setting: previous.my_grind_setting ?? "",
-    });
-    setCarried(true);
-  }
-
+  // Carrying a dial-in forward is a brew-level action now — the fields it
+  // used to fill live on coffee.brews. Kept as a hint on the confirm screen
+  // until the brew form can take it directly.
   async function save() {
     if (!bagId) return;
     setStage("saving");
@@ -278,7 +310,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
       const res = await fetch(`/api/bags/${bagId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ my_method: myMethod || null, ...dialIn }),
+        body: JSON.stringify({ ...(purchased ? { purchased_date: purchased } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Couldn't save that bag.");
@@ -420,57 +452,38 @@ function Scan({ onSaved }: { onSaved: () => void }) {
         <section className="bg-white border border-accent rounded-2xl p-4 flex flex-col gap-2">
           <h2 className="font-medium">You&apos;ve had this before</h2>
           <p className="text-sm text-ink/70">
-            Bought {new Date(previous.created_at).toLocaleDateString()}, dialled in on{" "}
+            Bought {new Date(previous.created_at).toLocaleDateString()}, last brewed on{" "}
             {[
-              previous.my_method ? METHOD_LABELS[previous.my_method as BrewMethod] : null,
-              previous.my_grinder,
-              previous.my_grind_setting,
+              previous.brewer ? MY_BREWER_LABELS[previous.brewer as MyBrewer] : null,
+              previous.brew_method,
+              previous.grinder,
+              previous.grind_setting,
             ]
               .filter(Boolean)
               .join(" · ")}
             .
           </p>
-          {carried ? (
-            <p className="text-sm text-ink/60">Carried over. Edit anything below.</p>
-          ) : (
-            <button onClick={carryForward} className="self-start text-sm text-accent underline">
-              Start from that
-            </button>
-          )}
+          <p className="text-xs text-ink/50">
+            That dial-in belongs to a brew, not to the bag — log a brew on this one when you make it.
+          </p>
         </section>
       )}
 
       {stage !== "confirm" && (
         <section className="bg-white border border-line rounded-2xl p-4 flex flex-col gap-3">
-          <h2 className="font-medium">How you&apos;ll brew it</h2>
+          <h2 className="font-medium">The purchase</h2>
           <label className="text-sm text-ink/70 flex flex-col gap-1">
-            Brew method
-            <select
-              value={myMethod}
-              onChange={(e) => setMyMethod(e.target.value as BrewMethod)}
+            Purchased
+            <input
+              type="date"
+              value={purchased}
+              onChange={(e) => setPurchased(e.target.value)}
               className="border border-line rounded-lg px-3 py-2 bg-white"
-            >
-              <option value="">—</option>
-              {BREW_METHODS.map((m) => (
-                <option key={m} value={m}>
-                  {METHOD_LABELS[m]}
-                </option>
-              ))}
-            </select>
+            />
           </label>
-          {guide?.method && myMethod === guide.method && !carried && (
-            <p className="text-xs text-ink/50">Pre-filled from the roaster&apos;s recommendation. Change it freely.</p>
-          )}
-          <Field
-            label="grinder"
-            value={dialIn.my_grinder}
-            onChange={(v) => setDialIn({ ...dialIn, my_grinder: v })}
-          />
-          <Field
-            label="grind setting"
-            value={dialIn.my_grind_setting}
-            onChange={(v) => setDialIn({ ...dialIn, my_grind_setting: v })}
-          />
+          <p className="text-xs text-ink/50">
+            How you brew it is recorded per brew, on the bag in your shelf — a bag holds many brews.
+          </p>
         </section>
       )}
 
@@ -587,23 +600,38 @@ function Library({
 function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [brewCount, setBrewCount] = useState<number | null>(null);
   const [draft, setDraft] = useState({
-    my_method: bag.my_method ?? "",
-    my_grinder: bag.my_grinder ?? "",
-    my_grind_setting: bag.my_grind_setting ?? "",
+    purchased_date: bag.purchased_date ?? "",
     my_notes: bag.my_notes ?? "",
-    my_rating: bag.my_rating ? String(bag.my_rating) : "",
   });
+
+  async function remove() {
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/bags/${bag.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Couldn't delete that bag.");
+      }
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't delete that bag.");
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  }
 
   async function save() {
     setSaving(true);
     await fetch(`/api/bags/${bag.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...draft,
-        my_rating: draft.my_rating ? Number(draft.my_rating) : null,
-      }),
+      body: JSON.stringify(draft),
     });
     setSaving(false);
     setOpen(false);
@@ -636,7 +664,6 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
             {bag.origin ? ` · ${bag.origin}` : ""}
           </span>
         </span>
-        {bag.my_rating && <span className="text-sm shrink-0">{"★".repeat(bag.my_rating)}</span>}
       </button>
 
       {open && (
@@ -680,63 +707,364 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
             </details>
           )}
 
+          <Brews bagId={bag.id} onCount={setBrewCount} />
+
           <div className="flex flex-col gap-3 border-t border-line pt-4">
             <label className="text-sm text-ink/70 flex flex-col gap-1">
-              Brew method
-              <select
-                value={draft.my_method}
-                onChange={(e) => setDraft({ ...draft, my_method: e.target.value })}
+              Purchased
+              <input
+                type="date"
+                value={draft.purchased_date}
+                onChange={(e) => setDraft({ ...draft, purchased_date: e.target.value })}
                 className="border border-line rounded-lg px-3 py-2 bg-white"
-              >
-                <option value="">—</option>
-                {BREW_METHODS.map((m) => (
-                  <option key={m} value={m}>
-                    {METHOD_LABELS[m]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Field label="grinder" value={draft.my_grinder} onChange={(v) => setDraft({ ...draft, my_grinder: v })} />
-            <Field
-              label="grind setting"
-              value={draft.my_grind_setting}
-              onChange={(v) => setDraft({ ...draft, my_grind_setting: v })}
-            />
-            <label className="text-sm text-ink/70 flex flex-col gap-1">
-              Rating
-              <select
-                value={draft.my_rating}
-                onChange={(e) => setDraft({ ...draft, my_rating: e.target.value })}
-                className="border border-line rounded-lg px-3 py-2 bg-white"
-              >
-                <option value="">—</option>
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <option key={n} value={n}>
-                    {"★".repeat(n)}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             <label className="text-sm text-ink/70 flex flex-col gap-1">
-              Notes
+              Notes on the coffee
               <textarea
                 rows={3}
                 value={draft.my_notes}
                 onChange={(e) => setDraft({ ...draft, my_notes: e.target.value })}
                 className="border border-line rounded-lg px-3 py-2 bg-white"
               />
+              <span className="text-xs text-ink/50">
+                What the coffee tastes like, which outlives any one brew. Per-brew observations go on the brew.
+              </span>
             </label>
+            {error && (
+              <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+            )}
+
             <button
               onClick={() => void save()}
-              disabled={saving}
+              disabled={saving || deleting}
               className="bg-accent text-white rounded-lg px-3 py-2 font-medium disabled:opacity-60"
             >
               {saving ? "Saving…" : "Save"}
             </button>
+
+            {/* Deleting a bag also deletes its photo and cannot be undone, so
+                it asks once. The confirm replaces the button rather than
+                appearing beside it — there is then no adjacent control to hit
+                by accident on a phone. */}
+            <div className="border-t border-line pt-3">
+              {confirmingDelete ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-ink/70">
+                    Delete <strong>{bag.coffee_name}</strong>, its photo
+                    {brewCount ? ` and ${brewCount} brew${brewCount === 1 ? "" : "s"}` : ""}? This cannot be
+                    undone.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => void remove()}
+                      disabled={deleting}
+                      className="flex-1 bg-red-700 text-white rounded-lg px-3 py-2 font-medium disabled:opacity-60"
+                    >
+                      {deleting ? "Deleting…" : "Yes, delete"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmingDelete(false)}
+                      disabled={deleting}
+                      className="flex-1 border border-line rounded-lg px-3 py-2"
+                    >
+                      Keep it
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmingDelete(true)}
+                  className="text-sm text-red-700 underline"
+                >
+                  Delete this bag
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
     </article>
+  );
+}
+
+/**
+ * The brews of one bag, and the form for adding another.
+ *
+ * TDS is entered in either unit and shown in both, because the reading is one
+ * number — a refractometer says percent, everything else quotes ppm, and
+ * 1% is 10,000ppm. Only percent is ever sent to the server; ppm is derived
+ * here and derived again for display, so the two can never disagree.
+ */
+function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void }) {
+  const [brews, setBrews] = useState<Brew[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState({
+    brewer: "",
+    brew_method: "",
+    grinder: DEFAULT_GRINDER,
+    grind_setting: "",
+    dose_g: "",
+    beverage_g: "",
+    notes: "",
+  });
+  const [tdsPercent, setTdsPercent] = useState("");
+  const [rating, setRating] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/bags/${bagId}/brews`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Couldn't read the brews.");
+      setBrews(data.brews);
+      onCount(data.brews.length);
+      setError(null);
+    } catch (e) {
+      // An unread list and an empty one must not look the same.
+      setError(e instanceof Error ? e.message : "Couldn't read the brews.");
+      setBrews([]);
+    }
+  }, [bagId, onCount]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const pct = tdsPercent ? Number(tdsPercent) : null;
+  const live = extractionYield({
+    doseG: draft.dose_g ? Number(draft.dose_g) : null,
+    beverageG: draft.beverage_g ? Number(draft.beverage_g) : null,
+    tdsPercent: pct,
+  });
+
+  async function add() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/bags/${bagId}/brews`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...draft, tds_percent: tdsPercent || null, rating }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Couldn't log that brew.");
+      setAdding(false);
+      setDraft({ brewer: "", brew_method: "", grinder: DEFAULT_GRINDER, grind_setting: "", dose_g: "", beverage_g: "", notes: "" });
+      setTdsPercent("");
+      setRating(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't log that brew.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeBrew(id: string) {
+    await fetch(`/api/brews/${id}`, { method: "DELETE" });
+    await load();
+  }
+
+  return (
+    <section className="flex flex-col gap-3 border-t border-line pt-4">
+      <h3 className="font-medium">Brews{brews?.length ? ` (${brews.length})` : ""}</h3>
+
+      {error && (
+        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+      )}
+
+      {brews?.length === 0 && !error && <p className="text-sm text-ink/60">No brews logged yet.</p>}
+
+      {brews?.map((b) => (
+        <BrewRow key={b.id} brew={b} onDelete={() => void removeBrew(b.id)} />
+      ))}
+
+      {adding ? (
+        <div className="flex flex-col gap-3 bg-paper border border-line rounded-xl p-3">
+          <label className="text-sm text-ink/70 flex flex-col gap-1">
+            Rating
+            <Stars value={rating} onChange={setRating} />
+          </label>
+
+          <Inline>
+            <label className="text-sm text-ink/70 flex flex-col gap-1">
+              Brewer
+              <select
+                value={draft.brewer}
+                onChange={(e) => setDraft({ ...draft, brewer: e.target.value })}
+                className="border border-line rounded-lg px-3 py-2 bg-white"
+              >
+                <option value="">—</option>
+                {MY_BREWERS.map((b) => (
+                  <option key={b} value={b}>
+                    {MY_BREWER_LABELS[b]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Field label="brew method" value={draft.brew_method} onChange={(v) => setDraft({ ...draft, brew_method: v })} />
+          </Inline>
+
+          <Inline>
+            <label className="text-sm text-ink/70 flex flex-col gap-1">
+              Grinder
+              <select
+                value={draft.grinder}
+                onChange={(e) => setDraft({ ...draft, grinder: e.target.value })}
+                className="border border-line rounded-lg px-3 py-2 bg-white"
+              >
+                <option value="">—</option>
+                {GRINDERS.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Field label="grind setting" value={draft.grind_setting} onChange={(v) => setDraft({ ...draft, grind_setting: v })} />
+          </Inline>
+
+          <Inline>
+            <Field label="dose (g)" value={draft.dose_g} onChange={(v) => setDraft({ ...draft, dose_g: v })} />
+            <Field label="in the cup (g)" value={draft.beverage_g} onChange={(v) => setDraft({ ...draft, beverage_g: v })} />
+          </Inline>
+
+          <TdsInput percent={tdsPercent} onPercent={setTdsPercent} />
+
+          {live != null && (
+            <p className="text-sm">
+              <strong>{live}%</strong> extraction —{" "}
+              <span className={band(live, YIELD_TARGET) === "in" ? "text-ink/70" : "text-red-700"}>
+                {readBrew({ tdsPercent: pct, yieldPercent: live })}
+              </span>
+            </p>
+          )}
+
+          <BrewNotes />
+
+          <label className="text-sm text-ink/70 flex flex-col gap-1">
+            Notes on this brew
+            <textarea
+              rows={2}
+              value={draft.notes}
+              onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+              className="border border-line rounded-lg px-3 py-2 bg-white"
+            />
+          </label>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => void add()}
+              disabled={saving}
+              className="flex-1 bg-accent text-white rounded-lg px-3 py-2 font-medium disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Log this brew"}
+            </button>
+            <button onClick={() => setAdding(false)} className="flex-1 border border-line rounded-lg px-3 py-2">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(true)} className="self-start text-sm text-accent underline">
+          Log a brew
+        </button>
+      )}
+    </section>
+  );
+}
+
+/** One logged brew, with its reading in both units. */
+function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
+  const pct = brew.tds_percent == null ? null : Number(brew.tds_percent);
+  const ey = brew.extraction_yield == null ? null : Number(brew.extraction_yield);
+
+  return (
+    <div className="bg-paper border border-line rounded-xl p-3 flex flex-col gap-1">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm font-medium">
+          {brew.brewer ? MY_BREWER_LABELS[brew.brewer as MyBrewer] : "Brew"}
+          {brew.brew_method ? ` · ${brew.brew_method}` : ""}
+        </span>
+        <span className="text-xs text-ink/50 shrink-0">{new Date(brew.brewed_at).toLocaleDateString()}</span>
+      </div>
+
+      {(brew.grinder || brew.grind_setting) && (
+        <span className="text-sm text-ink/60">{[brew.grinder, brew.grind_setting].filter(Boolean).join(" · ")}</span>
+      )}
+
+      {pct != null && (
+        <span className="text-sm">
+          TDS <strong>{pct}%</strong> <span className="text-ink/50">({percentToPpm(pct)} ppm)</span>
+          {ey != null && (
+            <>
+              {" · "}
+              <strong className={band(ey, YIELD_TARGET) === "in" ? "" : "text-red-700"}>{ey}%</strong> extraction
+            </>
+          )}
+        </span>
+      )}
+
+      {brew.rating ? <span className="text-sm text-accent">{"★".repeat(brew.rating)}</span> : null}
+      {brew.notes && <span className="text-sm text-ink/70">{brew.notes}</span>}
+
+      <button onClick={onDelete} className="self-start text-xs text-red-700 underline mt-1">
+        Remove
+      </button>
+    </div>
+  );
+}
+
+/** One reading, two units. Type either; percent is what gets stored. */
+function TdsInput({ percent, onPercent }: { percent: string; onPercent: (v: string) => void }) {
+  const asNumber = percent ? Number(percent) : null;
+  return (
+    <Inline>
+      <Field label="TDS (%)" value={percent} onChange={onPercent} />
+      <label className="text-sm text-ink/70 flex flex-col gap-1">
+        TDS (ppm)
+        <input
+          inputMode="numeric"
+          value={asNumber ? String(percentToPpm(asNumber)) : ""}
+          onChange={(e) => {
+            const ppm = Number(e.target.value);
+            onPercent(e.target.value && Number.isFinite(ppm) ? String(ppmToPercent(ppm)) : "");
+          }}
+          className="border border-line rounded-lg px-3 py-2 bg-white"
+        />
+      </label>
+    </Inline>
+  );
+}
+
+/** The margin notes: how to take the reading, and what it means. */
+function BrewNotes() {
+  return (
+    <details className="text-xs text-ink/60 bg-white border border-line rounded-lg px-3 py-2">
+      <summary className="cursor-pointer">How to measure this</summary>
+      <ul className="list-disc pl-4 mt-2 flex flex-col gap-1">
+        <li>
+          <strong>Extraction = (cup grams × TDS%) ÷ dose grams.</strong> Weigh the cup, not the kettle — the bed
+          keeps roughly 2g of water per gram of coffee, and using water-in overstates extraction by about a tenth.
+        </li>
+        <li>
+          <strong>TDS is strength; extraction is how much you pulled out.</strong> A drink can be strong and
+          under-extracted at once. Ratio moves strength, grind moves extraction.
+        </li>
+        <li>
+          Filter targets: TDS {TDS_TARGET.low}–{TDS_TARGET.high}%, extraction {YIELD_TARGET.low}–{YIELD_TARGET.high}%.
+          Under is sour and thin, over is bitter and drying.
+        </li>
+        <li>
+          <strong>1% = 10,000 ppm.</strong> A refractometer reads percent. Cheap conductivity pens read ppm and are
+          not measuring coffee TDS — they measure dissolved ions against a water calibration, and most of what is in
+          coffee is not ionic.
+        </li>
+        <li>Let the sample cool and filter it before reading, or it reads high.</li>
+      </ul>
+    </details>
   );
 }
 
@@ -762,6 +1090,43 @@ function Field({
       />
     </label>
   );
+}
+
+/**
+ * Rating as a meter rather than a dropdown: tap the star you mean. Tapping
+ * the current rating again clears it, because "I have not rated this" and
+ * "I rated it one star" are different things and a picker with no way back
+ * to the first makes one of them unreachable.
+ */
+function Stars({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
+  return (
+    <div className="flex items-center gap-1" role="group" aria-label="Rating">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          aria-label={`${n} star${n === 1 ? "" : "s"}`}
+          aria-pressed={value === n}
+          onClick={() => onChange(value === n ? null : n)}
+          className={`text-2xl leading-none px-0.5 ${value && n <= value ? "text-accent" : "text-line"}`}
+        >
+          ★
+        </button>
+      ))}
+      {value ? (
+        <button type="button" onClick={() => onChange(null)} className="text-xs text-ink/50 underline ml-2">
+          clear
+        </button>
+      ) : (
+        <span className="text-xs text-ink/40 ml-2">not rated</span>
+      )}
+    </div>
+  );
+}
+
+/** Two fields on one row on a phone, which is where this is used. */
+function Inline({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-2 gap-3">{children}</div>;
 }
 
 function Busy({ label, hint }: { label: string; hint?: string }) {

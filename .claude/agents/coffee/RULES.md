@@ -100,6 +100,19 @@ should record what you did without erasing what they suggested.
 
 ## Design decisions, and why
 
+**Two brewer vocabularies, not one.** `guide_method` records what the roaster published and stays
+broad, because it describes the world; `my_brewer` names the five things actually on the shelf.
+They were one shared list until the first real bags arrived and every one of them was Sweet Bloom
+publishing **"ORIGAMI AIR"** — a real dripper that no five-item list has room for. Narrowing the
+shared list would have turned the roaster's own column into "other" for most of the specialty
+world, which is information loss in the column whose entire job is recording what they said.
+
+`myBrewerFor` carries the roaster's choice across **only on an exact correspondence**. Origami,
+Chemex and espresso leave your brewer blank rather than rounding to the nearest cone, and a bare
+"V60" leaves it blank too, because you own an 02 and a Switch and the roaster did not say which.
+Rounding to the nearest thing on the shelf, on the roaster's authority, is the same species of
+invention this tool refuses about brewing parameters.
+
 **Brew method is a fixed vocabulary, not free text.** "V60", "v60" and "Hario V60" as three values
 would quietly break grouping and filtering, and roasters' wording varies more than that.
 `normalizeMethod` maps their phrasing onto the enum, ordered longest-phrase-first so "french press"
@@ -111,6 +124,26 @@ worth storing — keep that distinction.
 
 **Two URLs, not one.** `product_url` and `guide_url` are the same page at tier 1 and different
 pages at tier 2. One column would lose which you are looking at.
+
+**A bag is a purchase; a brew is one thing you did with it.** One bag, many brews. The bag holds
+what is fixed the moment you buy it — identity, purchased date, photo, and the whole `guide_*`
+block — and `my_notes`, which describes the coffee and outlives any one attempt at it. Everything
+variable is a brew: brewer, brew method, grinder, grind setting, dose, beverage mass, TDS, rating,
+and notes about that cup.
+
+The dial-in used to live on the bag, as a single set of columns. One dial-in per bag can only
+record the last thing you tried, which is the opposite of what dialling in is — a sequence of
+attempts whose whole value is comparing them. This is the repo's "prefer append over rewrite for
+anything that accumulates", applied to the thing that was accumulating.
+
+**Deleting a bag deletes its brews**, by cascade, and its photo. The confirm names the brew count
+for that reason: losing a dial-in history silently is worse than losing the photo.
+
+**TDS is stored once, in percent.** A refractometer reads percent; everything else quotes ppm; they
+are the same number and `1% = 10,000 ppm`. ppm is derived at display and never stored, because two
+columns for one measurement is two things that can disagree. **Extraction yield is a generated
+column**, not an input — it is a function of dose, beverage mass and TDS, and an editable copy
+would be free to drift from the brew it claims to describe.
 
 **Each purchase is its own row.** Roasters re-release the same coffee each crop, so "have I had
 this before" is a lookup on `(lower(roaster), lower(coffee_name))`, not a uniqueness constraint.
