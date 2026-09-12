@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchBrewGuide } from "@/lib/anthropic";
-import { isSearchModel, DEFAULT_SEARCH_MODEL } from "@/lib/models";
+import { isSearchModel, isEffortFor, effortsFor, DEFAULT_SEARCH_MODEL } from "@/lib/models";
 import { findRoasterDomain, guideColumns } from "@/lib/bags";
 import { getServiceClient } from "@/lib/supabase";
 
@@ -27,6 +27,21 @@ export async function POST(request: NextRequest) {
   }
   const model = isSearchModel(body.model) ? body.model : DEFAULT_SEARCH_MODEL;
 
+  // Refused rather than dropped. Silently ignoring an effort level this model
+  // cannot take would report a comparison that never ran at that setting.
+  if (body.effort != null && !isEffortFor(model, body.effort)) {
+    const offered = effortsFor(model);
+    return NextResponse.json(
+      {
+        error: offered.length
+          ? `${model} takes effort ${offered.join(", ")} — not "${body.effort}".`
+          : `${model} has no effort control, so "${body.effort}" can't be set for it.`,
+      },
+      { status: 400 }
+    );
+  }
+  const effort = isEffortFor(model, body.effort) ? body.effort : null;
+
   const supabase = getServiceClient();
 
   // Mark it in flight before the long call, so a page that reconnects can tell
@@ -45,19 +60,19 @@ export async function POST(request: NextRequest) {
       (await findRoasterDomain(roaster)) ??
       (typeof body.roaster_domain === "string" && body.roaster_domain.trim() ? body.roaster_domain.trim() : null);
 
-    const guide = await searchBrewGuide({ roaster, coffeeName, roasterDomain, model });
+    const guide = await searchBrewGuide({ roaster, coffeeName, roasterDomain, model, effort });
 
     // The result lands in the row, not in this response. That is the whole
     // point: by now the page that asked for it may be long gone.
     if (bagId) {
       const { error } = await supabase
         .from("bags")
-        .update({ ...guideColumns(guide, model), guide_search_started_at: null })
+        .update({ ...guideColumns(guide, model, effort), guide_search_started_at: null })
         .eq("id", bagId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ guide, model });
+    return NextResponse.json({ guide, model, effort });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The search failed.";
     // A failure is recorded too. Otherwise a bag sits on "searching" forever

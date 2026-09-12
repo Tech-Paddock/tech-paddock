@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
         varietal: field("varietal"),
         roast_date: field("roast_date"),
         photo_path: photoPath,
-        ...guideColumns(guide, field("guide_model")),
+        ...guideColumns(guide, field("guide_model"), field("guide_effort")),
         // Picking a method pre-populates the bag's; when a guide was found its
         // method is the roaster's recommendation and seeds this.
         my_method: myMethod ?? guide?.method ?? null,

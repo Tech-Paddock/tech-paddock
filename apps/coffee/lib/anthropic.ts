@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { BREW_METHODS } from "./methods";
 import { validateGuide, type Guide, type RawGuide } from "./guide";
-import { SEARCH_MODELS, DEFAULT_SEARCH_MODEL, type SearchModel } from "./models";
+import { SEARCH_MODELS, DEFAULT_SEARCH_MODEL, isEffortFor, type SearchModel } from "./models";
 
 /**
  * Reading a label is transcription and it is already fast, so it stays on the
@@ -115,9 +115,13 @@ export async function searchBrewGuide(params: {
   coffeeName: string;
   roasterDomain?: string | null;
   model?: SearchModel;
+  effort?: string | null;
 }): Promise<Guide> {
   const model = params.model ?? DEFAULT_SEARCH_MODEL;
   const spec = SEARCH_MODELS[model];
+  // Only a level this model accepts is sent. Anything else is dropped rather
+  // than passed through, because the request would fail rather than degrade.
+  const effort = isEffortFor(model, params.effort) ? params.effort : null;
 
   const tools: Record<string, unknown>[] = [
     {
@@ -154,7 +158,7 @@ export async function searchBrewGuide(params: {
       max_tokens: 8192,
       // Omitted rather than defaulted for a model that has no effort control:
       // sending it anyway is a 400, not a no-op.
-      ...(spec.effort ? { output_config: { effort: spec.effort } } : {}),
+      ...(effort ? { output_config: { effort } } : {}),
       system: SEARCH_SYSTEM,
       tools,
       messages,

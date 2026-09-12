@@ -78,7 +78,7 @@ export function hostOf(url: string | null | undefined): string | null {
  * moment a guide field is added — the stored quotes would still be right and
  * the parsed values silently would not.
  */
-export function guideColumns(guide: Guide | null, model: string | null = null) {
+export function guideColumns(guide: Guide | null, model: string | null = null, effort: string | null = null) {
   const answered = !!guide && guide.status !== "not_searched";
   return {
     product_url: guide?.product_url ?? null,
@@ -96,8 +96,10 @@ export function guideColumns(guide: Guide | null, model: string | null = null) {
     // beside what was kept, and the search no longer hands this to the page.
     guide_dropped: guide?.dropped ?? [],
     guide_fetched_at: answered ? new Date().toISOString() : null,
-    // Which model answered, recorded only when one did. A guide is comparable
-    // against another guide only if you know what produced it.
+    // What answered, recorded only when something did. A guide is comparable
+    // against another guide only if you know what produced it, and the effort
+    // level is as much a part of that as the model.
     guide_model: answered ? model : null,
+    guide_effort: answered ? effort : null,
   };
 }

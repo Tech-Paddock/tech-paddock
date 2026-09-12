@@ -99,6 +99,9 @@ describe("guideColumns", () => {
     // no source is meant to be shown beside what was kept, not discarded.
     const columns = guideColumns(found, "claude-haiku-4-5");
     expect(columns.guide_model).toBe("claude-haiku-4-5");
+    // Haiku has no effort control, and that is recorded as null rather than as
+    // a default level it never actually ran at.
+    expect(columns.guide_effort).toBeNull();
     expect(columns.guide_dropped).toEqual(found.dropped);
     expect(columns.guide_quotes).toEqual(found.quotes);
     expect(columns.guide_fetched_at).toBeTruthy();
@@ -107,8 +110,9 @@ describe("guideColumns", () => {
   it("treats a recorded 'none' as an answer", () => {
     // Tier 3 is a real result: the roaster published nothing. It is stamped
     // like any other answer so a bag is never re-searched for having one.
-    const columns = guideColumns({ ...found, status: "none", method: null, params: {}, quotes: [] }, "claude-sonnet-5");
+    const columns = guideColumns({ ...found, status: "none", method: null, params: {}, quotes: [] }, "claude-sonnet-5", "xhigh");
     expect(columns.guide_status).toBe("none");
+    expect(columns.guide_effort).toBe("xhigh");
     expect(columns.guide_fetched_at).toBeTruthy();
     expect(columns.guide_model).toBe("claude-sonnet-5");
   });
@@ -118,6 +122,7 @@ describe("guideColumns", () => {
     expect(columns.guide_status).toBe("not_searched");
     expect(columns.guide_fetched_at).toBeNull();
     expect(columns.guide_model).toBeNull();
+    expect(columns.guide_effort).toBeNull();
     expect(columns.guide_dropped).toEqual([]);
   });
 });

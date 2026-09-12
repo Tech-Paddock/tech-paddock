@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SEARCH_MODELS, MODEL_LABELS, DEFAULT_SEARCH_MODEL, isSearchModel, type SearchModel } from "@/lib/models";
+import { SEARCH_MODELS, MODEL_LABELS, DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT, effortsFor, isEffortFor, isSearchModel, type SearchModel } from "@/lib/models";
 
 describe("the search model registry", () => {
   it("refuses a model it does not know", () => {
@@ -21,10 +21,36 @@ describe("the search model registry", () => {
     }
   });
 
-  it("sends no effort to Haiku 4.5, which rejects it", () => {
-    // Not a preference. `output_config.effort` is a 400 on this model, so the
-    // registry is what stops the search route sending it.
-    expect(SEARCH_MODELS["claude-haiku-4-5"].effort).toBeNull();
+  it("offers no effort level for Haiku 4.5, which rejects the parameter", () => {
+    // Not a preference. `output_config.effort` is a 400 on this model, so an
+    // empty list is the honest answer and the toggle has to respect it.
+    expect(effortsFor("claude-haiku-4-5")).toEqual([]);
+    for (const level of ["low", "medium", "high", "xhigh", "max"]) {
+      expect(isEffortFor("claude-haiku-4-5", level), level).toBe(false);
+    }
+  });
+
+  it("offers xhigh only on the model that has it", () => {
+    // xhigh arrived a generation after Sonnet 4.6, so offering it there would
+    // be a 400 raised by a dropdown.
+    expect(isEffortFor("claude-sonnet-5", "xhigh")).toBe(true);
+    expect(isEffortFor("claude-sonnet-4-6", "xhigh")).toBe(false);
+    expect(isEffortFor("claude-sonnet-4-6", "max")).toBe(true);
+  });
+
+  it("refuses a level no model has", () => {
+    for (const model of Object.keys(SEARCH_MODELS) as SearchModel[]) {
+      expect(isEffortFor(model, "highest"), model).toBe(false);
+      expect(isEffortFor(model, ""), model).toBe(false);
+      expect(isEffortFor(model, null), model).toBe(false);
+    }
+  });
+
+  it("defaults to a level every effort-capable model accepts", () => {
+    for (const model of Object.keys(SEARCH_MODELS) as SearchModel[]) {
+      if (effortsFor(model).length === 0) continue;
+      expect(isEffortFor(model, DEFAULT_EFFORT), model).toBe(true);
+    }
   });
 
   it("pairs the dynamic-filtering web tools only with models that have them", () => {

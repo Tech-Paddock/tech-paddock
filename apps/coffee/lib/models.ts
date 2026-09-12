@@ -12,10 +12,43 @@
  * importing the SDK into the browser bundle.
  */
 export const SEARCH_MODELS = {
-  "claude-haiku-4-5": { search: "web_search_20250305", fetch: "web_fetch_20250910", effort: null },
-  "claude-sonnet-4-6": { search: "web_search_20260209", fetch: "web_fetch_20260209", effort: "high" },
-  "claude-sonnet-5": { search: "web_search_20260209", fetch: "web_fetch_20260209", effort: "high" },
+  "claude-haiku-4-5": {
+    search: "web_search_20250305",
+    fetch: "web_fetch_20250910",
+    // Empty, not "unset": this model returns a 400 for output_config.effort,
+    // so there is no level that can be offered for it.
+    efforts: [],
+  },
+  "claude-sonnet-4-6": {
+    search: "web_search_20260209",
+    fetch: "web_fetch_20260209",
+    // No xhigh — it arrived a generation later.
+    efforts: ["low", "medium", "high", "max"],
+  },
+  "claude-sonnet-5": {
+    search: "web_search_20260209",
+    fetch: "web_fetch_20260209",
+    efforts: ["low", "medium", "high", "xhigh", "max"],
+  },
 } as const;
+
+export type Effort = (typeof SEARCH_MODELS)[keyof typeof SEARCH_MODELS]["efforts"][number];
+
+/** The API's own default, so leaving it alone changes nothing. */
+export const DEFAULT_EFFORT = "high";
+
+/**
+ * Which levels this model will actually accept. The empty list is the whole
+ * reason this is model-derived rather than a fixed dropdown: offering a level
+ * for a model that rejects the parameter turns the toggle into a 400.
+ */
+export function effortsFor(model: SearchModel): readonly string[] {
+  return SEARCH_MODELS[model].efforts;
+}
+
+export function isEffortFor(model: SearchModel, value: unknown): value is Effort {
+  return typeof value === "string" && (effortsFor(model) as readonly string[]).includes(value);
+}
 
 export type SearchModel = keyof typeof SEARCH_MODELS;
 

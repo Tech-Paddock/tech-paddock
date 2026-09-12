@@ -18,6 +18,7 @@ alter table coffee.bags
   add column guide_search_started_at timestamptz,
   add column guide_search_error      text,
   add column guide_model             text,
+  add column guide_effort            text,
   add column guide_dropped           jsonb not null default '[]'::jsonb;
 
 comment on column coffee.bags.guide_search_started_at is
@@ -25,6 +26,9 @@ comment on column coffee.bags.guide_search_started_at is
 
 comment on column coffee.bags.guide_search_error is
   'Why the last search could not answer. A recorded failure, as against ''none'', which is an answer.';
+
+comment on column coffee.bags.guide_effort is
+  'The effort level the search ran at, where the model has one. Null for a model with no effort control, which is not the same as a model that ran at the default.';
 
 comment on column coffee.bags.guide_model is
   'Which model produced this guide. The search model is selectable while its retrieval quality is being compared, and a guide is only comparable against another if you know what answered.';

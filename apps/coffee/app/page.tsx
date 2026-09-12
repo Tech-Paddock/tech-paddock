@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { downscale } from "@/lib/image";
 import { BREW_METHODS, METHOD_LABELS, type BrewMethod } from "@/lib/methods";
 import type { Guide, GuideStatus } from "@/lib/guide";
-import { MODEL_LABELS, DEFAULT_SEARCH_MODEL, type SearchModel } from "@/lib/models";
+import { MODEL_LABELS, DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT, effortsFor, isEffortFor, type SearchModel } from "@/lib/models";
 
 type Identity = {
   roaster: string | null;
@@ -31,6 +31,7 @@ type Bag = Identity & {
   guide_quotes: { field: string; text: string; url: string }[];
   guide_dropped: { field: string; value: string; reason: string }[];
   guide_model: string | null;
+  guide_effort: string | null;
   guide_search_error: string | null;
   my_method: string | null;
   my_grinder: string | null;
@@ -128,6 +129,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
   const [carried, setCarried] = useState(false);
   const [dialIn, setDialIn] = useState({ my_grinder: "", my_grind_setting: "" });
   const [model, setModel] = useState<SearchModel>(DEFAULT_SEARCH_MODEL);
+  const [effort, setEffort] = useState<string>(DEFAULT_EFFORT);
   const [bagId, setBagId] = useState<string | null>(null);
   const [waited, setWaited] = useState(0);
 
@@ -196,6 +198,9 @@ function Scan({ onSaved }: { onSaved: () => void }) {
           roaster: identity.roaster,
           coffee_name: identity.coffee_name,
           model,
+          // Sent only when this model has the control. Haiku 4.5 returns a
+          // 400 for it rather than ignoring it.
+          effort: isEffortFor(model, effort) ? effort : null,
         }),
       }).catch(() => {});
     } catch (e) {
@@ -351,20 +356,43 @@ function Scan({ onSaved }: { onSaved: () => void }) {
 
       {stage === "confirm" && (
         <div className="flex flex-col gap-2">
-          <label className="text-sm text-ink/60 flex items-center gap-2">
-            Search with
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value as SearchModel)}
-              className="border border-line rounded-lg px-2 py-1 bg-white"
-            >
-              {(Object.keys(MODEL_LABELS) as SearchModel[]).map((m) => (
-                <option key={m} value={m}>
-                  {MODEL_LABELS[m]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="text-sm text-ink/60 flex items-center gap-3 flex-wrap">
+            <label className="flex items-center gap-2">
+              Search with
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value as SearchModel)}
+                className="border border-line rounded-lg px-2 py-1 bg-white"
+              >
+                {(Object.keys(MODEL_LABELS) as SearchModel[]).map((m) => (
+                  <option key={m} value={m}>
+                    {MODEL_LABELS[m]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {/* Absent rather than disabled for a model with no effort control:
+                a greyed-out control implies a setting that exists. */}
+            {effortsFor(model).length > 0 ? (
+              <label className="flex items-center gap-2">
+                at effort
+                <select
+                  value={isEffortFor(model, effort) ? effort : DEFAULT_EFFORT}
+                  onChange={(e) => setEffort(e.target.value)}
+                  className="border border-line rounded-lg px-2 py-1 bg-white"
+                >
+                  {effortsFor(model).map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <span className="text-ink/40">no effort control on this model</span>
+            )}
+          </div>
           <button
             onClick={() => void findAndSave()}
             className="bg-accent text-white rounded-xl px-4 py-3 font-medium"

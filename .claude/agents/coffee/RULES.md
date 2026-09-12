@@ -127,12 +127,18 @@ fix: an iPhone shot is 3–5MB of HEIC, the Anthropic API accepts only jpeg/png/
 rejects bodies over ~4.5MB with an opaque error. 1568px is Claude's optimal size, so this costs no
 accuracy.
 
-**The search model is selectable; the label reader is not.** Which model retrieves well enough is
-an open question, so the search offers Haiku 4.5, Sonnet 4.6 and Sonnet 5 and records on each bag
-which one answered — a guide is only comparable against another if you know what produced it. The
-models do not take the same request: the dynamic-filtering web tools need Sonnet 4.6 or better,
-and Haiku 4.5 rejects `output_config.effort` outright, so those differences live in a registry in
-`lib/models.ts` where picking a model cannot get them wrong. Reading a label is transcription, is
+**The search model and its effort are selectable; the label reader is not.** Which model retrieves
+well enough is an open question, so the search offers Haiku 4.5, Sonnet 4.6 and Sonnet 5, with an
+effort level where the model has one, and records both on each bag — a guide is only comparable
+against another if you know what produced it, and effort is as much a part of that as the model.
+
+The models do not take the same request, which is why both controls are derived from a registry in
+`lib/models.ts` rather than being fixed dropdowns: the dynamic-filtering web tools need Sonnet 4.6
+or better, Haiku 4.5 rejects `output_config.effort` outright so its list of levels is empty, and
+`xhigh` exists on Sonnet 5 but not on Sonnet 4.6. Every one of those is a 400 rather than a
+degraded result, so a level the model does not take is refused by the route and never offered by
+the page — absent rather than greyed out, because a disabled control implies a setting that
+exists. Reading a label is transcription, is
 already fast, and stays on `claude-sonnet-5`. **This needs an explicit exception to the
 `claude-sonnet-5` pin in `CLAUDE.md` and does not stand without one.**
 

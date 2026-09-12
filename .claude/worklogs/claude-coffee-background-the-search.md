@@ -32,3 +32,13 @@ waiting. Model picker on the confirm screen, backed by a registry that carries e
 versions. Tests 23 → 30, build clean.
 Open: unverified against a live deploy. The model comparison is the point and has not started.
 Need from TD: the `CLAUDE.md` model exception, and a view on the charter amendment.
+
+## 2026-09-12 03:31 — effort toggle added to this branch
+Joel asked for an effort toggle alongside the model one. Same branch rather than a third: it is
+the same feature — a comparison harness for the search — and this branch is unmerged.
+
+Effort is per-model and derived from the registry, not a fixed list. Haiku 4.5's list is empty
+because the parameter is a 400 there; `xhigh` is on Sonnet 5 and not on Sonnet 4.6. The route
+refuses a level the chosen model cannot take rather than dropping it, because a silently ignored
+setting would report a comparison that never ran. `guide_effort` is stored beside `guide_model`.
+Tests 30 → 33.
