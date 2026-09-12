@@ -6,62 +6,41 @@ Read `RULES.md` first. This file is only what is true right now.
 
 ---
 
-## Production has not deployed since 17:48 today
+## The deploy outage is closed — read this before you touch Vercel
 
-**This is the biggest live problem in the project and it is yours.**
+**Fixed 2026-09-12 at 00:40.** All five projects serve `0c7d882` (#33); `techpaddock.io` returns 200
+from that deployment with the password gate intact. It ran six hours and forty minutes.
 
-Every one of the five Vercel projects last deployed production at **17:48 UTC**, commit `92c1ec1`
-(PR #16). The last deployment of any kind was a preview at 17:54. Everything merged to `main` since
-then is undeployed — check the commit rather than a count, because the count grows on every merge.
+There were **two** causes, and only the first was diagnosed here originally.
 
-**Re-verified at 23:45, hours after the diagnosis below: still zero deployments on any of the five
-projects.** Three more pull requests merged in between and produced nothing. The GitHub App has not
-been reconnected.
+**One: the GitHub App installation.** The repo moved to the `Tech-Paddock` org and the installation
+did not travel with it — a GitHub App is installed on an *account*, not a repository. An earlier
+version of this file said the repo moved to the org *and back to `joelb-401`*. It did not; it is
+still org-owned, id `1358809705`, owner type Organization. That one wrong word sent the fix to
+`github.com/settings/installations`, a personal-account page that cannot reach an org-owned repo.
 
-The evidence, so you do not re-derive it:
+**Two, and this is the one that was missed: the project's git link is stored on the Vercel project,
+not derived from the installation.** After the org installation was in place, a push at 00:12 reached
+GitHub, ran CI, and produced **zero** deployments. All five projects still recorded
+`link.org: "joelb-401"`, and nothing on the GitHub side could rewrite it — removing the personal
+installation changed nothing. The fix was per project, in **Vercel's own Settings → Git**:
+disconnect, then reconnect to `Tech-Paddock/tech-paddock`.
 
-```
-17:48:28   last production deploy (#16)
-17:49:01   tp-resume         project settings modified
-17:49:30   tp-message-editor project settings modified
-17:49:57   tp-tracker        project settings modified
-17:50:23   tp-home           project settings modified
-17:50:26   tp-coffee-app     project settings modified
-17:54:49   last deployment of any kind
-           ... nothing, across 11 merges
-```
+What proved the installation itself was sound was an accident: a sixth project, created from
+Vercel's import flow at 00:16, deployed current `main` to production two seconds later carrying
+`githubOrg: Tech-Paddock`. That separated "Vercel cannot see the repo" from "Vercel is looking in the
+wrong place", which look identical from outside. The project has since been deleted.
 
-Five separate projects do not modify their own settings within 85 seconds of each other. That is one
-account-level event rippling through all of them, and the thing that rewrites every project's stored
-git link at once is **the repository changing hands**. The repo was transferred to the `Tech-Paddock`
-org in that window and **is still there** — id `1358809705`, owner type Organization, verified
-2026-09-12. An earlier version of this file said it came back to `joelb-401`. It did not, and that
-error is what pointed the fix below at the wrong installations page for six hours.
+Verified after the five reconnects: every custom domain survived — `techpaddock.io`,
+`editor.`, `tracker.`, `resume.` all still attached, and `tp-coffee-app` still holds
+`tech-paddock.vercel.app`.
 
-**Diagnosis: Vercel's GitHub App installation did not survive the transfer.** A GitHub App is
-installed on an *account*, not on a repository; the repo left the personal account's installation
-scope and landed on an org that has no Vercel installation at all. Nothing errors. Pushes succeed,
-GitHub Actions still runs (it is built into GitHub, not an installed app), and Vercel simply never
-hears about it.
+**If deployments stop again, read `link.org` on the project before touching anything on GitHub.**
 
-Ruled out along the way: the Hobby plan's 100-deploys-per-day cap — Joel checked the dashboard and
-there is no limit banner — and, read from the files rather than a summary of them,
-`git.deploymentEnabled: false` and the legacy `github.enabled: false`. Neither appears in any of the
-five `vercel.json` files, and there is no root `vercel.json`.
-
-**The fix:** `github.com/organizations/Tech-Paddock/settings/installations` → Vercel → confirm it
-exists and that `tech-paddock` is in its repository access list. The repo is org-owned, so the
-personal `github.com/settings/installations` page is the wrong one. **Joel installed it on the org
-on 2026-09-12.**
-
-Then a new push against current `main` is needed; do **not** use the dashboard's Redeploy button on
-the existing production deployment, because that rebuilds `92c1ec1` — the same stale code.
-
-**Open, and not to be guessed at:** all five projects still record `link.org: "joelb-401"` and
-`githubRepoOwnerType: "User"`. The repo id is unchanged, so Vercel may re-resolve on its own at
-webhook time — or each project may need `vercel git disconnect` / `vercel git connect` against
-`Tech-Paddock/tech-paddock`. Do not re-point five projects until a push has been tried and produced
-nothing, and note that re-pointing a Git link is Joel's under `CLAUDE.md` either way.
+Ruled out along the way, read from the files rather than a summary of them: the Hobby plan's
+100-deploys-per-day cap (no banner), and `git.deploymentEnabled: false` and the legacy
+`github.enabled: false` — neither appears in any of the five `vercel.json`, and there is no root
+`vercel.json`.
 
 ## Ignored Build Step — agreed, written, not landed
 
@@ -92,8 +71,9 @@ against the Hobby daily cap. Vercel's documentation does not say. It certainly s
 builds per push.
 
 Merging this is also the cleanest way to clear the backlog — it touches all five `vercel.json`
-files, so every project rebuilds and `VERCEL_GIT_PREVIOUS_SHA` still points at `92c1ec1`, meaning
-each project sees the full accumulated diff.
+files, so every project rebuilds. Note the backlog argument that used to sit here is spent: the
+outage is fixed and all five have deployed `0c7d882`, so this change is now worth landing on its own
+merits — five full Next.js builds per docs-only commit — rather than as a way to clear a backlog.
 
 ## `tp-coffee-app` is partly configured, and it is the only public exposure
 
@@ -120,8 +100,10 @@ Skipping cache upload because no files were prepared
 
 against `tp-home` on the same push installing 31 packages and detecting Next.js 14.2.35. So
 **`tp-coffee-app` is still pointed at the repo root**, and that — not the framework preset — is
-what keeps `tech-paddock.vercel.app` serving an ungated page. Root Directory must be `apps/coffee`, and it
-only takes effect on the next build, so a push has to follow the change.
+what keeps `tech-paddock.vercel.app` serving an ungated page — checked 2026-09-12, and it is a bare
+84-byte 404 with no data and no repo contents, so it is embarrassing rather than dangerous. Root
+Directory must be `apps/coffee`, and it only takes effect on the next build, so a push has to follow
+the change. Re-confirmed after #33 deployed: still a repo-root build.
 
 The framework preset is close to cosmetic by comparison: `apps/coffee/vercel.json` already declares
 `"framework": "nextjs"`, and `tp-message-editor` has deployed correctly for weeks with `framework:
