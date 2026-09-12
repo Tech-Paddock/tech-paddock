@@ -89,3 +89,49 @@ Correction for the TD while I am here: `CLAUDE.md` says `middleware.ts` is byte-
 apps. It is not — there are three distinct versions, because `editor` and `tracker` carry
 deliberate carve-outs. `lib/auth.ts` and `lib/password.ts` are genuinely identical; I verified all
 three by checksum. The rule is still right; its stated reason is out of date.
+
+## 2026-09-12 18:20 — handoff, and what I need from the TD
+Landed: `/admin` (`9bd079e`), on top of the JPS re-theme (`417dbdc`). Both unmerged, no PR yet.
+`tsc --noEmit` and `next build` clean; rendered at desktop and 390px.
+
+**The full scoping note is in `.claude/agents/techpad-gen/HANDOFF.md`** — Joel asked for it there so
+he can work through it with the TD. Summarised here because this is the channel the ledger says to
+use, and because three items need someone other than me.
+
+Need from TD — decisions:
+
+1. **Whether `/admin` becomes the pit wall.** If it renders agent notes, the source should be the
+   files agents already keep (`_open-items.md`, the `HANDOFF.md`s, live worklogs) rather than a new
+   place to type. Three sub-decisions in the handoff: note latency, note lifetime, markdown
+   rendering.
+2. **The one that is genuinely Joel's, not the TD's:** showing notes from *unmerged* branches means
+   the hub reading the GitHub API at request time, which would put a read-only token in the hub —
+   **the first key it has ever held**, and a direct exception to a property `RULES.md` says to
+   protect. I have not built toward it in either direction.
+3. **Whether a sixth app is created for this.** My recommendation in the handoff is no: `/admin` is
+   already a route in `apps/home` and needs no Vercel project, no DNS record and no new variable. A
+   sixth app would add a sixth copy of the auth plumbing and a CI-matrix entry, and would still not
+   be reachable when the platform is down, because it shares the account and the gate.
+
+Need from TD — work that is not mine:
+
+4. **A middleware carve-out for `/api/health` per app.** Shared auth plumbing, so the TD's. Until it
+   exists the admin page reports unknown for every tool's database and keys, which is most of what
+   an admin page is for.
+5. **`/api/health` in `editor`, `tracker` and `home`** — one change per app agent, pattern already
+   exists at `apps/coffee/app/api/health/route.ts`.
+6. **A public `/api/version` per app** returning the deployed commit SHA. Highest value item on the
+   list: it would have made the deployment outage visible in seconds. Needs a decision on whether it
+   is public or behind the internal secret.
+
+For the ledger (not editing it, as instructed):
+
+7. `CLAUDE.md`'s claim that `middleware.ts` is byte-identical across five apps is **false** — three
+   distinct versions, because `editor` and `tracker` carry deliberate carve-outs. `lib/auth.ts` and
+   `lib/password.ts` are genuinely identical. Checksummed all three.
+8. **"Verify `SESSION_SECRET` on all five projects" can never be closed by a page.** Nothing may echo
+   it. The only safe check is behavioural. Worth rewording so it stops reading as a pending task a
+   dashboard will one day answer.
+
+Open, not started: the mobile login bug (both cheap explanations now ruled out — see handoff), no
+`test` script in `apps/home`, and the deferred Pit Wall type pass.
