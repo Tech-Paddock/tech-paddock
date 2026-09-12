@@ -76,3 +76,43 @@ current, ledger numbering fixed where it skipped 2.
 Open: #43 awaiting TechPad Gen. Two questions with Joel — the `tuning` project and the
 `middleware.ts` sentence in `CLAUDE.md`.
 Need from TD: nothing, this is the TD.
+
+---
+
+## 2026-09-12 19:00 — claim: the browser is Chrome, said once in CLAUDE.md
+
+Joel asked for a general note that the browser is Chrome and that Safari should not be referenced.
+Branch reset onto `main` after #44 merged, so this sits on a clean base under the same name.
+
+**Written as a diagnosis rule, not a word ban, and that distinction is the whole substance.** I
+grepped the repo first. The nine Safari references are two different things wearing one name:
+
+*Wrong, and what Joel is objecting to* — the Safari/ITP theory for the mobile login bug, in
+techpad-gen's handoff and in this ledger. A guess about an engine nobody runs, which survived because
+the word made it sound diagnosed.
+
+*Load-bearing* — on iOS **every** browser is WebKit, Chrome included. `apps/coffee/lib/image.ts`
+keeps an `<img>` fallback because `createImageBitmap` cannot always decode an iPhone HEIC, and the
+primary device is a phone. An agent told only "we use Chrome, drop the Safari references" deletes that
+and breaks photograph-a-bag on the exact device the tool exists for. And iOS standalone home-screen
+install is a Safari-only mechanism, which #42 depends on.
+
+So the note names those two as platform constraints, requires the constraint be named rather than the
+browser, and forbids Safari everywhere else. A blanket ban would have been faithful to the words and
+would have caused a bug.
+
+**Not mine to edit:** the Safari/ITP text in techpad-gen's `HANDOFF.md` — that file is the open
+conflict in #43 and rewriting it is exactly what #41 forbids me. Flagged on the ledger instead. Same
+for a cosmetic Coffee CSS comment.
+
+**Raised for Joel rather than assumed:** #42 shipped iOS home-screen install yesterday, and that
+install runs through Safari because Apple allows no other route to a standalone app. If he never opens
+Safari, that feature is unreachable as built. Reaching it from Chrome needs a manifest, which needs
+`middleware.ts`, which is TechPad Gen's shared-pattern call — not Coffee's.
+
+## 2026-09-12 19:00 — handoff
+Landed: the Chrome note in `CLAUDE.md` under the shared foundation, and the ledger's own mobile-bug
+entry reworded to stop leading with the wrong engine.
+Open: #43 still with TechPad Gen. Three questions with Joel — the `tuning` project, the
+`middleware.ts` sentence, and whether Coffee's iOS install is worth keeping if he never opens Safari.
+Need from TD: nothing, this is the TD.
