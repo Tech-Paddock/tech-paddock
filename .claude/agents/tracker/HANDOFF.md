@@ -40,14 +40,18 @@ Joel holds the Azure registration. It is on his list. **Chase it before building
 on top of Graph** — the daily sweep has never once run against real credentials, so every claim
 about it is a claim about code that has not executed.
 
-## Your app is live but stale
+## Your app is deployed and current again
 
-`tracker.techpaddock.io` is serving code from **17:48 today**, commit `92c1ec1`. Everything merged to
-`main` since then is undeployed, #22 included.
+**Fixed 2026-09-12.** `tracker.techpaddock.io` serves `0c7d882`, #22 included. The outage that pinned
+every app to `92c1ec1` for six and a half hours is over, and you can verify against the live site
+again.
 
-Not your bug and not yours to fix — Vercel's GitHub App lost its installation when the repo was
-transferred. It is on Joel's list and the Platform agent's. **But it means the live site is not
-running your code**, so nothing can be verified there. Test locally.
+**#22 is deployed but still inert**, and that is a separate thing: `MS_GRAPH_CLIENT_ID`,
+`MS_GRAPH_CLIENT_SECRET`, `MS_GRAPH_REFRESH_TOKEN` and `CRON_SECRET` are unset, so `graphConfigured()`
+is false and the calendar, To Do and daily sweep all degrade quietly by design. Those are Joel's to
+set and need a one-time Azure registration. **Note the ordering constraint**: your middleware exempts
+`/api/cron/*` from the password gate and the route's guard fails open when `CRON_SECRET` is unset, so
+`CRON_SECRET` has to be set before or with the Graph credentials, never after.
 
 ## Next steps
 

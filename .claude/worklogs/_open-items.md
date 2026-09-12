@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-12 00:11 UTC.**
+**Last reviewed: 2026-09-12 00:45 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -15,47 +15,38 @@ and the things that belong to nobody else.
 
 ## Blocking everything else
 
-- **2026-09-11 — PRODUCTION HAS NOT DEPLOYED SINCE 17:48** (updated 2026-09-12). Every app serves
-  commit `92c1ec1`, and everything merged since is undeployed — the count only grows, so check the
-  commit rather than a number. Verified at 23:45 and again at 23:58: zero deployments on **any** of
-  the five projects since 17:54. Cause: Vercel's GitHub App lost its installation when the repo was
-  transferred — a GitHub App is installed on an *account*, not a repository. Pushes succeed, CI runs,
-  Vercel never hears. Ruled out, read from the files rather than from a summary of them: the Hobby
-  daily deploy cap (no banner), and both `git.deploymentEnabled` and the legacy `github.enabled` —
-  neither appears in any of the five `vercel.json`, and there is no root `vercel.json`.
-  **The repo is owned by the `Tech-Paddock` org right now** — id `1358809705`, owner type
-  Organization — so the installation belongs on the *org*:
-  `github.com/organizations/Tech-Paddock/settings/installations`. An earlier version of this entry
-  sent people to `github.com/settings/installations`, which is the personal account and cannot reach
-  an org-owned repo. **Joel installed it on the org on 2026-09-12.**
-  What remains is a *new push* against current `main` — not the dashboard Redeploy button, which
-  rebuilds the stale commit. All five projects still record `link.org: "joelb-401"`; whether that
-  re-resolves by repo id or needs five disconnect/reconnects is unknown until a push is tried.
-  Evidence and timestamps in `.claude/agents/platform/HANDOFF.md`.
-  **Until a push actually deploys, nothing can be verified on a live URL.** What is deployed is not
-  what is on `main`.
+Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
-1. **2026-09-11 — Finish `tp-coffee-app`. Partly done as of 23:31.** The project's `updatedAt` moved,
-   so something was changed, but two settings are verifiably still outstanding: **framework preset is
-   still `null`** and **`coffee.techpaddock.io` is not in its domain list**. **Root Directory is also
-   wrong** — verified 2026-09-12 from the build log, which is a check earlier entries wrongly called
-   impossible: the project built the repo root in 310ms and prepared no files, where `tp-home` on the
-   same push installed 31 packages and ran `next build`. It must be `apps/coffee`, and it only takes
-   effect on the next build. The framework preset is near-cosmetic by comparison, since
-   `apps/coffee/vercel.json` already declares `nextjs`. The five environment variables remain
-   API-invisible; `GET /api/health` on the deployed app is the way to check those.
+1. **2026-09-12 — Finish `tp-coffee-app`. Root Directory is the one that matters.** Re-verified
+   after the outage was fixed: the project deployed `0c7d882` to production and *still* built the
+   repo root. **Root Directory must be set to `apps/coffee`**, and it only takes effect on the next
+   build, so a push has to follow the change. That — not the framework preset — is why
+   `tech-paddock.vercel.app` serves a page outside the password gate. Checked: it returns a bare 404,
+   84 bytes, no data and no repo contents. Embarrassing rather than dangerous, so it is not blocking.
+   Also outstanding: `coffee.techpaddock.io` is still not in the domain list (the Cloudflare A record
+   already exists), and the framework preset is `null` — near-cosmetic, since
+   `apps/coffee/vercel.json` already declares `nextjs` and `tp-message-editor` has deployed correctly
+   for weeks with the same `null`.
+   The five environment variables it actually reads, from the source rather than CI's dummy list:
+   `ANTHROPIC_API_KEY`, `APP_PASSWORD_HASH`, `SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`,
+   `SUPABASE_URL`. They stay API-invisible; `GET /api/health` on the deployed app checks them.
+   **Root Directory is checkable from a session — read the build log.** A correct build installs
+   dependencies and runs `next build`; a repo-root build finds no `package.json` and exits in
+   milliseconds. Earlier entries called this impossible and were wrong.
    **The Cloudflare DNS is already done**: `coffee.techpaddock.io` has a real A record at
    `76.76.21.21`, confirmed not a wildcard because a nonsense subdomain on the same zone does not
    resolve. Only the Vercel-side attachment remains.
    **This is still the only publicly exposed thing in the project** until Root Directory points at a
    real app: `tech-paddock.vercel.app` serves an empty page outside the password gate, because the
    gate lives in each app's middleware and a project with no app has no gate.
-2. **2026-09-11 — Verify the new `SESSION_SECRET` on all five projects.** It was rotated today
-   because the old value could not be read back out of the dashboard. Nobody has confirmed it landed
-   everywhere, and with deploys broken it is likely no project has picked it up. A partial rollout is
-   the silent-SSO failure: no error anywhere, just a login loop.
+2. **2026-09-12 — Verify `SESSION_SECRET` parity across all five. Now checkable, and untested.**
+   It was rotated on 09-11 because the old value could not be read back out of the dashboard, and
+   nobody has confirmed it landed everywhere. All five have now redeployed, so the behavioural check
+   finally works: log in at `techpaddock.io`, then open a tool from a hub tile. A login loop means
+   the secret did not land on that app. No agent can read the values — this one is Joel's eyes only.
+   A partial rollout is the silent-SSO failure: no error anywhere, just the loop.
 3. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
    `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
    will tell you they are doing nothing. Needs a one-time Azure registration against a personal
@@ -75,6 +66,21 @@ and the things that belong to nobody else.
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
+
+- **2026-09-12 — THE DEPLOY OUTAGE IS CLOSED.** Production had not deployed since 17:48 on 09-11.
+  All five projects now serve `0c7d882` (#33); `techpaddock.io` returns 200 from that deployment
+  with the password gate intact. Six hours and forty minutes.
+  **Two causes, and the second is the one the documentation missed.** Vercel's GitHub App
+  installation did not survive the repo moving to the `Tech-Paddock` org, and installing it on the
+  org did *not* fix it on its own — a push at 00:12 reached GitHub, ran CI, and produced zero
+  deployments. **A project's git link is stored on the Vercel project, not derived from the
+  installation.** All five still recorded `link.org: "joelb-401"`, and nothing on the GitHub side
+  could rewrite that; removing the personal installation changed nothing. Each project had to be
+  disconnected and reconnected to `Tech-Paddock/tech-paddock` in Vercel's own Settings → Git.
+  What proved the installation itself was sound was an accident: a sixth project created from
+  Vercel's import flow deployed current `main` two seconds after it was made. That project has since
+  been deleted. Every custom domain survived the five reconnects.
+  **If this happens again, check the project's `link.org` before touching anything on GitHub.**
 
 - **2026-09-11 — PR #28 closed and all dead branches deleted.** The queue is empty: zero open pull
   requests, and `main` plus one docs branch is the whole branch list.

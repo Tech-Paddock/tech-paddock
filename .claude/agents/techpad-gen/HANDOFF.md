@@ -50,13 +50,12 @@ This is a genuine open bug and good next work.
 
 ## One complication before you test anything
 
-**`techpaddock.io` is serving code from 17:48 today**, commit `92c1ec1`. Everything merged to `main`
-since then is undeployed. Vercel's GitHub App lost its installation when the repo was
-transferred; it is on Joel's list and the Platform agent's.
+**Resolved 2026-09-12.** `techpaddock.io` serves `0c7d882` and returns 200 with the password gate
+intact. The outage that pinned every app to `92c1ec1` for six and a half hours is over.
 
-For you specifically this matters more than for most: **you cannot reproduce the mobile bug against
-the live site and learn anything reliable**, because the live site is not running current code. Wait
-for deployments to resume, or reproduce locally.
+For you specifically: **the mobile login bug is now reproducible against the live site again**, which
+it was not while the site ran stale code. That was the blocker on diagnosing it. Start by checking
+what URL the iframe actually loads — the Safari/ITP theory does not fit a report from mobile Chrome.
 
 Also note `coffee.techpaddock.io` does not exist yet — `apps/coffee` is built and merged but its
 Vercel project still points at the repo root. The Coffee tile in `APPS` currently points at a

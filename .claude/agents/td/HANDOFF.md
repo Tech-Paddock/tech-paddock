@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-11, end of day.
+State as of 2026-09-12, 00:45 UTC.
 
 Read `RULES.md` first for the role. This is the workload.
 
@@ -10,20 +10,23 @@ automatically, so it should already be there.
 
 ---
 
-## The largest live problem
+## The deploy outage is closed
 
-**Production has not deployed since 17:48 today.** `editor.techpaddock.io` and the rest serve commit
-`92c1ec1`, and everything merged since is undeployed — check the commit, not a count, because the
-count grows on every merge. Verified at 23:45: zero deployments on any of the five projects since
-17:54, across three merged pull requests.
+All five projects serve `0c7d882` (#33). `techpaddock.io` returns 200 from that deployment with the
+password gate intact. The PII scrub (#21) is deployed with it, so the resume app's live UI no longer
+serves the company name that was sitting in the undeployed backlog.
 
-Diagnosis, evidence and fix are in `.claude/agents/platform/HANDOFF.md` — it is that agent's to
-carry, and Joel's to unblock, because it needs a GitHub App installation only he can restore. Your
-job is to keep it visible until it is fixed and not to let anything be declared verified against a
-live URL in the meantime. **What is deployed is not what is on `main`.**
+**The lesson worth carrying, because the documentation cost six hours by getting it wrong twice.**
+The repo is owned by the `Tech-Paddock` org; the handoff said it had moved back to `joelb-401`, and
+sent the fix to the personal installations page, which cannot reach an org-owned repo. Then, once
+the org installation existed, deploys *still* did not fire — because **a project's git link is
+stored on the Vercel project, not derived from the installation.** All five recorded
+`link.org: "joelb-401"` and had to be disconnected and reconnected in Vercel's own Settings → Git.
 
-The PII scrub (#21) is in that backlog. A real company name is still being served in the resume
-app's live UI, behind the password gate.
+**If deployments ever stop again: read `link.org` on the project before touching anything on
+GitHub.** And the general form of the mistake — read the thing itself, not the document describing
+it. Every correction tonight came from a build log, a route, or an API response contradicting a
+document that sounded authoritative.
 
 ## The queue is empty
 
@@ -41,24 +44,23 @@ rather than promising it.
 
 Live infrastructure and one-time credentials. None of it is yours.
 
-1. **Reconnect Vercel's GitHub App.** Unblocks everything else. The repo is org-owned, so the page
-   is `github.com/organizations/Tech-Paddock/settings/installations` — **not** the personal
-   `github.com/settings/installations`, which cannot reach an org-owned repo. Installed on the org
-   2026-09-12; a new push to `main` is still required before anything deploys.
-2. **Finish `tp-coffee-app`. Partly done.** Outstanding: **Root Directory is still the repo root**,
-   proven 2026-09-12 from the build log — a 310ms build preparing no files. That, not the framework
-   preset, is the public exposure. Also outstanding: `coffee.techpaddock.io` is not in its domain
-   list, and the framework preset is `null` (near-cosmetic — `vercel.json` already says `nextjs`).
-   The five env vars stay API-invisible; `GET /api/health` on the deployed app is how to check them.
-   The Cloudflare DNS record already exists. **Still the only publicly exposed thing in the
-   project** until Root Directory points at a real app.
-3. **Verify the new `SESSION_SECRET` landed on all five projects** and that all five redeployed. It
-   was rotated today. A partial rollout is the silent-SSO failure.
-4. **Set `MS_GRAPH_*` and `CRON_SECRET`** on `tp-tracker`. The Microsoft To Do integration and daily
-   cron shipped in #22 and are inert without them, and degrade quietly by design.
-5. **Add `build (coffee)` to branch protection's required checks.** The matrix is five jobs; the
+1. **Finish `tp-coffee-app`, Root Directory first.** It is still the repo root — re-proven from the
+   build log after #33 deployed. Set it to `apps/coffee`; it only takes effect on the next build, so
+   a push has to follow. That, not the `null` framework preset, is why `tech-paddock.vercel.app`
+   serves outside the password gate — and that surface is a bare 84-byte 404, checked, so it is
+   embarrassing rather than urgent. Also outstanding: `coffee.techpaddock.io` is not in its domain
+   list, though the Cloudflare A record already exists. The five env vars stay API-invisible;
+   `GET /api/health` on the deployed app checks them.
+2. **Verify `SESSION_SECRET` parity across all five.** Now finally checkable, because all five have
+   redeployed. Log in at `techpaddock.io`, open a tool from a tile; a login loop means it did not
+   land on that app. No agent can read the values.
+3. **Set `CRON_SECRET` first, then `MS_GRAPH_*`** on `tp-tracker` — the order is not cosmetic. The
+   middleware exempts `/api/cron/*` from the password gate and the route's guard fails open when
+   `CRON_SECRET` is unset, so setting the Graph credentials alone publishes an unauthenticated
+   endpoint that creates To Do items on demand. Harmless today only because Graph is unconfigured.
+4. **Add `build (coffee)` to branch protection's required checks.** The matrix is five jobs; the
    rule names four.
-6. **Run `supabase link` and `migration list` once, locally.** Expect eight local matching remote
+5. **Run `supabase link` and `migration list` once, locally.** Expect eight local matching remote
    with `20260908235234` remote-only. That gap is deliberate. Do not repair it.
 
 ## Decisions made today
