@@ -122,6 +122,21 @@ searches pin `allowed_domains` up front rather than leaning on the post-hoc host
 search for an unknown roaster stays unpinned — guessing a domain from the roaster's name is exactly
 the invention this tool refuses.
 
+**It installs to the iPhone home screen, and is iOS-only on purpose.** The primary device is a
+phone in a kitchen, so the tool is installed rather than opened in a tab: `apple-touch-icon` plus
+the `apple-mobile-web-app-*` tags, which is all iOS needs. There is deliberately no web app
+manifest. A manifest is fetched without credentials, so the password gate would return the login
+redirect and the install would silently never offer itself; allowing it through means editing
+`middleware.ts`, which is byte-identical in five apps and is not Coffee's to change. If every tool
+should be installable, that pattern belongs to TechPad Gen, not here.
+
+The icon is a static import so it is served from `/_next/static`, the one prefix the middleware
+matcher excludes. Next's own `app/apple-icon.png` convention is served from a gated route, and iOS
+would fall back to a screenshot of the login page as the home screen icon.
+
+**An installed app has its own cookie jar**, so signing in inside it is expected rather than a
+session bug. It is also reached directly rather than through the hub's iframe.
+
 **Images downscale in the browser** to 1568px on the long edge at quality 0.85. Three problems, one
 fix: an iPhone shot is 3–5MB of HEIC, the Anthropic API accepts only jpeg/png/webp/gif, and Vercel
 rejects bodies over ~4.5MB with an opaque error. 1568px is Claude's optimal size, so this costs no
@@ -139,8 +154,7 @@ or better, Haiku 4.5 rejects `output_config.effort` outright so its list of leve
 degraded result, so a level the model does not take is refused by the route and never offered by
 the page — absent rather than greyed out, because a disabled control implies a setting that
 exists. Reading a label is transcription, is
-already fast, and stays on `claude-sonnet-5`. **This needs an explicit exception to the
-`claude-sonnet-5` pin in `CLAUDE.md` and does not stand without one.**
+already fast, and stays on `claude-sonnet-5`.
 
 Lowering the model does not lower the guard. `validateGuide` enforces quote-backing in code, so a
 weaker model cannot invent a recipe — it can only fail to find one and report `none`. That is what
