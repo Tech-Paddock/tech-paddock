@@ -28,3 +28,30 @@ this SHA, the outage is closed and `SESSION_SECRET` parity becomes checkable for
 If nothing appears, the stale `link.org` is the next suspect and the five Git links need
 re-pointing — Joel's, not an agent's.
 Need from TD: nothing, this is the TD's own change.
+
+## 2026-09-12 00:27 — the org installation was necessary but not sufficient
+Recording the sequence, because the diagnosis in the Platform handoff was right about the cause and
+incomplete about the remedy.
+
+Installing Vercel's GitHub App on the `Tech-Paddock` org did **not** restore deploys on its own. A
+branch push at 00:12:40 reached GitHub — CI ran on it — and produced zero deployments across all
+five projects four minutes later.
+
+What proved the installation was fine was an accident: a sixth Vercel project was created from
+Vercel's import flow at 00:16:06 and deployed `ff9d630` to production two seconds later, carrying
+`githubOrg: Tech-Paddock` and `githubRepoOwnerType: Organization`. So Vercel could see the org repo;
+the five old projects simply held a stale link and nothing on the GitHub side could rewrite it.
+
+**The link is stored on the Vercel project, not derived from the installation.** Removing the
+personal `joelb-401` installation changed nothing. Each project had to be disconnected and
+reconnected to `Tech-Paddock/tech-paddock` individually, in Vercel's own Settings → Git.
+
+Verified after the reconnect: all five read `org: Tech-Paddock`, and every custom domain survived —
+`techpaddock.io`, `editor.`, `tracker.`, `resume.` still attached, and `tp-coffee-app` still holds
+`tech-paddock.vercel.app`. Environment variables are not API-readable, so `SESSION_SECRET` parity
+across the five is still unconfirmed and is the next thing to check once deploys land.
+
+Left behind and needing disposal: the accidental sixth project, `tech-paddock`
+(`prj_T0L27CLJWQizV70mOrOgzxzktuES`). It points at the repo root with no app under it and serves a
+public, ungated 404 on three `.vercel.app` hostnames — checked, not assumed. Joel said he would
+delete it.
