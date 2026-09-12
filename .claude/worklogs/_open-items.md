@@ -66,11 +66,6 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
   to merge a draft outright — checked, and CI still runs all five jobs on drafts, so waiting costs
   nothing. Until now the file's own closing line was true: every rule was convention except the
   hooks.
-  For the record, and because it changes what the rule is for rather than excusing anything: today's
-  merges of #42 and #48 were not accidents or rule-breaking — the brief as written made the TD both
-  gate and merge, with no approval step to skip. This adds a step that did not exist; it does not
-  repair one that was ignored. Worth knowing because a rule written to stop carelessness reads
-  differently from one written to add a checkpoint, and this is the second.
   **#43 converted to draft** — it was open, unapproved and failing the gate, which is exactly the
   accident this rule removes. Converting toward draft is the safe direction and is not promoting on
   an author's behalf, which the rule forbids.

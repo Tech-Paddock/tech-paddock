@@ -231,12 +231,6 @@ merge API refuses a draft outright. That makes this the first rule in `CLAUDE.md
 enforcement behind it rather than an agent's compliance — the file's closing line says the hooks were
 the only such part, and that is now one item out of date in the right direction.
 
-**Said plainly rather than left implied:** Joel's reason was "so you don't accidentally merge them."
-Today's merges of #42 and #48 were neither accidental nor against the rules — the brief made the TD
-gate and merge, with no approval step available to skip. This adds a checkpoint that did not exist
-rather than repairing one that was ignored. I record that because a rule written against carelessness
-and a rule written to add oversight are different rules, and the second is the one that was asked for.
-
 **This pull request is a draft**, which is the rule applying to itself on the first opportunity, the
 way #41 did. I will not promote it. #43 I converted *to* draft — the safe direction, and not the
 promoting-for-someone-else the rule forbids.
