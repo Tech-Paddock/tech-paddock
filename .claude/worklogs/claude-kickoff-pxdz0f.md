@@ -1,36 +1,31 @@
 # claude-kickoff-pxdz0f
 agent: technical director · apps: none · shared files: none
 
-## 2026-09-12 01:45 — claim
-Working on: recording the state after Joel's configuration pass, and providing the push that makes
-it live. Documentation only.
+## 2026-09-12 02:05 — claim
+Working on: recording that Coffee is live and correcting a claim I made about Vercel's skip toggle
+that turned out to be false.
 Touching: .claude/worklogs/_open-items.md, .claude/agents/td/HANDOFF.md,
-.claude/agents/platform/HANDOFF.md
+.claude/agents/platform/HANDOFF.md, .claude/agents/coffee/HANDOFF.md
 Depends on: nothing
 
-## 2026-09-12 01:45 — the diagnostic behind this commit
-Joel rotated SESSION_SECRET, moved the four subdomains to CNAMEs, attached coffee.techpaddock.io and
-set tp-coffee-app's Root Directory. All of it verified correct. None of it was live.
+## 2026-09-12 02:05 — the correction, stated plainly
+I told Joel that tp-coffee-app's *Skip deployments when there are no changes to the root directory*
+setting meant a docs-only push would not rebuild that project, and I wrote that into the ledger and
+two handoffs. It is wrong. #35 touched only .claude/ and tp-coffee-app rebuilt from it twice — once
+from the branch, once from main — and those builds are what brought Coffee up.
 
-  01:39:28  tp-coffee-app      settings changed
-  01:39:40  tp-resume          settings changed
-  01:39:51  tp-tracker         settings changed
-  01:40:07  tp-message-editor  settings changed
-  01:40:29  tp-home            settings changed
-  00:48:22  last deployment on all five — fifty-one minutes earlier
+The practical cost was small: Joel clicked Redeploy about five times on my advice, which was
+unnecessary but harmless. The cost worth avoiding was writing an unverified mechanism into three
+documents as though it were established. Corrected in place with the error named.
 
-DNS needs no deploy and was already live: all four subdomains resolve through
-d1317e1174061c29.vercel-dns-017.com, all four return 200, and the frame-ancestors header survived.
-The apex stays an A record because an apex cannot be a CNAME.
+Why it did not skip is not understood. Plausible readings: it does not apply to the first build
+after a Root Directory change, or "dependencies" is broader than the label suggests. Recorded as
+open rather than guessed at.
 
-The other two needed a build. Vercel bakes the environment into the function at deploy time, so
-every app was still running the previous SESSION_SECRET, and tp-coffee-app's last build was still
-the 153ms repo-root build, which is why coffee.techpaddock.io answered 404.
-
-## 2026-09-12 01:45 — handoff
-Landed: documentation only, and deliberately also the build that activates the configuration.
-Open: whether Coffee actually comes up. Read its build log — dependencies installed and next build
-run means Root Directory took; an exit in milliseconds means it did not. Then GET /api/health behind
-the login for the five environment variables, which no agent can read.
-SSO is worth testing only after this deploy, not before.
+## 2026-09-12 02:05 — handoff
+Landed: documentation only. Coffee is live at coffee.techpaddock.io, the tech-paddock.vercel.app
+exposure is closed because the project finally has middleware, and the four app handoffs and the
+ledger now say so.
+Open: GET /api/health on Coffee, behind the login — the only check on its five environment
+variables, and still unrun. SESSION_SECRET parity, now testable since all five rebuilt at 01:59.
 Need from TD: nothing, this is the TD's own change.

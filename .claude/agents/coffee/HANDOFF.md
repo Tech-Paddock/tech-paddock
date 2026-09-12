@@ -20,20 +20,23 @@ Verified today, directly, not inferred:
   Vercel will build this successfully before it is configured, and then throw at runtime on a
   missing `SESSION_SECRET`. **A green build will not tell you the config is right.**
 
-## What stands between it and live
+## It is live
 
-All of it is Vercel configuration, and none of it is yours. `tp-coffee-app` still points at the
-**repo root** rather than at `apps/coffee`, which is why `tech-paddock.vercel.app` currently serves
-an empty page outside the password gate — the gate lives in each app's middleware, so a project
-with no app has no gate.
+**Deployed and reachable as of 2026-09-12, 02:00.** `coffee.techpaddock.io` returns 200 and serves
+your login page. Root Directory is `apps/coffee`, the domain is attached, DNS resolves through the
+shared CNAME target, and the build log shows dependencies installed and `next build` run — against
+the 153ms `no files were prepared` it produced while still pointed at the repo root.
 
-Needed on that project: Root Directory → `apps/coffee`, framework → Next.js, five environment
-variables (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_PASSWORD_HASH`, `SESSION_SECRET`,
-`ANTHROPIC_API_KEY`), then attach `coffee.techpaddock.io` in Vercel.
+`tech-paddock.vercel.app` also points at this project and now serves the same gated login, so the
+ungated page this file used to warn about is gone.
 
-**The Cloudflare half is already done.** `coffee.techpaddock.io` has a real A record at
-`76.76.21.21` — confirmed not a wildcard, because a nonsense subdomain on the same zone does not
-resolve. Only the Vercel-side attachment remains, and it should take effect immediately.
+**One check is still unrun and it is the one that matters: `GET /api/health`, behind the login.**
+The five environment variables are invisible to every API, are read per request rather than at build
+time, and a green build proves nothing about them. The route names whichever of the `coffee` schema,
+the `coffee-files` bucket, or `ANTHROPIC_API_KEY` is unhappy. Run it before trusting a bag scan.
+
+The framework preset still reads `Other`, and that is cosmetic: your `vercel.json` declares `nextjs`
+and overrides the dashboard, which is why the build succeeded with the preset unset.
 
 **As of 23:31 the project is partly configured.** Its `updatedAt` moved, so something was changed,
 but the framework preset is still `null` and the domain is still not attached. Root Directory and
