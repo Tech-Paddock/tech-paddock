@@ -17,7 +17,16 @@ export async function GET(request: NextRequest) {
   const roaster = params.get("roaster")?.trim();
   const coffeeName = params.get("coffee_name")?.trim();
   if (roaster && coffeeName) {
-    return NextResponse.json({ previous: await findPreviousBag(roaster, coffeeName) });
+    // Report a lookup that could not run as a failure rather than as "no
+    // previous purchase" — they are the same null, and only one is an answer.
+    try {
+      return NextResponse.json({ previous: await findPreviousBag(roaster, coffeeName) });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "The previous-purchase lookup failed." },
+        { status: 500 }
+      );
+    }
   }
 
   const q = params.get("q")?.trim();
