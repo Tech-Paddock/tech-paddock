@@ -23,6 +23,15 @@ export async function signedPhotoUrl(path: string, seconds = 3600): Promise<stri
   return data?.signedUrl ?? null;
 }
 
+/**
+ * Remove a bag's photo. Best effort by design: the row is already gone by the
+ * time this runs, and a leftover object is a smaller problem than a row
+ * pointing at a file that no longer exists.
+ */
+export async function deletePhoto(path: string): Promise<void> {
+  await getServiceClient().storage.from(BUCKET).remove([path]);
+}
+
 export class StorageError extends Error {
   constructor(message: string) {
     super(message);
