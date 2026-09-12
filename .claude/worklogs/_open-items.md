@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-12 03:05 UTC.**
+**Last reviewed: 2026-09-12 04:00 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -52,6 +52,21 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
+
+- **2026-09-12 — Handoffs are now part of the gate, and #40 is why.** Agents update their
+  `HANDOFF.md` when they open or change a pull request; the TD reads every handoff a change touches
+  before merging, and a stale one sends the change back rather than getting backfilled on the way
+  past. #40 moved Coffee's save ahead of its search — the app's central flow — and updated the
+  charter and the worklog and no handoff, so the merge published a document that was confidently
+  wrong about the one thing it exists to explain. Coffee's handoff now carries a staleness banner
+  and its rewrite is the Coffee agent's first task; the TD did not write it, because a handoff
+  written by the TD is a second-hand reading of someone else's work.
+- **2026-09-12 — #39 and #40 merged.** Bag lookups no longer report success when the database is
+  unreachable — a swallowed Supabase `error` made an unreachable database look like a first-time
+  coffee, and two of three call sites answered 200 with a confident wrong answer. And the
+  brew-guide search is backgrounded, with a selectable model and effort recorded per bag. #40's
+  migration was applied to the hosted project immediately before the merge — additive columns, so
+  the running code ignored them and there was no window where new code met old schema.
 
 - **2026-09-12 — COFFEE IS FULLY UP.** `GET /api/health` returns `{"ok":true}`: `coffee schema
   reachable`, `bucket coffee-files reachable`, `ANTHROPIC_API_KEY` set. It is deployed at

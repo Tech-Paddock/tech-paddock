@@ -101,9 +101,23 @@ between configuring something that exists and creating, destroying, or re-pointi
   ships untested and nothing tells you.
 - Keep your worklog current. It carries what a commit cannot: what you are doing right now, what
   you are blocked on, what you decided that affects someone else, what you need from the TD.
+- **Update your `HANDOFF.md` when you open a pull request, and again whenever you change what that
+  pull request does.** The two files are not the same job. The worklog is what you are doing right
+  now and it dies with its branch; the handoff is what the next session in your area inherits and
+  it outlives everything. A pull request is the moment work stops being in-flight and becomes
+  something the next agent has to know about — so that is when the handoff is written, not at the
+  end of a session you may not get to finish.
+  Say what is now true, not what you did: the commit already records the what. If the change alters
+  a flow, a contract, or a constraint your handoff describes, the old description is now wrong and
+  correcting it is part of the change, not follow-up work.
 
 ### Merging
 
+- **Handoffs current before the merge.** The technical director reads every handoff the change
+  touches and checks it describes what the change leaves behind. A merge that lands a new flow
+  while its handoff still describes the old one hands the next session a document that is
+  confidently wrong — which is the single failure this project has paid for most often. A stale
+  handoff sends the change back; it does not get fixed by the TD on the way past.
 - **Squash merge, always.** One commit on `main` per change.
 - **CI green before merge** — all five matrix jobs, on the current head. A red build does not get
   merged on the assumption that the failure is unrelated. Establish that it is, or fix it.
