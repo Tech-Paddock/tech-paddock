@@ -195,20 +195,24 @@ Every agent needs these. Per-tool detail lives in that tool's charter.
   server-side. And a new model can carry API-shape changes — `effort` moving under `output_config`
   caught this project once already — so moving an app to a different model is a deliberate change
   with a test behind it, never a string swap.
-- **The browser is Chrome, on desktop and on the phone. Do not diagnose against Safari, and do not
-  reach for it as an explanation.** Every report here comes from Chrome unless it explicitly says
-  otherwise. A theory resting on Safari, WebKit third-party cookie partitioning or ITP is a theory
-  about a browser nobody here is using — the mobile login bug already cost one round of exactly
-  that, and it survived because the word *Safari* made a wrong explanation sound like a diagnosis.
-  Reproduce in Chrome, and describe behaviour as Chrome's.
+- **Chrome is the default browser, on desktop and on the phone. Safari is a utility, used only where
+  Chrome cannot do the job.** Every report here comes from Chrome unless it explicitly says
+  otherwise, so **Safari is never the explanation for a bug.** A theory resting on WebKit
+  third-party cookie partitioning or ITP is a theory about a browser that was not in the loop — the
+  mobile login bug already cost one round of exactly that, and it survived because the word *Safari*
+  made a guess sound like a diagnosis. Reproduce in Chrome, and describe behaviour as Chrome's.
 
-  **Two places the platform genuinely forces WebKit. Neither is licence to bring Safari back as an
-  explanation.** On iOS every browser is WebKit, Chrome included, so a WebKit *rendering or decoding*
-  quirk still applies on the phone — the `<img>` fallback in `apps/coffee/lib/image.ts` is there for
-  that and is not dead code, so do not delete it on the grounds that we use Chrome. And adding a web
-  app to the iOS home screen so it launches standalone is a Safari-only mechanism, which is what
-  Coffee's install path depends on: an Apple constraint, not a browser preference. When you hit one
-  of these, name the constraint. Do not name Safari anywhere else.
+  **Reaching for Safari on purpose is fine — that is what a utility browser is for.** Adding a web
+  app to the iOS home screen so it launches standalone is Safari-only, and that is how Coffee is
+  installed: open it in Safari once, add it, and the installed app is its own thing afterwards. The
+  intended path, not a workaround to design away. So do not add a web app manifest to make an app
+  Chrome-installable on the strength of this rule alone — that means editing `middleware.ts`, which
+  is five copies and TechPad Gen's call, and it is not what this rule asks for.
+
+  **On iOS every browser is WebKit, Chrome included**, so a WebKit rendering or decoding quirk still
+  applies on the phone whichever browser is in front of it. The `<img>` fallback in
+  `apps/coffee/lib/image.ts` is there because `createImageBitmap` cannot always decode an iPhone
+  HEIC. It protects Chrome on the primary device and is not dead code.
 
 - **Agent isolation.** Never point two Claude Code sessions at the same working directory at the
   same time. One app folder at a time, or genuinely separate worktrees.

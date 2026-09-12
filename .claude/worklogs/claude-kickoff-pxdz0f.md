@@ -116,3 +116,32 @@ entry reworded to stop leading with the wrong engine.
 Open: #43 still with TechPad Gen. Three questions with Joel — the `tuning` project, the
 `middleware.ts` sentence, and whether Coffee's iOS install is worth keeping if he never opens Safari.
 Need from TD: nothing, this is the TD.
+
+---
+
+## 2026-09-12 19:25 — claim: amend the browser note, Safari is a utility
+
+Joel amended it within the hour of #45 landing, once the consequence I flagged surfaced: Chrome is the
+**default**, Safari is a **utility browser** used where Chrome cannot do the job. Not a ban.
+
+That is a better rule than the one I wrote, and it resolves the tension I had raised rather than
+choosing a side of it. My version forbade Safari everywhere but two named carve-outs, which made
+Coffee's install read as a tolerated exception. Under the amendment it reads as the intended path,
+which is what it actually is — iOS allows no other route to a standalone home-screen app.
+
+What survives unchanged is the part that was doing the work: **Safari is never the explanation for a
+bug.** Reports come from Chrome unless they say otherwise, and the mobile login bug already lost a
+round to an ITP theory about a browser that was not in the loop.
+
+One thing I added that Joel did not ask for, and the reason: the rule now says explicitly that it is
+**not** grounds for adding a web app manifest to make apps Chrome-installable. Without that line, the
+next agent reads "Chrome is the default" and reasonably concludes the install should work from Chrome
+— which means editing `middleware.ts`, five copies, TechPad Gen's call, on the strength of a rule that
+never asked for it. A rule that quietly authorizes work nobody sanctioned is worse than no rule.
+
+## 2026-09-12 19:25 — handoff
+Landed: the amended note in `CLAUDE.md`, ledger entry rewritten rather than appended to so there is
+one account of the rule and not two.
+Open: #43 still with TechPad Gen. Two questions with Joel — the `tuning` project and the
+`middleware.ts` sentence. The iOS install question is closed by this amendment.
+Need from TD: nothing, this is the TD.
