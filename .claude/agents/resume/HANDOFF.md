@@ -37,16 +37,15 @@ describing the rule against it. All replaced with a synthetic substitute or remo
 fixture is a place a real name can hide, and for a `.docx` that means checking `.rels` and
 `docProps/` as well as `document.xml`.
 
-## Your app is live but stale
+## Your app is deployed and current again
 
-`resume.techpaddock.io` is serving code from **17:48 today**, commit `92c1ec1`. Everything merged to
-`main` since then is undeployed — **including #21, the PII scrub.** The real company name is still
-being served in the live UI, behind the password gate.
+**Fixed 2026-09-12.** `resume.techpaddock.io` serves `0c7d882`. The deploy outage that pinned every
+app to `92c1ec1` for six and a half hours is over, and **#21, the PII scrub, went out with it** —
+the company name is no longer in the live UI.
 
-Not your bug and not yours to fix: Vercel's GitHub App lost its installation when the repo was
-transferred. It is on Joel's list and the Platform agent's. But it does mean the live site is not
-running your code, so nothing can be verified there, and the one user-visible consequence of the
-outage is yours.
+You can verify against the live site again. If deployments ever appear to stop, the cause both times
+was Vercel-side rather than anything in this repo; the diagnosis is in
+`.claude/agents/platform/HANDOFF.md` and the first thing to check is the project's `link.org`.
 
 ## Next steps
 

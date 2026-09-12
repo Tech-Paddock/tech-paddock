@@ -67,15 +67,15 @@ fails on permissions, shape, or an unhandled rejection that is being swallowed.
 
 ---
 
-## Your app is live but stale
+## Your app is deployed and current again
 
-`editor.techpaddock.io` is serving code from **17:48 today** — commit `92c1ec1`. Everything merged to
-`main` since then is undeployed, yours included.
+**Fixed 2026-09-12.** `editor.techpaddock.io` serves `0c7d882`. The outage that pinned every app to
+`92c1ec1` for six and a half hours is over, and your merged work went out with it.
 
-This is not your bug and not yours to fix. Vercel's GitHub App lost its installation when the repo
-was transferred, so pushes stopped triggering builds. It is on Joel's list and the Vercel Config
-agent's. **But it means you cannot verify anything on the live site right now** — what you see
-there is not your code. Test locally.
+You can verify against the live site again. Note the agent roster changed while this was stale:
+Vercel and Supabase are now one **Platform Config** agent, and the diagnosis lives in
+`.claude/agents/platform/HANDOFF.md`. If deployments ever appear to stop, check the Vercel project's
+`link.org` before anything else.
 
 ---
 
