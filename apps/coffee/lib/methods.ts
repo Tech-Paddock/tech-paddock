@@ -1,3 +1,5 @@
+import { ROASTER_BREWERS, ROASTER_BREWER_LABELS, type RoasterBrewer } from "./brewers";
+
 // Brew method is a fixed vocabulary, not free text. "V60", "v60" and
 // "Hario V60" as three distinct values would quietly break grouping and
 // filtering in the library, and the roaster's own wording varies more than
@@ -5,33 +7,14 @@
 // obvious next step and deliberately isn't built yet — promoting this enum
 // to a table later is an additive migration.
 
-export const BREW_METHODS = [
-  "v60",
-  "chemex",
-  "kalita",
-  "aeropress",
-  "french-press",
-  "espresso",
-  "moka",
-  "cold-brew",
-  "batch",
-  "other",
-] as const;
+// The roaster-facing vocabulary now lives in brewers.ts alongside yours, so
+// the two lists sit next to each other and the reason they differ is written
+// down once. These re-exports keep the existing names working.
+export const BREW_METHODS = ROASTER_BREWERS;
 
-export type BrewMethod = (typeof BREW_METHODS)[number];
+export type BrewMethod = RoasterBrewer;
 
-export const METHOD_LABELS: Record<BrewMethod, string> = {
-  v60: "V60",
-  chemex: "Chemex",
-  kalita: "Kalita Wave",
-  aeropress: "AeroPress",
-  "french-press": "French press",
-  espresso: "Espresso",
-  moka: "Moka pot",
-  "cold-brew": "Cold brew",
-  batch: "Batch brew",
-  other: "Other",
-};
+export const METHOD_LABELS = ROASTER_BREWER_LABELS;
 
 export function isBrewMethod(value: unknown): value is BrewMethod {
   return typeof value === "string" && (BREW_METHODS as readonly string[]).includes(value);
@@ -49,6 +32,10 @@ const ALIASES: [RegExp, BrewMethod][] = [
   [/\baeropress\b/i, "aeropress"],
   [/\bkalita\b|\bwave\s*185\b|\bflat\s*bottom\b/i, "kalita"],
   [/\bchemex\b/i, "chemex"],
+  // Sweet Bloom publishes "ORIGAMI AIR". Every bag in the library hit this and
+  // was correctly recorded as "other" — unplaceable, not guessed at. It is
+  // placeable now.
+  [/\borigami\b/i, "origami"],
   [/\bv-?60\b|\bhario\b|\bcone\b/i, "v60"],
   [/\bespresso\b|\bportafilter\b|\bbasket\b/i, "espresso"],
   [/\bbatch\b|\bauto-?drip\b|\bbrewer\b|\bmachine\b/i, "batch"],
