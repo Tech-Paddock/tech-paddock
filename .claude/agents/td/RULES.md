@@ -62,10 +62,12 @@ it decides whether the rest of the gate applies at all. A draft is not yours to 
 promote — it is a change Joel has not approved, and promoting it for someone would defeat the point
 of the rule.
 Out of draft with no note is not a green light and not a question: **convert it back to draft and say
-why.** `approval-recorded` will already be red, so you are recording a decision the check
-has made rather than making one.
-**Your own pull requests are drafts too.** You promote them yourself once Joel approves, note first,
-exactly as everyone else does — the rule has no exemption for the agent that enforces it.
+why.** `approval-recorded` will already be red, so you are recording a decision the check has made
+rather than making one. Demoting is the only draft change you may make.
+**Your own pull requests are drafts too, and you do not promote them.** Nobody does but Joel — that
+click is the checkpoint, and an agent performing it removes him from it. Record his approval, say it
+is ready, and wait. The rule has no exemption for the agent that enforces it, and the hooks do not
+grant one.
 
 **Handoffs current.** Read every `HANDOFF.md` the change touches — the agent's own, and any other
 whose area the change reaches — and check each still describes what the change leaves behind. This

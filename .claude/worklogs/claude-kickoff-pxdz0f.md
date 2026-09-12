@@ -301,3 +301,43 @@ promoted-with-note passes, comment-on-a-plain-issue is ignored. **First real pro
 someone promotes without a note**, and that is worth confirming when it happens rather than assuming.
 I did not promote anything to test it: doing that would be an agent promoting without approval on the
 day the rule forbidding it landed.
+
+## 2026-09-12 21:05 — correction: no agent promotes, and the hooks now enforce it
+
+Joel's "so that they can promote their own" was a typo for **can't**. That inverts the design, and the
+inverted one is better for a reason worth writing down: if an agent may promote, the technical director
+can promote and then merge, which collapses the checkpoint back into the single actor the rule was
+written to interrupt. Promotion has to sit with the one participant who is not an agent.
+
+So: **nobody promotes but Joel.** Not the author, not the TD. Demoting back to draft stays allowed,
+because it is the safe direction and it is the TD's defined response to a promotion that should not
+have happened.
+
+**And this is enforceable, unlike the note.** Two new `PreToolUse` hooks in `.claude/settings.json`
+following the existing deny pattern: `create_pull_request` is refused unless `draft: true`, and
+`update_pull_request` is refused when it sets `draft: false`. Hooks are the part of this repo that does
+not depend on an agent choosing to comply, which is exactly the property this rule needed and the note
+can never have.
+
+**A real bug in my first version, found by testing rather than by reading.** I wrote
+`jq -r ".tool_input.draft // \"absent\""`. jq's `//` is a null-**or-false** default, so `false` yields
+`"absent"` — and the promotion case, the single case the hook exists to block, fell straight through as
+allowed. Proven directly:
+
+    $ echo '{"tool_input":{"draft":false}}' | jq -r '.tool_input.draft // "absent"'
+    absent
+
+Replaced with `if has("draft") then (.draft|tostring) else "absent" end`, which distinguishes false
+from absent. All six cases now behave: create with draft true allowed, create with draft absent or
+false denied, update to draft false denied, update to draft true allowed, body-only edit allowed.
+
+Worth noting the shape of that mistake, because it is the same one as the read-all.sh bug earlier in
+this branch: both were guards that silently permitted the thing they existed to catch, and both looked
+correct on the page. A guard that fails open is worse than no guard, because it is also reassuring.
+
+## 2026-09-12 21:05 — handoff
+Landed (pending approval): promotion belongs to Joel alone, enforced by two hooks; the approval note
+still required and checked; demoting the only draft change an agent may make.
+Open: this PR a draft awaiting Joel — and now only he can promote it, which is the rule proving itself.
+#43 draft with TechPad Gen.
+Need from TD: nothing, this is the TD.

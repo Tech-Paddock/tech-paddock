@@ -67,8 +67,11 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
   binds every agent **including the technical director** — his words: "nothing wrong with a sanity
   check before deployment." The agent says it is ready, Joel approves in chat, and only then is it
   marked ready for review.
-  **Agents promote their own**, and post the approval note first: one line reading
-  `Approved by Joel on YYYY-MM-DD — "what he said"` in a comment on the pull request.
+  **No agent promotes a pull request — not its own, not anyone's.** Joel marks it ready for review
+  himself, because that click is the checkpoint and an agent performing it removes him from it. When
+  he approves, the agent records it first: one line reading
+  `Approved by Joel on YYYY-MM-DD — "what he said"` in a comment on the pull request. Converting a
+  pull request back to draft is the one draft change an agent may make.
   That note is the part that makes it work rather than decorative: no agent can see the chat where
   Joel approved, so a pull request merely out of draft is indistinguishable from one an agent
   promoted itself. This repo is the only channel between agents, so an approval living only in a
@@ -78,8 +81,10 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
   rather than leaving it red. Its one honest limit: every agent comments as the same GitHub account,
   so it catches an approval somebody forgot to get, never one they invented. That residue closes by
   honesty and is not worth machinery here.
-  **So enforcement went from one mechanism to four** — branch protection, the hooks, GitHub refusing
-  to merge a draft, and this check. The file's closing line said the hooks were the only part not
+  **Two new hooks make it non-voluntary rather than a rule agents are asked to respect.**
+  `.claude/settings.json` now refuses `create_pull_request` unless `draft: true`, and refuses any
+  `update_pull_request` that sets `draft: false`. Demoting stays allowed. So enforcement went from one
+  mechanism to four — branch protection, the hooks, GitHub refusing to merge a draft, and this check. The file's closing line said the hooks were the only part not
   depending on an agent choosing to comply; it is corrected in the same change.
   **A promoted pull request with no note is not a question.** The TD converts it back to draft and
   says why, rather than asking — the check has already made the decision.
