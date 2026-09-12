@@ -145,3 +145,46 @@ one account of the rule and not two.
 Open: #43 still with TechPad Gen. Two questions with Joel — the `tuning` project and the
 `middleware.ts` sentence. The iOS install question is closed by this amendment.
 Need from TD: nothing, this is the TD.
+
+---
+
+## 2026-09-12 19:45 — claim: correct the middleware.ts claim everywhere it is asserted
+
+Joel delegated this ("update the middleware as you see fit"). Scope decision made here rather than
+assumed: he authorised the correction, and the question was how far it reaches.
+
+**Re-verified by checksum first, not taken from TechPad Gen's report.** `lib/auth.ts` and
+`lib/password.ts` are identical across all five. `middleware.ts` is three: `home`/`resume`/`coffee`
+share one at 47 lines, `editor` is 59 with a scoped `/api/draft` bypass, `tracker` is 65 with
+`/api/summary` plus an outright `/api/cron/*` wave-through. Both carve-outs are commented and
+deliberate.
+
+**The rule was never wrong. The reason under it was, and that is the dangerous part** — it hid the
+real hazard. `middleware.ts` is not risky because the copies must match; it is risky because it *is*
+the password gate, so a bad edit publishes an endpoint rather than breaking a login. Tracker already
+demonstrates it: `/api/cron/*` skips the gate and the route's own `if (secret && …)` fails open
+without `CRON_SECRET`. That trap has been on the ledger for a day while the rule guarding the file
+described a different danger entirely.
+
+**Corrected in eleven places** — `CLAUDE.md` twice, the TD charter, and the `RULES.md` and
+`KICKOFF.md` of all five app agents. Every prohibition is byte-for-byte unchanged; only the
+justification moved. I edited other agents' charters, which is TD-permitted and which I would not do
+on my own initiative; the alternative was leaving ten specification files asserting a fact the brief
+now contradicts, which is the drift this project keeps paying for.
+
+One of the eleven was mine, written an hour earlier: the Chrome note in `CLAUDE.md` said
+`middleware.ts` "is five copies". I repeated the error while flagging it.
+
+`message-editor` and `tracker` were the proof it had gone unread for a long time — each names its own
+carve-out and then calls the file byte-identical in the very next sentence.
+
+**Left alone:** `.claude/agents/coffee/HANDOFF.md` still carries the claim. A handoff is not the TD's
+to rewrite; Coffee corrects it next time it touches that file. Merged worklogs keep it too, correctly
+— they are a record of what was believed at the time, not a specification.
+
+## 2026-09-12 19:45 — handoff
+Landed: the corrected reason in the brief, the TD charter and five agent charters plus their
+kickoffs; ledger item closed and the two stale ledger references fixed.
+Open: #43 still with TechPad Gen. One question with Joel — the `tuning` project, which he has said he
+will delete.
+Need from TD: nothing, this is the TD.

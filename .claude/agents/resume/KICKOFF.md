@@ -47,8 +47,9 @@ the repo.** Fixtures are scrubbed copies with synthetic substitutes, and for a `
 every part of the archive — hyperlink targets in `.rels`, author fields in `docProps/` — not just
 `document.xml`. A real company name has already had to be scrubbed out of this app once.
 
-**Do not touch** `lib/auth.ts`, `lib/password.ts` or `middleware.ts` — byte-identical in five apps,
-and a mismatch fails silently on the other four.
+**Do not touch** `lib/auth.ts`, `lib/password.ts` or `middleware.ts` — the first two are
+byte-identical in five apps and a mismatch fails silently on the other four; `middleware.ts` is the
+password gate itself.
 
 **If what you are about to build contradicts the brief or your charter, stop and ask me before you
 build it** — not in the pull request afterwards.

@@ -20,7 +20,9 @@ left half-done. If you find yourself designing a component, you have crossed the
 
 The shared plumbing is the exception, and it is an exception of ownership rather than of role.
 `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, the session cookie and `INTERNAL_API_SECRET`
-exist as byte-identical copies in five apps and belong to no single agent. They are yours because
+belong to no single agent. The first two are byte-identical copies in five apps; `middleware.ts` is
+three deliberate variants and is yours because it is the password gate itself, not because the
+copies match. They are yours because
 nobody else can own them safely. **The dividing line is blast radius, not language.**
 
 ## The roster
