@@ -88,6 +88,60 @@ file before the row that points at it, so deleting in the same order means a row
 an object that is gone. A leftover object is the lesser failure and the delete is best-effort about
 it. Deleting an id that matches no row is a 404, not a success.
 
+## The shape of the data
+
+`coffee.bags` 1 ──< `coffee.brews`. A bag is a purchase and what the roaster published; a brew is
+one attempt at it. The dial-in — brewer, brew method, grinder, grind setting — moved off the bag
+entirely, because one set of columns can only hold the last thing you tried.
+
+Two things on `coffee.brews` are deliberately not writable and should stay that way:
+`extraction_yield` is a generated column, and ppm is never stored at all. Both exist to stop one
+measurement being recorded twice in forms that can disagree. If you add a field here, ask first
+whether it is a measurement or a function of measurements.
+
+`findPreviousBag` reads the most recent brew of the previous bag, not columns on the bag.
+
+## Deploying the brew log
+
+**Nothing here needs a new environment variable, a Vercel setting, a project or a DNS record.**
+That is worth saying first, because every Coffee deploy so far has been slowed by assuming
+otherwise. Coffee's five variables are set and correct; the `coffee` schema is already exposed to
+the Data API.
+
+The one thing that is not automatic is the migration. `20260912200000_coffee_brews_shelf_and_bag_fields.sql`
+adds `purchased_date`, drops the bag's four dial-in columns, and creates `coffee.brews`.
+
+**Order matters, and there is a short window either way.** The new code needs `purchased_date` and
+`coffee.brews`; the old code writes the columns this migration drops. So:
+
+1. Merge the three branches in order — vocabulary, page shell, brew log. Squash, CI green on each
+   head.
+2. **Apply the migration as soon as the merge lands**, while Vercel is still building. A deploy
+   takes a couple of minutes and the exposure is that long.
+3. Apply it through Supabase's `apply_migration`, not by pasting into the SQL editor. The editor
+   changes the database without recording the migration as applied, and then `migration list`
+   shows a file the remote has never heard of — which is how six migrations came to live only in
+   the database the first time.
+4. `NOTIFY pgrst, 'reload schema'` is the last line of the file. Do not drop it: a new table can be
+   invisible to the API while plainly present in SQL, and it reads as "relation does not exist"
+   against a table you can see in the dashboard.
+
+**Applying it before the merge breaks the running app**, because the deployed code still inserts
+`my_grinder` and `my_rating` on every scan. Reads keep working; saving a new bag does not.
+
+**Verify in this order, and stop at the first failure:**
+
+- `GET /api/health` → 200. It does not check `coffee.brews`, so this only proves the old surface.
+- Open a bag → the Brews panel says "No brews logged yet" rather than an error. An error here is
+  the schema cache or the grants, not the code.
+- Log a brew with a dose, a cup weight and a TDS reading → the extraction figure appears on the
+  row. That exercises the generated column, which no test can reach.
+- Scan a bag → still saves. That is what the dropped columns would break.
+
+**Rollback:** the code is a Vercel rollback to the previous deployment. The migration is not
+reversible — it drops four columns — but the data loss is already known to be nil: the only value
+ever held across all three bags was a single `my_method` of 'other'.
+
 ## In flight
 
 **Library load failures are now visible (branch `claude/coffee-surface-library-errors`).** The
