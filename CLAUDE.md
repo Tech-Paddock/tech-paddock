@@ -173,7 +173,14 @@ between configuring something that exists and creating, destroying, or re-pointi
 - **Decide the order when more than one change is mergeable, before merging any of them.** Order is
   a decision even when nobody makes it, and the one nobody makes is usually wrong. Say what the order
   is and why, in the ledger.
-  Four ways it bites. **A rule or format change invalidates pull requests already open** — merge it
+  **Squash merge plus a stack of pull requests is the sharpest case, and it is not obvious.** Merging
+  the base of a stack rewrites that change into one new commit, whose identity git cannot match to
+  the original the next branch is built on — so the next pull request conflicts in every file the
+  first one touched, with no real disagreement in any of them. Before resolving one of those, compare
+  the base branch's copy of each conflicted file against what the stacked branch already inherited: if
+  they are identical, taking the branch side is lossless as a matter of fact rather than judgement,
+  and worth saying so. If they are not, it is a real conflict and belongs to its author.
+  Four more ways it bites. **A rule or format change invalidates pull requests already open** — merge it
   after them, or grandfather them explicitly, because landing it first makes finished work fail a
   check for a rule that did not exist when it was written. **Two branches touching one file** — the
   second to merge pays the conflict, so let it fall on the branch still being worked rather than the

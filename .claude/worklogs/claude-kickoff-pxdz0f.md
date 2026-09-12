@@ -417,3 +417,49 @@ charter, above the request/deployment check so it is read first.
 Open: this branch awaiting Joel's decision to have a pull request opened, and it merges **after** #43.
 #43 itself is gate-clean and awaiting his word.
 Need from TD: nothing, this is the TD.
+
+## 2026-09-12 22:30 — merge Coffee's brew log: #51, #52, #53
+
+Joel: "Merge coffee app." Three stacked pull requests, each based on the one before, so the order was
+forced rather than chosen — which is the merge-order check's easiest case and, as it turned out, its
+most instructive.
+
+**The migration was the real gate work.** It drops four columns from `coffee.bags`, and the note said
+that was safe. I verified it against the live database instead of accepting it: three bags, one
+`my_method` of `'other'`, every other dial-in column entirely null. Also grepped the final tree for
+references to the dropped columns — none. Then applied it **as the merge landed**, which is what the
+agent's own deployment section asked for, and it was right: applying earlier would have left the
+deployed app unable to save a scan, because the running code still read those columns.
+
+Verified after: 3 bags intact, `coffee.brews` present with RLS on and zero policies, `purchased_date`
+added, no dropped column remaining, `extraction_yield` reported `ALWAYS` generated. Then the arithmetic
+no unit test can reach — dose 15g, beverage 250g, TDS 1.35% computed 22.50, matching `250 × 1.35 ÷ 15`.
+
+**A mistake caught only because I re-checked.** I inserted and deleted that test row in one statement.
+The delete could not see the insert in its own snapshot, so the row survived — while the same query
+reported zero brews, because that count read the same pre-statement snapshot. A fresh query found it
+and I removed it properly. **A count read inside the statement that wrote it proves nothing**, and had
+I trusted it I would have left test data in Joel's library and reported it clean.
+
+**The new lesson, now in the brief and the charter: a squash merge conflicts the rest of its own
+stack.** Squashing #51 rewrote it as a commit git cannot match to what #52 was built on, so #52
+conflicted; then #53 conflicted in three files, two of them app code. None was a real disagreement.
+The test that settles it rather than guessing: compare the base branch's copy of each conflicted file
+against what the stacked branch already inherited. On #53 all three were byte-identical and the handoff
+was a strict superset, so taking the branch side was lossless as a fact. **Where they differ it is a
+genuine conflict in another agent's logic and is not mine to resolve** — that distinction is what keeps
+this from becoming licence to pick between two versions of somebody else's code.
+
+Also corrected a claim I made mid-gate: I reported `tsc --noEmit` clean when the command had actually
+errored and my shell test was reading the wrong exit code. The error was real but benign —
+`next-env.d.ts` had not been generated yet — and it passes after `npm run build`, which is the order
+CI uses. Worth recording because the wrong thing to do would have been to quietly re-run it and move on.
+
+## 2026-09-12 22:30 — handoff
+Landed: #51, #52 and #53 on `main` at `872f3aa`, migration applied and verified, `tp-coffee-app` green
+in production. `main` merged into this branch; the squash-stack lesson added to `CLAUDE.md` and the TD
+charter.
+Open: this branch still has no pull request and is waiting on Joel to ask for one. Two tidy-ups on his
+list — deleting the abandoned `claude/coffee-rework-the-bag-form`, and the domain map still calling
+Coffee "built, not yet deployed".
+Need from TD: nothing, this is the TD.

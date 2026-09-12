@@ -69,6 +69,15 @@ What to look for, each with a case this project has already produced:
   somebody's finished work is the worst of the four because it looks like their mistake.
 - **Two branches on one file.** #39 and #40 both touched `bags.test.ts`; whoever merged second paid
   the conflict. Let that fall on the branch still being worked, not the one that is finished.
+- **A squash merge conflicts the rest of its own stack.** #51, #52 and #53 were stacked, each based on
+  the one before. Squashing #51 rewrote it as a new commit git could not match to the original #52 was
+  built on, so #52 conflicted; then #53 conflicted in three files including two of app code. None of
+  it was a real disagreement.
+  **The test before resolving one of those:** compare the base branch's copy of each conflicted file
+  against what the stacked branch already inherited. On #53 all three were byte-identical, so taking
+  the branch side was lossless as a fact rather than a judgement, and the handoff was a strict
+  superset. Where they are *not* identical it is a genuine conflict in someone's app code and belongs
+  to its author — do not pick between two versions of another agent's logic.
 - **A correction others are waiting on goes first.** #47 corrected `middleware.ts` in the brief;
   every branch opened after it inherited the truth instead of rediscovering it.
 - **A merge that turns another open pull request red.** Say so before merging, on the pull request it

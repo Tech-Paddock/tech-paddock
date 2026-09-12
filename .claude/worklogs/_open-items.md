@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-12 21:40 UTC.**
+**Last reviewed: 2026-09-12 22:30 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -19,7 +19,14 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
-1. **2026-09-12 — Verify `SESSION_SECRET` parity. Rotated again at 01:39, live only after this
+1. **2026-09-12 — Two tidy-ups only you can do.** `claude/coffee-rework-the-bag-form` is abandoned:
+   5 ahead, 10 behind, and its commits are the earlier monolithic version of work that landed properly
+   as #51-#53, plus one that already merged as #48. Nothing on it is wanted. **Deleting a branch by
+   hand is a GitHub UI job** — the git proxy refuses `--delete` — so it needs your click.
+   And `CLAUDE.md`'s domain map still lists `coffee.techpaddock.io` as **"built, not yet deployed"**.
+   It has been live and green for a day, and is now serving the brew log. That is a brief change, so
+   it is yours; say the word and I will correct the row.
+2. **2026-09-12 — Verify `SESSION_SECRET` parity. Rotated again at 01:39, live only after this
    push.** Rotating is the right move rather than churn: the existing values cannot be read back out
    of the dashboard, so parity cannot be confirmed by inspection — setting one fresh known value on
    all five is the only way to guarantee it.
@@ -33,7 +40,7 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    Once deployed: log in at `techpaddock.io`, then open a tool from a hub tile, on desktop and on
    mobile. A loop on both points at the secret; a loop on mobile only points at the iframe, which is
    the separate known bug. No agent can read the values — this one is Joel's eyes only.
-2. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
+3. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
    `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
    will tell you they are doing nothing. Needs a one-time Azure registration against a personal
    Microsoft account — the `consumers` authority, scopes `offline_access Calendars.Read
@@ -46,7 +53,7 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
    endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
    first, or in the same save. Never after.**
-3. **2026-09-11 — Add `build (coffee)` and `requested-by-joel` to branch protection's
+4. **2026-09-11 — Add `build (coffee)` and `requested-by-joel` to branch protection's
    required checks.** The matrix is five jobs and the rule names four — confirmed today the hard way,
    when #48's merge was refused with "4 of 4 required status checks are expected", so `build (coffee)`
    is currently protecting nothing.
@@ -60,10 +67,38 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    satisfied, which would block every merge in the repo until it was removed again. This was verified
    for the previous version of this check against a live run; verify it again on the first pull
    request that carries it before requiring it.
-4. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
+5. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
+
+- **2026-09-12 — Coffee's brew log is merged and live: #51, #52, #53, in that order.** Joel asked for
+  the Coffee app to be merged. The order was forced — they were a stack, each based on the one before.
+  A bag is now a purchase plus what the roaster published; every variable thing is a brew, so dialling
+  in is a sequence you can compare rather than one value overwritten. `coffee.brews` carries the
+  dial-in and the measurements, with `extraction_yield` **generated** rather than stored as an input,
+  so it cannot drift from the numbers it describes.
+  **The migration dropped four columns, and the claim that it was safe was verified before merging
+  rather than taken on the note.** Three bags, one `my_method` of `'other'`, every other dial-in column
+  entirely null — so the loss is one meaningless value. Also confirmed no code anywhere still
+  references them. Applied **as the merge landed**, per the agent's own deployment note: earlier would
+  have left the deployed app unable to save a scan, because the running code still read those columns.
+  Verified after applying: 3 bags intact, `coffee.brews` present with **RLS on and zero policies**,
+  `purchased_date` added, no dropped column remaining, `extraction_yield` reported as `ALWAYS`
+  generated. Then the arithmetic itself, which no unit test can reach — a test row with dose 15g,
+  beverage 250g, TDS 1.35% computed 22.50, matching `250 × 1.35 ÷ 15`. `tp-coffee-app` is green in
+  production on `872f3aa`.
+  **One mistake caught by checking rather than assuming:** the test row was inserted and deleted in a
+  single statement, and the delete could not see the insert in its own snapshot, so it survived while
+  the same query reported zero. A fresh query found it and it was removed properly. Counts read inside
+  the statement that wrote them prove nothing.
+- **2026-09-12 — New lesson, now in the brief and the charter: a squash merge conflicts the rest of
+  its own stack.** Squashing #51 rewrote it as a commit git could not match to what #52 was built on,
+  so #52 conflicted, then #53 conflicted in three files including two of app code — none of it a real
+  disagreement. The test that settles it: compare the base branch's copy of each conflicted file with
+  what the stacked branch already inherited. On #53 all three were byte-identical, making the branch
+  side lossless as a fact. Where they differ it is a genuine conflict in another agent's logic and is
+  not the TD's to resolve.
 
 - **2026-09-12 — Merge order is now a gate check, and it had a live case the hour it was written.**
   Joel's addition. When more than one change is mergeable the order is a decision even if nobody makes
