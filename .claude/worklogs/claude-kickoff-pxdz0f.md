@@ -341,3 +341,44 @@ still required and checked; demoting the only draft change an agent may make.
 Open: this PR a draft awaiting Joel — and now only he can promote it, which is the rule proving itself.
 #43 draft with TechPad Gen.
 Need from TD: nothing, this is the TD.
+
+## 2026-09-12 21:40 — supersede the draft design: no pull request until Joel asks
+
+Third pass on the same problem in one evening, and this one is better than my two. Joel: agents commit
+and push; a pull request is opened only when he asks; no drafts needed, because asking *is* the
+approval. **The checkpoint moved earlier rather than being added later**, which is why it is simpler —
+there is nothing to promote and nothing to click.
+
+**Two things had to change with it or the rule would have quietly broken something, and I checked
+rather than assumed.** Every CI run in this branch's history was `event=pull_request` — confirmed
+against the Actions API — and `ci.yml` only ran on pushes to `main`. So with no pull request there
+would have been **no build and no tests at all** until the moment Joel was asked to approve: he would
+have been greenlighting code CI had never seen. `ci.yml` now runs on every branch push. And the two
+hooks refusing non-draft pull requests had to go, or they would have blocked the pull request he does
+ask for — a guard outliving its rule and breaking the successor.
+
+**`approval-recorded` is repointed rather than deleted**, as `requested-by-joel`, reading the pull
+request *body* instead of scanning comments. That is strictly simpler: no ordering constraint, no
+self-healing comment trigger, nothing to post separately — the line goes in the body at creation.
+Seven regex cases checked, JS validated as `github-script` wraps it.
+
+**Enforcement went from four mechanisms to three, and I am not dressing that up.** Nothing mechanical
+can distinguish an asked-for pull request from an unasked-for one, because every agent acts as the same
+GitHub account. "Do not open one until Joel asks" rests entirely on honesty. I wrote that into the
+brief as the most important convention there, rather than leaving the enforcement summary overstating
+what holds.
+
+**#50 closed as superseded**, and this branch carries the replacement. That also dissolved the deadlock
+it was stuck in: it needed a promotion only Joel could perform, on a rule that no longer exists.
+
+**This change follows its own rule.** The branch is pushed and finished; I am not opening a pull request
+for it. Joel asks, or it waits.
+
+## 2026-09-12 21:40 — handoff
+Landed on the branch, no pull request opened: commit-and-push as the default, pull requests only on
+Joel's request with the request recorded in the body, `requested-by-joel` checking it, CI on every
+branch push, deployment steps required in every pull request and handover, draft machinery and its two
+hooks removed.
+Open: this branch awaiting Joel's decision to have a pull request opened. #43 with TechPad Gen — it is
+a draft, which under this rule is simply a pull request that exists; its three blockers are unchanged.
+Need from TD: nothing, this is the TD.

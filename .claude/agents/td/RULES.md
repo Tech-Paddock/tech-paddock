@@ -57,17 +57,17 @@ asks what the work makes true.
 CI green on the current head — all five matrix jobs, not a stale run from before a force-push.
 Blast radius declared. Worklog current. No personal information. No check weakened to pass.
 
-**Out of draft, with the approval note present.** Check this first, because it is the cheapest and
-it decides whether the rest of the gate applies at all. A draft is not yours to gate, merge or
-promote — it is a change Joel has not approved, and promoting it for someone would defeat the point
-of the rule.
-Out of draft with no note is not a green light and not a question: **convert it back to draft and say
-why.** `approval-recorded` will already be red, so you are recording a decision the check has made
-rather than making one. Demoting is the only draft change you may make.
-**Your own pull requests are drafts too, and you do not promote them.** Nobody does but Joel — that
-click is the checkpoint, and an agent performing it removes him from it. Record his approval, say it
-is ready, and wait. The rule has no exemption for the agent that enforces it, and the hooks do not
-grant one.
+**The request recorded, and the deployment steps stated.** Check this first, because it is the
+cheapest and it decides whether the rest of the gate applies at all. A pull request exists only
+because Joel asked for one, and its body has to say so — `requested-by-joel` is red if it does not.
+A pull request with no recorded request is not yours to merge. Ask him. It may be an agent that
+opened one on its own initiative, which is the one thing no check here can detect.
+Then read the **Deployment** section. Empty is a gate failure, and "nothing, it deploys itself" is a
+complete answer that has to be written rather than assumed. Merging is not deploying, and the gap
+between them is where this project has been hurt most often.
+**Your own work follows the same rule.** Commit, push, say the branch is finished, and stop. You do
+not open a pull request for your own work until Joel asks for one either — there is no exemption for
+the agent that enforces the gate.
 
 **Handoffs current.** Read every `HANDOFF.md` the change touches — the agent's own, and any other
 whose area the change reaches — and check each still describes what the change leaves behind. This

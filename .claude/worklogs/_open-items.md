@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-12 20:15 UTC.**
+**Last reviewed: 2026-09-12 21:40 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -46,85 +46,46 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
    endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
    first, or in the same save. Never after.**
-3. **2026-09-11 — Add `build (coffee)` and `approval-recorded` to branch protection's
+3. **2026-09-11 — Add `build (coffee)` and `requested-by-joel` to branch protection's
    required checks.** The matrix is five jobs and the rule names four — confirmed today the hard way,
    when #48's merge was refused with "4 of 4 required status checks are expected", so `build (coffee)`
    is currently protecting nothing.
-   `approval-recorded` is new in the same change as this note — the job in
-   `.github/workflows/promotion.yml`. It fails a pull request promoted without your approval recorded
-   on it, but **a failing check only blocks a merge if it is required** — until you add it, it is a
-   red X the technical director reads rather than a gate.
-   **Add it by the exact name `approval-recorded`.** That is the context GitHub reports, verified
-   against a live run. The workflow is called Promotion, so `Promotion / approval-recorded` is the
-   plausible guess and it is wrong — a required check whose name matches nothing is never satisfied,
-   which would block every merge in the repo until it was removed again.
+   `requested-by-joel` is new in the same change as this note — the job in
+   `.github/workflows/pr-requested.yml`. It fails a pull request whose body does not record that you
+   asked for it, but **a failing check only blocks a merge if it is required** — until you add it, it
+   is a red X the technical director reads rather than a gate.
+   **Add it by the exact name `requested-by-joel`.** That is the job name, which is the context
+   GitHub reports. The workflow is called "Pull request", so `Pull request / requested-by-joel` is
+   the plausible guess and it is wrong — a required check whose name matches nothing is never
+   satisfied, which would block every merge in the repo until it was removed again. This was verified
+   for the previous version of this check against a live run; verify it again on the first pull
+   request that carries it before requiring it.
 4. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
 
-- **2026-09-12 — Every pull request now opens as a draft, and Joel promotes it.** His call, and it
-  binds every agent **including the technical director** — his words: "nothing wrong with a sanity
-  check before deployment." The agent says it is ready, Joel approves in chat, and only then is it
-  marked ready for review.
-  **No agent promotes a pull request — not its own, not anyone's.** Joel marks it ready for review
-  himself, because that click is the checkpoint and an agent performing it removes him from it. When
-  he approves, the agent records it first: one line reading
-  `Approved by Joel on YYYY-MM-DD — "what he said"` in a comment on the pull request. Converting a
-  pull request back to draft is the one draft change an agent may make.
-  That note is the part that makes it work rather than decorative: no agent can see the chat where
-  Joel approved, so a pull request merely out of draft is indistinguishable from one an agent
-  promoted itself. This repo is the only channel between agents, so an approval living only in a
-  conversation did not happen.
-  **And the note is checked, not trusted.** `.github/workflows/promotion.yml` fails a promoted pull
-  request that carries no note. A draft passes trivially; a comment posted late heals the check
-  rather than leaving it red. Its one honest limit: every agent comments as the same GitHub account,
-  so it catches an approval somebody forgot to get, never one they invented. That residue closes by
-  honesty and is not worth machinery here.
-  **Two new hooks make it non-voluntary rather than a rule agents are asked to respect.**
-  `.claude/settings.json` now refuses `create_pull_request` unless `draft: true`, and refuses any
-  `update_pull_request` that sets `draft: false`. Demoting stays allowed. So enforcement went from one
-  mechanism to four — branch protection, the hooks, GitHub refusing to merge a draft, and this check. The file's closing line said the hooks were the only part not
-  depending on an agent choosing to comply; it is corrected in the same change.
-  **A promoted pull request with no note is not a question.** The TD converts it back to draft and
-  says why, rather than asking — the check has already made the decision.
-  **#43 converted to draft** — it was open, unapproved and failing the gate, which is exactly the
-  accident this rule removes. Converting toward draft is the safe direction and is not promoting on
-  an author's behalf, which the rule forbids.
-
-- **2026-09-12 — The `tuning` Vercel project is gone. Joel deleted it; verified against the account,
-  not taken on report.** Five projects remain — `tp-home`, `tp-message-editor`, `tp-tracker`,
-  `tp-resume`, `tp-coffee-app` — and every one still reads `link.org: "Tech-Paddock"`, so the
-  re-linking that closed the deploy outage is holding.
-  Worth keeping for the next time one appears: it was created 18:02, carried a READY production
-  deployment, and **was never publicly reachable** — Vercel SSO covered all three `*.vercel.app`
-  domains and no custom domain was attached, so it answered a redirect to `sso-api` and
-  `x-robots-tag: noindex`. That is the check to run first, because the incident this project already
-  has on record is a Vercel project pointed at the repo root serving an unprotected page. Contained
-  is not the same as authorized, which is why it went to Joel rather than being noted and dropped.
-
-- **2026-09-12 — `middleware.ts` is three versions, not five copies, and the brief now says so.**
-  Joel's call, delegated. The rule was always right; the reason printed under it was false, and a
-  rule defended by a wrong fact is one somebody talks themselves past — TechPad Gen checked, found
-  three, and correctly reported the brief as wrong.
-  Re-verified by checksum before writing: `lib/auth.ts` and `lib/password.ts` **are** identical
-  across all five. `middleware.ts` is three — `home`/`resume`/`coffee` share one, `editor` adds a
-  scoped `/api/draft` bypass, `tracker` adds `/api/summary` plus an outright `/api/cron/*` wave-
-  through.
-  **The correction also names the real danger, which the old wording hid.** `middleware.ts` is not
-  gated because the copies match; it is gated because it *is* the password gate. A bad edit there
-  publishes an endpoint rather than breaking a login — and tracker already shows the shape, since
-  `/api/cron/*` skips the gate and the route's own `if (secret && …)` fails **open** without
-  `CRON_SECRET`. That trap was already on this ledger and the rule protecting it described the
-  wrong hazard.
-  Corrected in eleven places: `CLAUDE.md` twice — including a line I wrote myself an hour earlier in
-  the Chrome note, which repeated the error I was about to correct — the TD charter, and the
-  `RULES.md` and `KICKOFF.md` of all five app agents. **Every prohibition is unchanged**; only the
-  justification moved. `message-editor` and `tracker` were the clearest proof it was wrong: each
-  named its own carve-out and then called the file byte-identical in the next sentence.
-  **One left for its owner.** `.claude/agents/coffee/HANDOFF.md` still says it. Handoffs are not the
-  TD's to rewrite, so Coffee corrects that next time it touches the file.
-
+- **2026-09-12 — Agents commit and push. A pull request exists only when Joel asks for one.**
+  His call, arrived at over three passes in one evening: first every pull request as a draft, then no
+  agent promoting its own, then this — which replaces both. **The checkpoint moved earlier.** Rather
+  than a pull request that exists but cannot move, there is no pull request at all until he asks, and
+  asking is how he approves. No drafts, no promotion step, nothing to click.
+  When he asks, the agent opens it normally and records the request in the body:
+  `Requested by Joel on YYYY-MM-DD — "what he said"`. `requested-by-joel` fails a pull request whose
+  body lacks that line.
+  **Two things had to change with it or the rule would have quietly broken something.**
+  `ci.yml` ran on `pull_request` and on pushes to `main` only — every CI run in the session that
+  produced this rule was `event=pull_request`, checked — so with no pull request there would have
+  been **no build and no tests** until the moment Joel was asked to approve. It now runs on every
+  branch push, so a pushed branch is fully tested before he ever sees it. And the two hooks that
+  refused non-draft pull requests were removed: they would have blocked the pull request he does ask
+  for.
+  **Enforcement dropped from four mechanisms to three, and that is the price of the simpler rule.**
+  Nothing mechanical can tell an asked-for pull request from an unasked-for one, because every agent
+  acts as the same GitHub account. "Do not open one until Joel asks" rests on honesty. It is written
+  in the brief as the most important convention there for that reason.
+  **#50 closed as superseded** — it implemented the design this replaced. Its branch carries this work
+  instead.
 - **2026-09-12 — `CLAUDE.md` now says Chrome is the default and Safari is a utility.** Joel asked
   for a browser note, then amended it the same hour once the consequence surfaced: **Chrome is the
   default, on desktop and phone; Safari is a utility browser, used only where Chrome cannot do the

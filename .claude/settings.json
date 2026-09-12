@@ -30,26 +30,6 @@
             "timeout": 10
           }
         ]
-      },
-      {
-        "matcher": "mcp__github__create_pull_request",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "d=$(jq -r \".tool_input | if has(\\\"draft\\\") then (.draft|tostring) else \\\"absent\\\" end\"); if [ \"$d\" != \"true\" ]; then jq -n \"{hookSpecificOutput:{hookEventName:\\\"PreToolUse\\\",permissionDecision:\\\"deny\\\",permissionDecisionReason:\\\"Every pull request here opens as a draft \u2014 see CLAUDE.md. Pass draft: true. You say it is ready, Joel approves in chat, and Joel promotes it; no agent promotes one.\\\"}}\"; fi",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__github__update_pull_request",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "d=$(jq -r \".tool_input | if has(\\\"draft\\\") then (.draft|tostring) else \\\"absent\\\" end\"); if [ \"$d\" = \"false\" ]; then jq -n \"{hookSpecificOutput:{hookEventName:\\\"PreToolUse\\\",permissionDecision:\\\"deny\\\",permissionDecisionReason:\\\"Promoting a pull request is Joel's, not yours. He marks it ready for review himself, which is the sanity check the draft rule exists for \u2014 see CLAUDE.md. Record his approval on the pull request and ask him to promote it. Converting one back to draft is still allowed.\\\"}}\"; fi",
-            "timeout": 10
-          }
-        ]
       }
     ]
   }
