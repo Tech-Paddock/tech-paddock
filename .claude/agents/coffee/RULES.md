@@ -100,6 +100,19 @@ should record what you did without erasing what they suggested.
 
 ## Design decisions, and why
 
+**Two brewer vocabularies, not one.** `guide_method` records what the roaster published and stays
+broad, because it describes the world; `my_brewer` names the five things actually on the shelf.
+They were one shared list until the first real bags arrived and every one of them was Sweet Bloom
+publishing **"ORIGAMI AIR"** — a real dripper that no five-item list has room for. Narrowing the
+shared list would have turned the roaster's own column into "other" for most of the specialty
+world, which is information loss in the column whose entire job is recording what they said.
+
+`myBrewerFor` carries the roaster's choice across **only on an exact correspondence**. Origami,
+Chemex and espresso leave your brewer blank rather than rounding to the nearest cone, and a bare
+"V60" leaves it blank too, because you own an 02 and a Switch and the roaster did not say which.
+Rounding to the nearest thing on the shelf, on the roaster's authority, is the same species of
+invention this tool refuses about brewing parameters.
+
 **Brew method is a fixed vocabulary, not free text.** "V60", "v60" and "Hario V60" as three values
 would quietly break grouping and filtering, and roasters' wording varies more than that.
 `normalizeMethod` maps their phrasing onto the enum, ordered longest-phrase-first so "french press"
