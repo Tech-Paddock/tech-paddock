@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-11, end of day.
+State as of 2026-09-12, 18:40 UTC.
 
 Read `RULES.md` first for the role. This is the workload.
 
@@ -10,50 +10,70 @@ automatically, so it should already be there.
 
 ---
 
-## The largest live problem
+## The deploy outage is closed
 
-**Production has not deployed since 17:48 today.** `editor.techpaddock.io` and the rest serve commit
-`92c1ec1`, and everything merged since is undeployed — check the commit, not a count, because the
-count grows on every merge. Verified at 23:45: zero deployments on any of the five projects since
-17:54, across three merged pull requests.
+All five projects serve `0c7d882` (#33). `techpaddock.io` returns 200 from that deployment with the
+password gate intact. The PII scrub (#21) is deployed with it, so the resume app's live UI no longer
+serves the company name that was sitting in the undeployed backlog.
 
-Diagnosis, evidence and fix are in `.claude/agents/platform/HANDOFF.md` — it is that agent's to
-carry, and Joel's to unblock, because it needs a GitHub App installation only he can restore. Your
-job is to keep it visible until it is fixed and not to let anything be declared verified against a
-live URL in the meantime. **What is deployed is not what is on `main`.**
+**The lesson worth carrying, because the documentation cost six hours by getting it wrong twice.**
+The repo is owned by the `Tech-Paddock` org; the handoff said it had moved back to `joelb-401`, and
+sent the fix to the personal installations page, which cannot reach an org-owned repo. Then, once
+the org installation existed, deploys *still* did not fire — because **a project's git link is
+stored on the Vercel project, not derived from the installation.** All five recorded
+`link.org: "joelb-401"` and had to be disconnected and reconnected in Vercel's own Settings → Git.
 
-The PII scrub (#21) is in that backlog. A real company name is still being served in the resume
-app's live UI, behind the password gate.
+**If deployments ever stop again: read `link.org` on the project before touching anything on
+GitHub.** And the general form of the mistake — read the thing itself, not the document describing
+it. Every correction tonight came from a build log, a route, or an API response contradicting a
+document that sounded authoritative.
 
-## The queue is empty
+## One pull request open, sent back
 
-Zero open pull requests. `main` carries the full agent documentation restructure (#29, #30), the
-Coffee health check (#31), and Joel's two direct commits deleting the orphaned worklogs.
+**#43 — the hub re-theme and `/admin`, from TechPad Gen.** Sent back 2026-09-12 18:35, with the
+reasoning on the pull request rather than only here. Three failures, one root cause: the branch is
+behind `main` and was never brought current.
 
-PR #28 was closed as superseded, with the reasoning posted on the pull request rather than only in
-this file, and every dead branch has been deleted.
+1. **Merge conflict** in `.claude/agents/techpad-gen/HANDOFF.md` — `main` changed it in #34 closing
+   the outage, the branch rewrote the same region. Test-merged in a scratch worktree: that one file
+   is the whole conflict.
+2. **CI never ran.** Not red, absent — only `Vercel Preview Comments` reported. GitHub cannot build
+   a merge ref while a pull request conflicts, so the `pull_request` workflow never got a checkout.
+   `build (home)` matters more than usual here: `apps/home/package.json` gained a `prebuild` that
+   reads above the app directory, and only the matrix job can prove it.
+3. **The handoff and the body are confidently wrong.** Both say production serves `92c1ec1`.
+   `tp-home` production is `f06ff0c`, promoted 03:57 today — verified against the Vercel account.
+   #34 corrected that text on `main`; the branch never saw it and restated the old reality as fact.
 
-**Branch deletion is not something you can do.** The git proxy returns 403 on `--delete` while
-permitting pushes, and no GitHub tool in this session exposes it. It is a GitHub UI job, so say so
-rather than promising it.
+**I did not fix any of it.** The conflict is inside their handoff, so resolving it would mean
+writing their handoff — which is exactly what #41 forbids. That rule's first live test was the
+pull request opened an hour after it landed, and it caught precisely what it was written for.
+
+The work itself is sound and its verification section is the most thorough gated so far. It goes
+back for its base, not its content.
+
+**Branch deletion happens by itself now.** The note that used to live here — git proxy 403 on
+`--delete`, a GitHub UI job — is stale: the repo auto-deletes head branches on merge. #39, #40, #41
+and #42 all vanished without being asked. What the proxy still refuses is deleting a branch by hand,
+which is now rarely needed. Prune local refs after a merge or a stale `origin/<branch>` will make
+the next squash commit look unpushed.
 
 ## Waiting on Joel
 
 Live infrastructure and one-time credentials. None of it is yours.
 
-1. **Reconnect Vercel's GitHub App.** Unblocks everything else. `github.com/settings/installations`.
-2. **Finish `tp-coffee-app`. Partly done.** Verifiably outstanding: framework preset is still
-   `null`, and `coffee.techpaddock.io` is not in its domain list. Root Directory and the five
-   env vars are not API-visible, so `GET /api/health` on the deployed app is how to check them.
-   The Cloudflare DNS record already exists. **Still the only publicly exposed thing in the
-   project** until Root Directory points at a real app.
-3. **Verify the new `SESSION_SECRET` landed on all five projects** and that all five redeployed. It
-   was rotated today. A partial rollout is the silent-SSO failure.
-4. **Set `MS_GRAPH_*` and `CRON_SECRET`** on `tp-tracker`. The Microsoft To Do integration and daily
-   cron shipped in #22 and are inert without them, and degrade quietly by design.
-5. **Add `build (coffee)` to branch protection's required checks.** The matrix is five jobs; the
+1. **Verify `SESSION_SECRET` parity across all five.** Rotated again at 01:39 on 09-12 and live
+   since the 01:59 deployments — a dashboard change does not reach a running deployment, because
+   Vercel bakes the environment in at deploy time. All five have now rebuilt, so this is testable.
+   Then log in at `techpaddock.io` and open a tool from a tile, on desktop and mobile: a loop on both
+   is the secret, mobile-only is the iframe bug. No agent can read the values.
+3. **Set `CRON_SECRET` first, then `MS_GRAPH_*`** on `tp-tracker` — the order is not cosmetic. The
+   middleware exempts `/api/cron/*` from the password gate and the route's guard fails open when
+   `CRON_SECRET` is unset, so setting the Graph credentials alone publishes an unauthenticated
+   endpoint that creates To Do items on demand. Harmless today only because Graph is unconfigured.
+4. **Add `build (coffee)` to branch protection's required checks.** The matrix is five jobs; the
    rule names four.
-6. **Run `supabase link` and `migration list` once, locally.** Expect eight local matching remote
+5. **Run `supabase link` and `migration list` once, locally.** Expect eight local matching remote
    with `20260908235234` remote-only. That gap is deliberate. Do not repair it.
 
 ## Decisions made today
@@ -85,8 +105,9 @@ explanation teaches nothing. **Verify from the code.**
 
 - **Every push rebuilds every Vercel project.** No Ignored Build Step. The change is written and
   agreed — one line per app's `vercel.json`, in the Platform handoff — and not landed.
-- **DNS is wired two ways.** `editor` resolves through `vercel-dns-017.com`; the others use the
-  legacy A record. Both work.
+- **DNS is uniform as of 2026-09-12.** All four subdomains are CNAMEs to
+  `d1317e1174061c29.vercel-dns-017.com`; the apex stays an A record because an apex cannot be a
+  CNAME. Verified resolving, and the `frame-ancestors` header survived the switch.
 - **`/api/health` sits behind the password gate**, so no external monitor can reach it.
 - **`editor.model_status` has zero rows.** The login-time drift check has never successfully
   written. Not diagnosed, and the oldest unexplained thing here.

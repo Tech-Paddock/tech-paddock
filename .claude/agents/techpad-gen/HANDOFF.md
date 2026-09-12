@@ -8,7 +8,7 @@ Read `RULES.md` first. This file is only what is true right now.
 
 ## What is on the branch, unmerged
 
-`claude/techpad-gen-kickoff-qjnbws`, two commits, no pull request opened yet.
+`claude/techpad-gen-kickoff-qjnbws`, open as **draft PR #43**.
 
 1. **`417dbdc` — the hub wears a John Player Special livery.** Near-black ground, gold accents, the
    four tiles on a gold ramp (champagne / gold / brass / bronze). This was a light-to-dark flip, so
@@ -17,9 +17,16 @@ Read `RULES.md` first. This file is only what is true right now.
 2. **`9bd079e` — `/admin`**, a page showing what the repo declares against what the platform
    reports. Linked from the sidebar, behind the existing password gate.
 
-Both were built and rendered locally. Neither can be checked on `techpaddock.io`: production still
-serves `92c1ec1`, which **predates `HomeShell.tsx` entirely**, so the deployed hub is a different
-program from `main`, not merely an older one.
+Both were built and rendered locally. **The deploy outage is over** — previews build on this branch
+and production is promoting again.
+
+**This file deliberately does not name the commit production is serving.** An earlier version did,
+and was wrong by the time it was read. At the point that was caught there were four documents each
+naming a different production commit, every one correct when written: this branch said `92c1ec1`,
+`main`'s copy of this file said `0c7d882`, the gate comment on #43 said `f06ff0c`, and the Vercel
+account said something newer than all three. A commit SHA in prose is stale on the next merge, so
+the only honest thing to write is where to look: the Vercel account today, or `/api/version` once
+that exists (item 3 below). That is the same reason the `/admin` page computes rather than asserts.
 
 Two changes share this branch because the session was pinned to it. The second extends the token
 block the first created, so it reads as one "restyle the hub" branch rather than as reuse.
@@ -54,8 +61,8 @@ Everything below is outside what this agent may do alone. Nothing here has been 
 
 ### 1. Do NOT create a new Vercel project or DNS record for the admin page
 
-**`/admin` needs neither.** It is a route inside `apps/home` and ships with the hub the moment
-deployments work again — no new project, no new subdomain, no new environment variable.
+**`/admin` needs neither.** It is a route inside `apps/home` and ships with the hub on the next
+deploy — no new project, no new subdomain, no new environment variable.
 
 If `admin.techpaddock.io` is wanted anyway as a separate app, the real cost is:
 
@@ -63,8 +70,8 @@ If `admin.techpaddock.io` is wanted anyway as a separate app, the real cost is:
 - `apps/admin` added to the CI matrix in the same pull request — the matrix is hardcoded to five
   names and silently skips anything else
 - `build (admin)` added to branch protection's required checks, which is already one short
-- a **sixth** byte-identical copy of `lib/auth.ts`, `lib/password.ts` and `middleware.ts`, making
-  the project's largest latent risk larger
+- a **sixth** copy of `lib/auth.ts`, `lib/password.ts` and `middleware.ts` — the first two are
+  genuinely identical across the five, so a sixth makes the project's largest latent risk larger
 - `SESSION_SECRET` byte-identical again, plus `APP_PASSWORD_HASH` and `INTERNAL_API_SECRET`
 
 Recommendation: keep it at `techpaddock.io/admin`. **If the goal is seeing the platform when the
@@ -110,19 +117,21 @@ The TD needs to settle three things before this is built:
 - **Lifetime.** A worklog dies with its branch, by rule. So notes meant to outlive a change have
   to land in a `HANDOFF.md`. Worth stating explicitly if the page renders both, or notes will
   appear to vanish.
-- **Rendering.** Markdown in the hub means either a dependency or a build-time transform. The hub
-  currently has zero runtime dependencies beyond Next and React; adding a markdown renderer is
-  small but it is a first.
+- **Rendering.** Markdown in the hub means either a dependency or a build-time transform. The hub's
+  runtime dependencies are `next`, `react`, `react-dom` and `bcryptjs` — nothing for presentation —
+  so a markdown renderer would be the first dependency added purely to display something.
 
-### 5. Two corrections for the ledger
+### 5. Two corrections — both now closed
 
-- **`CLAUDE.md` is wrong about `middleware.ts`.** It says the file is byte-identical in five apps.
-  There are **three distinct versions** — `editor` and `tracker` carry deliberate carve-outs.
-  `lib/auth.ts` and `lib/password.ts` genuinely are identical; all three were checksummed. The rule
-  is right, its stated reason is stale, and someone will eventually rely on the stale reason.
-- **`SESSION_SECRET` consistency can never be shown on a dashboard.** Nothing may echo it. The only
-  safe signal is behavioural: log in on the hub, then open a tool and see whether it asks again.
-  Worth recording so it stops reading as an open verification task.
+Kept as a record of where they went, not as outstanding work.
+
+- **`middleware.ts` is three versions, not five identical copies.** Raised from this branch,
+  landed on `main` as **#47**, corrected in eleven places. The correction names the hazard the old
+  wording hid: the file is gated because it *is* the password gate, so a bad edit publishes an
+  endpoint rather than breaking a login. `lib/auth.ts` and `lib/password.ts` genuinely are
+  identical. Nothing further needed.
+- **`SESSION_SECRET` consistency can never be shown on a dashboard.** Nothing may echo it; the only
+  safe signal is behavioural. The TD confirms the ledger already reads that way. Agreed, closed.
 
 ---
 
@@ -131,10 +140,10 @@ The TD needs to settle three things before this is built:
 - **The hub's mobile login bug.** Opening a tool from an embedded tile re-triggers that app's
   login on mobile. The handoff's old suggestion — that the iframe points at a `*.vercel.app`
   preview URL — is **ruled out by the code**: `APPS` hardcodes the custom domains, and did at
-  `92c1ec1` too. Cookie attributes are also sound on paper: `.techpaddock.io`, `SameSite=Lax`,
-  which is same-site across subdomains and so not blocked. Both cheap explanations are gone, so
-  this needs a live repro with devtools — and it cannot be reproduced against production while
-  production runs different code.
+  the commit production was pinned to during the outage. Cookie attributes are also sound on paper:
+  `.techpaddock.io`, `SameSite=Lax`, which is same-site across subdomains and so not blocked. Both
+  cheap explanations are gone, so this needs a live repro with devtools — **which is possible again
+  now that deploys are flowing**, and was the thing blocking it.
 - **`apps/home` still has no `test` script.** CI runs `npm run test --if-present`, so adding one
   opts the app in with no CI change. `lib/glance.ts` and now `lib/diagnostics.ts` are pure and
   untested. `editor` and `home` are the two apps without tests.

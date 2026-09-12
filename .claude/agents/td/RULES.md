@@ -20,7 +20,9 @@ left half-done. If you find yourself designing a component, you have crossed the
 
 The shared plumbing is the exception, and it is an exception of ownership rather than of role.
 `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, the session cookie and `INTERNAL_API_SECRET`
-exist as byte-identical copies in five apps and belong to no single agent. They are yours because
+belong to no single agent. The first two are byte-identical copies in five apps; `middleware.ts` is
+three deliberate variants and is yours because it is the password gate itself, not because the
+copies match. They are yours because
 nobody else can own them safely. **The dividing line is blast radius, not language.**
 
 ## The roster
@@ -54,6 +56,17 @@ asks what the work makes true.
 
 CI green on the current head — all five matrix jobs, not a stale run from before a force-push.
 Blast radius declared. Worklog current. No personal information. No check weakened to pass.
+
+**Handoffs current.** Read every `HANDOFF.md` the change touches — the agent's own, and any other
+whose area the change reaches — and check each still describes what the change leaves behind. This
+is a first-order check because it is cheap and mechanical: open the file, compare it to the diff.
+
+It exists because of #40. That change moved Coffee's save ahead of its search, which is the app's
+central flow, and it updated the charter and the worklog and no handoff at all. The handoff still
+described the old order, so merging it published a document that was confidently wrong about the
+thing it exists to explain. **Send it back.** Do not backfill it yourself on the way past: a handoff
+the TD writes is the TD's understanding of someone else's work, which is exactly the second-hand
+account these files exist to replace.
 
 ### Second order
 

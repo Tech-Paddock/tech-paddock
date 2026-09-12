@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { downscale } from "@/lib/image";
 import { BREW_METHODS, METHOD_LABELS, type BrewMethod } from "@/lib/methods";
 import type { Guide, GuideStatus } from "@/lib/guide";
+import { MODEL_LABELS, DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT, effortsFor, isEffortFor, type SearchModel } from "@/lib/models";
 
 type Identity = {
   roaster: string | null;
@@ -28,6 +29,10 @@ type Bag = Identity & {
   guide_grind: string | null;
   guide_time: string | null;
   guide_quotes: { field: string; text: string; url: string }[];
+  guide_dropped: { field: string; value: string; reason: string }[];
+  guide_model: string | null;
+  guide_effort: string | null;
+  guide_search_error: string | null;
   my_method: string | null;
   my_grinder: string | null;
   my_grind_setting: string | null;
@@ -64,10 +69,22 @@ export default function CoffeePage() {
   const [tab, setTab] = useState<"scan" | "library">("scan");
   const [bags, setBags] = useState<Bag[]>([]);
   const [query, setQuery] = useState("");
+  const [libraryError, setLibraryError] = useState<string | null>(null);
 
   const loadBags = useCallback(async (q: string) => {
-    const res = await fetch(`/api/bags${q ? `?q=${encodeURIComponent(q)}` : ""}`);
-    if (res.ok) setBags((await res.json()).bags ?? []);
+    // A failed load used to do nothing at all, which rendered as "No bags
+    // yet. Scan one." — a confident statement about data that was never
+    // read. An empty library and a broken one must not look the same.
+    try {
+      const res = await fetch(`/api/bags${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Couldn't load the library.");
+      setBags(data.bags ?? []);
+      setLibraryError(null);
+    } catch (e) {
+      setLibraryError(e instanceof Error ? e.message : "Couldn't load the library.");
+      setBags([]);
+    }
   }, []);
 
   useEffect(() => {
@@ -105,7 +122,7 @@ export default function CoffeePage() {
             }}
           />
         ) : (
-          <Library bags={bags} query={query} setQuery={setQuery} onChanged={() => void loadBags(query)} />
+          <Library bags={bags} query={query} setQuery={setQuery} error={libraryError} onChanged={() => void loadBags(query)} />
         )}
       </div>
     </main>
@@ -123,6 +140,10 @@ function Scan({ onSaved }: { onSaved: () => void }) {
   const [previous, setPrevious] = useState<PreviousBag | null>(null);
   const [carried, setCarried] = useState(false);
   const [dialIn, setDialIn] = useState({ my_grinder: "", my_grind_setting: "" });
+  const [model, setModel] = useState<SearchModel>(DEFAULT_SEARCH_MODEL);
+  const [effort, setEffort] = useState<string>(DEFAULT_EFFORT);
+  const [bagId, setBagId] = useState<string | null>(null);
+  const [waited, setWaited] = useState(0);
 
   async function pick(file: File) {
     setError(null);
@@ -149,27 +170,53 @@ function Scan({ onSaved }: { onSaved: () => void }) {
     }
   }
 
-  async function search() {
+  /**
+   * Save the bag, then start the search against the saved row.
+   *
+   * The order is deliberate and it is the opposite of what this did before.
+   * The search takes anywhere from thirty seconds to a few minutes and nothing
+   * travels on the connection while it works, so a phone gives up and the
+   * answer is lost even though the server finished it. Writing the row first
+   * means the result has somewhere to land that is not this response.
+   */
+  async function findAndSave() {
     if (!identity?.roaster || !identity?.coffee_name) {
       setError("A roaster and a coffee name are needed to search.");
       return;
     }
     setError(null);
+    setWaited(0);
     setStage("searching");
     void lookForPrevious(identity.roaster, identity.coffee_name);
+
     try {
-      const res = await fetch("/api/search", {
+      const body = new FormData();
+      for (const [k, v] of Object.entries(identity)) if (v) body.append(k, v);
+      if (photo) body.append("photo", photo);
+      const res = await fetch("/api/bags", { method: "POST", body });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Couldn't save that bag.");
+
+      const id = data.bag.id as string;
+      setBagId(id);
+
+      // Fired, not awaited. This request routinely outlives the page's
+      // patience, and its answer is read back off the row instead.
+      void fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roaster: identity.roaster, coffee_name: identity.coffee_name }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "The search failed.");
-      setGuide(data.guide as Guide);
-      if ((data.guide as Guide).method) setMyMethod((data.guide as Guide).method as BrewMethod);
-      setStage("review");
+        body: JSON.stringify({
+          bag_id: id,
+          roaster: identity.roaster,
+          coffee_name: identity.coffee_name,
+          model,
+          // Sent only when this model has the control. Haiku 4.5 returns a
+          // 400 for it rather than ignoring it.
+          effort: isEffortFor(model, effort) ? effort : null,
+        }),
+      }).catch(() => {});
     } catch (e) {
-      setError(e instanceof Error ? e.message : "The search failed.");
+      setError(e instanceof Error ? e.message : "Couldn't start the search.");
       setStage("confirm");
     }
   }
@@ -182,6 +229,35 @@ function Scan({ onSaved }: { onSaved: () => void }) {
     setPrevious(((await res.json()).previous as PreviousBag) ?? null);
   }
 
+  // Poll the saved row. The search writes its answer there, so this survives
+  // the request that started it being dropped, backgrounded or timed out.
+  useEffect(() => {
+    if (stage !== "searching" || !bagId) return;
+    const started = Date.now();
+
+    const tick = async () => {
+      setWaited(Math.round((Date.now() - started) / 1000));
+      const res = await fetch(`/api/bags/${bagId}`);
+      if (!res.ok) return;
+      const bag = (await res.json()).bag as Bag;
+
+      if (bag.guide_search_error) {
+        setError(bag.guide_search_error);
+        setStage("review");
+        return;
+      }
+      if (bag.guide_status === "not_searched") return;
+
+      const found = guideFromBag(bag);
+      setGuide(found);
+      if (found.method) setMyMethod(found.method as BrewMethod);
+      setStage("review");
+    };
+
+    const timer = setInterval(() => void tick(), 4000);
+    return () => clearInterval(timer);
+  }, [stage, bagId]);
+
   function carryForward() {
     if (!previous) return;
     if (previous.my_method) setMyMethod(previous.my_method as BrewMethod);
@@ -193,18 +269,17 @@ function Scan({ onSaved }: { onSaved: () => void }) {
   }
 
   async function save() {
-    if (!identity) return;
+    if (!bagId) return;
     setStage("saving");
     setError(null);
     try {
-      const body = new FormData();
-      for (const [k, v] of Object.entries(identity)) if (v) body.append(k, v);
-      if (photo) body.append("photo", photo);
-      if (guide) body.append("guide", JSON.stringify(guide));
-      if (myMethod) body.append("my_method", myMethod);
-      for (const [k, v] of Object.entries(dialIn)) if (v) body.append(k, v);
-
-      const res = await fetch("/api/bags", { method: "POST", body });
+      // The row already exists — this only records the dial-in. The guide on
+      // it was written by the search and is not editable here by design.
+      const res = await fetch(`/api/bags/${bagId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ my_method: myMethod || null, ...dialIn }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Couldn't save that bag.");
       onSaved();
@@ -249,7 +324,16 @@ function Scan({ onSaved }: { onSaved: () => void }) {
 
   if (stage === "reading") return <Busy label="Reading the bag…" />;
   if (stage === "searching") {
-    return <Busy label="Looking for the roaster's instructions…" hint="Checking this coffee's page, then their brew guide." />;
+    return (
+      <Busy
+        label="Looking for the roaster's instructions…"
+        hint={
+          waited < 20
+            ? "Checking this coffee's page, then their brew guide."
+            : `${waited}s. The bag is already saved — this can finish without you, and the guide will be on it when you come back.`
+        }
+      />
+    );
   }
 
   return (
@@ -283,12 +367,51 @@ function Scan({ onSaved }: { onSaved: () => void }) {
       </section>
 
       {stage === "confirm" && (
-        <button
-          onClick={() => void search()}
-          className="bg-accent text-white rounded-xl px-4 py-3 font-medium"
-        >
-          Find brewing instructions
-        </button>
+        <div className="flex flex-col gap-2">
+          <div className="text-sm text-ink/60 flex items-center gap-3 flex-wrap">
+            <label className="flex items-center gap-2">
+              Search with
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value as SearchModel)}
+                className="border border-line rounded-lg px-2 py-1 bg-white"
+              >
+                {(Object.keys(MODEL_LABELS) as SearchModel[]).map((m) => (
+                  <option key={m} value={m}>
+                    {MODEL_LABELS[m]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {/* Absent rather than disabled for a model with no effort control:
+                a greyed-out control implies a setting that exists. */}
+            {effortsFor(model).length > 0 ? (
+              <label className="flex items-center gap-2">
+                at effort
+                <select
+                  value={isEffortFor(model, effort) ? effort : DEFAULT_EFFORT}
+                  onChange={(e) => setEffort(e.target.value)}
+                  className="border border-line rounded-lg px-2 py-1 bg-white"
+                >
+                  {effortsFor(model).map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <span className="text-ink/40">no effort control on this model</span>
+            )}
+          </div>
+          <button
+            onClick={() => void findAndSave()}
+            className="bg-accent text-white rounded-xl px-4 py-3 font-medium"
+          >
+            Save and find brewing instructions
+          </button>
+        </div>
       )}
 
       {stage !== "confirm" && guide && <GuideCard guide={guide} />}
@@ -429,11 +552,13 @@ function Library({
   bags,
   query,
   setQuery,
+  error,
   onChanged,
 }: {
   bags: Bag[];
   query: string;
   setQuery: (q: string) => void;
+  error: string | null;
   onChanged: () => void;
 }) {
   return (
@@ -444,7 +569,11 @@ function Library({
         placeholder="Search roaster, coffee, origin, notes"
         className="w-full border border-line rounded-xl px-3 py-2 bg-white outline-none focus:border-accent"
       />
-      {bags.length === 0 ? (
+      {error ? (
+        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          The library could not be read, so this is not a statement about what is in it: {error}
+        </p>
+      ) : bags.length === 0 ? (
         <p className="text-sm text-ink/60 text-center py-10">
           {query ? "Nothing matches that." : "No bags yet. Scan one."}
         </p>
@@ -642,6 +771,23 @@ function Busy({ label, hint }: { label: string; hint?: string }) {
       {hint && <p className="text-sm text-ink/60 mt-1">{hint}</p>}
     </div>
   );
+}
+
+/**
+ * A stored bag back into the guide shape the card renders. The search no
+ * longer hands its result to the page directly, so this is how it arrives.
+ */
+function guideFromBag(bag: Bag): Guide {
+  const params = { ratio: bag.guide_ratio, dose: bag.guide_dose, water: bag.guide_water, temp: bag.guide_temp, grind: bag.guide_grind, time: bag.guide_time };
+  return {
+    status: bag.guide_status,
+    product_url: bag.product_url,
+    guide_url: bag.guide_url,
+    method: bag.guide_method as Guide["method"],
+    params: Object.fromEntries(Object.entries(params).filter(([, v]) => v)) as Guide["params"],
+    quotes: bag.guide_quotes as Guide["quotes"],
+    dropped: (bag.guide_dropped ?? []) as Guide["dropped"],
+  };
 }
 
 function stripNulls(identity: Identity): Partial<Identity> {

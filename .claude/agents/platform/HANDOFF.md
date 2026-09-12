@@ -6,49 +6,41 @@ Read `RULES.md` first. This file is only what is true right now.
 
 ---
 
-## Production has not deployed since 17:48 today
+## The deploy outage is closed — read this before you touch Vercel
 
-**This is the biggest live problem in the project and it is yours.**
+**Fixed 2026-09-12 at 00:40.** All five projects serve `0c7d882` (#33); `techpaddock.io` returns 200
+from that deployment with the password gate intact. It ran six hours and forty minutes.
 
-Every one of the five Vercel projects last deployed production at **17:48 UTC**, commit `92c1ec1`
-(PR #16). The last deployment of any kind was a preview at 17:54. Everything merged to `main` since
-then is undeployed — check the commit rather than a count, because the count grows on every merge.
+There were **two** causes, and only the first was diagnosed here originally.
 
-**Re-verified at 23:45, hours after the diagnosis below: still zero deployments on any of the five
-projects.** Three more pull requests merged in between and produced nothing. The GitHub App has not
-been reconnected.
+**One: the GitHub App installation.** The repo moved to the `Tech-Paddock` org and the installation
+did not travel with it — a GitHub App is installed on an *account*, not a repository. An earlier
+version of this file said the repo moved to the org *and back to `joelb-401`*. It did not; it is
+still org-owned, id `1358809705`, owner type Organization. That one wrong word sent the fix to
+`github.com/settings/installations`, a personal-account page that cannot reach an org-owned repo.
 
-The evidence, so you do not re-derive it:
+**Two, and this is the one that was missed: the project's git link is stored on the Vercel project,
+not derived from the installation.** After the org installation was in place, a push at 00:12 reached
+GitHub, ran CI, and produced **zero** deployments. All five projects still recorded
+`link.org: "joelb-401"`, and nothing on the GitHub side could rewrite it — removing the personal
+installation changed nothing. The fix was per project, in **Vercel's own Settings → Git**:
+disconnect, then reconnect to `Tech-Paddock/tech-paddock`.
 
-```
-17:48:28   last production deploy (#16)
-17:49:01   tp-resume         project settings modified
-17:49:30   tp-message-editor project settings modified
-17:49:57   tp-tracker        project settings modified
-17:50:23   tp-home           project settings modified
-17:50:26   tp-coffee-app     project settings modified
-17:54:49   last deployment of any kind
-           ... nothing, across 11 merges
-```
+What proved the installation itself was sound was an accident: a sixth project, created from
+Vercel's import flow at 00:16, deployed current `main` to production two seconds later carrying
+`githubOrg: Tech-Paddock`. That separated "Vercel cannot see the repo" from "Vercel is looking in the
+wrong place", which look identical from outside. The project has since been deleted.
 
-Five separate projects do not modify their own settings within 85 seconds of each other. That is one
-account-level event rippling through all of them, and the thing that rewrites every project's stored
-git link at once is **the repository changing hands**. The repo was transferred to the `Tech-Paddock`
-org and back to `joelb-401` in that window.
+Verified after the five reconnects: every custom domain survived — `techpaddock.io`,
+`editor.`, `tracker.`, `resume.` all still attached, and `tp-coffee-app` still holds
+`tech-paddock.vercel.app`.
 
-**Diagnosis: Vercel's GitHub App installation did not survive the transfer.** A GitHub App is
-installed on an *account*, not on a repository; the repo left the installation's scope and came back
-to an account whose installation no longer covers it. Nothing errors. Pushes succeed, GitHub Actions
-still runs (it is built into GitHub, not an installed app), and Vercel simply never hears about it.
+**If deployments stop again, read `link.org` on the project before touching anything on GitHub.**
 
-Ruled out along the way: the Hobby plan's 100-deploys-per-day cap — Joel checked the dashboard and
-there is no limit banner — and `git.deploymentEnabled: false`, which appears in none of the five
-`vercel.json` files.
-
-**The fix:** `github.com/settings/installations` → Vercel → confirm it exists and that
-`tech-paddock` is in its repository access list. Then a new push against current `main` is needed;
-do **not** use the dashboard's Redeploy button on the existing production deployment, because that
-rebuilds `92c1ec1` — the same stale code.
+Ruled out along the way, read from the files rather than a summary of them: the Hobby plan's
+100-deploys-per-day cap (no banner), and `git.deploymentEnabled: false` and the legacy
+`github.enabled: false` — neither appears in any of the five `vercel.json`, and there is no root
+`vercel.json`.
 
 ## Ignored Build Step — agreed, written, not landed
 
@@ -79,36 +71,44 @@ against the Hobby daily cap. Vercel's documentation does not say. It certainly s
 builds per push.
 
 Merging this is also the cleanest way to clear the backlog — it touches all five `vercel.json`
-files, so every project rebuilds and `VERCEL_GIT_PREVIOUS_SHA` still points at `92c1ec1`, meaning
-each project sees the full accumulated diff.
+files, so every project rebuilds. Note the backlog argument that used to sit here is spent: the
+outage is fixed and all five have deployed `0c7d882`, so this change is now worth landing on its own
+merits — five full Next.js builds per docs-only commit — rather than as a way to clear a backlog.
 
-## `tp-coffee-app` is partly configured, and it is the only public exposure
+## Coffee is fully working, and the schema trap that cost an hour
 
-Joel worked on it at **23:31** — the project's `updatedAt` moved. Two things are **verifiably still
-outstanding**, and two cannot be checked from a session at all:
+**Green as of 2026-09-12 03:00.** `GET /api/health` returns `{"ok":true}` on all three checks, at
+`coffee.techpaddock.io`, behind the password gate, on current `main`. Root Directory is
+`apps/coffee`; the build log shows dependencies installed and `next build` run, where it used to
+exit in 153ms having prepared no files. `tech-paddock.vercel.app` belongs to this project and now
+serves the same gated login, so the ungated surface this file used to warn about is gone.
 
-| Setting | State at 23:45 |
+**The part worth carrying forward.** Standing it up produced three failures in three different
+systems, and only one was where it appeared to be:
+
+| Symptom | Actually |
 |---|---|
-| `framework` | still `null` — not set to Next.js |
-| domains | `coffee.techpaddock.io` **not attached**; only the three `.vercel.app` names |
-| Root Directory | **not exposed by the Vercel API** — unknowable from here |
-| the five env vars | **not exposed by the Vercel API** — unknowable from here |
+| `database: Invalid API key` | `SUPABASE_SERVICE_ROLE_KEY` held a non-JWT value |
+| `storage: Invalid Compact JWS` | same key — Storage failing to *parse* it as a JWT |
+| `anthropic_key: not set` | a blank Vercel field |
+| `database: Invalid schema: coffee` | **the schema was never exposed to the hosted Data API** |
 
-For the last two, `GET /api/health` on the deployed app is the check — it landed in #31 and names
-which dependency is unhappy. A green build proves nothing, because the variables are read per
-request rather than at build time.
+The first is the shape to remember: **Supabase's value living in a Vercel field.** The project has
+both key systems enabled — legacy `eyJ…` JWTs and modern `sb_secret_…` — and the code needs the
+legacy `service_role` JWT. `Invalid Compact JWS` is the decisive tell, because a merely *wrong* JWT
+parses fine and fails differently.
 
-**The Cloudflare DNS is already done.** `coffee.techpaddock.io` resolves to `76.76.21.21`, a real A
-record rather than a wildcard — confirmed because a nonsense subdomain on the same zone does not
-resolve. Only the Vercel-side attachment remains.
+The last one is the trap. `coffee` had a correct migration, correct grants — verified directly
+against Postgres, `service_role` had USAGE and SELECT — and was already listed in `config.toml`.
+PostgREST still refused it, because the hosted project's **exposed schemas** list is a dashboard
+setting that is not in this repo and that `config.toml` does not touch. Adding it there fixed it
+with no code, no migration and no redeploy.
 
-Until Root Directory points at a real app, `tech-paddock.vercel.app` serves an empty page
-**outside the password gate** — the gate lives in each app's middleware, so a project with no app
-has no gate. That is why this is first on the list. Joel's decision stands: **fix in place, do not
-delete.**
+**`supabase/README.md` said two migrations plus `config.toml` and is now corrected to three steps.**
 
-Note: `tp-message-editor` also shows `framework: null`, though it has been deploying correctly via
-its own `vercel.json`. Worth setting for consistency; not urgent.
+**Verifying it without dashboard access:** `postgrest_logs` prints a relation count on every reload.
+Count the tables across the schemas that should be exposed and compare. Here the log read
+`Schema cache loaded 8 Relations` — 8 rather than 7 is `coffee.bags` arriving.
 
 ## `SESSION_SECRET` was rotated today — verify parity
 
@@ -149,14 +149,17 @@ grants or RLS problem it becomes yours.
 
 ## Known, deliberately not fixed
 
-- **DNS is wired two ways.** `editor` resolves through `vercel-dns-017.com`; the other three use the
-  legacy `76.76.21.21` A record. Both work. Switching is hygiene, not a problem — and if you do,
-  take each target from that project's own Domains tab.
+- **DNS is uniform as of 2026-09-12, and this entry is retired.** Joel moved all four subdomains to
+  CNAMEs on `d1317e1174061c29.vercel-dns-017.com` at 01:39; verified resolving, and all four still
+  return 200 with `frame-ancestors 'self' https://techpaddock.io https://*.techpaddock.io` intact.
+  The apex `techpaddock.io` stays an A record at `76.76.21.21` — an apex cannot be a CNAME, so that
+  is correct rather than an oversight. `coffee.techpaddock.io` is attached and resolving too.
 - **`/api/health` on the resume app sits behind the password gate**, so no external uptime monitor
   can reach it. Fine for human use; a blocker if it is ever meant for monitoring.
 - **`build (coffee)` is not in branch protection's required checks.** The matrix is five jobs; the
-  ruleset still names four. Branch protection is also probably inert while the repo sits on a
-  personal account.
+  ruleset still names four. `main` now reports `protected: true` on the org, checked 2026-09-12,
+  which supersedes the old note that protection is inert on a personal account — but no agent can
+  read rulesets, so which checks are required is unverifiable from a session.
 
 ## Next steps, in order
 

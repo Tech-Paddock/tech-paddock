@@ -128,7 +128,15 @@ function sharedSecretProbe(project: Project, path: string) {
   }, label);
 }
 
-/** Presence only. No value is read into a variable that could be rendered. */
+/**
+ * Presence only. No value is read into a variable that could be rendered.
+ *
+ * Reports what *this deployment* was built with, not what the Vercel dashboard
+ * currently says: the environment is baked into the serverless function at
+ * deploy time, so reading process.env per request still reads the deployment's
+ * environment. A setting changed since the last deploy reads as it was until a
+ * redeploy. The page says so rather than letting the number imply otherwise.
+ */
 function hubEnv(): EnvCheck[] {
   return HUB_ENV_NAMES.map((name) => ({ name, set: !!process.env[name] }));
 }

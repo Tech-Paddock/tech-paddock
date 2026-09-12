@@ -77,6 +77,12 @@ export default async function AdminPage() {
         </div>
       </div>
 
+      <p className="admin-note">
+        Hub config is what <em>this deployment</em> was built with. Vercel bakes the environment into
+        the function at deploy time, so a variable changed in the dashboard since the last deploy
+        will still read as it was — a redeploy is what makes a change real, not saving the setting.
+      </p>
+
       <h2 className="admin-section">
         Live connections <span className="admin-qualifier">public /login on each project</span>
       </h2>

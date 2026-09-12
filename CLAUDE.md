@@ -72,8 +72,18 @@ in the file every session loads, so that they cannot drift the way seven copies 
 - **Apply a schema change without its migration file in the same pull request.** The database is
   not allowed to be the only record of its own shape again.
 - **Edit the shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, or
-  anything touching `SESSION_SECRET` and the shared cookie. These are byte-identical copies in five
-  apps and a mismatch does not throw. It silently rejects valid sessions on the other four.
+  anything touching `SESSION_SECRET` and the shared cookie. **These are gated for two different
+  reasons, and merging them is how the rule gets talked past.**
+  `lib/auth.ts` and `lib/password.ts` genuinely are byte-identical in all five apps — checksummed,
+  not assumed — and a mismatch does not throw. It silently rejects valid sessions on the other four.
+  `middleware.ts` is **three distinct versions**: `home`, `resume` and `coffee` share one, `editor`
+  adds a scoped `/api/draft` bypass, `tracker` adds `/api/summary` and waves `/api/cron/*` through.
+  That divergence is deliberate, so "they are all the same" is not the reason to leave it alone —
+  and an agent who checks, finds three, and concludes the rule is wrong has been handed that
+  conclusion by the rule itself. **It is gated because it *is* the password gate.** A bad edit here
+  does not break a login; it publishes an endpoint. `tracker` already shows the shape: `/api/cron/*`
+  skips the gate entirely and the route's own `if (secret && …)` check fails **open** when
+  `CRON_SECRET` is unset — harmless today only because Graph is unconfigured.
 - **Edit this file, or any charter but your own.** Both are approved before they are updated, never
   quietly alongside the code that outdated them. **If what you are about to build contradicts
   either, stop and ask before you build it** — in your worklog and to Joel. Raising it in the pull
@@ -101,9 +111,23 @@ between configuring something that exists and creating, destroying, or re-pointi
   ships untested and nothing tells you.
 - Keep your worklog current. It carries what a commit cannot: what you are doing right now, what
   you are blocked on, what you decided that affects someone else, what you need from the TD.
+- **Update your `HANDOFF.md` when you open a pull request, and again whenever you change what that
+  pull request does.** The two files are not the same job. The worklog is what you are doing right
+  now and it dies with its branch; the handoff is what the next session in your area inherits and
+  it outlives everything. A pull request is the moment work stops being in-flight and becomes
+  something the next agent has to know about — so that is when the handoff is written, not at the
+  end of a session you may not get to finish.
+  Say what is now true, not what you did: the commit already records the what. If the change alters
+  a flow, a contract, or a constraint your handoff describes, the old description is now wrong and
+  correcting it is part of the change, not follow-up work.
 
 ### Merging
 
+- **Handoffs current before the merge.** The technical director reads every handoff the change
+  touches and checks it describes what the change leaves behind. A merge that lands a new flow
+  while its handoff still describes the old one hands the next session a document that is
+  confidently wrong — which is the single failure this project has paid for most often. A stale
+  handoff sends the change back; it does not get fixed by the TD on the way past.
 - **Squash merge, always.** One commit on `main` per change.
 - **CI green before merge** — all five matrix jobs, on the current head. A red build does not get
   merged on the assumption that the failure is unrelated. Establish that it is, or fix it.
@@ -173,11 +197,38 @@ Every agent needs these. Per-tool detail lives in that tool's charter.
 - **Prefer append over rewrite for anything that accumulates.** When a feature involves growing
   history, the default write path is a plain insert — cheap, instant, no model call — with any
   model-driven synthesis kept as a separate, deliberately triggered, batched step.
+- **Model choice is per task.** No model is mandated repo-wide. Pick what the job needs —
+  capability where judgment matters, something cheaper and faster where it does not — and record
+  the choice and the reason at the call site, because the next reader cannot infer either. Apps are
+  not required to agree with each other, so "which model are we on" now has one answer per app.
+  **Two things the old `claude-sonnet-5` pin was protecting still hold.** Every call stays
+  server-side. And a new model can carry API-shape changes — `effort` moving under `output_config`
+  caught this project once already — so moving an app to a different model is a deliberate change
+  with a test behind it, never a string swap.
+- **Chrome is the default browser, on desktop and on the phone. Safari is a utility, used only where
+  Chrome cannot do the job.** Every report here comes from Chrome unless it explicitly says
+  otherwise, so **Safari is never the explanation for a bug.** A theory resting on WebKit
+  third-party cookie partitioning or ITP is a theory about a browser that was not in the loop — the
+  mobile login bug already cost one round of exactly that, and it survived because the word *Safari*
+  made a guess sound like a diagnosis. Reproduce in Chrome, and describe behaviour as Chrome's.
+
+  **Reaching for Safari on purpose is fine — that is what a utility browser is for.** Adding a web
+  app to the iOS home screen so it launches standalone is Safari-only, and that is how Coffee is
+  installed: open it in Safari once, add it, and the installed app is its own thing afterwards. The
+  intended path, not a workaround to design away. So do not add a web app manifest to make an app
+  Chrome-installable on the strength of this rule alone — that means editing `middleware.ts`, which
+  is the password gate in every app and TechPad Gen's call, and it is not what this rule asks for.
+
+  **On iOS every browser is WebKit, Chrome included**, so a WebKit rendering or decoding quirk still
+  applies on the phone whichever browser is in front of it. The `<img>` fallback in
+  `apps/coffee/lib/image.ts` is there because `createImageBitmap` cannot always decode an iPhone
+  HEIC. It protects Chrome on the primary device and is not dead code.
+
 - **Agent isolation.** Never point two Claude Code sessions at the same working directory at the
   same time. One app folder at a time, or genuinely separate worktrees.
 
-**Stack:** Next.js on Vercel · Supabase Postgres · Anthropic API, `claude-sonnet-5`, server-side
-only · techpaddock.io via Cloudflare Registrar.
+**Stack:** Next.js on Vercel · Supabase Postgres · Anthropic API, server-side only ·
+techpaddock.io via Cloudflare Registrar.
 
 **Domain map** — project names carry a `tp-` prefix and do not match their folder or subdomain.
 That is verified against the live account and the prefix stays; the table gets corrected, not the

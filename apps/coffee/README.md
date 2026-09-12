@@ -36,6 +36,24 @@ roaster's, and demotes a `coffee_specific` claim to `roaster_generic` unless the
 instructions were genuinely read on the product page. The quotes are shown in the UI next
 to the parsed values, so a misparse is visible rather than silent.
 
+## Install it on an iPhone
+
+Open `coffee.techpaddock.io` in Safari, Share → **Add to Home Screen**. It launches full screen
+with its own icon and no browser chrome, which is the point when you are holding a bag in one hand.
+
+Two things worth knowing:
+
+- **An installed app has its own cookie jar.** The session you have in Safari does not come with
+  it, so you log in once more inside the installed app. That is iOS, not a bug, and it does not
+  affect the shared `.techpaddock.io` cookie anywhere else.
+- **It is reached directly, not through the hub's iframe.** Which is the point of installing it,
+  and it sidesteps the hub's mobile login bug rather than fixing it.
+
+There is no web app manifest, so this is iOS only. Android install would need one, and a manifest
+is fetched without credentials — it would be caught by the password gate and the install would
+silently never offer itself. Allowing it through means editing `middleware.ts`, which is
+byte-identical in five apps and is not Coffee's to change.
+
 ## Development
 
 ```

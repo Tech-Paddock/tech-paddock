@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-11 23:45 UTC.**
+**Last reviewed: 2026-09-12 18:40 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -15,46 +15,154 @@ and the things that belong to nobody else.
 
 ## Blocking everything else
 
-- **2026-09-11 — PRODUCTION HAS NOT DEPLOYED SINCE 17:48.** Every app serves commit `92c1ec1`, and
-  everything merged since is undeployed — the count only grows, so check the commit rather than a
-  number. Verified at 23:45: zero deployments on **any** of the five projects since 17:54, across
-  three merged pull requests. Cause: Vercel's GitHub App lost
-  its installation when the repo was transferred to the org and back — a GitHub App is installed on
-  an *account*, not a repository. Pushes succeed, CI runs, Vercel never hears. Ruled out: the Hobby
-  daily deploy cap (no banner) and `git.deploymentEnabled` (set in none of the five `vercel.json`).
-  **Fix is Joel's:** `github.com/settings/installations` → Vercel → confirm `tech-paddock` is in its
-  repository list. Then a *new push* against current `main` — not the dashboard Redeploy button,
-  which rebuilds the stale commit. Evidence and timestamps in `.claude/agents/platform/HANDOFF.md`.
-  **Until this is fixed, nothing can be verified on a live URL.** What is deployed is not what is on
-  `main`.
+Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
-1. **2026-09-11 — Finish `tp-coffee-app`. Partly done as of 23:31.** The project's `updatedAt` moved,
-   so something was changed, but two settings are verifiably still outstanding: **framework preset is
-   still `null`** and **`coffee.techpaddock.io` is not in its domain list**. Root Directory and the
-   five environment variables are not exposed by the Vercel API, so they cannot be confirmed from a
-   session either way — `GET /api/health` on the deployed app is the way to check them.
-   **The Cloudflare DNS is already done**: `coffee.techpaddock.io` has a real A record at
-   `76.76.21.21`, confirmed not a wildcard because a nonsense subdomain on the same zone does not
-   resolve. Only the Vercel-side attachment remains.
-   **This is still the only publicly exposed thing in the project** until Root Directory points at a
-   real app: `tech-paddock.vercel.app` serves an empty page outside the password gate, because the
-   gate lives in each app's middleware and a project with no app has no gate.
-2. **2026-09-11 — Verify the new `SESSION_SECRET` on all five projects.** It was rotated today
-   because the old value could not be read back out of the dashboard. Nobody has confirmed it landed
-   everywhere, and with deploys broken it is likely no project has picked it up. A partial rollout is
-   the silent-SSO failure: no error anywhere, just a login loop.
-3. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
+1. **2026-09-12 — Verify `SESSION_SECRET` parity. Rotated again at 01:39, live only after this
+   push.** Rotating is the right move rather than churn: the existing values cannot be read back out
+   of the dashboard, so parity cannot be confirmed by inspection — setting one fresh known value on
+   all five is the only way to guarantee it.
+   **A dashboard change does not reach a running deployment.** Vercel bakes the environment into the
+   serverless function at deploy time, so reading `process.env` per request still reads the
+   environment the deployment was built with. At 01:45 all five projects had settings changed at
+   01:39-01:40 and a last deployment of 00:48:22 — fifty-one minutes earlier — so every app was
+   still
+   running the previous secret. **Do not test SSO before a redeploy; you would be testing the old
+   value and learning nothing.**
+   Once deployed: log in at `techpaddock.io`, then open a tool from a hub tile, on desktop and on
+   mobile. A loop on both points at the secret; a loop on mobile only points at the iframe, which is
+   the separate known bug. No agent can read the values — this one is Joel's eyes only.
+2. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
    `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
    will tell you they are doing nothing. Needs a one-time Azure registration against a personal
-   Microsoft account.
-4. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
+   Microsoft account — the `consumers` authority, scopes `offline_access Calendars.Read
+   Tasks.ReadWrite`, and one by-hand authorization-code exchange to mint the refresh token, since the
+   code only ever does `grant_type=refresh_token`.
+   **Order matters, and it is a trap** (found 2026-09-12 by reading the route). The tracker's
+   middleware exempts `/api/cron/*` from the password gate outright, and the route guards itself with
+   `if (secret && ...)` — which fails **open** when `CRON_SECRET` is unset. That is harmless today
+   only because `graphConfigured()` is false and the route answers "Outlook is not connected". Set
+   the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
+   endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
+   first, or in the same save. Never after.**
+3. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
    jobs; the rule names four.
-5. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
+4. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
+
+- **2026-09-12 — The `tuning` Vercel project is gone. Joel deleted it; verified against the account,
+  not taken on report.** Five projects remain — `tp-home`, `tp-message-editor`, `tp-tracker`,
+  `tp-resume`, `tp-coffee-app` — and every one still reads `link.org: "Tech-Paddock"`, so the
+  re-linking that closed the deploy outage is holding.
+  Worth keeping for the next time one appears: it was created 18:02, carried a READY production
+  deployment, and **was never publicly reachable** — Vercel SSO covered all three `*.vercel.app`
+  domains and no custom domain was attached, so it answered a redirect to `sso-api` and
+  `x-robots-tag: noindex`. That is the check to run first, because the incident this project already
+  has on record is a Vercel project pointed at the repo root serving an unprotected page. Contained
+  is not the same as authorized, which is why it went to Joel rather than being noted and dropped.
+
+- **2026-09-12 — `middleware.ts` is three versions, not five copies, and the brief now says so.**
+  Joel's call, delegated. The rule was always right; the reason printed under it was false, and a
+  rule defended by a wrong fact is one somebody talks themselves past — TechPad Gen checked, found
+  three, and correctly reported the brief as wrong.
+  Re-verified by checksum before writing: `lib/auth.ts` and `lib/password.ts` **are** identical
+  across all five. `middleware.ts` is three — `home`/`resume`/`coffee` share one, `editor` adds a
+  scoped `/api/draft` bypass, `tracker` adds `/api/summary` plus an outright `/api/cron/*` wave-
+  through.
+  **The correction also names the real danger, which the old wording hid.** `middleware.ts` is not
+  gated because the copies match; it is gated because it *is* the password gate. A bad edit there
+  publishes an endpoint rather than breaking a login — and tracker already shows the shape, since
+  `/api/cron/*` skips the gate and the route's own `if (secret && …)` fails **open** without
+  `CRON_SECRET`. That trap was already on this ledger and the rule protecting it described the
+  wrong hazard.
+  Corrected in eleven places: `CLAUDE.md` twice — including a line I wrote myself an hour earlier in
+  the Chrome note, which repeated the error I was about to correct — the TD charter, and the
+  `RULES.md` and `KICKOFF.md` of all five app agents. **Every prohibition is unchanged**; only the
+  justification moved. `message-editor` and `tracker` were the clearest proof it was wrong: each
+  named its own carve-out and then called the file byte-identical in the next sentence.
+  **One left for its owner.** `.claude/agents/coffee/HANDOFF.md` still says it. Handoffs are not the
+  TD's to rewrite, so Coffee corrects that next time it touches the file.
+
+- **2026-09-12 — `CLAUDE.md` now says Chrome is the default and Safari is a utility.** Joel asked
+  for a browser note, then amended it the same hour once the consequence surfaced: **Chrome is the
+  default, on desktop and phone; Safari is a utility browser, used only where Chrome cannot do the
+  job.** Safari is still never the explanation for a bug — reports come from Chrome unless stated,
+  and the mobile login bug already lost a round to an ITP theory about a browser that was not in the
+  loop.
+  Written as a diagnosis rule rather than a word ban, because a ban would have caused a bug: on iOS
+  every browser is WebKit, Chrome included, so the `<img>` decode fallback in
+  `apps/coffee/lib/image.ts` protects the phone Joel actually uses, and an agent told only "we use
+  Chrome" would have deleted it as dead code.
+  **This also settles #42.** Installing Coffee through Safari is the intended path, not a defect —
+  iOS allows no other route to a standalone home-screen app. The rule says so explicitly, and says
+  it is *not* grounds for adding a manifest to make apps Chrome-installable, because that means
+  editing `middleware.ts` — the password gate, TechPad Gen's call.
+  **Two stale references left for their owners.** `.claude/agents/techpad-gen/HANDOFF.md` still
+  carries the Safari/ITP theory for the mobile bug — that file is the open conflict in #43 and is
+  theirs to rewrite. `apps/coffee/app/globals.css` has a comment reading "In Safari these insets are
+  zero", which is true of any browser tab and should say so; Coffee's to fix, cosmetic, not urgent.
+- **2026-09-12 — #42 merged: Coffee installs on the iPhone home screen.** `apple-touch-icon` and
+  the `apple-mobile-web-app-*` tags, safe-area insets, a favicon. Deliberately iOS-only: a manifest
+  is fetched without credentials, so the gate returns the login redirect and the install silently
+  never offers itself, and letting it through means editing `middleware.ts` — the password gate, not
+  Coffee's to change. The icon is a static import so it serves from `/_next/static`, the one prefix
+  the matcher excludes; Next's own `app/apple-icon.png` convention sits behind the gate, where iOS
+  falls back to a screenshot of the login page as the icon. Verified at the gate: matcher confirmed,
+  `middleware.ts` untouched, both binaries scanned for metadata and clean, all five matrix jobs
+  green. **It also carried the handoff rewrite #41 asked for** — the new rule working in the
+  direction it was meant to, one pull request after it landed.
+- **2026-09-12 — #43 sent back, and the handoff rule is why.** TechPad Gen's hub re-theme and
+  `/admin` page: good work on a base that was never brought current. Conflict in its own handoff,
+  CI never ran at all (GitHub cannot build a merge ref while a PR conflicts), and both the handoff
+  and the body assert production serves `92c1ec1` when `tp-home` has served `f06ff0c` since 03:57.
+  Not backfilled by me, deliberately — the conflict is inside the handoff, so fixing it would mean
+  writing it. Detail in `.claude/agents/td/HANDOFF.md`.
+
+- **2026-09-12 — Handoffs are now part of the gate, and #40 is why.** Agents update their
+  `HANDOFF.md` when they open or change a pull request; the TD reads every handoff a change touches
+  before merging, and a stale one sends the change back rather than getting backfilled on the way
+  past. #40 moved Coffee's save ahead of its search — the app's central flow — and updated the
+  charter and the worklog and no handoff, so the merge published a document that was confidently
+  wrong about the one thing it exists to explain. Coffee's handoff now carries a staleness banner
+  and its rewrite is the Coffee agent's first task; the TD did not write it, because a handoff
+  written by the TD is a second-hand reading of someone else's work.
+- **2026-09-12 — #39 and #40 merged.** Bag lookups no longer report success when the database is
+  unreachable — a swallowed Supabase `error` made an unreachable database look like a first-time
+  coffee, and two of three call sites answered 200 with a confident wrong answer. And the
+  brew-guide search is backgrounded, with a selectable model and effort recorded per bag. #40's
+  migration was applied to the hosted project immediately before the merge — additive columns, so
+  the running code ignored them and there was no window where new code met old schema.
+
+- **2026-09-12 — COFFEE IS FULLY UP.** `GET /api/health` returns `{"ok":true}`: `coffee schema
+  reachable`, `bucket coffee-files reachable`, `ANTHROPIC_API_KEY` set. It is deployed at
+  `coffee.techpaddock.io`, behind the password gate, on current `main`.
+  **Three separate failures, in three different systems, and only one was where it looked.** The
+  `SUPABASE_SERVICE_ROLE_KEY` held a non-JWT value — Supabase's value in a Vercel field, diagnosed
+  from `Invalid Compact JWS`, which is Storage failing to parse it as a JWT. `ANTHROPIC_API_KEY` was
+  simply blank. And the last one was neither: **the `coffee` schema was never added to the hosted
+  project's exposed schemas**, so PostgREST refused it with `Invalid schema: coffee` while the grants
+  were perfect all along. Fixed in the Supabase dashboard with no code, no migration and no redeploy.
+  **`supabase/README.md` was wrong about this and is corrected.** It said adding a schema means two
+  migrations plus `config.toml` — but `config.toml` configures only the local stack, and `coffee` was
+  already listed there while the hosted project still refused it. Three steps, not two.
+
+- **2026-09-12 — THE DEPLOY OUTAGE IS CLOSED.** Production had not deployed since 17:48 on 09-11.
+  All five projects now serve `0c7d882` (#33); `techpaddock.io` returns 200 from that deployment
+  with the password gate intact. Six hours and forty minutes.
+  **Two causes, and the second is the one the documentation missed.** Vercel's GitHub App
+  installation did not survive the repo moving to the `Tech-Paddock` org, and installing it on the
+  org did *not* fix it on its own — a push at 00:12 reached GitHub, ran CI, and produced zero
+  deployments. **A project's git link is stored on the Vercel project, not derived from the
+  installation.** All five still recorded `link.org: "joelb-401"`, and nothing on the GitHub side
+  could rewrite that; removing the personal installation changed nothing. Each project had to be
+  disconnected and reconnected to `Tech-Paddock/tech-paddock` in Vercel's own Settings → Git.
+  What proved the installation itself was sound was an accident: a sixth project created from
+  Vercel's import flow deployed current `main` two seconds after it was made. That project has since
+  been deleted. Every custom domain survived the five reconnects.
+  **If this happens again, check the project's `link.org` before touching anything on GitHub.**
 
 - **2026-09-11 — PR #28 closed and all dead branches deleted.** The queue is empty: zero open pull
   requests, and `main` plus one docs branch is the whole branch list.
@@ -94,18 +202,30 @@ and the things that belong to nobody else.
 
 ## Known, deliberately not fixed
 
-- **2026-09-11 — Every push rebuilds every Vercel project.** No Ignored Build Step. The change is
-  written and agreed — one `ignoreCommand` line per app's `vercel.json`, in the Platform handoff —
-  and not landed. Merging it is also the cleanest way to clear the deploy backlog.
-- **2026-09-11 — DNS is wired two ways.** `editor` resolves through `vercel-dns-017.com`; the others
-  use the legacy `76.76.21.21` A record. Both work. If switching, take each target from that
-  project's own Domains tab — they are not interchangeable.
+- **2026-09-12 — Every push still rebuilds every Vercel project, including `tp-coffee-app`.**
+  `tp-coffee-app` has *Skip deployments when there are no changes to the root directory or its
+  dependencies* **enabled**, and it still rebuilt twice from #35 — a commit touching only `.claude/`,
+  nothing under `apps/coffee`. **So the toggle does not behave as its label suggests, at least not
+  here, and a previous version of this entry asserted the opposite. Do not plan around it.** Why it
+  did not skip is not understood; the plausible readings are that it does not apply to the first
+  build after a Root Directory change, or that "dependencies" is broader than it sounds. Establish
+  the behaviour before relying on it either way.
+  That leaves the `ignoreCommand` change in the Platform handoff still unlanded and still arguably
+  wanted — a docs-only commit currently triggers five full Next.js builds.
+- **2026-09-12 — DNS is now uniform, and that entry is retired.** All four subdomains — `editor`,
+  `tracker`, `resume`, `coffee` — are CNAMEs to `d1317e1174061c29.vercel-dns-017.com`, changed by Joel
+  at 01:39 and verified resolving. The apex `techpaddock.io` stays an A record at `76.76.21.21`
+  because an apex cannot be a CNAME; that is correct rather than a leftover. All four app domains
+  still return 200 and still send `frame-ancestors 'self' https://techpaddock.io
+  https://*.techpaddock.io`, so the embed restriction survived the switch.
 - **2026-09-11 — `/api/health` sits behind the password gate**, so no external monitor can reach it.
 - **2026-09-11 — `editor.model_status` has zero rows.** The login-time drift check has never
   successfully written. Not diagnosed, and the oldest unexplained thing here.
 - **2026-09-11 — The hub's mobile login bug.** Opening a tool from an embedded tile re-triggers that
-  app's login on mobile. Reported on mobile Chrome, so the Safari/ITP explanation does not fit.
-  Check what URL the iframe actually loads first.
+  app's login on mobile. **Reported on Chrome, which is the only browser used here** — so a
+  cookie-partitioning explanation borrowed from another engine is not the diagnosis, and reaching for
+  one cost a round already. Check what URL the iframe actually loads first; that is still unchecked.
+  `CLAUDE.md` now says this once, under the shared foundation, so it stops being re-litigated.
 
 ## Read this before transferring the repo again
 
@@ -129,8 +249,10 @@ running session. Then move. In that order.
 
 Rules in `CLAUDE.md` are written, not enforced. Only three things enforce:
 
-1. **Branch protection** — configured, but probably inert while the repo sits on a personal account.
-   **Assume `main` is unprotected.**
+1. **Branch protection** — the GitHub API now reports `main` as `protected: true`, checked
+   2026-09-12. That supersedes the previous standing instruction to assume it is inert. No agent can
+   read rulesets, so *which* checks are required is still unverifiable from a session — including
+   whether `build (coffee)` is among them.
 2. **CI** — five matrix jobs. Hardcoded; a sixth app is silently untested until added.
 3. **Hooks** — three in `.claude/settings.json`, currently doing the real work. `SessionStart`
    prints this ledger into every session; two `PreToolUse` guards refuse a push to `main` and refuse
