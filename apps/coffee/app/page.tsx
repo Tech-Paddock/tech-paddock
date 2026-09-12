@@ -69,10 +69,22 @@ export default function CoffeePage() {
   const [tab, setTab] = useState<"scan" | "library">("scan");
   const [bags, setBags] = useState<Bag[]>([]);
   const [query, setQuery] = useState("");
+  const [libraryError, setLibraryError] = useState<string | null>(null);
 
   const loadBags = useCallback(async (q: string) => {
-    const res = await fetch(`/api/bags${q ? `?q=${encodeURIComponent(q)}` : ""}`);
-    if (res.ok) setBags((await res.json()).bags ?? []);
+    // A failed load used to do nothing at all, which rendered as "No bags
+    // yet. Scan one." — a confident statement about data that was never
+    // read. An empty library and a broken one must not look the same.
+    try {
+      const res = await fetch(`/api/bags${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Couldn't load the library.");
+      setBags(data.bags ?? []);
+      setLibraryError(null);
+    } catch (e) {
+      setLibraryError(e instanceof Error ? e.message : "Couldn't load the library.");
+      setBags([]);
+    }
   }, []);
 
   useEffect(() => {
@@ -110,7 +122,7 @@ export default function CoffeePage() {
             }}
           />
         ) : (
-          <Library bags={bags} query={query} setQuery={setQuery} onChanged={() => void loadBags(query)} />
+          <Library bags={bags} query={query} setQuery={setQuery} error={libraryError} onChanged={() => void loadBags(query)} />
         )}
       </div>
     </main>
@@ -540,11 +552,13 @@ function Library({
   bags,
   query,
   setQuery,
+  error,
   onChanged,
 }: {
   bags: Bag[];
   query: string;
   setQuery: (q: string) => void;
+  error: string | null;
   onChanged: () => void;
 }) {
   return (
@@ -555,7 +569,11 @@ function Library({
         placeholder="Search roaster, coffee, origin, notes"
         className="w-full border border-line rounded-xl px-3 py-2 bg-white outline-none focus:border-accent"
       />
-      {bags.length === 0 ? (
+      {error ? (
+        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          The library could not be read, so this is not a statement about what is in it: {error}
+        </p>
+      ) : bags.length === 0 ? (
         <p className="text-sm text-ink/60 text-center py-10">
           {query ? "Nothing matches that." : "No bags yet. Scan one."}
         </p>

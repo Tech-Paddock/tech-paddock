@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { findPreviousBag, findRoasterDomain, guideColumns, hostOf, LookupError } from "@/lib/bags";
+import { findPreviousBag, findRoasterDomain, guideColumns, hostOf, searchPattern, LookupError } from "@/lib/bags";
 import type { Guide } from "@/lib/guide";
 
 // The Supabase query builder is chainable and only resolves at the end, so the
@@ -124,5 +124,38 @@ describe("guideColumns", () => {
     expect(columns.guide_model).toBeNull();
     expect(columns.guide_effort).toBeNull();
     expect(columns.guide_dropped).toEqual([]);
+  });
+});
+
+describe("searchPattern", () => {
+  it("quotes the term so a comma searches for a comma", () => {
+    // The term lands inside `or=(...)`, where a bare comma starts a new
+    // filter term. "Sweet Bloom, Colombia" was a 500, not a search.
+    expect(searchPattern("Sweet Bloom, Colombia")).toBe('"%Sweet Bloom, Colombia%"');
+  });
+
+  it("survives the other characters that break an or() filter", () => {
+    // Parentheses group terms and a dot separates column from operator.
+    expect(searchPattern("Kenya (AA)")).toBe('"%Kenya (AA)%"');
+    expect(searchPattern("roaster.ilike")).toBe('"%roaster.ilike%"');
+  });
+
+  it("escapes what quoting alone cannot cover", () => {
+    // A double quote would close the value early; a backslash would escape
+    // whatever followed it.
+    expect(searchPattern('say "hi"')).toBe('"%say \\"hi\\"%"');
+    expect(searchPattern("back\\slash")).toBe('"%back\\\\slash%"');
+  });
+
+  it("treats wildcards as literal text", () => {
+    // A search box is not a pattern language. % and _ are LIKE wildcards and
+    // PostgREST maps * onto % as well, so all three are escaped.
+    expect(searchPattern("100%")).toBe('"%100\\%%"');
+    expect(searchPattern("a_b")).toBe('"%a\\_b%"');
+    expect(searchPattern("st*r")).toBe('"%st\\*r%"');
+  });
+
+  it("still matches the ordinary case", () => {
+    expect(searchPattern("sweet bloom")).toBe('"%sweet bloom%"');
   });
 });
