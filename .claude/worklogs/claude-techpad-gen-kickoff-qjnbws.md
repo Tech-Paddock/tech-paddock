@@ -135,3 +135,68 @@ For the ledger (not editing it, as instructed):
 
 Open, not started: the mobile login bug (both cheap explanations now ruled out — see handoff), no
 `test` script in `apps/home`, and the deferred Pit Wall type pass.
+
+## 2026-09-12 21:20 — Joel approved the scoping list; here it is scoped
+Joel said yes to the whole "For Joel to take to the technical director" section of
+`.claude/agents/techpad-gen/HANDOFF.md`. Breaking it into requests the TD can act on or hand out.
+
+Put here rather than only in the handoff because `read-all.sh` reads worklogs from unmerged
+branches, so this reaches the next session without waiting for #43 to merge. The handoff carries the
+same list marked approved, for after it lands.
+
+**None of this is mine to build.** Each item names whose it is.
+
+### Request 1 — TD: a `/api/health` carve-out in four apps
+`middleware.ts`, so the TD's. Pattern already exists and is reviewed: tracker's `/api/summary`
+bypass. Exact-path match, `x-internal-secret` header, fails closed.
+
+| app | has `/api/health` | needs carve-out |
+|---|---|---|
+| editor | no | yes |
+| tracker | no | yes |
+| resume | **yes** | yes |
+| coffee | **yes** | yes |
+
+`resume` and `coffee` need *only* the carve-out — the routes are already written and are currently
+unreachable from the hub, returning 401. That makes them the cheapest two to do first and the
+cheapest proof the mechanism works end to end.
+
+`home` needs neither: the hub reports on itself without a network call, deliberately.
+
+Worth doing as one change per app rather than one change across four, so each carve-out is reviewed
+on its own. This is the file where a bad edit publishes an endpoint rather than breaking a login —
+#47's wording, and the reason it is gated.
+
+### Request 2 — editor and tracker agents: a `/api/health` route
+Pattern: `apps/coffee/app/api/health/route.ts`. Each app reports on its own dependencies; the hub
+only aggregates. Nothing for the hub to change — `/admin` already renders whatever comes back and
+currently shows these as unknown with the reason.
+
+### Request 3 — a public `/api/version` per app
+The highest-value item on the list, and today is the evidence: four documents each asserted a
+different production commit and nothing in the repo could settle it. Vercel exposes
+`VERCEL_GIT_COMMIT_SHA` to an app but never to a sibling, so no page can show deploy drift without
+this.
+
+One line per app. **Decision needed: public, or behind the internal secret.** Recommendation:
+public. It exposes a commit hash of a private repo and nothing else, and public is what lets an
+external monitor notice an outage — which is the actual use case, since `/api/health` sits behind
+the password gate where no monitor can reach it.
+
+### Request 4 — whether `/admin` becomes the pit wall
+Approved in principle. Three things still to settle before anyone builds it, all in the handoff:
+latency (a note on a branch is invisible until merged and deployed), lifetime (a worklog dies with
+its branch, so durable notes belong in a `HANDOFF.md`), and rendering (markdown would be the hub's
+first dependency added purely to display something).
+
+**One part of this is NOT covered by Joel's yes and I am not treating it as approved.** Showing
+notes from unmerged branches means the hub reading the GitHub API at request time, which puts a
+read-only token in the hub — the first key it has ever held, and a direct exception to a property
+`RULES.md` tells me to protect. That needs Joel saying it specifically. Until he does, the
+buildable version is the one that renders `main` only and accepts the latency.
+
+### Not in the list, but noted
+#50 was closed unmerged at 21:08, so the draft rule and its four enforcement mechanisms did not
+land. Joel has separately told the TD he wants agents to commit but never open pull requests, with
+him opening them. If that supersedes #50 it changes the end of every agent's workflow, so it is
+worth the TD writing down which of the two is in force before the next change is built.

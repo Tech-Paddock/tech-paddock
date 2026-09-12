@@ -8,7 +8,8 @@ Read `RULES.md` first. This file is only what is true right now.
 
 ## What is on the branch, unmerged
 
-`claude/techpad-gen-kickoff-qjnbws`, open as **draft PR #43**.
+`claude/techpad-gen-kickoff-qjnbws`, open as **PR #43** — promoted on Joel's instruction, with the
+approval recorded on the pull request. Green on all five matrix jobs; the merge is the TD's.
 
 1. **`417dbdc` — the hub wears a John Player Special livery.** Near-black ground, gold accents, the
    four tiles on a gold ramp (champagne / gold / brass / bronze). This was a light-to-dark flip, so
@@ -55,9 +56,23 @@ database, and a ledger asserting a deployment state nobody re-verified.
 
 ---
 
-## For Joel to take to the technical director
+## Approved by Joel, 2026-09-12 — for the technical director to schedule
 
-Everything below is outside what this agent may do alone. Nothing here has been started.
+Everything below is outside what this agent may do alone, and **none of it has been started.** Joel
+approved this list as a whole on 2026-09-12, so the next session inherits it as agreed rather than
+as a proposal to re-open.
+
+`.claude/worklogs/claude-techpad-gen-kickoff-qjnbws.md` carries the same list broken into
+request-by-request scope — who each piece belongs to, and which two are cheapest to prove first.
+Deliberately not duplicated here: the worklog dies with the branch and this file outlives it, so one
+of them has to be the detail and the other the summary.
+
+**One thing the approval does not cover, and I am not treating it as covered.** Item 4 contains a
+sub-decision about the hub reading the GitHub API at request time, which would put a **read-only
+token in the hub — the first key it has ever held**, and a direct exception to a property `RULES.md`
+tells this agent to protect. Joel approved the scoping list; he did not separately approve that.
+Until he says it in those terms, the buildable version of item 4 renders `main` only and accepts the
+latency.
 
 ### 1. Do NOT create a new Vercel project or DNS record for the admin page
 
@@ -144,9 +159,49 @@ Kept as a record of where they went, not as outstanding work.
   `.techpaddock.io`, `SameSite=Lax`, which is same-site across subdomains and so not blocked. Both
   cheap explanations are gone, so this needs a live repro with devtools — **which is possible again
   now that deploys are flowing**, and was the thing blocking it.
+  `CLAUDE.md` now settles the browser question at brief level: Chrome is the default on desktop and
+  phone, and **Safari is never the explanation for a bug**. So the WebKit/ITP theory is not merely
+  unsupported here, it is ruled out — reproduce in Chrome and describe the behaviour as Chrome's.
+  Note the same rule records that on iOS every browser is WebKit, so a decoding or rendering quirk
+  still applies on the phone; it is cookie-policy theories that are out, not all WebKit behaviour.
 - **`apps/home` still has no `test` script.** CI runs `npm run test --if-present`, so adding one
   opts the app in with no CI change. `lib/glance.ts` and now `lib/diagnostics.ts` are pure and
   untested. `editor` and `home` are the two apps without tests.
 - **A "Pit Wall" style pass** was planned and not approved — a monospace stack, a type scale to
   replace ten ad-hoc pixel values, and collapsing the three drifted copies of the micro-label rule
   (`.eyebrow`, `.sidebar-label`, `.slot-label`). Joel deferred it; pick it up when he returns to it.
+
+---
+
+## Two things flagged to Joel, neither of them this agent's to change
+
+Recorded here because both outlive the branch, and because the next session in this area will hit
+them before anyone else does.
+
+### The brief contradicts the ledger about Coffee
+
+`CLAUDE.md`'s domain map says `coffee.techpaddock.io` is **"built, not yet deployed"**. The ledger
+says **"COFFEE IS FULLY UP"** — deployed at that domain, behind the password gate, on current
+`main`, with `GET /api/health` returning `{"ok":true}`.
+
+The ledger is the one with evidence behind it. This matters more than a stale row usually would,
+because `CLAUDE.md` is the file every session loads first and nothing else is read before it, so a
+wrong row there outlives corrections made anywhere else. **Not this agent's to edit** — raised with
+Joel, and it needs the TD or Joel to change the brief.
+
+It also touched this app directly: the hub's Coffee tile was described as pointing at a domain that
+does not resolve. It resolves.
+
+### Which workflow is in force is currently undefined
+
+**#50 was closed unmerged**, so the draft rule and all four of its enforcement mechanisms — the two
+hooks, `promotion.yml`, and the `approval-recorded` check — did **not** land. Separately, Joel has
+told the TD he wants agents to commit their work and never open pull requests, with him opening
+them, and no draft step at all.
+
+Those are two different endings to every agent's change, and the repo currently documents neither as
+settled. This branch has followed the older convention: opened its own pull request, waited, and
+promoted only on Joel's explicit instruction with the approval recorded on #43.
+
+**The TD needs to write down which is in force before the next change is built.** An agent reading
+only `CLAUDE.md` today finds the Merging section unchanged and would open a pull request as normal.
