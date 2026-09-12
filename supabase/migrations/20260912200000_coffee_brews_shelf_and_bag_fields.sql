@@ -93,3 +93,9 @@ alter table coffee.brews enable row level security;
 -- grants trap in supabase/README.md has bitten this project twice, and an
 -- explicit grant costs nothing.
 grant all on coffee.brews to anon, authenticated, service_role;
+
+-- PostgREST caches the schema, so a new table can be invisible to the API
+-- while plainly present in SQL — which reads as "relation does not exist"
+-- against a table you can see in the dashboard. Every migration here that
+-- adds a table or changes grants ends this way.
+NOTIFY pgrst, 'reload schema';
