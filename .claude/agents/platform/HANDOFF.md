@@ -104,12 +104,34 @@ outstanding**, and two cannot be checked from a session at all:
 |---|---|
 | `framework` | still `null` — not set to Next.js |
 | domains | `coffee.techpaddock.io` **not attached**; only the three `.vercel.app` names |
-| Root Directory | **not exposed by the Vercel API** — unknowable from here |
+| Root Directory | **wrong** — verified 2026-09-12 from the build log, see below |
 | the five env vars | **not exposed by the Vercel API** — unknowable from here |
 
-For the last two, `GET /api/health` on the deployed app is the check — it landed in #31 and names
-which dependency is unhappy. A green build proves nothing, because the variables are read per
-request rather than at build time.
+**Root Directory is checkable from a session after all — read the build log.** An earlier version of
+this table called it unknowable, which was wrong and left the worst of the four unverified. A build
+against the correct Root Directory installs dependencies and runs `next build`; a build against the
+repo root finds no `package.json` and exits in milliseconds. On 2026-09-12 `tp-coffee-app` produced:
+
+```
+Running "vercel build"
+Build Completed in /vercel/output [310ms]
+Skipping cache upload because no files were prepared
+```
+
+against `tp-home` on the same push installing 31 packages and detecting Next.js 14.2.35. So
+**`tp-coffee-app` is still pointed at the repo root**, and that — not the framework preset — is
+what keeps `tech-paddock.vercel.app` serving an ungated page. Root Directory must be `apps/coffee`, and it
+only takes effect on the next build, so a push has to follow the change.
+
+The framework preset is close to cosmetic by comparison: `apps/coffee/vercel.json` already declares
+`"framework": "nextjs"`, and `tp-message-editor` has deployed correctly for weeks with `framework:
+null`. Worth setting, but it was never the blocker this file implied.
+
+For the environment variables, `GET /api/health` on the deployed app is the check — it landed in #31
+and names which dependency is unhappy. A green build proves nothing, because the variables are read
+per request rather than at build time. The five the app actually reads, confirmed from the source
+rather than from CI's dummy list: `ANTHROPIC_API_KEY`, `APP_PASSWORD_HASH`, `SESSION_SECRET`,
+`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`.
 
 **The Cloudflare DNS is already done.** `coffee.techpaddock.io` resolves to `76.76.21.21`, a real A
 record rather than a wildcard — confirmed because a nonsense subdomain on the same zone does not

@@ -39,9 +39,13 @@ and the things that belong to nobody else.
 
 1. **2026-09-11 — Finish `tp-coffee-app`. Partly done as of 23:31.** The project's `updatedAt` moved,
    so something was changed, but two settings are verifiably still outstanding: **framework preset is
-   still `null`** and **`coffee.techpaddock.io` is not in its domain list**. Root Directory and the
-   five environment variables are not exposed by the Vercel API, so they cannot be confirmed from a
-   session either way — `GET /api/health` on the deployed app is the way to check them.
+   still `null`** and **`coffee.techpaddock.io` is not in its domain list**. **Root Directory is also
+   wrong** — verified 2026-09-12 from the build log, which is a check earlier entries wrongly called
+   impossible: the project built the repo root in 310ms and prepared no files, where `tp-home` on the
+   same push installed 31 packages and ran `next build`. It must be `apps/coffee`, and it only takes
+   effect on the next build. The framework preset is near-cosmetic by comparison, since
+   `apps/coffee/vercel.json` already declares `nextjs`. The five environment variables remain
+   API-invisible; `GET /api/health` on the deployed app is the way to check those.
    **The Cloudflare DNS is already done**: `coffee.techpaddock.io` has a real A record at
    `76.76.21.21`, confirmed not a wildcard because a nonsense subdomain on the same zone does not
    resolve. Only the Vercel-side attachment remains.
@@ -55,7 +59,16 @@ and the things that belong to nobody else.
 3. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
    `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
    will tell you they are doing nothing. Needs a one-time Azure registration against a personal
-   Microsoft account.
+   Microsoft account — the `consumers` authority, scopes `offline_access Calendars.Read
+   Tasks.ReadWrite`, and one by-hand authorization-code exchange to mint the refresh token, since the
+   code only ever does `grant_type=refresh_token`.
+   **Order matters, and it is a trap** (found 2026-09-12 by reading the route). The tracker's
+   middleware exempts `/api/cron/*` from the password gate outright, and the route guards itself with
+   `if (secret && ...)` — which fails **open** when `CRON_SECRET` is unset. That is harmless today
+   only because `graphConfigured()` is false and the route answers "Outlook is not connected". Set
+   the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
+   endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
+   first, or in the same save. Never after.**
 4. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
    jobs; the rule names four.
 5. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no

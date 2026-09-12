@@ -45,9 +45,11 @@ Live infrastructure and one-time credentials. None of it is yours.
    is `github.com/organizations/Tech-Paddock/settings/installations` — **not** the personal
    `github.com/settings/installations`, which cannot reach an org-owned repo. Installed on the org
    2026-09-12; a new push to `main` is still required before anything deploys.
-2. **Finish `tp-coffee-app`. Partly done.** Verifiably outstanding: framework preset is still
-   `null`, and `coffee.techpaddock.io` is not in its domain list. Root Directory and the five
-   env vars are not API-visible, so `GET /api/health` on the deployed app is how to check them.
+2. **Finish `tp-coffee-app`. Partly done.** Outstanding: **Root Directory is still the repo root**,
+   proven 2026-09-12 from the build log — a 310ms build preparing no files. That, not the framework
+   preset, is the public exposure. Also outstanding: `coffee.techpaddock.io` is not in its domain
+   list, and the framework preset is `null` (near-cosmetic — `vercel.json` already says `nextjs`).
+   The five env vars stay API-invisible; `GET /api/health` on the deployed app is how to check them.
    The Cloudflare DNS record already exists. **Still the only publicly exposed thing in the
    project** until Root Directory points at a real app.
 3. **Verify the new `SESSION_SECRET` landed on all five projects** and that all five redeployed. It
