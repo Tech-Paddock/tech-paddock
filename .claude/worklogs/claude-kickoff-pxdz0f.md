@@ -76,3 +76,136 @@ current, ledger numbering fixed where it skipped 2.
 Open: #43 awaiting TechPad Gen. Two questions with Joel — the `tuning` project and the
 `middleware.ts` sentence in `CLAUDE.md`.
 Need from TD: nothing, this is the TD.
+
+---
+
+## 2026-09-12 19:00 — claim: the browser is Chrome, said once in CLAUDE.md
+
+Joel asked for a general note that the browser is Chrome and that Safari should not be referenced.
+Branch reset onto `main` after #44 merged, so this sits on a clean base under the same name.
+
+**Written as a diagnosis rule, not a word ban, and that distinction is the whole substance.** I
+grepped the repo first. The nine Safari references are two different things wearing one name:
+
+*Wrong, and what Joel is objecting to* — the Safari/ITP theory for the mobile login bug, in
+techpad-gen's handoff and in this ledger. A guess about an engine nobody runs, which survived because
+the word made it sound diagnosed.
+
+*Load-bearing* — on iOS **every** browser is WebKit, Chrome included. `apps/coffee/lib/image.ts`
+keeps an `<img>` fallback because `createImageBitmap` cannot always decode an iPhone HEIC, and the
+primary device is a phone. An agent told only "we use Chrome, drop the Safari references" deletes that
+and breaks photograph-a-bag on the exact device the tool exists for. And iOS standalone home-screen
+install is a Safari-only mechanism, which #42 depends on.
+
+So the note names those two as platform constraints, requires the constraint be named rather than the
+browser, and forbids Safari everywhere else. A blanket ban would have been faithful to the words and
+would have caused a bug.
+
+**Not mine to edit:** the Safari/ITP text in techpad-gen's `HANDOFF.md` — that file is the open
+conflict in #43 and rewriting it is exactly what #41 forbids me. Flagged on the ledger instead. Same
+for a cosmetic Coffee CSS comment.
+
+**Raised for Joel rather than assumed:** #42 shipped iOS home-screen install yesterday, and that
+install runs through Safari because Apple allows no other route to a standalone app. If he never opens
+Safari, that feature is unreachable as built. Reaching it from Chrome needs a manifest, which needs
+`middleware.ts`, which is TechPad Gen's shared-pattern call — not Coffee's.
+
+## 2026-09-12 19:00 — handoff
+Landed: the Chrome note in `CLAUDE.md` under the shared foundation, and the ledger's own mobile-bug
+entry reworded to stop leading with the wrong engine.
+Open: #43 still with TechPad Gen. Three questions with Joel — the `tuning` project, the
+`middleware.ts` sentence, and whether Coffee's iOS install is worth keeping if he never opens Safari.
+Need from TD: nothing, this is the TD.
+
+---
+
+## 2026-09-12 19:25 — claim: amend the browser note, Safari is a utility
+
+Joel amended it within the hour of #45 landing, once the consequence I flagged surfaced: Chrome is the
+**default**, Safari is a **utility browser** used where Chrome cannot do the job. Not a ban.
+
+That is a better rule than the one I wrote, and it resolves the tension I had raised rather than
+choosing a side of it. My version forbade Safari everywhere but two named carve-outs, which made
+Coffee's install read as a tolerated exception. Under the amendment it reads as the intended path,
+which is what it actually is — iOS allows no other route to a standalone home-screen app.
+
+What survives unchanged is the part that was doing the work: **Safari is never the explanation for a
+bug.** Reports come from Chrome unless they say otherwise, and the mobile login bug already lost a
+round to an ITP theory about a browser that was not in the loop.
+
+One thing I added that Joel did not ask for, and the reason: the rule now says explicitly that it is
+**not** grounds for adding a web app manifest to make apps Chrome-installable. Without that line, the
+next agent reads "Chrome is the default" and reasonably concludes the install should work from Chrome
+— which means editing `middleware.ts`, five copies, TechPad Gen's call, on the strength of a rule that
+never asked for it. A rule that quietly authorizes work nobody sanctioned is worse than no rule.
+
+## 2026-09-12 19:25 — handoff
+Landed: the amended note in `CLAUDE.md`, ledger entry rewritten rather than appended to so there is
+one account of the rule and not two.
+Open: #43 still with TechPad Gen. Two questions with Joel — the `tuning` project and the
+`middleware.ts` sentence. The iOS install question is closed by this amendment.
+Need from TD: nothing, this is the TD.
+
+---
+
+## 2026-09-12 19:45 — claim: correct the middleware.ts claim everywhere it is asserted
+
+Joel delegated this ("update the middleware as you see fit"). Scope decision made here rather than
+assumed: he authorised the correction, and the question was how far it reaches.
+
+**Re-verified by checksum first, not taken from TechPad Gen's report.** `lib/auth.ts` and
+`lib/password.ts` are identical across all five. `middleware.ts` is three: `home`/`resume`/`coffee`
+share one at 47 lines, `editor` is 59 with a scoped `/api/draft` bypass, `tracker` is 65 with
+`/api/summary` plus an outright `/api/cron/*` wave-through. Both carve-outs are commented and
+deliberate.
+
+**The rule was never wrong. The reason under it was, and that is the dangerous part** — it hid the
+real hazard. `middleware.ts` is not risky because the copies must match; it is risky because it *is*
+the password gate, so a bad edit publishes an endpoint rather than breaking a login. Tracker already
+demonstrates it: `/api/cron/*` skips the gate and the route's own `if (secret && …)` fails open
+without `CRON_SECRET`. That trap has been on the ledger for a day while the rule guarding the file
+described a different danger entirely.
+
+**Corrected in eleven places** — `CLAUDE.md` twice, the TD charter, and the `RULES.md` and
+`KICKOFF.md` of all five app agents. Every prohibition is byte-for-byte unchanged; only the
+justification moved. I edited other agents' charters, which is TD-permitted and which I would not do
+on my own initiative; the alternative was leaving ten specification files asserting a fact the brief
+now contradicts, which is the drift this project keeps paying for.
+
+One of the eleven was mine, written an hour earlier: the Chrome note in `CLAUDE.md` said
+`middleware.ts` "is five copies". I repeated the error while flagging it.
+
+`message-editor` and `tracker` were the proof it had gone unread for a long time — each names its own
+carve-out and then calls the file byte-identical in the very next sentence.
+
+**Left alone:** `.claude/agents/coffee/HANDOFF.md` still carries the claim. A handoff is not the TD's
+to rewrite; Coffee corrects it next time it touches that file. Merged worklogs keep it too, correctly
+— they are a record of what was believed at the time, not a specification.
+
+## 2026-09-12 19:45 — handoff
+Landed: the corrected reason in the brief, the TD charter and five agent charters plus their
+kickoffs; ledger item closed and the two stale ledger references fixed.
+Open: #43 still with TechPad Gen. One question with Joel — the `tuning` project, which he has said he
+will delete.
+Need from TD: nothing, this is the TD.
+
+---
+
+## 2026-09-12 20:00 — claim: close the tuning project item
+
+Joel deleted it. Verified against the Vercel account rather than recorded on his word — five projects
+remain, all `tp-` prefixed, and every one still reads `link.org: "Tech-Paddock"`, so the re-linking
+that closed this morning's deploy outage is still holding. That second fact is the one worth having
+checked; the deletion was never in doubt.
+
+Kept the exposure finding in the Done entry rather than deleting it with the item. The next unexplained
+project is the case it is for: check SSO coverage and custom domains first, because the recorded
+incident here is a project pointed at the repo root serving an unprotected page. `tuning` was behind
+SSO with no custom domain, so it was contained — which is not the same as authorized, and is why it
+went to Joel instead of being noted and dropped.
+
+## 2026-09-12 20:00 — handoff
+Landed: ledger item closed, Waiting-on-Joel renumbered to four.
+Open: #43 with TechPad Gen, and a new Coffee branch `claude/coffee-surface-library-errors` with no PR
+yet. Nothing waiting on me.
+Need from TD: nothing, this is the TD.

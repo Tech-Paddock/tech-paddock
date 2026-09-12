@@ -62,8 +62,11 @@ One login covers every subdomain because the session cookie is scoped to `.techp
 **Never touch:**
 
 - **The shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, anything
-  touching `SESSION_SECRET` or the shared cookie. Byte-identical in five apps; a mismatch fails
-  silently, rejecting valid sessions on the other four. The TD owns them.
+  touching `SESSION_SECRET` or the shared cookie. `lib/auth.ts` and `lib/password.ts` are
+  byte-identical in five apps and a mismatch fails silently, rejecting valid sessions on the other
+  four. `middleware.ts` is three deliberate variants and is gated because it *is* the password gate.
+  The TD owns them. **Making every tool installable is the one cross-cutting change that would need
+  it** — a web app manifest is fetched without credentials, so it has to be allowlisted there.
 - **Another app's folder**, without declaring it in your worklog and your pull request first. You
   have repo-wide odd jobs, which is not the same as repo-wide write access.
 - `CLAUDE.md` or another agent's charter.

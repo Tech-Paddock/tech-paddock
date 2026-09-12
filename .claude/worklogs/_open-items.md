@@ -33,22 +33,7 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    Once deployed: log in at `techpaddock.io`, then open a tool from a hub tile, on desktop and on
    mobile. A loop on both points at the secret; a loop on mobile only points at the iframe, which is
    the separate known bug. No agent can read the values — this one is Joel's eyes only.
-2. **2026-09-12 — A sixth Vercel project called `tuning` exists. Did you create it?** Created
-   18:02 UTC today, three minutes before a TechPad Gen preview, `framework: null`, one READY
-   production deployment, Node 24.x. **It is not publicly exposed** — Vercel SSO covers all three
-   `*.vercel.app` domains and no custom domain is attached, so it redirects to `sso-api` and carries
-   `x-robots-tag: noindex`. Checked, because a project pointed at the repo root serving an unprotected
-   page is an incident this project has already had. So it is contained, not urgent — but creating a
-   project is on the never-without-the-TD list and I did not authorize it. If it is yours, say so and
-   I will record it. If it is not, it should be deleted, and that is your click, not mine.
-3. **2026-09-12 — `CLAUDE.md` is wrong about `middleware.ts`, and it is your call to fix.** The brief
-   says it is byte-identical in five apps. It is not: there are **three** distinct versions, because
-   `editor` and `tracker` carry deliberate carve-outs. `lib/auth.ts` and `lib/password.ts` genuinely
-   are identical — TechPad Gen checksummed all three and is right. **The rule still holds** — a
-   mismatch in the auth plumbing still fails silently — but its stated reason is stale, and a rule
-   defended by a wrong fact is one somebody talks themselves past. Brief change, so it is yours; I
-   will not touch it without your word.
-4. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
+2. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
    `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
    will tell you they are doing nothing. Needs a one-time Azure registration against a personal
    Microsoft account — the `consumers` authority, scopes `offline_access Calendars.Read
@@ -61,17 +46,68 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
    endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
    first, or in the same save. Never after.**
-5. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
+3. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
    jobs; the rule names four.
-6. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
+4. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
 
+- **2026-09-12 — The `tuning` Vercel project is gone. Joel deleted it; verified against the account,
+  not taken on report.** Five projects remain — `tp-home`, `tp-message-editor`, `tp-tracker`,
+  `tp-resume`, `tp-coffee-app` — and every one still reads `link.org: "Tech-Paddock"`, so the
+  re-linking that closed the deploy outage is holding.
+  Worth keeping for the next time one appears: it was created 18:02, carried a READY production
+  deployment, and **was never publicly reachable** — Vercel SSO covered all three `*.vercel.app`
+  domains and no custom domain was attached, so it answered a redirect to `sso-api` and
+  `x-robots-tag: noindex`. That is the check to run first, because the incident this project already
+  has on record is a Vercel project pointed at the repo root serving an unprotected page. Contained
+  is not the same as authorized, which is why it went to Joel rather than being noted and dropped.
+
+- **2026-09-12 — `middleware.ts` is three versions, not five copies, and the brief now says so.**
+  Joel's call, delegated. The rule was always right; the reason printed under it was false, and a
+  rule defended by a wrong fact is one somebody talks themselves past — TechPad Gen checked, found
+  three, and correctly reported the brief as wrong.
+  Re-verified by checksum before writing: `lib/auth.ts` and `lib/password.ts` **are** identical
+  across all five. `middleware.ts` is three — `home`/`resume`/`coffee` share one, `editor` adds a
+  scoped `/api/draft` bypass, `tracker` adds `/api/summary` plus an outright `/api/cron/*` wave-
+  through.
+  **The correction also names the real danger, which the old wording hid.** `middleware.ts` is not
+  gated because the copies match; it is gated because it *is* the password gate. A bad edit there
+  publishes an endpoint rather than breaking a login — and tracker already shows the shape, since
+  `/api/cron/*` skips the gate and the route's own `if (secret && …)` fails **open** without
+  `CRON_SECRET`. That trap was already on this ledger and the rule protecting it described the
+  wrong hazard.
+  Corrected in eleven places: `CLAUDE.md` twice — including a line I wrote myself an hour earlier in
+  the Chrome note, which repeated the error I was about to correct — the TD charter, and the
+  `RULES.md` and `KICKOFF.md` of all five app agents. **Every prohibition is unchanged**; only the
+  justification moved. `message-editor` and `tracker` were the clearest proof it was wrong: each
+  named its own carve-out and then called the file byte-identical in the next sentence.
+  **One left for its owner.** `.claude/agents/coffee/HANDOFF.md` still says it. Handoffs are not the
+  TD's to rewrite, so Coffee corrects that next time it touches the file.
+
+- **2026-09-12 — `CLAUDE.md` now says Chrome is the default and Safari is a utility.** Joel asked
+  for a browser note, then amended it the same hour once the consequence surfaced: **Chrome is the
+  default, on desktop and phone; Safari is a utility browser, used only where Chrome cannot do the
+  job.** Safari is still never the explanation for a bug — reports come from Chrome unless stated,
+  and the mobile login bug already lost a round to an ITP theory about a browser that was not in the
+  loop.
+  Written as a diagnosis rule rather than a word ban, because a ban would have caused a bug: on iOS
+  every browser is WebKit, Chrome included, so the `<img>` decode fallback in
+  `apps/coffee/lib/image.ts` protects the phone Joel actually uses, and an agent told only "we use
+  Chrome" would have deleted it as dead code.
+  **This also settles #42.** Installing Coffee through Safari is the intended path, not a defect —
+  iOS allows no other route to a standalone home-screen app. The rule says so explicitly, and says
+  it is *not* grounds for adding a manifest to make apps Chrome-installable, because that means
+  editing `middleware.ts` — the password gate, TechPad Gen's call.
+  **Two stale references left for their owners.** `.claude/agents/techpad-gen/HANDOFF.md` still
+  carries the Safari/ITP theory for the mobile bug — that file is the open conflict in #43 and is
+  theirs to rewrite. `apps/coffee/app/globals.css` has a comment reading "In Safari these insets are
+  zero", which is true of any browser tab and should say so; Coffee's to fix, cosmetic, not urgent.
 - **2026-09-12 — #42 merged: Coffee installs on the iPhone home screen.** `apple-touch-icon` and
   the `apple-mobile-web-app-*` tags, safe-area insets, a favicon. Deliberately iOS-only: a manifest
   is fetched without credentials, so the gate returns the login redirect and the install silently
-  never offers itself, and letting it through means editing `middleware.ts` — five copies, not
+  never offers itself, and letting it through means editing `middleware.ts` — the password gate, not
   Coffee's to change. The icon is a static import so it serves from `/_next/static`, the one prefix
   the matcher excludes; Next's own `app/apple-icon.png` convention sits behind the gate, where iOS
   falls back to a screenshot of the login page as the icon. Verified at the gate: matcher confirmed,
@@ -186,8 +222,10 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 - **2026-09-11 — `editor.model_status` has zero rows.** The login-time drift check has never
   successfully written. Not diagnosed, and the oldest unexplained thing here.
 - **2026-09-11 — The hub's mobile login bug.** Opening a tool from an embedded tile re-triggers that
-  app's login on mobile. Reported on mobile Chrome, so the Safari/ITP explanation does not fit.
-  Check what URL the iframe actually loads first.
+  app's login on mobile. **Reported on Chrome, which is the only browser used here** — so a
+  cookie-partitioning explanation borrowed from another engine is not the diagnosis, and reaching for
+  one cost a round already. Check what URL the iframe actually loads first; that is still unchecked.
+  `CLAUDE.md` now says this once, under the shared foundation, so it stops being re-litigated.
 
 ## Read this before transferring the repo again
 

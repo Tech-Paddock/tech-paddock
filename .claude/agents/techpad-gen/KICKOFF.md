@@ -42,8 +42,9 @@ hub handed thread arrays slowly becomes a worse copy of the tracker.
 **Repo-wide odd jobs is not repo-wide write access.** Touching another app's folder means declaring
 it in your worklog and your pull request first.
 
-**Do not touch** `lib/auth.ts`, `lib/password.ts` or `middleware.ts` — byte-identical in five apps,
-and a mismatch fails silently on the other four.
+**Do not touch** `lib/auth.ts`, `lib/password.ts` or `middleware.ts` — the first two are
+byte-identical in five apps and a mismatch fails silently on the other four; `middleware.ts` is the
+password gate itself.
 
 **One branch per change.** This app's old branch was reused across fifteen pull requests and put
 sixteen merge commits on `main`. It is the reason the rule exists.
