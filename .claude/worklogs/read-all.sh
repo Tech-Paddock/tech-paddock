@@ -27,7 +27,12 @@ for ref in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | 
   branch="${ref#origin/}"
   [ "$branch" = "main" ] && continue
   git merge-base --is-ancestor "$ref" origin/main 2>/dev/null && continue
-  pending=$(git diff origin/main.."$ref" -- .claude/worklogs/_open-items.md 2>/dev/null)
+  # Diff from the merge base, not from main. A branch that is merely behind
+  # main differs from it in the ledger too, and diffing against main presents
+  # that staleness as pending work — which would make this warning itself the
+  # confidently-wrong document it exists to prevent.
+  base=$(git merge-base origin/main "$ref" 2>/dev/null) || continue
+  pending=$(git diff "$base".."$ref" -- .claude/worklogs/_open-items.md 2>/dev/null)
   [ -z "$pending" ] && continue
   echo
   echo "  !! LEDGER CHANGES PENDING ON $branch — not yet on main"
