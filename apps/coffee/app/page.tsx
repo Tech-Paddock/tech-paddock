@@ -66,7 +66,10 @@ const GUIDE_LABELS: Record<GuideStatus, string> = {
 };
 
 export default function CoffeePage() {
-  const [tab, setTab] = useState<"scan" | "library">("scan");
+  // Scanning is an action you take occasionally; the shelf is the thing you
+  // come back to. Two tabs gave them equal weight and hid each behind the
+  // other — so the shelf is the page, and scanning opens above it.
+  const [scanning, setScanning] = useState(false);
   const [bags, setBags] = useState<Bag[]>([]);
   const [query, setQuery] = useState("");
   const [libraryError, setLibraryError] = useState<string | null>(null);
@@ -99,31 +102,38 @@ export default function CoffeePage() {
         <h1 className="font-semibold">Coffee</h1>
       </header>
 
-      <nav className="flex border-b border-line bg-white">
-        {(["scan", "library"] as const).map((t) => (
+      <div className="px-4 py-5 max-w-2xl mx-auto flex flex-col gap-5">
+        <section className="bg-white border border-line rounded-2xl overflow-hidden">
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 px-4 py-3 text-sm font-medium capitalize ${
-              tab === t ? "text-accent border-b-2 border-accent" : "text-ink/60"
-            }`}
+            onClick={() => setScanning((open) => !open)}
+            aria-expanded={scanning}
+            className="w-full flex items-center justify-between px-4 py-3 text-left font-medium"
           >
-            {t === "scan" ? "Scan a bag" : `Library${bags.length ? ` (${bags.length})` : ""}`}
+            Scan a bag
+            <span aria-hidden className="text-accent text-xl leading-none">{scanning ? "−" : "+"}</span>
           </button>
-        ))}
-      </nav>
+          {scanning && (
+            <div className="px-4 pb-4 border-t border-line pt-4">
+              <Scan
+                onSaved={() => {
+                  setScanning(false);
+                  void loadBags(query);
+                }}
+              />
+            </div>
+          )}
+        </section>
 
-      <div className="px-4 py-5 max-w-2xl mx-auto">
-        {tab === "scan" ? (
-          <Scan
-            onSaved={() => {
-              setTab("library");
-              void loadBags(query);
-            }}
+        <section className="flex flex-col gap-3">
+          <h2 className="font-medium">Shelf{bags.length ? ` (${bags.length})` : ""}</h2>
+          <Library
+            bags={bags}
+            query={query}
+            setQuery={setQuery}
+            error={libraryError}
+            onChanged={() => void loadBags(query)}
           />
-        ) : (
-          <Library bags={bags} query={query} setQuery={setQuery} error={libraryError} onChanged={() => void loadBags(query)} />
-        )}
+        </section>
       </div>
     </main>
   );
@@ -587,6 +597,9 @@ function Library({
 function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState({
     my_method: bag.my_method ?? "",
     my_grinder: bag.my_grinder ?? "",
@@ -594,6 +607,23 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
     my_notes: bag.my_notes ?? "",
     my_rating: bag.my_rating ? String(bag.my_rating) : "",
   });
+
+  async function remove() {
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/bags/${bag.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Couldn't delete that bag.");
+      }
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't delete that bag.");
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -726,13 +756,51 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
                 className="border border-line rounded-lg px-3 py-2 bg-white"
               />
             </label>
+            {error && (
+              <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+            )}
+
             <button
               onClick={() => void save()}
-              disabled={saving}
+              disabled={saving || deleting}
               className="bg-accent text-white rounded-lg px-3 py-2 font-medium disabled:opacity-60"
             >
               {saving ? "Saving…" : "Save"}
             </button>
+
+            {/* Deleting a bag takes its photo with it and cannot be undone, so
+                it asks once. The confirm replaces the button rather than
+                appearing beside it — there is then no adjacent control to hit
+                by accident on a phone. */}
+            <div className="border-t border-line pt-3">
+              {confirmingDelete ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-ink/70">
+                    Delete <strong>{bag.coffee_name}</strong> and its photo? This cannot be undone.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => void remove()}
+                      disabled={deleting}
+                      className="flex-1 bg-red-700 text-white rounded-lg px-3 py-2 font-medium disabled:opacity-60"
+                    >
+                      {deleting ? "Deleting…" : "Yes, delete"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmingDelete(false)}
+                      disabled={deleting}
+                      className="flex-1 border border-line rounded-lg px-3 py-2"
+                    >
+                      Keep it
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setConfirmingDelete(true)} className="text-sm text-red-700 underline">
+                  Delete this bag
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

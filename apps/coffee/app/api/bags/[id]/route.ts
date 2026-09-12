@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
-import { signedPhotoUrl } from "@/lib/storage";
+import { signedPhotoUrl, deletePhoto } from "@/lib/storage";
 import { isBrewMethod } from "@/lib/methods";
 
 export const dynamic = "force-dynamic";
@@ -80,7 +80,22 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
-  const { error } = await getServiceClient().from("bags").delete().eq("id", params.id);
+  // Take the row away first and the photo after it. The save path writes the
+  // file before the row that points at it, so a row never references an object
+  // that was never created; deleting in the same order keeps that true. A
+  // leftover object is a smaller problem than a row with a broken photo.
+  const { data, error } = await getServiceClient()
+    .from("bags")
+    .delete()
+    .eq("id", params.id)
+    .select("id, photo_path")
+    .maybeSingle();
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Deleting nothing is not success. Without this a wrong id reports "deleted".
+  if (!data) return NextResponse.json({ error: "No such bag." }, { status: 404 });
+
+  if (data.photo_path) await deletePhoto(data.photo_path);
+
   return NextResponse.json({ ok: true });
 }

@@ -76,6 +76,18 @@ recorded as "other" rather than guessed at as a V60. Origami is in the roaster's
 `myBrewerFor` crosses between them only on an exact match. A bare "V60" does not map, because two
 of them are on the shelf and the roaster did not say which.
 
+## The page, and deleting a bag
+
+One page, not two tabs: the shelf is the page and scanning is a collapsible section above it.
+"Shelf" is what the library is called — every bag is on it, not a subset. Splitting finished bags
+from open ones was scoped and parked; it would be one nullable `finished_at` and a filter, and the
+column is deliberately absent until that is wanted.
+
+`DELETE /api/bags/[id]` removes the row and then its photo, in that order. The save path writes the
+file before the row that points at it, so deleting in the same order means a row never references
+an object that is gone. A leftover object is the lesser failure and the delete is best-effort about
+it. Deleting an id that matches no row is a 404, not a success.
+
 ## In flight
 
 **Library load failures are now visible (branch `claude/coffee-surface-library-errors`).** The
