@@ -166,9 +166,11 @@ grants or RLS problem it becomes yours.
 
 ## Known, deliberately not fixed
 
-- **DNS is wired two ways.** `editor` resolves through `vercel-dns-017.com`; the other three use the
-  legacy `76.76.21.21` A record. Both work. Switching is hygiene, not a problem — and if you do,
-  take each target from that project's own Domains tab.
+- **DNS is uniform as of 2026-09-12, and this entry is retired.** Joel moved all four subdomains to
+  CNAMEs on `d1317e1174061c29.vercel-dns-017.com` at 01:39; verified resolving, and all four still
+  return 200 with `frame-ancestors 'self' https://techpaddock.io https://*.techpaddock.io` intact.
+  The apex `techpaddock.io` stays an A record at `76.76.21.21` — an apex cannot be a CNAME, so that
+  is correct rather than an oversight. `coffee.techpaddock.io` is attached and resolving too.
 - **`/api/health` on the resume app sits behind the password gate**, so no external uptime monitor
   can reach it. Fine for human use; a blocker if it is ever meant for monitoring.
 - **`build (coffee)` is not in branch protection's required checks.** The matrix is five jobs; the
