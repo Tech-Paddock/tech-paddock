@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { findPreviousBag, findRoasterDomain, hostOf, LookupError } from "@/lib/bags";
+import { findPreviousBag, findRoasterDomain, guideColumns, hostOf, LookupError } from "@/lib/bags";
+import type { Guide } from "@/lib/guide";
 
 // The Supabase query builder is chainable and only resolves at the end, so the
 // stub returns itself from every link and hands back a fixed result at the tip.
@@ -78,5 +79,50 @@ describe("findRoasterDomain", () => {
     // Reaching it via a broken database is a different thing wearing its face.
     fails("permission denied for schema coffee");
     await expect(findRoasterDomain("Sweet Bloom")).rejects.toBeInstanceOf(LookupError);
+  });
+});
+
+describe("guideColumns", () => {
+  const found: Guide = {
+    status: "coffee_specific",
+    product_url: "https://sweetbloomcoffee.com/products/x",
+    guide_url: "https://sweetbloomcoffee.com/products/x",
+    method: "v60",
+    params: { ratio: "1:16", temp: "205F" },
+    quotes: [{ field: "ratio", text: "We brew this at 1:16.", url: "https://sweetbloomcoffee.com/products/x" }],
+    dropped: [{ field: "grind", value: "medium-fine", reason: "no quote" }],
+  };
+
+  it("records which model answered, and the quotes and dropped values with it", () => {
+    // The search is backgrounded, so dropped values have to survive in the row
+    // — they used to live only in the response, and a value dropped for having
+    // no source is meant to be shown beside what was kept, not discarded.
+    const columns = guideColumns(found, "claude-haiku-4-5");
+    expect(columns.guide_model).toBe("claude-haiku-4-5");
+    // Haiku has no effort control, and that is recorded as null rather than as
+    // a default level it never actually ran at.
+    expect(columns.guide_effort).toBeNull();
+    expect(columns.guide_dropped).toEqual(found.dropped);
+    expect(columns.guide_quotes).toEqual(found.quotes);
+    expect(columns.guide_fetched_at).toBeTruthy();
+  });
+
+  it("treats a recorded 'none' as an answer", () => {
+    // Tier 3 is a real result: the roaster published nothing. It is stamped
+    // like any other answer so a bag is never re-searched for having one.
+    const columns = guideColumns({ ...found, status: "none", method: null, params: {}, quotes: [] }, "claude-sonnet-5", "xhigh");
+    expect(columns.guide_status).toBe("none");
+    expect(columns.guide_effort).toBe("xhigh");
+    expect(columns.guide_fetched_at).toBeTruthy();
+    expect(columns.guide_model).toBe("claude-sonnet-5");
+  });
+
+  it("stamps neither a time nor a model on a bag that was never searched", () => {
+    const columns = guideColumns(null);
+    expect(columns.guide_status).toBe("not_searched");
+    expect(columns.guide_fetched_at).toBeNull();
+    expect(columns.guide_model).toBeNull();
+    expect(columns.guide_effort).toBeNull();
+    expect(columns.guide_dropped).toEqual([]);
   });
 });

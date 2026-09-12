@@ -1,8 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { BREW_METHODS } from "./methods";
 import { validateGuide, type Guide, type RawGuide } from "./guide";
+import { SEARCH_MODELS, DEFAULT_SEARCH_MODEL, isEffortFor, type SearchModel } from "./models";
 
-const MODEL = "claude-sonnet-5";
+/**
+ * Reading a label is transcription and it is already fast, so it stays on the
+ * model that is known to do it well. Only the search is under comparison.
+ */
+const IDENTIFY_MODEL = "claude-sonnet-5";
 
 let client: Anthropic | null = null;
 
@@ -43,7 +48,7 @@ const IDENTITY_SCHEMA = {
  */
 export async function identifyBag(image: { media_type: string; data: string }): Promise<BagIdentity> {
   const response = await getClient().messages.create({
-    model: MODEL,
+    model: IDENTIFY_MODEL,
     max_tokens: 1024,
     output_config: {
       effort: "low",
@@ -109,15 +114,23 @@ export async function searchBrewGuide(params: {
   roaster: string;
   coffeeName: string;
   roasterDomain?: string | null;
+  model?: SearchModel;
+  effort?: string | null;
 }): Promise<Guide> {
+  const model = params.model ?? DEFAULT_SEARCH_MODEL;
+  const spec = SEARCH_MODELS[model];
+  // Only a level this model accepts is sent. Anything else is dropped rather
+  // than passed through, because the request would fail rather than degrade.
+  const effort = isEffortFor(model, params.effort) ? params.effort : null;
+
   const tools: Record<string, unknown>[] = [
     {
-      type: "web_search_20260209",
+      type: spec.search,
       name: "web_search",
       max_uses: 6,
       ...(params.roasterDomain ? { allowed_domains: [params.roasterDomain] } : {}),
     },
-    { type: "web_fetch_20260209", name: "web_fetch", max_uses: 6 },
+    { type: spec.fetch, name: "web_fetch", max_uses: 6 },
   ];
 
   const messages: Record<string, unknown>[] = [
@@ -141,9 +154,11 @@ export async function searchBrewGuide(params: {
   // is silently truncated instead of erroring.
   for (let i = 0; i < 6; i++) {
     const response = (await getClient().messages.create({
-      model: MODEL,
+      model,
       max_tokens: 8192,
-      output_config: { effort: "high" },
+      // Omitted rather than defaulted for a model that has no effort control:
+      // sending it anyway is a 400, not a no-op.
+      ...(effort ? { output_config: { effort } } : {}),
       system: SEARCH_SYSTEM,
       tools,
       messages,

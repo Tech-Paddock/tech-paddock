@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { uploadPhoto, signedPhotoUrl, StorageError, IMAGE_TYPES } from "@/lib/storage";
 import { isBrewMethod } from "@/lib/methods";
-import { findPreviousBag } from "@/lib/bags";
+import { findPreviousBag, guideColumns } from "@/lib/bags";
 import type { Guide } from "@/lib/guide";
 
 export const dynamic = "force-dynamic";
@@ -122,18 +122,7 @@ export async function POST(request: NextRequest) {
         varietal: field("varietal"),
         roast_date: field("roast_date"),
         photo_path: photoPath,
-        product_url: guide?.product_url ?? null,
-        guide_url: guide?.guide_url ?? null,
-        guide_status: guide?.status ?? "not_searched",
-        guide_method: guide?.method ?? null,
-        guide_ratio: guide?.params.ratio ?? null,
-        guide_dose: guide?.params.dose ?? null,
-        guide_water: guide?.params.water ?? null,
-        guide_temp: guide?.params.temp ?? null,
-        guide_grind: guide?.params.grind ?? null,
-        guide_time: guide?.params.time ?? null,
-        guide_quotes: guide?.quotes ?? [],
-        guide_fetched_at: guide && guide.status !== "not_searched" ? new Date().toISOString() : null,
+        ...guideColumns(guide, field("guide_model"), field("guide_effort")),
         // Picking a method pre-populates the bag's; when a guide was found its
         // method is the roaster's recommendation and seeds this.
         my_method: myMethod ?? guide?.method ?? null,
