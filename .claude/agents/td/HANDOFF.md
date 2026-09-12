@@ -44,19 +44,15 @@ rather than promising it.
 
 Live infrastructure and one-time credentials. None of it is yours.
 
-1. **Verify `tp-coffee-app` came up.** Root Directory was set to `apps/coffee` and
-   `coffee.techpaddock.io` attached at 01:39 on 09-12; both confirmed correct. Neither had built —
-   the last build was 00:48 and still a 153ms repo-root build, so the domain answered 404.
-   **Use Redeploy, not a push**: the project has "Skip deployments when there are no changes to the
-   root directory" enabled, so a commit touching only `.claude/` skips this project's build entirely.
-   Check the build log afterwards — dependencies installed and `next build` run, versus an exit in
-   milliseconds — then `GET /api/health` behind the login. The framework preset reads `Other`, which
-   is near-cosmetic since `apps/coffee/vercel.json` declares `nextjs`, but setting it removes a
-   variable.
-2. **Verify `SESSION_SECRET` parity across all five.** Rotated again at 01:39 on 09-12. A dashboard
-   change does not reach a running deployment — Vercel bakes the environment in at deploy time — so
-   every app kept the old value until redeployed. Same caveat as above: if the skip toggle is on for
-   the other projects too, a docs-only push will not roll it out. Redeploy is deterministic.
+1. **Coffee is up; run its health check.** Verified 02:04 — `coffee.techpaddock.io` returns 200
+   serving the Coffee login, and the build log shows dependencies installed and `next build` run,
+   against the 153ms `no files were prepared` from 00:48. What remains is `GET /api/health` behind
+   the login, the only check for the five environment variables, which stay API-invisible. The
+   framework preset reads `Other` and is genuinely cosmetic: `vercel.json` declares `nextjs` and
+   overrides it, which is why this build succeeded anyway.
+2. **Verify `SESSION_SECRET` parity across all five.** Rotated again at 01:39 on 09-12 and live
+   since the 01:59 deployments — a dashboard change does not reach a running deployment, because
+   Vercel bakes the environment in at deploy time. All five have now rebuilt, so this is testable.
    Then log in at `techpaddock.io` and open a tool from a tile, on desktop and mobile: a loop on both
    is the secret, mobile-only is the iframe bug. No agent can read the values.
 3. **Set `CRON_SECRET` first, then `MS_GRAPH_*`** on `tp-tracker` — the order is not cosmetic. The

@@ -75,57 +75,39 @@ files, so every project rebuilds. Note the backlog argument that used to sit her
 outage is fixed and all five have deployed `0c7d882`, so this change is now worth landing on its own
 merits — five full Next.js builds per docs-only commit — rather than as a way to clear a backlog.
 
-## `tp-coffee-app` is partly configured, and it is the only public exposure
+## `tp-coffee-app` is up, and the public exposure is closed
 
-Joel worked on it at **23:31** — the project's `updatedAt` moved. Two things are **verifiably still
-outstanding**, and two cannot be checked from a session at all:
-
-| Setting | State at 23:45 |
-|---|---|
-| `framework` | still `null` — not set to Next.js |
-| domains | `coffee.techpaddock.io` **not attached**; only the three `.vercel.app` names |
-| Root Directory | **wrong** — verified 2026-09-12 from the build log, see below |
-| the five env vars | **not exposed by the Vercel API** — unknowable from here |
-
-**Root Directory is checkable from a session after all — read the build log.** An earlier version of
-this table called it unknowable, which was wrong and left the worst of the four unverified. A build
-against the correct Root Directory installs dependencies and runs `next build`; a build against the
-repo root finds no `package.json` and exits in milliseconds. On 2026-09-12 `tp-coffee-app` produced:
+**Resolved 2026-09-12 at 02:00.** Root Directory is `apps/coffee`, `coffee.techpaddock.io` is
+attached and returns 200 serving the Coffee login, and the build log carries the proof:
 
 ```
-Running "vercel build"
-Build Completed in /vercel/output [310ms]
-Skipping cache upload because no files were prepared
+Installing dependencies...
+Detected Next.js version: 14.2.35
+Running "npm run build"
+> coffee@0.1.0 build
 ```
 
-against `tp-home` on the same push installing 31 packages and detecting Next.js 14.2.35. So
-**`tp-coffee-app` is still pointed at the repo root**, and that — not the framework preset — is
-what keeps `tech-paddock.vercel.app` serving an ungated page — checked 2026-09-12, and it is a bare
-84-byte 404 with no data and no repo contents, so it is embarrassing rather than dangerous. Root
-Directory must be `apps/coffee`, and it only takes effect on the next build, so a push has to follow
-the change. Re-confirmed after #33 deployed: still a repo-root build.
+against the `Build Completed in /vercel/output [153ms]` / `no files were prepared` it produced while
+still pointed at the repo root.
 
-The framework preset is close to cosmetic by comparison: `apps/coffee/vercel.json` already declares
-`"framework": "nextjs"`, and `tp-message-editor` has deployed correctly for weeks with `framework:
-null`. Worth setting, but it was never the blocker this file implied.
+**The `tech-paddock.vercel.app` exposure is closed by the same change.** That hostname now serves
+the Coffee login rather than an ungated page — the gate lives in each app's middleware, and the
+project finally has an app, so it finally has middleware. It was never a leak (a bare 84-byte 404,
+checked), but it is now gated like everything else.
 
-For the environment variables, `GET /api/health` on the deployed app is the check — it landed in #31
-and names which dependency is unhappy. A green build proves nothing, because the variables are read
-per request rather than at build time. The five the app actually reads, confirmed from the source
-rather than from CI's dummy list: `ANTHROPIC_API_KEY`, `APP_PASSWORD_HASH`, `SESSION_SECRET`,
-`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`.
+**Root Directory is checkable from a session: read the build log.** A correct build installs
+dependencies and runs `next build`; a repo-root build finds no `package.json` and exits in
+milliseconds. An earlier version of this file called that unknowable and was wrong, which left the
+most consequential of four settings unverified while two cosmetic ones were tracked as blockers.
 
-**The Cloudflare DNS is already done.** `coffee.techpaddock.io` resolves to `76.76.21.21`, a real A
-record rather than a wildcard — confirmed because a nonsense subdomain on the same zone does not
-resolve. Only the Vercel-side attachment remains.
+**Still unrun:** `GET /api/health` behind the login. It is the only check on the five environment
+variables — `ANTHROPIC_API_KEY`, `APP_PASSWORD_HASH`, `SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`,
+`SUPABASE_URL` — which stay API-invisible. A green build proves nothing about them, since they are
+read per request.
 
-Until Root Directory points at a real app, `tech-paddock.vercel.app` serves an empty page
-**outside the password gate** — the gate lives in each app's middleware, so a project with no app
-has no gate. That is why this is first on the list. Joel's decision stands: **fix in place, do not
-delete.**
-
-Note: `tp-message-editor` also shows `framework: null`, though it has been deploying correctly via
-its own `vercel.json`. Worth setting for consistency; not urgent.
+The framework preset still reads `Other` and is genuinely cosmetic: `apps/coffee/vercel.json`
+declares `nextjs` and overrides the dashboard, which is exactly why this build succeeded with the
+preset unset. `tp-message-editor` has run the same way for weeks.
 
 ## `SESSION_SECRET` was rotated today — verify parity
 
