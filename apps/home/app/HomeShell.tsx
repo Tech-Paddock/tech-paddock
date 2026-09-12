@@ -5,12 +5,26 @@ import { useRouter, useSearchParams } from "next/navigation";
 import type { Glance } from "@/lib/glance";
 import GlancePanel from "./GlancePanel";
 
+/** A step on the hub's gold ramp. Each has a `.tone-*` rule in globals.css. */
+type Tone = "champagne" | "gold" | "brass" | "bronze";
+
+type AppEntry = {
+  slug: string;
+  name: string;
+  href: string;
+  tone: Tone;
+  icon: string;
+};
+
+// `satisfies` rather than a plain annotation: it checks each tone against the
+// union while keeping the inferred literal types. A bare `as const` would not
+// check anything, and an unmatched tone renders an unstyled tile silently.
 const APPS = [
-  { slug: "editor", name: "Message Editor", href: "https://editor.techpaddock.io", team: "ferrari", icon: "✉️" },
-  { slug: "tracker", name: "Pipeline Tracker", href: "https://tracker.techpaddock.io", team: "mercedes", icon: "📊" },
-  { slug: "resume", name: "Resume Formatter", href: "https://resume.techpaddock.io", team: "astonmartin", icon: "📄" },
-  { slug: "coffee", name: "Coffee", href: "https://coffee.techpaddock.io", team: "mclaren", icon: "☕" },
-];
+  { slug: "editor", name: "Message Editor", href: "https://editor.techpaddock.io", tone: "champagne", icon: "✉️" },
+  { slug: "tracker", name: "Pipeline Tracker", href: "https://tracker.techpaddock.io", tone: "gold", icon: "📊" },
+  { slug: "resume", name: "Resume Formatter", href: "https://resume.techpaddock.io", tone: "brass", icon: "📄" },
+  { slug: "coffee", name: "Coffee", href: "https://coffee.techpaddock.io", tone: "bronze", icon: "☕" },
+] satisfies AppEntry[];
 
 function Shell({ glance }: { glance: Glance }) {
   const router = useRouter();
@@ -76,7 +90,7 @@ function Shell({ glance }: { glance: Glance }) {
                 {APPS.map((a, i) => (
                   <button
                     key={a.name}
-                    className={`app-button team-${a.team}`}
+                    className={`app-button tone-${a.tone}`}
                     onClick={() => select(i)}
                   >
                     <span className="app-button-icon icon">{a.icon}</span>
