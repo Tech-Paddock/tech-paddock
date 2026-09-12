@@ -66,6 +66,16 @@ answered `Invalid schema: coffee`, because the hosted project's **exposed schema
 dashboard setting that lives nowhere in this repo. `supabase/README.md` documents it as step three
 of three.
 
+## Two brewer vocabularies
+
+`guide_method` records what the roaster published and stays broad; the list in `lib/brewers.ts`
+names what is on the shelf. They were one list until the first real bags arrived and every one was
+Sweet Bloom publishing "ORIGAMI AIR" — unplaceable against any five-item list, and correctly
+recorded as "other" rather than guessed at as a V60. Origami is in the roaster's vocabulary now.
+
+`myBrewerFor` crosses between them only on an exact match. A bare "V60" does not map, because two
+of them are on the shelf and the roaster did not say which.
+
 ## In flight
 
 **Library load failures are now visible (branch `claude/coffee-surface-library-errors`).** The
