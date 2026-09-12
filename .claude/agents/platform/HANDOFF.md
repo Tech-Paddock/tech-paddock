@@ -34,21 +34,34 @@ The evidence, so you do not re-derive it:
 Five separate projects do not modify their own settings within 85 seconds of each other. That is one
 account-level event rippling through all of them, and the thing that rewrites every project's stored
 git link at once is **the repository changing hands**. The repo was transferred to the `Tech-Paddock`
-org and back to `joelb-401` in that window.
+org in that window and **is still there** — id `1358809705`, owner type Organization, verified
+2026-09-12. An earlier version of this file said it came back to `joelb-401`. It did not, and that
+error is what pointed the fix below at the wrong installations page for six hours.
 
 **Diagnosis: Vercel's GitHub App installation did not survive the transfer.** A GitHub App is
-installed on an *account*, not on a repository; the repo left the installation's scope and came back
-to an account whose installation no longer covers it. Nothing errors. Pushes succeed, GitHub Actions
-still runs (it is built into GitHub, not an installed app), and Vercel simply never hears about it.
+installed on an *account*, not on a repository; the repo left the personal account's installation
+scope and landed on an org that has no Vercel installation at all. Nothing errors. Pushes succeed,
+GitHub Actions still runs (it is built into GitHub, not an installed app), and Vercel simply never
+hears about it.
 
 Ruled out along the way: the Hobby plan's 100-deploys-per-day cap — Joel checked the dashboard and
-there is no limit banner — and `git.deploymentEnabled: false`, which appears in none of the five
-`vercel.json` files.
+there is no limit banner — and, read from the files rather than a summary of them,
+`git.deploymentEnabled: false` and the legacy `github.enabled: false`. Neither appears in any of the
+five `vercel.json` files, and there is no root `vercel.json`.
 
-**The fix:** `github.com/settings/installations` → Vercel → confirm it exists and that
-`tech-paddock` is in its repository access list. Then a new push against current `main` is needed;
-do **not** use the dashboard's Redeploy button on the existing production deployment, because that
-rebuilds `92c1ec1` — the same stale code.
+**The fix:** `github.com/organizations/Tech-Paddock/settings/installations` → Vercel → confirm it
+exists and that `tech-paddock` is in its repository access list. The repo is org-owned, so the
+personal `github.com/settings/installations` page is the wrong one. **Joel installed it on the org
+on 2026-09-12.**
+
+Then a new push against current `main` is needed; do **not** use the dashboard's Redeploy button on
+the existing production deployment, because that rebuilds `92c1ec1` — the same stale code.
+
+**Open, and not to be guessed at:** all five projects still record `link.org: "joelb-401"` and
+`githubRepoOwnerType: "User"`. The repo id is unchanged, so Vercel may re-resolve on its own at
+webhook time — or each project may need `vercel git disconnect` / `vercel git connect` against
+`Tech-Paddock/tech-paddock`. Do not re-point five projects until a push has been tried and produced
+nothing, and note that re-pointing a Git link is Joel's under `CLAUDE.md` either way.
 
 ## Ignored Build Step — agreed, written, not landed
 
@@ -91,12 +104,34 @@ outstanding**, and two cannot be checked from a session at all:
 |---|---|
 | `framework` | still `null` — not set to Next.js |
 | domains | `coffee.techpaddock.io` **not attached**; only the three `.vercel.app` names |
-| Root Directory | **not exposed by the Vercel API** — unknowable from here |
+| Root Directory | **wrong** — verified 2026-09-12 from the build log, see below |
 | the five env vars | **not exposed by the Vercel API** — unknowable from here |
 
-For the last two, `GET /api/health` on the deployed app is the check — it landed in #31 and names
-which dependency is unhappy. A green build proves nothing, because the variables are read per
-request rather than at build time.
+**Root Directory is checkable from a session after all — read the build log.** An earlier version of
+this table called it unknowable, which was wrong and left the worst of the four unverified. A build
+against the correct Root Directory installs dependencies and runs `next build`; a build against the
+repo root finds no `package.json` and exits in milliseconds. On 2026-09-12 `tp-coffee-app` produced:
+
+```
+Running "vercel build"
+Build Completed in /vercel/output [310ms]
+Skipping cache upload because no files were prepared
+```
+
+against `tp-home` on the same push installing 31 packages and detecting Next.js 14.2.35. So
+**`tp-coffee-app` is still pointed at the repo root**, and that — not the framework preset — is
+what keeps `tech-paddock.vercel.app` serving an ungated page. Root Directory must be `apps/coffee`, and it
+only takes effect on the next build, so a push has to follow the change.
+
+The framework preset is close to cosmetic by comparison: `apps/coffee/vercel.json` already declares
+`"framework": "nextjs"`, and `tp-message-editor` has deployed correctly for weeks with `framework:
+null`. Worth setting, but it was never the blocker this file implied.
+
+For the environment variables, `GET /api/health` on the deployed app is the check — it landed in #31
+and names which dependency is unhappy. A green build proves nothing, because the variables are read
+per request rather than at build time. The five the app actually reads, confirmed from the source
+rather than from CI's dummy list: `ANTHROPIC_API_KEY`, `APP_PASSWORD_HASH`, `SESSION_SECRET`,
+`SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`.
 
 **The Cloudflare DNS is already done.** `coffee.techpaddock.io` resolves to `76.76.21.21`, a real A
 record rather than a wildcard — confirmed because a nonsense subdomain on the same zone does not
@@ -155,8 +190,9 @@ grants or RLS problem it becomes yours.
 - **`/api/health` on the resume app sits behind the password gate**, so no external uptime monitor
   can reach it. Fine for human use; a blocker if it is ever meant for monitoring.
 - **`build (coffee)` is not in branch protection's required checks.** The matrix is five jobs; the
-  ruleset still names four. Branch protection is also probably inert while the repo sits on a
-  personal account.
+  ruleset still names four. `main` now reports `protected: true` on the org, checked 2026-09-12,
+  which supersedes the old note that protection is inert on a personal account — but no agent can
+  read rulesets, so which checks are required is unverifiable from a session.
 
 ## Next steps, in order
 
