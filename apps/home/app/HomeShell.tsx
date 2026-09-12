@@ -3,28 +3,29 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Glance } from "@/lib/glance";
+import { TOOLS, type ToolSlug } from "@/lib/platform";
 import GlancePanel from "./GlancePanel";
 
 /** A step on the hub's gold ramp. Each has a `.tone-*` rule in globals.css. */
 type Tone = "champagne" | "gold" | "brass" | "bronze";
 
-type AppEntry = {
-  slug: string;
-  name: string;
-  href: string;
-  tone: Tone;
-  icon: string;
+// Names and URLs come from lib/platform.ts so the shell and the admin page
+// cannot drift apart; only presentation lives here. Typing this as a Record
+// over ToolSlug means adding a tool to that file breaks this build until it is
+// given a colour and an icon — rather than rendering an unstyled tile.
+const PRESENTATION: Record<ToolSlug, { tone: Tone; icon: string }> = {
+  editor: { tone: "champagne", icon: "✉️" },
+  tracker: { tone: "gold", icon: "📊" },
+  resume: { tone: "brass", icon: "📄" },
+  coffee: { tone: "bronze", icon: "☕" },
 };
 
-// `satisfies` rather than a plain annotation: it checks each tone against the
-// union while keeping the inferred literal types. A bare `as const` would not
-// check anything, and an unmatched tone renders an unstyled tile silently.
-const APPS = [
-  { slug: "editor", name: "Message Editor", href: "https://editor.techpaddock.io", tone: "champagne", icon: "✉️" },
-  { slug: "tracker", name: "Pipeline Tracker", href: "https://tracker.techpaddock.io", tone: "gold", icon: "📊" },
-  { slug: "resume", name: "Resume Formatter", href: "https://resume.techpaddock.io", tone: "brass", icon: "📄" },
-  { slug: "coffee", name: "Coffee", href: "https://coffee.techpaddock.io", tone: "bronze", icon: "☕" },
-] satisfies AppEntry[];
+const APPS = TOOLS.map((tool) => ({
+  slug: tool.slug,
+  name: tool.name,
+  href: tool.url,
+  ...PRESENTATION[tool.slug],
+}));
 
 function Shell({ glance }: { glance: Glance }) {
   const router = useRouter();
@@ -78,6 +79,9 @@ function Shell({ glance }: { glance: Glance }) {
             </button>
           ))}
           <p className="sidebar-label">Account</p>
+          <a className="nav-item" href="/admin">
+            <span className="icon">🔧</span> Admin
+          </a>
           <button className="nav-item logout-item" onClick={logout} disabled={loggingOut}>
             <span className="icon">🚪</span> {loggingOut ? "Logging out…" : "Log out"}
           </button>

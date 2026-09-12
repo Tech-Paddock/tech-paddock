@@ -56,3 +56,36 @@ different program from `main`, not merely an older one.
 PR #19 flipped the topbar *from* near-black *to* an accent fill. This change flips it back. That is
 intentional, not a regression: the ground/accent relationship inverts when the page goes dark, and
 white-on-gold measures 2.42:1 (fails WCAG AA) where gold-on-black is 8.18:1.
+
+## 2026-09-12 01:40 — claim (second change on this branch)
+Working on: an admin/diagnostics page at `/admin` in the hub. Agreed with Joel: declared-vs-reported,
+hub only for now, and designed so that no new agent instruction is needed.
+Touching: `apps/home/` only — `app/admin/`, `lib/platform.ts`, `lib/diagnostics.ts`,
+`lib/declared.generated.ts`, `scripts/collect-declared.mjs`, `app/HomeShell.tsx`, `app/globals.css`.
+Depends on: nothing.
+
+Declared for anyone reading before I open the PR: **I am not touching any other app's folder, and
+not `middleware.ts` anywhere.** The page therefore reports "unknown" for things it genuinely cannot
+reach, and names what would fix each one. That list is the handoff to Platform and the TD, below.
+
+## 2026-09-12 01:40 — what this page cannot see, and who can fix it
+Recording this here because it is the useful half of the result and it is not mine to build.
+
+The hub can prove liveness for any app by fetching its `/login`, which is public on all five. It
+cannot see inside any app it has no carve-out for. Specifically:
+
+- **`/api/health` exists only on `resume` and `coffee`**, and on both it sits behind the password
+  gate with no internal-secret carve-out, so the hub gets 401. `editor`, `tracker` and `home` have
+  no health route at all.
+- **Fixing that needs a `middleware.ts` carve-out per app**, exactly like tracker's existing
+  `/api/summary` one. `middleware.ts` is auth plumbing — the TD's, not mine, and not any app
+  agent's to do unilaterally.
+- **`SESSION_SECRET` consistency across the five projects cannot be checked by any page**, and
+  should not be: nothing may echo it. The only safe signal is behavioural — log in on the hub, then
+  open a tool without being asked again. Worth stating because it is item 2 on the TD's list and a
+  dashboard will never answer it.
+
+Correction for the TD while I am here: `CLAUDE.md` says `middleware.ts` is byte-identical in five
+apps. It is not — there are three distinct versions, because `editor` and `tracker` carry
+deliberate carve-outs. `lib/auth.ts` and `lib/password.ts` are genuinely identical; I verified all
+three by checksum. The rule is still right; its stated reason is out of date.
