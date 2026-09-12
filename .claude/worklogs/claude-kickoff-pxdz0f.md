@@ -1,35 +1,35 @@
 # claude-kickoff-pxdz0f
-agent: technical director · apps: none · shared files: none
+agent: technical director · apps: none · shared files: CLAUDE.md
+authorized by: Joel, directly, in session — "remove restriction on model usage, this will be task
+dependant."
 
-## 2026-09-12 03:05 — claim
-Working on: closing Coffee in the record, and correcting supabase/README.md, which was wrong about
-what it takes to add a schema — in the exact way that cost an hour tonight.
-Touching: supabase/README.md, .claude/worklogs/_open-items.md, .claude/agents/td/HANDOFF.md,
-.claude/agents/platform/HANDOFF.md, .claude/agents/coffee/HANDOFF.md
+## 2026-09-12 03:15 — claim
+Working on: the CLAUDE.md amendment Joel asked for — removing the repo-wide `claude-sonnet-5` pin
+and making model choice per task.
+Touching: CLAUDE.md
 Depends on: nothing
 
-## 2026-09-12 03:05 — for Platform Config, and for whoever adds the next schema
-Coffee is green: GET /api/health returns {"ok":true} on all three checks.
+## 2026-09-12 03:15 — for the Message Editor agent, and it is not optional reading
+The amendment changes a premise your drift check is built on.
 
-Getting there produced three failures in three systems and only one was where it looked:
+`apps/editor/lib/modelCheck.ts` filters the model list with `model.id.includes("sonnet")` and
+compares against a `PINNED_MODEL` constant. That was exactly right while the repo mandated one
+Sonnet model. With model choice now per task, **that check monitors one family and silently ignores
+every other** — if any app moves to Opus or Haiku, drift in that app is invisible to it. The
+`pinned_model` column it writes also presupposes a pin that no longer exists repo-wide.
 
-- SUPABASE_SERVICE_ROLE_KEY held a non-JWT value. Supabase's value in a Vercel field. The tell was
-  `Invalid Compact JWS` from Storage — a merely wrong JWT parses fine and fails differently.
-- ANTHROPIC_API_KEY was blank.
-- `Invalid schema: coffee` was neither a key nor a grants problem. Verified directly: service_role
-  had USAGE on the schema and SELECT on coffee.bags, and `coffee` was already listed in
-  config.toml. PostgREST still refused it, because the hosted project's exposed-schemas list is a
-  dashboard setting that is not in this repo and that config.toml does not touch.
+Not changed here, because it is your code and because the right fix is a design decision rather than
+a rename. The options worth weighing: filter on the set of models the repo actually uses rather than
+a hardcoded family, or scope the check per app, or retire it. Worth doing alongside diagnosing why
+`editor.model_status` has never successfully written a row — the two are the same file.
 
-supabase/README.md told you two migrations plus config.toml. That is incomplete and is corrected to
-three steps, with the dashboard setting named as the one that is easy to miss.
+Also still true and unchanged by this: three files pin `claude-sonnet-5` in code
+(`apps/editor/lib/anthropic.ts`, `apps/editor/lib/modelCheck.ts`, `apps/coffee/lib/anthropic.ts`).
+The amendment stops mandating a model; it does not move anything. Each app's agent decides.
 
-**CLAUDE.md carries the same incomplete claim** — "adding one means two migrations, not one" — and
-I have not touched it, because that needs Joel. Proposed replacement is in the pull request.
-
-## 2026-09-12 03:05 — handoff
-Landed: documentation only. Coffee removed from Joel's list; the schema trap recorded in three
-places so the next new schema does not repeat it.
-Open: SESSION_SECRET parity (untested), CRON_SECRET before MS_GRAPH_*, build (coffee) in required
-checks, supabase link. None of them mine.
-Need from TD: nothing. The CLAUDE.md line needs Joel.
+## 2026-09-12 03:15 — handoff
+Landed: CLAUDE.md only. Model choice is per task; the two protections the pin was carrying —
+server-side only, and treating a model change as a deliberate change with a test — are kept
+explicitly so they do not get lost with the pin.
+Open: the drift-check question above, for the Message Editor agent.
+Need from TD: nothing. Joel authorized the amendment directly.
