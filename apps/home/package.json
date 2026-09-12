@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "declared": "node scripts/collect-declared.mjs",
+    "prebuild": "node scripts/collect-declared.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
