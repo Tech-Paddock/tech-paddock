@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-12 00:45 UTC.**
+**Last reviewed: 2026-09-12 01:45 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -19,34 +19,43 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
-1. **2026-09-12 — Finish `tp-coffee-app`. Root Directory is the one that matters.** Re-verified
-   after the outage was fixed: the project deployed `0c7d882` to production and *still* built the
-   repo root. **Root Directory must be set to `apps/coffee`**, and it only takes effect on the next
-   build, so a push has to follow the change. That — not the framework preset — is why
-   `tech-paddock.vercel.app` serves a page outside the password gate. Checked: it returns a bare 404,
-   84 bytes, no data and no repo contents. Embarrassing rather than dangerous, so it is not blocking.
-   Also outstanding: `coffee.techpaddock.io` is still not in the domain list (the Cloudflare A record
-   already exists), and the framework preset is `null` — near-cosmetic, since
-   `apps/coffee/vercel.json` already declares `nextjs` and `tp-message-editor` has deployed correctly
-   for weeks with the same `null`.
-   The five environment variables it actually reads, from the source rather than CI's dummy list:
+1. **2026-09-12 — Verify `tp-coffee-app` came up. Configured at 01:39; this push is its first
+   build.** Joel set Root Directory to `apps/coffee` and attached `coffee.techpaddock.io` at 01:39,
+   and the domain resolves through the shared CNAME target. Neither had been built at the time this
+   was written: the project's last build was 00:48:24 and read `Build Completed [153ms]` with
+   *no files were prepared*, a repo-root build, so `coffee.techpaddock.io` answered 404.
+   **Redeploy it from the dashboard rather than relying on a push.** The project has *Skip
+   deployments when there are no changes to the root directory or its dependencies* enabled, so a
+   commit touching only `.claude/` — including the one carrying this entry — skips this project's
+   build entirely. That toggle is the built-in equivalent of the `ignoreCommand` change the Platform
+   handoff has been proposing, so it is worth keeping; it just means docs pushes no longer rebuild
+   anything and configuration changes need an explicit Redeploy.
+   **How to check, in order:** read the build log — a correct build installs dependencies and runs
+   `next build`, a repo-root build exits in milliseconds. Then `GET /api/health` behind the login,
+   which names whichever of the `coffee` schema, the `coffee-files` bucket or `ANTHROPIC_API_KEY` is
+   unhappy. The five variables the app actually reads, from the source rather than CI's dummy list:
    `ANTHROPIC_API_KEY`, `APP_PASSWORD_HASH`, `SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `SUPABASE_URL`. They stay API-invisible; `GET /api/health` on the deployed app checks them.
-   **Root Directory is checkable from a session — read the build log.** A correct build installs
-   dependencies and runs `next build`; a repo-root build finds no `package.json` and exits in
-   milliseconds. Earlier entries called this impossible and were wrong.
-   **The Cloudflare DNS is already done**: `coffee.techpaddock.io` has a real A record at
-   `76.76.21.21`, confirmed not a wildcard because a nonsense subdomain on the same zone does not
-   resolve. Only the Vercel-side attachment remains.
+   `SUPABASE_URL`. Environment values stay API-invisible; Root Directory does not — read the log.
+   Still outstanding and near-cosmetic: the framework preset is `null`. `apps/coffee/vercel.json`
+   already declares `nextjs`, and `tp-message-editor` has deployed correctly for weeks with the same
+   `null`, so this was never the blocker earlier entries implied.
    **This is still the only publicly exposed thing in the project** until Root Directory points at a
    real app: `tech-paddock.vercel.app` serves an empty page outside the password gate, because the
    gate lives in each app's middleware and a project with no app has no gate.
-2. **2026-09-12 — Verify `SESSION_SECRET` parity across all five. Now checkable, and untested.**
-   It was rotated on 09-11 because the old value could not be read back out of the dashboard, and
-   nobody has confirmed it landed everywhere. All five have now redeployed, so the behavioural check
-   finally works: log in at `techpaddock.io`, then open a tool from a hub tile. A login loop means
-   the secret did not land on that app. No agent can read the values — this one is Joel's eyes only.
-   A partial rollout is the silent-SSO failure: no error anywhere, just the loop.
+2. **2026-09-12 — Verify `SESSION_SECRET` parity. Rotated again at 01:39, live only after this
+   push.** Rotating is the right move rather than churn: the existing values cannot be read back out
+   of the dashboard, so parity cannot be confirmed by inspection — setting one fresh known value on
+   all five is the only way to guarantee it.
+   **A dashboard change does not reach a running deployment.** Vercel bakes the environment into the
+   serverless function at deploy time, so reading `process.env` per request still reads the
+   environment the deployment was built with. At 01:45 all five projects had settings changed at
+   01:39-01:40 and a last deployment of 00:48:22 — fifty-one minutes earlier — so every app was
+   still
+   running the previous secret. **Do not test SSO before a redeploy; you would be testing the old
+   value and learning nothing.**
+   Once deployed: log in at `techpaddock.io`, then open a tool from a hub tile, on desktop and on
+   mobile. A loop on both points at the secret; a loop on mobile only points at the iframe, which is
+   the separate known bug. No agent can read the values — this one is Joel's eyes only.
 3. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
    `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
    will tell you they are doing nothing. Needs a one-time Azure registration against a personal
@@ -120,12 +129,20 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Known, deliberately not fixed
 
-- **2026-09-11 — Every push rebuilds every Vercel project.** No Ignored Build Step. The change is
-  written and agreed — one `ignoreCommand` line per app's `vercel.json`, in the Platform handoff —
-  and not landed. Merging it is also the cleanest way to clear the deploy backlog.
-- **2026-09-11 — DNS is wired two ways.** `editor` resolves through `vercel-dns-017.com`; the others
-  use the legacy `76.76.21.21` A record. Both work. If switching, take each target from that
-  project's own Domains tab — they are not interchangeable.
+- **2026-09-12 — Vercel's own skip toggle may have superseded the `ignoreCommand` plan.**
+  `tp-coffee-app` shows *Skip deployments when there are no changes to the root directory or its
+  dependencies* **enabled** — the built-in equivalent of the one-line `ignoreCommand` per
+  `vercel.json` that the Platform handoff proposes. Whether the other four have it is not visible
+  from the API and has not been checked. **Consequence either way: a docs-only push no longer
+  reliably rebuilds anything**, so a configuration change now needs an explicit Redeploy rather than
+  a push riding along behind it. Check the other four before landing `ignoreCommand`, which may now
+  be redundant.
+- **2026-09-12 — DNS is now uniform, and that entry is retired.** All four subdomains — `editor`,
+  `tracker`, `resume`, `coffee` — are CNAMEs to `d1317e1174061c29.vercel-dns-017.com`, changed by Joel
+  at 01:39 and verified resolving. The apex `techpaddock.io` stays an A record at `76.76.21.21`
+  because an apex cannot be a CNAME; that is correct rather than a leftover. All four app domains
+  still return 200 and still send `frame-ancestors 'self' https://techpaddock.io
+  https://*.techpaddock.io`, so the embed restriction survived the switch.
 - **2026-09-11 — `/api/health` sits behind the password gate**, so no external monitor can reach it.
 - **2026-09-11 — `editor.model_status` has zero rows.** The login-time drift check has never
   successfully written. Not diagnosed, and the oldest unexplained thing here.

@@ -44,16 +44,21 @@ rather than promising it.
 
 Live infrastructure and one-time credentials. None of it is yours.
 
-1. **Finish `tp-coffee-app`, Root Directory first.** It is still the repo root — re-proven from the
-   build log after #33 deployed. Set it to `apps/coffee`; it only takes effect on the next build, so
-   a push has to follow. That, not the `null` framework preset, is why `tech-paddock.vercel.app`
-   serves outside the password gate — and that surface is a bare 84-byte 404, checked, so it is
-   embarrassing rather than urgent. Also outstanding: `coffee.techpaddock.io` is not in its domain
-   list, though the Cloudflare A record already exists. The five env vars stay API-invisible;
-   `GET /api/health` on the deployed app checks them.
-2. **Verify `SESSION_SECRET` parity across all five.** Now finally checkable, because all five have
-   redeployed. Log in at `techpaddock.io`, open a tool from a tile; a login loop means it did not
-   land on that app. No agent can read the values.
+1. **Verify `tp-coffee-app` came up.** Root Directory was set to `apps/coffee` and
+   `coffee.techpaddock.io` attached at 01:39 on 09-12; both confirmed correct. Neither had built —
+   the last build was 00:48 and still a 153ms repo-root build, so the domain answered 404.
+   **Use Redeploy, not a push**: the project has "Skip deployments when there are no changes to the
+   root directory" enabled, so a commit touching only `.claude/` skips this project's build entirely.
+   Check the build log afterwards — dependencies installed and `next build` run, versus an exit in
+   milliseconds — then `GET /api/health` behind the login. The framework preset reads `Other`, which
+   is near-cosmetic since `apps/coffee/vercel.json` declares `nextjs`, but setting it removes a
+   variable.
+2. **Verify `SESSION_SECRET` parity across all five.** Rotated again at 01:39 on 09-12. A dashboard
+   change does not reach a running deployment — Vercel bakes the environment in at deploy time — so
+   every app kept the old value until redeployed. Same caveat as above: if the skip toggle is on for
+   the other projects too, a docs-only push will not roll it out. Redeploy is deterministic.
+   Then log in at `techpaddock.io` and open a tool from a tile, on desktop and mobile: a loop on both
+   is the secret, mobile-only is the iframe bug. No agent can read the values.
 3. **Set `CRON_SECRET` first, then `MS_GRAPH_*`** on `tp-tracker` — the order is not cosmetic. The
    middleware exempts `/api/cron/*` from the password gate and the route's guard fails open when
    `CRON_SECRET` is unset, so setting the Graph credentials alone publishes an unauthenticated
@@ -92,8 +97,9 @@ explanation teaches nothing. **Verify from the code.**
 
 - **Every push rebuilds every Vercel project.** No Ignored Build Step. The change is written and
   agreed — one line per app's `vercel.json`, in the Platform handoff — and not landed.
-- **DNS is wired two ways.** `editor` resolves through `vercel-dns-017.com`; the others use the
-  legacy A record. Both work.
+- **DNS is uniform as of 2026-09-12.** All four subdomains are CNAMEs to
+  `d1317e1174061c29.vercel-dns-017.com`; the apex stays an A record because an apex cannot be a
+  CNAME. Verified resolving, and the `frame-ancestors` header survived the switch.
 - **`/api/health` sits behind the password gate**, so no external monitor can reach it.
 - **`editor.model_status` has zero rows.** The login-time drift check has never successfully
   written. Not diagnosed, and the oldest unexplained thing here.
