@@ -25,8 +25,36 @@ the order this directory exists to enforce.
 | `20260910215015` | `editor.model_status`, the model drift check's singleton row |
 | `20260911034533` | Resume Formatter rebuild; drops the four original content tables |
 | `20260911144519` | `position` on `shared.contacts` |
-| `20260911203000` | The `coffee` schema and `coffee.bags`, plus the private `coffee-files` bucket |
-| `20260911203100` | Grants for the `coffee` schema — see below, this one is not optional |
+| `20260911202805` | The `coffee` schema and `coffee.bags`, plus the private `coffee-files` bucket |
+| `20260911202901` | Grants for the `coffee` schema — see below, this one is not optional |
+| `20260912034941` | Backgrounding the brew-guide search: in-flight, failure and provenance columns |
+| `20260912213501` | Splits a bag from its brews; `coffee.brews` with a generated `extraction_yield` |
+
+### Four versions were renamed on 2026-09-14, and why that is the honest direction
+
+The four `coffee` migrations were applied through the hosted API rather than the CLI, and **that
+path stamps its own version at the moment it runs and ignores the filename.** So the repo said
+`20260911203000_coffee_schema` while the database recorded `20260911202805`, and similarly for the
+other three. Nobody noticed, because nothing compares the two until you run `migration list`.
+
+The files were renamed to the versions that actually ran. **The alternative — editing the database's
+recorded versions to match the filenames — was rejected, and the reason is worth keeping.** This
+directory exists so the database stops being the only record of its own shape; it does not follow
+that the repo overrules the database about *what already happened*. The database is the record of
+what ran and when. The repo is the record of what was intended. When they disagree about history,
+history wins, and the cheap side moves.
+
+It also means `supabase migration repair` was never needed, which matters because the brief forbids
+it. A rule that would have had to be argued around turned out not to apply.
+
+The SQL was verified identical before renaming — statement by statement against
+`supabase_migrations.schema_migrations`, not eyeballed. The only difference is that the hosted API
+strips the leading comment block, so the *reasoning* for each migration lives in this directory and
+nowhere else. That is an argument for the files, not against them.
+
+**What to expect from this in future:** any migration applied through the hosted API will do this
+again. Name the file after the fact where you can, or rename it to match once applied, and check
+`migration list` afterwards rather than assuming.
 
 ### The deliberate gap
 
@@ -38,7 +66,9 @@ docx fixtures.
 Consequences to expect:
 
 - `supabase migration list` will always show `20260908235234` as present remotely and missing
-  locally. That is correct and permanent.
+  locally. That is correct and permanent. **It should be the only difference** — as of 2026-09-14 it
+  is again, and a second discrepancy appearing means something drifted and is worth reading rather
+  than dismissing.
 - **Do not run `supabase migration repair` on it.** Repairing would edit the remote history to
   match the repo, falsifying the record of what was actually applied in order to silence a gap we
   chose on purpose.

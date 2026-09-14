@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-14 22:45 UTC.**
+**Last reviewed: 2026-09-14 23:20 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -19,58 +19,67 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
-1. **2026-09-12 — Two tidy-ups only you can do.** `claude/coffee-rework-the-bag-form` is abandoned:
-   5 ahead, 10 behind, and its commits are the earlier monolithic version of work that landed properly
-   as #51-#53, plus one that already merged as #48. Nothing on it is wanted. **Deleting a branch by
-   hand is a GitHub UI job** — the git proxy refuses `--delete` — so it needs your click.
-   And `CLAUDE.md`'s domain map still lists `coffee.techpaddock.io` as **"built, not yet deployed"**.
-   It has been live and green for a day, and is now serving the brew log. That is a brief change, so
-   it is yours; say the word and I will correct the row.
-2. **2026-09-12 — Verify `SESSION_SECRET` parity. Rotated again at 01:39, live only after this
-   push.** Rotating is the right move rather than churn: the existing values cannot be read back out
-   of the dashboard, so parity cannot be confirmed by inspection — setting one fresh known value on
-   all five is the only way to guarantee it.
-   **A dashboard change does not reach a running deployment.** Vercel bakes the environment into the
-   serverless function at deploy time, so reading `process.env` per request still reads the
-   environment the deployment was built with. At 01:45 all five projects had settings changed at
-   01:39-01:40 and a last deployment of 00:48:22 — fifty-one minutes earlier — so every app was
-   still
-   running the previous secret. **Do not test SSO before a redeploy; you would be testing the old
-   value and learning nothing.**
-   Once deployed: log in at `techpaddock.io`, then open a tool from a hub tile, on desktop and on
-   mobile. A loop on both points at the secret; a loop on mobile only points at the iframe, which is
-   the separate known bug. No agent can read the values — this one is Joel's eyes only.
-3. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
-   `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
-   will tell you they are doing nothing. Needs a one-time Azure registration against a personal
-   Microsoft account — the `consumers` authority, scopes `offline_access Calendars.Read
-   Tasks.ReadWrite`, and one by-hand authorization-code exchange to mint the refresh token, since the
-   code only ever does `grant_type=refresh_token`.
-   **Order matters, and it is a trap** (found 2026-09-12 by reading the route). The tracker's
-   middleware exempts `/api/cron/*` from the password gate outright, and the route guards itself with
-   `if (secret && ...)` — which fails **open** when `CRON_SECRET` is unset. That is harmless today
-   only because `graphConfigured()` is false and the route answers "Outlook is not connected". Set
-   the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
-   endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
-   first, or in the same save. Never after.**
-4. **2026-09-11 — Add `build (coffee)` and `requested-by-joel` to branch protection's
-   required checks.** The matrix is five jobs and the rule names four — confirmed today the hard way,
-   when #48's merge was refused with "4 of 4 required status checks are expected", so `build (coffee)`
-   is currently protecting nothing.
-   `requested-by-joel` is new in the same change as this note — the job in
-   `.github/workflows/pr-requested.yml`. It fails a pull request whose body does not record that you
-   asked for it, but **a failing check only blocks a merge if it is required** — until you add it, it
-   is a red X the technical director reads rather than a gate.
-   **Add it by the exact name `requested-by-joel`.** That is the job name, which is the context
-   GitHub reports. The workflow is called "Pull request", so `Pull request / requested-by-joel` is
-   the plausible guess and it is wrong — a required check whose name matches nothing is never
-   satisfied, which would block every merge in the repo until it was removed again. This was verified
-   for the previous version of this check against a live run; verify it again on the first pull
-   request that carries it before requiring it.
-5. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
-   agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
-   is deliberate. Do not repair it — a hook blocks the command.
+1. **2026-09-14 — Branch protection: three changes, and one of them is a trap you are already
+   standing next to.** Screenshot confirms the required checks are `build (editor)`, `build (home)`,
+   `build (resume)`, `build (tracker)` and **`Vercel – tp-coffee-app`**.
+   **Add** `build (coffee)` — the matrix is five jobs and only four are required, so Coffee can merge
+   broken. **Add** `requested-by-joel` — it runs on every pull request and is not required, so a
+   pull request nobody asked for goes red and merges anyway. Both by those exact names, no prefix.
+   **Remove `Vercel – tp-coffee-app`, and do it before enabling the Ignored Build Step.** That check
+   is a deployment status, not a test, and it is required for one app out of five for no recorded
+   reason. An Ignored Build Step makes Vercel skip the deployment on a push that does not touch
+   `apps/coffee` — and a skipped deployment does not reliably post that status. A required check
+   that never reports is never satisfied, and the pull request cannot merge, ever. That is the same
+   failure the CI change was designed around; it would arrive through the Vercel side instead.
+2. **2026-09-14 — The Vercel Ignored Build Step, on `tp-coffee-app` only, after item 1.**
+   `git diff --quiet HEAD^ HEAD -- . ../../supabase` in Settings → Git. It is not the *Skip
+   deployments* toggle, which is enabled on that project and demonstrably does not work; that is a
+   heuristic, this is a command whose exit code Vercel reads. Prove it on one project before the
+   other four.
+3. **2026-09-14 — `CRON_SECRET` before `MS_GRAPH_*` on `tp-tracker`, whenever Graph gets wired up.**
+   Unchanged and still the only item here with a security consequence: `middleware.ts` waves
+   `/api/cron/*` past the password gate, and the route's own `if (secret && …)` check fails **open**
+   when `CRON_SECRET` is unset. Graph credentials alone publish an unauthenticated endpoint.
+4. **2026-09-14 — The history rewrite is authorized and deliberately not started.** Joel said
+   "rewrite it" for the two names in git history. It cannot run yet and the order is not negotiable:
+   **#56 merges first**, because rewriting history rebases every commit and orphans an open pull
+   request built on the old ones. Then branch protection needs *Block force pushes* and *Restrict
+   deletions* relaxed on `main`, since a rewrite is a force push by definition. Then the rewrite,
+   then protection back on. Nothing about this is reversible once pushed, so it happens with Joel
+   present rather than as background work.
+
 ## Done since this ledger was last written
+
+- **2026-09-14 — Migration versions reconciled by renaming four files, not by repairing the
+  database.** The `coffee` migrations were applied through the hosted API, which stamps its own
+  version and ignores the filename, so the repo and the database disagreed on four version numbers
+  since 2026-09-11. **The files were renamed to the versions that actually ran.**
+  The direction is the decision. The database is the record of what ran and when; the repo is the
+  record of what was intended. When they disagree about *history*, history wins and the cheap side
+  moves. Editing `supabase_migrations.schema_migrations` to match a document written afterwards is
+  rewriting the past to agree with the present.
+  **Consequence worth carrying: `supabase migration repair` was never needed.** I had put it to Joel
+  as a rule that was written for a different case and arguably did not apply here — and it turned out
+  not to be in the way at all. The lesson is not about migrations. A ban that looks like it needs
+  arguing around is worth one more look for the option that does not touch it.
+  SQL verified identical statement by statement before renaming. Local and remote now differ by
+  exactly one version, `20260908235234`, which is the withheld contacts seed and is permanent.
+  `supabase db push` is safe again — it read those four as unapplied and would have errored on
+  `add column`.
+
+- **2026-09-14 — Three conventions into the brief, all Joel's.** The **migration shape rule**
+  (additive rides with its code; destructive splits into two pull requests, stop-using then drop; the
+  TD applies at gate time before merging; the Deployment section states which shape it is).
+  **Branch naming** — `claude/<area>-<description>`, prefix kept, anything after the description
+  explicitly declared noise. And the **domain map** finally reads `live` for Coffee.
+  The shape rule carries its own incident: `20260912213501` dropped four columns alongside the code
+  that stopped using them, which had no safe application moment and went out only because the live
+  table was queried by hand first.
+
+- **2026-09-14 — `SESSION_SECRET` parity confirmed good by Joel.** Open since 09-12 across two
+  rotations. Closed, and the reason it took two attempts stays on record: the values cannot be read
+  back out of the dashboard, and a dashboard change does not reach a running deployment until it
+  rebuilds.
 
 - **2026-09-14 — GitHub Actions stops rebuilding all five apps on every push: #57.** Joel: "lets only
   push the apps we are updating if possible." Each matrix job now compares its own folder against the

@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-12, 18:40 UTC.
+State as of 2026-09-14, 23:20 UTC.
 
 Read `RULES.md` first for the role. This is the workload.
 
@@ -76,15 +76,45 @@ against four real merges (#48, #43, #47, #53) and matched every time, but the fi
 happen on the next branch that touches one app. If it is wrong it fails loudly — a broken step turns
 the job red — rather than passing something untested, which is the right way round.
 
+## Migrations have a shape rule now, and the TD applies them
+
+Since 2026-09-14 a migration must be safe to apply **before** the code that needs it, because
+merging is unattended: the merge triggers the deploy and the new code is live in about a minute, so
+anything done after the merge happens while the app is already broken.
+
+**Additive rides with its code. Destructive splits into two pull requests** — stop using the column
+and ship, then drop it once that is live. **You apply it at gate time, before merging.** You have
+direct database access through the hosted API and it works; an agent claiming a migration needs a
+credential nobody holds has guessed, and that guess becomes a manual step that gets forgotten. It
+already appeared once, in #56's body.
+
+**The hosted API stamps its own migration version and ignores the filename.** That is how the repo
+and the database came to disagree on four versions between 09-11 and 09-14. Fixed by renaming the
+files to the versions that ran, not by repairing the database — the database is the record of what
+happened, the repo is the record of what was intended, and when they disagree about history the repo
+moves. **After applying anything through the API, check the recorded version and rename the file to
+match.** Local and remote now differ by exactly one version, the withheld contacts seed, and a second
+difference means real drift.
+
+## `Vercel – tp-coffee-app` is a required check, and it conflicts with the build scoping
+
+Branch protection requires four of the five matrix jobs — `build (coffee)` is missing — plus a
+Vercel *deployment* status for one app. That last one has to come off before the Ignored Build Step
+goes on `tp-coffee-app`: a skipped deployment does not reliably post a status, and a required check
+that never reports blocks the pull request permanently. Same failure the CI scoping was designed to
+avoid, arriving through the Vercel side.
+
+Raised with Joel on 2026-09-14 with the ordering spelled out. His clicks, not yours.
+
 ## Waiting on Joel
 
 Live infrastructure and one-time credentials. None of it is yours.
 
-1. **Verify `SESSION_SECRET` parity across all five.** Rotated again at 01:39 on 09-12 and live
-   since the 01:59 deployments — a dashboard change does not reach a running deployment, because
-   Vercel bakes the environment in at deploy time. All five have now rebuilt, so this is testable.
-   Then log in at `techpaddock.io` and open a tool from a tile, on desktop and mobile: a loop on both
-   is the secret, mobile-only is the iframe bug. No agent can read the values.
+1. **`SESSION_SECRET` parity — confirmed good by Joel on 2026-09-14. Closed.** Kept here only for
+   the mechanism, which will matter again at the next rotation: the values cannot be read back out of
+   the dashboard, so parity cannot be confirmed by inspection, and a dashboard change does not reach
+   a running deployment until it rebuilds. Setting one fresh known value on all five and then
+   redeploying is the only way to establish it.
 3. **Set `CRON_SECRET` first, then `MS_GRAPH_*`** on `tp-tracker` — the order is not cosmetic. The
    middleware exempts `/api/cron/*` from the password gate and the route's guard fails open when
    `CRON_SECRET` is unset, so setting the Graph credentials alone publishes an unauthenticated

@@ -103,8 +103,17 @@ between configuring something that exists and creating, destroying, or re-pointi
 
 ### Always
 
-- One branch per change, named for the change. Never reuse a branch across unrelated work, and
-  never treat one as a permanent working branch.
+- **One branch per change, named `claude/<area>-<description>`.** Area is the app folder where
+  there is one — `home`, `editor`, `tracker`, `resume`, `coffee` — and otherwise the layer it
+  touches: `ci`, `db`, `brief`, `platform`. Description is a few hyphenated words naming the change.
+  `claude/coffee-brew-log`, `claude/resume-template-archive`, `claude/ci-per-app-builds`.
+  Anything after that is noise and nobody minds it; what has to be readable at a glance is **which
+  area and what change**, because that is the whole question being asked of a branch list.
+  A session's opening branch is named by the harness and arrives as something like
+  `claude/kickoff-pxdz0f`, which names neither. That is expected and it is not the branch the work
+  belongs on: the brief already requires cutting a fresh branch once the change is agreed, and that
+  is the one that gets the name.
+  Never reuse a branch across unrelated work, and never treat one as a permanent working branch.
 - State your blast radius in the pull request: which apps, which shared files.
 - Add any new app under `apps/` to the CI matrix in `.github/workflows/ci.yml` in the same pull
   request. The matrix is hardcoded to five names and silently skips anything else, so a new app
@@ -134,6 +143,32 @@ between configuring something that exists and creating, destroying, or re-pointi
   asked-for one. **So this rule rests further on honesty than the ones around it**, which is the
   price of it being this simple. Do not open one on your own judgement, however obviously ready the
   work looks.
+- **A migration must be safe to apply *before* the code that needs it.** This is the shape rule,
+  and it exists because merging is unattended: a merge triggers the deploy by itself and the new
+  code is live in about a minute. Anything a human does *after* the merge happens inside a window
+  where the app is already broken, so "apply it at merge" is not an instruction anyone can follow.
+  **So the migration goes first and the code follows** — which only works if the migration is one
+  the currently-running code can ignore.
+  **Additive changes ride with their code.** Add a column, a table, an index, a constraint every
+  existing row already satisfies. The old code does not know the new column exists and does not care
+  that it does. The database sitting ahead of the code is harmless; the code sitting ahead of the
+  database is an outage.
+  **Destructive changes split into two pull requests.** The first stops using the column and ships.
+  Once that is deployed and live, a second one drops it. The drop is then safe at any moment,
+  because by then nothing reads it either way. The cost is honest — two merges and a wait between
+  them instead of one — and what it buys is that there is no moment when a deploy and a migration
+  race each other.
+  `20260912213501` is the case this is written against. It dropped four columns in the same pull
+  request as the code that stopped using them: apply it early and the old code breaks, apply it late
+  and the new code breaks, and there is no safe moment in between. It went out safely only because
+  the technical director queried the live table by hand first and found the columns empty. That is
+  luck wearing the clothes of a process.
+  **The technical director applies the migration at gate time, before merging.** Not Joel, and not
+  the agent. The TD has direct database access and uses it; an agent asserting that applying needs a
+  credential nobody holds has guessed, and the guess turns into a manual step that gets forgotten.
+  **Say which shape it is in the Deployment section** — additive and applied before merge, or the
+  first half of an expand-and-contract with the drop named as the follow-up. A migration whose shape
+  is not stated is treated as destructive until someone reads the SQL.
 - **Say what it takes to deploy it, every time.** Every pull request carries a **Deployment**
   section, and so does the message in which you hand a finished branch over. Four things: what
   happens by itself when this merges, what a human has to do and in what order, how to verify it is
@@ -301,7 +336,7 @@ projects renamed.
 | `editor.techpaddock.io` | Message Editor | `tp-message-editor` | live |
 | `tracker.techpaddock.io` | Pipeline Tracker | `tp-tracker` | live |
 | `resume.techpaddock.io` | Resume Formatter | `tp-resume` | live |
-| `coffee.techpaddock.io` | Coffee | `tp-coffee-app` | built, not yet deployed |
+| `coffee.techpaddock.io` | Coffee | `tp-coffee-app` | live |
 
 ---
 
