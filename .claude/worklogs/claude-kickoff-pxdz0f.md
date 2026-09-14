@@ -504,3 +504,38 @@ Landed on the branch, no pull request: per-app build scoping in `ci.yml`.
 Open: this branch is finished and awaiting Joel's decision to have a pull request opened. The Vercel
 half is a deployment step for him, not code.
 Need from TD: nothing, this is the TD.
+
+## 2026-09-14 22:45 — pull request opened, on Joel's ask
+
+Joel: "merge your pr". Opened #57 from `403531d` and recorded the request in the body, per the rule
+that landed in #55 — the first pull request opened under it.
+
+Gate check on my own work, run the same way I would run it on anyone else's:
+
+- **CI green on `403531d`** — all five matrix jobs, run 129, and all five genuinely built, because
+  the commit touches `.github/workflows` which is in scope for every app. The change does not exempt
+  itself from its own rule, which is the case worth checking.
+- **Handoffs.** Mine was stale in two places and both are fixed here rather than left for the next
+  session. It still described #43 as open and sent back; #43 merged on 09-12 and #54 deleted the
+  worklog it orphaned. And the thing this change makes newly true needed writing down: **a green
+  `build (app)` no longer means that app was built.** A handoff that let the next TD read a skipped
+  job as proof of a compile is precisely the confidently-wrong document this project keeps paying
+  for.
+- **Deployment section** — written, and it is not "nothing". The GitHub half is complete on merge;
+  the Vercel half is a per-project Ignored Build Step, offered as a command to try on one project
+  first, with the reason `vercel.json` is the better home and still not the right first move.
+- **Merge order** — #56 was open and mergeable. It is not mine to merge and Joel did not ask for it,
+  so it stays. Checked both directions anyway: no shared file, and a merged workflow change does not
+  re-run an open pull request's checks, so #57 cannot turn #56 red.
+
+One thing I am not claiming. **The skip path has still never run in CI.** Every commit on this branch
+touches the workflow directory, so every job built. It was simulated against four real merges and it
+matched, but simulation is not execution and the body says so. The failure mode is a red job, not a
+false green.
+
+## 2026-09-14 22:45 — handoff
+
+Landed: #57 — per-app build scoping in `ci.yml`, the handoff correction, and the ledger entry.
+Open: the Vercel half, which is Joel's dashboard step, not code. #56 sits gated-but-unmerged until
+he asks.
+Need from TD: nothing, this is the TD.

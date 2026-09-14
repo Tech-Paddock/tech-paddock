@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-12 22:30 UTC.**
+**Last reviewed: 2026-09-14 22:45 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -71,6 +71,37 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
+
+- **2026-09-14 — GitHub Actions stops rebuilding all five apps on every push: #57.** Joel: "lets only
+  push the apps we are updating if possible." Each matrix job now compares its own folder against the
+  merge base with `main` and exits early when nothing under `apps/<app>`, `.github/workflows` or
+  `supabase` changed.
+  **The implementation is deliberately not the obvious one, and the reason matters more than the
+  change.** A workflow-level `paths:` filter skips jobs, and a skipped job never reports a status —
+  so a required check is never satisfied and the pull request can never merge. That is the same shape
+  as the `Promotion / approval-recorded` name nearly added to branch protection, where a required
+  check matching nothing would have blocked every merge in the repo. Every job therefore still runs
+  and still reports; the early exit is inside it.
+  **The consequence to carry: a green `build (app)` no longer means that app was built.** Read the
+  log, where a skipped job says `Nothing to do`. Pushes to `main` still build everything.
+  Scope is complete only while there is no root `package.json` and no `packages/shared`. **Adding a
+  shared package means adding it to that list in the same pull request**, or an app silently stops
+  being built when its own dependency changes.
+  The skip path has not executed in CI yet — every commit on the branch touched `.github/workflows`,
+  which is in scope for all five. It was simulated against #48, #43, #47 and #53 and matched each
+  time. A wrong step turns a job red rather than green, so the untested case fails loudly.
+
+- **2026-09-14 — Merge order: #57 before #56, and why it did not matter much.** Two changes were
+  mergeable. **#56 (Resume: template archive, delete, download plus three renderer bugs) was not
+  gated and was not merged** — Joel asked for #57 only, and a pull request is merged because he asks.
+  The check ran anyway, because order is a decision even when it looks free: #57 touches
+  `.github/workflows/ci.yml` and nothing else; #56 touches `apps/resume`, `supabase` and its own
+  charter. No shared file, so no conflict in either direction. #57 cannot turn #56 red — CI re-runs
+  on push and on pull-request *open*, so a merged workflow change does not re-evaluate an open pull
+  request, and #56's `requested-by-joel` result is already recorded. Nothing in #56's body is
+  invalidated either: it states that every Vercel project still rebuilds, which #57 does not change.
+  **When #56 is gated, its migration is the thing to get right** — `archived_at` must exist before
+  its code is live or the Templates tab returns 500.
 
 - **2026-09-12 — Coffee's brew log is merged and live: #51, #52, #53, in that order.** Joel asked for
   the Coffee app to be merged. The order was forced — they were a stack, each based on the one before.
@@ -249,6 +280,11 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 ## Known, deliberately not fixed
 
 - **2026-09-12 — Every push still rebuilds every Vercel project, including `tp-coffee-app`.**
+  **Still true after #57, which fixed the GitHub Actions half only.** The remaining fix is an Ignored
+  Build Step — `git diff --quiet HEAD^ HEAD -- . ../../supabase`, set per project in Settings → Git,
+  run from each project's Root Directory. **That is a different mechanism from the toggle described
+  below, which is the one that failed here**, so its failure is not evidence against the command.
+  Untested by any agent; try it on `tp-coffee-app` alone before the other four.
   `tp-coffee-app` has *Skip deployments when there are no changes to the root directory or its
   dependencies* **enabled**, and it still rebuilt twice from #35 — a commit touching only `.claude/`,
   nothing under `apps/coffee`. **So the toggle does not behave as its label suggests, at least not
