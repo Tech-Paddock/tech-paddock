@@ -463,3 +463,44 @@ Open: this branch still has no pull request and is waiting on Joel to ask for on
 list — deleting the abandoned `claude/coffee-rework-the-bag-form`, and the domain map still calling
 Coffee "built, not yet deployed".
 Need from TD: nothing, this is the TD.
+
+---
+
+## 2026-09-14 — build only the apps a change actually touches
+
+Joel: "lets only push the apps we are updating if possible." Every push was building all five
+apps — confirmed against the Actions API, where a commit touching only `CLAUDE.md`, the TD charter,
+the ledger and a worklog still ran `build (home)`, `(editor)`, `(resume)`, `(tracker)` and `(coffee)`.
+
+**The obvious implementation is the wrong one, and it would have been expensive to discover.** A
+workflow-level `paths:` filter *skips* jobs, and a skipped job never reports a status at all.
+Branch protection requires these checks by name, so an unsatisfied required check means the pull
+request can never merge. Slow builds traded for permanently stuck merges — the same shape as the
+`Promotion / approval-recorded` name I nearly handed Joel, where a required check matching nothing
+would have blocked the whole repo.
+
+So every job still runs and still reports. The scoping happens *inside* the job: a first step
+compares the app's folder against the merge base with `main` and sets an output, and every
+subsequent step is gated on it. Nothing to build means a green tick in seconds instead of a minute.
+
+Scope is the app's own folder plus `.github/workflows` and `supabase` — the workflow can change how
+every app is built, and a migration can break any app that reads the schema. **Pushes to `main`
+always build everything**, because a merge commit can break an app whose folder it never touched,
+and `main` is what production deploys from.
+
+Simulated against four real merges before committing: #48 (coffee only) builds coffee alone, #43
+(hub only) builds home alone, #47 (documentation) builds nothing, and #53 (coffee plus a migration)
+correctly builds all five.
+
+**The Vercel half is deliberately not in this commit.** Vercel's ignore rule can live in
+`vercel.json` as `ignoreCommand`, which would be version-controlled and visible in a diff — much
+better than a dashboard setting, and it fits this project's objection to config that leaves no
+trace. But an unrecognised key in `vercel.json` can fail the build outright, and doing that to all
+five projects at once is how the last deploy outage felt. It is offered as a dashboard command Joel
+can paste, with the `vercel.json` version worth trying on one app first.
+
+## 2026-09-14 — handoff
+Landed on the branch, no pull request: per-app build scoping in `ci.yml`.
+Open: this branch is finished and awaiting Joel's decision to have a pull request opened. The Vercel
+half is a deployment step for him, not code.
+Need from TD: nothing, this is the TD.
