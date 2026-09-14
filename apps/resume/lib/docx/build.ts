@@ -131,7 +131,7 @@ function renderSection(section: Section, spec: TemplateSpec): (Paragraph | Table
       return section.entries.flatMap((e) => renderEntry(e, spec));
     case "highlights":
       return spec.highlightsStyle === "table"
-        ? [highlightsTable(section.items)]
+        ? [highlightsTable(section.items, spec)]
         : section.items.map((h) => bullet(h.metric ? `${h.metric}: ${h.description}` : h.description));
   }
 }
@@ -154,33 +154,65 @@ function renderEntry(entry: Entry, spec: TemplateSpec): Paragraph[] {
   ];
 }
 
-/** Flat rows, two columns, no merged cells, no nesting — the one permitted table. */
-function highlightsTable(items: Highlight[]): Table {
+/**
+ * The one permitted table. Flat, no merged cells, no nesting, either way round.
+ *
+ * "columns" gives each highlight its own cell with the metric stacked above its
+ * description, which is how Joel's template draws it. "rows" gives a row per
+ * highlight, metric beside description. The template decides; this only obeys.
+ */
+function highlightsTable(items: Highlight[], spec: TemplateSpec): Table {
+  const metric = (h: Highlight) =>
+    new Paragraph({ children: [new TextRun({ text: h.metric, bold: true })] });
+  const description = (h: Highlight) => new Paragraph({ children: [new TextRun(h.description)] });
+
+  if (spec.highlightsLayout === "columns" && items.length > 0) {
+    // Integer division leaves up to items.length-1 twips on the table's width.
+    // That is under a thousandth of an inch and, more to the point, the same
+    // every time — a width computed with rounding would not be.
+    const width = Math.floor(CONTENT_WIDTH_TWIPS / items.length);
+    return new Table({
+      columnWidths: items.map(() => width),
+      borders: NO_BORDERS,
+      rows: [
+        new TableRow({
+          children: items.map(
+            (h) =>
+              new TableCell({
+                width: { size: width, type: WidthType.DXA },
+                children: [metric(h), description(h)],
+              })
+          ),
+        }),
+      ],
+    });
+  }
+
   const metricWidth = 2200;
   return new Table({
     columnWidths: [metricWidth, CONTENT_WIDTH_TWIPS - metricWidth],
-    borders: {
-      top: { style: BorderStyle.NONE, size: 0, color: "auto" },
-      bottom: { style: BorderStyle.NONE, size: 0, color: "auto" },
-      left: { style: BorderStyle.NONE, size: 0, color: "auto" },
-      right: { style: BorderStyle.NONE, size: 0, color: "auto" },
-      insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "auto" },
-      insideVertical: { style: BorderStyle.NONE, size: 0, color: "auto" },
-    },
+    borders: NO_BORDERS,
     rows: items.map(
       (h) =>
         new TableRow({
           children: [
-            new TableCell({
-              width: { size: metricWidth, type: WidthType.DXA },
-              children: [new Paragraph({ children: [new TextRun({ text: h.metric, bold: true })] })],
-            }),
+            new TableCell({ width: { size: metricWidth, type: WidthType.DXA }, children: [metric(h)] }),
             new TableCell({
               width: { size: CONTENT_WIDTH_TWIPS - metricWidth, type: WidthType.DXA },
-              children: [new Paragraph({ children: [new TextRun(h.description)] })],
+              children: [description(h)],
             }),
           ],
         })
     ),
   });
 }
+
+const NONE = { style: BorderStyle.NONE, size: 0, color: "auto" } as const;
+const NO_BORDERS = {
+  top: NONE,
+  bottom: NONE,
+  left: NONE,
+  right: NONE,
+  insideHorizontal: NONE,
+  insideVertical: NONE,
+};

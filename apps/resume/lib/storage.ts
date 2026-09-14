@@ -24,6 +24,15 @@ export async function downloadDocx(path: string): Promise<Buffer> {
   return Buffer.from(await data.arrayBuffer());
 }
 
+/** Remove a stored object. Used only when deleting a template that no render
+ *  references — the row goes first, so a failure here leaves an orphaned object
+ *  rather than a row pointing at bytes that are gone. An orphan costs storage; a
+ *  dangling row breaks the download. */
+export async function removeDocx(path: string): Promise<void> {
+  const { error } = await getServiceClient().storage.from(BUCKET).remove([path]);
+  if (error) throw new StorageError(`Couldn't remove ${path}: ${error.message}`);
+}
+
 export class StorageError extends Error {
   constructor(message: string) {
     super(message);
