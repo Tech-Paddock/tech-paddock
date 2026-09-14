@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-12 18:40 UTC.**
+**Last reviewed: 2026-09-12 22:30 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -19,7 +19,14 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
-1. **2026-09-12 — Verify `SESSION_SECRET` parity. Rotated again at 01:39, live only after this
+1. **2026-09-12 — Two tidy-ups only you can do.** `claude/coffee-rework-the-bag-form` is abandoned:
+   5 ahead, 10 behind, and its commits are the earlier monolithic version of work that landed properly
+   as #51-#53, plus one that already merged as #48. Nothing on it is wanted. **Deleting a branch by
+   hand is a GitHub UI job** — the git proxy refuses `--delete` — so it needs your click.
+   And `CLAUDE.md`'s domain map still lists `coffee.techpaddock.io` as **"built, not yet deployed"**.
+   It has been live and green for a day, and is now serving the brew log. That is a brief change, so
+   it is yours; say the word and I will correct the row.
+2. **2026-09-12 — Verify `SESSION_SECRET` parity. Rotated again at 01:39, live only after this
    push.** Rotating is the right move rather than churn: the existing values cannot be read back out
    of the dashboard, so parity cannot be confirmed by inspection — setting one fresh known value on
    all five is the only way to guarantee it.
@@ -33,7 +40,7 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    Once deployed: log in at `techpaddock.io`, then open a tool from a hub tile, on desktop and on
    mobile. A loop on both points at the secret; a loop on mobile only points at the iframe, which is
    the separate known bug. No agent can read the values — this one is Joel's eyes only.
-2. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
+3. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
    `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
    will tell you they are doing nothing. Needs a one-time Azure registration against a personal
    Microsoft account — the `consumers` authority, scopes `offline_access Calendars.Read
@@ -46,46 +53,85 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
    the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
    endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
    first, or in the same save. Never after.**
-3. **2026-09-11 — Add `build (coffee)` to branch protection's required checks.** The matrix is five
-   jobs; the rule names four.
-4. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
+4. **2026-09-11 — Add `build (coffee)` and `requested-by-joel` to branch protection's
+   required checks.** The matrix is five jobs and the rule names four — confirmed today the hard way,
+   when #48's merge was refused with "4 of 4 required status checks are expected", so `build (coffee)`
+   is currently protecting nothing.
+   `requested-by-joel` is new in the same change as this note — the job in
+   `.github/workflows/pr-requested.yml`. It fails a pull request whose body does not record that you
+   asked for it, but **a failing check only blocks a merge if it is required** — until you add it, it
+   is a red X the technical director reads rather than a gate.
+   **Add it by the exact name `requested-by-joel`.** That is the job name, which is the context
+   GitHub reports. The workflow is called "Pull request", so `Pull request / requested-by-joel` is
+   the plausible guess and it is wrong — a required check whose name matches nothing is never
+   satisfied, which would block every merge in the repo until it was removed again. This was verified
+   for the previous version of this check against a live run; verify it again on the first pull
+   request that carries it before requiring it.
+5. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
    agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
    is deliberate. Do not repair it — a hook blocks the command.
 ## Done since this ledger was last written
 
-- **2026-09-12 — The `tuning` Vercel project is gone. Joel deleted it; verified against the account,
-  not taken on report.** Five projects remain — `tp-home`, `tp-message-editor`, `tp-tracker`,
-  `tp-resume`, `tp-coffee-app` — and every one still reads `link.org: "Tech-Paddock"`, so the
-  re-linking that closed the deploy outage is holding.
-  Worth keeping for the next time one appears: it was created 18:02, carried a READY production
-  deployment, and **was never publicly reachable** — Vercel SSO covered all three `*.vercel.app`
-  domains and no custom domain was attached, so it answered a redirect to `sso-api` and
-  `x-robots-tag: noindex`. That is the check to run first, because the incident this project already
-  has on record is a Vercel project pointed at the repo root serving an unprotected page. Contained
-  is not the same as authorized, which is why it went to Joel rather than being noted and dropped.
+- **2026-09-12 — Coffee's brew log is merged and live: #51, #52, #53, in that order.** Joel asked for
+  the Coffee app to be merged. The order was forced — they were a stack, each based on the one before.
+  A bag is now a purchase plus what the roaster published; every variable thing is a brew, so dialling
+  in is a sequence you can compare rather than one value overwritten. `coffee.brews` carries the
+  dial-in and the measurements, with `extraction_yield` **generated** rather than stored as an input,
+  so it cannot drift from the numbers it describes.
+  **The migration dropped four columns, and the claim that it was safe was verified before merging
+  rather than taken on the note.** Three bags, one `my_method` of `'other'`, every other dial-in column
+  entirely null — so the loss is one meaningless value. Also confirmed no code anywhere still
+  references them. Applied **as the merge landed**, per the agent's own deployment note: earlier would
+  have left the deployed app unable to save a scan, because the running code still read those columns.
+  Verified after applying: 3 bags intact, `coffee.brews` present with **RLS on and zero policies**,
+  `purchased_date` added, no dropped column remaining, `extraction_yield` reported as `ALWAYS`
+  generated. Then the arithmetic itself, which no unit test can reach — a test row with dose 15g,
+  beverage 250g, TDS 1.35% computed 22.50, matching `250 × 1.35 ÷ 15`. `tp-coffee-app` is green in
+  production on `872f3aa`.
+  **One mistake caught by checking rather than assuming:** the test row was inserted and deleted in a
+  single statement, and the delete could not see the insert in its own snapshot, so it survived while
+  the same query reported zero. A fresh query found it and it was removed properly. Counts read inside
+  the statement that wrote them prove nothing.
+- **2026-09-12 — New lesson, now in the brief and the charter: a squash merge conflicts the rest of
+  its own stack.** Squashing #51 rewrote it as a commit git could not match to what #52 was built on,
+  so #52 conflicted, then #53 conflicted in three files including two of app code — none of it a real
+  disagreement. The test that settles it: compare the base branch's copy of each conflicted file with
+  what the stacked branch already inherited. On #53 all three were byte-identical, making the branch
+  side lossless as a fact. Where they differ it is a genuine conflict in another agent's logic and is
+  not the TD's to resolve.
 
-- **2026-09-12 — `middleware.ts` is three versions, not five copies, and the brief now says so.**
-  Joel's call, delegated. The rule was always right; the reason printed under it was false, and a
-  rule defended by a wrong fact is one somebody talks themselves past — TechPad Gen checked, found
-  three, and correctly reported the brief as wrong.
-  Re-verified by checksum before writing: `lib/auth.ts` and `lib/password.ts` **are** identical
-  across all five. `middleware.ts` is three — `home`/`resume`/`coffee` share one, `editor` adds a
-  scoped `/api/draft` bypass, `tracker` adds `/api/summary` plus an outright `/api/cron/*` wave-
-  through.
-  **The correction also names the real danger, which the old wording hid.** `middleware.ts` is not
-  gated because the copies match; it is gated because it *is* the password gate. A bad edit there
-  publishes an endpoint rather than breaking a login — and tracker already shows the shape, since
-  `/api/cron/*` skips the gate and the route's own `if (secret && …)` fails **open** without
-  `CRON_SECRET`. That trap was already on this ledger and the rule protecting it described the
-  wrong hazard.
-  Corrected in eleven places: `CLAUDE.md` twice — including a line I wrote myself an hour earlier in
-  the Chrome note, which repeated the error I was about to correct — the TD charter, and the
-  `RULES.md` and `KICKOFF.md` of all five app agents. **Every prohibition is unchanged**; only the
-  justification moved. `message-editor` and `tracker` were the clearest proof it was wrong: each
-  named its own carve-out and then called the file byte-identical in the next sentence.
-  **One left for its owner.** `.claude/agents/coffee/HANDOFF.md` still says it. Handoffs are not the
-  TD's to rewrite, so Coffee corrects that next time it touches the file.
+- **2026-09-12 — Merge order is now a gate check, and it had a live case the hour it was written.**
+  Joel's addition. When more than one change is mergeable the order is a decision even if nobody makes
+  it, and the default — whichever got gated first — is the one with no reasoning behind it. Four
+  failure modes, each with a case this project already produced: a rule change invalidating pull
+  requests already open, two branches on one file, a correction others are waiting on, and a merge that
+  turns another pull request red.
+  **The live case: #43 and the `requested-by-joel` rule.** #43 was opened before that rule existed and
+  its body carries no request line, so merging the rule first turns an in-flight pull request red for a
+  rule that did not exist when it was written — which reads as the author's mistake. **So #43 merges
+  first.** Recorded here rather than only decided, which is the point of the check.
 
+- **2026-09-12 — Agents commit and push. A pull request exists only when Joel asks for one.**
+  His call, arrived at over three passes in one evening: first every pull request as a draft, then no
+  agent promoting its own, then this — which replaces both. **The checkpoint moved earlier.** Rather
+  than a pull request that exists but cannot move, there is no pull request at all until he asks, and
+  asking is how he approves. No drafts, no promotion step, nothing to click.
+  When he asks, the agent opens it normally and records the request in the body:
+  `Requested by Joel on YYYY-MM-DD — "what he said"`. `requested-by-joel` fails a pull request whose
+  body lacks that line.
+  **Two things had to change with it or the rule would have quietly broken something.**
+  `ci.yml` ran on `pull_request` and on pushes to `main` only — every CI run in the session that
+  produced this rule was `event=pull_request`, checked — so with no pull request there would have
+  been **no build and no tests** until the moment Joel was asked to approve. It now runs on every
+  branch push, so a pushed branch is fully tested before he ever sees it. And the two hooks that
+  refused non-draft pull requests were removed: they would have blocked the pull request he does ask
+  for.
+  **Enforcement dropped from four mechanisms to three, and that is the price of the simpler rule.**
+  Nothing mechanical can tell an asked-for pull request from an unasked-for one, because every agent
+  acts as the same GitHub account. "Do not open one until Joel asks" rests on honesty. It is written
+  in the brief as the most important convention there for that reason.
+  **#50 closed as superseded** — it implemented the design this replaced. Its branch carries this work
+  instead.
 - **2026-09-12 — `CLAUDE.md` now says Chrome is the default and Safari is a utility.** Joel asked
   for a browser note, then amended it the same hour once the consequence surfaced: **Chrome is the
   default, on desktop and phone; Safari is a utility browser, used only where Chrome cannot do the

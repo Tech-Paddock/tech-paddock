@@ -111,6 +111,43 @@ between configuring something that exists and creating, destroying, or re-pointi
   ships untested and nothing tells you.
 - Keep your worklog current. It carries what a commit cannot: what you are doing right now, what
   you are blocked on, what you decided that affects someone else, what you need from the TD.
+- **Commit and push your work. Do not open a pull request until Joel asks for one.** This binds
+  every agent, the technical director included. Work on your branch, commit as you go, push it, and
+  when it is finished say so — in your worklog and to Joel — then stop. **A finished branch is the
+  deliverable.** Opening a pull request is Joel's decision, and asking for one is how he makes it.
+  CI runs on every branch push, so a pushed branch is fully built and tested before he is ever asked.
+  Nothing is unverified while it waits, and nothing is live either: a branch affects no deployed app.
+  **When he asks, open it normally — not as a draft — and record the request in the body.** One line:
+
+  ```
+  Requested by Joel on YYYY-MM-DD — "what he said"
+  ```
+
+  The note is not for Joel's benefit and it is not ceremony. **No other agent can see the
+  conversation where he asked**, so a pull request is otherwise indistinguishable from one an agent
+  opened on its own initiative. The repo is the only channel between agents, which means the request
+  lands in the repo or it did not happen.
+  **What is enforced, and what is not.** `requested-by-joel` fails any pull request whose body
+  carries no such line, and that runs server-side whether or not anyone means to comply. What no
+  check can see is whether the quote is real — every agent acts as the same GitHub account, so
+  authorship proves nothing, and nothing mechanical can tell an unasked-for pull request from an
+  asked-for one. **So this rule rests further on honesty than the ones around it**, which is the
+  price of it being this simple. Do not open one on your own judgement, however obviously ready the
+  work looks.
+- **Say what it takes to deploy it, every time.** Every pull request carries a **Deployment**
+  section, and so does the message in which you hand a finished branch over. Four things: what
+  happens by itself when this merges, what a human has to do and in what order, how to verify it is
+  genuinely live, and what breaks if the steps are skipped.
+  **"Nothing — it deploys itself on merge" is a valid answer and must be written down.** A blank
+  section is indistinguishable from a forgotten one.
+  This exists because merging and deploying are different events, and every serious incident here
+  lives in the gap between them: six migrations that existed only in the database, environment
+  variables set in a dashboard that never reached a running deployment because Vercel bakes them in
+  at build time, a schema needing a dashboard setting that appears nowhere in this repo, and a
+  rotated `SESSION_SECRET` that was silently not live until a redeploy. In each case the code was
+  correct and merged, and the change was not real.
+  So name the dashboard click, the environment variable, the migration, the required check, the
+  redeploy. If it cannot be verified from the repo, say who has to look and where.
 - **Update your `HANDOFF.md` when you open a pull request, and again whenever you change what that
   pull request does.** The two files are not the same job. The worklog is what you are doing right
   now and it dies with its branch; the handoff is what the next session in your area inherits and
@@ -128,6 +165,30 @@ between configuring something that exists and creating, destroying, or re-pointi
   while its handoff still describes the old one hands the next session a document that is
   confidently wrong — which is the single failure this project has paid for most often. A stale
   handoff sends the change back; it does not get fixed by the TD on the way past.
+- **The request recorded, and the deployment steps stated.** A pull request exists because Joel asked
+  for one, so its body says so. If nothing records the request, `requested-by-joel` is already red:
+  ask him rather than merging, because the alternative is a pull request nobody asked for going live.
+  Check the **Deployment** section is filled in too. Merging is not deploying, and a change that
+  merges green and never becomes real is the most repeated failure in this project's history.
+- **Decide the order when more than one change is mergeable, before merging any of them.** Order is
+  a decision even when nobody makes it, and the one nobody makes is usually wrong. Say what the order
+  is and why, in the ledger.
+  **Squash merge plus a stack of pull requests is the sharpest case, and it is not obvious.** Merging
+  the base of a stack rewrites that change into one new commit, whose identity git cannot match to
+  the original the next branch is built on — so the next pull request conflicts in every file the
+  first one touched, with no real disagreement in any of them. Before resolving one of those, compare
+  the base branch's copy of each conflicted file against what the stacked branch already inherited: if
+  they are identical, taking the branch side is lossless as a matter of fact rather than judgement,
+  and worth saying so. If they are not, it is a real conflict and belongs to its author.
+  Four more ways it bites. **A rule or format change invalidates pull requests already open** — merge it
+  after them, or grandfather them explicitly, because landing it first makes finished work fail a
+  check for a rule that did not exist when it was written. **Two branches touching one file** — the
+  second to merge pays the conflict, so let it fall on the branch still being worked rather than the
+  one that is done. **A correction others are waiting on goes first**, so they inherit it instead of
+  each rediscovering it. And **a merge that turns another open pull request red** is said out loud
+  before, not explained after.
+  After each merge the rest are behind. Re-check them; do not merge a second change on a gate result
+  taken before the first.
 - **Squash merge, always.** One commit on `main` per change.
 - **CI green before merge** — all five matrix jobs, on the current head. A red build does not get
   merged on the assumption that the failure is unrelated. Establish that it is, or fix it.
@@ -253,6 +314,12 @@ committing names, and sixteen merge commits from a single reused branch — fift
 several merged within ten seconds of opening, far too fast for CI to have reported. The gate
 existed and was walked straight through.
 
-Until `main` is protected in the GitHub UI, every rule here is convention rather than enforcement.
-The `.claude/settings.json` hooks are the only part that does not depend on an agent choosing to
-comply.
+Most rules here are convention: they hold because an agent chooses to comply. Three things do not,
+and it is worth knowing which. `main` is protected in the GitHub UI. The `.claude/settings.json`
+hooks run whether or not anyone wants them to — they refuse a push to `main` and a
+`supabase migration repair`. And `requested-by-joel` fails a pull request whose body does not record
+who asked for it.
+Notably **"do not open a pull request until Joel asks" is not one of them.** Nothing mechanical can
+tell an asked-for pull request from an unasked-for one, because every agent acts as the same GitHub
+account. That rule holds on honesty, and it is the most important convention here for exactly that
+reason.

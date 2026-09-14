@@ -1,0 +1,52 @@
+name: Pull request
+
+# Agents commit and push. A pull request exists only because Joel asked for one,
+# and no other agent can see the conversation where he did — so the request is
+# recorded in the pull request body or it did not happen as far as the repo is
+# concerned.
+#
+# This check reads that line. What it cannot do is tell whether the quote is
+# real: every agent acts as the same GitHub account, so authorship proves
+# nothing, and nothing mechanical distinguishes an unasked-for pull request from
+# an asked-for one. It catches the line somebody forgot, not one they invented.
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  requested-by-joel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+
+            // One line, anywhere in the body:
+            //   Requested by Joel on 2026-09-12 — "what he said"
+            const NOTE = /^\s*Requested by Joel on \d{4}-\d{2}-\d{2}\s*[—–-]\s*".+"/m;
+
+            if (NOTE.test(body)) {
+              core.info('Request recorded in the pull request body.');
+              return;
+            }
+
+            core.setFailed(
+              [
+                'This pull request does not record who asked for it.',
+                '',
+                'Agents here commit and push; a pull request is opened only when Joel asks',
+                'for one. No other agent can see that conversation, so the request is',
+                'recorded here or it did not happen as far as the repo is concerned.',
+                '',
+                'Add one line to the pull request body, and this check passes:',
+                '',
+                '  Requested by Joel on YYYY-MM-DD — "what he said"',
+                '',
+                'If nobody asked for this pull request, close it and leave the branch pushed.',
+              ].join('\n'),
+            );
