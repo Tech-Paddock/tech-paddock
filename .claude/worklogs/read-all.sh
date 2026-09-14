@@ -18,6 +18,29 @@ echo " OPEN ITEMS — technical director"
 echo "================================================================"
 cat .claude/worklogs/_open-items.md 2>/dev/null || echo "(no ledger found)"
 
+# Every pull request is now a draft until Joel approves it, so a ledger update
+# can sit unmerged for a while. Worklogs survive that — they are read from the
+# branch they live on, below. The ledger was not: it is read from the working
+# tree, which on a fresh session is main, so anything pending was invisible
+# exactly when it mattered most. Show what is waiting rather than hiding it.
+for ref in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -v 'origin/HEAD'); do
+  branch="${ref#origin/}"
+  [ "$branch" = "main" ] && continue
+  git merge-base --is-ancestor "$ref" origin/main 2>/dev/null && continue
+  # Diff from the merge base, not from main. A branch that is merely behind
+  # main differs from it in the ledger too, and diffing against main presents
+  # that staleness as pending work — which would make this warning itself the
+  # confidently-wrong document it exists to prevent.
+  base=$(git merge-base origin/main "$ref" 2>/dev/null) || continue
+  pending=$(git diff "$base".."$ref" -- .claude/worklogs/_open-items.md 2>/dev/null)
+  [ -z "$pending" ] && continue
+  echo
+  echo "  !! LEDGER CHANGES PENDING ON $branch — not yet on main"
+  echo "  !! A draft pull request is probably waiting on Joel. Read this before"
+  echo "  !! trusting the ledger above to be current."
+  echo "$pending" | grep -E '^[-+]' | grep -vE '^[-+]{3}' | sed 's/^/  /'
+done
+
 echo
 echo "================================================================"
 echo " AGENT WORKLOGS"

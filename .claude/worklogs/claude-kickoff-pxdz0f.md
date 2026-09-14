@@ -209,3 +209,257 @@ Landed: ledger item closed, Waiting-on-Joel renumbered to four.
 Open: #43 with TechPad Gen, and a new Coffee branch `claude/coffee-surface-library-errors` with no PR
 yet. Nothing waiting on me.
 Need from TD: nothing, this is the TD.
+
+---
+
+## 2026-09-12 20:15 — claim: every pull request opens as a draft
+
+Joel's change. I asked two questions first rather than assuming, because both readings led to
+materially different rules: whether it binds the TD as well, and who performs the promotion. Answers:
+everyone including me, and the agent says it is ready, Joel approves in chat, then it is promoted.
+
+**The second answer has a consequence he did not have to spell out, and I built it in.** Agents cannot
+see each other, and they cannot see Joel's chat. So a pull request that is merely out of draft carries
+no evidence of approval — the next TD session cannot tell an approved promotion from an agent that
+promoted itself. The rule therefore requires the approval be recorded on the pull request, quoting it.
+This follows from something already in the brief: the repo is the only channel. An approval that lives
+only in a conversation did not happen.
+
+**Checked before writing, not assumed:** `ci.yml` triggers on bare `pull_request:` with no `types:`
+filter and nothing anywhere keys on draft state, so drafts get all five matrix jobs. And GitHub's
+merge API refuses a draft outright. That makes this the first rule in `CLAUDE.md` with actual
+enforcement behind it rather than an agent's compliance — the file's closing line says the hooks were
+the only such part, and that is now one item out of date in the right direction.
+
+**This pull request is a draft**, which is the rule applying to itself on the first opportunity, the
+way #41 did. I will not promote it. #43 I converted *to* draft — the safe direction, and not the
+promoting-for-someone-else the rule forbids.
+
+## 2026-09-12 20:15 — handoff
+Landed (pending approval): the draft rule in `CLAUDE.md` Always and Merging, and as the first
+first-order check in the TD charter.
+Open: this PR awaiting Joel's promotion. #43 now a draft with TechPad Gen.
+Need from TD: nothing, this is the TD.
+
+## 2026-09-12 20:45 — fill the enforcement gap, and let agents promote their own
+
+Joel: "Fill the gap. Write it so that they can promote their own." Those go together — self-promotion
+is only safe if the record is checked by something other than an agent's good intentions.
+
+**The gap, precisely.** GitHub refuses to merge a draft, which is real enforcement. Nothing stopped an
+agent promoting its own pull request and asserting an approval that never happened. The note I had
+already required was convention, in the same class as everything else here.
+
+**The fill is a check, not a prohibition.** `.github/workflows/promotion.yml` reads the pull request on
+promotion and fails it if no comment carries
+`Approved by Joel on YYYY-MM-DD — "what he said"`. Server-side, so it does not depend on compliance.
+
+Built and tested rather than written and hoped:
+
+- YAML parses; the `on:` key becomes boolean `True`, which is the usual gotcha and is what `ci.yml`
+  already does, so it is fine.
+- The inline script is valid as `github-script` wraps it — `node --check` rejects it bare because of
+  top-level `await`, which is a property of the checker, not the script.
+- The regex was run against eight cases: em dash, en dash and hyphen all pass, a note buried
+  mid-comment passes, and missing date, missing quote, empty quote and plain prose all fail.
+- The four logic paths were dry-run against fake payloads: draft passes, promoted-without-note fails,
+  promoted-with-note passes, comment-on-a-plain-issue is ignored.
+- `issue_comment` is a trigger so a note posted after promotion heals the check instead of leaving it
+  stuck red.
+
+**Its one honest limit, written into the file and the rule rather than buried.** Every agent comments
+as the same GitHub account, so authorship proves nothing. The check catches an approval somebody forgot
+to get, never one they invented. I did not pretend otherwise, and there is no machinery worth building
+for the difference in a single-user project.
+
+**A consequence for Joel's list:** a failing check only blocks a merge if it is required, and branch
+protection currently names four of five. So this is a red X the TD reads until he adds it — recorded
+alongside `build (coffee)`, which today proved it is protecting nothing when #48's merge was refused
+with "4 of 4 required status checks are expected".
+
+**Also corrected the file's closing line**, which claimed the hooks were the only enforcement. That was
+true when written and is now wrong in four places rather than one.
+
+## 2026-09-12 20:45 — handoff
+Landed (pending approval): self-promotion with a mandatory note, the check that verifies it, the
+matching TD gate action of demoting rather than asking, and a corrected enforcement summary.
+Open: this PR still a draft awaiting Joel. #43 draft with TechPad Gen.
+Need from TD: nothing, this is the TD.
+
+**Correction before it could bite.** I had written the check as `Promotion / approval-recorded` in six
+places — the workflow name plus the job name, which is how some CI surfaces label a check. GitHub
+reports this one as plain `approval-recorded`, verified against the live run. Left alone, Joel would
+have added the wrong name to required checks, and a required check matching nothing is never satisfied:
+it would have blocked every merge in the repo until removed. Corrected everywhere, with the exact name
+and that warning written into the ledger item asking him to add it.
+
+**What the live run does and does not prove.** It proves the workflow is wired, runs on a draft, and
+completes green. It cannot prove the failing path, because this pull request is a draft and the draft
+branch is the only one reachable — and the Actions log API refuses this token, so I cannot read which
+branch executed. The negative cases are covered by local dry-run only: promoted-without-note fails,
+promoted-with-note passes, comment-on-a-plain-issue is ignored. **First real proof comes the first time
+someone promotes without a note**, and that is worth confirming when it happens rather than assuming.
+I did not promote anything to test it: doing that would be an agent promoting without approval on the
+day the rule forbidding it landed.
+
+## 2026-09-12 21:05 — correction: no agent promotes, and the hooks now enforce it
+
+Joel's "so that they can promote their own" was a typo for **can't**. That inverts the design, and the
+inverted one is better for a reason worth writing down: if an agent may promote, the technical director
+can promote and then merge, which collapses the checkpoint back into the single actor the rule was
+written to interrupt. Promotion has to sit with the one participant who is not an agent.
+
+So: **nobody promotes but Joel.** Not the author, not the TD. Demoting back to draft stays allowed,
+because it is the safe direction and it is the TD's defined response to a promotion that should not
+have happened.
+
+**And this is enforceable, unlike the note.** Two new `PreToolUse` hooks in `.claude/settings.json`
+following the existing deny pattern: `create_pull_request` is refused unless `draft: true`, and
+`update_pull_request` is refused when it sets `draft: false`. Hooks are the part of this repo that does
+not depend on an agent choosing to comply, which is exactly the property this rule needed and the note
+can never have.
+
+**A real bug in my first version, found by testing rather than by reading.** I wrote
+`jq -r ".tool_input.draft // \"absent\""`. jq's `//` is a null-**or-false** default, so `false` yields
+`"absent"` — and the promotion case, the single case the hook exists to block, fell straight through as
+allowed. Proven directly:
+
+    $ echo '{"tool_input":{"draft":false}}' | jq -r '.tool_input.draft // "absent"'
+    absent
+
+Replaced with `if has("draft") then (.draft|tostring) else "absent" end`, which distinguishes false
+from absent. All six cases now behave: create with draft true allowed, create with draft absent or
+false denied, update to draft false denied, update to draft true allowed, body-only edit allowed.
+
+Worth noting the shape of that mistake, because it is the same one as the read-all.sh bug earlier in
+this branch: both were guards that silently permitted the thing they existed to catch, and both looked
+correct on the page. A guard that fails open is worse than no guard, because it is also reassuring.
+
+## 2026-09-12 21:05 — handoff
+Landed (pending approval): promotion belongs to Joel alone, enforced by two hooks; the approval note
+still required and checked; demoting the only draft change an agent may make.
+Open: this PR a draft awaiting Joel — and now only he can promote it, which is the rule proving itself.
+#43 draft with TechPad Gen.
+Need from TD: nothing, this is the TD.
+
+## 2026-09-12 21:40 — supersede the draft design: no pull request until Joel asks
+
+Third pass on the same problem in one evening, and this one is better than my two. Joel: agents commit
+and push; a pull request is opened only when he asks; no drafts needed, because asking *is* the
+approval. **The checkpoint moved earlier rather than being added later**, which is why it is simpler —
+there is nothing to promote and nothing to click.
+
+**Two things had to change with it or the rule would have quietly broken something, and I checked
+rather than assumed.** Every CI run in this branch's history was `event=pull_request` — confirmed
+against the Actions API — and `ci.yml` only ran on pushes to `main`. So with no pull request there
+would have been **no build and no tests at all** until the moment Joel was asked to approve: he would
+have been greenlighting code CI had never seen. `ci.yml` now runs on every branch push. And the two
+hooks refusing non-draft pull requests had to go, or they would have blocked the pull request he does
+ask for — a guard outliving its rule and breaking the successor.
+
+**`approval-recorded` is repointed rather than deleted**, as `requested-by-joel`, reading the pull
+request *body* instead of scanning comments. That is strictly simpler: no ordering constraint, no
+self-healing comment trigger, nothing to post separately — the line goes in the body at creation.
+Seven regex cases checked, JS validated as `github-script` wraps it.
+
+**Enforcement went from four mechanisms to three, and I am not dressing that up.** Nothing mechanical
+can distinguish an asked-for pull request from an unasked-for one, because every agent acts as the same
+GitHub account. "Do not open one until Joel asks" rests entirely on honesty. I wrote that into the
+brief as the most important convention there, rather than leaving the enforcement summary overstating
+what holds.
+
+**#50 closed as superseded**, and this branch carries the replacement. That also dissolved the deadlock
+it was stuck in: it needed a promotion only Joel could perform, on a rule that no longer exists.
+
+**This change follows its own rule.** The branch is pushed and finished; I am not opening a pull request
+for it. Joel asks, or it waits.
+
+## 2026-09-12 21:40 — handoff
+Landed on the branch, no pull request opened: commit-and-push as the default, pull requests only on
+Joel's request with the request recorded in the body, `requested-by-joel` checking it, CI on every
+branch push, deployment steps required in every pull request and handover, draft machinery and its two
+hooks removed.
+Open: this branch awaiting Joel's decision to have a pull request opened. #43 with TechPad Gen — it is
+a draft, which under this rule is simply a pull request that exists; its three blockers are unchanged.
+Need from TD: nothing, this is the TD.
+
+## 2026-09-12 22:00 — merge order as a gate check, with its own live case
+
+Joel's addition, and a good one: consider merge order when several merges are on the table. Written
+with four failure modes rather than as a principle, because "consider the order" without cases is
+advice nobody acts on.
+
+**It had a live instance within the hour, which is why the rule earns its place.** #43 is now clean and
+green — TechPad Gen brought `main` in, and all five matrix jobs passed on `8cf161f`, the first time CI
+has ever run on that branch. Its body carries no `Requested by Joel` line, because it was opened days
+before that rule existed. So merging my rule branch first would turn a finished, in-flight pull request
+red for a rule that did not exist when it was written — and a retroactive failure reads as the author's
+mistake, not the rule's.
+
+**Order: #43 first, then this branch.** Recorded rather than merely decided.
+
+Checked rather than assumed that the order is otherwise free: #43 touches `apps/home` plus its own
+handoff and worklog; this branch touches `CLAUDE.md`, the TD charter, `settings.json`, two workflows,
+the ledger and this worklog. No overlap, so nothing conflicts in either direction — the ordering is
+purely about who gets failed by a rule they never saw.
+
+**TechPad Gen corrected me and is right, recorded because it should not be silent.** I had suggested
+`/admin` was the tool for deriving which commit production serves. It is not: the page names that as an
+explicit blind spot, because Vercel exposes the deployed SHA to an app but never to a sibling. The
+Vercel API answers it, which is what they used. Their handling of the original error is also better than
+what I asked for — four documents each named a different production commit, every one correct when
+written, so rather than writing a fifth they recorded **where the answer is derivable**. That is the
+right fix and I would not have specified it.
+
+## 2026-09-12 22:00 — handoff
+Landed on the branch, still no pull request: the merge-order check in `CLAUDE.md` Merging and in the TD
+charter, above the request/deployment check so it is read first.
+Open: this branch awaiting Joel's decision to have a pull request opened, and it merges **after** #43.
+#43 itself is gate-clean and awaiting his word.
+Need from TD: nothing, this is the TD.
+
+## 2026-09-12 22:30 — merge Coffee's brew log: #51, #52, #53
+
+Joel: "Merge coffee app." Three stacked pull requests, each based on the one before, so the order was
+forced rather than chosen — which is the merge-order check's easiest case and, as it turned out, its
+most instructive.
+
+**The migration was the real gate work.** It drops four columns from `coffee.bags`, and the note said
+that was safe. I verified it against the live database instead of accepting it: three bags, one
+`my_method` of `'other'`, every other dial-in column entirely null. Also grepped the final tree for
+references to the dropped columns — none. Then applied it **as the merge landed**, which is what the
+agent's own deployment section asked for, and it was right: applying earlier would have left the
+deployed app unable to save a scan, because the running code still read those columns.
+
+Verified after: 3 bags intact, `coffee.brews` present with RLS on and zero policies, `purchased_date`
+added, no dropped column remaining, `extraction_yield` reported `ALWAYS` generated. Then the arithmetic
+no unit test can reach — dose 15g, beverage 250g, TDS 1.35% computed 22.50, matching `250 × 1.35 ÷ 15`.
+
+**A mistake caught only because I re-checked.** I inserted and deleted that test row in one statement.
+The delete could not see the insert in its own snapshot, so the row survived — while the same query
+reported zero brews, because that count read the same pre-statement snapshot. A fresh query found it
+and I removed it properly. **A count read inside the statement that wrote it proves nothing**, and had
+I trusted it I would have left test data in Joel's library and reported it clean.
+
+**The new lesson, now in the brief and the charter: a squash merge conflicts the rest of its own
+stack.** Squashing #51 rewrote it as a commit git cannot match to what #52 was built on, so #52
+conflicted; then #53 conflicted in three files, two of them app code. None was a real disagreement.
+The test that settles it rather than guessing: compare the base branch's copy of each conflicted file
+against what the stacked branch already inherited. On #53 all three were byte-identical and the handoff
+was a strict superset, so taking the branch side was lossless as a fact. **Where they differ it is a
+genuine conflict in another agent's logic and is not mine to resolve** — that distinction is what keeps
+this from becoming licence to pick between two versions of somebody else's code.
+
+Also corrected a claim I made mid-gate: I reported `tsc --noEmit` clean when the command had actually
+errored and my shell test was reading the wrong exit code. The error was real but benign —
+`next-env.d.ts` had not been generated yet — and it passes after `npm run build`, which is the order
+CI uses. Worth recording because the wrong thing to do would have been to quietly re-run it and move on.
+
+## 2026-09-12 22:30 — handoff
+Landed: #51, #52 and #53 on `main` at `872f3aa`, migration applied and verified, `tp-coffee-app` green
+in production. `main` merged into this branch; the squash-stack lesson added to `CLAUDE.md` and the TD
+charter.
+Open: this branch still has no pull request and is waiting on Joel to ask for one. Two tidy-ups on his
+list — deleting the abandoned `claude/coffee-rework-the-bag-form`, and the domain map still calling
+Coffee "built, not yet deployed".
+Need from TD: nothing, this is the TD.

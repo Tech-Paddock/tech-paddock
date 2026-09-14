@@ -57,6 +57,47 @@ asks what the work makes true.
 CI green on the current head — all five matrix jobs, not a stale run from before a force-push.
 Blast radius declared. Worklog current. No personal information. No check weakened to pass.
 
+**Merge order, when more than one thing is mergeable.** Decide it before merging any of them, and
+record it. Order is a decision even when nobody makes it, and the default — whichever you happened to
+gate first — is the one with no reasoning behind it.
+
+What to look for, each with a case this project has already produced:
+
+- **A rule or format change invalidates pull requests already open.** `requested-by-joel` and #43:
+  merging the rule first would have turned an in-flight pull request red for a rule that did not exist
+  when it was opened. Merge the rule after them, or grandfather them in writing. Retroactively failing
+  somebody's finished work is the worst of the four because it looks like their mistake.
+- **Two branches on one file.** #39 and #40 both touched `bags.test.ts`; whoever merged second paid
+  the conflict. Let that fall on the branch still being worked, not the one that is finished.
+- **A squash merge conflicts the rest of its own stack.** #51, #52 and #53 were stacked, each based on
+  the one before. Squashing #51 rewrote it as a new commit git could not match to the original #52 was
+  built on, so #52 conflicted; then #53 conflicted in three files including two of app code. None of
+  it was a real disagreement.
+  **The test before resolving one of those:** compare the base branch's copy of each conflicted file
+  against what the stacked branch already inherited. On #53 all three were byte-identical, so taking
+  the branch side was lossless as a fact rather than a judgement, and the handoff was a strict
+  superset. Where they are *not* identical it is a genuine conflict in someone's app code and belongs
+  to its author — do not pick between two versions of another agent's logic.
+- **A correction others are waiting on goes first.** #47 corrected `middleware.ts` in the brief;
+  every branch opened after it inherited the truth instead of rediscovering it.
+- **A merge that turns another open pull request red.** Say so before merging, on the pull request it
+  affects. Finding out from a red check is finding out from the worst possible source.
+
+Then re-gate what is left. After a merge the others are behind, and a gate result taken before it is
+stale — #48 was clean, then needed its branch updated once #42 landed.
+
+**The request recorded, and the deployment steps stated.** Check this first, because it is the
+cheapest and it decides whether the rest of the gate applies at all. A pull request exists only
+because Joel asked for one, and its body has to say so — `requested-by-joel` is red if it does not.
+A pull request with no recorded request is not yours to merge. Ask him. It may be an agent that
+opened one on its own initiative, which is the one thing no check here can detect.
+Then read the **Deployment** section. Empty is a gate failure, and "nothing, it deploys itself" is a
+complete answer that has to be written rather than assumed. Merging is not deploying, and the gap
+between them is where this project has been hurt most often.
+**Your own work follows the same rule.** Commit, push, say the branch is finished, and stop. You do
+not open a pull request for your own work until Joel asks for one either — there is no exemption for
+the agent that enforces the gate.
+
 **Handoffs current.** Read every `HANDOFF.md` the change touches — the agent's own, and any other
 whose area the change reaches — and check each still describes what the change leaves behind. This
 is a first-order check because it is cheap and mechanical: open the file, compare it to the diff.

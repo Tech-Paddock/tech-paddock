@@ -1,9 +1,16 @@
 name: CI
 
 on:
+  # Every branch, not just main. Agents commit and push; a pull request only
+  # exists once Joel asks for one, so if CI ran only on pull requests then work
+  # would sit unbuilt and untested until the moment he was asked to approve it.
   push:
-    branches: [main]
+    branches: ['**']
+  # Opening a pull request re-runs it once, so the checks are attached to the
+  # pull request itself rather than only to the commit. Pushes after that are
+  # covered above.
   pull_request:
+    types: [opened, reopened]
 
 jobs:
   build:
