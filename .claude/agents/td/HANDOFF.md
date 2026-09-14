@@ -28,35 +28,53 @@ GitHub.** And the general form of the mistake — read the thing itself, not the
 it. Every correction tonight came from a build log, a route, or an API response contradicting a
 document that sounded authoritative.
 
-## One pull request open, sent back
+## One pull request open, not yet gated
 
-**#43 — the hub re-theme and `/admin`, from TechPad Gen.** Sent back 2026-09-12 18:35, with the
-reasoning on the pull request rather than only here. Three failures, one root cause: the branch is
-behind `main` and was never brought current.
+**#56 — template archive, delete and download, plus three renderer bugs, from Resume.** Opened
+2026-09-14 22:33, green on all five matrix jobs and on `requested-by-joel`, request line present,
+one app plus one migration. **Joel has not asked for it to be merged, so it has not been gated.**
 
-1. **Merge conflict** in `.claude/agents/techpad-gen/HANDOFF.md` — `main` changed it in #34 closing
-   the outage, the branch rewrote the same region. Test-merged in a scratch worktree: that one file
-   is the whole conflict.
-2. **CI never ran.** Not red, absent — only `Vercel Preview Comments` reported. GitHub cannot build
-   a merge ref while a pull request conflicts, so the `pull_request` workflow never got a checkout.
-   `build (home)` matters more than usual here: `apps/home/package.json` gained a `prebuild` that
-   reads above the app directory, and only the matrix job can prove it.
-3. **The handoff and the body are confidently wrong.** Both say production serves `92c1ec1`.
-   `tp-home` production is `f06ff0c`, promoted 03:57 today — verified against the Vercel account.
-   #34 corrected that text on `main`; the branch never saw it and restated the old reality as fact.
+**It carries a migration and the order is not optional.** `20260914221259_resume_template_archive.sql`
+adds `archived_at` to `resume.templates`. Every templates query selects that column, so if the code
+deploys before the migration runs, `GET /api/templates` returns 500 and takes out both the Templates
+tab and the active-template lookup Reformat depends on. Apply the migration first. The pull request
+body says this itself, which is what the Deployment rule was written to produce.
 
-**I did not fix any of it.** The conflict is inside their handoff, so resolving it would mean
-writing their handoff — which is exactly what #41 forbids. That rule's first live test was the
-pull request opened an hour after it landed, and it caught precisely what it was written for.
+It also asks for a charter amendment: `resume.templates` stops being append-only. Joel approved the
+behaviour on 2026-09-14; the charter edit is in the pull request and nobody has ratified it. That is
+a gate decision when the gate happens.
 
-The work itself is sound and its verification section is the most thorough gated so far. It goes
-back for its base, not its content.
+**#43 closed out.** The hub re-theme merged on 2026-09-12 after TechPad Gen brought the branch
+current; #54 then deleted the worklog it orphaned. The three failures recorded here — the handoff
+conflict, CI absent rather than red because GitHub cannot build a conflicted merge ref, and a body
+restating production's commit from a stale branch — are kept in the ledger as the case that proved
+the handoff rule, not as live work.
 
 **Branch deletion happens by itself now.** The note that used to live here — git proxy 403 on
 `--delete`, a GitHub UI job — is stale: the repo auto-deletes head branches on merge. #39, #40, #41
 and #42 all vanished without being asked. What the proxy still refuses is deleting a branch by hand,
 which is now rarely needed. Prune local refs after a merge or a stale `origin/<branch>` will make
 the next squash commit look unpushed.
+
+## A green `build (app)` no longer means that app was built
+
+Since #57, each matrix job first compares its own folder against the merge base with `main` and
+exits early when nothing under `apps/<app>`, `.github/workflows` or `supabase` changed. The job
+still runs and still reports success — that is the whole point, because branch protection requires
+these checks by name and a job skipped by a workflow-level `paths:` filter never reports at all,
+which would leave the required check permanently unsatisfied and the pull request permanently
+unmergeable.
+
+**So read the job, not the tick.** A green `build (tracker)` on a branch that never touched
+`apps/tracker` means "nothing to build", and its log says so in a step called `Nothing to do`.
+Pushes to `main` always build all five, because a merge commit can break an app whose folder it
+never touched and `main` is what production deploys from.
+
+**The skip path has not yet executed in CI.** Every commit on the branch that introduced it touched
+`.github/workflows`, which is in scope for all five, so all five built. The logic was simulated
+against four real merges (#48, #43, #47, #53) and matched every time, but the first genuine skip will
+happen on the next branch that touches one app. If it is wrong it fails loudly — a broken step turns
+the job red — rather than passing something untested, which is the right way round.
 
 ## Waiting on Joel
 
@@ -103,8 +121,10 @@ explanation teaches nothing. **Verify from the code.**
 
 ## Known, deliberately not fixed
 
-- **Every push rebuilds every Vercel project.** No Ignored Build Step. The change is written and
-  agreed — one line per app's `vercel.json`, in the Platform handoff — and not landed.
+- **Every push rebuilds every Vercel project.** No Ignored Build Step. Still true, and it is now the
+  *only* half that is: GitHub Actions stopped rebuilding all five in #57 (below), Vercel did not.
+  The change is written and agreed — one line per app's `vercel.json`, in the Platform handoff — and
+  not landed.
 - **DNS is uniform as of 2026-09-12.** All four subdomains are CNAMEs to
   `d1317e1174061c29.vercel-dns-017.com`; the apex stays an A record because an apex cannot be a
   CNAME. Verified resolving, and the `frame-ancestors` header survived the switch.
