@@ -23,20 +23,75 @@ jobs:
       run:
         working-directory: apps/${{ matrix.app }}
     steps:
+      # Full history: the scope check below needs a merge base with main.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Every job in the matrix still RUNS and still REPORTS, even when it has
+      # nothing to build. That is deliberate and it is the whole trick.
+      # Branch protection requires these checks by name, and a job skipped by a
+      # workflow-level `paths:` filter never reports at all — so the required
+      # check is never satisfied and the pull request can never merge. Slow
+      # builds would have been traded for stuck merges. Exiting early inside the
+      # job keeps the green tick and skips the minute of work.
+      - name: Does this app need building?
+        id: scope
+        working-directory: .
+        run: |
+          set -euo pipefail
+
+          # main is what production deploys from, so it is always built in full.
+          # A merge commit can touch one app while another was broken by the
+          # merge itself, and that is exactly when you want every app checked.
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            echo "reason=on main — building everything" >> "$GITHUB_OUTPUT"
+            echo "build=yes" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch origin main --quiet || true
+          base="$(git merge-base origin/main HEAD 2>/dev/null || true)"
+          if [ -z "$base" ]; then
+            echo "reason=no merge base with main — building to be safe" >> "$GITHUB_OUTPUT"
+            echo "build=yes" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # This app's own folder, plus the shared things that can break any app:
+          # the workflow itself, and the migration history every app reads.
+          if git diff --quiet "$base" HEAD -- \
+               "apps/${{ matrix.app }}" \
+               ".github/workflows" \
+               "supabase"; then
+            echo "reason=nothing under apps/${{ matrix.app }}, .github/workflows or supabase changed" >> "$GITHUB_OUTPUT"
+            echo "build=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "reason=changed since ${base}" >> "$GITHUB_OUTPUT"
+            echo "build=yes" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Nothing to do
+        if: steps.scope.outputs.build != 'yes'
+        working-directory: .
+        run: echo "Skipped — ${{ steps.scope.outputs.reason }}. Reporting success so the required check is satisfied."
 
       - uses: actions/setup-node@v4
+        if: steps.scope.outputs.build == 'yes'
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
 
       - run: npm ci
+        if: steps.scope.outputs.build == 'yes'
 
       - name: Test
+        if: steps.scope.outputs.build == 'yes'
         run: npm run test --if-present
 
       - name: Build
+        if: steps.scope.outputs.build == 'yes'
         run: npm run build
         env:
           # Dummy values — this job only checks that the app compiles, it
