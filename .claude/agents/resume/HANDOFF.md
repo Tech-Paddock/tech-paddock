@@ -95,6 +95,31 @@ both directions have a test.
 **Joel intends to move the block into the body.** When he does, no code change is needed: the
 header fallback is skipped when there are no header sizes to take.
 
+## Deploying this is blocked on the migration history, not on the code
+
+**2026-09-14.** `20260914221259_resume_template_archive.sql` has never been applied. The CLI refuses
+to push it: the remote holds five versions the local directory does not — the deliberately withheld
+`20260908235234`, plus four coffee migrations that exist in the repo under different version stamps
+than the ones actually applied. Full evidence is in this branch's worklog, raised for the TD.
+
+**Do not work around it by applying the SQL by hand.** Doing that without recording the version is
+how the coffee drift happened; recording it by hand is the forbidden repair subcommand wearing a
+different hat. It needs the global decision, which is Platform's and the TD's.
+
+Until then: PR #56 merges safely but must not reach a deployment. The app selects `archived_at`, so
+live code without the column means `/api/templates` returns 500 and takes the Templates tab and
+Reformat's active-template lookup with it.
+
+## The stored spec is what renders, so a template must be re-uploaded after this ships
+
+Worth knowing before anyone wonders why the fixes "did not work". `extractSpec` runs once, at
+upload, and `/api/reformat` reads the stored `spec` column rather than re-extracting
+(`app/api/reformat/route.ts:59`). So of the three renderer fixes, only the markdown-table parsing
+takes effect on existing templates — it happens at reformat time. `highlightsLayout` and the
+name/contact sizes live in the spec, so the active template has to be uploaded again to pick them
+up. The one-off template slot on Reformat does re-extract fresh, which makes it the way to check a
+template before committing it to a version.
+
 ## Next steps
 
 1. **Run real generated output through a free ATS checker.** Still the highest-value open item and
