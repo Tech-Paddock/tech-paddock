@@ -97,6 +97,30 @@ header fallback is skipped when there are no header sizes to take.
 
 ## Deploying this is blocked on the migration history, not on the code
 
+> **RESOLVED 2026-09-15 by the technical director, at the gate, before merging. The section below is
+> kept because its reasoning was right; its conclusion is now out of date, and rewriting it is
+> yours.**
+>
+> `20260914221259_resume_template_archive.sql` **is applied.** Verified from a fresh query, not from
+> the write: `archived_at` exists, the check constraint exists, all three templates are intact, and
+> the recorded version is `20260914221259` — the file's own, so nothing drifted and nothing needs
+> renaming.
+>
+> **You were right to refuse, and right about why.** The CLI genuinely cannot push here, and it never
+> will: `db push` refuses whenever the remote holds a version the local directory lacks, and
+> `20260908235234` is remote-only permanently and on purpose because it is real contacts. Declining
+> to rename another agent's migration files was also correct.
+>
+> What was missing was not a decision you should have made — it was that **nothing in this repo ever
+> documented how a migration gets applied at all.** `supabase/README.md` covered inspecting the
+> history and never covered applying to it. That gap is now closed, and the answer is that the TD
+> applies it through the hosted API at gate time, recording the file's own version as part of the
+> same transaction. Your write-up is what found it.
+>
+> **So this pull request is no longer deployment-blocked.** What remains true below is the re-upload
+> requirement in the next section — the stored `spec` is what renders, so the active template must be
+> uploaded again before two of the three renderer fixes show up.
+
 **2026-09-14.** `20260914221259_resume_template_archive.sql` has never been applied. The CLI refuses
 to push it: the remote holds five versions the local directory does not — the deliberately withheld
 `20260908235234`, plus four coffee migrations that exist in the repo under different version stamps
