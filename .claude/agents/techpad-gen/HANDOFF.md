@@ -129,10 +129,24 @@ blocking script, no flash.
 from racing entirely. **Clark replaces it**: the Lotus 25 in British racing green with the yellow
 nose stripe as the accent. Calm and legible, which is what a tool you write long text in wants.
 
-**Senna was tested against the same rule and kept.** The helmet is worn as tribute worldwide and
-reads as celebration, where the 1955 Mercedes reads as the thing that killed the crowd. The rule is
-*no mass-casualty association*, not *no driver who died* — otherwise JPS goes too, since Ronnie
-Peterson died in a Lotus 79's sister car at Monza in 1978.
+**The rule, in Joel's words on 2026-09-15, because the first version written here was wrong.**
+He is *fine with liveries tied to dead racers* — Senna stayed, and Villeneuve, Peterson and Rindt
+are all in the book. A blanket no-dead-drivers rule would take JPS too, since Ronnie Peterson died
+in a Lotus 79's sister car at Monza in 1978, and it is not what he meant.
+
+**Two things disqualify a livery: mass casualties, and a regime.** Silver Arrows failed both.
+Le Mans 1955 killed 83 spectators. And the name is not the 1954 car's — it belongs to the 1934-39
+Mercedes and Auto Union teams, funded by the Nazi state at around 450,000 Reichsmarks a year and run
+as a propaganda demonstration of German technical supremacy, with swastikas on the cars.
+Daimler-Benz also used tens of thousands of forced labourers during the war. The W196 is post-war
+and not itself implicated, but it took the name and the myth on purpose, so the association travels
+with it.
+
+**What this filter actually catches in the current book: nothing else.** Auto Union and Porsche are
+absent. Rosso Corsa predates fascism by decades and is a national colour, not a team. The one thread
+worth naming so nobody rediscovers it: **Fangio's early career in Europe was funded by Perón's
+government.** That is a real fact and a thin one — he was apolitical and is universally admired —
+so he stays unless Joel says otherwise.
 
 **Three palettes were built for this assignment and did not exist before it**, because every
 assigned livery needs both halves: **Senna light**, **MP4/4 dark**, and **Clark** in both (Silver
