@@ -113,3 +113,27 @@ matters.
 from the stored template file at render time would end it permanently, and `renders.template_snapshot`
 already preserves reproducibility so nothing is lost. Not built here: Joel did not ask, and it
 changes how every render resolves its formatting, which is his call.
+
+## 2026-09-16 00:20 — correction, and the handoff written
+**The merge-order note in my claim above is stale and I got it wrong by not re-checking.**
+`claude/resume-ratify-template-deletion` had already merged as #63 by the time I wrote it; there is
+no branch to sequence against and no conflict to pay. I said the opposite to Joel in the message
+handing this branch over. Two other claims in that note are also now resolved on `main`:
+`RULES.md` and `HANDOFF.md` carry the ratification, and `supabase/README.md` documents applying
+through the hosted API.
+
+Merged `origin/main` in — five changes, `apps/resume` untouched by any of them, no conflict. The
+merge does touch `supabase/` (four coffee migrations renamed to their real timestamps), so CI now
+builds every app on this branch rather than resume alone. Re-ran on the merged tree: 109 tests,
+`tsc --noEmit` and `npm run build` clean.
+
+**`HANDOFF.md` is now current, which it should have been before I handed the branch over.** The
+brief's rule is that a finished branch is a checkpoint and everything that has to survive is in the
+repo *before* the handover message — not at pull-request time, which is what I was working from.
+Corrected rather than left for later, because after may not exist.
+
+What the handoff now says that it did not: the branch exists and is finished so a later session does
+not restart it; what `TemplateSpec` carries and the four traps behind reading it; that `extractSpec`
+starts from `normalizeSpec(null)` and must not go back to a spread of `DEFAULT_SPEC`; that
+`normalizeSpec` is the one place a future spec field has to be taught about; the test count
+(109 here, 86 on `main`); and that the migration-documentation gap it described as open is closed.
