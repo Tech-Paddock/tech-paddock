@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-14, 23:20 UTC.
+State as of 2026-09-15, 00:05 UTC.
 
 Read `RULES.md` first for the role. This is the workload.
 
@@ -96,15 +96,31 @@ moves. **After applying anything through the API, check the recorded version and
 match.** Local and remote now differ by exactly one version, the withheld contacts seed, and a second
 difference means real drift.
 
-## `Vercel – tp-coffee-app` is a required check, and it conflicts with the build scoping
+## Branch protection, as of 2026-09-15 — and the one setting that changes how you merge
 
-Branch protection requires four of the five matrix jobs — `build (coffee)` is missing — plus a
-Vercel *deployment* status for one app. That last one has to come off before the Ignored Build Step
-goes on `tp-coffee-app`: a skipped deployment does not reliably post a status, and a required check
-that never reports blocks the pull request permanently. Same failure the CI scoping was designed to
-avoid, arriving through the Vercel side.
+Required checks are finally right: six, all GitHub Actions —
+`build (editor)`, `build (home)`, `build (resume)`, `build (tracker)`, `build (coffee)`,
+`requested-by-joel`. **`Vercel – tp-coffee-app` was on that list and has been removed**, which was
+the important half. It was a *deployment* status, required for one app out of five, and leaving it
+there while an Ignored Build Step skips Coffee's deployments would have produced a required check
+that stops reporting — permanently unmergeable pull requests, arriving through the Vercel side while
+the CI scoping was busy preventing exactly that failure on the GitHub side. **If a Vercel status
+ever reappears in that list, take it out.**
 
-Raised with Joel on 2026-09-14 with the ordering spelled out. His clicks, not yours.
+**`Require branches to be up to date before merging` is on.** This is the setting that gives the
+merge-order rule teeth: after any merge, every other open pull request is behind and must take
+`main` again and re-run before it can go in. So the order you pick decides who pays, every time —
+prefer merging the branch that is *finished* and let the cost fall on the one still being worked.
+
+`Block force pushes` and `Restrict deletions` are also on, which is why a history rewrite needs Joel
+to relax them first.
+
+## The ledger has a Parked section now
+
+Separate from "Waiting on Joel" on purpose. Waiting means someone owes an action; parked means Joel
+deliberately deferred it and **it is not to be picked up as background work.** The first entry is
+`CRON_SECRET` and the Graph integration, where the parked state is the *safe* one and un-parking is
+the dangerous moment — read the entry before touching it.
 
 ## Waiting on Joel
 

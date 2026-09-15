@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-14 23:20 UTC.**
+**Last reviewed: 2026-09-15 00:05 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -19,36 +19,57 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
-1. **2026-09-14 — Branch protection: three changes, and one of them is a trap you are already
-   standing next to.** Screenshot confirms the required checks are `build (editor)`, `build (home)`,
-   `build (resume)`, `build (tracker)` and **`Vercel – tp-coffee-app`**.
-   **Add** `build (coffee)` — the matrix is five jobs and only four are required, so Coffee can merge
-   broken. **Add** `requested-by-joel` — it runs on every pull request and is not required, so a
-   pull request nobody asked for goes red and merges anyway. Both by those exact names, no prefix.
-   **Remove `Vercel – tp-coffee-app`, and do it before enabling the Ignored Build Step.** That check
-   is a deployment status, not a test, and it is required for one app out of five for no recorded
-   reason. An Ignored Build Step makes Vercel skip the deployment on a push that does not touch
-   `apps/coffee` — and a skipped deployment does not reliably post that status. A required check
-   that never reports is never satisfied, and the pull request cannot merge, ever. That is the same
-   failure the CI change was designed around; it would arrive through the Vercel side instead.
-2. **2026-09-14 — The Vercel Ignored Build Step, on `tp-coffee-app` only, after item 1.**
-   `git diff --quiet HEAD^ HEAD -- . ../../supabase` in Settings → Git. It is not the *Skip
-   deployments* toggle, which is enabled on that project and demonstrably does not work; that is a
-   heuristic, this is a command whose exit code Vercel reads. Prove it on one project before the
-   other four.
-3. **2026-09-14 — `CRON_SECRET` before `MS_GRAPH_*` on `tp-tracker`, whenever Graph gets wired up.**
-   Unchanged and still the only item here with a security consequence: `middleware.ts` waves
-   `/api/cron/*` past the password gate, and the route's own `if (secret && …)` check fails **open**
-   when `CRON_SECRET` is unset. Graph credentials alone publish an unauthenticated endpoint.
-4. **2026-09-14 — The history rewrite is authorized and deliberately not started.** Joel said
-   "rewrite it" for the two names in git history. It cannot run yet and the order is not negotiable:
-   **#56 merges first**, because rewriting history rebases every commit and orphans an open pull
-   request built on the old ones. Then branch protection needs *Block force pushes* and *Restrict
-   deletions* relaxed on `main`, since a rewrite is a force push by definition. Then the rewrite,
-   then protection back on. Nothing about this is reversible once pushed, so it happens with Joel
-   present rather than as background work.
+1. **2026-09-15 — Merge order, and it is the only thing moving right now.** Two branches are
+   finished and neither has a pull request. **#56 merges first**, and the reason is mechanical rather
+   than aesthetic: *Require branches to be up to date before merging* is on, so whichever merges
+   second has to take `main` again and re-run. #56 has already done that twice tonight and is
+   `clean` on `29890a9`; `claude/brief-migration-and-branch-conventions` is the one still being
+   worked. The cost falls on the branch still in hand, not the one that is done.
+   **Checked for the trap the merge-order rule names: a rule change invalidating work already open.**
+   It does not here. #56's migration is additive, which the new shape rule permits; its branch is
+   already `claude/resume-<description>`, which the new naming rule permits. Nothing in #56 becomes
+   non-compliant by merging the conventions after it.
+2. **2026-09-15 — The history rewrite, authorized and blocked behind #56.** Detail in the artifact
+   and unchanged: #56 merges or closes, then *Block force pushes* and *Restrict deletions* come off
+   `main`, then the rewrite with Joel present, then protection back on. Irreversible once pushed.
+
+## Parked
+
+Deliberately deferred. Not waiting on anyone, not forgotten, and not to be picked up as background
+work. Something here moves only when Joel says so.
+
+- **2026-09-15 — `CRON_SECRET` and the Microsoft Graph integration.** Parked at Joel's request.
+  **What it is:** `tracker`'s daily sweep at `/api/cron/stale-tasks` reads the dashboard's decay
+  list, finds threads that have gone quiet with no follow-up task already open, and creates a
+  Microsoft To Do task for each through Graph.
+  **Why it is parked safely rather than left half-done:** a scheduled job cannot log in, so
+  `middleware.ts` waves `/api/cron/*` past the password gate, and the route's own guard reads
+  `if (secret && …)` — which means an unset `CRON_SECRET` skips the check entirely and the endpoint
+  is public. It is harmless *only* because the next line returns early when Graph is unconfigured.
+  **So the parking is the safe state and un-parking is the dangerous moment.** Whoever picks this
+  up sets `CRON_SECRET`, redeploys so it is actually live, and only then sets `MS_GRAPH_*`. Setting
+  the Graph credentials first publishes an unauthenticated endpoint that writes into Joel's Outlook
+  on demand.
 
 ## Done since this ledger was last written
+
+- **2026-09-15 — Branch protection required checks are correct for the first time.** All six, all
+  GitHub Actions: `build (editor)`, `build (home)`, `build (resume)`, `build (tracker)`,
+  `build (coffee)`, `requested-by-joel`. Joel did it and sent the screenshot.
+  **`Vercel – tp-coffee-app` is off the list**, which matters more than the two additions. It was a
+  *deployment* status required for one app out of five, and leaving it there while turning on an
+  Ignored Build Step would have produced a required check that stops reporting — permanently
+  unmergeable pull requests, arriving through the Vercel side while the CI change was busy
+  preventing exactly that on the GitHub side.
+  **Also now visible: *Require branches to be up to date before merging* is on.** That is why merge
+  order has teeth from here: after any merge, every other open pull request has to take `main` again
+  and re-run before it can go in.
+
+- **2026-09-15 — The Vercel Ignored Build Step is set on `tp-coffee-app`.** Joel did it through
+  Claude in Chrome. **Not yet independently verified, and the honest reason is that nothing has
+  tested it:** every push since has touched either an app folder or `supabase/`, so building was the
+  correct outcome each time and proves nothing either way. `get_project` does not return the
+  command. The test is a commit touching only `.claude/` — which is this one.
 
 - **2026-09-14 — Migration versions reconciled by renaming four files, not by repairing the
   database.** The `coffee` migrations were applied through the hosted API, which stamps its own
