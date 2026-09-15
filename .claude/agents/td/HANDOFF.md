@@ -100,12 +100,17 @@ difference means real drift.
 
 Required checks are finally right: six, all GitHub Actions —
 `build (editor)`, `build (home)`, `build (resume)`, `build (tracker)`, `build (coffee)`,
-`requested-by-joel`. **`Vercel – tp-coffee-app` was on that list and has been removed**, which was
-the important half. It was a *deployment* status, required for one app out of five, and leaving it
-there while an Ignored Build Step skips Coffee's deployments would have produced a required check
-that stops reporting — permanently unmergeable pull requests, arriving through the Vercel side while
-the CI scoping was busy preventing exactly that failure on the GitHub side. **If a Vercel status
-ever reappears in that list, take it out.**
+`requested-by-joel`. `Vercel – tp-coffee-app` was on that list and has been removed.
+
+**Do not repeat the reason I first gave for that, because it was wrong.** I claimed a skipped Vercel
+build posts no status and that requiring it would have blocked every Coffee pull request forever.
+It does post one: **`success`, with the description "Canceled by Ignored Build Step."** Confirmed on
+#56's own checks. A required Vercel check would have been satisfied.
+
+The reason that survives is weaker and still sufficient: a deployment status is not a test, and
+requiring one for a single app out of five was arbitrary and written down nowhere. Keep it off the
+list on those grounds. **And note how that error happened — the mechanism was inferred rather than
+read, inside a warning about checks that fail to report.** Read the status.
 
 **`Require branches to be up to date before merging` is on.** This is the setting that gives the
 merge-order rule teeth: after any merge, every other open pull request is behind and must take

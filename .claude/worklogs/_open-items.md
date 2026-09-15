@@ -19,12 +19,11 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
-1. **2026-09-15 — Merge order, and it is the only thing moving right now.** Two branches are
-   finished and neither has a pull request. **#56 merges first**, and the reason is mechanical rather
-   than aesthetic: *Require branches to be up to date before merging* is on, so whichever merges
-   second has to take `main` again and re-run. #56 has already done that twice tonight and is
-   `clean` on `29890a9`; `claude/brief-migration-and-branch-conventions` is the one still being
-   worked. The cost falls on the branch still in hand, not the one that is done.
+1. **2026-09-15 — #56 is merged at `1a40550`. `claude/brief-migration-and-branch-conventions` is
+   finished and waiting on Joel for a pull request.** The predicted cost arrived on schedule: this
+   branch was behind the moment #56 landed and has taken `main` again, exactly as
+   *Require branches to be up to date before merging* forces. That is the order working, not a
+   surprise.
    **Checked for the trap the merge-order rule names: a rule change invalidating work already open.**
    It does not here. #56's migration is additive, which the new shape rule permits; its branch is
    already `claude/resume-<description>`, which the new naming rule permits. Nothing in #56 becomes
@@ -72,10 +71,17 @@ work. Something here moves only when Joel says so.
   **`tp-coffee-app` CANCELED with no runtime stats, meaning it never built. `tp-home`, `tp-tracker`,
   `tp-resume` and `tp-message-editor` all READY and built.** One commit, four controls, one
   treatment. There is no reading of that except the rule firing correctly.
-  Note what a skip looks like from outside: Vercel still *creates* a deployment and marks it
-  `CANCELED`. That is the concrete reason `Vercel – tp-coffee-app` had to come off the required
-  checks — a cancelled deployment is not a passing status, and it was one merge away from blocking
-  every Coffee pull request permanently.
+  **Correction, 2026-09-15 — I got the consequence wrong and said it confidently.** I reported that
+  a skipped build posts no passing status and that requiring `Vercel – tp-coffee-app` was "one merge
+  away from blocking every Coffee pull request permanently." **That is false.** #56's own checks show
+  it: `Vercel – tp-coffee-app` reported **`state: success`, description "Canceled by Ignored Build
+  Step."** Vercel marks the *deployment* CANCELED and reports *success* to GitHub. A required Vercel
+  check would have been satisfied and nothing would have blocked.
+  Removing it was still the right call, for the reason that survives: a deployment status is not a
+  test, and requiring one for a single app out of five was arbitrary and undocumented. But that is a
+  tidiness argument, not the near-miss I described. **I inferred the mechanism instead of reading it,
+  while writing a warning about a check that never reports — the exact failure mode the warning was
+  about.**
   **The other four still rebuild on everything.** That is the remaining saving, and it is one paste
   per project whenever Joel wants it.
 
