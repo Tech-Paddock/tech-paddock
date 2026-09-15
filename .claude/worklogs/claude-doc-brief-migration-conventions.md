@@ -1,4 +1,4 @@
-# claude-brief-migration-and-branch-conventions
+# claude-doc-brief-migration-conventions
 agent: technical director · apps: none · shared files: CLAUDE.md, supabase/README.md
 authorized by: Joel, directly, in session — the four migration-shape bullets quoted back with
 "do it", "Leave claude but also require area … i just need to know area and description", "its live"
@@ -65,3 +65,27 @@ Landed on the branch, no pull request: the migration shape rule and the branch-n
 Open: Joel's history rewrite decision is authorized but not started — it cannot run while #56 is
 open and it needs branch protection relaxed, so it is sequenced after that merge, not before.
 Need from TD: nothing, this is the TD.
+
+
+## 2026-09-15 00:40 — the action identifier, and the one part I pushed back on
+
+Joel: "For naming convention I need action identifier ie pr, mrg, ci etc."
+
+Added as `claude/<action>-<area>-<description>` with six non-overlapping actions — `feat`, `fix`,
+`ci`, `db`, `doc`, `ops`.
+
+**Two of his three examples cannot work as branch names, and saying so was the useful part.**
+`ci` is a kind of change and belongs in the list. `pr` and `mrg` are *states*, not kinds. A branch
+name is fixed for the life of the branch and a state moves several times a day, so a branch called
+`mrg-…` is accurate for about an hour and wrong afterwards — and nobody renames a branch to keep a
+label honest, which means the name decays into noise that looks like information. That is worse than
+no label.
+
+The need behind it is real and already met twice over: what needs Joel is answered by the pull
+request's own state, which updates itself, and by this ledger, which exists for exactly that
+question. So the action says what a change **is**; where it has got to is looked up, never named.
+
+Also renamed this branch and its worklog to obey the rule it contains, and
+`claude/resume-handoff-migration-section` with it. A naming rule whose own branch does not follow it
+is a rule nobody will follow either — and the rename is free because Joel is already deleting the
+resurrected branch in the same visit.

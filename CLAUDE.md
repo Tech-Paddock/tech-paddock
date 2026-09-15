@@ -103,12 +103,44 @@ between configuring something that exists and creating, destroying, or re-pointi
 
 ### Always
 
-- **One branch per change, named `claude/<area>-<description>`.** Area is the app folder where
-  there is one — `home`, `editor`, `tracker`, `resume`, `coffee` — and otherwise the layer it
-  touches: `ci`, `db`, `brief`, `platform`. Description is a few hyphenated words naming the change.
-  `claude/coffee-brew-log`, `claude/resume-template-archive`, `claude/ci-per-app-builds`.
-  Anything after that is noise and nobody minds it; what has to be readable at a glance is **which
-  area and what change**, because that is the whole question being asked of a branch list.
+- **One branch per change, named `claude/<action>-<area>-<description>`.**
+
+  **Action** is what kind of change it is. Six, and they do not overlap:
+
+  | | |
+  |---|---|
+  | `feat` | a new capability |
+  | `fix` | something is broken |
+  | `ci` | the pipeline — workflows, checks, branch protection |
+  | `db` | schema and migrations |
+  | `doc` | the brief, charters, handoffs, worklogs |
+  | `ops` | Vercel, DNS, environment variables, secrets |
+
+  **Area** is the app folder that owns it — `home`, `editor`, `tracker`, `resume`, `coffee` — and is
+  **left out when no single app owns the change.** A repo-wide pipeline change is
+  `claude/ci-per-app-builds`, not `claude/ci-all-per-app-builds`; an invented area is worse than a
+  missing one.
+
+  **Description** is a few hyphenated words naming the change. Anything after that is noise and
+  nobody minds it. What has to be readable at a glance is **kind, area, change** — that is the whole
+  question being asked of a branch list.
+
+  `claude/feat-coffee-brew-log` · `claude/fix-resume-highlights-table` ·
+  `claude/db-resume-template-archive` · `claude/ci-per-app-builds` ·
+  `claude/doc-brief-migration-conventions`
+
+  **The action says what the change *is*, never where it has got to.** `pr`, `mrg`, `ready`,
+  `blocked` and the like do not go in a branch name, and the reason is not style: a name is fixed for
+  the life of the branch and a status moves several times a day, so a branch called `mrg-…` is
+  telling the truth for about an hour and lying afterwards — and nobody renames a branch to keep a
+  label honest. Where a change has got to is already carried by things that update themselves: the
+  pull request's own state, and the technical director's ledger, which exists precisely to answer
+  "what needs me".
+
+  A session's opening branch is named by the harness and arrives as something like
+  `claude/kickoff-pxdz0f`, which names none of the three. That is expected and it is not the branch
+  the work belongs on: the brief already requires cutting a fresh branch once the change is agreed,
+  and that is the one that gets the name.
   A session's opening branch is named by the harness and arrives as something like
   `claude/kickoff-pxdz0f`, which names neither. That is expected and it is not the branch the work
   belongs on: the brief already requires cutting a fresh branch once the change is agreed, and that
