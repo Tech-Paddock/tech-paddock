@@ -30,12 +30,25 @@ Database: the `resume` schema.
 
 ### `templates`
 id, version, name, `file_path` (original docx in Storage), `spec` (jsonb — extracted formatting),
-is_active, created_at
+is_active, `archived_at` (nullable), created_at
 
-Append-only; templates are never deleted. `is_active` auto-points at the newest upload, and pinning
-an older one is deliberate — it raises a persistent banner on the render screen naming both
-versions. **The template file is itself a deliverable**: it doubles as the general-purpose resume to
-hand someone when there is no specific job, so the original bytes are kept, not just the spec.
+`is_active` auto-points at the newest upload, and pinning an older one is deliberate — it raises a
+persistent banner on the render screen naming both versions.
+
+**Templates leave the list two ways, and the difference is history.** Archiving (`archived_at`)
+hides one and keeps both the row and its stored `.docx`, because a render that points at it has to
+stay explainable. Deleting removes both, and is **refused for any template a render was built
+from** — `renders.template_id` is a not-null foreign key with no delete action, so the database
+refuses it too; the API checks first only to return a sentence instead of a constraint violation.
+The archived template and the active template are disjoint by constraint: neither can be the other.
+
+This was append-only until 2026-09-14. Joel asked for deletion so a duplicate upload could be
+removed, and the reasoning behind append-only never covered that case: a template with no renders
+is nobody's history. **Approved by Joel; the TD has not ratified this amendment.**
+
+**The template file is itself a deliverable**: it doubles as the general-purpose resume to hand
+someone when there is no specific job, so the original bytes are kept, not just the spec — and
+`GET /api/templates/[id]/file` returns those bytes, archived or not.
 
 ### `renders`
 id, template_id, template_snapshot, `source_file_path`, `parsed_content` (jsonb), `coverage`
@@ -79,9 +92,28 @@ to lie.**
 
 ## Things that will catch you out
 
-**Content is not always a direct child of `<w:body>`.** The template keeps Core Competencies inside
-a `<w:sdt>` content control and Career Highlights inside a table cell. Walk the tree, never just the
-body's direct children, or whole sections read as empty. There is a named regression test for this.
+**Content is not always a direct child of `<w:body>`.** Walk the tree, never just the body's direct
+children, or whole sections read as empty. There is a named regression test for this. The shape
+varies by template and is not worth memorising: the `<w:sdt>` content control the older template
+wrapped Core Competencies in is gone from the 2026-09 templates, which instead use two tables —
+Career Highlights as one row of columns, Core Competencies as label/value rows. **The output still
+emits exactly one table**, so Core Competencies renders as flat paragraphs whatever the template
+does. That is the ATS rule in `CLAUDE.md`, not a preference.
+
+**A template may keep the name and contact in `word/header1.xml`.** Both 2026-09 templates do.
+Spec extraction ranks body prose sizes, so when the name is not in the body every rank shifts and
+the render comes out with no hierarchy at all — the name set in body text. `extractSpec` therefore
+takes the name and contact sizes from the header when it finds them there, and shifts the body
+ranks up by one. The blocking `header_footer_content` finding stays: it is the only thing reporting
+that the contact block is somewhere a parser may never read. Note that a `w:type="first"` header
+with no `<w:titlePg/>` is not displayed by Word at all, so this reads as absent while being fully
+present in the archive.
+
+**Jobright pastes Career Highlights in as a markdown table** — a row of metrics, a `| :--- |`
+alignment row, and a row of descriptions, all as ordinary paragraphs. Transposed into pairs only
+when the cell counts line up; anything else falls through and renders verbatim, because a guess
+here costs keyword coverage. The alignment row is scaffolding and is counted on neither side of the
+coverage fraction, exactly as a blank paragraph already is.
 
 **Sizes are ranked, not hardcoded.** Jobright runs 25/11/10.5/10pt, the template 16/12.5/11/10pt,
 and the template sets its Career Highlights metrics *larger than its own headings* — so ranking
@@ -141,6 +173,7 @@ schema but `resume`; `CLAUDE.md` or another agent's charter.
 
 - Reintroduce a model call. See above.
 - Let the coverage report overstate what the output contains.
+- Delete a template any render points at, or make the archived one active.
 - Emit a second table, a text box, an image, or contact details in a header or footer.
 - A schema change without its migration at `supabase/` in the repo root. Migrations were moved
   there from `apps/resume/` deliberately — one project, one history.
