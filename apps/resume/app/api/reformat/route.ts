@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { DocxReadError, readDocxParts } from "@/lib/docx/read";
 import { extractParagraphs } from "@/lib/docx/paragraphs";
-import { extractSpec, type TemplateSpec } from "@/lib/docx/spec";
+import { extractSpec, normalizeSpec, type TemplateSpec } from "@/lib/docx/spec";
 import { labelParagraphs } from "@/lib/docx/label";
 import { buildResumeDocx } from "@/lib/docx/build";
 import { auditAts } from "@/lib/docx/ats";
@@ -57,7 +57,12 @@ export async function POST(request: NextRequest) {
       if (!active) {
         return fail(409, "no_template", "No active template. Upload one on the Templates tab, or attach a one-off template here.");
       }
-      spec = active.spec as TemplateSpec;
+      // Through normalizeSpec, not straight out of the row: a spec stored by an
+      // earlier release is missing whatever fields have been added since, and the
+      // builder reading one of those off it would throw rather than degrade. The
+      // template has to be re-uploaded for its new fields to be read out of the
+      // file at all — this only guarantees that until then it renders as before.
+      spec = normalizeSpec(active.spec);
       templateId = active.id as string;
       templateLabel = `${active.name} (v${active.version})`;
     }
