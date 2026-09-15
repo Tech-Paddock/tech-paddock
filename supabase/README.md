@@ -97,6 +97,41 @@ alongside `public`, so a local stack exposes them. **Add a new schema there too*
 miss, and a local stack will simply not see the tables. Without it, `supabase start` would serve an API
 that cannot see any of this project's tables.
 
+## How a migration actually gets applied
+
+This section exists because it did not, and that silence is the most plausible root cause of the
+version drift above. The Resume Formatter found the gap on 2026-09-14 while trying to apply its own
+migration: this file documented `link`, `migration list` and `db pull` — how to inspect the history
+and how to capture drift — and never once said how anything gets *applied*. An agent that needs to
+apply a migration and finds no documented path invents one.
+
+**`supabase db push` does not work here, and it is not going to.** It refuses when the remote
+history contains a version the local directory does not have — *"Remote migration versions not found
+in local migrations directory"* — and it writes nothing. `20260908235234` is remote-only
+**permanently and on purpose**, because it is seven real contacts and this repo does not commit
+names. So the one condition `db push` requires is the one condition this project has deliberately
+chosen never to satisfy. That is not a bug to work around; it is the cost of the decision, and it
+was simply never written down.
+
+**So: the technical director applies migrations through the hosted API, at gate time, before
+merging.** Not by hand in the SQL editor, not by an app agent, and not by Joel. That is now a rule
+in `CLAUDE.md` rather than a habit, alongside the shape rule that makes applying-before-merging safe
+in the first place.
+
+**The one thing to get right is the recorded version.** The hosted API stamps its own version from
+the clock at the moment it runs and ignores the filename — that is exactly how four `coffee`
+migrations came to disagree with the repo. Two ways to keep them in step:
+
+1. **Record the file's own version as part of applying it.** The version column is a sequence key,
+   not an audit timestamp, so writing the version the repo already declares is accurate and the
+   filename never has to change. **Preferred**, and to be proven on the next migration applied —
+   which is the resume one — rather than asserted here.
+2. **Rename the file to whatever got recorded.** What was done for the four `coffee` migrations,
+   retroactively. It works, but it means editing a branch after its author is finished with it.
+
+Either way, **read the history back afterwards** and confirm local and remote differ by exactly one
+version. Not doing that is the whole of how this went unnoticed for three days.
+
 ## A new schema does not inherit anything
 
 `20260910051549` granted schema USAGE by naming four schemas explicitly. It cannot cover a schema

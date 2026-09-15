@@ -65,11 +65,19 @@ work. Something here moves only when Joel says so.
   order has teeth from here: after any merge, every other open pull request has to take `main` again
   and re-run before it can go in.
 
-- **2026-09-15 — The Vercel Ignored Build Step is set on `tp-coffee-app`.** Joel did it through
-  Claude in Chrome. **Not yet independently verified, and the honest reason is that nothing has
-  tested it:** every push since has touched either an app folder or `supabase/`, so building was the
-  correct outcome each time and proves nothing either way. `get_project` does not return the
-  command. The test is a commit touching only `.claude/` — which is this one.
+- **2026-09-15 — The Vercel Ignored Build Step is set on `tp-coffee-app`, and it works. Proven, not
+  assumed.** Joel set it through Claude in Chrome. `get_project` does not return the command, so it
+  was tested instead: commit `e88c814` touches nothing but `.claude/`, and across the five projects
+  on that one commit —
+  **`tp-coffee-app` CANCELED with no runtime stats, meaning it never built. `tp-home`, `tp-tracker`,
+  `tp-resume` and `tp-message-editor` all READY and built.** One commit, four controls, one
+  treatment. There is no reading of that except the rule firing correctly.
+  Note what a skip looks like from outside: Vercel still *creates* a deployment and marks it
+  `CANCELED`. That is the concrete reason `Vercel – tp-coffee-app` had to come off the required
+  checks — a cancelled deployment is not a passing status, and it was one merge away from blocking
+  every Coffee pull request permanently.
+  **The other four still rebuild on everything.** That is the remaining saving, and it is one paste
+  per project whenever Joel wants it.
 
 - **2026-09-14 — Migration versions reconciled by renaming four files, not by repairing the
   database.** The `coffee` migrations were applied through the hosted API, which stamps its own
