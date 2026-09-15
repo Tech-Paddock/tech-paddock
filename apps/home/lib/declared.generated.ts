@@ -5,7 +5,7 @@
 import type { Declared } from "./platform";
 
 export const DECLARED: Declared = {
-  "generatedAt": "2026-09-12T20:57:27.231Z",
+  "generatedAt": "2026-09-15T02:20:09.279Z",
   "complete": true,
   "ciMatrix": [
     "home",
@@ -14,7 +14,7 @@ export const DECLARED: Declared = {
     "tracker",
     "coffee"
   ],
-  "migrationCount": 9,
+  "migrationCount": 11,
   "apps": [
     {
       "slug": "coffee",
