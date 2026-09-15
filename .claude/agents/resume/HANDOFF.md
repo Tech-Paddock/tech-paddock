@@ -6,10 +6,10 @@ Read `RULES.md` first. This file is only what is true right now.
 
 ---
 
-## One branch in flight
+## Nothing in flight
 
-`claude/resume-template-management-and-render-fixes` — the 2026-09-14 batch described below.
-Everything else is merged. Start fresh, one branch per change.
+The 2026-09-14 batch described below merged as #56 and is live. Its branch and worklog are gone,
+as they should be. Start fresh, one branch per change, cut from current `main`.
 
 ## The app is rebuilt and live
 
@@ -95,44 +95,37 @@ both directions have a test.
 **Joel intends to move the block into the body.** When he does, no code change is needed: the
 header fallback is skipped when there are no header sizes to take.
 
-## Deploying this is blocked on the migration history, not on the code
+## How a migration gets applied here — the CLI cannot do it, and never will
 
-> **RESOLVED 2026-09-15 by the technical director, at the gate, before merging. The section below is
-> kept because its reasoning was right; its conclusion is now out of date, and rewriting it is
-> yours.**
->
-> `20260914221259_resume_template_archive.sql` **is applied.** Verified from a fresh query, not from
-> the write: `archived_at` exists, the check constraint exists, all three templates are intact, and
-> the recorded version is `20260914221259` — the file's own, so nothing drifted and nothing needs
-> renaming.
->
-> **You were right to refuse, and right about why.** The CLI genuinely cannot push here, and it never
-> will: `db push` refuses whenever the remote holds a version the local directory lacks, and
-> `20260908235234` is remote-only permanently and on purpose because it is real contacts. Declining
-> to rename another agent's migration files was also correct.
->
-> What was missing was not a decision you should have made — it was that **nothing in this repo ever
-> documented how a migration gets applied at all.** `supabase/README.md` covered inspecting the
-> history and never covered applying to it. That gap is now closed, and the answer is that the TD
-> applies it through the hosted API at gate time, recording the file's own version as part of the
-> same transaction. Your write-up is what found it.
->
-> **So this pull request is no longer deployment-blocked.** What remains true below is the re-upload
-> requirement in the next section — the stored `spec` is what renders, so the active template must be
-> uploaded again before two of the three renderer fixes show up.
+**`20260914221259_resume_template_archive.sql` is applied.** The technical director applied it at
+the gate on 2026-09-15 and verified it from a fresh query rather than from the write: `archived_at`
+exists, the check constraint exists, all three templates are intact, and the recorded version is
+`20260914221259` — the file's own, so nothing drifted and no file needs renaming.
 
-**2026-09-14.** `20260914221259_resume_template_archive.sql` has never been applied. The CLI refuses
-to push it: the remote holds five versions the local directory does not — the deliberately withheld
-`20260908235234`, plus four coffee migrations that exist in the repo under different version stamps
-than the ones actually applied. Full evidence is in this branch's worklog, raised for the TD.
+**The part worth carrying forward is the mechanism, because it is not obvious and it cost a
+round.** `db push` cannot work in this repo and that is permanent, not a bug to fix: it refuses
+whenever the remote holds a version the local directory lacks, and `20260908235234` is remote-only
+for ever, on purpose, because it is seven real people's contact details and they are not coming into
+this repo. So the CLI refuses every push, regardless of what else is or is not drifted.
 
-**Do not work around it by applying the SQL by hand.** Doing that without recording the version is
-how the coffee drift happened; recording it by hand is the forbidden repair subcommand wearing a
-different hat. It needs the global decision, which is Platform's and the TD's.
+**The answer is that the TD applies migrations through the hosted API at gate time**, recording the
+file's own version in the same transaction. Write the file, open the pull request, and the
+migration lands when the change does. Nothing for you to run, and nothing to route around.
 
-Until then: PR #56 merges safely but must not reach a deployment. The app selects `archived_at`, so
-live code without the column means `/api/templates` returns 500 and takes the Templates tab and
-Reformat's active-template lookup with it.
+Two things not to do when the CLI refuses, both of which look reasonable at 11pm:
+
+- **Do not apply the SQL by hand without recording the version.** That is exactly how four coffee
+  migrations came to exist twice, in the repo under invented round-minute timestamps and in the
+  database under real ones. Recording it by hand instead is the forbidden repair subcommand wearing
+  a different hat.
+- **Do not rename another agent's migration files** to make the histories line up. Shared
+  `supabase/` history is not `apps/resume`'s, and it would not have helped anyway — the withheld
+  seed is enough on its own to make the CLI refuse.
+
+`supabase/README.md` documented how to *inspect* the history and never how to *apply* to it.
+**As of 2026-09-15 that gap is still open on `main`** — the fix is on
+`claude/doc-brief-migration-conventions`, unmerged. Until it lands, this section is the only place
+the mechanism is written down, which is exactly the reason it is written down here.
 
 ## The stored spec is what renders, so a template must be re-uploaded after this ships
 
