@@ -103,8 +103,21 @@ between configuring something that exists and creating, destroying, or re-pointi
 
 ### Always
 
-- One branch per change, named for the change. Never reuse a branch across unrelated work, and
-  never treat one as a permanent working branch.
+- **One branch per change, named `claude/<area>-<description>`.** Area is the app folder where
+  there is one — `home`, `editor`, `tracker`, `resume`, `coffee` — and otherwise the layer it
+  touches: `ci`, `db`, `brief`, `platform`. Description is a few hyphenated words naming the change.
+  `claude/coffee-brew-log`, `claude/resume-template-archive`, `claude/ci-per-app-builds`.
+  Anything after that is noise and nobody minds it; what has to be readable at a glance is **which
+  area and what change**, because that is the whole question being asked of a branch list.
+  **An action prefix — `feat`, `fix`, `db`, `doc` and the like — was drafted on 2026-09-15 and
+  parked by Joel before it landed. Do not add one.** It is in the ledger under Parked with the
+  reasoning, including why a *state* such as `pr` or `mrg` cannot go in a branch name. If it is ever
+  revived, that is where it starts.
+  A session's opening branch is named by the harness and arrives as something like
+  `claude/kickoff-pxdz0f`, which names neither. That is expected and it is not the branch the work
+  belongs on: the brief already requires cutting a fresh branch once the change is agreed, and that
+  is the one that gets the name.
+  Never reuse a branch across unrelated work, and never treat one as a permanent working branch.
 - State your blast radius in the pull request: which apps, which shared files.
 - Add any new app under `apps/` to the CI matrix in `.github/workflows/ci.yml` in the same pull
   request. The matrix is hardcoded to five names and silently skips anything else, so a new app
@@ -134,6 +147,53 @@ between configuring something that exists and creating, destroying, or re-pointi
   asked-for one. **So this rule rests further on honesty than the ones around it**, which is the
   price of it being this simple. Do not open one on your own judgement, however obviously ready the
   work looks.
+- **A migration must be safe to apply *before* the code that needs it.** This is the shape rule,
+  and it exists because merging is unattended: a merge triggers the deploy by itself and the new
+  code is live in about a minute. Anything a human does *after* the merge happens inside a window
+  where the app is already broken, so "apply it at merge" is not an instruction anyone can follow.
+  **So the migration goes first and the code follows** — which only works if the migration is one
+  the currently-running code can ignore.
+  **Additive changes ride with their code.** Add a column, a table, an index, a constraint every
+  existing row already satisfies. The old code does not know the new column exists and does not care
+  that it does. The database sitting ahead of the code is harmless; the code sitting ahead of the
+  database is an outage.
+  **Destructive changes split into two pull requests.** The first stops using the column and ships.
+  Once that is deployed and live, a second one drops it. The drop is then safe at any moment,
+  because by then nothing reads it either way. The cost is honest — two merges and a wait between
+  them instead of one — and what it buys is that there is no moment when a deploy and a migration
+  race each other.
+  `20260912213501` is the case this is written against. It dropped four columns in the same pull
+  request as the code that stopped using them: apply it early and the old code breaks, apply it late
+  and the new code breaks, and there is no safe moment in between. It went out safely only because
+  the technical director queried the live table by hand first and found the columns empty. That is
+  luck wearing the clothes of a process.
+  **The technical director applies the migration at gate time, before merging.** Not Joel, and not
+  the agent. The TD has direct database access and uses it; an agent asserting that applying needs a
+  credential nobody holds has guessed, and the guess turns into a manual step that gets forgotten.
+  **Say which shape it is in the Deployment section** — additive and applied before merge, or the
+  first half of an expand-and-contract with the drop named as the follow-up. A migration whose shape
+  is not stated is treated as destructive until someone reads the SQL.
+- **Write yourself down before you hand work over.** A finished branch is a checkpoint: the session
+  may be compacted or ended right after it, and sessions here run long enough that this is the normal
+  case rather than the unlucky one. So when you hand a branch over — in the message that hands it
+  over, or in the pull request when Joel asks for one — **everything that has to survive is in the
+  repo before you send it.** Handoff current, worklog closed, deployment steps stated, blast radius
+  named.
+  **Not at every commit.** You are told to commit as you go, several times an hour and mid-thought.
+  A commit is a save point; a finished branch is a delivery, and only the delivery is a seam.
+  **Then say, in as many words, that you are at a compaction point** — that the durable record is
+  written and the context is safe to lose. That sentence is the deliverable, because it is the only
+  signal anyone gets that the work is safely on disk rather than still in your head.
+  **You cannot compact yourself.** There is no tool and no command for it; `/compact` is Joel's
+  keystroke, and the harness also does it on its own when the window fills. That is stated here as a
+  fact about the system, not as something you are being asked to arrange, because **a rule that
+  instructs an agent to do something impossible teaches it that the rules here are aspirational** —
+  and almost everything in this file holds only because agents choose to comply.
+  **Order, not ceremony.** Compaction is lossy. A handoff written *after* one is composed from a
+  summary of a summary: fluent, second-hand, and confidently wrong, which is the single failure this
+  project has paid for most. Never leave it as "I will write the handoff after" — after may not
+  exist. The benefit worth naming: an agent that expects to lose its context writes a real handoff
+  instead of a polite one. This binds the technical director too.
 - **Say what it takes to deploy it, every time.** Every pull request carries a **Deployment**
   section, and so does the message in which you hand a finished branch over. Four things: what
   happens by itself when this merges, what a human has to do and in what order, how to verify it is
@@ -301,7 +361,7 @@ projects renamed.
 | `editor.techpaddock.io` | Message Editor | `tp-message-editor` | live |
 | `tracker.techpaddock.io` | Pipeline Tracker | `tp-tracker` | live |
 | `resume.techpaddock.io` | Resume Formatter | `tp-resume` | live |
-| `coffee.techpaddock.io` | Coffee | `tp-coffee-app` | built, not yet deployed |
+| `coffee.techpaddock.io` | Coffee | `tp-coffee-app` | live |
 
 ---
 

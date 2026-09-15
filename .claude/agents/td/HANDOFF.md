@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-12, 18:40 UTC.
+State as of 2026-09-15, 00:05 UTC.
 
 Read `RULES.md` first for the role. This is the workload.
 
@@ -50,6 +50,29 @@ conflict, CI absent rather than red because GitHub cannot build a conflicted mer
 restating production's commit from a stale branch — are kept in the ledger as the case that proved
 the handoff rule, not as live work.
 
+## A merged branch can come back, and it comes back carrying everything
+
+**2026-09-15.** GitHub auto-deleted #56's branch on merge; the Resume Formatter pushed thirteen
+seconds later and git **recreated** it. A push to a deleted branch is a branch creation, not an
+error, so nothing refused it.
+
+**What comes back is not the one late commit.** Because the merge was a squash, the resurrected
+branch carries its entire pre-squash history — a pull request from it would claim 18 files and 1,402
+lines, the whole change again, while its actual content difference from `main` was two files. Check
+both before believing either: `git diff main branch` for what is really different,
+`git diff main...branch` for what a pull request would show. When they disagree by that much, the
+branch is a squash ghost and the answer is a fresh branch off `main`, never a pull request from this
+one.
+
+**The cause was mine and it is easy to repeat.** I pushed a banner onto their branch saying the
+rewrite was theirs to finish, then merged that branch three minutes later. No agent can see a pull
+request change state, so from their side the place to work simply vanished mid-edit. **Do not leave
+a to-do on a branch you are about to merge** — either the note names a fresh branch, or the merge
+waits for the work.
+
+Deleting the resurrected branch by hand still needs Joel: the git proxy refuses `--delete` with a
+403, tested again on 2026-09-15 rather than assumed.
+
 **Branch deletion happens by itself now.** The note that used to live here — git proxy 403 on
 `--delete`, a GitHub UI job — is stale: the repo auto-deletes head branches on merge. #39, #40, #41
 and #42 all vanished without being asked. What the proxy still refuses is deleting a branch by hand,
@@ -76,15 +99,66 @@ against four real merges (#48, #43, #47, #53) and matched every time, but the fi
 happen on the next branch that touches one app. If it is wrong it fails loudly — a broken step turns
 the job red — rather than passing something untested, which is the right way round.
 
+## Migrations have a shape rule now, and the TD applies them
+
+Since 2026-09-14 a migration must be safe to apply **before** the code that needs it, because
+merging is unattended: the merge triggers the deploy and the new code is live in about a minute, so
+anything done after the merge happens while the app is already broken.
+
+**Additive rides with its code. Destructive splits into two pull requests** — stop using the column
+and ship, then drop it once that is live. **You apply it at gate time, before merging.** You have
+direct database access through the hosted API and it works; an agent claiming a migration needs a
+credential nobody holds has guessed, and that guess becomes a manual step that gets forgotten. It
+already appeared once, in #56's body.
+
+**The hosted API stamps its own migration version and ignores the filename.** That is how the repo
+and the database came to disagree on four versions between 09-11 and 09-14. Fixed by renaming the
+files to the versions that ran, not by repairing the database — the database is the record of what
+happened, the repo is the record of what was intended, and when they disagree about history the repo
+moves. **After applying anything through the API, check the recorded version and rename the file to
+match.** Local and remote now differ by exactly one version, the withheld contacts seed, and a second
+difference means real drift.
+
+## Branch protection, as of 2026-09-15 — and the one setting that changes how you merge
+
+Required checks are finally right: six, all GitHub Actions —
+`build (editor)`, `build (home)`, `build (resume)`, `build (tracker)`, `build (coffee)`,
+`requested-by-joel`. `Vercel – tp-coffee-app` was on that list and has been removed.
+
+**Do not repeat the reason I first gave for that, because it was wrong.** I claimed a skipped Vercel
+build posts no status and that requiring it would have blocked every Coffee pull request forever.
+It does post one: **`success`, with the description "Canceled by Ignored Build Step."** Confirmed on
+#56's own checks. A required Vercel check would have been satisfied.
+
+The reason that survives is weaker and still sufficient: a deployment status is not a test, and
+requiring one for a single app out of five was arbitrary and written down nowhere. Keep it off the
+list on those grounds. **And note how that error happened — the mechanism was inferred rather than
+read, inside a warning about checks that fail to report.** Read the status.
+
+**`Require branches to be up to date before merging` is on.** This is the setting that gives the
+merge-order rule teeth: after any merge, every other open pull request is behind and must take
+`main` again and re-run before it can go in. So the order you pick decides who pays, every time —
+prefer merging the branch that is *finished* and let the cost fall on the one still being worked.
+
+`Block force pushes` and `Restrict deletions` are also on, which is why a history rewrite needs Joel
+to relax them first.
+
+## The ledger has a Parked section now
+
+Separate from "Waiting on Joel" on purpose. Waiting means someone owes an action; parked means Joel
+deliberately deferred it and **it is not to be picked up as background work.** The first entry is
+`CRON_SECRET` and the Graph integration, where the parked state is the *safe* one and un-parking is
+the dangerous moment — read the entry before touching it.
+
 ## Waiting on Joel
 
 Live infrastructure and one-time credentials. None of it is yours.
 
-1. **Verify `SESSION_SECRET` parity across all five.** Rotated again at 01:39 on 09-12 and live
-   since the 01:59 deployments — a dashboard change does not reach a running deployment, because
-   Vercel bakes the environment in at deploy time. All five have now rebuilt, so this is testable.
-   Then log in at `techpaddock.io` and open a tool from a tile, on desktop and mobile: a loop on both
-   is the secret, mobile-only is the iframe bug. No agent can read the values.
+1. **`SESSION_SECRET` parity — confirmed good by Joel on 2026-09-14. Closed.** Kept here only for
+   the mechanism, which will matter again at the next rotation: the values cannot be read back out of
+   the dashboard, so parity cannot be confirmed by inspection, and a dashboard change does not reach
+   a running deployment until it rebuilds. Setting one fresh known value on all five and then
+   redeploying is the only way to establish it.
 3. **Set `CRON_SECRET` first, then `MS_GRAPH_*`** on `tp-tracker` — the order is not cosmetic. The
    middleware exempts `/api/cron/*` from the password gate and the route's guard fails open when
    `CRON_SECRET` is unset, so setting the Graph credentials alone publishes an unauthenticated

@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-14 22:45 UTC.**
+**Last reviewed: 2026-09-15 00:05 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -19,58 +19,193 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
-1. **2026-09-12 — Two tidy-ups only you can do.** `claude/coffee-rework-the-bag-form` is abandoned:
-   5 ahead, 10 behind, and its commits are the earlier monolithic version of work that landed properly
-   as #51-#53, plus one that already merged as #48. Nothing on it is wanted. **Deleting a branch by
-   hand is a GitHub UI job** — the git proxy refuses `--delete` — so it needs your click.
-   And `CLAUDE.md`'s domain map still lists `coffee.techpaddock.io` as **"built, not yet deployed"**.
-   It has been live and green for a day, and is now serving the brew log. That is a brief change, so
-   it is yours; say the word and I will correct the row.
-2. **2026-09-12 — Verify `SESSION_SECRET` parity. Rotated again at 01:39, live only after this
-   push.** Rotating is the right move rather than churn: the existing values cannot be read back out
-   of the dashboard, so parity cannot be confirmed by inspection — setting one fresh known value on
-   all five is the only way to guarantee it.
-   **A dashboard change does not reach a running deployment.** Vercel bakes the environment into the
-   serverless function at deploy time, so reading `process.env` per request still reads the
-   environment the deployment was built with. At 01:45 all five projects had settings changed at
-   01:39-01:40 and a last deployment of 00:48:22 — fifty-one minutes earlier — so every app was
-   still
-   running the previous secret. **Do not test SSO before a redeploy; you would be testing the old
-   value and learning nothing.**
-   Once deployed: log in at `techpaddock.io`, then open a tool from a hub tile, on desktop and on
-   mobile. A loop on both points at the secret; a loop on mobile only points at the iframe, which is
-   the separate known bug. No agent can read the values — this one is Joel's eyes only.
-3. **2026-09-11 — Set `MS_GRAPH_CLIENT_ID`/`_SECRET`/`_REFRESH_TOKEN` and `CRON_SECRET`** on
-   `tp-tracker`. Shipped in #22 and inert without them. They degrade quietly by design, so nothing
-   will tell you they are doing nothing. Needs a one-time Azure registration against a personal
-   Microsoft account — the `consumers` authority, scopes `offline_access Calendars.Read
-   Tasks.ReadWrite`, and one by-hand authorization-code exchange to mint the refresh token, since the
-   code only ever does `grant_type=refresh_token`.
-   **Order matters, and it is a trap** (found 2026-09-12 by reading the route). The tracker's
-   middleware exempts `/api/cron/*` from the password gate outright, and the route guards itself with
-   `if (secret && ...)` — which fails **open** when `CRON_SECRET` is unset. That is harmless today
-   only because `graphConfigured()` is false and the route answers "Outlook is not connected". Set
-   the three `MS_GRAPH_*` values without `CRON_SECRET` and it becomes an unauthenticated public
-   endpoint that creates To Do items in a personal Microsoft account on demand. **Set `CRON_SECRET`
-   first, or in the same save. Never after.**
-4. **2026-09-11 — Add `build (coffee)` and `requested-by-joel` to branch protection's
-   required checks.** The matrix is five jobs and the rule names four — confirmed today the hard way,
-   when #48's merge was refused with "4 of 4 required status checks are expected", so `build (coffee)`
-   is currently protecting nothing.
-   `requested-by-joel` is new in the same change as this note — the job in
-   `.github/workflows/pr-requested.yml`. It fails a pull request whose body does not record that you
-   asked for it, but **a failing check only blocks a merge if it is required** — until you add it, it
-   is a red X the technical director reads rather than a gate.
-   **Add it by the exact name `requested-by-joel`.** That is the job name, which is the context
-   GitHub reports. The workflow is called "Pull request", so `Pull request / requested-by-joel` is
-   the plausible guess and it is wrong — a required check whose name matches nothing is never
-   satisfied, which would block every merge in the repo until it was removed again. This was verified
-   for the previous version of this check against a live run; verify it again on the first pull
-   request that carries it before requiring it.
-5. **2026-09-11 — Run `supabase link` and `migration list` once, locally.** Needs an access token no
-   agent should hold. Expect eight local matching remote with `20260908235234` remote-only. That gap
-   is deliberate. Do not repair it — a hook blocks the command.
+1. **2026-09-15 — Delete `claude/resume-template-management-and-render-fixes`. It came back from
+   the dead and it is not harmless.** #56 merged at 00:14:08 and GitHub auto-deleted the branch; the
+   Resume Formatter pushed thirteen seconds later and git **recreated** it rather than refusing.
+   I tried to delete it and the git proxy still refuses `--delete` with a 403 — that note in here is
+   accurate, so **this needs your click** in the GitHub UI. Nothing else is blocked by it.
+   **It is worse than it was reported to me, and the difference is the point.** The agent described
+   it as "one orphaned doc commit". It is not: because #56 was squash-merged, the resurrected branch
+   carries **all six** of its original commits, and a pull request opened from it would claim to
+   change **18 files and 1,402 lines** — the whole of #56 again. The *content* difference from `main`
+   is genuinely just two files, which I verified two ways. That gap between what it contains and what
+   it would appear to propose is the squash-stack trap already in `CLAUDE.md`, showing up for the
+   third time in four days and in a new costume.
+
+1. **2026-09-15 — #56 is merged at `1a40550`. `claude/brief-migration-and-branch-conventions` is
+   finished and waiting on Joel for a pull request.** The predicted cost arrived on schedule: this
+   branch was behind the moment #56 landed and has taken `main` again, exactly as
+   *Require branches to be up to date before merging* forces. That is the order working, not a
+   surprise.
+   **Checked for the trap the merge-order rule names: a rule change invalidating work already open.**
+   It does not here. #56's migration is additive, which the new shape rule permits; its branch is
+   already `claude/resume-<description>`, which the new naming rule permits. Nothing in #56 becomes
+   non-compliant by merging the conventions after it.
+2. **2026-09-15 — The history rewrite, authorized and blocked behind #56.** Detail in the artifact
+   and unchanged: #56 merges or closes, then *Block force pushes* and *Restrict deletions* come off
+   `main`, then the rewrite with Joel present, then protection back on. Irreversible once pushed.
+
+## Parked
+
+- **2026-09-15 — The branch-name action prefix.** Drafted at Joel's request and parked by him the
+  same hour, before it reached `main`. **The area rule he approved earlier stands and is unaffected:**
+  `claude/<area>-<description>`.
+  The draft was six non-overlapping actions — `feat`, `fix`, `ci`, `db`, `doc`, `ops` — placed before
+  the area, with the area omitted where no single app owned the change.
+  **The part worth keeping if this is ever revived** is the objection to two of the three examples
+  that prompted it. `ci` is a kind of change and works. `pr` and `mrg` are *states*, and a state
+  cannot live in a branch name: the name is fixed for the life of the branch and the state moves
+  several times a day, so `mrg-…` is accurate for about an hour and misleading afterwards, and nobody
+  renames a branch to keep a label honest. What it decays into is noise shaped like information.
+  Where a change has got to is already carried by two things that update themselves — the pull
+  request's own state, and this ledger.
+  **Two branches were renamed to the parked scheme before it was parked** and keep those names:
+  `claude/doc-brief-migration-conventions` and `claude/doc-resume-handoff-migration`. Renaming them
+  back would cost Joel two more deletions to fix a cosmetic inconsistency, which is not worth it. A
+  name is not a rule.
+
+Deliberately deferred. Not waiting on anyone, not forgotten, and not to be picked up as background
+work. Something here moves only when Joel says so.
+
+- **2026-09-15 — `CRON_SECRET` and the Microsoft Graph integration.** Parked at Joel's request.
+  **What it is:** `tracker`'s daily sweep at `/api/cron/stale-tasks` reads the dashboard's decay
+  list, finds threads that have gone quiet with no follow-up task already open, and creates a
+  Microsoft To Do task for each through Graph.
+  **Why it is parked safely rather than left half-done:** a scheduled job cannot log in, so
+  `middleware.ts` waves `/api/cron/*` past the password gate, and the route's own guard reads
+  `if (secret && …)` — which means an unset `CRON_SECRET` skips the check entirely and the endpoint
+  is public. It is harmless *only* because the next line returns early when Graph is unconfigured.
+  **So the parking is the safe state and un-parking is the dangerous moment.** Whoever picks this
+  up sets `CRON_SECRET`, redeploys so it is actually live, and only then sets `MS_GRAPH_*`. Setting
+  the Graph credentials first publishes an unauthenticated endpoint that writes into Joel's Outlook
+  on demand.
+
 ## Done since this ledger was last written
+
+- **2026-09-15 — The git history was rewritten to scrub real names. What it cost, and what it could
+  not reach.** Seven real entities — five companies, two people — traced to one seed-contacts line in
+  `CLAUDE.md`'s history. **They were live on `main` as well, not merely historical**, in three
+  `apps/tracker` files, which two of my earlier reports had called clean. The first audit searched
+  emails exhaustively and proper nouns not at all; the second examined history and assumed the
+  working tree was settled.
+  **Five things worth not rediscovering:**
+  1. **`--replace-text` does not touch commit messages.** Six occurrences were hiding there.
+     `--replace-message` with the same file is required, or the scrub reports clean and is not.
+  2. **Derived values are the trap.** A name in a test has slugs, email domains and lowercase
+     variants that are *separate string literals*. `slugify("X")` asserted against a lowercase
+     concatenation breaks if only the input is replaced. One was still missed —
+     `recruiter@attain.example`, lowercase, where the map held only the capitalised company — and the
+     suite caught it. **An eyeballed scrub would have shipped it.**
+  3. **Nine blobs are permanently out of reach**, in GitHub's `refs/pull/*`. GitHub owns those refs.
+     A clone is clean; a determined look at old pull-request refs is not. Only GitHub Support can
+     clear them, and **the scrub must never be described as a complete erasure.**
+  4. **The repo and the database disagreed on four migration versions**, because the hosted API
+     stamps its own. Fixed by renaming files, not by repairing the database: the database records
+     what ran, the repo records what was intended, and when they disagree about history the repo
+     moves.
+  5. **A stale clone can silently undo all of it.** Every checkout predating the rewrite reports
+     dozens of "unpushed" commits and a stop-hook will tell an agent to push them. **Pushing restores
+     the real names.** Mine did exactly this within minutes; TechPad Gen hit it too and correctly
+     reset rather than pushed. Any session open across a rewrite must re-clone, never pull.
+  **Mechanics, because two guards blocked the last step and neither was wrong.** The repo hook
+  refuses `git push … main` — correct, and its regex also catches any compound command merely *ending*
+  with the word `main`. The harness classifier separately refused the force-push. Joel finished it
+  through the GitHub UI: default branch moved to a rewritten branch, `main` recreated from it. He
+  renamed `main` to `main-dep` rather than deleting it, which left **every scrubbed name live on that
+  branch** until it was deleted — the safer-looking choice was briefly the more exposed one.
+
+- **2026-09-15 — #56 merged at `1a40550`, migration applied first.** `20260914221259` went in at the
+  gate before the merge, which is the new shape rule's first real use: additive, so the running code
+  could not see it, so applying first was safe. Verified from a fresh query rather than from the
+  write — `archived_at` present, constraint present, three templates intact, one active.
+  **And it settled the open question about versions.** Recorded under `20260914221259`, the file's
+  own, by inserting the migration row in the same transaction as the DDL. So the preferred mechanism
+  in `supabase/README.md` is now proven rather than proposed, and no file has to be renamed after the
+  fact. That is the drift closed at its source.
+
+- **2026-09-15 — The Resume Formatter's handoff rewrite is preserved, not retyped:
+  `claude/resume-handoff-migration-section`, off current `main`.** Their commit `025b41e`
+  cherry-picked verbatim — same message, same bytes, 2 files and 55 insertions, identical to the
+  content diff I measured. **I did not edit a word of it**, which matters: the rule is that the TD
+  does not write another agent's handoff, and transplanting a commit onto a correct base is a git
+  operation rather than an authoring one. The section stays theirs.
+  It is a real improvement, which is why it was worth saving rather than dropping: it turns the stale
+  "blocked" section into the durable thing — *why the CLI can never push here, and what to do
+  instead* — and names the two wrong turns that look reasonable at 11pm.
+
+- **2026-09-15 — The resurrection was at least half mine, and the ledger should say so.** The agent
+  took the blame for pushing without re-checking the pull request state. Fair, but incomplete.
+  **I pushed a banner onto their branch saying "rewriting it is yours", and then merged the branch
+  out from under them three minutes later.** That is an instruction to start work and a removal of
+  the place to do it, in that order. The agent had no way to see the merge — no agent can see a pull
+  request change state.
+  **The lesson is for the TD, not for them: do not leave a to-do on a branch you are about to
+  merge.** Either the note points at a fresh branch, or the merge waits. A banner that says "yours to
+  finish" on a branch with minutes to live is a trap, however accurate its contents.
+
+- **2026-09-15 — Branch protection required checks are correct for the first time.** All six, all
+  GitHub Actions: `build (editor)`, `build (home)`, `build (resume)`, `build (tracker)`,
+  `build (coffee)`, `requested-by-joel`. Joel did it and sent the screenshot.
+  **`Vercel – tp-coffee-app` is off the list**, which matters more than the two additions. It was a
+  *deployment* status required for one app out of five, and leaving it there while turning on an
+  Ignored Build Step would have produced a required check that stops reporting — permanently
+  unmergeable pull requests, arriving through the Vercel side while the CI change was busy
+  preventing exactly that on the GitHub side.
+  **Also now visible: *Require branches to be up to date before merging* is on.** That is why merge
+  order has teeth from here: after any merge, every other open pull request has to take `main` again
+  and re-run before it can go in.
+
+- **2026-09-15 — The Vercel Ignored Build Step is set on `tp-coffee-app`, and it works. Proven, not
+  assumed.** Joel set it through Claude in Chrome. `get_project` does not return the command, so it
+  was tested instead: commit `e88c814` touches nothing but `.claude/`, and across the five projects
+  on that one commit —
+  **`tp-coffee-app` CANCELED with no runtime stats, meaning it never built. `tp-home`, `tp-tracker`,
+  `tp-resume` and `tp-message-editor` all READY and built.** One commit, four controls, one
+  treatment. There is no reading of that except the rule firing correctly.
+  **Correction, 2026-09-15 — I got the consequence wrong and said it confidently.** I reported that
+  a skipped build posts no passing status and that requiring `Vercel – tp-coffee-app` was "one merge
+  away from blocking every Coffee pull request permanently." **That is false.** #56's own checks show
+  it: `Vercel – tp-coffee-app` reported **`state: success`, description "Canceled by Ignored Build
+  Step."** Vercel marks the *deployment* CANCELED and reports *success* to GitHub. A required Vercel
+  check would have been satisfied and nothing would have blocked.
+  Removing it was still the right call, for the reason that survives: a deployment status is not a
+  test, and requiring one for a single app out of five was arbitrary and undocumented. But that is a
+  tidiness argument, not the near-miss I described. **I inferred the mechanism instead of reading it,
+  while writing a warning about a check that never reports — the exact failure mode the warning was
+  about.**
+  **The other four still rebuild on everything.** That is the remaining saving, and it is one paste
+  per project whenever Joel wants it.
+
+- **2026-09-14 — Migration versions reconciled by renaming four files, not by repairing the
+  database.** The `coffee` migrations were applied through the hosted API, which stamps its own
+  version and ignores the filename, so the repo and the database disagreed on four version numbers
+  since 2026-09-11. **The files were renamed to the versions that actually ran.**
+  The direction is the decision. The database is the record of what ran and when; the repo is the
+  record of what was intended. When they disagree about *history*, history wins and the cheap side
+  moves. Editing `supabase_migrations.schema_migrations` to match a document written afterwards is
+  rewriting the past to agree with the present.
+  **Consequence worth carrying: `supabase migration repair` was never needed.** I had put it to Joel
+  as a rule that was written for a different case and arguably did not apply here — and it turned out
+  not to be in the way at all. The lesson is not about migrations. A ban that looks like it needs
+  arguing around is worth one more look for the option that does not touch it.
+  SQL verified identical statement by statement before renaming. Local and remote now differ by
+  exactly one version, `20260908235234`, which is the withheld contacts seed and is permanent.
+  `supabase db push` is safe again — it read those four as unapplied and would have errored on
+  `add column`.
+
+- **2026-09-14 — Three conventions into the brief, all Joel's.** The **migration shape rule**
+  (additive rides with its code; destructive splits into two pull requests, stop-using then drop; the
+  TD applies at gate time before merging; the Deployment section states which shape it is).
+  **Branch naming** — `claude/<area>-<description>`, prefix kept, anything after the description
+  explicitly declared noise. And the **domain map** finally reads `live` for Coffee.
+  The shape rule carries its own incident: `20260912213501` dropped four columns alongside the code
+  that stopped using them, which had no safe application moment and went out only because the live
+  table was queried by hand first.
+
+- **2026-09-14 — `SESSION_SECRET` parity confirmed good by Joel.** Open since 09-12 across two
+  rotations. Closed, and the reason it took two attempts stays on record: the values cannot be read
+  back out of the dashboard, and a dashboard change does not reach a running deployment until it
+  rebuilds.
 
 - **2026-09-14 — GitHub Actions stops rebuilding all five apps on every push: #57.** Joel: "lets only
   push the apps we are updating if possible." Each matrix job now compares its own folder against the
