@@ -121,3 +121,26 @@ chosen.
 
 Landed on this branch rather than a new one: it already edits `CLAUDE.md`, and two branches touching
 one file is a guaranteed conflict the brief explicitly tells the TD to avoid creating.
+
+## 2026-09-15 02:45 — rewritten, because Joel caught the half-measure
+
+Joel: "are we setting them up to do something they cant if they cant compact themselves?"
+
+**Yes, and the first version was a hedge rather than a fix.** It named the gap in its own body while
+still leading with "Compact yourself" as the instruction. Verified there is genuinely no capability —
+no tool, no skill, nothing in the deferred set. `/compact` is Joel's keystroke or the harness acting
+alone.
+
+**Why this mattered more here than it would elsewhere.** `CLAUDE.md` says plainly that only three
+things in this project are mechanically enforced and that everything else holds because an agent
+chooses to comply. A rule containing a clause no agent can execute is not a harmless bit of
+aspiration in that setting: it is a demonstration that the rules can be partly ignored, issued by the
+file that depends on them not being. The cost is to every other rule in the file, which is far more
+than this one buys.
+
+So every clause is now something an agent can actually do — write the record, name the checkpoint —
+and the impossibility is stated as a fact about the system rather than an instruction. The title
+changed too: a rule whose headline commands the impossible is read as the headline, not the caveat.
+
+Joel's intent survives intact. The compaction still happens; what the rule now guarantees is that it
+is *safe* when it does.

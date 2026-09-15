@@ -173,25 +173,27 @@ between configuring something that exists and creating, destroying, or re-pointi
   **Say which shape it is in the Deployment section** — additive and applied before merge, or the
   first half of an expand-and-contract with the drop named as the follow-up. A migration whose shape
   is not stated is treated as destructive until someone reads the SQL.
-- **Compact yourself when you hand work over.** When a branch is finished — the message in which you
-  hand it over, or the pull request when Joel asks for one — that is a checkpoint, and you take it.
-  Sessions here run long and a full context window degrades judgement quietly rather than loudly.
-  **Not at every commit.** You are told to commit as you go, several times an hour, mid-thought;
-  compacting there would shred the working context at the moment you most need it. A commit is a save
-  point. A finished branch is a delivery, and only the delivery is the seam.
-  **The order is the whole rule and reversing it is worse than skipping it.** Write the durable
-  record *first* — handoff current, worklog closed, deployment steps stated, blast radius named —
-  and only then compact. Everything not written down is gone. A handoff composed *after* a
-  compaction is written from a summary of a summary: second-hand, fluent, and confidently wrong,
-  which is the single failure this project has paid for most. So never leave it as "I will write the
-  handoff after." After may not exist.
-  **What is actually yours here.** No agent can compact itself; that is Joel's keystroke or the
-  harness acting on its own. What you own is the half that is yours either way — getting everything
-  durable into the repo before the window closes, and **saying out loud that you are at a compaction
-  point**, so the checkpoint is visible rather than assumed.
-  The benefit worth naming, because it is what makes this more than hygiene: an agent that knows it
-  is about to lose its context writes a real handoff instead of a polite one. This binds the
-  technical director too.
+- **Write yourself down before you hand work over.** A finished branch is a checkpoint: the session
+  may be compacted or ended right after it, and sessions here run long enough that this is the normal
+  case rather than the unlucky one. So when you hand a branch over — in the message that hands it
+  over, or in the pull request when Joel asks for one — **everything that has to survive is in the
+  repo before you send it.** Handoff current, worklog closed, deployment steps stated, blast radius
+  named.
+  **Not at every commit.** You are told to commit as you go, several times an hour and mid-thought.
+  A commit is a save point; a finished branch is a delivery, and only the delivery is a seam.
+  **Then say, in as many words, that you are at a compaction point** — that the durable record is
+  written and the context is safe to lose. That sentence is the deliverable, because it is the only
+  signal anyone gets that the work is safely on disk rather than still in your head.
+  **You cannot compact yourself.** There is no tool and no command for it; `/compact` is Joel's
+  keystroke, and the harness also does it on its own when the window fills. That is stated here as a
+  fact about the system, not as something you are being asked to arrange, because **a rule that
+  instructs an agent to do something impossible teaches it that the rules here are aspirational** —
+  and almost everything in this file holds only because agents choose to comply.
+  **Order, not ceremony.** Compaction is lossy. A handoff written *after* one is composed from a
+  summary of a summary: fluent, second-hand, and confidently wrong, which is the single failure this
+  project has paid for most. Never leave it as "I will write the handoff after" — after may not
+  exist. The benefit worth naming: an agent that expects to lose its context writes a real handoff
+  instead of a polite one. This binds the technical director too.
 - **Say what it takes to deploy it, every time.** Every pull request carries a **Deployment**
   section, and so does the message in which you hand a finished branch over. Four things: what
   happens by itself when this merges, what a human has to do and in what order, how to verify it is
