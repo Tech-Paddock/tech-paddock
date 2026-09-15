@@ -67,3 +67,31 @@ standalone layout. URLs do not change, so existing links to `/admin` keep workin
 
 **No pull request opened**, per the brief's new rule: the finished branch is the deliverable and
 asking for a pull request is Joel's call.
+
+## 2026-09-15 — brought onto the rewritten main
+`main` was **force-updated** while this branch sat: `1a40550...ab660ed (forced update)`, head
+*"Replace real people and companies in tracker fixtures with placeholders"*. Seven real entities —
+five companies and two people — were live in `apps/tracker` fixtures, not merely in history.
+
+**The local copy of this branch was discarded rather than pushed, and that was the whole point.** It
+sat on the pre-scrub history, and the entire content difference between it and the rebuilt remote was
+exactly those three `apps/tracker` files — the un-scrubbed ones. Pushing it would have reintroduced
+real names and an employer, which is the one thing `CLAUDE.md` puts in its Never list and already
+records as a past incident. `git reset --hard` onto the rebuilt remote, then `git merge origin/main`.
+
+Verified after the merge, because this is the check that actually matters here: `apps/tracker` is
+byte-identical to `main`, so the scrub carried through. `apps/resume` and `supabase/` are byte-
+identical too, so #56 is untouched. This branch changes `apps/home` and its own two worklogs and
+handoff, nothing else. `tsc --noEmit` and `npm run build` clean on the merged tree.
+
+**A false alarm of mine, recorded rather than quietly dropped.** Before checking, I read
+`git diff main branch` as this branch deleting #56 wholesale — resume tests, a migration, the scrub
+worklog. It was an artifact of the branch being two commits behind, not a revert: a merge uses the
+merge base, and this branch touches no `apps/resume` file. The merge in fact *created* those files.
+Raising it before verifying was the error.
+
+**#58 is closed and unmerged, and its work rides here.** The rewrite orphaned every original commit,
+so GitHub reports #43 and #51–#57 as `merged: false` too even though their content is plainly on
+`main` — cosmetic for those, but real for #58, whose content never reached `main`. Its branch is
+deleted; its commit survives as `de35e88` in this branch. So this is one pull request carrying both
+the handoff correction and the chrome change, not two.
