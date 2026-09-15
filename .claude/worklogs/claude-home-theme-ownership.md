@@ -53,13 +53,33 @@ reach the three machine-enforced gates — branch protection, the `.claude/setti
 `requested-by-joel`. Those need the TD or a settings change. An agent that accepts a chat override
 for one of those and then hits the wall has promised something it cannot do.
 
+## 2026-09-15 15:05 — Joel assigned a livery per app, which changes the architecture
+Recorded because it affects four other agents' apps and replaces what the earlier plan assumed.
+
+Hub and `/admin` → Martini. Message Editor → Silver Arrows. Pipeline Tracker → Senna.
+Resume Formatter → MP4/4. Coffee → JPS. Both polarities each, toggle in every app's header.
+
+**The platform-wide theme picker is off.** A livery per app is a build-time constant, not a cookie,
+so the root layouts keep their static rendering and there is no cross-subdomain livery to propagate.
+Only **polarity** stays shared at runtime — one cookie carrying `light`/`dark`/`system`, so toggling
+in Coffee flips the hub too. The iframe mismatch is no longer a defect to solve; it is the design.
+
+**Three palettes built for this and gate-passed first time:** Silver Arrows dark, Senna light,
+MP4/4 dark. Every assigned livery needs both halves and those three were missing one. Two needed
+their hairline lifted to the shipped 1.82:1 bar. The gate now runs 551 pairs across 19 themes, 0
+failing.
+
+**One thing found while checking the toggle is placeable:** all five apps have a `<header>`, but
+`apps/resume` is `flex flex-col` where the other four are horizontal, so it needs a small
+restructure rather than just a child element. Flagged here so the Resume Formatter is not surprised.
+
 ## 2026-09-15 14:10 — handoff
 Landed: the TD note, the rewrite warning relocated, two dead worklogs removed, two stale flags
 closed. Documents only — no file under `apps/` is touched, so nothing here can affect a deployment.
 
-Open: the theme system itself, blocked on the TD writing ownership down. The fifteen palettes are
-defined and gate-passing in the session scratchpad; when ownership lands, Phase 2 ports verified
-values rather than re-deriving them.
+Open: the theme system itself, blocked on the TD writing ownership down. Nineteen palettes are
+defined and gate-passing in the session scratchpad, ten of them assigned; when ownership lands, the
+build ports verified values rather than re-deriving them.
 
 Need from TD: the three edits in `HANDOFF.md` under *For the technical director — theme ownership*.
 
