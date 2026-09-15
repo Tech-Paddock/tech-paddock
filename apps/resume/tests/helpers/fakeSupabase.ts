@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 
 type Row = Record<string, unknown>;
-type Result = { data: unknown; error: { message: string } | null };
+type Result = { data: unknown; error: { message: string } | null; count?: number | null };
 
 export type Call = { table: string; op: string; payload?: unknown; filters: [string, unknown][] };
 
@@ -31,6 +31,16 @@ export function fakeSupabase(tables: Record<string, Result | ((call: Call) => Re
       order: () => chain,
       limit: () => chain,
       in: () => chain,
+      // Null checks record themselves as filters so a test can assert which
+      // branch of the templates list ran — archived or live.
+      is: (column: string, value: unknown) => {
+        call.filters.push([`is:${column}`, value]);
+        return chain;
+      },
+      not: (column: string, _op: string, value: unknown) => {
+        call.filters.push([`not:${column}`, value]);
+        return chain;
+      },
       eq: (column: string, value: unknown) => {
         call.filters.push([column, value]);
         return chain;
@@ -47,6 +57,7 @@ export function fakeSupabase(tables: Record<string, Result | ((call: Call) => Re
       select: (..._args: unknown[]) => builder(table, "select"),
       insert: (payload: Row) => builder(table, "insert", payload),
       update: (payload: Row) => builder(table, "update", payload),
+      delete: () => builder(table, "delete"),
     }),
   };
 
@@ -64,6 +75,7 @@ export const mockModules = (overrides: {
   tracker?: unknown;
   upload?: (...args: unknown[]) => Promise<string>;
   download?: (...args: unknown[]) => Promise<Buffer>;
+  remove?: (...args: unknown[]) => Promise<void>;
 }) => {
   vi.doMock("@/lib/supabase", () => ({
     getServiceClient: () => overrides.resume,
@@ -76,6 +88,7 @@ export const mockModules = (overrides: {
       ...actual,
       uploadDocx: overrides.upload ?? (async () => "path/x.docx"),
       downloadDocx: overrides.download ?? (async () => Buffer.from("x")),
+      removeDocx: overrides.remove ?? (async () => undefined),
     };
   });
 };

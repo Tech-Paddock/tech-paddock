@@ -4,8 +4,14 @@ export type DocxParts = {
   document: string;
   styles: string | null;
   numbering: string | null;
-  /** Header/footer part names. Their presence is itself an ATS finding. */
+  /** Header/footer part names. */
   headerFooterParts: string[];
+  /** Header/footer XML, keyed by part name. Two things need the content rather
+   *  than the name: the ATS audit, which must report a header that actually
+   *  carries text and stay quiet about the empty part Word leaves behind, and
+   *  spec extraction, which finds the name and contact sizes here when a
+   *  template keeps that block in its header. */
+  headerFooterXml: Record<string, string>;
   partNames: string[];
 };
 
@@ -58,11 +64,18 @@ export async function readDocxParts(
   }
 
   const partNames = Object.keys(zip.files).filter((n) => !zip.files[n].dir);
+  const headerFooterParts = partNames.filter((n) => /^word\/(header|footer)\d*\.xml$/.test(n));
+  const headerFooterXml: Record<string, string> = {};
+  for (const name of headerFooterParts) {
+    headerFooterXml[name] = (await zip.file(name)?.async("string")) ?? "";
+  }
+
   return {
     document,
     styles: (await zip.file("word/styles.xml")?.async("string")) ?? null,
     numbering: (await zip.file("word/numbering.xml")?.async("string")) ?? null,
-    headerFooterParts: partNames.filter((n) => /^word\/(header|footer)\d*\.xml$/.test(n)),
+    headerFooterParts,
+    headerFooterXml,
     partNames,
   };
 }

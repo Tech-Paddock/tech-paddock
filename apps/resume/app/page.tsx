@@ -25,6 +25,7 @@ type Template = {
   version: number;
   name: string;
   is_active: boolean;
+  archived_at: string | null;
   created_at: string;
   spec: { font: string; bodySize: number; headingSize: number; margins: { left: number; top: number } };
 };
@@ -49,29 +50,62 @@ type Inspection = {
 
 const DOCX = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
+/**
+ * The upload control, used for every file this app takes in.
+ *
+ * A drop target rather than a button: same pattern as Coffee's bag scanner, so
+ * the two tools do not ask for a file in two different ways. The <label> wraps a
+ * visually hidden input, which keeps the keyboard and screen-reader behaviour of
+ * a real file input — a div with a click handler has neither.
+ *
+ * Fixed height, because these sit side by side and a long filename in one must
+ * not make it taller than its neighbour.
+ */
 function FilePick({ label, hint, file, onPick }: { label: string; hint: string; file: File | null; onPick: (f: File) => void }) {
-  const ref = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+
+  // Only ever the first file: every input here takes exactly one document, and
+  // a multi-file drop silently using one of them would be a guess.
+  const take = (list: FileList | null | undefined) => {
+    const f = list?.[0];
+    if (f) onPick(f);
+  };
+
   return (
-    <div className="flex flex-col gap-1">
+    <label
+      onDragOver={(e) => {
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(false);
+        take(e.dataTransfer.files);
+      }}
+      className={`h-full min-h-[10.5rem] border-2 border-dashed rounded-2xl bg-white px-4 py-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${
+        over ? "border-accent bg-accent/5" : "border-line"
+      }`}
+    >
       <input
-        ref={ref}
         type="file"
         accept={DOCX}
-        className="hidden"
+        className="sr-only"
         onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onPick(f);
+          take(e.target.files);
+          // Clear it, or picking the same file twice fires no change event.
           e.target.value = "";
         }}
       />
-      <button
-        onClick={() => ref.current?.click()}
-        className="w-full text-left bg-white border border-line rounded-xl px-4 py-3 flex flex-col gap-0.5"
-      >
-        <span className="text-xs uppercase tracking-wide opacity-60">{label}</span>
-        <span className={`text-sm break-all ${file ? "font-medium" : "opacity-50"}`}>{file ? file.name : hint}</span>
-      </button>
-    </div>
+      <span className="text-3xl block mb-2" aria-hidden>
+        📄
+      </span>
+      <span className="text-xs uppercase tracking-wide opacity-60">{label}</span>
+      <span className={`text-sm mt-1 break-all line-clamp-2 ${file ? "font-medium" : "opacity-60"}`}>
+        {file ? file.name : hint}
+      </span>
+      <span className="text-xs opacity-50 mt-1">{file ? "Choose another, or drop one in" : "Drop it here, or choose a file"}</span>
+    </label>
   );
 }
 
@@ -118,6 +152,8 @@ function ReformatShell() {
   const [job, setJob] = useState({ company: "", role: "", jobUrl: "" });
   const [saved, setSaved] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Template[] | null>(null);
+  const [archived, setArchived] = useState<Template[] | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [template, setTemplate] = useState<File | null>(null);
   const [source, setSource] = useState<File | null>(null);
   const [single, setSingle] = useState<File | null>(null);
@@ -162,11 +198,47 @@ function ReformatShell() {
 
   async function refreshTemplates() {
     try {
-      const res = await fetch("/api/templates");
-      const data = await res.json();
-      if (res.ok) setTemplates(data.templates as Template[]);
+      const [live, gone] = await Promise.all([fetch("/api/templates"), fetch("/api/templates?archived=1")]);
+      const liveData = await live.json();
+      if (live.ok) setTemplates(liveData.templates as Template[]);
+      const goneData = await gone.json();
+      if (gone.ok) setArchived(goneData.templates as Template[]);
     } catch {
       // The tab shows its own empty state; a failed refresh is not worth a banner.
+    }
+  }
+
+  async function setArchivedState(id: string, archive: boolean) {
+    setError(null);
+    try {
+      const res = await fetch(`/api/templates/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived: archive }),
+      });
+      if (!res.ok) {
+        throw new Error((await res.json().catch(() => null))?.error ?? "Couldn't change that template.");
+      }
+      await refreshTemplates();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't change that template.");
+    }
+  }
+
+  /** Deletion is refused by the API for any template a render points at, so the
+   *  confirmation says what it actually does rather than promising more. */
+  async function remove(t: Template) {
+    setError(null);
+    const ok = window.confirm(
+      `Delete ${t.name} (v${t.version})? The file goes too. This is refused if any render was built from it — archive those instead.`
+    );
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/templates/${t.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Couldn't delete that template.");
+      await refreshTemplates();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete that template.");
     }
   }
 
@@ -304,13 +376,18 @@ function ReformatShell() {
                 {pinnedOlder.newest.version}.
               </p>
             )}
-            <FilePick label="Tailored resume" hint="The Jobright export to reformat" file={source} onPick={setSource} />
-            <FilePick
-              label={active ? "One-off template (optional)" : "Template"}
-              hint={active ? "Overrides the saved template, saves nothing" : "Your resume, whose formatting to copy"}
-              file={template}
-              onPick={setTemplate}
-            />
+            {/* Side by side from sm up, stacked on a phone. `items-stretch` with
+                the control's own h-full is what keeps the two the same height
+                when one holds a long filename and the other holds a hint. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+              <FilePick label="Tailored resume" hint="The Jobright export to reformat" file={source} onPick={setSource} />
+              <FilePick
+                label={active ? "One-off template (optional)" : "Template"}
+                hint={active ? "Overrides the saved template, saves nothing" : "Your resume, whose formatting to copy"}
+                file={template}
+                onPick={setTemplate}
+              />
+            </div>
             <button
               onClick={reformat}
               disabled={!source || (!template && !active) || busy !== null}
@@ -436,8 +513,8 @@ function ReformatShell() {
               onPick={uploadTemplate}
             />
             <p className="text-xs opacity-60">
-              Every upload is a new version and becomes active. Templates are never deleted, so an older one is
-              always one tap away.
+              Every upload is a new version and becomes active. Archiving hides one without touching the
+              renders built from it; deleting is only possible when there are none.
             </p>
           </section>
 
@@ -477,9 +554,52 @@ function ReformatShell() {
                     </button>
                   )}
                 </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                  {/* A plain link, not fetch: the browser saves the file itself
+                      and the response never has to pass through React. */}
+                  <a href={`/api/templates/${t.id}/file`} className="underline opacity-80">
+                    Download
+                  </a>
+                  <button onClick={() => setArchivedState(t.id, true)} className="underline opacity-80">
+                    Archive
+                  </button>
+                  <button onClick={() => remove(t)} className="underline text-red-800">
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </section>
+
+          {archived && archived.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <button
+                onClick={() => setShowArchived((v) => !v)}
+                className="text-sm underline opacity-70 w-fit"
+              >
+                {showArchived ? "Hide" : "Show"} archived ({archived.length})
+              </button>
+              {showArchived &&
+                archived.map((t) => (
+                  <div key={t.id} className="bg-white border border-line rounded-xl px-4 py-3 flex flex-col gap-2 opacity-70">
+                    <p className="font-medium break-all">
+                      {t.name} <span className="opacity-60 font-normal">v{t.version}</span>
+                    </p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                      <a href={`/api/templates/${t.id}/file`} className="underline opacity-80">
+                        Download
+                      </a>
+                      <button onClick={() => setArchivedState(t.id, false)} className="underline opacity-80">
+                        Restore
+                      </button>
+                      <button onClick={() => remove(t)} className="underline text-red-800">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </section>
+          )}
         </>
       ) : tab === "history" ? (
         <section className="flex flex-col gap-2">
