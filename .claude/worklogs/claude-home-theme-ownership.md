@@ -73,6 +73,40 @@ failing.
 `apps/resume` is `flex flex-col` where the other four are horizontal, so it needs a small
 restructure rather than just a child element. Flagged here so the Resume Formatter is not surprised.
 
+## 2026-09-15 16:20 — Clark replaces Silver Arrows, and the filter I wrote down was wrong
+Silver Arrows is out. Joel's reason has two halves and I had only recorded one.
+
+**The half I inferred correctly:** Le Mans 1955, Levegh's 300 SLR into the crowd, 83 spectators
+killed. Deadliest accident in the sport.
+
+**The half I invented:** I wrote the rule as "no mass-casualty association, not no driver who died",
+and presented it to Joel as *his* test. He then said plainly that he is fine with liveries tied to
+dead racers and that the Mercedes objection was also **the regime** — the Silver Arrows name belongs
+to the 1934-39 Mercedes and Auto Union teams, funded by the Nazi state at roughly 450,000
+Reichsmarks a year and run as propaganda, swastikas on the cars, with Daimler-Benz using tens of
+thousands of forced labourers during the war. The 1954 W196 is post-war and not itself implicated,
+but it took the name deliberately.
+
+Both halves are now in `HANDOFF.md`. **Generalising one decision into a stated rule and attributing
+it back to him was the error**, and it is the kind that survives because it sounds like policy.
+
+**Clark takes the seat** — Lotus 25, British racing green, yellow nose stripe as the accent. Both
+polarities built and gated.
+
+## 2026-09-15 16:20 — the all-timers book
+Thirty new liveries drawn from historical teams, drivers and the national colours, replacing the
+exploratory sets. The book now has two sections Joel toggles between — **In use** (the ten seated)
+and **Available** (thirty-six) — and the unassigned rounds-one-and-two palettes are retired from
+rendering while staying defined, so re-adding one is a one-word change.
+
+**1,653 contrast pairs across 57 palettes, 0 failing.** Three rounds of failures got fixed on the
+way, and one is worth recording because it is a process error rather than a colour error:
+**I grepped only the `FAIL` lines after the first batch of 24 and missed four hairlines reported on
+a separate line as `LOW`.** They sat below the shipped 1.82:1 bar for a full round before the next
+run caught them. The gate had said so both times; I had filtered its output.
+
+All of this lives in the session scratchpad, not the repo. Nothing here changes an app.
+
 ## 2026-09-15 14:10 — handoff
 Landed: the TD note, the rewrite warning relocated, two dead worklogs removed, two stale flags
 closed. Documents only — no file under `apps/` is touched, so nothing here can affect a deployment.
