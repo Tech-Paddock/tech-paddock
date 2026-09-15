@@ -10,11 +10,13 @@ export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 4 * 1024 * 1024;
 
-export async function GET() {
-  const { data, error } = await getServiceClient()
-    .from("templates")
-    .select("id, version, name, spec, is_active, created_at")
-    .order("version", { ascending: false });
+/** The live list. Archived templates are hidden — that is what archiving is for —
+ *  and `?archived=1` lists those instead, so one can be restored. */
+export async function GET(request: NextRequest) {
+  const archived = request.nextUrl.searchParams.get("archived") === "1";
+  const query = getServiceClient().from("templates").select(SELECT).order("version", { ascending: false });
+
+  const { data, error } = await (archived ? query.not("archived_at", "is", null) : query.is("archived_at", null));
 
   if (error) return NextResponse.json({ code: "db_error", error: error.message }, { status: 500 });
   return NextResponse.json({ templates: data ?? [] });
@@ -48,6 +50,8 @@ export async function POST(request: NextRequest) {
     const spec = extractSpec(parts, paragraphs);
     const findings = auditAts(parts, paragraphs);
 
+    // Across every row including archived ones: version is unique, and skipping
+    // archived rows here would collide with one.
     const { data: latest, error: latestError } = await supabase
       .from("templates")
       .select("version")
@@ -68,7 +72,7 @@ export async function POST(request: NextRequest) {
     const { data: inserted, error } = await supabase
       .from("templates")
       .insert({ version, name: file.name, file_path: path, spec, is_active: false })
-      .select("id, version, name, spec, is_active, created_at")
+      .select(SELECT)
       .single();
     if (error) return fail(500, "db_error", error.message);
 
@@ -80,7 +84,7 @@ export async function POST(request: NextRequest) {
       .from("templates")
       .update({ is_active: true })
       .eq("id", inserted.id)
-      .select("id, version, name, spec, is_active, created_at")
+      .select(SELECT)
       .single();
     if (activateError) return fail(500, "db_error", activateError.message);
 
@@ -94,6 +98,8 @@ export async function POST(request: NextRequest) {
     return fail(500, "upload_failed", "Couldn't save that template.");
   }
 }
+
+const SELECT = "id, version, name, spec, is_active, archived_at, created_at";
 
 function fail(status: number, code: string, error: string) {
   return NextResponse.json({ code, error }, { status });

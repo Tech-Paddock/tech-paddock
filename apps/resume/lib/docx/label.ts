@@ -74,9 +74,11 @@ export function labelParagraphs(paras: Para[]): { content: ResumeContent; covera
   }
 
   const orphans: string[] = [];
+  const structural: Para[] = [];
   content.sections = groups.map((g) => {
-    const { section, unplaced } = toSection(g.label, g.members, entrySize);
+    const { section, unplaced, scaffolding } = toSection(g.label, g.members, entrySize);
     orphans.push(...unplaced);
+    structural.push(...(scaffolding ?? []));
     return section;
   });
 
@@ -88,13 +90,23 @@ export function labelParagraphs(paras: Para[]): { content: ResumeContent; covera
   // Orphans were marked placed on the first pass, so discount them here — the
   // percentage and the dropped list have to describe the same document.
   const reallyPlaced = placed.size - orphans.length;
+
+  // A markdown alignment row (`| :--- | :--- |`) is table scaffolding, not
+  // content: it carries no words, and the output cannot contain it. Counting it
+  // as placed would be the coverage report claiming text the document does not
+  // have — the one thing this design exists to prevent. Counting it as dropped
+  // would be just as wrong, and would put a false miss on every Jobright file
+  // until the number stopped meaning anything. So it leaves both sides, exactly
+  // as a blank paragraph already does.
+  const total = withText.length - structural.length;
+  const netPlaced = reallyPlaced - structural.length;
   return {
     content,
     coverage: {
-      totalParagraphs: withText.length,
-      placed: reallyPlaced,
+      totalParagraphs: total,
+      placed: netPlaced,
       dropped,
-      percent: withText.length === 0 ? 100 : Math.round((reallyPlaced / withText.length) * 1000) / 10,
+      percent: total === 0 ? 100 : Math.round((netPlaced / total) * 1000) / 10,
     },
   };
 }
@@ -103,9 +115,10 @@ function toSection(
   label: string,
   members: Para[],
   entrySize: number | undefined
-): { section: Section; unplaced: string[] } {
+): { section: Section; unplaced: string[]; scaffolding?: Para[] } {
   if (/highlight/i.test(label)) {
-    return { section: { kind: "highlights", label, items: toHighlights(members) }, unplaced: [] };
+    const { items, scaffolding } = toHighlights(members);
+    return { section: { kind: "highlights", label, items }, unplaced: [], scaffolding };
   }
 
   const entryLines = members.filter((p) => !p.listId && (DATE_RANGE.test(p.text) || p.size === entrySize));
@@ -120,9 +133,18 @@ function toSection(
   return { section: { kind: "bullets", label, items: members.map((p) => p.text.trim()) }, unplaced: [] };
 }
 
-/** Highlights arrive either as "metric: description" in one paragraph, or as a
- *  metric paragraph followed by its description — both shapes appear in real files. */
-function toHighlights(members: Para[]): Highlight[] {
+/**
+ * Highlights arrive in three shapes, all of them seen in real files:
+ * "metric: description" in one paragraph, a metric paragraph followed by its
+ * description, or a markdown table Jobright pastes in as plain text.
+ *
+ * Text is only ever sliced out of the source here, never composed — same as the
+ * colon split has always done.
+ */
+function toHighlights(members: Para[]): { items: Highlight[]; scaffolding?: Para[] } {
+  const asTable = fromMarkdownTable(members);
+  if (asTable) return asTable;
+
   const out: Highlight[] = [];
   for (let i = 0; i < members.length; i += 1) {
     const text = members[i].text.trim();
@@ -139,7 +161,45 @@ function toHighlights(members: Para[]): Highlight[] {
     }
     out.push({ metric: "", description: text });
   }
-  return out;
+  return { items: out };
+}
+
+const isPipeRow = (text: string) => /^\|.*\|$/.test(text.trim());
+const splitCells = (text: string) =>
+  text.trim().slice(1, -1).split("|").map((c) => c.trim());
+/** `:---`, `---`, `:---:` — markdown's column alignment row. */
+const isAlignmentRow = (text: string) => {
+  const cells = splitCells(text);
+  return cells.length > 0 && cells.every((c) => /^:?-{3,}:?$/.test(c));
+};
+
+/**
+ * Jobright renders Career Highlights as a markdown table and pastes the result
+ * in as three ordinary paragraphs — a row of metrics, an alignment row, and a
+ * row of descriptions. Left alone, the pipes and dashes render verbatim into the
+ * output table.
+ *
+ * Only recognised when it is unambiguous and nothing is lost: one row of metrics
+ * and one of descriptions, cell counts equal. Anything else falls through to the
+ * paragraph rules and renders as written — ugly and visible beats parsed wrong
+ * and silent, because whatever is dropped here is keyword coverage.
+ */
+function fromMarkdownTable(members: Para[]): { items: Highlight[]; scaffolding: Para[] } | null {
+  const pipeRows = members.filter((p) => isPipeRow(p.text));
+  if (pipeRows.length < 2 || pipeRows.length !== members.length) return null;
+
+  const alignment = pipeRows.filter((p) => isAlignmentRow(p.text));
+  const content = pipeRows.filter((p) => !isAlignmentRow(p.text));
+  if (content.length !== 2) return null;
+
+  const metrics = splitCells(content[0].text);
+  const descriptions = splitCells(content[1].text);
+  if (metrics.length === 0 || metrics.length !== descriptions.length) return null;
+
+  return {
+    items: metrics.map((metric, i) => ({ metric, description: descriptions[i] })),
+    scaffolding: alignment,
+  };
 }
 
 function toEntries(
