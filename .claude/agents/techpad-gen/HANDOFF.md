@@ -116,7 +116,7 @@ stock `red-*`/`amber-*` severity classes. Converting them means editing `tailwin
 **This replaces the platform-wide picker that the earlier plan assumed**, and it is simpler in every
 direction. The livery is fixed per app, so it is a build-time constant rather than a cookie, and the
 root layouts do not need `cookies()` for it and stay statically rendered. The iframe mismatch stops
-being a defect and becomes the design: a Martini hub framing a Silver Arrows editor is intentional.
+being a defect and becomes the design: a Martini hub framing a Clark editor is intentional.
 
 What still needs to be shared at runtime is **polarity only** — one cookie carrying
 `light` / `dark` / `system`, scoped `.techpaddock.io` so toggling in Coffee also flips the hub. Far
@@ -135,7 +135,8 @@ reads as celebration, where the 1955 Mercedes reads as the thing that killed the
 Peterson died in a Lotus 79's sister car at Monza in 1978.
 
 **Three palettes were built for this assignment and did not exist before it**, because every
-assigned livery needs both halves: **Silver Arrows dark**, **Senna light**, **MP4/4 dark**. All
+assigned livery needs both halves: **Senna light**, **MP4/4 dark**, and **Clark** in both (Silver
+Arrows dark was built too and is now unused, retired alongside the rest of the exploration). All
 three passed the 29-pair gate first time; two needed their hairline lifted to the shipped 1.82:1
 bar. Senna light is arguably the truer Senna — the helmet is a yellow ground with the chevrons on
 top, so the dark version is the one that inverts it.
