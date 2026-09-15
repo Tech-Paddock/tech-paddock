@@ -47,6 +47,23 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Parked
 
+- **2026-09-15 — The branch-name action prefix.** Drafted at Joel's request and parked by him the
+  same hour, before it reached `main`. **The area rule he approved earlier stands and is unaffected:**
+  `claude/<area>-<description>`.
+  The draft was six non-overlapping actions — `feat`, `fix`, `ci`, `db`, `doc`, `ops` — placed before
+  the area, with the area omitted where no single app owned the change.
+  **The part worth keeping if this is ever revived** is the objection to two of the three examples
+  that prompted it. `ci` is a kind of change and works. `pr` and `mrg` are *states*, and a state
+  cannot live in a branch name: the name is fixed for the life of the branch and the state moves
+  several times a day, so `mrg-…` is accurate for about an hour and misleading afterwards, and nobody
+  renames a branch to keep a label honest. What it decays into is noise shaped like information.
+  Where a change has got to is already carried by two things that update themselves — the pull
+  request's own state, and this ledger.
+  **Two branches were renamed to the parked scheme before it was parked** and keep those names:
+  `claude/doc-brief-migration-conventions` and `claude/doc-resume-handoff-migration`. Renaming them
+  back would cost Joel two more deletions to fix a cosmetic inconsistency, which is not worth it. A
+  name is not a rule.
+
 Deliberately deferred. Not waiting on anyone, not forgotten, and not to be picked up as background
 work. Something here moves only when Joel says so.
 
