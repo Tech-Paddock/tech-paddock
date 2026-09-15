@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "declared": "node scripts/collect-declared.mjs",
-    "prebuild": "node scripts/collect-declared.mjs"
+    "paddock": "node scripts/collect-paddock.mjs",
+    "prebuild": "node scripts/collect-declared.mjs && node scripts/collect-paddock.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

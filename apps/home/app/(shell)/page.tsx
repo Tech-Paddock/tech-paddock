@@ -1,5 +1,6 @@
 import Landing from "../Landing";
 import { loadGlance } from "@/lib/glance";
+import { loadPitWall } from "@/lib/pitwall";
 
 /**
  * The hub is a top-level dashboard rather than a launcher.
@@ -11,6 +12,7 @@ import { loadGlance } from "@/lib/glance";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const glance = await loadGlance();
-  return <Landing glance={glance} />;
+  // Both in parallel: neither should wait on the other to render.
+  const [glance, pit] = await Promise.all([loadGlance(), loadPitWall()]);
+  return <Landing glance={glance} pit={pit} />;
 }
