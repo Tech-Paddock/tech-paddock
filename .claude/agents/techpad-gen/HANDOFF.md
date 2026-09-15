@@ -108,7 +108,7 @@ stock `red-*`/`amber-*` severity classes. Converting them means editing `tailwin
 | App | Livery | Slugs |
 |---|---|---|
 | Hub and `/admin` | Martini | `martini-light` · `martini` |
-| Message Editor | Silver Arrows | `silver` · `silver-dark` |
+| Message Editor | **Clark** | `clark-light` · `clark` |
 | Pipeline Tracker | Senna | `senna-light` · `senna` |
 | Resume Formatter | MP4/4 | `mp44` · `mp44-dark` |
 | Coffee | John Player Special | `jps-light` · `jps` |
@@ -123,6 +123,16 @@ What still needs to be shared at runtime is **polarity only** — one cookie car
 less machinery than a full theme cookie: `[data-livery="martini"][data-mode="dark"]`, with `system`
 stamping no mode and letting `@media (prefers-color-scheme: dark)` supply the dark tokens. No
 blocking script, no flash.
+
+**Silver Arrows was dropped on 2026-09-15** over the 1955 Le Mans disaster — Levegh's Mercedes
+300 SLR disintegrated into the crowd, 83 spectators killed plus the driver, and Mercedes withdrew
+from racing entirely. **Clark replaces it**: the Lotus 25 in British racing green with the yellow
+nose stripe as the accent. Calm and legible, which is what a tool you write long text in wants.
+
+**Senna was tested against the same rule and kept.** The helmet is worn as tribute worldwide and
+reads as celebration, where the 1955 Mercedes reads as the thing that killed the crowd. The rule is
+*no mass-casualty association*, not *no driver who died* — otherwise JPS goes too, since Ronnie
+Peterson died in a Lotus 79's sister car at Monza in 1978.
 
 **Three palettes were built for this assignment and did not exist before it**, because every
 assigned livery needs both halves: **Silver Arrows dark**, **Senna light**, **MP4/4 dark**. All
