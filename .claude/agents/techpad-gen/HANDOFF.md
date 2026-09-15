@@ -26,9 +26,38 @@ account said something newer than all three. A commit SHA in prose is stale on t
 only honest thing to write is where to look: the Vercel account today, or `/api/version` once that
 exists (item 3 below). That is the same reason the `/admin` page computes rather than asserts.
 
+## The chrome is a layout, not a component inside one page
+
+`apps/home/app/(shell)/` is a route group holding `/` and `/admin`. Its `layout.tsx` renders
+`Chrome.tsx` — topbar, sidebar, and the `.content` box — with each page as `children`. Route groups
+are invisible in the URL, so both routes are unchanged and existing links keep working.
+
+**`/login` is deliberately outside the group.** It is the pre-auth page, and a sidebar there would
+offer links the visitor cannot follow. That is why the chrome is not in the root layout, which
+`/login` shares.
+
+**`children` rather than props is what makes it possible at all.** `/admin` is an async server
+component running live probes, so it can never be rendered *by* a client component — but it can be
+passed *through* one.
+
+`HomeShell.tsx` is gone, split into `Chrome.tsx` (chrome, plus the `APPS` list and the
+tone-completeness check that fails the build when a tool has no colour) and `Landing.tsx` (glance,
+tiles, iframe). Sidebar items are `Link`s reading `usePathname()` and `?app=`, so they work from
+either route and the right one is active on both.
+
+**The trap, before adding a third route here.** The shell was built around an iframe at
+`height: 100%`, so nothing had ever needed to scroll and there was **no `overflow-y` anywhere in the
+stylesheet**. A document-length page is not clipped by that — it escapes into *document* scroll,
+dragging the topbar off the top while `.shell` stays capped at one viewport, leaving the sidebar's
+surface ending partway down the page. `.content` now has `min-height: 0` and `overflow-y: auto`.
+
+Measured rather than eyeballed, because this was the whole risk: scrolling `/admin` to its end moves
+`.content.scrollTop` to 841 while `window.scrollY` stays **0**, the topbar stays visible, and the
+sidebar's bottom edge equals the viewport height exactly.
+
 ## What `/admin` is, and what it deliberately is not
 
-`apps/home/app/admin/page.tsx`, `lib/platform.ts`, `lib/diagnostics.ts`,
+`apps/home/app/(shell)/admin/page.tsx`, `lib/platform.ts`, `lib/diagnostics.ts`,
 `lib/declared.generated.ts`, `scripts/collect-declared.mjs`.
 
 - **Declared** is generated from the repo at build time — `.env.example` names, the CI matrix,
