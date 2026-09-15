@@ -50,6 +50,29 @@ conflict, CI absent rather than red because GitHub cannot build a conflicted mer
 restating production's commit from a stale branch — are kept in the ledger as the case that proved
 the handoff rule, not as live work.
 
+## A merged branch can come back, and it comes back carrying everything
+
+**2026-09-15.** GitHub auto-deleted #56's branch on merge; the Resume Formatter pushed thirteen
+seconds later and git **recreated** it. A push to a deleted branch is a branch creation, not an
+error, so nothing refused it.
+
+**What comes back is not the one late commit.** Because the merge was a squash, the resurrected
+branch carries its entire pre-squash history — a pull request from it would claim 18 files and 1,402
+lines, the whole change again, while its actual content difference from `main` was two files. Check
+both before believing either: `git diff main branch` for what is really different,
+`git diff main...branch` for what a pull request would show. When they disagree by that much, the
+branch is a squash ghost and the answer is a fresh branch off `main`, never a pull request from this
+one.
+
+**The cause was mine and it is easy to repeat.** I pushed a banner onto their branch saying the
+rewrite was theirs to finish, then merged that branch three minutes later. No agent can see a pull
+request change state, so from their side the place to work simply vanished mid-edit. **Do not leave
+a to-do on a branch you are about to merge** — either the note names a fresh branch, or the merge
+waits for the work.
+
+Deleting the resurrected branch by hand still needs Joel: the git proxy refuses `--delete` with a
+403, tested again on 2026-09-15 rather than assumed.
+
 **Branch deletion happens by itself now.** The note that used to live here — git proxy 403 on
 `--delete`, a GitHub UI job — is stale: the repo auto-deletes head branches on merge. #39, #40, #41
 and #42 all vanished without being asked. What the proxy still refuses is deleting a branch by hand,

@@ -19,6 +19,19 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
+1. **2026-09-15 — Delete `claude/resume-template-management-and-render-fixes`. It came back from
+   the dead and it is not harmless.** #56 merged at 00:14:08 and GitHub auto-deleted the branch; the
+   Resume Formatter pushed thirteen seconds later and git **recreated** it rather than refusing.
+   I tried to delete it and the git proxy still refuses `--delete` with a 403 — that note in here is
+   accurate, so **this needs your click** in the GitHub UI. Nothing else is blocked by it.
+   **It is worse than it was reported to me, and the difference is the point.** The agent described
+   it as "one orphaned doc commit". It is not: because #56 was squash-merged, the resurrected branch
+   carries **all six** of its original commits, and a pull request opened from it would claim to
+   change **18 files and 1,402 lines** — the whole of #56 again. The *content* difference from `main`
+   is genuinely just two files, which I verified two ways. That gap between what it contains and what
+   it would appear to propose is the squash-stack trap already in `CLAUDE.md`, showing up for the
+   third time in four days and in a new costume.
+
 1. **2026-09-15 — #56 is merged at `1a40550`. `claude/brief-migration-and-branch-conventions` is
    finished and waiting on Joel for a pull request.** The predicted cost arrived on schedule: this
    branch was behind the moment #56 landed and has taken `main` again, exactly as
@@ -51,6 +64,35 @@ work. Something here moves only when Joel says so.
   on demand.
 
 ## Done since this ledger was last written
+
+- **2026-09-15 — #56 merged at `1a40550`, migration applied first.** `20260914221259` went in at the
+  gate before the merge, which is the new shape rule's first real use: additive, so the running code
+  could not see it, so applying first was safe. Verified from a fresh query rather than from the
+  write — `archived_at` present, constraint present, three templates intact, one active.
+  **And it settled the open question about versions.** Recorded under `20260914221259`, the file's
+  own, by inserting the migration row in the same transaction as the DDL. So the preferred mechanism
+  in `supabase/README.md` is now proven rather than proposed, and no file has to be renamed after the
+  fact. That is the drift closed at its source.
+
+- **2026-09-15 — The Resume Formatter's handoff rewrite is preserved, not retyped:
+  `claude/resume-handoff-migration-section`, off current `main`.** Their commit `025b41e`
+  cherry-picked verbatim — same message, same bytes, 2 files and 55 insertions, identical to the
+  content diff I measured. **I did not edit a word of it**, which matters: the rule is that the TD
+  does not write another agent's handoff, and transplanting a commit onto a correct base is a git
+  operation rather than an authoring one. The section stays theirs.
+  It is a real improvement, which is why it was worth saving rather than dropping: it turns the stale
+  "blocked" section into the durable thing — *why the CLI can never push here, and what to do
+  instead* — and names the two wrong turns that look reasonable at 11pm.
+
+- **2026-09-15 — The resurrection was at least half mine, and the ledger should say so.** The agent
+  took the blame for pushing without re-checking the pull request state. Fair, but incomplete.
+  **I pushed a banner onto their branch saying "rewriting it is yours", and then merged the branch
+  out from under them three minutes later.** That is an instruction to start work and a removal of
+  the place to do it, in that order. The agent had no way to see the merge — no agent can see a pull
+  request change state.
+  **The lesson is for the TD, not for them: do not leave a to-do on a branch you are about to
+  merge.** Either the note points at a fresh branch, or the merge waits. A banner that says "yours to
+  finish" on a branch with minutes to live is a trap, however accurate its contents.
 
 - **2026-09-15 — Branch protection required checks are correct for the first time.** All six, all
   GitHub Actions: `build (editor)`, `build (home)`, `build (resume)`, `build (tracker)`,
