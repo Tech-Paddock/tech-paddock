@@ -44,7 +44,8 @@ The archived template and the active template are disjoint by constraint: neithe
 
 This was append-only until 2026-09-14. Joel asked for deletion so a duplicate upload could be
 removed, and the reasoning behind append-only never covered that case: a template with no renders
-is nobody's history. **Approved by Joel; the TD has not ratified this amendment.**
+is nobody's history. **Approved by Joel 2026-09-14; ratified by the technical director 2026-09-15**, in the act of
+merging #56, which carried this amendment.
 
 **The template file is itself a deliverable**: it doubles as the general-purpose resume to hand
 someone when there is no specific job, so the original bytes are kept, not just the spec — and
