@@ -706,3 +706,69 @@ a.slot:hover {
     border-top: none;
   }
 }
+
+/* ---------------------------------------------------------------- pit wall
+   The board: what needs you, ordered by who is blocked.
+
+   Every colour here comes from a token already in this file. Nothing new is
+   introduced, because the theme belongs to TechPad Gen — severity reads through
+   --sev-urgent and --accent, which were already picked against this ground.
+   -------------------------------------------------------------------------- */
+.pitwall { display: flex; flex-direction: column; gap: 14px; }
+
+.pit-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.pit-head h2 { margin: 0; font-size: 1.15rem; letter-spacing: 0.01em; }
+.pit-asof { margin: 0; font-size: 0.78rem; color: var(--ink-soft); }
+
+.pit-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.pit-car {
+  background: var(--surface); border: none; color: inherit; font: inherit;
+  padding: 8px 10px; text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.pit-car:hover { background: var(--surface-raised); }
+.pit-car[aria-pressed="true"] { background: var(--surface-raised); box-shadow: inset 3px 0 0 var(--accent); }
+.pit-car-name { font-size: 0.8rem; font-weight: 600; line-height: 1.2; }
+.pit-car-seen { font-size: 0.72rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+.pit-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.pit-f { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); display: flex; align-items: center; gap: 5px; }
+.pit-f select { font: inherit; font-size: 0.78rem; text-transform: none; letter-spacing: 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line); padding: 3px 6px; }
+.pit-tally { margin-left: auto; font-size: 0.74rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+.pit-rows { border: 1px solid var(--line); background: var(--surface); }
+.pit-row { display: grid; grid-template-columns: 62px 1fr; gap: 12px; padding: 10px 13px; border-bottom: 1px solid var(--line); align-items: start; }
+.pit-row:last-child { border-bottom: none; }
+.pit-box { background: linear-gradient(90deg, color-mix(in srgb, var(--sev-urgent) 13%, transparent), transparent 60%); }
+
+.pit-pill { font-size: 0.64rem; letter-spacing: 0.09em; text-align: center; padding: 2px 0; border: 1px solid; margin-top: 2px; }
+.pit-box .pit-pill { color: var(--sev-urgent); border-color: var(--sev-urgent); }
+.pit-agent .pit-pill { color: var(--accent); border-color: var(--accent); }
+.pit-clear .pit-pill { color: var(--ink-soft); border-color: var(--line); }
+
+.pit-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pit-what b { font-weight: 600; font-size: 0.92rem; }
+.pit-what > span { color: var(--ink-soft); font-size: 0.83rem; }
+.pit-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
+.pit-tag { font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); border: 1px solid var(--line); padding: 1px 5px; }
+.pit-src { color: var(--accent); }
+
+.pit-empty { padding: 20px 13px; margin: 0; text-align: center; color: var(--ink-soft); font-size: 0.82rem; }
+
+/* Sources that could not be reached are rendered, never swallowed. An empty
+   board and a broken board must not look alike. */
+.pit-unavailable { border: 1px dashed var(--line); padding: 10px 13px; }
+.pit-unavailable-title { margin: 0 0 6px; font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+.pit-unavailable ul { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.pit-unavailable li { font-size: 0.8rem; color: var(--ink-soft); }
+
+@media (max-width: 560px) {
+  .pit-row { grid-template-columns: 56px 1fr; }
+  .pit-tally { margin-left: 0; width: 100%; }
+}

@@ -72,9 +72,9 @@ function Bar({ children }: { children: React.ReactNode }) {
             <span className="topbar-title">Paddock</span>
             <span className="topbar-subtitle">
               {onAdmin
-                ? "Platform diagnostics"
+                ? "The garage — declared against reported"
                 : selected === null
-                  ? "Your command center — pick a tool to get started"
+                  ? "What needs you, with several agents out"
                   : `Working in ${APPS[selected].name}`}
             </span>
           </div>
@@ -87,7 +87,7 @@ function Bar({ children }: { children: React.ReactNode }) {
               group. On the landing this is a same-route query change; from
               /admin it is a route change. Both are client-side. */}
           <Link className={`nav-item ${onLanding ? "active" : ""}`} href="/">
-            <span className="icon">🏁</span> Paddock
+            <span className="icon">🏁</span> Pit Wall
           </Link>
           {APPS.map((a, i) => (
             <Link
@@ -101,7 +101,7 @@ function Bar({ children }: { children: React.ReactNode }) {
           ))}
           <p className="sidebar-label">Account</p>
           <Link className={`nav-item ${onAdmin ? "active" : ""}`} href="/admin">
-            <span className="icon">🔧</span> Admin
+            <span className="icon">🔧</span> The Garage
           </Link>
           <button className="nav-item logout-item" onClick={logout} disabled={loggingOut}>
             <span className="icon">🚪</span> {loggingOut ? "Logging out…" : "Log out"}
