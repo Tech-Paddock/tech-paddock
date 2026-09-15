@@ -1,36 +1,30 @@
 # TechPad Gen — handoff
 
-State as of 2026-09-12.
+State as of 2026-09-15.
 
 Read `RULES.md` first. This file is only what is true right now.
 
 ---
 
-## What is on the branch, unmerged
+## What is live on `main`
 
-`claude/techpad-gen-kickoff-qjnbws`, open as **PR #43** — promoted on Joel's instruction, with the
-approval recorded on the pull request. Green on all five matrix jobs; the merge is the TD's.
+Merged as **`2be59b2`** (#43): the hub's John Player Special livery and the `/admin` page. **`fc9ec7f`**
+(#54) then removed that branch's worklog, which the merge had orphaned.
 
-1. **`417dbdc` — the hub wears a John Player Special livery.** Near-black ground, gold accents, the
-   four tiles on a gold ramp (champagne / gold / brass / bronze). This was a light-to-dark flip, so
-   the token set was expanded until nothing colour-bearing was left literal. It reverts #19's
-   accent-filled topbar deliberately: white on gold measures 2.42:1, gold on black 8.18:1.
-2. **`9bd079e` — `/admin`**, a page showing what the repo declares against what the platform
-   reports. Linked from the sidebar, behind the existing password gate.
-
-Both were built and rendered locally. **The deploy outage is over** — previews build on this branch
-and production is promoting again.
+- **The livery.** Near-black ground, gold accents, the four tiles on a gold ramp — champagne, gold,
+  brass, bronze. A light-to-dark flip, so the token set was expanded until nothing colour-bearing was
+  left literal. It reverts #19's accent-filled topbar deliberately: white on gold measures 2.42:1,
+  gold on black 8.18:1.
+- **`/admin`.** What the repo declares, against what the platform reports. Linked from the sidebar,
+  behind the existing password gate. Described in full below.
 
 **This file deliberately does not name the commit production is serving.** An earlier version did,
 and was wrong by the time it was read. At the point that was caught there were four documents each
-naming a different production commit, every one correct when written: this branch said `92c1ec1`,
-`main`'s copy of this file said `0c7d882`, the gate comment on #43 said `f06ff0c`, and the Vercel
-account said something newer than all three. A commit SHA in prose is stale on the next merge, so
-the only honest thing to write is where to look: the Vercel account today, or `/api/version` once
-that exists (item 3 below). That is the same reason the `/admin` page computes rather than asserts.
-
-Two changes share this branch because the session was pinned to it. The second extends the token
-block the first created, so it reads as one "restyle the hub" branch rather than as reuse.
+naming a different production commit, every one correct when written: this file's own copy on `main`
+said `0c7d882`, the branch said `92c1ec1`, the gate comment on #43 said `f06ff0c`, and the Vercel
+account said something newer than all three. A commit SHA in prose is stale on the next merge, so the
+only honest thing to write is where to look: the Vercel account today, or `/api/version` once that
+exists (item 3 below). That is the same reason the `/admin` page computes rather than asserts.
 
 ## What `/admin` is, and what it deliberately is not
 
@@ -62,10 +56,12 @@ Everything below is outside what this agent may do alone, and **none of it has b
 approved this list as a whole on 2026-09-12, so the next session inherits it as agreed rather than
 as a proposal to re-open.
 
-`.claude/worklogs/claude-techpad-gen-kickoff-qjnbws.md` carries the same list broken into
-request-by-request scope — who each piece belongs to, and which two are cheapest to prove first.
-Deliberately not duplicated here: the worklog dies with the branch and this file outlives it, so one
-of them has to be the detail and the other the summary.
+The scope below used to live in the worklog of the branch that carried #43, with this file holding
+only a pointer to it.
+**The worklog was then deleted with its branch (#54) and took the detail with it** — the pointer
+outlived the thing it pointed at. It is inlined here instead, because the test of "move what
+outlives the branch into the handoff" is whether this file still reads correctly once no worklog
+exists.
 
 **One thing the approval does not cover, and I am not treating it as covered.** Item 4 contains a
 sub-decision about the hub reading the GitHub API at request time, which would put a **read-only
@@ -76,8 +72,8 @@ latency.
 
 ### 1. Do NOT create a new Vercel project or DNS record for the admin page
 
-**`/admin` needs neither.** It is a route inside `apps/home` and ships with the hub on the next
-deploy — no new project, no new subdomain, no new environment variable.
+**`/admin` needs neither.** It is a route inside `apps/home` and shipped with the hub — no new
+project, no new subdomain, no new environment variable.
 
 If `admin.techpaddock.io` is wanted anyway as a separate app, the real cost is:
 
@@ -94,26 +90,48 @@ platform is down, a sixth Vercel project does not achieve it** — it shares the
 and the deploy pipeline. That job needs something outside the platform entirely: an external
 uptime monitor. Note it cannot reach `/api/health` today, which sits behind the password gate.
 
-### 2. Make the tools answerable — needs the TD, then three agents
+### 2. Make the tools answerable — needs the TD, then two app agents
 
-The page reports unknowns because it cannot see inside any app. To close that:
+The page reports unknowns because it cannot see inside any app. Two separate pieces of work, and
+they are not the same people's:
 
-- **`/api/health` in `editor`, `tracker` and `home`.** `resume` and `coffee` already have one.
-  Each is that app agent's own work; `apps/coffee/app/api/health/route.ts` is the pattern.
-- **A middleware carve-out for `/api/health` in each app**, exactly like tracker's existing
-  `/api/summary` one. This is shared auth plumbing — the TD's, and not any app agent's to do
-  unilaterally. Without it the hub gets 401 even where the route exists.
+**The carve-out is the TD's.** `middleware.ts` — the file gated because it *is* the password gate,
+so a bad edit publishes an endpoint rather than breaking a login. The pattern already exists and is
+reviewed: tracker's `/api/summary` bypass. Exact-path match, `x-internal-secret` header, fails
+closed.
 
-Scope it as one change per app so the carve-outs land reviewed rather than copied in a hurry.
+| app | has `/api/health` | needs a route | needs a carve-out |
+|---|---|---|---|
+| editor | no | yes | yes |
+| tracker | no | yes | yes |
+| resume | **yes** | — | yes |
+| coffee | **yes** | — | yes |
+| home | no | — | — |
+
+**`resume` and `coffee` need only the carve-out.** Their routes are already written and are
+currently unreachable from the hub, returning 401. That makes them the cheapest two to do first and
+the cheapest proof the mechanism works end to end.
+
+`home` needs neither: the hub reports on itself without a network call, deliberately.
+
+**The routes are the editor and tracker agents' own work.** Pattern:
+`apps/coffee/app/api/health/route.ts`. Each app reports on its own dependencies and the hub only
+aggregates, so nothing in `apps/home` changes — `/admin` already renders whatever comes back, and
+shows these as unknown with the reason until they exist.
+
+One change per app rather than one change across four, so each carve-out is reviewed on its own.
 
 ### 3. A public `/api/version` per app — the highest-value item on this list
 
-One line returning the deployed commit SHA, unauthenticated. It would have made the three-hour
-deployment outage visible in seconds instead of being found by reading build logs. Vercel exposes
-the SHA to the app itself, never to a sibling, so nothing else can show deploy drift.
+One line per app returning `VERCEL_GIT_COMMIT_SHA`, which Vercel exposes to an app but never to a
+sibling — so nothing else in the platform can show deploy drift. It would have made the three-hour
+deployment outage visible in seconds instead of being found by reading build logs, and it is what
+would let this handoff name a production commit without the claim going stale.
 
-Decide whether it is public (so an external monitor can read it) or behind the internal secret.
-Public exposes only a commit hash of a private repo; that is the trade.
+**Decision needed: public, or behind the internal secret.** Recommendation: public. It exposes a
+commit hash of a private repo and nothing else, and public is what lets an external monitor notice
+an outage — the actual use case, since `/api/health` sits behind the password gate where no monitor
+can reach it.
 
 ### 4. Whether `/admin` replaces the pit-wall artifact — and how agents leave notes
 
@@ -140,7 +158,7 @@ The TD needs to settle three things before this is built:
 
 Kept as a record of where they went, not as outstanding work.
 
-- **`middleware.ts` is three versions, not five identical copies.** Raised from this branch,
+- **`middleware.ts` is three versions, not five identical copies.** Raised while building #43,
   landed on `main` as **#47**, corrected in eleven places. The correction names the hazard the old
   wording hid: the file is gated because it *is* the password gate, so a bad edit publishes an
   endpoint rather than breaking a login. `lib/auth.ts` and `lib/password.ts` genuinely are
