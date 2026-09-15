@@ -82,6 +82,38 @@ work. Something here moves only when Joel says so.
 
 ## Done since this ledger was last written
 
+- **2026-09-15 — The git history was rewritten to scrub real names. What it cost, and what it could
+  not reach.** Seven real entities — five companies, two people — traced to one seed-contacts line in
+  `CLAUDE.md`'s history. **They were live on `main` as well, not merely historical**, in three
+  `apps/tracker` files, which two of my earlier reports had called clean. The first audit searched
+  emails exhaustively and proper nouns not at all; the second examined history and assumed the
+  working tree was settled.
+  **Five things worth not rediscovering:**
+  1. **`--replace-text` does not touch commit messages.** Six occurrences were hiding there.
+     `--replace-message` with the same file is required, or the scrub reports clean and is not.
+  2. **Derived values are the trap.** A name in a test has slugs, email domains and lowercase
+     variants that are *separate string literals*. `slugify("X")` asserted against a lowercase
+     concatenation breaks if only the input is replaced. One was still missed —
+     `recruiter@attain.example`, lowercase, where the map held only the capitalised company — and the
+     suite caught it. **An eyeballed scrub would have shipped it.**
+  3. **Nine blobs are permanently out of reach**, in GitHub's `refs/pull/*`. GitHub owns those refs.
+     A clone is clean; a determined look at old pull-request refs is not. Only GitHub Support can
+     clear them, and **the scrub must never be described as a complete erasure.**
+  4. **The repo and the database disagreed on four migration versions**, because the hosted API
+     stamps its own. Fixed by renaming files, not by repairing the database: the database records
+     what ran, the repo records what was intended, and when they disagree about history the repo
+     moves.
+  5. **A stale clone can silently undo all of it.** Every checkout predating the rewrite reports
+     dozens of "unpushed" commits and a stop-hook will tell an agent to push them. **Pushing restores
+     the real names.** Mine did exactly this within minutes; TechPad Gen hit it too and correctly
+     reset rather than pushed. Any session open across a rewrite must re-clone, never pull.
+  **Mechanics, because two guards blocked the last step and neither was wrong.** The repo hook
+  refuses `git push … main` — correct, and its regex also catches any compound command merely *ending*
+  with the word `main`. The harness classifier separately refused the force-push. Joel finished it
+  through the GitHub UI: default branch moved to a rewritten branch, `main` recreated from it. He
+  renamed `main` to `main-dep` rather than deleting it, which left **every scrubbed name live on that
+  branch** until it was deleted — the safer-looking choice was briefly the more exposed one.
+
 - **2026-09-15 — #56 merged at `1a40550`, migration applied first.** `20260914221259` went in at the
   gate before the merge, which is the new shape rule's first real use: additive, so the running code
   could not see it, so applying first was safe. Verified from a fresh query rather than from the
