@@ -79,6 +79,79 @@ database, and a ledger asserting a deployment state nobody re-verified.
 
 ---
 
+## For the technical director — theme ownership, 2026-09-15
+
+**Status: asked for by Joel, not yet written into any document. Until it is, this agent does not own
+themes outside `apps/home` and has not acted as if it does.**
+
+Joel asked the TD to update the markdown so TechPad Gen owns the theme system across all five apps.
+It is recorded here because **he said he may have previously told the TD to undo it**, and because
+nothing in the repo currently authorises it — which is the point. The repo is the only channel
+between agents, so an instruction that lives in a chat nobody else can read did not happen.
+
+### Why it is needed
+
+A fifteen-theme system was designed and gate-passed on 2026-09-15 — 464 contrast pairs across the
+29 places `globals.css` actually paints one token on another, 0 failing. `apps/home` can take it
+with **no rule changes at all**: every rule there already reads through `var()`.
+
+The four tools cannot. They are Tailwind with colour compiled in at build time — `bg-paper` becomes
+`background-color: #FBF4EC`, not a variable — plus 69 literal `bg-white`, 23 `text-white`, and ~40
+stock `red-*`/`amber-*` severity classes. Converting them means editing `tailwind.config.ts`,
+`globals.css`, `layout.tsx` and colour utilities **inside four other agents' folders**, which
+`RULES.md` permits only as a declared exception, not as ownership.
+
+### Three edits, and the second is the one that gets missed
+
+1. **`CLAUDE.md`, the "Who you are" table.** Extend the TechPad Gen row to `apps/home`,
+   cross-cutting UI, shared conventions, **the theme system in all five apps**.
+
+2. **The four tool charters.** Each currently assigns its agent a team livery — Scuderia red, Aston
+   green, Silver Arrows, McLaren papaya. Ownership without a matching prohibition over there is half
+   a rule: the next Coffee or Tracker session adds a hex, and a theme then breaks in one app only,
+   so nothing tells anyone. Proposed wording:
+
+   > **Colour is not yours.** Do not add a hex, a Tailwind stock colour utility (`bg-white`,
+   > `text-red-800`), or a `theme.extend.colors` entry. Paint through the shared tokens. Needing a
+   > colour that does not exist means asking TechPad Gen for a token, not inventing one.
+
+3. **`CLAUDE.md`, the shared foundation.** `lib/theme.css` becomes a byte-identical five-way copy
+   alongside `lib/auth.ts` and `lib/password.ts`. Drift here is visible immediately rather than
+   silent, but it belongs written down beside them. With the warning that comes with it: **`paper`
+   and `ink` mean near-white and near-black in the four tools and the exact opposite in the hub**,
+   so unifying them inverts four apps at once. This app has already paid for that — `globals.css`
+   still carries the comment about a token whose name survived a theme flip while its meaning
+   inverted, painting black on black.
+
+### What should *not* be granted
+
+Themes need `app/globals.css`, `tailwind.config.ts`, the `<html>` attribute and viewport export in
+`app/layout.tsx`, the colour-bearing utility classes, and the new `lib/theme.css`. They do **not**
+need `middleware.ts`, `lib/auth.ts`, `lib/password.ts`, `lib/supabase.ts`, or any API route. Those
+stay exactly as gated as they are. A grant wider than the job is how a gate gets talked past later.
+
+### Joel's standing override, and the one condition on it
+
+On 2026-09-15 Joel said he would rather grant override access case by case, with his explicit
+permission, than write every boundary down in advance. **That works and this agent will act on it.**
+
+One condition, and it is not this agent being cautious — it is the condition `requested-by-joel`
+already enforces for the same reason: **the override gets recorded in the repo.** No other agent can
+see the conversation where he grants it, and every agent acts as the same GitHub account, so an
+override that exists only in chat is indistinguishable from an agent deciding on its own. One line
+in the worklog and in the pull request body, the same shape as the request line:
+
+```
+Override granted by Joel on YYYY-MM-DD — "what he said" — permits: <the specific thing>
+```
+
+**What an override reaches:** jurisdiction — whose folder, who owns what. That is Joel's to give.
+
+**What it does not reach:** the three machine-enforced gates. `main` is protected in the GitHub UI,
+the `.claude/settings.json` hooks refuse a push to `main` and a `supabase migration repair`, and
+`requested-by-joel` fails a pull request body with no request line. Those need the TD or a settings
+change; permission in chat will not move them, and an agent that promises otherwise is wrong.
+
 ## Approved by Joel, 2026-09-12 — for the technical director to schedule
 
 Everything below is outside what this agent may do alone, and **none of it has been started.** Joel
@@ -220,35 +293,31 @@ Kept as a record of where they went, not as outstanding work.
 
 ---
 
-## Two things flagged to Joel, neither of them this agent's to change
+## Two things previously flagged to Joel — both now closed
 
-Recorded here because both outlive the branch, and because the next session in this area will hit
-them before anyone else does.
+**The brief's Coffee row.** `CLAUDE.md` said `coffee.techpaddock.io` was "built, not yet deployed"
+while the ledger said it was fully up. Corrected on `main` in #61; the row now reads **live**. The
+hub's Coffee tile was never wrong — the domain always resolved.
 
-### The brief contradicts the ledger about Coffee
+**Which workflow is in force.** Settled. `CLAUDE.md` now carries *"Commit and push your work. Do not
+open a pull request until Joel asks for one"*, and `requested-by-joel` enforces the request line
+server-side. The draft-pull-request convention #50 would have introduced is dead; #50 stays closed.
 
-`CLAUDE.md`'s domain map says `coffee.techpaddock.io` is **"built, not yet deployed"**. The ledger
-says **"COFFEE IS FULLY UP"** — deployed at that domain, behind the password gate, on current
-`main`, with `GET /api/health` returning `{"ok":true}`.
+## The history rewrite of 2026-09-15 — read this before pushing any old branch
 
-The ledger is the one with evidence behind it. This matters more than a stale row usually would,
-because `CLAUDE.md` is the file every session loads first and nothing else is read before it, so a
-wrong row there outlives corrections made anywhere else. **Not this agent's to edit** — raised with
-Joel, and it needs the TD or Joel to change the brief.
+Moved here from the worklog of `claude/techpad-gen-admin-in-shell` before that worklog was deleted
+with its merged branch. It is a safety fact, not a record of a change, so it outlives the branch.
 
-It also touched this app directly: the hub's Coffee tile was described as pointing at a domain that
-does not resolve. It resolves.
+`main` was **force-updated** (`1a40550...ab660ed`) to scrub seven real entities — five companies and
+two people — out of `apps/tracker` fixtures. They were live in the working tree, not merely in
+history.
 
-### Which workflow is in force is currently undefined
+**Any branch cut before that rewrite still carries the un-scrubbed files.** A local copy of
+`claude/techpad-gen-admin-in-shell` was discarded rather than pushed for exactly this reason: its
+entire content difference from the rebuilt remote was those three `apps/tracker` files. If you find
+an old branch, do not push it and do not cherry-pick from it until
+`git diff origin/main <branch> -- apps/tracker` comes back empty.
 
-**#50 was closed unmerged**, so the draft rule and all four of its enforcement mechanisms — the two
-hooks, `promotion.yml`, and the `approval-recorded` check — did **not** land. Separately, Joel has
-told the TD he wants agents to commit their work and never open pull requests, with him opening
-them, and no draft step at all.
-
-Those are two different endings to every agent's change, and the repo currently documents neither as
-settled. This branch has followed the older convention: opened its own pull request, waited, and
-promoted only on Joel's explicit instruction with the approval recorded on #43.
-
-**The TD needs to write down which is in force before the next change is built.** An agent reading
-only `CLAUDE.md` today finds the Merging section unchanged and would open a pull request as normal.
+The rewrite also orphaned every original commit, so GitHub reports #43 and #51–#57 as
+`merged: false` even though their content is plainly on `main`. That is cosmetic for those. It was
+real for #58, whose content never reached `main` and rode into #59 instead.
