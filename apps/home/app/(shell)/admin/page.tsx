@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { DECLARED } from "@/lib/declared.generated";
 import { PROJECTS } from "@/lib/platform";
 import { countByStatus, runDiagnostics, severityFor, type Probe } from "@/lib/diagnostics";
@@ -37,15 +36,10 @@ export default async function AdminPage() {
   const declaredFor = (slug: string) => DECLARED.apps.find((a) => a.slug === slug);
 
   return (
-    <main className="admin">
-      <header className="admin-head">
-        <div>
-          <p className="eyebrow">Admin</p>
-          <h1>Platform</h1>
-        </div>
-        <Link href="/" className="admin-back">
-          ← Paddock
-        </Link>
+    <div className="admin">
+      <header>
+        <p className="eyebrow">Admin</p>
+        <h1>Platform</h1>
       </header>
 
       <p className="description">
@@ -207,6 +201,6 @@ export default async function AdminPage() {
         Probed {new Date(diag.checkedAt).toUTCString()} · declared manifest generated{" "}
         {new Date(DECLARED.generatedAt).toUTCString()}
       </p>
-    </main>
+    </div>
   );
 }

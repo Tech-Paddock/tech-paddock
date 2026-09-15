@@ -1,0 +1,123 @@
+"use client";
+
+import { Suspense, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { TOOLS, type ToolSlug } from "@/lib/platform";
+
+/**
+ * The hub's chrome — topbar, sidebar, and the box everything else renders into.
+ *
+ * It takes `children` rather than the data any particular page needs, which is
+ * what lets `/admin` sit inside it: that page is an async server component
+ * running live probes, so it can never be rendered *by* a client component, but
+ * it can be passed *through* one.
+ *
+ * Rendered from the (shell) route group's layout, so it survives navigation
+ * between the routes inside that group instead of remounting. `/login` is
+ * outside the group deliberately — it is the pre-auth page and must not have a
+ * sidebar offering links it cannot follow.
+ */
+
+/** A step on the hub's gold ramp. Each has a `.tone-*` rule in globals.css. */
+export type Tone = "champagne" | "gold" | "brass" | "bronze";
+
+// Names and URLs come from lib/platform.ts so the chrome, the tiles and the
+// admin page cannot drift apart; only presentation lives here. Typing this as a
+// Record over ToolSlug means adding a tool to that file breaks this build until
+// it is given a colour and an icon — rather than rendering an unstyled tile.
+const PRESENTATION: Record<ToolSlug, { tone: Tone; icon: string }> = {
+  editor: { tone: "champagne", icon: "✉️" },
+  tracker: { tone: "gold", icon: "📊" },
+  resume: { tone: "brass", icon: "📄" },
+  coffee: { tone: "bronze", icon: "☕" },
+};
+
+export const APPS = TOOLS.map((tool) => ({
+  slug: tool.slug,
+  name: tool.name,
+  href: tool.url,
+  ...PRESENTATION[tool.slug],
+}));
+
+/** Which tool `?app=` names, or null for the landing. Shared with Landing. */
+export function selectedIndexFrom(slug: string | null) {
+  const i = APPS.findIndex((a) => a.slug === slug);
+  return i === -1 ? null : i;
+}
+
+function Bar({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const onAdmin = pathname === "/admin";
+  // A tool is only ever selected on the landing route; /admin has no ?app=.
+  const selected = onAdmin ? null : selectedIndexFrom(params.get("app"));
+  const onLanding = !onAdmin && selected === null;
+
+  async function logout() {
+    setLoggingOut(true);
+    await fetch("/api/logout", { method: "POST" }).catch(() => {});
+    window.location.href = "/login";
+  }
+
+  return (
+    <main className="page">
+      <header className="topbar">
+        <div className="topbar-brand">
+          <span className="topbar-badge icon">🏁</span>
+          <div className="topbar-text">
+            <span className="topbar-title">Paddock</span>
+            <span className="topbar-subtitle">
+              {onAdmin
+                ? "Platform diagnostics"
+                : selected === null
+                  ? "Your command center — pick a tool to get started"
+                  : `Working in ${APPS[selected].name}`}
+            </span>
+          </div>
+        </div>
+      </header>
+      <div className="shell">
+        <nav className="sidebar">
+          <p className="sidebar-label">Navigate</p>
+          {/* Links rather than buttons, so they work from any route in the
+              group. On the landing this is a same-route query change; from
+              /admin it is a route change. Both are client-side. */}
+          <Link className={`nav-item ${onLanding ? "active" : ""}`} href="/">
+            <span className="icon">🏁</span> Paddock
+          </Link>
+          {APPS.map((a, i) => (
+            <Link
+              key={a.slug}
+              className={`nav-item ${i === selected ? "active" : ""}`}
+              href={`/?app=${a.slug}`}
+              replace={!onAdmin}
+            >
+              <span className="icon">{a.icon}</span> {a.name}
+            </Link>
+          ))}
+          <p className="sidebar-label">Account</p>
+          <Link className={`nav-item ${onAdmin ? "active" : ""}`} href="/admin">
+            <span className="icon">🔧</span> Admin
+          </Link>
+          <button className="nav-item logout-item" onClick={logout} disabled={loggingOut}>
+            <span className="icon">🚪</span> {loggingOut ? "Logging out…" : "Log out"}
+          </button>
+        </nav>
+        <section className="content">{children}</section>
+      </div>
+    </main>
+  );
+}
+
+export default function Chrome({ children }: { children: React.ReactNode }) {
+  // useSearchParams needs a suspense boundary during static rendering.
+  return (
+    <Suspense fallback={null}>
+      <Bar>{children}</Bar>
+    </Suspense>
+  );
+}
