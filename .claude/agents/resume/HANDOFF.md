@@ -51,7 +51,8 @@ doubles as the general-purpose resume, and until now there was no way to get it 
 `PATCH {archived}` hides one without touching the renders built from it; `DELETE` removes row and
 file but is **refused for any template a render points at**, and refused for the active one. That
 ends append-only, which was Joel's call on 2026-09-14 — the reasoning never covered a duplicate
-upload. **The TD has not ratified the charter amendment.**
+upload. **Ratified by the TD on 2026-09-15** — merging #56 was the ratification, since the amendment was
+in it.
 
 ## Uploads are drop targets now
 

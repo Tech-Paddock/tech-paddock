@@ -43,7 +43,7 @@ agent anything. The repo is the only channel, and these five steps are the whole
 | Agent | Owns | Charter |
 |---|---|---|
 | Technical Director | ops, gatekeeping, the ledger, merges | `.claude/agents/td/` |
-| TechPad Gen | `apps/home`, cross-cutting UI, shared conventions | `.claude/agents/techpad-gen/` |
+| TechPad Gen | `apps/home`, **the visual theme of every app**, cross-cutting UI, shared conventions | `.claude/agents/techpad-gen/` |
 | Message Editor | `apps/editor` | `.claude/agents/message-editor/` |
 | Pipeline Tracker | `apps/tracker` | `.claude/agents/tracker/` |
 | Resume Formatter | `apps/resume` | `.claude/agents/resume/` |
@@ -122,6 +122,25 @@ between configuring something that exists and creating, destroying, or re-pointi
 - Add any new app under `apps/` to the CI matrix in `.github/workflows/ci.yml` in the same pull
   request. The matrix is hardcoded to five names and silently skips anything else, so a new app
   ships untested and nothing tells you.
+- **TechPad Gen owns the theme, in every app — not only the hub.** Palette, colour tokens, type,
+  spacing scale, and the shared component language: buttons, inputs, cards, drop targets, the look of
+  a severity. An app agent does not get to invent a second visual system inside its own folder.
+  **Using what exists is free and needs nobody.** Build with the tokens that are already there, as
+  often as you like. **What needs TechPad Gen is changing or forking it** — a new colour, a new token,
+  a component that deliberately looks different from its equivalent in another app.
+  **Why one owner rather than five.** The hub embeds the four tools in iframes, so two apps' buttons
+  sit inches apart on the same screen. Drift there is not a matter of taste, it is visible, and it
+  makes one product look like five. The JPS livery was a single cross-app identity decision — near
+  black, gold accents, a ramp of champagne through bronze — and it stops meaning anything the moment
+  each app starts amending it locally.
+  **This is already how the careful sessions behave, which is why it is worth writing down rather
+  than imposing.** The Resume Formatter copied Coffee's drag-and-drop pattern into `apps/resume` and
+  said so in its own pull request: *"copied into `apps/resume`, not shared: if it should be common,
+  that is TechPad Gen's call, not mine."* That is this rule, observed before it existed.
+  **It is deliberately not a bottleneck.** You never wait on TechPad Gen to ship. Duplicate the
+  pattern locally, name it in your worklog and your pull request exactly as above, and let TechPad Gen
+  decide later whether it becomes shared. A copy that is flagged is a decision deferred; a copy that
+  is quiet is drift.
 - Keep your worklog current. It carries what a commit cannot: what you are doing right now, what
   you are blocked on, what you decided that affects someone else, what you need from the TD.
 - **Commit and push your work. Do not open a pull request until Joel asks for one.** This binds

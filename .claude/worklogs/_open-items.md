@@ -82,6 +82,20 @@ work. Something here moves only when Joel says so.
 
 ## Done since this ledger was last written
 
+- **2026-09-15 — Ratified: `resume.templates` is no longer append-only.** Joel approved the
+  behaviour on 09-14 and the Resume Formatter amended its own charter in #56. **Merging that pull
+  request was the ratification** — but three places on `main` went on saying "the TD has not ratified
+  this amendment", which was true when written and false the moment it merged. Struck in the charter
+  and the handoff.
+  **Left alone deliberately:** the same claim in
+  `.claude/worklogs/claude-doc-resume-handoff-migration.md`. A worklog is a record of what was true
+  when it was written, not a live document, so correcting one retroactively would make it a worse
+  record rather than a better one. It is also the Resume Formatter's, and by their own rule it should
+  have died with its branch.
+  **The general shape, worth recognising next time:** an approval that lands inside the change it
+  approves leaves the change asserting it is unapproved. Nothing is wrong except the sentence, and
+  the sentence is the part people read.
+
 - **2026-09-15 — The git history was rewritten to scrub real names. What it cost, and what it could
   not reach.** Seven real entities — five companies, two people — traced to one seed-contacts line in
   `CLAUDE.md`'s history. **They were live on `main` as well, not merely historical**, in three
@@ -398,6 +412,18 @@ work. Something here moves only when Joel says so.
   toggle deliberately not built, the Context input. Settled; recorded in the Message Editor charter.
 
 ## Mistakes, recorded so they are not repeated
+
+- **2026-09-15 — A heredoc delimiter reached `main` in a commit message, for the second time.**
+  `MSGEOF` sits at the end of #60's squash message. Cosmetic, and staying: removing it means
+  rewriting `main` again, with protections restored, for one stray word.
+  **The first time this happened it was recorded as a lesson and the lesson did not work**, which is
+  the part worth fixing rather than the typo. It failed because it was filed as "be careful with
+  heredocs" — and this time the delimiter was not in a heredoc at all. It was pasted into a merge
+  tool's `commit_message` parameter, where no shell was involved and the earlier lesson simply did
+  not apply.
+  **So the rule is about the destination, not the mechanism: read the last line of a commit message
+  before submitting it, wherever it is being submitted.** A lesson attached to one mechanism misses
+  the next mechanism, which is how a repeat gets recorded as a novelty.
 
 - **2026-09-11 — PR #27 was merged when it should have been held.** It contradicted three settled
   decisions in the brief. Every first-order check passed — clean rebase, worklog opened, `CLAUDE.md`
