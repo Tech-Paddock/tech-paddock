@@ -135,6 +135,25 @@ All five apps already have a `<header>`, so the toggle has somewhere to go in ea
 `coffee` is a horizontal bar; **`resume` is `flex flex-col` and needs a small restructure** to take
 a control on the right.
 
+**What goes in the header's right-hand slot**, settled 2026-09-15 and the same in all five apps:
+
+```
+                              MARTINI            ☀ ☾
+                       Brabham BT44B, 1975
+```
+
+The livery name in `--accent`, uppercase, 11px; the inspiration beneath it in `--ink-soft` at 10px;
+then the two-state light/dark control. Both states stay visible so it reads as a choice rather than
+a button whose meaning depends on the state it is currently in.
+
+**The inspiration string is not the palette's `source` field.** That is written to be read in a spec
+line and runs too long for chrome — Martini's is three cars. Each livery gets a short one instead:
+Lotus 79, 1978 · Brabham BT44B, 1975 · Ayrton Senna's helmet · Mercedes W196, 1954 ·
+McLaren MP4/4, 1988.
+
+No new contrast pairs: the name reuses accent-on-paper and the active toggle segment reuses
+accent-on-`--surface-raised`, both already in the 29-pair gate.
+
 ### Three edits, and the second is the one that gets missed
 
 1. **`CLAUDE.md`, the "Who you are" table.** Extend the TechPad Gen row to `apps/home`,
