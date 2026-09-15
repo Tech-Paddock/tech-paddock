@@ -89,3 +89,35 @@ Also renamed this branch and its worklog to obey the rule it contains, and
 `claude/resume-handoff-migration-section` with it. A naming rule whose own branch does not follow it
 is a rule nobody will follow either — and the rename is free because Joel is already deleting the
 resurrected branch in the same visit.
+
+## 2026-09-15 02:35 — compact at the hand-over, and the word I narrowed
+
+Joel: "Whenever an agent is submitting their work, like commits or submitting a pull request, they
+should compact themselves. yourself included" — with "you will have to dial it in for me".
+
+**Narrowed "commits" out of the trigger, deliberately, and it is the only change I made to his
+intent.** The brief already tells agents to commit as they go, several times an hour and mid-thought.
+Compacting at each one would destroy working context at precisely the moment it is carrying the most.
+A commit is a save point; a finished branch is a delivery. Only the delivery is a seam worth cutting
+at.
+
+**The order is where the value is, and it is not what the instruction literally says.** Compaction is
+lossy, so the rule that matters is: durable record first, compaction second. A handoff written after
+a compaction is composed from a summary of a summary — fluent, second-hand, and wrong in exactly the
+way that has cost this project more than anything else. Writing that down makes the existing handoff
+and worklog rules load-bearing rather than ceremonial: they stop being paperwork the moment they
+become the only memory.
+
+**Named the mechanical gap rather than papering over it.** No agent can invoke `/compact` on itself.
+A rule stated as "compact yourself" would have been unenforceable and would have quietly become
+decorative, which is worse than absent. So the rule assigns the agent the half that is genuinely
+theirs — write everything down, and announce the checkpoint — and says plainly that the compaction
+itself is Joel's keystroke or the harness's.
+
+**Raised and not decided:** compacting at *submission* means an agent whose work is sent back at the
+gate has already lost the reasoning it needs to answer. The safer boundary is arguably acceptance
+rather than submission. Written as Joel asked, with the tradeoff flagged to him rather than silently
+chosen.
+
+Landed on this branch rather than a new one: it already edits `CLAUDE.md`, and two branches touching
+one file is a guaranteed conflict the brief explicitly tells the TD to avoid creating.
