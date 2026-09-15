@@ -162,6 +162,8 @@ body {
   padding: 0 6px;
 }
 
+/* These are links rather than buttons so they work from any route in the shell
+   group, which means they need the underline turned off explicitly. */
 .nav-item {
   display: block;
   padding: 4px 8px;
@@ -169,6 +171,7 @@ body {
   border: 1px solid transparent;
   background: transparent;
   text-align: left;
+  text-decoration: none;
   color: var(--ink-soft);
   font-size: 11px;
   font-weight: 400;
@@ -195,10 +198,18 @@ body {
   cursor: default;
 }
 
+/* The shell was built around an iframe at height:100%, so nothing ever needed
+   to scroll and no overflow-y existed anywhere in this file. A document-length
+   page dropped in here does not get clipped — it escapes into document scroll,
+   dragging the topbar off the top while .shell stays capped at one viewport,
+   leaving the sidebar's surface ending partway down. Scrolling the content box
+   keeps the chrome fixed, which is the point of having chrome. */
 .content {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
+  overflow-y: auto;
 }
 
 .placeholder {
@@ -355,6 +366,7 @@ a.slot:hover {
   border: none;
   background: var(--tone-bg, var(--accent));
   color: var(--tone-ink, var(--accent-ink));
+  text-decoration: none;
   font-size: 16px;
   font-weight: 700;
   font-family: inherit;
@@ -534,7 +546,9 @@ a.slot:hover {
     align-items: center;
   }
 
-  .eyebrow {
+  /* Scoped to the glance. Unscoped, this also hid the admin page's own "Admin"
+     label, leaving that page with no eyebrow on a phone. */
+  .landing .eyebrow {
     display: none;
   }
 
@@ -548,35 +562,16 @@ a.slot:hover {
 .admin {
   width: 100%;
   max-width: 820px;
-  margin: 0 auto;
+  /* margin-inline only: vertical auto margins on an overflowing flex item put
+     its top out of reach, which is the trap .landing is centred with and this
+     page is too tall for. */
+  margin-inline: auto;
   padding: 32px 24px 64px;
 }
 
-.admin-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.admin-head h1 {
+.admin h1 {
   font-size: 26px;
   margin: 2px 0 0;
-}
-
-.admin-back {
-  color: var(--ink-soft);
-  text-decoration: none;
-  font-size: 12px;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  white-space: nowrap;
-}
-
-.admin-back:hover {
-  color: var(--accent);
-  border-color: var(--accent);
 }
 
 .admin .description {
