@@ -4,8 +4,10 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Glance } from "@/lib/glance";
+import type { PitWall as PitWallData } from "@/lib/pitwall";
 import { APPS, selectedIndexFrom } from "./Chrome";
 import GlancePanel from "./GlancePanel";
+import PitWall from "./PitWall";
 
 /**
  * What the landing route renders inside the chrome: the glance and the tiles,
@@ -15,13 +17,14 @@ import GlancePanel from "./GlancePanel";
  * topbar or sidebar. Selection is read from `?app=` rather than held as state,
  * so the sidebar and this component agree without either owning the other.
  */
-function Body({ glance }: { glance: Glance }) {
+function Body({ glance, pit }: { glance: Glance; pit: PitWallData }) {
   const params = useSearchParams();
   const selected = selectedIndexFrom(params.get("app"));
 
   if (selected === null) {
     return (
       <div className="landing">
+        <PitWall data={pit} />
         <GlancePanel glance={glance} />
         <div className="app-buttons">
           {APPS.map((a) => (
@@ -52,10 +55,10 @@ function Body({ glance }: { glance: Glance }) {
   );
 }
 
-export default function Landing({ glance }: { glance: Glance }) {
+export default function Landing({ glance, pit }: { glance: Glance; pit: PitWallData }) {
   return (
     <Suspense fallback={null}>
-      <Body glance={glance} />
+      <Body glance={glance} pit={pit} />
     </Suspense>
   );
 }
