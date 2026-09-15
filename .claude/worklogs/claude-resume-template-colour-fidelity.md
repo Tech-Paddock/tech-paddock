@@ -50,3 +50,66 @@ Re-extracting the spec from the stored `.docx` at render time would end that for
 `renders.template_snapshot` already preserves reproducibility so nothing is lost. **Not built here** —
 Joel did not ask for it, and it is a change to how every render resolves its formatting, which is his
 call and not a thing to slip in alongside a colour fix.
+
+## 2026-09-16 00:05 — handoff
+Landed on this branch: the renderer reads the template's colours and the three sizes of its
+employer/title/date line. `apps/resume` only — no schema, no `middleware.ts`, no shared auth file,
+no other app, no migration.
+
+`npm run test` 109 passed (23 new), `npx tsc --noEmit` clean, `npm run build` clean. Those are the
+two things CI runs, so a push is fully checked.
+
+**Measured against the two files Joel sent, not eyeballed.** Employer 11pt bold `#1A1A1A`, title
+10.5pt grey italic `#666666`, date 10pt grey — the three numbers he named, with 10.5pt resolved out
+of docDefaults where the run itself states nothing. Highlights metric 12.5pt `#1F3864` over a 9pt
+`#444444` description. Name and headings `#1F3864`, contact line `#666666`, document default
+`#1A1A1A`. Coverage 100% with nothing dropped, ATS audit empty.
+
+**Two bugs found while reading the trio, both fixed here.** An entry line's first run is set at the
+heading size, so "the first paragraph at the heading size" could land on an employer — it was a
+heading today only because one happens to come first in the document, and every heading would
+otherwise have taken the grey of the title beside it. And `{ ...DEFAULT_SPEC }` shares its nested
+objects, so writing to `spec.entry.company` wrote into the defaults themselves; in a long-lived
+server process every later template would have inherited whatever the last one measured. Both have
+a test.
+
+**One judgement call worth Joel's eye.** His contact line hyperlinks the email and the LinkedIn in
+the accent colour and sets the phone number grey. The output renders that line as a single run, so
+one colour has to win. By length the accent does — and a phone number in link blue is not what the
+template looks like — so a link's colour is treated as the link's, and grey wins. Say the word if
+you want the accent instead; it is one rule.
+
+**Deliberately not changed: body size.** The template's bullets inherit 10.5pt from docDefaults and
+the renderer emits 10pt, because `bodySize` is the commonest explicitly-stated size and that rule is
+deliberate. Half a point, nobody has mentioned it, and changing it reflows the whole document — so
+it is flagged rather than fixed.
+
+Open: nothing in this change.
+
+**No pull request opened.** Joel has not asked. The branch is the deliverable and `HANDOFF.md` is
+written at the moment a pull request exists, which also keeps this out of the technical director's
+way — see the claim above: `claude/resume-ratify-template-deletion` is already editing that file and
+should merge first.
+
+Need from TD: nothing yet. When this does become a pull request, the merge order in the claim
+applies.
+
+**Deployment.** Nothing happens by itself beyond the rebuild, and there is one manual step that
+matters.
+
+1. On merge, Vercel rebuilds `tp-resume` and only `tp-resume`. No environment variable, no dashboard
+   setting, no migration, no DNS.
+2. **Joel must re-upload the active template afterwards.** `app/api/reformat/route.ts` renders from
+   the spec stored on the template row, not from the stored `.docx`, so the colours cannot appear
+   until a fresh upload re-extracts them. Templates tab → upload → make it active.
+3. Verify: reformat a Jobright export and open the result. The name and section headings are dark
+   blue, the employer is black-ish bold 11pt with a grey italic title and a grey date beside it, and
+   the Career Highlights metrics are blue over grey descriptions. If any of it is black, the active
+   template predates this change and step 2 has not been done.
+4. Skip step 2 and nothing breaks — every existing template renders exactly as it does today,
+   because `normalizeSpec` fills in the fields it is missing. The change is simply invisible.
+
+**The re-upload is the third of these in a week, and it has a root cause.** Re-extracting the spec
+from the stored template file at render time would end it permanently, and `renders.template_snapshot`
+already preserves reproducibility so nothing is lost. Not built here: Joel did not ask, and it
+changes how every render resolves its formatting, which is his call.
