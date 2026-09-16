@@ -162,6 +162,10 @@ wrong or the rule is, and that is a conversation before any code exists.
   until then you do not know what the change is, and the branch would be named after a guess.
 
 - **State your blast radius in the pull request:** which apps, which shared files.
+- **Only the technical director watches a pull request.** Subscribing to a pull request's activity —
+  CI failures, review comments — is the technical director's, and no other agent offers it. **Only
+  one watcher gets the events**, and a second subscriber silently receives nothing rather than an
+  error, so two agents watching means one is deaf to the thing it promised to watch.
 - **Adding or deprecating an app under `apps/` needs no CI change.** The matrix is derived from the
   folders on disk, and one fixed-name `gate` job sits in front of it, so branch protection requires
   a single check that never changes shape. Create the folder and it builds; delete it and it stops.

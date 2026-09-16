@@ -49,10 +49,7 @@ Nothing.
 7. **Switch the required checks to `gate`, `drift` and `requested-by-joel`**, dropping every per-app
    entry. The matrix is derived now, so a per-app required check breaks on every roster change —
    deprecating an app leaves one that can never report. Repository settings, unverifiable from here.
-8. **The pull-request watcher rule.** An agent may subscribe to its own PR, own app only. **Only one
-   watcher gets the events** — a second subscriber silently receives nothing — and the subscription
-   dies with that session, so the offer is only honest said out loud. Yes or no.
-9. **Raise the hairline contrast bar?** `--line` on `--surface` is 1.82:1 in production, short of
+8. **Raise the hairline contrast bar?** `--line` on `--surface` is 1.82:1 in production, short of
    the 3:1 bar for a non-text component. Raising it **changes the look of every app**.
 
 ## Waiting on an agent
