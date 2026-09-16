@@ -24,8 +24,8 @@ gets built next: a page agents write config into is a second source of truth, an
 been injured twice by exactly that.
 
 **The theme system** — ten palettes, five liveries, both polarities, the light/dark control in every
-header. `lib/theme.css` holds every token and is byte-identical in all five apps; `lib/livery.ts` is
-the one file that differs per app and holds a single constant. The four tools' `tailwind.config.ts`
+header. `lib/theme.css` holds every token and is byte-identical in every app; `lib/livery.ts` is
+the one file that differs per app and holds a single constant. The tools' `tailwind.config.ts`
 no longer contains a colour — every entry reads `rgb(var(--token-rgb) / <alpha-value>)`, and the
 triplet form is required, not preferred: it is the only shape Tailwind's alpha modifier can
 interpolate.
@@ -62,7 +62,7 @@ Nothing.
    and cost a round already.
 2. **`apps/home` still has no `test` script.** CI runs `npm run test --if-present`, so adding one
    opts the app in with no CI change. `lib/glance.ts`, `lib/diagnostics.ts` and `lib/pitwall.ts` are
-   pure and untested. `editor` and `home` are the two apps without tests.
+   pure and untested. `editor` and `home` are the apps without tests.
 3. **A style pass, deferred by Joel** — a monospace stack, a type scale to replace ten ad-hoc pixel
    values, and collapsing the three drifted copies of the micro-label rule (`.eyebrow`,
    `.sidebar-label`, `.slot-label`). Pick it up when he returns to it.
@@ -73,4 +73,4 @@ Nothing.
 
 Waiting on Joel: whether to raise the hairline contrast bar. `--line` against `--surface` is 1.82:1
 in production, short of the 3:1 bar. Every new theme matches or beats it, so raising the bar changes
-the look of all five apps — a decision, not a cleanup. It is in the ledger.
+the look of every app — a decision, not a cleanup. It is in the ledger.

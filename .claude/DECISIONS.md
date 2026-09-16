@@ -26,6 +26,16 @@ just been bitten by something and want to know whether it is known.
   disqualify a livery: mass casualties and a regime. Le Mans 1955 killed 83 spectators, and the name
   belongs to the Nazi-funded 1934-39 teams. **This is not a no-dead-drivers rule** — Senna stayed,
   and Peterson, Villeneuve and Rindt are all in the book.
+- **2026-09-16 — The Morning Paper is a Pit Wall tab, not a route and not an app.** `Board · Feed ·
+  Paper`, Paper landing. Moving the board to The Garage was proposed and rejected: the board answers
+  *what needs me now*, The Garage answers *declared versus reported*, and one label cannot carry both.
+- **2026-09-16 — The Paper leads with what is owed, not what arrived.** Threads gone quiet are a
+  task; replies received are a statistic. Above the fold carries no job-search content at all —
+  a privacy requirement, because two days a week the screen is in an office.
+- **2026-09-16 — Stale must be loud.** Past 3× its cadence a panel is struck through and banners
+  itself. Cached data is fine; an honest timestamp nobody reads is not the fix.
+- **2026-09-16 — X/Twitter parked before it was built.** Access was never the hard part — Owned
+  Reads cover the reverse-chronological timeline at $0.001 per resource. Ranking is, and it is ours.
 - **2026-09-15 — One livery per app, both polarities, toggle in every header.** Fixed per app, so it
   is a build-time constant; only polarity is shared, as one `paddock_mode` cookie. A Martini hub
   framing a Clark editor is the design, not a defect.

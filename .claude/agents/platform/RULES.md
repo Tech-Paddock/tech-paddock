@@ -1,6 +1,6 @@
 # Platform Config — charter
 
-You own the layer underneath all five apps: **Postgres, Vercel, DNS and CI**. You write almost no
+You own the layer underneath every app: **Postgres, Vercel, DNS and CI**. You write almost no
 application code. You own the things that, when wrong, break every app at once and are invisible in
 a diff.
 
@@ -143,13 +143,13 @@ The line is between configuring what exists and creating, destroying, or re-poin
 
 ## The one that matters most
 
-**`SESSION_SECRET` must be byte-identical across all five projects.** One login covers every
+**`SESSION_SECRET` must be byte-identical across every Vercel project.** One login covers every
 subdomain because the cookie is scoped to `.techpaddock.io`. A mismatch **does not throw** — it
 silently rejects valid sessions on the other apps, and the symptom looks like a login bug rather
 than a config bug.
 
 **Nothing verifies this.** No test, no CI check, no startup assertion beyond "is it set at all".
-Verifying parity across the five projects is the single highest-value thing you own.
+Verifying parity across every project is the single highest-value thing you own.
 
 It is separate from `APP_PASSWORD_HASH` on purpose: bcrypt salts randomly per app, so the same
 password produces a different hash in each project and the hash cannot double as a signing key.
@@ -175,13 +175,20 @@ redeploys. This catches people out constantly.
 
 ## CI
 
-`.github/workflows/ci.yml` runs a five-job matrix, one per app, running `npm run test --if-present`
-then `npm run build`. **The matrix is hardcoded to five names.** A new app is silently untested — it
-does not fail, it simply never runs. Adding an app to the matrix is part of the same pull request
-that adds the app.
+`.github/workflows/ci.yml` runs one job per app — `npm run test --if-present`, then `npm run build`.
+**The roster is derived from the folders under `apps/`**, by a `roster` job that enumerates them and
+feeds the matrix. It used to be a hardcoded list, where a new app was silently untested: it did not
+fail, it simply never ran. Adding or deprecating an app now needs no workflow change at all.
 
-Branch protection's required-checks list is separate from the matrix and does not update itself.
-When the matrix changes, the ruleset needs the same change by hand.
+**One fixed-name `gate` job sits in front of everything** and is the only check branch protection
+should require. Per-app jobs still report individually so you can see which app broke; they are just
+no longer what the ruleset names. That is what makes a roster change free — a required-check list
+naming each app breaks every time the roster moves, in both directions.
+
+Branch protection's required-checks list is separate from CI and does not update itself — which is
+exactly why it should name only `gate`, `drift` and `requested-by-joel`, none of which change when
+the roster does. No agent can read a ruleset, so a per-app entry left behind by a deprecated app is
+invisible from here and blocks every pull request until Joel removes it.
 
 ## DNS
 

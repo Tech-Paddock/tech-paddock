@@ -30,7 +30,7 @@ install`). Each app's `.env.example` documents its own environment variables, wi
 generate the ones that need generating.
 
 `packages/shared` was never created: `lib/auth.ts`, `lib/password.ts` and `lib/theme.css` are
-byte-identical copies in all five apps, so a session or lockout fix is the same edit five times.
+byte-identical copies in every app, so a session or lockout fix is the same edit five times.
 Worth consolidating before the auth logic changes again.
 
 ## Database

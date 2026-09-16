@@ -40,8 +40,12 @@ Nothing.
    the icon needs a deploy and a phone.** Open it in Safari, Add to Home Screen, check the icon.
 4. **Decide whether to raise the hairline contrast bar.** `--line` against `--surface` is 1.82:1 in
    the theme running in production, short of the 3:1 bar for a non-text component. Every new theme
-   matches or beats the shipped figure, and raising the bar **changes the look of all five apps**.
+   matches or beats the shipped figure, and raising the bar **changes the look of every app**.
    A decision, not a cleanup.
+5. **Morning Paper: polarity or density?** Its two modes are light Dispatch and dark Timing, so the
+   switch *is* the polarity switch — contradicting "one livery per app, both polarities" in
+   `DECISIONS.md`. Either both densities get both polarities, or amend the decision for the hub.
+   **Blocks the build below.**
 
 ## Waiting on an agent
 
@@ -55,6 +59,10 @@ the start of its next session, because the hook prints this file into every one.
    Reported, baked at build time the way `collect-declared.mjs` already does — **computed, never
    typed**, which is the property that page exists to protect. The TD wrote the script and the
    contract; the page is yours.
+2. **Build the Morning Paper.** *Owner: TechPad Gen.* A third Pit Wall tab — `Board · Feed · Paper`,
+   Paper landing — in two densities off one markup tree. The board does not move. The hub holds no
+   keys: everything about jobs and mail comes from `tracker`'s `/api/summary`. Joel has the full
+   brief and the prototype and pastes them at kickoff. **Waiting on Joel item 5 first.**
 
 ## Parked
 

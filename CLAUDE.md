@@ -118,7 +118,7 @@ wrong or the rule is, and that is a conversation before any code exists.
 - **The technical director: the shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`,
   `middleware.ts`, or anything touching `SESSION_SECRET` and the shared cookie. **These are gated for two different reasons, and
   merging them is how the rule gets talked past.** `lib/auth.ts` and `lib/password.ts` genuinely are
-  byte-identical in all five apps — checksummed, not assumed — and a mismatch does not throw, it
+  byte-identical in every app — checksummed, not assumed — and a mismatch does not throw, it
   silently rejects valid sessions on the other four. `middleware.ts` is **three distinct versions**:
   `home`, `resume` and `coffee` share one, `editor` adds a scoped `/api/draft` bypass, `tracker`
   adds `/api/summary` and waves `/api/cron/*` through. That divergence is deliberate, so "they are
@@ -147,8 +147,11 @@ wrong or the rule is, and that is a conversation before any code exists.
   did not happen. `requested-by-joel` fails a body without that line. What no check can see is
   whether the quote is real, so **this rule rests further on honesty than the ones around it.**
 - **State your blast radius in the pull request:** which apps, which shared files.
-- **Add any new app under `apps/` to the CI matrix** in `.github/workflows/ci.yml` in the same pull
-  request. The matrix is hardcoded to five names and silently skips anything else.
+- **Adding or deprecating an app under `apps/` needs no CI change.** The matrix is derived from the
+  folders on disk, and one fixed-name `gate` job sits in front of it, so branch protection requires
+  a single check that never changes shape. Create the folder and it builds; delete it and it stops.
+  **What still cannot be automated is the Vercel project and the DNS record** — both outside the
+  repo, both without an undo. Everything else The Garage will tell you is missing.
 - **TechPad Gen owns the theme, in every app.** Palette, tokens, type, spacing, and the shared
   component language. **Using what exists is free and needs nobody** — build with the tokens already
   there. **What needs TechPad Gen is changing or forking it.** One owner rather than five because the
@@ -242,7 +245,7 @@ Per-tool detail lives in that tool's charter. Live facts about what is deployed 
 - **One repo, monorepo layout.** `apps/{home,editor,tracker,resume,coffee}`, each with its own
   `package.json`, each pointed at by its own Vercel project via that project's Root Directory. There
   is no root `package.json`; work inside the relevant app folder. `packages/shared` was never
-  created: `lib/auth.ts` and `lib/password.ts` are byte-identical copies in all five apps and
+  created: `lib/auth.ts` and `lib/password.ts` are byte-identical copies in every app and
   `lib/supabase.ts` is a per-app variant. **`lib/theme.css` is a sixth byte-identical five-way
   copy** — unlike the auth pair its drift is loud, showing up as one app looking wrong beside
   another in an iframe, but it is one more file that must be edited five times. A session or lockout
@@ -261,7 +264,7 @@ Per-tool detail lives in that tool's charter. Live facts about what is deployed 
   through the app's own server-side API routes.
 - **One login covers every subdomain.** The session cookie is scoped to `.techpaddock.io`;
   `SESSION_SECRET` must be byte-identical across all five Vercel projects or the others silently
-  reject valid sessions. The four tools send
+  reject valid sessions. The tools send
   `frame-ancestors 'self' https://techpaddock.io https://*.techpaddock.io` so only the hub embeds them.
 - **Every deployed app sits behind a password**, with lockout after repeated failed attempts.
 - **Prefer append over rewrite for anything that accumulates.** When a feature involves growing
