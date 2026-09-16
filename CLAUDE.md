@@ -222,7 +222,7 @@ wrong or the rule is, and that is a conversation before any code exists.
   | | Stage | Means |
   |---|---|---|
   | 🟡 | **In progress** | Still being worked on. Covers everything before it is finished, saved or not — that distinction is the agent's business, never his. |
-  | 🟢 | **Needs a PR** | Finished, pushed, CI green. Waiting on Joel's word to open one. |
+  | 🟡 | **Needs a PR** | Finished and pushed, CI green — but the pull request is still work, so it is yellow until Joel asks and the agent writes it. |
   | 🟢 | **Ready to merge** | Pull request open and green. Waiting on the technical director. |
   | 🔴 | **Stuck** | CI failing, a merge conflict, or a step that errored. **Say what is broken, not just that it is.** |
 
@@ -233,6 +233,12 @@ wrong or the rule is, and that is a conversation before any code exists.
   **It cannot report another agent's in-progress work.** That lives in the other agent's session and
   never reaches the repo until it is pushed, so a line about it would be invented. This is the same
   rule as the ledger's: what you have not measured does not get a row.
+
+  **Colour tracks whether an agent still has work, not who is blocking.** That is why *Needs a PR*
+  is yellow: the branch is finished, but writing the pull request — body, blast radius, Deployment
+  section — is real work that has not happened yet. **Green means nothing is left but the merge.**
+  Reading the colours alone should answer "is anything of mine still to do", and the stage name
+  beside it says who moves next.
 
   **A stage comes from `git status` and a live check run in this session — never from memory.** If
   you could not check, the line reads `unchecked` rather than guessing.
