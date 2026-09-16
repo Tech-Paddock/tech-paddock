@@ -16,6 +16,11 @@ type Reformatted = {
   templateLabel: string;
   coverage: Coverage;
   findings: Finding[];
+  /** Whether the formatting was read from the template file or fell back to the
+   *  spec stored at upload. A fallback is shown, never swallowed: silence here is
+   *  what made three rounds of "why didn't that work" cost a re-upload each. */
+  specSource: "file" | "stored";
+  specNote: string | null;
   summary: { name: string | null; contact: string | null; sections: SectionSummary[] };
   docxBase64: string;
 };
@@ -461,6 +466,9 @@ function ReformatShell() {
                   Rendered with {result.templateLabel}.{" "}
                   {result.renderId ? "Saved to your render history." : "Preview only — nothing was saved."}
                 </p>
+                {result.specSource === "stored" && result.specNote && (
+                  <p className="text-xs bg-white border border-line rounded-xl px-4 py-3">{result.specNote}</p>
+                )}
               </div>
 
               {result.renderId && (
@@ -540,7 +548,7 @@ function ReformatShell() {
                     </p>
                     <p className="text-xs opacity-60 mt-0.5">
                       {t.spec.font} {t.spec.bodySize}pt · headings {t.spec.headingSize}pt · margins{" "}
-                      {t.spec.margins.left}&quot; · {new Date(t.created_at).toLocaleDateString()}
+                      {t.spec.margins.left}&quot; as uploaded · {new Date(t.created_at).toLocaleDateString()}
                     </p>
                   </div>
                   {t.is_active ? (

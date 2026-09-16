@@ -6,14 +6,14 @@ Read `RULES.md` first. This file is only what is true right now.
 
 ---
 
-## In flight: one finished branch, waiting on Joel
+## In flight: one branch
 
-`claude/resume-template-colour-fidelity` — colour fidelity and the employer/title/date trio.
-Pushed, all five CI jobs green, current with `main`. **No pull request: Joel has not asked for one.**
-It is finished work, not work in progress; if you are a later session, do not restart it and do not
-cut a second branch over the same files. Its worklog carries the detail.
+`claude/resume-extract-spec-at-render` — `/api/reformat` re-extracts the spec from the stored
+template `.docx` instead of trusting the `spec` column. Its worklog carries the detail and the
+second-order questions.
 
-The 2026-09-14 batch described below merged as #56 and is live.
+**Merged and live:** the colour work is `#67`, squashed onto `main` as `76971bf` and deployed to
+`tp-resume` production. The 2026-09-14 batch is `#56`.
 
 ## The app is rebuilt and live
 
@@ -26,7 +26,7 @@ The original build — structured content CRUD plus template CRUD plus docx gene
 shape: it assumed the app authored resume content. It does not; Jobright does. The auth, password
 and Supabase plumbing survived the rebuild; the content schema and its CRUD did not.
 
-**109 tests pass** on `claude/resume-template-colour-fidelity`, 86 on `main`. Verified by running
+**120 tests pass** on `claude/resume-extract-spec-at-render`, 109 on `main`. Verified by running
 them, not counted from a grep — `grep -c "it("` counts `describe` lines too and reads high.
 
 ## PII scrub: done (#21)
@@ -137,7 +137,7 @@ Additive changes ride with their code; destructive ones split into two pull requ
 
 ## The template's colours and its entry line are read and rendered
 
-On `claude/resume-template-colour-fidelity`, not yet on `main`.
+Merged as #67 and live.
 
 Every output used to be black. `headingColor` and `nameColor` had been in `TemplateSpec` since the
 start and the builder already consumed both — `extractSpec` simply never assigned them. The
@@ -183,33 +183,53 @@ test pinning this; do not swap it back for a spread.
 and the renderer emits 10pt, because `bodySize` is the commonest explicitly-stated size and that
 rule is deliberate. Half a point, nobody has raised it, and changing it reflows the whole document.
 
-## The stored spec is what renders, so a template must be re-uploaded after a spec change
+## The template file is what renders, not the `spec` column
 
-Worth knowing before anyone wonders why the fixes "did not work". `extractSpec` runs once, at
-upload, and `/api/reformat` reads the stored `spec` column rather than re-extracting. So a fix that
-lives in the spec needs the active template uploaded again; only a fix at reformat time — the
-markdown-table parsing, for instance — reaches an existing template. The one-off template slot on
-Reformat does re-extract fresh, which makes it the way to check a template before committing it to a
-version.
+On `claude/resume-extract-spec-at-render`, not yet on `main`. **This is the section to read before
+touching anything about how formatting is resolved.**
 
-**`normalizeSpec` is what makes that survivable rather than fatal.** `resume.templates.spec` is JSON
-with no version, so a spec stored by an earlier release is missing whatever has been added since —
-and reading `spec.entry.company` off one throws rather than degrading. Every stored spec goes through
-`normalizeSpec` before it reaches the builder, which fills each missing field from the defaults and
-keeps the employer at that spec's own `entrySize` rather than letting it fall back to the body size.
-An old template therefore renders exactly as it did. **A future field added to `TemplateSpec` is one
-place to teach, and this is it.**
+`/api/reformat` used to render from `resume.templates.spec` — written once, at upload, by whichever
+release was running then. So every change to what a spec can express did nothing until the template
+was uploaded again by hand, with nothing anywhere saying so. Three times in one week the answer to
+"why didn't that work" was a re-upload. Joel approved ending it on 2026-09-16.
 
-**This is the third re-upload in a week and it has a root cause.** Re-extracting the spec from the
-stored `.docx` at render time would end it permanently, and `renders.template_snapshot` already
-preserves reproducibility so nothing would be lost. Raised with Joel on 2026-09-15 and **not built**:
-he did not ask, and it changes how every render resolves its formatting, which is his call.
+**What is now true.** The route downloads the template's stored `.docx` and runs `extractSpec` on it.
+The file is the template, so the file is what is read.
+
+- **A render's formatting is derived from the file plus the code that reads it.** Two renders from the
+  same template row at different times can legitimately differ. That is the point. `template_snapshot`
+  is what keeps each one auditable — the schema comment has said "the spec as it was at render time"
+  since the table was created, so this change is inside that design rather than against it.
+- **The `spec` column is now a cache and a fallback, not the source of truth.** It is still written at
+  upload and still shown on the Templates tab, which is why that line now reads "as uploaded" — a
+  reader who took those four numbers for what will render would be wrong.
+- **`extractSpec` runs on every saved render**, so a bug in it is now a render-time failure rather
+  than an upload-time one. It must stay total: never throw on a `.docx` that reads.
+
+**The fallback is deliberate and it is never silent.** If the download fails, or the stored bytes are
+not a readable `.docx`, or the row somehow has no `file_path`, the render uses `normalizeSpec` on the
+stored spec and succeeds — that spec is not a guess, it was extracted from those same bytes, and a
+storage blip should not block a resume going out tonight. But an invisible fallback is exactly how
+"the fix didn't work" happened three times, so the response carries `specSource` and a `specNote`
+saying why, and the Reformat tab prints it. **If you ever make that fallback quiet, you have
+reintroduced the bug this change exists to kill.**
+
+Only `StorageError` and `DocxReadError` are caught. Anything else is a programming error and still
+becomes the 500 it should be; there is a test pinning that, because laundering a `TypeError` into a
+quietly degraded render is the obvious way to get this wrong.
+
+**`normalizeSpec` still matters and is still the place a new spec field gets taught about.** It is
+what the fallback goes through, and what keeps an old stored spec from throwing.
+
+**A one-off template attached on Reformat is unchanged** — it always re-extracted, which is why it
+was the way to test a template before committing it to a version.
 
 ## Next steps
 
 0. **Ask Joel whether the contact line should be grey or accent.** His template hyperlinks the email
    and the LinkedIn in the accent colour and sets the phone number grey; the output has to pick one,
-   and it picks grey. Flagged to him 2026-09-15, unanswered. One rule either way.
+   and it picks grey. Offered to him twice, 2026-09-15 and 2026-09-16, and not taken up either time.
+   One rule either way, so it stays as it is until he says otherwise.
 1. **Run real generated output through a free ATS checker.** Still the highest-value open item and
    still untouched: every check in this app verifies it does what it was designed to do, and none
    verifies the design was right. Note the constraint that turned up on 2026-09-14 — doing this

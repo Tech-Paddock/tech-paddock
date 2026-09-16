@@ -7,7 +7,7 @@ import { extractSpec, normalizeSpec, type TemplateSpec } from "@/lib/docx/spec";
 import { labelParagraphs } from "@/lib/docx/label";
 import { buildResumeDocx } from "@/lib/docx/build";
 import { auditAts } from "@/lib/docx/ats";
-import { StorageError, uploadDocx } from "@/lib/storage";
+import { StorageError, downloadDocx, uploadDocx } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +40,8 @@ export async function POST(request: NextRequest) {
     let spec: TemplateSpec;
     let templateId: string | null = null;
     let templateLabel: string;
+    let specSource: SpecSource = "file";
+    let specNote: string | null = null;
 
     if (adHocTemplate instanceof File) {
       const parts = await readDocxParts(await adHocTemplate.arrayBuffer());
@@ -50,19 +52,17 @@ export async function POST(request: NextRequest) {
       // renders without touching it.
       const { data: active, error } = await getServiceClient()
         .from("templates")
-        .select("id, version, name, spec")
+        .select("id, version, name, spec, file_path")
         .eq("is_active", true)
         .maybeSingle();
       if (error) return fail(500, "db_error", error.message);
       if (!active) {
         return fail(409, "no_template", "No active template. Upload one on the Templates tab, or attach a one-off template here.");
       }
-      // Through normalizeSpec, not straight out of the row: a spec stored by an
-      // earlier release is missing whatever fields have been added since, and the
-      // builder reading one of those off it would throw rather than degrade. The
-      // template has to be re-uploaded for its new fields to be read out of the
-      // file at all — this only guarantees that until then it renders as before.
-      spec = normalizeSpec(active.spec);
+      const resolved = await resolveSpec(active as StoredTemplate);
+      spec = resolved.spec;
+      specSource = resolved.source;
+      specNote = resolved.note;
       templateId = active.id as string;
       templateLabel = `${active.name} (v${active.version})`;
     }
@@ -107,6 +107,8 @@ export async function POST(request: NextRequest) {
       contentHash,
       coverage,
       findings,
+      specSource,
+      specNote,
       summary: {
         name: content.name,
         contact: content.contact,
@@ -123,6 +125,63 @@ export async function POST(request: NextRequest) {
     if (error instanceof StorageError) return fail(502, "storage_error", error.message);
     console.error("reformat failed", error);
     return fail(500, "reformat_failed", "Couldn't reformat that document. It may be corrupt or password-protected.");
+  }
+}
+
+type SpecSource = "file" | "stored";
+type StoredTemplate = { spec: unknown; file_path: unknown };
+
+/**
+ * The active template's formatting, read out of the template file itself.
+ *
+ * `resume.templates.spec` is written once, at upload, by whichever release was
+ * running then. Trusting it meant that every change to what a spec can express —
+ * the highlights layout, the header-derived sizes, then all of the colour — did
+ * nothing until the template was uploaded again, by hand, with no prompt anywhere
+ * saying so. Three times in a week the answer to "why didn't that work" was a
+ * re-upload. Reading the stored `.docx` instead ends that: the file is the
+ * template, so extraction happens against the file.
+ *
+ * Reproducibility is unaffected, and that is a property of the schema rather than
+ * an assumption here. Every render stores `template_snapshot` — "the spec as it
+ * was at render time" — so what a given render was built with stays recorded even
+ * though it is no longer frozen on the template row.
+ *
+ * **The stored spec stays as the fallback, and falling back is never silent.** It
+ * is not a guess: it was extracted from these same bytes, so it is a true if
+ * possibly older description of this template. A storage blip should not block a
+ * render being sent to an employer tonight. But an invisible fallback is how "the
+ * fix didn't work" happens again, so the caller is told which one it got and why.
+ */
+async function resolveSpec(active: StoredTemplate): Promise<{
+  spec: TemplateSpec;
+  source: SpecSource;
+  note: string | null;
+}> {
+  const stored = () => normalizeSpec(active.spec);
+  // file_path is `not null` in the schema, so this is a guard against a shape
+  // that should not exist rather than a case with a story behind it.
+  const path = typeof active.file_path === "string" && active.file_path ? active.file_path : null;
+  if (!path) {
+    return {
+      spec: stored(),
+      source: "stored",
+      note: "That template has no stored file, so its formatting came from the spec saved when it was uploaded.",
+    };
+  }
+
+  try {
+    const parts = await readDocxParts(await downloadDocx(path));
+    return { spec: extractSpec(parts, extractParagraphs(parts.document)), source: "file", note: null };
+  } catch (err) {
+    // Only the two failures that mean "those bytes were no use". Anything else is
+    // a bug and belongs in the 500 the caller already has.
+    if (!(err instanceof StorageError) && !(err instanceof DocxReadError)) throw err;
+    return {
+      spec: stored(),
+      source: "stored",
+      note: `Couldn't read the stored template file, so the formatting came from the spec saved when it was uploaded, which may be older than the file. ${err.message}`,
+    };
   }
 }
 
