@@ -202,23 +202,36 @@ place to teach, and this is it.**
 
 **This is the third re-upload in a week and it has a root cause.** Re-extracting the spec from the
 stored `.docx` at render time would end it permanently, and `renders.template_snapshot` already
-preserves reproducibility so nothing would be lost. Raised with Joel on 2026-09-15 and **not built**:
-he did not ask, and it changes how every render resolves its formatting, which is his call.
+preserves reproducibility so nothing would be lost. Raised with Joel on 2026-09-15 and correctly
+**not built** at the time, because he had not asked and it changes how every render resolves its
+formatting, which is his call.
+
+**He has since said yes — 2026-09-15, in the conversation that merged #67.** Recorded here by the
+technical director, because no other agent can see that conversation and the repo is the only
+channel. It is this area's work and not the TD's, so it is a next step below rather than something
+already begun. The re-upload that #67 needs is still required either way: the fix ends the *fourth*
+re-upload, not the third.
 
 ## Next steps
 
-0. **Ask Joel whether the contact line should be grey or accent.** His template hyperlinks the email
+0. **Build the re-extract fix. Joel approved it on 2026-09-15.** Resolve the spec by re-extracting
+   from the stored `.docx` at render time instead of reading the `spec` column, so a spec change
+   reaches existing templates without a re-upload. `renders.template_snapshot` already preserves
+   reproducibility, so nothing is lost. The reasoning and the root cause are in the section above.
+   Expect it to need a test that proves an *old* template picks up a *new* field without being
+   re-uploaded, since that is the whole point of the change.
+1. **Ask Joel whether the contact line should be grey or accent.** His template hyperlinks the email
    and the LinkedIn in the accent colour and sets the phone number grey; the output has to pick one,
    and it picks grey. Flagged to him 2026-09-15, unanswered. One rule either way.
-1. **Run real generated output through a free ATS checker.** Still the highest-value open item and
+2. **Run real generated output through a free ATS checker.** Still the highest-value open item and
    still untouched: every check in this app verifies it does what it was designed to do, and none
    verifies the design was right. Note the constraint that turned up on 2026-09-14 — doing this
    with a real resume uploads Joel's personal data to a third party, which is his decision alone.
    A synthetic document exercises the structure without that.
-2. **Link a render to a shared contact.** Still open from the rebuild.
-3. **Decide whether `/api/health` should be reachable by an external monitor.** TD and Platform as
+3. **Link a render to a shared contact.** Still open from the rebuild.
+4. **Decide whether `/api/health` should be reachable by an external monitor.** TD and Platform as
    much as you.
-4. **Watch the version numbering now deletion exists.** `version` is unique and computed as
+5. **Watch the version numbering now deletion exists.** `version` is unique and computed as
    max+1 across all rows including archived ones. Delete the newest template and the next upload
    reuses that number, so v3 can name two different files over time. Harmless today — renders keep
    a `template_snapshot` — but it is the kind of thing that reads as a bug later.

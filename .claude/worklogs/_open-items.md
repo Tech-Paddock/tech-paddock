@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-15 00:05 UTC.**
+**Last reviewed: 2026-09-16 00:20 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -19,68 +19,129 @@ Nothing. The deploy outage is closed — see the first entry under "Done" below.
 
 ## Waiting on Joel
 
-1. **2026-09-15 — Delete `claude/resume-template-management-and-render-fixes`. It came back from
-   the dead and it is not harmless.** #56 merged at 00:14:08 and GitHub auto-deleted the branch; the
-   Resume Formatter pushed thirteen seconds later and git **recreated** it rather than refusing.
-   I tried to delete it and the git proxy still refuses `--delete` with a 403 — that note in here is
-   accurate, so **this needs your click** in the GitHub UI. Nothing else is blocked by it.
-   **It is worse than it was reported to me, and the difference is the point.** The agent described
-   it as "one orphaned doc commit". It is not: because #56 was squash-merged, the resurrected branch
-   carries **all six** of its original commits, and a pull request opened from it would claim to
-   change **18 files and 1,402 lines** — the whole of #56 again. The *content* difference from `main`
-   is genuinely just two files, which I verified two ways. That gap between what it contains and what
-   it would appear to propose is the squash-stack trap already in `CLAUDE.md`, showing up for the
-   third time in four days and in a new costume.
+**Titles here are now rendered on the Pit Wall**, so each one leads with a short bold phrase and puts
+the reasoning underneath. The generator takes the first bold run as the row title.
 
-1. **2026-09-15 — #56 is merged at `1a40550`. `claude/brief-migration-and-branch-conventions` is
-   finished and waiting on Joel for a pull request.** The predicted cost arrived on schedule: this
-   branch was behind the moment #56 landed and has taken `main` again, exactly as
-   *Require branches to be up to date before merging* forces. That is the order working, not a
-   surprise.
-   **Checked for the trap the merge-order rule names: a rule change invalidating work already open.**
-   It does not here. #56's migration is additive, which the new shape rule permits; its branch is
-   already `claude/resume-<description>`, which the new naming rule permits. Nothing in #56 becomes
-   non-compliant by merging the conventions after it.
-2. **2026-09-15 — The history rewrite, authorized and blocked behind #56.** Detail in the artifact
-   and unchanged: #56 merges or closes, then *Block force pushes* and *Restrict deletions* come off
-   `main`, then the rewrite with Joel present, then protection back on. Irreversible once pushed.
+1. **Send the GitHub Support request.** The history scrub removed the seven real names from every
+   clone, every branch and every commit on `main` — but nine objects stay reachable through
+   `refs/pull/*`, and the removed lines still render in the **Files changed** tab of #17 and #21.
+   GitHub owns those refs: no API, no force push and no branch deletion touches them, so this cannot
+   be done from here. Joel sends one ticket at `support.github.com` asking for garbage collection and
+   removal of cached views; the draft is in the 2026-09-15 conversation. **Nothing is more exposed
+   than it was an hour ago** — the repo is private with zero forks — this closes it rather than
+   accepting it.
+2. **Two tokens on `tp-home`, then redeploy.** `GITHUB_TOKEN` fine-grained, this repo, read-only:
+   Contents, Metadata, Pull requests, Actions. `VERCEL_TOKEN` read-only, `tech-paddock` team.
+   **The redeploy is not optional** — Vercel bakes the environment in at build time, so a dashboard
+   change does not reach a running deployment. Until both are set the Pit Wall runs on repo rows and
+   names the two missing sources under "not reported", which is the designed degraded state rather
+   than a failure.
+3. **Re-upload the active resume template.** #67 teaches the extractor to read colour out of a
+   `.docx`, but `/api/reformat` renders from the spec stored on the template row rather than from the
+   stored file, so the colours cannot appear until a fresh upload re-extracts them. **Skipping it
+   breaks nothing** — `normalizeSpec` fills the missing fields and existing templates render exactly
+   as they do today; the change is simply invisible. This is the third re-upload in a week and you
+   have approved the fix that ends them, which is now the Resume Formatter's next change.
+4. **Confirm Coffee's iOS install works on a real iPhone.** Carried out of a worklog before it was
+   deleted, because it is the one thing in the fifteen that was genuinely unfinished rather than
+   answered elsewhere. The apple-touch-icon, the web-app meta tags and the safe-area insets were
+   verified against the built HTML; **whether iOS actually takes the icon needs a deploy and a
+   phone**, which is you. Open it in Safari, add to home screen, and see whether the icon is right.
+5. **Decide who moves colours out of `tailwind.config.ts`.** Joel narrowed theme ownership to
+   colours and aesthetic decisions, **not config** — and that line cannot be drawn today, because the
+   four tools' colours live inside `tailwind.config.ts`. Making it real means moving the values to
+   CSS custom properties with Tailwind referencing `var(--token)`, after which colour values are
+   TechPad Gen's and the wiring stays the app agent's. **That refactor is itself a config change in
+   four apps, so it cannot be TechPad Gen's first act under the rule** — it is the TD's, or theirs
+   with explicit authorisation.
 
 ## Parked
-
-- **2026-09-15 — The branch-name action prefix.** Drafted at Joel's request and parked by him the
-  same hour, before it reached `main`. **The area rule he approved earlier stands and is unaffected:**
-  `claude/<area>-<description>`.
-  The draft was six non-overlapping actions — `feat`, `fix`, `ci`, `db`, `doc`, `ops` — placed before
-  the area, with the area omitted where no single app owned the change.
-  **The part worth keeping if this is ever revived** is the objection to two of the three examples
-  that prompted it. `ci` is a kind of change and works. `pr` and `mrg` are *states*, and a state
-  cannot live in a branch name: the name is fixed for the life of the branch and the state moves
-  several times a day, so `mrg-…` is accurate for about an hour and misleading afterwards, and nobody
-  renames a branch to keep a label honest. What it decays into is noise shaped like information.
-  Where a change has got to is already carried by two things that update themselves — the pull
-  request's own state, and this ledger.
-  **Two branches were renamed to the parked scheme before it was parked** and keep those names:
-  `claude/doc-brief-migration-conventions` and `claude/doc-resume-handoff-migration`. Renaming them
-  back would cost Joel two more deletions to fix a cosmetic inconsistency, which is not worth it. A
-  name is not a rule.
 
 Deliberately deferred. Not waiting on anyone, not forgotten, and not to be picked up as background
 work. Something here moves only when Joel says so.
 
-- **2026-09-15 — `CRON_SECRET` and the Microsoft Graph integration.** Parked at Joel's request.
+- **`CRON_SECRET` and the Microsoft Graph integration.** Parked at Joel's request, 2026-09-15.
   **What it is:** `tracker`'s daily sweep at `/api/cron/stale-tasks` reads the dashboard's decay
-  list, finds threads that have gone quiet with no follow-up task already open, and creates a
-  Microsoft To Do task for each through Graph.
-  **Why it is parked safely rather than left half-done:** a scheduled job cannot log in, so
-  `middleware.ts` waves `/api/cron/*` past the password gate, and the route's own guard reads
-  `if (secret && …)` — which means an unset `CRON_SECRET` skips the check entirely and the endpoint
-  is public. It is harmless *only* because the next line returns early when Graph is unconfigured.
-  **So the parking is the safe state and un-parking is the dangerous moment.** Whoever picks this
-  up sets `CRON_SECRET`, redeploys so it is actually live, and only then sets `MS_GRAPH_*`. Setting
-  the Graph credentials first publishes an unauthenticated endpoint that writes into Joel's Outlook
-  on demand.
+  list, finds threads gone quiet with no follow-up task open, and creates a Microsoft To Do task for
+  each through Graph.
+  **Why parking is the safe state:** a scheduled job cannot log in, so `middleware.ts` waves
+  `/api/cron/*` past the password gate, and the route's own guard reads `if (secret && …)` — an unset
+  `CRON_SECRET` skips the check entirely and the endpoint is public. It is harmless *only* because
+  the next line returns early while Graph is unconfigured.
+  **Un-parking is the dangerous moment, and the order is not optional.** Set `CRON_SECRET`, redeploy
+  so it is actually live, and only then set `MS_GRAPH_*`. Setting the Graph credentials first
+  publishes an unauthenticated endpoint that writes into Joel's Outlook on demand.
+
+- **The branch-name action prefix.** Drafted at Joel's request on 2026-09-15 and parked by him the
+  same hour, before it reached `main`. **The area rule he approved earlier stands:**
+  `claude/<area>-<description>`.
+  The draft was six non-overlapping actions — `feat`, `fix`, `ci`, `db`, `doc`, `ops` — before the
+  area, with the area omitted where no single app owned the change.
+  **The part worth keeping if this is ever revived** is the objection to two of the three examples
+  that prompted it. `ci` is a kind of change and works. `pr` and `mrg` are *states*, and a state
+  cannot live in a branch name: the name is fixed for the life of the branch while the state moves
+  several times a day, so `mrg-…` is accurate for about an hour and misleading afterwards, and nobody
+  renames a branch to keep a label honest. What it decays into is noise shaped like information.
+  Where a change has got to is already carried by two things that update themselves — the pull
+  request's own state, and this ledger.
 
 ## Done since this ledger was last written
+
+- **2026-09-16 — Draft pull requests: proposed, declined, settled.** The TD put up letting agents
+  open a draft when a branch is finished, on the argument that GitHub disables the merge button on a
+  draft and that is mechanical where the present rule is honesty-only. Joel declined — *"I'm fine
+  having them wait for me to instruct on PRs. It feels cleaner."* **`CLAUDE.md` is unchanged and no
+  workflow moved.** The reasoning, and what a revival would have to carry with it, is in the TD
+  handoff under *Decisions made today* so it is recognised rather than rediscovered.
+
+- **2026-09-16 — All fifteen orphaned worklogs deleted, on Joel's instruction.** Every branch is
+  merged and deleted except this one, so every worklog named a branch that no longer existed, which
+  is exactly what the README says to clear: `read-all.sh` is meant to show what is claimed *right
+  now*. The TD's six went first; Joel then said delete the rest, overriding the TD's judgement that
+  another agent's worklog was not the TD's to clear. **`.claude/worklogs/` is now `README.md`,
+  `_open-items.md` and `read-all.sh` and nothing else** — the clean baseline the convention assumes.
+  **Checked before deleting rather than after.** Three carried a *Need from TD*. Two were already
+  answered by `CLAUDE.md` as it now stands — the model exception, closed by *Model choice is per
+  task*, and project-wide installability, closed by the Safari paragraph that says not to add a
+  manifest on the strength of that rule. The third, TechPad Gen's theme-ownership ask, was closed by
+  #66. One genuinely unfinished item survived and is now item 4 above.
+
+- **2026-09-15 — #67 merged: the reformatter reproduces the template's own colours.** The Resume
+  Formatter's work; the gate only checked it. Confirmed it does not touch the theme rule that landed
+  an hour earlier despite the branch name — no `globals.css`, no `tailwind.config.ts`, no
+  `layout.tsx`, no new hex; every colour comes out of the user's `.docx` at extraction time.
+  `tp-resume` rebuilt to production on `76971bf` and is READY. **The re-upload it needs is item 3
+  above.**
+  **Worth keeping from the gate:** they brought `main` in and updated their handoff while the TD was
+  preparing to do it for them, so the local merge was discarded rather than force-pushed over live
+  work. Force-pushing in that situation is what caused the resurrected-branch incident earlier the
+  same night.
+  **Also recorded here because only the TD heard it:** Joel approved the re-extract fix — resolving
+  the spec from the stored `.docx` at render time instead of the `spec` column. It is written into
+  `.claude/agents/resume/HANDOFF.md` as that area's next step, not started by the TD, because
+  `apps/resume` is theirs and the `apps/home` override was a single bypass.
+
+- **2026-09-15 — Five merged in one ordered run: #62 to #66.** TechPad Gen's livery record first,
+  because it was finished and *Require branches to be up to date* means whichever merges second pays
+  the re-take — the cost belongs on the branch still in hand. Then the ratification, the Pit Wall
+  spec, the Pit Wall itself, and **the theme-ownership rule last, deliberately**: it is a rule
+  change, and landing it before #65 would have failed finished work against a rule that did not exist
+  when it was written. Verified first that no two of the five branches touched the same file.
+
+- **2026-09-15 — The Pit Wall is live, and this file is now part of its UI.** `/` is Pit Wall, `/admin`
+  is The Garage — labels only, no folder rename. The board reads this ledger's **Waiting on Joel**
+  section at build time and renders each entry as a row.
+  **That changes how this file should be written, which is why the section above now leads with short
+  bold titles.** The generator takes the first bold run as the row title and the rest as detail, so a
+  title that runs three lines becomes a three-line heading on the homepage. Keep them short.
+  It also means **a stale ledger is now visible rather than merely wrong.** The first build surfaced
+  three items here that had been closed hours earlier, which is how this correction came to be made.
+
+- **2026-09-15 — Three "Waiting on Joel" items closed and removed.** The resurrected branch is
+  deleted, `claude/brief-migration-and-branch-conventions` merged, and the history rewrite is done and
+  verified across 122 commits. **A formatting error of mine is also fixed here**: an earlier edit
+  inserted a Parked entry above that section's own introduction, leaving the explanation of what
+  Parked means stranded below the first item.
 
 - **2026-09-15 — Ratified: `resume.templates` is no longer append-only.** Joel approved the
   behaviour on 09-14 and the Resume Formatter amended its own charter in #56. **Merging that pull
