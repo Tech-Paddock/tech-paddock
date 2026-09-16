@@ -4,35 +4,29 @@ import type { Glance, SummaryItem } from "@/lib/glance";
 import { isStale } from "@/lib/glance";
 
 /**
- * The Morning Paper — PROTOTYPE, for approval before anything is proposed as
- * final. Built from the decisions already settled in .claude/DECISIONS.md, not
- * from Joel's brief, which this agent has not seen.
+ * The Morning Paper. Design approved by Joel on 2026-09-16.
  *
- * Four settled things shape everything here:
+ * **There is no fold, and that is a change to a settled decision.** DECISIONS.md
+ * still records "above the fold carries no job-search content at all — a privacy
+ * requirement, because two days a week the screen is in an office". Joel lifted
+ * it: *"drop above the fold below, ill manage privacy."* So the page no longer
+ * enforces a privacy boundary in its layout, and what is owed — job search
+ * included — leads, which is what the rest of that same decision asks for.
+ *
+ * That amendment is his to make and needs recording in DECISIONS.md; this
+ * comment is not the record, only a pointer to why the code stopped matching it.
  *
  * **It leads with what is owed, not what arrived.** Threads gone quiet are a
- * task and get names; replies received are a statistic and get a number. That
- * is why the arrived half of this page is deliberately the boring half.
+ * task and get names; replies received are a statistic and get a number. That is
+ * why the arrived column is deliberately the boring one.
  *
- * **Above the fold carries no job-search content at all.** Two days a week this
- * screen is in an office, so the top of the page has to be safe to be seen over
- * a shoulder. That is a hard constraint rather than a preference, and it is the
- * reason the fold is a visible rule on the page rather than an idea in someone's
- * head — a boundary you can see is one you notice breaking.
- *
- * **It extends to source names.** "Pipeline Tracker last spoke three hours ago"
- * is a job-search disclosure even though it names no company: it says there is a
- * pipeline. So no tool is named above the fold either, which is a sharper line
- * than the decision spells out and is flagged as this prototype's own reading.
- *
- * **Stale is loud.** Past three cadences a panel is struck through and says so.
- * A timestamp nobody reads is not the fix.
+ * **Stale is loud.** Past three cadences a source is struck through and the page
+ * banners itself. A timestamp nobody reads is not the fix.
  *
  * **Two densities, one markup tree.** Dispatch and Timing are the same elements
  * with a different class on the root; nothing is conditionally rendered between
- * them. Density is polarity's opposite in one important way — polarity is one
- * site-wide preference shared by cookie across every app, and density is local
- * to this page. They are no longer the same switch.
+ * them. Density is deliberately not polarity: polarity is one site-wide
+ * preference shared by cookie across every app, density is local to this page.
  */
 
 export type Density = "dispatch" | "timing";
@@ -109,33 +103,10 @@ export default function Paper({
         <h1>The Morning Paper</h1>
       </header>
 
-      {/* ---------------------------------------------------------------- above
-          Safe to be read over a shoulder. Nothing here may name a company, a
-          role, a tool that implies a search, or a count that implies one. The
-          slot below is empty on purpose: what belongs in it is the one thing
-          this prototype could not derive from a settled decision. */}
-      <section className="paper-above" aria-label="Above the fold">
-        <div className="paper-slot">
-          <p className="paper-slot-label">What is owed today</p>
-          <p className="paper-slot-body">
-            This is the lead, and it is deliberately blank. The decision says the Paper opens with
-            what is owed and that nothing job-related may appear above the fold — which settles the
-            shape of this slot but not what fills it.
-          </p>
-          <p className="paper-slot-ask">
-            Needs the brief: what is owed that is safe to read in an office.
-          </p>
-        </div>
-      </section>
-
-      {/* ----------------------------------------------------------------- fold
-          Drawn rather than implied. Everything past it assumes the screen is
-          private, so it is worth being able to see where that assumption starts. */}
-      <p className="paper-fold">
-        <span>Below the fold — private</span>
-      </p>
-
-      <section className="paper-below" aria-label="Below the fold">
+      {/* What is owed leads the page, job search included. The privacy split
+          that used to sit above this is gone at Joel's instruction — he manages
+          that himself rather than having the layout do it for him. */}
+      <section className="paper-below" aria-label="The day">
         <div className="paper-column">
           <h2 className="paper-head">Owed</h2>
           {owed.length > 0 ? (
@@ -204,6 +175,21 @@ export default function Paper({
               <span className="paper-source-when">{d}</span>
             </p>
           ))}
+        </div>
+      </section>
+
+      {/* Everything the tracker does not know about. Still undefined: it was the
+          lead when the page had a fold, and it keeps its place in the tree
+          rather than being deleted, because it is a question Joel has open
+          rather than one that has been answered no. */}
+      <section className="paper-deferred" aria-label="Off the tracker">
+        <div className="paper-slot">
+          <p className="paper-slot-label">Everything else you owe</p>
+          <p className="paper-slot-body">
+            What is owed that no tool here knows about. The shape is settled — owed things get
+            names — but nothing in the repo says where they come from.
+          </p>
+          <p className="paper-slot-ask">Needs a source, or a decision that there is not one.</p>
         </div>
       </section>
 

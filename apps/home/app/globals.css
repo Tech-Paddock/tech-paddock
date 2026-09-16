@@ -840,24 +840,10 @@ a.slot:hover {
 .paper-slot-body { margin: 0; font-size: 14px; line-height: 1.5; max-width: 62ch; }
 .paper-slot-ask { margin: 10px 0 0; font-size: 12px; font-weight: 600; color: var(--accent); }
 
-/* The privacy boundary, drawn. A rule you can see is one you notice breaking. */
-.paper-fold {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 4px 0;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
-.paper-fold::before, .paper-fold::after {
-  content: "";
-  flex: 1;
-  border-top: 1px solid var(--ink-soft);
-}
+/* The fold is gone: Joel manages privacy himself rather than having the layout
+   do it, so what is owed leads and nothing is held back to a second screen.
+   `.paper-deferred` is what used to be the lead, now sitting after the day. */
+.paper-deferred { margin-top: 6px; }
 
 .paper-below { display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; }
 .paper-column { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -934,7 +920,7 @@ a.slot:hover {
 .paper-timing .paper-owed-list { gap: 5px; }
 .paper-timing .paper-figure { padding: 5px 0; }
 .paper-timing .paper-figure-count { font-size: 19px; }
-.paper-timing .paper-fold { margin: 0; }
+.paper-timing .paper-deferred { margin-top: 2px; }
 
 @media (max-width: 760px) {
   .paper-below, .paper-timing .paper-below { grid-template-columns: 1fr; gap: 18px; }

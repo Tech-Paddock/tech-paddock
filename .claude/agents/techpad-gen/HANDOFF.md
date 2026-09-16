@@ -19,9 +19,8 @@ is probed live. **It never guesses** — anything unreachable reads "unknown" wi
 `CLAUDE.md` now makes this a rule for everyone: any fact that can be computed is computed, never
 written in prose. The Garage is where those facts live.
 
-**It is not a place anything is typed.** That was the central decision and it should survive whatever
-gets built next: a page agents write config into is a second source of truth, and this project has
-been injured twice by exactly that.
+**It is not a page anything is typed into** — the central decision, and worth keeping: a page agents
+write config into is a second source of truth, and that has injured this project twice.
 
 **The theme system** — ten palettes, five liveries, both polarities, the light/dark control in every
 header. `lib/theme.css` holds every token and is byte-identical in every app; `lib/livery.ts` is
@@ -43,16 +42,17 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 - **`children` rather than props is what makes the shell possible.** `/admin` is an async server
   component running live probes, so it can never be rendered *by* a client component — but it can be
   passed *through* one.
-- **Never name the production commit in prose.** An earlier version of this file did and was wrong by
-  the time it was read; at one point four documents each named a different production commit, every
-  one correct when written. Name where to look.
 - **The glance gets counts and singles, never rows.** A hub handed thread arrays slowly becomes a
   worse copy of the tracker. `SOURCES` holds one entry today — a fact about the present, not a
   design limit.
 
 ## In flight
 
-Nothing.
+`claude/home-morning-paper-prototype` — the Morning Paper, open as #82. **Design approved by Joel on
+2026-09-16**, and he lifted the privacy fold with it: *"drop above the fold below, ill manage
+privacy."* So what is owed leads, job search included, and the layout enforces no privacy boundary.
+**That amends a settled decision in `DECISIONS.md` and wants recording there.** The Feed is still
+undefined and renders as a labelled slot; its open questions are with Joel.
 
 ## Next
 
