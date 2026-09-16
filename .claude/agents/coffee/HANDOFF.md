@@ -57,7 +57,7 @@ page. The label now says where it came from instead of claiming it was written f
 
 ## In flight
 
-**`claude/coffee-brew-repeat-and-guide-label` — pushed, green, no pull request; Joel has not asked.**
+**`claude/coffee-brew-repeat-and-guide-label` — pushed, no pull request; Joel has not asked.**
 Repeat-the-last-brew with a Clear button, and the guide label stops over-claiming. `apps/coffee`
 only, no shared files, no schema change. **Deployment: nothing — it deploys itself on merge.**
 
