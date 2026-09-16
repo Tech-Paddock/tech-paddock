@@ -6,7 +6,7 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-16T19:28:24.946Z",
+  "generatedAt": "2026-09-16T19:42:15.710Z",
   "complete": true,
   "reason": "",
   "checks": [
@@ -78,12 +78,12 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/OPEN-ITEMS.md",
       "state": "warn",
-      "detail": "75 / 80"
+      "detail": "78 / 80"
     },
     {
       "name": "budget: .claude/DECISIONS.md",
-      "state": "ok",
-      "detail": "185 / 200"
+      "state": "warn",
+      "detail": "193 / 200"
     },
     {
       "name": "fresh: coffee",
@@ -147,8 +147,8 @@ export const DRIFT: Drift = {
     }
   ],
   "counts": {
-    "ok": 22,
-    "warn": 5,
+    "ok": 21,
+    "warn": 6,
     "fail": 0
   }
 };
