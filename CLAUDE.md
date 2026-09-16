@@ -146,6 +146,21 @@ wrong or the rule is, and that is a conversation before any code exists.
   **No other agent can see the conversation where he asked**, so the request lands in the repo or it
   did not happen. `requested-by-joel` fails a body without that line. What no check can see is
   whether the quote is real, so **this rule rests further on honesty than the ones around it.**
+- **Three phrases from Joel mean three specific things.** They exist so he can move work without
+  spelling out the steps each time, and so the steps are the same for every agent.
+
+  **"Close out."** Finish what you are on, commit and push, update your `HANDOFF.md`, and **open the
+  pull request** — body carrying `Requested by Joel on YYYY-MM-DD — "close out"`, blast radius, and
+  the Deployment section. Then say you are at a compaction point and stop. **This is the ask the
+  rule above requires**; there is no separate permission to wait for.
+
+  **"Park it."** The same, without the pull request. Stop at the pushed branch. He uses this when he
+  wants the work safe but not in the queue.
+
+  **"Pick up: <thing>."** New work. Come back with what you understand the job to be, what you would
+  do first, and the second-order answers. **Do not cut a branch or write code until he answers** —
+  until then you do not know what the change is, and the branch would be named after a guess.
+
 - **State your blast radius in the pull request:** which apps, which shared files.
 - **Adding or deprecating an app under `apps/` needs no CI change.** The matrix is derived from the
   folders on disk, and one fixed-name `gate` job sits in front of it, so branch protection requires
