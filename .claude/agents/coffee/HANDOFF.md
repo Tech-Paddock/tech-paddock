@@ -10,7 +10,7 @@ Read `RULES.md` first. This file is only what is true right now.
 
 **It is live at `coffee.techpaddock.io`**, behind the password gate, on current `main`.
 `GET /api/health` returns ok on all three checks. The whole flow has run end to end against a real
-bag: identify 200, search 200, three-tier retrieval against a live roaster site. **56 tests pass.**
+bag: identify 200, search 200, three-tier retrieval against a live roaster site. `npm test` is green.
 
 **Save comes before the search, and that is deliberate.** Confirm the label → the bag row is written
 → the search runs against that row and updates it → the page polls the row. The search reads real

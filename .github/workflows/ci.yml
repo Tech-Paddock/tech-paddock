@@ -103,58 +103,27 @@ jobs:
           EDITOR_BASE_URL: https://editor.techpaddock.io
           INTERNAL_API_SECRET: dummy
 
+  # The mechanical half of the weekly rules-drift audit, run on every push.
+  #
   # Every one of these files grew monotonically for five days: the ledger from
   # 76 lines to 588, of which 401 were an archive of finished work that every
   # agent read at the start of every session. "Overwrite it" was already the
-  # written rule and it failed, because nothing bounded it. This is the bound.
+  # written rule and it failed, because nothing bounded it. This is the bound —
+  # and it now also measures the facts CLAUDE.md asserts, rather than trusting
+  # the document that asserts them.
   #
-  # The ceilings are deliberately generous — you cannot hit one writing a real
+  # The ceilings are deliberately generous. You cannot hit one writing a real
   # handoff, only by letting a file become a log again. A check that fires on
   # good work teaches agents to route around checks, which costs more than it
   # catches.
-  budgets:
+  drift:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The handoff-staleness check compares each file's stated date against
+          # the newest commit in that agent's area, so it needs real history.
+          fetch-depth: 0
 
-      - name: Handoffs, ledger and decisions stay within budget
-        run: |
-          set -uo pipefail
-          fail=0
-
-          check() {
-            path="$1"; ceiling="$2"
-            [ -f "$path" ] || return 0
-            n=$(wc -l < "$path")
-            if [ "$n" -gt "$ceiling" ]; then
-              echo "::error file=$path::$path is $n lines, over its $ceiling-line budget."
-              echo "   A handoff is state, not history. Overwrite it — do not append."
-              echo "   Anything that outlives this release belongs in .claude/DECISIONS.md;"
-              echo "   anything finished belongs nowhere, because git log is the archive."
-              fail=1
-            else
-              printf '  ok  %-44s %3d / %s\n' "$path" "$n" "$ceiling"
-            fi
-          }
-
-          for f in .claude/agents/*/HANDOFF.md; do check "$f" 80; done
-          check .claude/OPEN-ITEMS.md 80
-          check .claude/DECISIONS.md 200
-
-          # The ledger carries what is open. A "Done" heading is how it became
-          # a 588-line file the last time.
-          if [ -f .claude/OPEN-ITEMS.md ] && grep -qiE '^#+ *done' .claude/OPEN-ITEMS.md; then
-            echo "::error file=.claude/OPEN-ITEMS.md::The ledger has a 'Done' section again."
-            echo "   Finished work is not an open item. Delete it; git log is the archive."
-            fail=1
-          fi
-
-          # Worklogs were retired on 2026-09-16 — see the communication layer in
-          # CLAUDE.md. They existed so a live agent could see what another live
-          # agent had claimed, and agents here never run at the same time.
-          if [ -d .claude/worklogs ]; then
-            echo "::error::.claude/worklogs/ is back. Worklogs were retired; see CLAUDE.md."
-            fail=1
-          fi
-
-          exit "$fail"
+      - name: Rules match the repo they describe
+        run: node scripts/drift-check.mjs

@@ -43,6 +43,19 @@ Nothing.
    matches or beats the shipped figure, and raising the bar **changes the look of all five apps**.
    A decision, not a cleanup.
 
+## Waiting on an agent
+
+Requests with an owner who is not Joel. This is how one agent asks another for something — they
+never run at the same time, so it lands here or it does not happen. The owning agent picks it up at
+the start of its next session, because the hook prints this file into every one.
+
+1. **Render the drift check in The Garage.** *Owner: TechPad Gen.* `scripts/drift-check.mjs --json`
+   emits `{checks: [{name, state, detail}], counts}` where state is `ok` / `warn` / `fail`, and it
+   never reports `ok` for something it could not measure. It wants a panel beside Declared and
+   Reported, baked at build time the way `collect-declared.mjs` already does — **computed, never
+   typed**, which is the property that page exists to protect. The TD wrote the script and the
+   contract; the page is yours.
+
 ## Parked
 
 Deliberately deferred. Not waiting on anyone, not forgotten, **not to be picked up as background

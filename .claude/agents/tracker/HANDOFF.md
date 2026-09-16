@@ -9,7 +9,7 @@ Read `RULES.md` first. This file is only what is true right now.
 ## What is true now
 
 **`tracker.techpaddock.io` is live and serving current `main`.** Everything this agent has built is
-merged; nothing is in flight and no branch of yours exists. **38 tests pass** — the second-largest
+merged; nothing is in flight and no branch of yours exists. `npm test` is green — the second-largest
 suite in the repo, and the reason changes here are reviewable.
 
 **The Microsoft Graph integration is built and inert.** `MS_GRAPH_CLIENT_ID`,

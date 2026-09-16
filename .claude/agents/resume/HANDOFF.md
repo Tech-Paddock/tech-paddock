@@ -9,9 +9,9 @@ Read `RULES.md` first. This file is only what is true right now.
 ## What is true now
 
 **Everything is merged and live.** The re-extract fix landed as #71, the colour work as #67, the
-template lifecycle as #56. `resume.techpaddock.io` serves current `main`. **120 tests pass** —
-verified by running them, not counted from a grep, because `grep -c "it("` counts `describe` lines
-too and reads high.
+template lifecycle as #56. `resume.techpaddock.io` serves current `main`, and `npm test` is green.
+**Count the suite by running it, never by grepping** — `grep -c "it("` counts `describe` lines too
+and reads high, which is how this app's size was documented at half its real value for a week.
 
 **The template file is what renders, not the `spec` column.** `/api/reformat` downloads the
 template's stored `.docx` and runs `extractSpec` on it. This is the section to read before touching

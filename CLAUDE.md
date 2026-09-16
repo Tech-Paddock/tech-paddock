@@ -305,7 +305,9 @@ Most rules here are convention: they hold because an agent chooses to comply. Th
 2. **The `.claude/settings.json` hooks** run whether or not anyone wants them to — they refuse a push
    to `main` and refuse rewriting the migration history, and they print the ledger into every session.
 3. **`requested-by-joel`** fails a pull request whose body does not record who asked for it, and
-   **the budget check** fails one that lets the handoffs or the ledger grow back.
+   **`drift`** fails one where a rule in this file has stopped being true — the checksums, the three
+   `middleware.ts` variants, the CI matrix, the file budgets. It measures rather than trusting the
+   document. `node scripts/drift-check.mjs` runs it locally; `--json` is what The Garage renders.
 
 Notably **"do not open a pull request until Joel asks" is not one of them**, because every agent acts
 as the same GitHub account and nothing mechanical can tell an asked-for pull request from an

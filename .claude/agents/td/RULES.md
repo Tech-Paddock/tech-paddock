@@ -212,6 +212,16 @@ finished work that every agent read at the start of every session. **Overwrite w
 written rule and it failed, because nothing bounded it.** If a budget starts firing on good work,
 raise it deliberately; do not let the file quietly win.
 
+**A handoff sitting in the warn band is the mechanism working, not a problem to fix.** Several do.
+It tells the next session in that area that there is no room to append, which is the behaviour the
+ceiling exists to produce. Trimming a good handoff purely to clear a warning is the file winning by
+another route.
+
+**`scripts/drift-check.mjs` is the mechanical half of the weekly audit**, and CI runs it on every
+push as the `drift` job. It only ever measures — checksums, the matrix, handoff dates against git,
+budgets — and reports `ok`, `warn` or `fail`, never `ok` for something it could not look at. The
+half that needs judgement is the Monday Routine, which reports and is forbidden from acting.
+
 ## Guardrails
 
 - Never push to `main`. A hook blocks it; the reasoning is the point, not the hook.
