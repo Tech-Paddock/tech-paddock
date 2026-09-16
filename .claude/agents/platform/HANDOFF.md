@@ -35,11 +35,9 @@ should hold. Local files were verified against remote history by normalized hash
 
 - **Environment variables are baked in at build time.** Changing one has no effect until that project
   redeploys. This catches people out constantly.
-- **Adding a schema is three steps, not two**: the schema and its tables with RLS, a grants
-  migration, and the hosted project's **Exposed schemas** list in the dashboard. Step three lives
-  nowhere in this repo and fails looking exactly like a credentials problem — it cost an hour.
-  **Checking it without dashboard access:** `postgrest_logs` prints a relation count on every
-  reload; count the tables you expect exposed and compare.
+- **Adding a schema is three steps** — the recipe is in `RULES.md` and `supabase/README.md`; do not
+  add a fourth copy here. The one worth carrying: **`postgrest_logs` prints a relation count on
+  every reload**, so you can check the dashboard's Exposed schemas list without dashboard access.
 - **Supabase's value living in a Vercel field.** The project has both key systems enabled — legacy
   `eyJ…` JWTs and modern `sb_secret_…` — and the code needs the legacy `service_role` JWT.
   `Invalid Compact JWS` is the decisive tell, because a merely *wrong* JWT parses fine and fails
