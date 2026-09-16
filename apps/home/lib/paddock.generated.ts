@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-16T03:14:05.085Z",
+  bakedAt: "2026-09-16T14:01:11.841Z",
   waiting: [
   {
     "title": "Two tokens on `tp-home`, then redeploy",
@@ -28,6 +28,12 @@ export const PADDOCK = {
   {
     "title": "Decide whether to raise the hairline contrast bar",
     "detail": "--line against --surface is 1.82:1 in the theme running in production, short of the 3:1 bar for a non-text component. Every new theme matches or beats the shipped figure, and raising the bar changes the look of every app. A decision, not a ",
+    "ref": "—",
+    "state": "box"
+  },
+  {
+    "title": "Morning Paper: polarity or density?",
+    "detail": "Its two modes are light Dispatch and dark Timing, so the switch *is* the polarity switch — contradicting \"one livery per app, both polarities\" in DECISIONS.md. Either both densities get both polarities, or amend the decision for the hub. Bl",
     "ref": "—",
     "state": "box"
   }
