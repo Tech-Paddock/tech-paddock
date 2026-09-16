@@ -8,18 +8,25 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**`claude/brief-three-part-footer`** — the sign-off every agent ends a message with is now three
-sections: Work Brief, DevOps, Open Items. DevOps is the promotion pipeline in four stages named in
-Joel's words — in progress, needs a PR, ready to merge, stuck — because committed-versus-uncommitted
-is how an agent saves work, not a stage of getting something live. It also gives him three phrases
-that mean three specific things: **close out**, **park it**, **pick up: X**.
-**The scoping is the part to preserve:** you report every pushed branch and every ledger row; every
-other agent reports only its own. **You cannot see another agent's in-progress work** — it never
-reaches the repo until it is pushed — so it appears only in its author's section. Approved by Joel
-on 2026-09-16 and dialled in over four rounds of his feedback.
-**Deployment: nothing — no app code changed.**
+Two branches, both finished, both mine. **Merge the ledger one first** — until it lands, the
+`SessionStart` hook prints a ledger that is wrong in five places into every agent's session.
 
-Nothing else of mine is open.
+**`claude/brief-record-paper-decisions`** — `DECISIONS.md` said the Paper's above-the-fold carries
+no job-search content, a privacy requirement; **Joel lifted it** — *"drop above the fold below, ill
+manage privacy"* — and #82 shipped the code before the record caught up. Amended in place, not
+appended beside: a correction under a contradicting entry leaves two answers in one file. The
+polarity entry is confirmed rather than changed — density is a separate axis. The ledger is
+rewritten to what is true after #80, #82 and #85.
+
+**`claude/brief-status-check-refreshes`** — the sign-off gains a purple **Needs deletion** stage,
+*Needs a PR* turns yellow (colour tracks work left, not who is blocking), and **a status check
+re-measures all three sections.** Open Items specifically is re-read off disk: the hook prints the
+ledger once and every table written after that is a memory of a file other agents' merges have been
+changing underneath you. Three branches were editing this paragraph at once and were folded into
+one before they cost a three-way conflict.
+
+**Deployment, both: nothing — no app code changed.** They touch the same `td/HANDOFF.md`, written
+identically on each so the second merge does not conflict.
 
 ## What is true now
 

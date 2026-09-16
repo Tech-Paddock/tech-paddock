@@ -212,7 +212,7 @@ wrong or the rule is, and that is a conversation before any code exists.
 
   **2 · DevOps.** What exists and is not live yet, one line each, carrying **what it is, whose it
   is, and the stage it is parked at** — the owning agent is a column so he can see at a glance who a
-  branch belongs to, because a branch name does not always say. Four stages, in the order work moves
+  branch belongs to, because a branch name does not always say. Five stages, in the order work moves
   through them, and the words are the ones Joel reads — not git's:
 
   ```
@@ -222,9 +222,10 @@ wrong or the rule is, and that is a conversation before any code exists.
   | | Stage | Means |
   |---|---|---|
   | 🟡 | **In progress** | Still being worked on. Covers everything before it is finished, saved or not — that distinction is the agent's business, never his. |
-  | 🟢 | **Needs a PR** | Finished, pushed, CI green. Waiting on Joel's word to open one. |
+  | 🟡 | **Needs a PR** | Finished and pushed, CI green — but the pull request is still work, so it is yellow until Joel asks and the agent writes it. |
   | 🟢 | **Ready to merge** | Pull request open and green. Waiting on the technical director. |
   | 🔴 | **Stuck** | CI failing, a merge conflict, or a step that errored. **Say what is broken, not just that it is.** |
+  | 🟣 | **Needs deletion** | Merged, superseded or dead, and the remote branch is still there. |
 
   **Every agent reports its own work, all the way through** — from in progress to merged. **The
   technical director reports every pushed branch and every open pull request**, because the merge
@@ -234,8 +235,35 @@ wrong or the rule is, and that is a conversation before any code exists.
   never reaches the repo until it is pushed, so a line about it would be invented. This is the same
   rule as the ledger's: what you have not measured does not get a row.
 
+  **Needs deletion is nearly always Joel's action, which is why it gets its own colour.** No agent
+  can delete a remote branch here — the proxy refuses it — so a dead branch stays listed until he
+  removes it, and a line that never changes colour is one everybody stops reading. It covers three
+  cases: a merge that did not delete its branch, a duplicate of work that is already somewhere else,
+  and **a branch that is a liability rather than clutter** — one carrying something scrubbed from
+  `main`, which stays reachable through that ref for as long as the ref exists. **Say which of the
+  three it is**, because only the last one is urgent.
+
+  **Colour tracks whether an agent still has work, not who is blocking.** That is why *Needs a PR*
+  is yellow: the branch is finished, but writing the pull request — body, blast radius, Deployment
+  section — is real work that has not happened yet. **Green means nothing is left but the merge.**
+  Reading the colours alone should answer "is anything of mine still to do", and the stage name
+  beside it says who moves next.
+
   **A stage comes from `git status` and a live check run in this session — never from memory.** If
   you could not check, the line reads `unchecked` rather than guessing.
+
+  **When Joel asks for status, all three are re-measured — never reprinted.** A status check is a
+  request to go and look, and the last sign-off is the one thing that cannot answer it.
+
+  - **Work Brief** becomes what has landed since his last message, not what was in the previous
+    footer. `- None.` when nothing has.
+  - **DevOps** comes from a live branch list, a live pull request list and check runs read *now*. A
+    colour measured earlier in the same session is memory by the time it is reprinted.
+  - **Open Items** is **re-read from `.claude/OPEN-ITEMS.md` on disk.** The `SessionStart` hook
+    prints it once, at the start; after that every table you write from context is a memory of a
+    file that merges have been changing underneath you. **This is the one that actually goes wrong**
+    — a long session's footer quietly drifts from the ledger it claims to be reporting, and because
+    a table reads as verified, nothing says so.
 
   **3 · Open Items.** The ledger. **The technical director prints every row; every other agent
   prints only the rows whose `Agent` is them.** A merge waiting on Joel is hoisted onto its own line
