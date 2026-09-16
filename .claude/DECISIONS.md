@@ -68,6 +68,11 @@ just been bitten by something and want to know whether it is known.
   the same time. Every real message in one had a better home. `read-all.sh` went with them — its
   loops read `refs/remotes/origin`, and with only `main` there it had silently become a no-op that
   printed the ledger the `SessionStart` hook already prints.
+- **2026-09-16 — Only the technical director subscribes to a pull request.** Joel: *"only you
+  watch/subscribe prs"*. **One watcher gets the events; a second subscriber silently receives
+  nothing**, so two agents offering to watch means one of them is quietly deaf to the thing it
+  promised to watch. The subscription also dies with the session that made it, and the technical
+  director is the one who has to be there at the merge anyway. No other agent offers it.
 
 ## Mistakes — do not repeat
 
