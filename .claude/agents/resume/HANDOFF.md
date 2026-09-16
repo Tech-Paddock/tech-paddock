@@ -1,15 +1,19 @@
 # Resume Formatter — handoff
 
-State as of 2026-09-14.
+State as of 2026-09-16.
 
 Read `RULES.md` first. This file is only what is true right now.
 
 ---
 
-## Nothing in flight
+## In flight: one finished branch, waiting on Joel
 
-The 2026-09-14 batch described below merged as #56 and is live. Its branch and worklog are gone,
-as they should be. Start fresh, one branch per change, cut from current `main`.
+`claude/resume-template-colour-fidelity` — colour fidelity and the employer/title/date trio.
+Pushed, all five CI jobs green, current with `main`. **No pull request: Joel has not asked for one.**
+It is finished work, not work in progress; if you are a later session, do not restart it and do not
+cut a second branch over the same files. Its worklog carries the detail.
+
+The 2026-09-14 batch described below merged as #56 and is live.
 
 ## The app is rebuilt and live
 
@@ -22,7 +26,8 @@ The original build — structured content CRUD plus template CRUD plus docx gene
 shape: it assumed the app authored resume content. It does not; Jobright does. The auth, password
 and Supabase plumbing survived the rebuild; the content schema and its CRUD did not.
 
-**60 tests pass.** Verified today.
+**109 tests pass** on `claude/resume-template-colour-fidelity`, 86 on `main`. Verified by running
+them, not counted from a grep — `grep -c "it("` counts `describe` lines too and reads high.
 
 ## PII scrub: done (#21)
 
@@ -124,31 +129,109 @@ Two things not to do when the CLI refuses, both of which look reasonable at 11pm
   seed is enough on its own to make the CLI refuse.
 
 `supabase/README.md` documented how to *inspect* the history and never how to *apply* to it.
-**As of 2026-09-15 that gap is still open on `main`** — the fix is on
-`claude/doc-brief-migration-conventions`, unmerged. Until it lands, this section is the only place
-the mechanism is written down, which is exactly the reason it is written down here.
+**That gap is closed.** The README now says the technical director applies through the hosted API at
+gate time, and `CLAUDE.md` carries the shape rule that makes applying-before-merging safe: a
+migration must be one the currently-running code can ignore, because a merge deploys by itself in
+about a minute and anything a human does afterwards happens while the app is already broken.
+Additive changes ride with their code; destructive ones split into two pull requests.
 
-## The stored spec is what renders, so a template must be re-uploaded after this ships
+## The template's colours and its entry line are read and rendered
+
+On `claude/resume-template-colour-fidelity`, not yet on `main`.
+
+Every output used to be black. `headingColor` and `nameColor` had been in `TemplateSpec` since the
+start and the builder already consumed both — `extractSpec` simply never assigned them. The
+employer, title and dates had no colour support at all: one size, with bold and italic hardcoded
+into `renderEntry`.
+
+What is now true. `TemplateSpec` carries `defaultColor`, `contactColor` and two nested objects,
+`entry` (company / title / dates) and `highlight` (metric / description), each a `RunStyle` of
+size, colour, bold and italic. All of it is read out of the template and rendered.
+
+Four things it needed, each of which is a trap worth knowing:
+
+- **Runs, not just paragraphs.** The employer, title and dates are one paragraph and nothing but
+  the runs tells them apart. `Para` gains `runs`, and `size`/`bold`/`italic` now come off the first
+  of those rather than the first direct-child run — which also picks up a run Word has wrapped in a
+  hyperlink.
+- **Which cell a paragraph is in.** `Para.cell` numbers table, row and cell, so the highlights pair
+  can be read from the first table: two paragraphs in one cell in a columns template, two cells of
+  one row in a rows one.
+- **An inherited value is a value.** The title states no size at all — its 10.5pt is `docDefaults`.
+  `styleOf` resolves that at extraction time so the builder emits an explicit size and needs no
+  notion of inheritance. The same read of `docDefaults` supplies `defaultColor`, which is the one
+  line that stops bullets and prose rendering pure black.
+- **A link's colour is the link's.** The contact line hyperlinks the email and the LinkedIn in the
+  accent colour and sets the phone number grey. By length the accent wins, and the output renders
+  that line as a single run — so it would put a phone number in link blue. `dominantColor` weighs
+  the text that is *not* a link, by how much of the line it covers rather than by how many runs
+  carry it, because Word splits runs mid-word for spellcheck and that split must not get a vote. A
+  line that is nothing but links still has a colour, so links are the fallback rather than excluded.
+
+Two corrections fell out of reading the trio. An entry line's first run is set at the **heading**
+size, so "the first paragraph at the heading size" could land on an employer — it was a heading only
+because one happens to come first in this document, and every heading would otherwise have taken the
+grey of the title beside it. `isEntryLine` now keeps them out. And `entrySize`, the ranked guess,
+read 10pt where the document says 11; it is brought into line with what the entry line measures.
+
+**`extractSpec` starts from `normalizeSpec(null)`, never `{ ...DEFAULT_SPEC }`.** A spread shares
+the nested objects, so `spec.entry.company = …` wrote into the defaults themselves, and in a
+long-lived server process every later template inherited whatever the last one measured. There is a
+test pinning this; do not swap it back for a spread.
+
+**Deliberately not changed: `bodySize`.** The template's bullets inherit 10.5pt from `docDefaults`
+and the renderer emits 10pt, because `bodySize` is the commonest explicitly-stated size and that
+rule is deliberate. Half a point, nobody has raised it, and changing it reflows the whole document.
+
+## The stored spec is what renders, so a template must be re-uploaded after a spec change
 
 Worth knowing before anyone wonders why the fixes "did not work". `extractSpec` runs once, at
-upload, and `/api/reformat` reads the stored `spec` column rather than re-extracting
-(`app/api/reformat/route.ts:59`). So of the three renderer fixes, only the markdown-table parsing
-takes effect on existing templates — it happens at reformat time. `highlightsLayout` and the
-name/contact sizes live in the spec, so the active template has to be uploaded again to pick them
-up. The one-off template slot on Reformat does re-extract fresh, which makes it the way to check a
-template before committing it to a version.
+upload, and `/api/reformat` reads the stored `spec` column rather than re-extracting. So a fix that
+lives in the spec needs the active template uploaded again; only a fix at reformat time — the
+markdown-table parsing, for instance — reaches an existing template. The one-off template slot on
+Reformat does re-extract fresh, which makes it the way to check a template before committing it to a
+version.
+
+**`normalizeSpec` is what makes that survivable rather than fatal.** `resume.templates.spec` is JSON
+with no version, so a spec stored by an earlier release is missing whatever has been added since —
+and reading `spec.entry.company` off one throws rather than degrading. Every stored spec goes through
+`normalizeSpec` before it reaches the builder, which fills each missing field from the defaults and
+keeps the employer at that spec's own `entrySize` rather than letting it fall back to the body size.
+An old template therefore renders exactly as it did. **A future field added to `TemplateSpec` is one
+place to teach, and this is it.**
+
+**This is the third re-upload in a week and it has a root cause.** Re-extracting the spec from the
+stored `.docx` at render time would end it permanently, and `renders.template_snapshot` already
+preserves reproducibility so nothing would be lost. Raised with Joel on 2026-09-15 and correctly
+**not built** at the time, because he had not asked and it changes how every render resolves its
+formatting, which is his call.
+
+**He has since said yes — 2026-09-15, in the conversation that merged #67.** Recorded here by the
+technical director, because no other agent can see that conversation and the repo is the only
+channel. It is this area's work and not the TD's, so it is a next step below rather than something
+already begun. The re-upload that #67 needs is still required either way: the fix ends the *fourth*
+re-upload, not the third.
 
 ## Next steps
 
-1. **Run real generated output through a free ATS checker.** Still the highest-value open item and
+0. **Build the re-extract fix. Joel approved it on 2026-09-15.** Resolve the spec by re-extracting
+   from the stored `.docx` at render time instead of reading the `spec` column, so a spec change
+   reaches existing templates without a re-upload. `renders.template_snapshot` already preserves
+   reproducibility, so nothing is lost. The reasoning and the root cause are in the section above.
+   Expect it to need a test that proves an *old* template picks up a *new* field without being
+   re-uploaded, since that is the whole point of the change.
+1. **Ask Joel whether the contact line should be grey or accent.** His template hyperlinks the email
+   and the LinkedIn in the accent colour and sets the phone number grey; the output has to pick one,
+   and it picks grey. Flagged to him 2026-09-15, unanswered. One rule either way.
+2. **Run real generated output through a free ATS checker.** Still the highest-value open item and
    still untouched: every check in this app verifies it does what it was designed to do, and none
    verifies the design was right. Note the constraint that turned up on 2026-09-14 — doing this
    with a real resume uploads Joel's personal data to a third party, which is his decision alone.
    A synthetic document exercises the structure without that.
-2. **Link a render to a shared contact.** Still open from the rebuild.
-3. **Decide whether `/api/health` should be reachable by an external monitor.** TD and Platform as
+3. **Link a render to a shared contact.** Still open from the rebuild.
+4. **Decide whether `/api/health` should be reachable by an external monitor.** TD and Platform as
    much as you.
-4. **Watch the version numbering now deletion exists.** `version` is unique and computed as
+5. **Watch the version numbering now deletion exists.** `version` is unique and computed as
    max+1 across all rows including archived ones. Delete the newest template and the next upload
    reuses that number, so v3 can name two different files over time. Harmless today — renders keep
    a `template_snapshot` — but it is the kind of thing that reads as a bug later.

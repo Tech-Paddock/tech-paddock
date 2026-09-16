@@ -5,38 +5,50 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-15T22:54:14.423Z",
+  bakedAt: "2026-09-16T00:24:48.642Z",
   waiting: [
   {
-    "title": "Delete `claude/resume-template-management-and-render-fixes`. It came back from the dead and it is not harmless",
-    "detail": "#56 merged at 00:14:08 and GitHub auto-deleted the branch; the Resume Formatter pushed thirteen seconds later and git recreated it rather than refusing. I tried to delete it and the git proxy still refuses --delete with a 403 — that note in",
-    "ref": "2026-09-15",
+    "title": "Send the GitHub Support request",
+    "detail": "The history scrub removed the seven real names from every clone, every branch and every commit on main — but nine objects stay reachable through refs/pull/*, and the removed lines still render in the Files changed tab of #17 and #21. GitHub",
+    "ref": "—",
     "state": "box"
   },
   {
-    "title": "#56 is merged at `1a40550`. `claude/brief-migration-and-branch-conventions` is finished and waiting on Joel for a pull request",
-    "detail": "The predicted cost arrived on schedule: this branch was behind the moment #56 landed and has taken main again, exactly as *Require branches to be up to date before merging* forces. That is the order working, not a surprise. Checked for the ",
-    "ref": "2026-09-15",
+    "title": "Two tokens on `tp-home`, then redeploy",
+    "detail": "GITHUB_TOKEN fine-grained, this repo, read-only: Contents, Metadata, Pull requests, Actions. VERCEL_TOKEN read-only, tech-paddock team. The redeploy is not optional — Vercel bakes the environment in at build time, so a dashboard change does",
+    "ref": "—",
     "state": "box"
   },
   {
-    "title": "The history rewrite, authorized and blocked behind #56",
-    "detail": "Detail in the artifact and unchanged: #56 merges or closes, then *Block force pushes* and *Restrict deletions* come off main, then the rewrite with Joel present, then protection back on. Irreversible once pushed.",
-    "ref": "2026-09-15",
+    "title": "Re-upload the active resume template",
+    "detail": "#67 teaches the extractor to read colour out of a .docx, but /api/reformat renders from the spec stored on the template row rather than from the stored file, so the colours cannot appear until a fresh upload re-extracts them. Skipping it br",
+    "ref": "—",
+    "state": "box"
+  },
+  {
+    "title": "Confirm Coffee's iOS install works on a real iPhone",
+    "detail": "Carried out of a worklog before it was deleted, because it is the one thing in the fifteen that was genuinely unfinished rather than answered elsewhere. The apple-touch-icon, the web-app meta tags and the safe-area insets were verified agai",
+    "ref": "—",
+    "state": "box"
+  },
+  {
+    "title": "Decide who moves colours out of `tailwind.config.ts`",
+    "detail": "Joel narrowed theme ownership to colours and aesthetic decisions, not config — and that line cannot be drawn today, because the four tools' colours live inside tailwind.config.ts. Making it real means moving the values to CSS custom propert",
+    "ref": "—",
     "state": "box"
   }
 ] as BakedItem[],
   parked: [
   {
-    "title": "The branch-name action prefix",
-    "detail": "Drafted at Joel's request and parked by him the same hour, before it reached main. The area rule he approved earlier stands and is unaffected: claude/<area>-<description>. The draft was six non-overlapping actions — feat, fix, ci, db, doc, ",
-    "ref": "2026-09-15",
+    "title": "`CRON_SECRET` and the Microsoft Graph integration",
+    "detail": "Parked at Joel's request, 2026-09-15. What it is: tracker's daily sweep at /api/cron/stale-tasks reads the dashboard's decay list, finds threads gone quiet with no follow-up task open, and creates a Microsoft To Do task for each through Gra",
+    "ref": "—",
     "state": "clear"
   },
   {
-    "title": "`CRON_SECRET` and the Microsoft Graph integration",
-    "detail": "Parked at Joel's request. What it is: tracker's daily sweep at /api/cron/stale-tasks reads the dashboard's decay list, finds threads that have gone quiet with no follow-up task already open, and creates a Microsoft To Do task for each throu",
-    "ref": "2026-09-15",
+    "title": "The branch-name action prefix",
+    "detail": "Drafted at Joel's request on 2026-09-15 and parked by him the same hour, before it reached main. The area rule he approved earlier stands: claude/<area>-<description>. The draft was six non-overlapping actions — feat, fix, ci, db, doc, ops ",
+    "ref": "—",
     "state": "clear"
   }
 ] as BakedItem[],
@@ -59,12 +71,12 @@ export const PADDOCK = {
   {
     "id": "resume",
     "name": "Resume Formatter",
-    "asOf": "2026-09-14"
+    "asOf": "2026-09-16"
   },
   {
     "id": "td",
     "name": "Technical Director",
-    "asOf": "2026-09-15, 00:05 UTC"
+    "asOf": "2026-09-16, 00:20 UTC"
   },
   {
     "id": "techpad-gen",

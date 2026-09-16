@@ -13,11 +13,27 @@ import {
   WidthType,
   convertInchesToTwip,
 } from "docx";
-import type { TemplateSpec } from "./spec";
+import type { RunStyle, TemplateSpec } from "./spec";
 import type { Entry, Highlight, ResumeContent, Section } from "./label";
 
 const BULLET_REF = "resume-bullets";
 const CONTENT_WIDTH_TWIPS = 9360;
+
+/**
+ * One run, set the way the template sets it.
+ *
+ * A null size or colour is left off the run entirely rather than filled in, so
+ * the document default applies — exactly as it does in the template. Filling it in
+ * would pin a value the template never stated.
+ */
+const styled = (text: string, style: RunStyle) =>
+  new TextRun({
+    text,
+    bold: style.bold,
+    italics: style.italic,
+    size: style.size === null ? undefined : Math.round(style.size * 2),
+    color: style.color ?? undefined,
+  });
 
 /**
  * Build the .docx. Deterministic by construction: the same content and spec
@@ -52,7 +68,13 @@ export async function buildResumeDocx(content: ResumeContent, spec: TemplateSpec
     children.push(
       new Paragraph({
         spacing: { after: 120 },
-        children: [new TextRun({ text: content.contact, size: half(spec.contactSize) })],
+        children: [
+          new TextRun({
+            text: content.contact,
+            size: half(spec.contactSize),
+            color: spec.contactColor ?? undefined,
+          }),
+        ],
       })
     );
   }
@@ -65,7 +87,12 @@ export async function buildResumeDocx(content: ResumeContent, spec: TemplateSpec
   const doc = new Document({
     styles: {
       default: {
-        document: { run: { font: spec.font, size: half(spec.bodySize) } },
+        // The default colour matters as much as the default font: without it every
+        // run with no colour of its own comes out pure black, which is not what any
+        // of these templates say. Bullets and prose inherit it and set nothing.
+        document: {
+          run: { font: spec.font, size: half(spec.bodySize), color: spec.defaultColor ?? undefined },
+        },
       },
     },
     numbering: {
@@ -139,10 +166,17 @@ function renderSection(section: Section, spec: TemplateSpec): (Paragraph | Table
 const bullet = (text: string) =>
   new Paragraph({ numbering: { reference: BULLET_REF, level: 0 }, spacing: { after: 20 }, children: [new TextRun(text)] });
 
+/**
+ * The employer, the job title and the dates, on one line.
+ *
+ * All three take their size, colour and weight from the template's own entry line
+ * — Joel's is a bold 11pt employer, a grey italic 10.5pt title and a grey 10pt
+ * date — rather than from one size with hardcoded bold and italic.
+ */
 function renderEntry(entry: Entry, spec: TemplateSpec): Paragraph[] {
-  const runs: TextRun[] = [new TextRun({ text: entry.company, bold: true, size: Math.round(spec.entrySize * 2) })];
-  if (entry.title) runs.push(new TextRun({ text: `   ${entry.title}`, italics: true }));
-  if (entry.dates) runs.push(new TextRun({ text: `\t${entry.dates}` }));
+  const runs: TextRun[] = [styled(entry.company, spec.entry.company)];
+  if (entry.title) runs.push(styled(`   ${entry.title}`, spec.entry.title));
+  if (entry.dates) runs.push(styled(`\t${entry.dates}`, spec.entry.dates));
 
   return [
     new Paragraph({
@@ -162,9 +196,9 @@ function renderEntry(entry: Entry, spec: TemplateSpec): Paragraph[] {
  * highlight, metric beside description. The template decides; this only obeys.
  */
 function highlightsTable(items: Highlight[], spec: TemplateSpec): Table {
-  const metric = (h: Highlight) =>
-    new Paragraph({ children: [new TextRun({ text: h.metric, bold: true })] });
-  const description = (h: Highlight) => new Paragraph({ children: [new TextRun(h.description)] });
+  const metric = (h: Highlight) => new Paragraph({ children: [styled(h.metric, spec.highlight.metric)] });
+  const description = (h: Highlight) =>
+    new Paragraph({ children: [styled(h.description, spec.highlight.description)] });
 
   if (spec.highlightsLayout === "columns" && items.length > 0) {
     // Integer division leaves up to items.length-1 twips on the table's width.

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readDocxParts } from "../lib/docx/read";
 import { extractParagraphs } from "../lib/docx/paragraphs";
 import { labelParagraphs } from "../lib/docx/label";
-import { extractSpec, firstTableLayout } from "../lib/docx/spec";
+import { DEFAULT_SPEC, extractSpec, firstTableLayout } from "../lib/docx/spec";
 import { auditAts, headerFooterText } from "../lib/docx/ats";
 import { buildResumeDocx } from "../lib/docx/build";
 import { makeDocx, para, table } from "./helpers/docx";
@@ -216,19 +216,6 @@ describe("rendering highlights in the template's own layout", () => {
   });
 });
 
-const BASE_SPEC = {
-  font: "Calibri",
-  bodySize: 10,
-  headingSize: 11,
-  nameSize: 20,
-  contactSize: 10,
-  entrySize: 11,
-  headingBold: true,
-  headingColor: null,
-  nameColor: null,
-  margins: { top: 0.625, right: 0.75, bottom: 0.625, left: 0.75 },
-  spacing: { before: 40, after: 40, line: null },
-  bulletGlyph: "•",
-  highlightsStyle: "table" as const,
-  highlightsLayout: "rows" as const,
-};
+// The defaults, not a hand-written copy of them: these tests are about table
+// shape, and a literal spec here only ever went stale when a field was added.
+const BASE_SPEC = DEFAULT_SPEC;
