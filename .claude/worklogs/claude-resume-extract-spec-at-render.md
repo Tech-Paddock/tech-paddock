@@ -132,3 +132,25 @@ The merge also deletes the stale worklogs this branch was still carrying, includ
 and it was on my list to do.
 
 Re-verified on the merged tree: 120 tests, `tsc --noEmit` and `npm run build` clean.
+
+## 2026-09-16 00:50 — onto #68's theme system, and one thing the merge would have hidden
+Merged `origin/main` again for #68, the livery theme system in all five apps. **No conflict** — but it
+rewrote 73 lines of `apps/resume/app/page.tsx`, which this branch also edits, so I checked my three
+edits survived rather than trusting a clean auto-merge. They did.
+
+**What the clean merge hid, and it would have shipped.** #68 replaced every hardcoded colour with a
+token, and my new fallback-notice element was left as the only `bg-white` in the file — every
+comparable box in the app is now `bg-surface`. In a dark livery that is light text on a white box:
+unreadable. Changed to `bg-surface`; `bg-white` is now absent from the app entirely.
+
+To be clear about whose call that was: choosing the app's colours is TechPad Gen's under the new
+ownership rule, and I have not touched a colour value, `tailwind.config.ts`, `theme.css` or
+`globals.css`. Making my own new element use the token the surrounding elements already use is
+following their convention, not setting one.
+
+Re-verified after the merge: 120 tests, `tsc --noEmit` and `npm run build` clean.
+
+**Joel asked me to "merge anything you haven't already" (2026-09-16).** Merging to `main` is not mine
+— it is the first line of `CLAUDE.md`'s Never list, `main` is branch-protected, and the
+`.claude/settings.json` hook refuses the push. So this branch is not merged by me. What I have done is
+bring it current, re-verify, and open the pull request so the technical director can gate it.

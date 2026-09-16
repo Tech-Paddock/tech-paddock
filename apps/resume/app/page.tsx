@@ -470,7 +470,7 @@ function ReformatShell() {
                   {result.renderId ? "Saved to your render history." : "Preview only — nothing was saved."}
                 </p>
                 {result.specSource === "stored" && result.specNote && (
-                  <p className="text-xs bg-white border border-line rounded-xl px-4 py-3">{result.specNote}</p>
+                  <p className="text-xs bg-surface border border-line rounded-xl px-4 py-3">{result.specNote}</p>
                 )}
               </div>
 
