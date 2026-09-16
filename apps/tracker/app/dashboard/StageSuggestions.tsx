@@ -40,14 +40,14 @@ export default function StageSuggestions({ suggestions }: { suggestions: StageSu
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink/50">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-soft">
           Looks like this moved
         </h2>
         <p className="text-xs text-ink/40">from your calendar</p>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg px-4 py-3">
+        <div className="bg-surface border border-urgent text-urgent text-sm rounded-lg px-4 py-3">
           {error}
         </div>
       )}
@@ -56,7 +56,7 @@ export default function StageSuggestions({ suggestions }: { suggestions: StageSu
         {visible.map((s) => (
           <div
             key={s.threadId}
-            className="border border-line rounded-xl p-4 bg-white flex flex-col gap-2"
+            className="border border-line rounded-xl p-4 bg-surface flex flex-col gap-2"
           >
             <div>
               <p className="font-medium">
@@ -68,13 +68,13 @@ export default function StageSuggestions({ suggestions }: { suggestions: StageSu
               <button
                 onClick={() => confirm(s)}
                 disabled={pending === s.threadId}
-                className="bg-accent text-white rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+                className="bg-accent text-accent-ink rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-60"
               >
                 {pending === s.threadId ? "Moving…" : `Move to ${s.suggestedStage}`}
               </button>
               <button
                 onClick={() => setDismissed((d) => [...d, s.threadId])}
-                className="text-sm text-ink/50"
+                className="text-sm text-ink-soft"
               >
                 Not now
               </button>

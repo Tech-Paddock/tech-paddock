@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { LIVERY } from "@/lib/livery";
+import ThemeControl from "./ThemeControl";
 
 type Contact = { id: string; name: string; org: string | null; preferred_channel: string | null };
 
@@ -163,20 +165,21 @@ function HomeShell() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-10 flex flex-col gap-6">
-      <header className="flex items-center justify-between">
-        <div>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold">Pipeline Tracker</h1>
+          <ThemeControl livery={LIVERY} />
         </div>
         <div className="flex items-center gap-2">
           <Link
             href="/dashboard"
-            className="px-3 py-2 rounded-lg border border-line bg-white text-sm font-medium"
+            className="px-3 py-2 rounded-lg border border-line bg-surface text-sm font-medium"
           >
             Dashboard
           </Link>
           <button
             onClick={() => setNewOpen((v) => !v)}
-            className="px-3 py-2 rounded-lg border border-line bg-white text-sm font-medium"
+            className="px-3 py-2 rounded-lg border border-line bg-surface text-sm font-medium"
           >
             + New thread
           </button>
@@ -184,13 +187,13 @@ function HomeShell() {
       </header>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg px-4 py-3">
+        <div className="bg-surface border border-urgent text-urgent text-sm rounded-lg px-4 py-3">
           {error}
         </div>
       )}
 
       {newOpen && (
-        <div className="border border-line rounded-lg p-4 bg-white flex flex-col gap-3">
+        <div className="border border-line rounded-lg p-4 bg-surface flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
             <input
               value={newThread.company}
@@ -201,7 +204,7 @@ function HomeShell() {
             <select
               value={newThread.contact_id}
               onChange={(e) => setNewThread({ ...newThread, contact_id: e.target.value })}
-              className="border border-line rounded-lg px-3 py-2 text-sm bg-white"
+              className="border border-line rounded-lg px-3 py-2 text-sm bg-surface"
             >
               <option value="">No contact linked</option>
               {contacts.map((c) => (
@@ -214,7 +217,7 @@ function HomeShell() {
             <select
               value={newThread.stage}
               onChange={(e) => setNewThread({ ...newThread, stage: e.target.value })}
-              className="border border-line rounded-lg px-3 py-2 text-sm bg-white"
+              className="border border-line rounded-lg px-3 py-2 text-sm bg-surface"
             >
               {STAGES.map((s) => (
                 <option key={s} value={s}>
@@ -232,7 +235,7 @@ function HomeShell() {
           <button
             onClick={createThread}
             disabled={!newThread.company.trim()}
-            className="self-start bg-accent text-white rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+            className="self-start bg-accent text-accent-ink rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-60"
           >
             Save thread
           </button>
@@ -248,8 +251,8 @@ function HomeShell() {
             <div
               key={t.id}
               ref={focused ? focusedRef : undefined}
-              className={`border rounded-xl p-4 bg-white flex flex-col gap-3 ${
-                stale ? "border-red-300" : "border-line"
+              className={`border rounded-xl p-4 bg-surface flex flex-col gap-3 ${
+                stale ? "border-urgent" : "border-line"
               } ${focused ? "ring-2 ring-accent ring-offset-2" : ""}`}
             >
               <div className="flex items-center justify-between">
@@ -260,13 +263,13 @@ function HomeShell() {
                 <div className="flex items-center gap-2">
                   {stale && (
                     <span
-                      className="text-xs font-medium text-red-700 bg-red-50 px-2 py-1 rounded-full"
+                      className="text-xs font-medium text-ink-invert bg-urgent px-2 py-1 rounded-full"
                       title={`Past the ${t.decay_threshold}-day threshold for ${t.stage}`}
                     >
                       {quiet}d quiet
                     </span>
                   )}
-                  <button onClick={() => deleteThread(t.id)} className="text-xs text-red-700">
+                  <button onClick={() => deleteThread(t.id)} className="text-xs text-urgent">
                     Delete
                   </button>
                 </div>
@@ -276,7 +279,7 @@ function HomeShell() {
                 <select
                   value={t.stage}
                   onChange={(e) => updateThread(t.id, { stage: e.target.value })}
-                  className="border border-line rounded-lg px-2 py-1.5 bg-white"
+                  className="border border-line rounded-lg px-2 py-1.5 bg-surface"
                 >
                   {STAGES.map((s) => (
                     <option key={s} value={s}>
@@ -331,7 +334,7 @@ function HomeShell() {
                   </button>
                 </div>
                 {taskNote?.id === t.id && (
-                  <p className="text-xs text-ink/50">{taskNote.text}</p>
+                  <p className="text-xs text-ink-soft">{taskNote.text}</p>
                 )}
                 {draftFor === t.id && draftText && (
                   <div className="bg-paper border border-line rounded-lg p-3 text-sm whitespace-pre-wrap">
@@ -342,7 +345,7 @@ function HomeShell() {
             </div>
           );
         })}
-        {sorted.length === 0 && <p className="text-sm text-ink/50">No threads yet.</p>}
+        {sorted.length === 0 && <p className="text-sm text-ink-soft">No threads yet.</p>}
       </div>
     </main>
   );

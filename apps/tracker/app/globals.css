@@ -2,7 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The two values that cannot be utility classes, because nothing renders the
+   <body> element with a className. Both read the tokens lib/theme.css sets on
+   <html>, so they follow the livery and the polarity like everything else. */
 body {
-  background-color: #f1f2f3;
-  color: #121314;
+  background-color: var(--paper);
+  color: var(--ink);
 }

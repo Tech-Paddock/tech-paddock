@@ -2,6 +2,8 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { LIVERY } from "@/lib/livery";
+import ThemeControl from "./ThemeControl";
 
 type Tab = "reformat" | "templates" | "history" | "check";
 const TABS: Tab[] = ["reformat", "templates", "history", "check"];
@@ -83,7 +85,7 @@ function FilePick({ label, hint, file, onPick }: { label: string; hint: string; 
         setOver(false);
         take(e.dataTransfer.files);
       }}
-      className={`h-full min-h-[10.5rem] border-2 border-dashed rounded-2xl bg-white px-4 py-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${
+      className={`h-full min-h-[10.5rem] border-2 border-dashed rounded-2xl bg-surface px-4 py-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${
         over ? "border-accent bg-accent/5" : "border-line"
       }`}
     >
@@ -114,7 +116,7 @@ function Findings({ findings }: { findings: Finding[] }) {
   const warnings = findings.filter((f) => f.severity === "warning");
   if (findings.length === 0) {
     return (
-      <p className="text-sm bg-white border border-line rounded-xl px-4 py-3">
+      <p className="text-sm bg-surface border border-line rounded-xl px-4 py-3">
         No structural problems. Single column, contact details in the body, no stray tables.
       </p>
     );
@@ -125,7 +127,7 @@ function Findings({ findings }: { findings: Finding[] }) {
         <div
           key={f.code}
           className={`rounded-xl px-4 py-3 border text-sm ${
-            f.severity === "blocking" ? "bg-red-50 border-red-200 text-red-900" : "bg-amber-50 border-amber-200 text-amber-900"
+            f.severity === "blocking" ? "bg-surface border-urgent text-urgent" : "bg-surface border-warn text-warn"
           }`}
         >
           <p className="font-medium mb-1">
@@ -329,14 +331,15 @@ function ReformatShell() {
 
   return (
     <main className="min-h-screen px-5 py-8 max-w-3xl mx-auto flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
+      <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold">Resume Formatter</h1>
-        <p className="text-sm opacity-70">
+        <p className="text-sm text-ink-soft">
           Put a tailored resume into your own template, without losing a word of it.
         </p>
+        <ThemeControl livery={LIVERY} />
       </header>
 
-      <nav className="flex gap-1 bg-white border border-line rounded-xl p-1">
+      <nav className="flex gap-1 bg-surface border border-line rounded-xl p-1">
         {(["reformat", "templates", "history", "check"] as const).map((t) => (
           <button
             key={t}
@@ -345,7 +348,7 @@ function ReformatShell() {
               setError(null);
             }}
             className={`flex-1 rounded-lg px-2 py-2 text-xs sm:text-sm font-medium ${
-              tab === t ? "bg-accent text-white" : "opacity-70"
+              tab === t ? "bg-accent text-accent-ink" : "opacity-70"
             }`}
           >
             {t === "reformat" ? "Reformat" : t === "templates" ? "Templates" : t === "history" ? "History" : "Check"}
@@ -353,25 +356,25 @@ function ReformatShell() {
         ))}
       </nav>
 
-      {error && <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>}
+      {error && <p className="text-sm text-urgent bg-surface border border-urgent rounded-lg px-4 py-3">{error}</p>}
 
       {tab === "reformat" ? (
         <>
           <section className="flex flex-col gap-3">
             {active ? (
-              <div className="bg-white border border-line rounded-xl px-4 py-3">
+              <div className="bg-surface border border-line rounded-xl px-4 py-3">
                 <p className="text-xs uppercase tracking-wide opacity-60">Template</p>
                 <p className="text-sm font-medium">
                   {active.name} <span className="opacity-60 font-normal">v{active.version}</span>
                 </p>
               </div>
             ) : (
-              <p className="text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3">
+              <p className="text-sm bg-surface border border-warn text-warn rounded-xl px-4 py-3">
                 No template saved yet. Add one on the Templates tab, or attach a one-off below.
               </p>
             )}
             {pinnedOlder && (
-              <p className="text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3">
+              <p className="text-sm bg-surface border border-warn text-warn rounded-xl px-4 py-3">
                 Rendering with v{pinnedOlder.active.version} ({pinnedOlder.active.name}). Your most recent is v
                 {pinnedOlder.newest.version}.
               </p>
@@ -391,7 +394,7 @@ function ReformatShell() {
             <button
               onClick={reformat}
               disabled={!source || (!template && !active) || busy !== null}
-              className="w-full bg-accent text-white rounded-xl px-5 py-4 text-base font-medium disabled:opacity-50"
+              className="w-full bg-accent text-accent-ink rounded-xl px-5 py-4 text-base font-medium disabled:opacity-50"
             >
               {busy ?? "Reformat"}
             </button>
@@ -406,8 +409,8 @@ function ReformatShell() {
               <section
                 className={`rounded-xl px-4 py-3 border text-sm ${
                   result.coverage.percent === 100
-                    ? "bg-white border-line"
-                    : "bg-amber-50 border-amber-200 text-amber-900"
+                    ? "bg-surface border-line"
+                    : "bg-surface border-warn text-warn"
                 }`}
               >
                 <p className="font-medium">
@@ -435,7 +438,7 @@ function ReformatShell() {
 
               <section className="flex flex-col gap-3">
                 <h2 className="text-lg font-semibold">What went in</h2>
-                <div className="bg-white border border-line rounded-xl p-4 flex flex-col gap-2">
+                <div className="bg-surface border border-line rounded-xl p-4 flex flex-col gap-2">
                   <p className="text-sm">
                     <span className="opacity-60">Name:</span> <span className="font-medium">{result.summary.name ?? "not found"}</span>
                   </p>
@@ -454,7 +457,7 @@ function ReformatShell() {
               </section>
 
               <div className="flex flex-col gap-2">
-                <button onClick={download} className="w-full bg-accent text-white rounded-xl px-5 py-4 text-base font-medium">
+                <button onClick={download} className="w-full bg-accent text-accent-ink rounded-xl px-5 py-4 text-base font-medium">
                   Download {result.filename}
                 </button>
                 <p className="text-xs opacity-60">
@@ -467,9 +470,9 @@ function ReformatShell() {
                 <section className="flex flex-col gap-3">
                   <h2 className="text-lg font-semibold">Where did this go?</h2>
                   {saved ? (
-                    <p className="text-sm bg-white border border-line rounded-xl px-4 py-3">{saved}</p>
+                    <p className="text-sm bg-surface border border-line rounded-xl px-4 py-3">{saved}</p>
                   ) : (
-                    <div className="bg-white border border-line rounded-xl p-4 flex flex-col gap-3">
+                    <div className="bg-surface border border-line rounded-xl p-4 flex flex-col gap-3">
                       <p className="text-xs opacity-60">
                         Naming a company creates the thread in Pipeline Tracker. Leave it blank if you have not sent
                         this yet — it stays in history either way.
@@ -492,7 +495,7 @@ function ReformatShell() {
                       <button
                         onClick={recordJob}
                         disabled={!job.company.trim()}
-                        className="w-full bg-accent text-white rounded-xl px-5 py-3 text-sm font-medium disabled:opacity-50"
+                        className="w-full bg-accent text-accent-ink rounded-xl px-5 py-3 text-sm font-medium disabled:opacity-50"
                       >
                         Log as submitted
                       </button>
@@ -519,7 +522,7 @@ function ReformatShell() {
           </section>
 
           {pinnedOlder && (
-            <p className="text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3">
+            <p className="text-sm bg-surface border border-warn text-warn rounded-xl px-4 py-3">
               v{pinnedOlder.active.version} is pinned active, but v{pinnedOlder.newest.version} is newer.
             </p>
           )}
@@ -527,12 +530,12 @@ function ReformatShell() {
           <section className="flex flex-col gap-2">
             {templates === null && <p className="text-sm opacity-60">Loading…</p>}
             {templates?.length === 0 && (
-              <p className="text-sm bg-white border border-line rounded-xl px-4 py-3">
+              <p className="text-sm bg-surface border border-line rounded-xl px-4 py-3">
                 No templates yet. Add the resume whose look you want everything to match.
               </p>
             )}
             {templates?.map((t) => (
-              <div key={t.id} className="bg-white border border-line rounded-xl px-4 py-3 flex flex-col gap-2">
+              <div key={t.id} className="bg-surface border border-line rounded-xl px-4 py-3 flex flex-col gap-2">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium break-all">
@@ -544,7 +547,7 @@ function ReformatShell() {
                     </p>
                   </div>
                   {t.is_active ? (
-                    <span className="text-xs bg-accent text-white rounded-full px-2.5 py-1 whitespace-nowrap">Active</span>
+                    <span className="text-xs bg-accent text-accent-ink rounded-full px-2.5 py-1 whitespace-nowrap">Active</span>
                   ) : (
                     <button
                       onClick={() => activate(t.id)}
@@ -563,7 +566,7 @@ function ReformatShell() {
                   <button onClick={() => setArchivedState(t.id, true)} className="underline opacity-80">
                     Archive
                   </button>
-                  <button onClick={() => remove(t)} className="underline text-red-800">
+                  <button onClick={() => remove(t)} className="underline text-urgent">
                     Delete
                   </button>
                 </div>
@@ -581,7 +584,7 @@ function ReformatShell() {
               </button>
               {showArchived &&
                 archived.map((t) => (
-                  <div key={t.id} className="bg-white border border-line rounded-xl px-4 py-3 flex flex-col gap-2 opacity-70">
+                  <div key={t.id} className="bg-surface border border-line rounded-xl px-4 py-3 flex flex-col gap-2 opacity-70">
                     <p className="font-medium break-all">
                       {t.name} <span className="opacity-60 font-normal">v{t.version}</span>
                     </p>
@@ -592,7 +595,7 @@ function ReformatShell() {
                       <button onClick={() => setArchivedState(t.id, false)} className="underline opacity-80">
                         Restore
                       </button>
-                      <button onClick={() => remove(t)} className="underline text-red-800">
+                      <button onClick={() => remove(t)} className="underline text-urgent">
                         Delete
                       </button>
                     </div>
@@ -605,14 +608,14 @@ function ReformatShell() {
         <section className="flex flex-col gap-2">
           {renders === null && <p className="text-sm opacity-60">Loading…</p>}
           {renders?.length === 0 && (
-            <p className="text-sm bg-white border border-line rounded-xl px-4 py-3">
+            <p className="text-sm bg-surface border border-line rounded-xl px-4 py-3">
               No renders yet. Reformat a resume and it lands here.
             </p>
           )}
           {renders?.map((r) => (
             <div
               key={r.id}
-              className={`bg-white border rounded-xl px-4 py-3 flex flex-col gap-1 ${
+              className={`bg-surface border rounded-xl px-4 py-3 flex flex-col gap-1 ${
                 r.id === highlightRender ? "border-accent ring-2 ring-accent/30" : "border-line"
               }`}
             >
@@ -640,7 +643,7 @@ function ReformatShell() {
 
           {inspection && (
             <>
-              <section className="bg-white border border-line rounded-xl p-4 flex flex-col gap-1">
+              <section className="bg-surface border border-line rounded-xl p-4 flex flex-col gap-1">
                 <p className="font-medium break-all">{inspection.filename}</p>
                 <p className="text-sm opacity-70">
                   {(inspection.sizeBytes / 1024 / 1024).toFixed(2)} MB · {inspection.paragraphCount} paragraphs ·{" "}
@@ -655,7 +658,7 @@ function ReformatShell() {
 
               <section className="flex flex-col gap-3">
                 <h2 className="text-lg font-semibold">What the parser read</h2>
-                <div className="bg-white border border-line rounded-xl p-4 flex flex-col gap-2">
+                <div className="bg-surface border border-line rounded-xl p-4 flex flex-col gap-2">
                   <p className="text-sm">
                     <span className="opacity-60">Name detected:</span>{" "}
                     <span className="font-medium">{inspection.outline.title ?? "none"}</span>
