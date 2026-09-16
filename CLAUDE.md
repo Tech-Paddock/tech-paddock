@@ -190,9 +190,10 @@ wrong or the rule is, and that is a conversation before any code exists.
   always all three — a section with nothing in it says so rather than being dropped, because a
   missing section and a quiet one are indistinguishable.
 
-  **1 · Work Brief.** One or two lines on what you just finished, in this message. Not the session,
-  not the plan — what is now done. **`None.` is the correct answer when you only answered a
-  question**, and it is written.
+  **1 · Work Brief.** What you finished in this message, as **dashed bullets, one per thing** — the
+  dashes are the point, because a paragraph of three accomplishments reads as one. Not the session,
+  not the plan; what is now done. **`- None.` is the correct answer when the message only answered a
+  question**, and it is written rather than dropped.
 
   **2 · DevOps.** What exists and is not live yet, one line each, naming **the stage it is parked
   at.** Four stages, in the order work moves through them, and the words are the ones Joel reads —
