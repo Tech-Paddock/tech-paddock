@@ -6,7 +6,7 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-16T17:05:27.631Z",
+  "generatedAt": "2026-09-16T17:27:10.300Z",
   "complete": true,
   "reason": "",
   "checks": [
@@ -62,13 +62,13 @@ export const DRIFT: Drift = {
     },
     {
       "name": "budget: .claude/agents/td/HANDOFF.md",
-      "state": "ok",
-      "detail": "65 / 80"
+      "state": "warn",
+      "detail": "72 / 80"
     },
     {
       "name": "budget: .claude/agents/techpad-gen/HANDOFF.md",
       "state": "warn",
-      "detail": "78 / 80"
+      "detail": "80 / 80"
     },
     {
       "name": "budget: .claude/agents/tracker/HANDOFF.md",
@@ -147,8 +147,8 @@ export const DRIFT: Drift = {
     }
   ],
   "counts": {
-    "ok": 22,
-    "warn": 5,
+    "ok": 21,
+    "warn": 6,
     "fail": 0
   }
 };

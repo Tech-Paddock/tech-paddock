@@ -51,9 +51,11 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-`claude/home-morning-paper-prototype` — a Morning Paper prototype, built from the settled decisions
-rather than from Joel's brief, for him to approve. No pull request. Two things in it are guesses and
-are labelled as such on the page: the lead above the fold, and what the Feed is.
+`claude/home-morning-paper-prototype` — the Morning Paper, open as #82. **Design approved by Joel on
+2026-09-16**, and he lifted the privacy fold with it: *"drop above the fold below, ill manage
+privacy."* So what is owed leads, job search included, and the layout enforces no privacy boundary.
+**That amends a settled decision in `DECISIONS.md` and wants recording there.** The Feed is still
+undefined and renders as a labelled slot; its open questions are with Joel.
 
 ## Next
 
