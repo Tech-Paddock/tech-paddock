@@ -6,7 +6,7 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-16T16:44:23.739Z",
+  "generatedAt": "2026-09-16T17:05:27.631Z",
   "complete": true,
   "reason": "",
   "checks": [
@@ -26,9 +26,9 @@ export const DRIFT: Drift = {
       "detail": "5 copies, all ab55a1a4"
     },
     {
-      "name": "middleware.ts: three deliberate variants",
+      "name": "middleware.ts: a base copy plus the two scoped bypasses",
       "state": "ok",
-      "detail": "coffee+home+resume | editor | tracker"
+      "detail": "3 on the base copy, editor and tracker scoped — coffee+home+resume | editor | tracker"
     },
     {
       "name": "CI derives its roster from apps/",
@@ -43,7 +43,7 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/agents/coffee/HANDOFF.md",
       "state": "warn",
-      "detail": "80 / 80"
+      "detail": "76 / 80"
     },
     {
       "name": "budget: .claude/agents/message-editor/HANDOFF.md",
@@ -58,12 +58,12 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/agents/resume/HANDOFF.md",
       "state": "warn",
-      "detail": "76 / 80"
+      "detail": "77 / 80"
     },
     {
       "name": "budget: .claude/agents/td/HANDOFF.md",
       "state": "ok",
-      "detail": "57 / 80"
+      "detail": "65 / 80"
     },
     {
       "name": "budget: .claude/agents/techpad-gen/HANDOFF.md",
