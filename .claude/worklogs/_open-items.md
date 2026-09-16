@@ -86,6 +86,20 @@ work. Something here moves only when Joel says so.
 
 ## Done since this ledger was last written
 
+- **2026-09-16 — #71 and #73 merged in a decided order, and the order was the work.** #71 is the
+  Resume Formatter's re-extract fix: `/api/reformat` now downloads the template's stored `.docx` and
+  extracts the spec from it, so **a spec change no longer needs a re-upload to take effect**. #73 is
+  TechPad Gen narrowing the history-rewrite safety test, which #68 had silently broken by adding
+  theme files to every app — the old form flagged all five stale branches including two that were
+  provably clean, and a test that answers yes to everything answers nothing.
+  **Four branches, and the ordering was decided before any of them moved.** The two other agents'
+  branches first, so neither paid a re-take under require-branches-up-to-date. Then the TD's own
+  record, third, because it and #73 both deleted the same worklog and the second to merge pays — the
+  cost belongs on the branch still in hand. Then the rule change last. The shared delete resolved as
+  a no-op, which is what the ordering was for.
+  **#71 corrects a thing worth keeping:** it ends re-uploading to pick up a *code* change and does
+  nothing about a change to the *template file* — so the outstanding re-upload below still stands.
+
 - **2026-09-16 — #68 merged: the livery theme system is live in all five apps.** TechPad Gen's work;
   the gate only checked it. One livery per app, both polarities, the switch in every header, and one
   `paddock_mode` cookie on `.techpaddock.io` so polarity follows you across subdomains. Colour left

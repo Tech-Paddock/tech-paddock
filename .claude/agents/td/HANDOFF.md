@@ -30,8 +30,15 @@ document that sounded authoritative.
 
 ## Nothing is open, and the last time that was written it was wrong
 
-`main` is at the livery merge. #67, #68, #69 and #70 are in and every branch is deleted. Nothing is
-open, nothing is pushed and unmerged.
+**As this is written, #72 is open and merging last of tonight's four.** #67, #68, #69, #70, #71 and
+#73 are in. #74 is this change. The order was decided before any of tonight's four were merged and is
+recorded in each merge commit: another agent's finished work first so it never pays a re-take, the
+branch sharing a file with another one third so the re-take falls on the TD rather than its author,
+and the rule change last.
+
+**This section will be stale again within the hour, and that is the point of how it is written.** It
+names a moment rather than claiming a steady state, because the steady state was what made the last
+version wrong.
 
 **Read the next paragraph before trusting that sentence again.** The identical claim sat in this
 file an hour earlier and was false: #68 was opened by TechPad Gen at 00:28 while the TD was working,
