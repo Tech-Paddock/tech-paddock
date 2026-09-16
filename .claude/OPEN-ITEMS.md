@@ -58,8 +58,7 @@ Requests with an owner who is not Joel. This is how one agent asks another for s
 never run at the same time, so it lands here or it does not happen. The owning agent picks it up at
 the start of its next session, because the hook prints this file into every one.
 
-1. **Trim `techpad-gen/HANDOFF.md` off the ceiling.** *Owner: TechPad Gen — done, not yet landed.*
-   It is 76 of 80 on #92, which is open and green. The row closes when that merges.
+Nothing.
 
 ## Parked
 
