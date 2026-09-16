@@ -55,26 +55,30 @@ the handoff conflict, CI absent rather than red because GitHub cannot build a co
 and a body restating production's commit from a stale branch — are kept in the ledger as the case that
 proved the handoff rule, not as live work.
 
-## Nine orphaned worklogs are left, and they are not the TD's to clear
+## `.claude/worklogs/` is empty of worklogs, and that is the baseline now
 
-Every branch in the repo is merged and deleted except `claude/brief-ledger-current`, so every file in
-`.claude/worklogs/` names a branch that no longer exists. The README is explicit that a worklog dies
-with its branch, and that the point is keeping `read-all.sh` a signal about what is claimed *right
-now* rather than a pile of history.
+Three files: `README.md`, `_open-items.md`, `read-all.sh`. Every branch is merged and deleted except
+`claude/brief-ledger-current`, so all fifteen worklogs named branches that no longer existed and all
+fifteen are gone.
 
-**The technical director's own six were deleted on 09-15** — `kickoff-pxdz0f`,
-`doc-brief-migration-conventions`, `tracker-scrub-real-names`, `home-pit-wall`, `home-pit-wall-spec`
-and `brief-techpad-gen-owns-themes`. Everything durable in them is in this file or in `CLAUDE.md`, and
-git keeps the text regardless.
+**The TD deleted its own six and left the other nine; Joel said delete those too.** The reasoning for
+leaving them was that the README says to move anything durable into that agent's `HANDOFF.md` *before*
+deleting, and the TD cannot assert on another agent's behalf that it happened. **That reasoning was
+sound and Joel overruled it, which is his call, so it is settled — do not relitigate it.** What the
+next TD should take from it is the cheaper version: check the worklogs for a live *Need from TD* before
+deleting, which costs one grep, and carry anything unanswered into the ledger.
 
-**The remaining nine were deliberately left.** Seven are Coffee's, one is TechPad Gen's
-(`home-theme-ownership`) and one is the Resume Formatter's (`resume-template-colour-fidelity`). The
-README says to move anything durable into that agent's `HANDOFF.md` *before* deleting, and the TD
-cannot assert on another agent's behalf that it happened — a handoff the TD writes is a second-hand
-reading of someone else's work, which is exactly what handoffs exist to replace. **So the right move
-is each agent clearing its own on its next session**, and the ledger carries it rather than a bulk
-delete doing it quietly. Nothing is broken meanwhile: the Pit Wall declares `worklog` as a source type
-but does not read these files yet, so the only cost is noise in `read-all.sh`.
+**That check found three and it was worth running.** Two were already answered by `CLAUDE.md` as it now
+stands — Coffee's model exception, closed by *Model choice is per task*, and project-wide
+installability, closed by the Safari paragraph that says not to add a manifest on the strength of that
+rule. TechPad Gen's theme-ownership ask was closed by #66. One genuinely unfinished item survived —
+Coffee's iOS install is unverified on a real phone — and it is now a Waiting on Joel item in the
+ledger rather than lost with the file.
+
+**Keep it at this baseline.** A worklog is deleted by its own agent when its branch merges; the pile
+accumulated because that step was skipped at fifteen merges in a row, not because the rule is unclear.
+The Pit Wall declares `worklog` as a source type but does not read these files yet, so nothing on the
+homepage depends on them either way.
 
 ## A merged branch can come back, and it comes back carrying everything
 

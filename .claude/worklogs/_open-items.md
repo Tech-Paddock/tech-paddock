@@ -42,13 +42,11 @@ the reasoning underneath. The generator takes the first bold run as the row titl
    breaks nothing** — `normalizeSpec` fills the missing fields and existing templates render exactly
    as they do today; the change is simply invisible. This is the third re-upload in a week and you
    have approved the fix that ends them, which is now the Resume Formatter's next change.
-4. **Nine orphaned worklogs to clear.** Each agent clears its own on its next session, unless you say
-   sweep them. Every branch is merged and deleted except this one, so every worklog names a branch
-   that no longer exists. The TD's
-   own six are gone. The other nine are Coffee's seven, TechPad Gen's and the Resume Formatter's, and
-   the README says to move anything durable into that agent's `HANDOFF.md` *before* deleting — which
-   the TD cannot assert on someone else's behalf. **Nothing is broken meanwhile**; the cost is noise
-   in `read-all.sh`. Left as a decision rather than done quietly.
+4. **Confirm Coffee's iOS install works on a real iPhone.** Carried out of a worklog before it was
+   deleted, because it is the one thing in the fifteen that was genuinely unfinished rather than
+   answered elsewhere. The apple-touch-icon, the web-app meta tags and the safe-area insets were
+   verified against the built HTML; **whether iOS actually takes the icon needs a deploy and a
+   phone**, which is you. Open it in Safari, add to home screen, and see whether the icon is right.
 5. **Decide who moves colours out of `tailwind.config.ts`.** Joel narrowed theme ownership to
    colours and aesthetic decisions, **not config** — and that line cannot be drawn today, because the
    four tools' colours live inside `tailwind.config.ts`. Making it real means moving the values to
@@ -88,6 +86,18 @@ work. Something here moves only when Joel says so.
   request's own state, and this ledger.
 
 ## Done since this ledger was last written
+
+- **2026-09-16 — All fifteen orphaned worklogs deleted, on Joel's instruction.** Every branch is
+  merged and deleted except this one, so every worklog named a branch that no longer existed, which
+  is exactly what the README says to clear: `read-all.sh` is meant to show what is claimed *right
+  now*. The TD's six went first; Joel then said delete the rest, overriding the TD's judgement that
+  another agent's worklog was not the TD's to clear. **`.claude/worklogs/` is now `README.md`,
+  `_open-items.md` and `read-all.sh` and nothing else** — the clean baseline the convention assumes.
+  **Checked before deleting rather than after.** Three carried a *Need from TD*. Two were already
+  answered by `CLAUDE.md` as it now stands — the model exception, closed by *Model choice is per
+  task*, and project-wide installability, closed by the Safari paragraph that says not to add a
+  manifest on the strength of that rule. The third, TechPad Gen's theme-ownership ask, was closed by
+  #66. One genuinely unfinished item survived and is now item 4 above.
 
 - **2026-09-15 — #67 merged: the reformatter reproduces the template's own colours.** The Resume
   Formatter's work; the gate only checked it. Confirmed it does not touch the theme rule that landed

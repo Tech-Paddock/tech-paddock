@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-16T00:07:45.423Z",
+  bakedAt: "2026-09-16T00:12:58.312Z",
   waiting: [
   {
     "title": "Send the GitHub Support request",
@@ -26,8 +26,8 @@ export const PADDOCK = {
     "state": "box"
   },
   {
-    "title": "Nine orphaned worklogs to clear",
-    "detail": "Each agent clears its own on its next session, unless you say sweep them. Every branch is merged and deleted except this one, so every worklog names a branch that no longer exists. The TD's own six are gone. The other nine are Coffee's seve",
+    "title": "Confirm Coffee's iOS install works on a real iPhone",
+    "detail": "Carried out of a worklog before it was deleted, because it is the one thing in the fifteen that was genuinely unfinished rather than answered elsewhere. The apple-touch-icon, the web-app meta tags and the safe-area insets were verified agai",
     "ref": "—",
     "state": "box"
   },
