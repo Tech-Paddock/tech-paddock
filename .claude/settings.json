@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.claude/worklogs/_open-items.md\"; [ -f \"$f\" ] && jq -Rs \"{hookSpecificOutput:{hookEventName:\\\"SessionStart\\\",additionalContext:(\\\"TECHNICAL DIRECTOR OPEN ITEMS \u2014 lead your first message with these, then run: bash .claude/worklogs/read-all.sh\\n\\n\\\" + .)}}\" < \"$f\" || true",
+            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.claude/OPEN-ITEMS.md\"; [ -f \"$f\" ] && jq -Rs \"{hookSpecificOutput:{hookEventName:\\\"SessionStart\\\",additionalContext:(\\\"OPEN ITEMS \u2014 lead your first message with these. Then read your charter and handoff at .claude/agents/<you>/.\\n\\n\\\" + .)}}\" < \"$f\" || true",
             "timeout": 10,
             "statusMessage": "Loading open items\u2026"
           }

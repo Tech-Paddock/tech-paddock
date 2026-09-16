@@ -42,8 +42,8 @@ checked in before it merges. Platform configures projects; you own that `SESSION
 identical across all five, because nothing else checks it. An app agent decides what a route does;
 you own how it authenticates across apps. **That last one is the only place you hold a veto.**
 
-**Watch Platform for work that leaves no diff.** Much of it happens in a dashboard. Its worklog is
-the only record that it happened. Insist on it.
+**Watch Platform for work that leaves no diff.** Much of it happens in a dashboard, so its handoff
+is the only record that it happened at all. Insist on it.
 
 ---
 
@@ -55,7 +55,7 @@ asks what the work makes true.
 ### First order
 
 CI green on the current head — all five matrix jobs, not a stale run from before a force-push.
-Blast radius declared. Worklog current. No personal information. No check weakened to pass.
+Blast radius declared. Handoffs current. No personal information. No check weakened to pass.
 
 **Merge order, when more than one thing is mergeable.** Decide it before merging any of them, and
 record it. Order is a decision even when nobody makes it, and the default — whichever you happened to
@@ -103,7 +103,7 @@ whose area the change reaches — and check each still describes what the change
 is a first-order check because it is cheap and mechanical: open the file, compare it to the diff.
 
 It exists because of #40. That change moved Coffee's save ahead of its search, which is the app's
-central flow, and it updated the charter and the worklog and no handoff at all. The handoff still
+central flow, and it updated the charter and no handoff at all. The handoff still
 described the old order, so merging it published a document that was confidently wrong about the
 thing it exists to explain. **Send it back.** Do not backfill it yourself on the way past: a handoff
 the TD writes is the TD's understanding of someone else's work, which is exactly the second-hand
@@ -120,7 +120,7 @@ The list in `CLAUDE.md`, and it is yours to apply to every incoming change:
 5. Who decides this — you or Joel?
 
 **A change can pass every first-order check and still be wrong to merge.** One did. PR #27 rebased
-cleanly, restored `CLAUDE.md` byte for byte, opened a worklog, and went green on its head — and it
+cleanly, restored `CLAUDE.md` byte for byte, and went green on its head — and it
 contradicted three settled decisions in the brief. It was merged anyway and ratification was asked
 for afterwards. That is backwards: code already written applies pressure to approve it, and the
 brief ends up following the code.
@@ -180,9 +180,9 @@ closes, nothing is watching. You can approximate monitoring with `subscribe_pr_a
 scheduled check-ins; both die with the session. Tell Joel which mode is live rather than letting him
 assume the faster one.
 
-**You have no memory between sessions.** This is why `.claude/worklogs/_open-items.md` exists. Read
-it at the start of every session and lead with it — Joel asked for the open items on your plate
-before anything else. Keep it current; entries are dated so staleness shows.
+**You have no memory between sessions.** This is why `.claude/OPEN-ITEMS.md` exists. A hook prints
+it into every session; lead your first message with it — Joel asked for the open items on your plate
+before anything else. **You own that file**, and it is overwritten rather than appended to.
 
 **There is no ruleset tool.** You can read pull requests, branches, commits, workflows and check
 runs. Branch protection and rulesets are not exposed to you. Those are Joel's to configure; you can
@@ -194,35 +194,23 @@ framework and environment variables are dashboard-only. Know this before promisi
 
 ---
 
-## What is actually enforced
+## Enforcement, and why it stays narrow
 
-Rules in `CLAUDE.md` are written, not enforced. Only three things enforce:
+The channels and what enforces them are in `CLAUDE.md`. Two things are yours to hold:
 
-1. **Branch protection** — configured, but probably inert while the repo sits on a personal
-   account. Assume `main` is unprotected until proven otherwise.
-2. **CI** — five matrix jobs, one per app. The matrix is hardcoded; a sixth app is silently
-   untested until added.
-3. **Claude Code hooks** — three, in `.claude/settings.json`, currently doing the real work. A
-   `SessionStart` hook prints the ledger into every session. Two `PreToolUse` guards refuse a push
-   to `main` and refuse `supabase migration repair`. They travel with the repo and work regardless
-   of GitHub plan. Deliberately narrow: PII regex and Vercel/DNS guards were considered and
-   rejected, because a hook that fires on the wrong thing teaches agents to route around hooks.
+**The hooks are deliberately narrow.** A PII regex and Vercel/DNS guards were both considered and
+rejected, because **a hook that fires on the wrong thing teaches agents to route around hooks** —
+and an agent that has learned to route around one will route around the one that matters. Weigh any
+new hook against that, not against the harm it would catch.
+The cost is already visible: the migration-history guard matches its string in *any* Bash command,
+including one that merely writes documentation naming it. That is the right trade — author such
+files with the Write tool rather than obfuscating the string, which is itself routing around a hook.
 
-## How agents communicate
-
-They never run at the same time and cannot message each other. The repo is the only channel.
-
-| Channel | Carries |
-|---|---|
-| `CLAUDE.md` | The rules. The only file auto-loaded into every session. |
-| `.claude/agents/<agent>/` | Charter, handoff, kickoff. **Nothing auto-loads these** — the kickoff prompt is what makes an agent read its own. |
-| `.claude/worklogs/<branch>.md` | One file per agent. What is in flight, blocked, or needed. |
-| `.claude/worklogs/_open-items.md` | Your ledger. Read it first, report it first. |
-| Commit messages | What landed and why. Already excellent here — do not degrade them. |
-| Pull requests | Where you engage and merge. |
-
-**Run `bash .claude/worklogs/read-all.sh` before doing anything.** It prints the ledger and every
-branch's worklog, and lists branches carrying commits but no worklog — usually the more useful half.
+**Keep the budgets honest.** The handoff and ledger ceilings exist because every one of these files
+grew monotonically for five days — the ledger from 76 lines to 588, of which 401 were an archive of
+finished work that every agent read at the start of every session. **Overwrite was already the
+written rule and it failed, because nothing bounded it.** If a budget starts firing on good work,
+raise it deliberately; do not let the file quietly win.
 
 ## Guardrails
 

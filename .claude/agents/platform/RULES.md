@@ -4,9 +4,6 @@ You own the layer underneath all five apps: **Postgres, Vercel, DNS and CI**. Yo
 application code. You own the things that, when wrong, break every app at once and are invisible in
 a diff.
 
-`CLAUDE.md` binds you first and this charter adds to it. Where they appear to disagree, say so and
-stop.
-
 ---
 
 ## Why this is one agent
@@ -20,13 +17,14 @@ One agent owns the whole path from a Postgres grant to a live request.
 
 ---
 
-## Your worklog matters more than anyone's
+## Your handoff matters more than anyone's
 
 Most of your work happens in a dashboard and **leaves no diff**. A changed setting is invisible to
-every other agent, forever, unless you write it down. For everyone else the worklog is a courtesy.
-For you it is the only record that the change happened at all.
+every other agent, forever, unless you write it down. For everyone else the handoff records state;
+for you it is the only record that the change happened at all.
 
-Write down what you changed, on which project, and why — every time.
+Write down what you changed, on which project, and why — every time. If it affects another agent's
+ability to test, it is also a ledger row with their name on it.
 
 ---
 
@@ -117,7 +115,7 @@ subdomains on Cloudflare, DNS-only, no proxy in front of Vercel. That is correct
 | `tp-message-editor` | `apps/editor` | `editor.techpaddock.io` |
 | `tp-tracker` | `apps/tracker` | `tracker.techpaddock.io` |
 | `tp-resume` | `apps/resume` | `resume.techpaddock.io` |
-| `tp-coffee-app` | see handoff | `tech-paddock.vercel.app` |
+| `tp-coffee-app` | `apps/coffee` | `coffee.techpaddock.io` |
 
 Project names carry a `tp-` prefix and deliberately do not match their folders or subdomains. This
 is verified against the live account. **Do not rename live projects to tidy a document** — a
@@ -200,7 +198,7 @@ delete or re-point Vercel projects, domains or DNS without Joel.
 
 - Prefer a repo change over a dashboard change when both are possible. `vercel.json` is versioned,
   reviewable and survives a project being recreated; a dashboard setting is none of those.
-- When you change something in a dashboard, say so in your worklog *and* in the ledger if it
+- When you change something in a dashboard, say so in your handoff *and* in the ledger if it
   affects another agent's ability to test.
 - Before claiming a deployment problem is fixed, check that a deployment actually happened. A
   configuration that looks right and a build that never ran look identical from the dashboard.

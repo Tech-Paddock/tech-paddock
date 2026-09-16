@@ -5,35 +5,29 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-16T01:22:50.736Z",
+  bakedAt: "2026-09-16T02:22:05.242Z",
   waiting: [
   {
-    "title": "Send the GitHub Support request",
-    "detail": "The history scrub removed the seven real names from every clone, every branch and every commit on main — but nine objects stay reachable through refs/pull/*, and the removed lines still render in the Files changed tab of #17 and #21. GitHub",
-    "ref": "—",
-    "state": "box"
-  },
-  {
     "title": "Two tokens on `tp-home`, then redeploy",
-    "detail": "GITHUB_TOKEN fine-grained, this repo, read-only: Contents, Metadata, Pull requests, Actions. VERCEL_TOKEN read-only, tech-paddock team. The redeploy is not optional — Vercel bakes the environment in at build time, so a dashboard change does",
+    "detail": "GITHUB_TOKEN fine-grained, this repo, read-only: Contents, Metadata, Pull requests, Actions. VERCEL_TOKEN read-only, tech-paddock team. The redeploy is not optional — Vercel bakes the environment in at build time. Until both are set the Pit",
     "ref": "—",
     "state": "box"
   },
   {
     "title": "Re-upload the active resume template",
-    "detail": "#67 teaches the extractor to read colour out of a .docx, but /api/reformat renders from the spec stored on the template row rather than from the stored file, so the colours cannot appear until a fresh upload re-extracts them. Skipping it br",
+    "detail": "#71 ended re-uploads for *code* changes — the renderer now re-extracts from the stored .docx. It does nothing about the template file itself, so if the active row points at an older design, that is what renders. #67's colours need the curre",
     "ref": "—",
     "state": "box"
   },
   {
     "title": "Confirm Coffee's iOS install works on a real iPhone",
-    "detail": "Carried out of a worklog before it was deleted, because it is the one thing in the fifteen that was genuinely unfinished rather than answered elsewhere. The apple-touch-icon, the web-app meta tags and the safe-area insets were verified agai",
+    "detail": "The apple-touch-icon, the web-app meta tags and the safe-area insets are verified against the built HTML; whether iOS actually takes the icon needs a deploy and a phone. Open it in Safari, Add to Home Screen, check the icon.",
     "ref": "—",
     "state": "box"
   },
   {
     "title": "Decide whether to raise the hairline contrast bar",
-    "detail": "--line against --surface is 1.82:1 in the theme running in production right now, short of the 3:1 bar for a non-text component. TechPad Gen flagged it in #68 rather than fixing it quietly, because every new theme matches or beats the shippe",
+    "detail": "--line against --surface is 1.82:1 in the theme running in production, short of the 3:1 bar for a non-text component. Every new theme matches or beats the shipped figure, and raising the bar changes the look of all five apps. A decision, no",
     "ref": "—",
     "state": "box"
   }
@@ -41,13 +35,7 @@ export const PADDOCK = {
   parked: [
   {
     "title": "`CRON_SECRET` and the Microsoft Graph integration",
-    "detail": "Parked at Joel's request, 2026-09-15. What it is: tracker's daily sweep at /api/cron/stale-tasks reads the dashboard's decay list, finds threads gone quiet with no follow-up task open, and creates a Microsoft To Do task for each through Gra",
-    "ref": "—",
-    "state": "clear"
-  },
-  {
-    "title": "The branch-name action prefix",
-    "detail": "Drafted at Joel's request on 2026-09-15 and parked by him the same hour, before it reached main. The area rule he approved earlier stands: claude/<area>-<description>. The draft was six non-overlapping actions — feat, fix, ci, db, doc, ops ",
+    "detail": "Parked 2026-09-15. Why parking is the safe state: a scheduled job cannot log in, so tracker's middleware.ts waves /api/cron/* past the password gate, and the route's own guard reads if (secret && …) — an unset CRON_SECRET skips the check en",
     "ref": "—",
     "state": "clear"
   }
@@ -56,17 +44,17 @@ export const PADDOCK = {
   {
     "id": "coffee",
     "name": "Coffee",
-    "asOf": "2026-09-12, 15:10 UTC"
+    "asOf": "2026-09-16"
   },
   {
     "id": "message-editor",
     "name": "Message Editor",
-    "asOf": "2026-09-11, end of day"
+    "asOf": "2026-09-16"
   },
   {
     "id": "platform",
     "name": "Platform Config",
-    "asOf": "2026-09-11, end of day"
+    "asOf": "2026-09-16"
   },
   {
     "id": "resume",
@@ -76,17 +64,17 @@ export const PADDOCK = {
   {
     "id": "td",
     "name": "Technical Director",
-    "asOf": "2026-09-16, 00:20 UTC"
+    "asOf": "2026-09-16"
   },
   {
     "id": "techpad-gen",
     "name": "TechPad Gen",
-    "asOf": "2026-09-15"
+    "asOf": "2026-09-16"
   },
   {
     "id": "tracker",
     "name": "Pipeline Tracker",
-    "asOf": "2026-09-11, end of day"
+    "asOf": "2026-09-16"
   }
 ] as BakedAgent[],
 };

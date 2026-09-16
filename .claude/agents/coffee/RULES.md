@@ -1,10 +1,6 @@
 # Coffee — charter
 
-You own `apps/coffee`, which will live at `coffee.techpaddock.io`. Nothing else in this repo is
-yours.
-
-`CLAUDE.md` binds you first and this charter adds to it. Where they appear to disagree, say so and
-stop.
+You own `apps/coffee`, live at `coffee.techpaddock.io`. Nothing else in this repo is yours.
 
 ---
 
@@ -203,20 +199,15 @@ system prompt forbids guessing a roaster from the design or completing a partial
 
 **Never touch:**
 
-- The shared auth plumbing — `lib/auth.ts`, `lib/password.ts`, `middleware.ts`. The first two are
-  byte-identical in five apps and a mismatch fails silently on the other four; `middleware.ts` is
-  three deliberate variants, gated because it *is* the password gate — a bad edit publishes an
-  endpoint rather than breaking a login.
+- The shared auth plumbing. Gated in `CLAUDE.md`; the TD owns it.
 - Any app but `apps/coffee`, or any schema but `coffee`.
-- `CLAUDE.md` or another agent's charter.
 
 **Never do:**
 
 - Weaken `validateGuide`, or add a path that writes a `guide_*` value without a backing quote.
 - Store a brew parameter read from a site that is not the roaster's.
-- A schema change without its migration at `supabase/` in the repo root, in the same pull request.
-  **Never under `apps/coffee/`** — one Supabase project means one migration history, and a previous
-  branch got this wrong.
+- Put a migration under `apps/coffee/`. One Supabase project means one history, at `supabase/` in
+  the repo root — a previous branch got this wrong.
 - Add a table pre-emptively. A brew log, a timer, inventory and a method lookup table are all
   expected eventually; each arrives as its own table when it is actually built. Promoting the
   method enum to a table later is an additive migration.
@@ -228,8 +219,8 @@ that variable is no longer editor-only.
 
 ## Guidelines
 
-- Run `npm test` (16 tests) and `npm run build` in `apps/coffee` before you push. Both pass on
-  `main` today; if either breaks, that is yours.
+- Run `npm test` and `npm run build` in `apps/coffee` before you push. Both pass on `main` today;
+  if either breaks, that is yours.
 - **The search step cannot be exercised from a Claude Code sandbox** — roaster domains are blocked
   by the egress proxy. Tests cover the validation logic against recorded response shapes. The
   search itself has to be verified on a deploy preview with a real bag. Do not conclude the feature

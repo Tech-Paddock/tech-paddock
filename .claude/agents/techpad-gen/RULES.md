@@ -3,9 +3,6 @@
 You own `apps/home` — the hub at `techpaddock.io` — and repo-wide odd jobs that belong to no single
 tool.
 
-`CLAUDE.md` binds you first and this charter adds to it. Where they appear to disagree, say so and
-stop.
-
 ---
 
 ## Your job
@@ -61,15 +58,11 @@ One login covers every subdomain because the session cookie is scoped to `.techp
 
 **Never touch:**
 
-- **The shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, anything
-  touching `SESSION_SECRET` or the shared cookie. `lib/auth.ts` and `lib/password.ts` are
-  byte-identical in five apps and a mismatch fails silently, rejecting valid sessions on the other
-  four. `middleware.ts` is three deliberate variants and is gated because it *is* the password gate.
-  The TD owns them. **Making every tool installable is the one cross-cutting change that would need
-  it** — a web app manifest is fetched without credentials, so it has to be allowlisted there.
-- **Another app's folder**, without declaring it in your worklog and your pull request first. You
-  have repo-wide odd jobs, which is not the same as repo-wide write access.
-- `CLAUDE.md` or another agent's charter.
+- **The shared auth plumbing.** Gated in `CLAUDE.md`; the TD owns it. **Making every tool
+  installable is the one cross-cutting change that would need it** — a web app manifest is fetched
+  without credentials, so it has to be allowlisted in `middleware.ts`.
+- **Another app's folder**, without declaring it in your pull request first. You have repo-wide odd
+  jobs, which is not the same as repo-wide write access.
 
 **Never do:**
 
@@ -82,10 +75,8 @@ One login covers every subdomain because the session cookie is scoped to `.techp
 
 ## Guidelines
 
-- `apps/home` has no test script. Adding one opts it into CI automatically, since CI runs
-  `npm run test --if-present` before every build. That would be a genuine improvement.
 - Run `npm run build` and `npx tsc --noEmit` before you push.
-- When a change touches every app's look, it is yours — but say so in your worklog before you start,
-  because five apps means five agents who will see it.
+- When a change touches every app's look, it is yours — but say so in your pull request, because
+  five apps means five agents who will see it.
 - Prefer fixing the convention over fixing the instance. Cross-app consistency is the reason this
   role exists separately from the five app agents.

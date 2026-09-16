@@ -1,63 +1,68 @@
 # Pipeline Tracker — handoff
 
-State as of 2026-09-11, end of day.
+State as of 2026-09-16.
 
 Read `RULES.md` first. This file is only what is true right now.
 
 ---
 
-## Your work landed as #22
+## What is true now
 
-`claude/tracker-dashboard-concept-r6p9up` is merged and the branch should be deleted. All of it
-landed: the hub glance fan-out, the Microsoft Graph integration, the Vercel Cron sweep, meeting
-matching, and this app's **first 38 tests**.
+**`tracker.techpaddock.io` is live and serving current `main`.** Everything this agent has built is
+merged; nothing is in flight and no branch of yours exists. **38 tests pass** — the second-largest
+suite in the repo, and the reason changes here are reviewable.
 
-Three things about how that went, worth carrying:
+**The Microsoft Graph integration is built and inert.** `MS_GRAPH_CLIENT_ID`,
+`MS_GRAPH_CLIENT_SECRET`, `MS_GRAPH_REFRESH_TOKEN` and `CRON_SECRET` are all unset on `tp-tracker`,
+so `graphConfigured()` is false and the calendar, To Do and daily sweep all degrade quietly by
+design. **That is correct at runtime and it means nothing will tell you the cron is doing nothing.**
 
-**The `/api/summary` objection was withdrawn, and the TD was wrong to raise it.** It was flagged as
-widening `INTERNAL_API_SECRET` into a shared key across four apps — a reading taken from the design
-notes rather than from the route. The carve-out is `pathname === "/api/summary"` exactly, mirrors
-the editor's `/api/draft` precedent, is read-only, fails closed without the secret, and times out at
-four seconds. It followed the blessed pattern. Your narrow-shape discipline — counts and singles,
-never rows, rich lists behind `loadDashboard` — is what made it reviewable, and it stands.
+**It is parked, not forgotten, and un-parking is the dangerous moment.** Your `middleware.ts` waves
+`/api/cron/*` past the password gate and the route's own guard reads `if (secret && …)` — an unset
+`CRON_SECRET` skips the check entirely and the endpoint is public. It is harmless *only* because the
+next line returns early while Graph is unconfigured. **So `CRON_SECRET` is set first, then a
+redeploy, and only then `MS_GRAPH_*`.** Setting the Graph credentials first publishes an
+unauthenticated endpoint that writes into Joel's Outlook on demand. This is in the ledger under
+Parked and moves only when Joel says so.
 
-**Google Tasks → Microsoft To Do was approved.** You were right not to assume that edit would stand
-on its own; a stack change the brief named explicitly needed sign-off and got it.
+**Your `/api/summary` carve-out stands.** It was once flagged as widening `INTERNAL_API_SECRET`
+across four apps — read from design notes rather than from the route — and the objection was
+withdrawn. It is `pathname === "/api/summary"` exactly, read-only, fails closed without the secret,
+four-second timeout. **Your narrow-shape discipline is what made it reviewable.**
 
-**Your `CLAUDE.md` edits were dropped**, not because they were wrong but because agents do not edit
-the brief. That rule has since been sharpened: when what you are about to build contradicts the
-brief, stop and ask *before* you build it, rather than building it and flagging at pull-request
-time. Your tool's specification now lives in `RULES.md`, which you can propose changes to in a pull
-request — so the dead end that used to exist is gone.
+## The three contracts you sit inside
 
-## The integration is built and inert
+None of them is unilaterally yours. You call the Message Editor's `/api/draft`; the hub reads your
+`/api/summary`; the Resume Formatter writes threads into your table when a render names a company.
 
-`MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET`, `MS_GRAPH_REFRESH_TOKEN` and `CRON_SECRET` are
-**unset** on `tp-tracker`. The code degrades quietly by design, which is correct at runtime and
-means **nothing will tell you the cron is doing nothing**.
+**Job details live here, not there** — company, role, posting URL and contact are on the thread and
+are never duplicated into `resume.renders`. One record, one home.
 
-Joel holds the Azure registration. It is on his list. **Chase it before building anything further
-on top of Graph** — the daily sweep has never once run against real credentials, so every claim
-about it is a claim about code that has not executed.
+**Keep `/api/summary` to counts and singles, never rows.** Rich lists stay behind `loadDashboard`.
 
-## Your app is deployed and current again
+## Traps specific to this app
 
-**Fixed 2026-09-12.** `tracker.techpaddock.io` serves `0c7d882`, #22 included. The outage that pinned
-every app to `92c1ec1` for six and a half hours is over, and you can verify against the live site
-again.
+- **Never widen an `INTERNAL_API_SECRET` carve-out**, here or in another app. A blanket auth bypass
+  is what the narrowness exists to prevent.
+- **Degrade quietly at runtime, loudly in setup.** The Microsoft integration is the model: a missing
+  credential makes the feature absent, not broken — and that is exactly why nothing will tell you it
+  is absent.
+- **`open_task_id` clears when a thread is updated**, so a fresh task can fire next time it goes
+  stale. The manual button deliberately overrides the open-task guard — that guard exists to stop
+  the daily sweep repeating itself, not to stop you asking.
+- **The stale threshold is a setting, not a constant.** Resist hardcoding anything a user would
+  reasonably want to tune.
+- **This app's data is almost entirely real people.** Fixtures are synthetic and stay that way.
 
-**#22 is deployed but still inert**, and that is a separate thing: `MS_GRAPH_CLIENT_ID`,
-`MS_GRAPH_CLIENT_SECRET`, `MS_GRAPH_REFRESH_TOKEN` and `CRON_SECRET` are unset, so `graphConfigured()`
-is false and the calendar, To Do and daily sweep all degrade quietly by design. Those are Joel's to
-set and need a one-time Azure registration. **Note the ordering constraint**: your middleware exempts
-`/api/cron/*` from the password gate and the route's guard fails open when `CRON_SECRET` is unset, so
-`CRON_SECRET` has to be set before or with the Graph credentials, never after.
+## In flight
 
-## Next steps
+Nothing.
 
-1. **Verify the daily sweep once the Microsoft credentials exist.** It has never run for real. That
-   is the single largest untested surface you own.
-2. **The deferred piece:** syncing a completed task back to reset `last_touch_date`. The base loop
-   needs to be proven working first, which means step 1 comes before this.
-3. Delete `claude/tracker-dashboard-concept-r6p9up`.
-4. Nothing else is queued. Ask before starting anything larger than a fix.
+## Next
+
+1. **Verify the daily sweep once the Microsoft credentials exist.** It has never run for real, so
+   every claim about it is a claim about code that has not executed. That is the single largest
+   untested surface you own — and it is blocked on Joel un-parking the item above, in that order.
+2. **The deferred piece:** syncing a completed task back to auto-reset `last_touch_date`. The base
+   loop needs to be proven working first, which means step 1 comes before this.
+3. Nothing else is queued. Ask before starting anything larger than a fix.
