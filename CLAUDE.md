@@ -276,13 +276,23 @@ wrong or the rule is, and that is a conversation before any code exists.
   table, one line per item, no prose underneath:
 
   ```
-  | Item | Owner | Urgency | Blocking | Agent |
+  | Item | Owner | Urgency | LoE | Blocking | Agent |
   ```
 
   **`Owner` is who takes the next action; `Agent` is whose area it is.** The rows where they differ
   are the ones worth seeing. **Urgency is one of three words** — `Now` (Joel is the blocker), `Soon`
-  (real work, not blocked on him), `Whenever` (parked, or nothing turns on it). **`Blocking` names
-  what the item holds up, or the word `nothing`** — that is how an item earns being ignored tonight.
+  (real work, not blocked on him), `Whenever` (parked, or nothing turns on it). **`LoE` is one of
+  three too** — `Minutes` (a setting, a paste, a yes or no), `A session` (real work, one sitting),
+  `Multi-session` (spans sittings and needs its own plan). **`Blocking` names what the item holds
+  up, or the word `nothing`** — that is how an item earns being ignored tonight.
+
+  **Urgency and LoE both describe the owner's next action, not the whole item.** A decision Joel
+  makes in thirty seconds reads `Minutes` even when the work it releases is weeks — that is the
+  point of the column, because the two questions "what does this cost me tonight" and "what does
+  this cost the project" have different answers and only the first one sorts a list. Where the
+  follow-on is much larger than the next action, the row's own text says so.
+  **LoE is written in the ledger, not estimated at print time.** A number invented per session
+  drifts between sessions, which is the failure this file exists to stop.
   **Never fill in a row you cannot see.** What you genuinely know is the ledger, your own handoff,
   and the conversation in front of you. Do not report on another agent's behalf or infer that their
   work has moved. A guess in a status footer is worse than a missing row, because a table reads as
