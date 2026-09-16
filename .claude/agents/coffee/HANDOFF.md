@@ -55,9 +55,10 @@ page. The label now says where it came from instead of claiming it was written f
 
 ## In flight
 
-**#79 `claude/coffee-bean-link-and-optional-rating` — open, awaiting the gate.**
-"Beans ↗" links out from the collapsed pill, reachable without opening the card, and the rating says
-it is optional — which it always was. **Deployment: nothing, it deploys itself on merge.**
+**`claude/coffee-beans-link-on-the-pill` — pushed, no pull request; Joel has not asked.**
+"Beans ↗" moves onto the collapsed pill, reachable without opening the card. The toggle and the link
+are siblings rather than nested, because an `<a>` inside a `<button>` is invalid markup.
+**Deployment: nothing, it deploys itself on merge.**
 
 ## Next
 
