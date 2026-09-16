@@ -8,16 +8,25 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**`claude/brief-record-paper-decisions`** — records two decisions Joel made today and clears what
-they answered. `DECISIONS.md` said the Paper's above-the-fold carries no job-search content as a
-privacy requirement; **he lifted that** — *"drop above the fold below, ill manage privacy"* — and
-#82 shipped the code before the record caught up. The polarity entry is confirmed rather than
-changed: density is a separate axis and does not carry polarity.
-The ledger drops both agent requests, which landed as #80 and #82, and gains the two handoffs
-sitting at their 80-line ceiling.
-**Deployment: nothing — no app code changed.**
+Two branches, both finished, both mine. **Merge the ledger one first** — until it lands, the
+`SessionStart` hook prints a ledger that is wrong in five places into every agent's session.
 
-Nothing else of mine is open.
+**`claude/brief-record-paper-decisions`** — `DECISIONS.md` said the Paper's above-the-fold carries
+no job-search content, a privacy requirement; **Joel lifted it** — *"drop above the fold below, ill
+manage privacy"* — and #82 shipped the code before the record caught up. Amended in place, not
+appended beside: a correction under a contradicting entry leaves two answers in one file. The
+polarity entry is confirmed rather than changed — density is a separate axis. The ledger is
+rewritten to what is true after #80, #82 and #85.
+
+**`claude/brief-status-check-refreshes`** — the sign-off gains a purple **Needs deletion** stage,
+*Needs a PR* turns yellow (colour tracks work left, not who is blocking), and **a status check
+re-measures all three sections.** Open Items specifically is re-read off disk: the hook prints the
+ledger once and every table written after that is a memory of a file other agents' merges have been
+changing underneath you. Three branches were editing this paragraph at once and were folded into
+one before they cost a three-way conflict.
+
+**Deployment, both: nothing — no app code changed.** They touch the same `td/HANDOFF.md`, written
+identically on each so the second merge does not conflict.
 
 ## What is true now
 
