@@ -6,47 +6,59 @@ You own `apps/resume`, live at `resume.techpaddock.io`. Nothing else in this rep
 
 ## Your job
 
-Check a finished resume before it is sent, and record the submission.
+Pour a Jobright-tailored resume's text into Joel's own template, check the result, and record the
+submission.
 
-**This is not a content store, and as of 2026-09-16 it is not a formatter either.** Jobright authors
-and tailors the content. Joel formats it in Word. You own **verification, history and the
-application record**.
+**This is not a content store.** Jobright authors and tailors the content. You own **formatting,
+verification, history and the application record.**
 
-**Pipeline:** upload the finished `.docx`, optionally with the Jobright export it came from → lint
-it the way a parser will read it → compare it against the source so nothing was dropped → record the
-submission against its Pipeline Tracker thread.
+**Pipeline:** upload the tailored `.docx` → read its text → rewrite the template's own
+`word/document.xml` with it → lint the output the way a parser will read it → confirm everything
+taken from the source arrived → record the submission against its Pipeline Tracker thread.
 
-### Why formatting left the app — approved by Joel 2026-09-16
+### The one rule the whole app rests on — approved by Joel 2026-09-16
 
-> *"I'm fine downloading a template and editing in Word or gdrive and iterating within Claude. What
-> is the value add to doing it in app."* … *"It stops being a formatter and becomes a pre-flight
-> check and filing cabinet." — yes.*
+> *"I want the behavior to be the same it seemed to work. so lets set that functionality and build
+> from there."* … *"the caviat there is if its broken, flag it or fix it"*
 
-The app existed because Jobright's output formatting is unusable — every run bold+italic, section
-rules drawn as images, a mangled Education section, 900KB of direct formatting on two pages. All
-true, and none of it required *this* app to fix: Word fixes it by being the format.
+**Never build a document. Edit the template's.**
 
-**The renderer was measurably not doing its job.** It never read the template's XML in any version
-ever committed; it built a new document from a 17-scalar summary and hardcoded the rest. Measured
-against the real template on 2026-09-16: **every render came out A4 against a US Letter template**,
-inherited body text was 10pt against 10.5pt, the centred Career Highlights block rendered
-left-aligned with its shading dropped, the bullet glyph and indent were both invented, and the
-section rule was drawn under each heading where the template draws three above. The constants that
-*did* match matched because they were fitted to one file.
+The template's zip is opened, only the body of `word/document.xml` is rewritten block by block, and
+the same zip is written back out. `styles.xml`, `numbering.xml`, `theme1.xml`, `fontTable.xml`,
+`settings.xml`, the section properties, the headers and any embedded fonts are carried through
+untouched — **not copied carefully, never read at all**, which is a different and much stronger
+guarantee. Each paragraph keeps its own `pPr` and its first run's `rPr`; only the text changes.
 
-**What does not survive the move to Word, and is therefore the whole job now:**
+**This is not a preference, it is the correction of a measured failure.** Every earlier version
+synthesised a fresh document from a seventeen-field summary of the template and hardcoded the rest.
+Measured against the real template on 2026-09-16, that renderer produced **A4 pages from a US Letter
+template**, 10pt body text against the template's 10.5pt, a left-aligned Career Highlights block with
+its cell shading gone, an invented bullet glyph at an invented indent, and a section rule under every
+heading where the template draws three above. The constants that did match were fitted to one file
+and would have drifted the moment the template changed. Each of those is a property somebody had to
+think to carry; the list of properties a Word document has is not one you can finish.
 
-1. **The header trap.** Both current templates keep the name and contact block in `word/header1.xml`,
-   and a `w:type="first"` header with no `<w:titlePg/>` **is not displayed by Word at all**. Edit in
-   Word and you will ship a resume whose contact block a parser never sees, with nothing on screen
-   to tell you. `auditAts` raises it as blocking. This is the highest-stakes thing the app does.
-2. **The content guarantee.** Jobright's exact wording *is* the ATS keyword optimisation. Copy
-   between two documents by hand and a dropped bullet is invisible in the result.
-3. **The submission record.** What exactly was sent, to whom, when.
+**So a change that starts modelling the template again is the bug coming back**, whatever it fixes
+locally. The test that catches it is in `tests/reskin.test.ts`: the output's `styles.xml`,
+`numbering.xml` and `theme1.xml` must be byte-identical to the template's.
 
-**The renderer has not been deleted yet.** Stopping-use and removal are separate changes, in that
-order, for the same reason a destructive migration splits in two: the safe order is that the thing
-still works while the new path is proven. See the handoff for where that stands.
+### Where the text comes from, and where it does not
+
+**Static sections are the template's, never the input's.** Education, Certifications and Hobbies do
+not change between applications, so they are passed through untouched and the change log says
+`passthrough`. Edit them in the template. This is also a quality gate: Jobright mangles Education
+into run-together lines, and passthrough is why that never reaches the output.
+
+**The name and contact block are the template's too** — they are front matter, dropped from the
+input deliberately so the template's header is the only copy.
+
+**Career Highlights is the one section with a diff check.** If the highlights already match the
+template's, the table is left completely untouched rather than rewritten to the same values. The only
+way to guarantee a byte is unchanged is not to write it.
+
+**Count mismatches resolve positionally**: the template's last bullet or row is cloned, with its
+formatting, for surplus input; unmatched template entries are dropped. Every one of those is a
+change-log line, never silent.
 
 ## What you own
 
@@ -105,6 +117,18 @@ for a human rather than routing to a model.
 
 **Do not reintroduce a model call.** If a document defeats the rules, the report names what it could
 not account for and you fix it by hand.
+
+### Never lose a field to keep its formatting.
+
+The two ways text is written are not equal, and when they conflict the ugly one wins.
+
+Run-granular replacement — used where company, title and date share one line against a right tab
+stop — keeps each field's own weight, slant and colour by rewriting only the first run of each. It
+needs one non-empty run per field. **Where the template does not supply them, the fields with
+nowhere to go were silently dropped**, which is how a job shipped with no title and no dates. The
+renderer now reports which fields it could not place and composes the line whole instead: the
+per-field formatting is lost and the change log says so. A formatting loss is visible in the
+document; a dropped job title is not.
 
 ### Lossless: every string comes from a document, never from this app.
 
@@ -170,12 +194,28 @@ never duplicated here.
 Avoid tables generally: many ATS parsers read raw XML order, not visual order, and content inside
 cells gets scrambled or dropped. Also no text boxes, no images (Jobright draws section rules as
 images — use real paragraph borders), contact details in the document body and **never** in a header
-or footer, section headings from a known vocabulary, and a plain `•` bullet glyph.
+or footer, section headings from a known vocabulary, and a plain bullet glyph.
 
-**One exception, and exactly one.** Career Highlights renders as a table: that content is
-intentionally repeated in the body bullets, so a parser losing it loses nothing new, and it is
-natively two-column (`metric: description`). Flat rows, no merged cells, no nesting. **The ATS lint
-test enforces exactly one table; a table anywhere else fails the build.**
+**They are now a lint on the template, not a constraint on the renderer, and that is the point.**
+The renderer this replaced enforced them by rebuilding the document to satisfy them — which is why it
+always passed its own check while getting the page size, the alignment and the bullets wrong. It was
+grading its own work. Editing the template's own XML means the output inherits whatever the template
+does, **including the template's ATS problems**, and `auditAts` reports them.
+
+So a finding on a render is almost always a finding about the template. Fix it there and every
+future render inherits the fix. **Do not make the renderer rewrite the document to clear a finding** —
+that is the old failure with a new justification.
+
+**The header finding is the one that matters most.** Both current templates keep the name and contact
+block in `word/header1.xml`, and a `w:type="first"` header with no `<w:titlePg/>` **is not displayed
+by Word at all** — so it reads as absent while being fully present in the archive, and many parsers
+skip headers entirely. The renderer preserves it faithfully, which means it preserves the problem.
+`header_footer_content` is the only thing that will ever tell anyone.
+
+**The committed template fixture carries two blocking findings** — a second table and a `<w:sdt>`
+content control — and `tests/reformat-route.test.ts` asserts they survive into the output. That test
+is not describing a defect to be fixed in code. It pins the guarantee that nothing rewrites the
+template silently.
 
 ## Testing
 
