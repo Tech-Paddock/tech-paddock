@@ -2,67 +2,71 @@
 
 State as of 2026-09-16.
 
-Read `RULES.md` first — it was amended today and the change is the headline. This file is only what
-is true right now.
+Read `RULES.md` first — it was rewritten today and the change is the headline. This file is only
+what is true right now.
 
 ---
 
 ## What is true now
 
-**The app is a pre-flight check, not a formatter.** Joel approved this on 2026-09-16; the reasoning
-and his words are in `RULES.md`. Formatting happens in Word. The app lints the finished document the
-way a parser reads it, compares it against the Jobright export so nothing was dropped, and records
-the submission.
+**The app formats again, and this time it edits the template instead of rebuilding it.** Joel's own
+earlier tool — `resume-reskin`, which ran locally on his desktop and never lived in this repo — did
+it that way and got it right. Its engine is ported into `lib/reskin/`. He approved the port today;
+his words are in `RULES.md`.
 
-**#81 is merged and live.** `tp-resume`'s production deployment carries it — confirmed against the
-deployment record, not assumed from the merge. The Check tab takes both documents, reports what did
-not arrive, and is the landing tab.
+**This reverses the amendment made earlier the same day**, which had taken formatting out of the app
+on the grounds that fixing it was expensive. That was wrong: working code already existed, so
+porting beat both rebuilding and abandoning. The pre-flight check from #81 was not discarded — it
+became the verification step that runs on every render.
 
-**Nothing was deleted, and that is the half still to do.** `/api/reformat`, `spec.ts`, `build.ts` and
-the Reformat tab all still work and still ship. The split is the safe order — stop using, prove,
-then remove — the same discipline a destructive migration follows. **Removal is the next change**,
-and it is blocked on one decision rather than on effort: see Next.
+**In flight:** branch `claude/resume-port-reskin-engine`, pushed, no pull request asked for.
 
-**In flight: nothing.**
+## Why it works now, in one line
 
-## Why the renderer is going
+`lib/reskin/container.ts` opens the template's zip, rewrites only the body of `word/document.xml`,
+and writes the same zip back. Everything that decides how the document looks is never read, so it
+cannot be read wrongly. Measured against the fixture: page size, `styles.xml`, `numbering.xml`,
+`theme1.xml`, alignment, shading, borders and underline all match the template exactly, where the
+previous renderer got every one of them wrong.
 
-**`RULES.md` carries the measured defect list** — the A4 page, the 10pt/10.5pt body, the dropped
-centring and shading, the invented bullet, the misplaced rule, the three dead spec fields. It is not
-repeated here; a second copy is a copy that drifts.
+## Where the old renderer stands
 
-**The one thing worth carrying in both places is the root cause**, because every one of those
-defects is a symptom of it and a fix aimed at a symptom will not hold: **no version of this engine,
-in any commit, has ever read the template's XML.** It always synthesised a new document from a
-scalar summary and hardcoded the geometry. The constants that *do* match were fitted to one file.
+**`lib/docx/build.ts` is dead in production** — nothing outside tests imports it. `lib/docx/spec.ts`
+is still imported by `app/api/templates/route.ts`, which writes a spec into `templates.spec` that
+nothing now renders from.
+
+Removing both is one change, and it is gated on a schema decision rather than on effort:
+`templates.spec` is `not null`, so dropping it is destructive and splits into two pull requests.
+`tests/{spec,colour,roundtrip,highlights}.test.ts` exercise the dead path and go with it.
 
 ## Traps specific to this app
 
-- **The header trap is the reason the app still exists.** Both current templates keep the name and
-  contact in `word/header1.xml`, and a `w:type="first"` header with no `<w:titlePg/>` **is not
-  displayed by Word at all** — so editing in Word can ship a resume whose contact block no parser
-  reads, with nothing on screen to show it. `auditAts` raises it as blocking.
-- **`tests/fixtures/template-sample.docx` is scrubbed in a way that hides a bug.** The scrubber
-  collapsed each paragraph's text into its first run, so `isEntryLine` matches **nothing** in it and
-  the whole employer/title/dates measurement path is untested. Green tests do not cover it.
+- **`tests/fixtures/template-sample.docx` is scrubbed in a way that hides bugs.** The scrubber
+  hoisted each paragraph's text into its first run and left the rest empty, so run-granular
+  replacement can place only the company and the old `isEntryLine` matched nothing at all. Both were
+  found by accident. Regenerate it so runs survive.
+- **`String.replace` interprets `$&` and `` $` `` in the replacement even with a string pattern**, so
+  splicing by index is the only safe way to swap a cell. A tool whose headline section is dollar
+  figures cannot have a `$` hazard in its rewrite path.
 - **Content is not always a direct child of `<w:body>`.** Walk the tree or whole sections read as
   empty. There is a named regression test.
-- **`extractSpec` starts from `normalizeSpec(null)`, never `{ ...DEFAULT_SPEC }`.** A spread shares
-  the nested objects, so every later template inherited the last one's measurements.
-- **The content check must not overstate or cry wolf**, and both are the same rule. See `RULES.md`;
-  both failure modes have named tests.
+- **The content check must not overstate or cry wolf**, and both are the same rule. It compares
+  against what the renderer *took*, not the whole source — the name, contact and static sections are
+  left behind deliberately, and counting them would flag the design as a defect every time.
 - **Every new fixture is a place a real name can hide** — `.rels` and `docProps/`, not just
-  `document.xml`.
+  `document.xml`. The original tool's own tests assert against real employers and a real address;
+  none of that came across.
 
 ## Next
 
-1. **Remove the renderer** — `/api/reformat`, `spec.ts`, `build.ts`, the Reformat tab. Needs a
-   decision on what happens to `renders.template_id`, which is `NOT NULL`: that is a destructive
-   schema change and splits into two pull requests.
-2. **Persist a check** the way renders are persisted, so the pre-flight result is part of the
-   application record rather than a screen you close.
-3. **Regenerate `template-sample.docx`** so runs survive the scrub.
-4. **Run real output through a free ATS checker.** Still unverified externally.
+1. **Run a real resume through it.** Everything here is measured against a scrubbed fixture whose
+   runs are degenerate. The real template exercises the run-granular path that the fixture cannot.
+2. **Fix the template's two blocking ATS findings** — a second table and a `<w:sdt>` — in the
+   template itself. Joel's, not code.
+3. **Remove the old renderer**, per the schema note above.
+4. **Regenerate `template-sample.docx`** so runs survive the scrub.
+5. **Persist the change log.** It is returned and shown, not stored; `renders.template_snapshot`
+   carries it today, which is a stopgap rather than a home.
 
 **I am at a compaction point.** The branch is pushed and the charter and this file describe it; none
-of the above lives only in the session.
+of it lives only in the session.

@@ -1,0 +1,286 @@
+/**
+ * Surgical, string-level OOXML editing.
+ *
+ * We deliberately do NOT parse `word/document.xml` into a generic XML DOM and
+ * re-serialize it. A parser round-trip silently normalises things Word cares
+ * about — attribute order, self-closing tags, whitespace — across parts of the
+ * document nobody intended to touch.
+ *
+ * Instead: find the exact substring of a paragraph or table to change, and
+ * replace only that substring, byte for byte. **That is what makes "keep the
+ * template's formatting, replace the text" true at the file level** rather than
+ * approximately true at the level of whatever properties somebody remembered to
+ * model. The renderer this replaced modelled seventeen of them and invented the
+ * rest; every defect it had was a property nobody had thought to carry.
+ */
+
+export type Block =
+  | { type: "p"; raw: string }
+  | { type: "tbl"; raw: string }
+  /** sectPr, body-level bookmarks — anything that is not a paragraph or table. */
+  | { type: "other"; raw: string };
+
+/** Split the `<w:body>` inner XML into ordered top-level blocks. */
+export function splitBody(bodyInnerXml: string): Block[] {
+  const blocks: Block[] = [];
+  const re = /<w:p\b[\s\S]*?<\/w:p>|<w:tbl>[\s\S]*?<\/w:tbl>|<w:sectPr\b[\s\S]*?<\/w:sectPr>/g;
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(bodyInnerXml))) {
+    if (m.index > lastIndex) {
+      const gap = bodyInnerXml.slice(lastIndex, m.index).trim();
+      if (gap) blocks.push({ type: "other", raw: gap });
+    }
+    const raw = m[0];
+    if (raw.startsWith("<w:p")) blocks.push({ type: "p", raw });
+    else if (raw.startsWith("<w:tbl")) blocks.push({ type: "tbl", raw });
+    else blocks.push({ type: "other", raw });
+    lastIndex = re.lastIndex;
+  }
+  const tail = bodyInnerXml.slice(lastIndex).trim();
+  if (tail) blocks.push({ type: "other", raw: tail });
+  return blocks;
+}
+
+export function joinBody(blocks: Block[]): string {
+  return blocks.map((b) => b.raw).join("");
+}
+
+/**
+ * Every visible text run in a block, in document order.
+ *
+ * The tag-name boundary matters. `<w:t[^>]*>` also matches `<w:tabs>`,
+ * `<w:tblPr>`, `<w:textAlignment>` and `<w:top>` — anything starting `w:t` — and
+ * swallows whole spans of unrelated XML as if it were run text. Requiring
+ * whitespace or `>` straight after `w:t` matches only the real element.
+ * `lib/docx/ats.ts` carries the same rule for the same reason.
+ */
+const TEXT_RUN_RE = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g;
+
+export function extractText(raw: string): string {
+  return decodeXmlEntities([...raw.matchAll(TEXT_RUN_RE)].map((m) => m[1]).join(""));
+}
+
+export function getStyleId(raw: string): string | null {
+  const m = raw.match(/<w:pStyle w:val="([^"]*)"/);
+  return m ? m[1] : null;
+}
+
+export function hasNumPr(raw: string): boolean {
+  return /<w:numPr>/.test(raw);
+}
+
+export function isBold(raw: string): boolean {
+  return /<w:b\s*\/>/.test(raw);
+}
+
+export function isItalic(raw: string): boolean {
+  return /<w:i\s*\/>/.test(raw);
+}
+
+/** A paragraph's ordered `<w:r>` runs. */
+export function splitRuns(paragraphRaw: string): string[] {
+  return paragraphRaw.match(/<w:r(?:\s[^>]*)?>[\s\S]*?<\/w:r>/g) ?? [];
+}
+
+export function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    // Ampersand last: decoding it first would turn "&amp;lt;" into "<" rather
+    // than the literal "&lt;" the document actually contains.
+    .replace(/&amp;/g, "&");
+}
+
+export function encodeXmlEntities(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/**
+ * Splice `replacement` in where `needle` sits, without `String.replace`.
+ *
+ * `String.replace` interprets `$&`, `` $` ``, `$'` and `$$` inside the
+ * *replacement* even when the pattern is a plain string, so a résumé containing
+ * one of those would corrupt the XML around it. A tool whose headline section is
+ * dollar figures should not have a `$` hazard in its rewrite path.
+ */
+function spliceFirst(haystack: string, needle: string, replacement: string): string {
+  const at = haystack.indexOf(needle);
+  if (at === -1) return haystack;
+  return haystack.slice(0, at) + replacement + haystack.slice(at + needle.length);
+}
+
+/**
+ * Replace a paragraph's visible text, keeping its `pPr` — alignment, borders,
+ * tab stops, list numbering, spacing — and the first run's `rPr` — font, size,
+ * weight, colour — completely untouched. Every other run is dropped so the new
+ * text is not duplicated.
+ *
+ * A paragraph with no runs at all (a blank line) gets a bare run with no `rPr`,
+ * matching the empty paragraphs around it.
+ */
+export function replaceParagraphText(raw: string, newText: string): string {
+  const pPrMatch = raw.match(/^<w:p\b[^>]*>(?:\s*<w:pPr>[\s\S]*?<\/w:pPr>)?/);
+  const head = pPrMatch ? pPrMatch[0] : raw.slice(0, raw.indexOf(">") + 1);
+  const rest = raw.slice(head.length, raw.length - "</w:p>".length);
+
+  const firstRunMatch = rest.match(/<w:r(?:\s[^>]*)?>(?:\s*<w:rPr>[\s\S]*?<\/w:rPr>)?/);
+  const escaped = encodeXmlEntities(newText);
+
+  if (!firstRunMatch) {
+    return `${head}<w:r><w:t xml:space="preserve">${escaped}</w:t></w:r></w:p>`;
+  }
+
+  // "<w:r>" or "<w:r><w:rPr>…</w:rPr>" — the run's formatting, kept verbatim.
+  return `${head}${firstRunMatch[0]}<w:t xml:space="preserve">${escaped}</w:t></w:r></w:p>`;
+}
+
+/** Replace one run's text, keeping its `rPr`. */
+export function replaceRunText(runRaw: string, newText: string): string {
+  return runRaw.replace(TEXT_RUN_RE, () => `<w:t xml:space="preserve">${encodeXmlEntities(newText)}</w:t>`);
+}
+
+/**
+ * Empty a run's text. Used when one field spans several runs: the first run in
+ * the field keeps the new text and the rest are cleared, so it is not repeated.
+ */
+export function clearRunText(runRaw: string): string {
+  return replaceRunText(runRaw, "");
+}
+
+/**
+ * Some templates pack company, title and date onto one line against a right tab
+ * stop — **Acme Corp** *Consultant*⇥*Jan 2020 – Present* — with each field set
+ * differently. Replacing the paragraph whole would collapse all three onto the
+ * first run's formatting and lose the distinction.
+ *
+ * So classify each run by whether it falls after the tab and whether it is
+ * italic, and rewrite only the first run of each field: the same "keep the
+ * formatting, replace the text" rule applied at run granularity.
+ */
+export function replaceInlineHeaderLine(
+  paragraphRaw: string,
+  company: string,
+  title: string,
+  date: string
+): { raw: string; unplaced: string[] } {
+  const pPrMatch = paragraphRaw.match(/^<w:p\b[^>]*>(?:\s*<w:pPr>[\s\S]*?<\/w:pPr>)?/);
+  const head = pPrMatch ? pPrMatch[0] : paragraphRaw.slice(0, paragraphRaw.indexOf(">") + 1);
+
+  let seenTab = false;
+  let companyDone = false;
+  let titleDone = false;
+  let dateDone = false;
+
+  const newRuns = splitRuns(paragraphRaw).map((run) => {
+    if (/<w:tab\s*\/>/.test(run)) {
+      seenTab = true;
+      return run;
+    }
+    if (extractText(run).trim() === "") return run; // spacer run — untouched
+
+    if (seenTab) {
+      if (dateDone) return clearRunText(run);
+      dateDone = true;
+      return replaceRunText(run, date);
+    }
+    if (isItalic(run)) {
+      if (titleDone) return clearRunText(run);
+      titleDone = true;
+      return replaceRunText(run, title);
+    }
+    if (companyDone) return clearRunText(run);
+    companyDone = true;
+    return replaceRunText(run, company);
+  });
+
+  // Which fields found no run to live in.
+  //
+  // **The original returned only the XML, and that let a field vanish.** Run
+  // classification needs one non-empty run per field; a paragraph that does not
+  // supply them — every run but the first left empty, which is exactly what a
+  // scrubbed fixture looks like — silently produced a line carrying the company
+  // and nothing else. Reporting it lets the caller fall back rather than ship a
+  // job with no title and no dates.
+  const unplaced: string[] = [];
+  if (company && !companyDone) unplaced.push("company");
+  if (title && !titleDone) unplaced.push("title");
+  if (date && !dateDone) unplaced.push("date");
+
+  return { raw: `${head}${newRuns.join("")}</w:p>`, unplaced };
+}
+
+/** Does this paragraph carry company, title and date on one line? */
+export function looksLikeInlineHeaderLine(raw: string): boolean {
+  return /<w:tab\s*\/>/.test(raw) && isItalic(raw);
+}
+
+/**
+ * Add Word's keep-lines-together and keep-with-next, so a job entry — its header
+ * and every bullet — moves to the next page whole rather than splitting across
+ * one. Chain `keepNext` on every paragraph of the entry except the last.
+ *
+ * Idempotent, and inserts right after `<w:pPr>` (and after a leading
+ * `<w:pStyle>` if there is one), which is where the OOXML schema expects them.
+ * An entry taller than a page still breaks; Word relaxes this rather than
+ * looping, and there is nothing to be done about that.
+ */
+export function withKeepTogether(paragraphRaw: string, keepNext: boolean): string {
+  let toInsert = "";
+  if (keepNext && !/<w:keepNext\s*\/>/.test(paragraphRaw)) toInsert += "<w:keepNext/>";
+  if (!/<w:keepLines\s*\/>/.test(paragraphRaw)) toInsert += "<w:keepLines/>";
+  if (!toInsert) return paragraphRaw;
+
+  if (/<w:pPr\s*\/>/.test(paragraphRaw)) {
+    return paragraphRaw.replace(/<w:pPr\s*\/>/, `<w:pPr>${toInsert}</w:pPr>`);
+  }
+  if (/<w:pPr>/.test(paragraphRaw)) {
+    return paragraphRaw.replace(/<w:pPr>(\s*<w:pStyle\b[^>]*\/>)?/, (m) => m + toInsert);
+  }
+  return paragraphRaw.replace(/^(<w:p\b[^>]*>)/, `$1<w:pPr>${toInsert}</w:pPr>`);
+}
+
+// ---- Tables ---------------------------------------------------------------
+
+export function splitRows(tableRaw: string): string[] {
+  return tableRaw.match(/<w:tr\b[\s\S]*?<\/w:tr>/g) ?? [];
+}
+
+export function splitCells(rowRaw: string): string[] {
+  return rowRaw.match(/<w:tc\b[\s\S]*?<\/w:tc>/g) ?? [];
+}
+
+export function cellParagraphs(cellRaw: string): string[] {
+  return cellRaw.match(/<w:p\b[\s\S]*?<\/w:p>/g) ?? [];
+}
+
+/**
+ * Replace the text of the nth paragraph inside a cell, keeping the cell's own
+ * properties — shading, margins, vertical alignment, width — untouched.
+ *
+ * Matched by counting rather than by string, because paragraphs repeat verbatim
+ * inside a cell (two blank ones, for instance) and replacing the first match
+ * would rewrite the wrong one.
+ */
+export function replaceCellParagraphText(cellRaw: string, paraIndex: number, newText: string): string {
+  const paras = cellParagraphs(cellRaw);
+  if (paraIndex >= paras.length) return cellRaw;
+  const replaced = replaceParagraphText(paras[paraIndex], newText);
+  let count = -1;
+  return cellRaw.replace(/<w:p\b[\s\S]*?<\/w:p>/g, (match) => {
+    count += 1;
+    return count === paraIndex ? replaced : match;
+  });
+}
+
+/** Swap one cell for a rewritten copy of itself, by position rather than pattern. */
+export function spliceCell(containerRaw: string, cellRaw: string, newCellRaw: string): string {
+  return spliceFirst(containerRaw, cellRaw, newCellRaw);
+}

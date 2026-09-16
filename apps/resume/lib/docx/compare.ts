@@ -42,8 +42,19 @@ const normalize = (s: string) =>
  * Jobright writes its highlights as "metric:description" with no space at all —
  * which the renderer then splits into two table cells. Splitting on them here
  * costs nothing, because both documents are tokenised the same way.
+ *
+ * Punctuation clinging to either end of a word is then dropped, because the
+ * renderer legitimately rewrites a list's separators to match the template's —
+ * "Alpha, Beta" becomes "Alpha · Beta" — and without this the comma stays stuck
+ * to "Alpha," and every reformatted list reads as missing. Both documents get
+ * the same treatment, and only the edges are touched, so "$250,000" keeps its
+ * internal comma and stays distinct from "250".
  */
-const tokens = (s: string) => normalize(s).split(/[\s:;|]+/).filter(Boolean);
+const tokens = (s: string) =>
+  normalize(s)
+    .split(/[\s:;|]+/)
+    .map((t) => t.replace(/^[("'[•·]+/, "").replace(/[.,;:)"'\]•·]+$/, ""))
+    .filter(Boolean);
 
 /**
  * How many of a line's words the finished document accounts for, matching the
@@ -96,6 +107,29 @@ function coveredWords(line: string[], hay: string[], starts: Map<string, number[
  * contains is worse than no report at all: it reads as verified.
  */
 export function compareContent(source: Para[], final: Para[]): ContentCheck {
+  return compareLines(
+    source
+      // Scaffolding is tested before normalising: a markdown alignment row
+      // carries no words, and normalising collapses the dashes that identify it.
+      .filter((p) => p.text.trim() !== "" && !isAlignmentRow(p.text))
+      .map((p) => p.text),
+    final
+  );
+}
+
+/**
+ * The same check against lines chosen by the caller rather than every paragraph
+ * of a document.
+ *
+ * The renderer deliberately does not carry some of the source across — the name
+ * and contact block, and the static Education, Certifications and Hobbies
+ * sections, which come from the template on purpose. Comparing against the whole
+ * source therefore reports all of them as missing, every time, which is a report
+ * that cries wolf about its own design. Handed only the lines the renderer
+ * actually took, the question becomes the one worth asking: did everything it
+ * took arrive?
+ */
+export function compareLines(sourceLines: string[], final: Para[]): ContentCheck {
   const hay = tokens(final.map((p) => p.text).join("\n"));
   const starts = new Map<string, number[]>();
   hay.forEach((word, i) => {
@@ -109,12 +143,10 @@ export function compareContent(source: Para[], final: Para[]): ContentCheck {
   // did land — and valued by the original, so what gets reported back is the
   // text as the source actually wrote it and not this function's idea of it.
   const lines = new Map<string, string>();
-  for (const p of source) {
-    // Scaffolding is tested before normalising: a markdown alignment row carries
-    // no words, and normalising collapses the very dashes that identify it.
-    if (p.text.trim() === "" || isAlignmentRow(p.text)) continue;
-    const key = normalize(p.text);
-    if (key !== "" && !lines.has(key)) lines.set(key, p.text.trim());
+  for (const text of sourceLines) {
+    if (text.trim() === "") continue;
+    const key = normalize(text);
+    if (key !== "" && !lines.has(key)) lines.set(key, text.trim());
   }
 
   const missing = [...lines]

@@ -11,21 +11,24 @@ type Tab = "reformat" | "templates" | "history" | "check";
 const TABS: Tab[] = ["check", "reformat", "templates", "history"];
 
 type Finding = { code: string; severity: "blocking" | "warning"; message: string };
-type Coverage = { totalParagraphs: number; placed: number; dropped: string[]; percent: number };
-type SectionSummary = { label: string; kind: string; count: number };
-
+/** How much of what the renderer took from the source reached the document. The
+ *  name, contact block and static sections are not in that set — they come from
+ *  the template on purpose — so this is not a percentage of the whole source. */
+type Coverage = { totalLines: number; present: number; missing: string[]; percent: number };
+type ChangeLogEntry = { section: string; detail: string; action: string };
 type Reformatted = {
   filename: string;
   renderId: string | null;
   templateLabel: string;
   coverage: Coverage;
   findings: Finding[];
-  /** Whether the formatting was read from the template file or fell back to the
-   *  spec stored at upload. A fallback is shown, never swallowed: silence here is
-   *  what made three rounds of "why didn't that work" cost a re-upload each. */
-  specSource: "file" | "stored";
-  specNote: string | null;
-  summary: { name: string | null; contact: string | null; sections: SectionSummary[] };
+  changeLog: ChangeLogEntry[];
+  summary: {
+    experience: { company: string; title: string; date: string; bullets: number }[];
+    highlights: number;
+    competencies: number;
+    hasSummary: boolean;
+  };
   docxBase64: string;
 };
 
@@ -441,46 +444,71 @@ function ReformatShell() {
                 }`}
               >
                 <p className="font-medium">
-                  {result.coverage.percent}% of the source placed ({result.coverage.placed} of{" "}
-                  {result.coverage.totalParagraphs} paragraphs)
+                  {result.coverage.present} of {result.coverage.totalLines} lines carried across (
+                  {result.coverage.percent}%)
                 </p>
-                {result.coverage.dropped.length > 0 ? (
+                {result.coverage.missing.length > 0 ? (
                   <div className="mt-2 flex flex-col gap-1">
                     <p>Not carried across — check these before you send it:</p>
                     <ul className="list-disc pl-5">
-                      {result.coverage.dropped.map((d, i) => (
+                      {result.coverage.missing.map((d, i) => (
                         <li key={i} className="break-words">{d}</li>
                       ))}
                     </ul>
                   </div>
                 ) : (
-                  <p className="opacity-70 mt-1">Every line made it across. Wording is untouched.</p>
+                  <p className="opacity-70 mt-1">
+                    Every line taken from the source reached the document, wording untouched. Your name, contact
+                    block and the static sections come from the template on purpose, so they are not counted here.
+                  </p>
                 )}
               </section>
 
               <section className="flex flex-col gap-3">
                 <h2 className="text-lg font-semibold">ATS check on the output</h2>
+                <p className="text-xs opacity-60">
+                  The output is your template with the text swapped, so a finding here is almost always about the
+                  template. Fix it there and every future render inherits the fix.
+                </p>
                 <Findings findings={result.findings} />
               </section>
 
               <section className="flex flex-col gap-3">
                 <h2 className="text-lg font-semibold">What went in</h2>
                 <div className="bg-surface border border-line rounded-xl p-4 flex flex-col gap-2">
-                  <p className="text-sm">
-                    <span className="opacity-60">Name:</span> <span className="font-medium">{result.summary.name ?? "not found"}</span>
+                  <p className="text-sm opacity-70">
+                    {result.summary.hasSummary ? "Summary" : "No summary"} · {result.summary.highlights} highlight
+                    {result.summary.highlights === 1 ? "" : "s"} · {result.summary.competencies} competency row
+                    {result.summary.competencies === 1 ? "" : "s"}
                   </p>
                   <ul className="flex flex-col divide-y divide-line">
-                    {result.summary.sections.map((s) => (
-                      <li key={s.label} className="py-2 flex items-baseline justify-between gap-3">
-                        <span className="font-medium">{s.label}</span>
+                    {result.summary.experience.map((e, i) => (
+                      <li key={`${e.company}-${i}`} className="py-2 flex items-baseline justify-between gap-3">
+                        <span>
+                          <span className="font-medium">{e.company}</span>
+                          {e.title && <span className="opacity-70"> — {e.title}</span>}
+                        </span>
                         <span className="text-sm opacity-60 whitespace-nowrap">
-                          {s.count} {s.kind === "entries" ? "role" : s.kind === "prose" ? "paragraph" : "item"}
-                          {s.count === 1 ? "" : "s"}
+                          {e.date || "no date"} · {e.bullets} bullet{e.bullets === 1 ? "" : "s"}
                         </span>
                       </li>
                     ))}
                   </ul>
                 </div>
+              </section>
+
+              <section className="flex flex-col gap-3">
+                <h2 className="text-lg font-semibold">What it did to the template</h2>
+                <ul className="bg-surface border border-line rounded-xl p-4 flex flex-col divide-y divide-line">
+                  {result.changeLog.map((c, i) => (
+                    <li key={i} className="py-2 flex items-baseline justify-between gap-3">
+                      <span className="text-sm">
+                        <span className="font-medium">{c.section}</span> <span className="opacity-70">{c.detail}</span>
+                      </span>
+                      <span className="text-xs opacity-60 whitespace-nowrap">{c.action}</span>
+                    </li>
+                  ))}
+                </ul>
               </section>
 
               <div className="flex flex-col gap-2">
@@ -491,9 +519,6 @@ function ReformatShell() {
                   Rendered with {result.templateLabel}.{" "}
                   {result.renderId ? "Saved to your render history." : "Preview only — nothing was saved."}
                 </p>
-                {result.specSource === "stored" && result.specNote && (
-                  <p className="text-xs bg-surface border border-line rounded-xl px-4 py-3">{result.specNote}</p>
-                )}
               </div>
 
               {result.renderId && (

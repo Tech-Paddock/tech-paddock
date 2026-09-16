@@ -124,7 +124,7 @@ describe("reformat against the stored template", () => {
     const order: string[] = [];
     const { client, calls } = fakeSupabase({
       "templates.select": {
-        data: { id: "t1", version: 1, name: "template.docx", spec: { font: "Calibri", bodySize: 10, headingSize: 11, nameSize: 16, contactSize: 9, entrySize: 11, headingBold: true, headingColor: null, nameColor: null, margins: { top: 0.6, right: 0.75, bottom: 0.6, left: 0.75 }, spacing: { before: 40, after: 40, line: null }, bulletGlyph: "•", highlightsStyle: "table" } },
+        data: { id: "t1", version: 1, name: "template.docx", file_path: "templates/1.docx" },
         error: null,
       },
       "renders.insert": () => {
@@ -134,6 +134,9 @@ describe("reformat against the stored template", () => {
     });
     mockModules({
       resume: client,
+      // The render is built from the template's stored bytes, so the download is
+      // load-bearing rather than incidental.
+      download: async () => fixture("template-sample.docx"),
       upload: async (prefix) => {
         order.push(`file:${prefix}`);
         return `${prefix}/x.docx`;
@@ -151,8 +154,12 @@ describe("reformat against the stored template", () => {
     expect(body.templateLabel).toContain("v1");
     expect(body.coverage.percent).toBe(100);
 
-    // The snapshot is the spec as it was, so the render stays reproducible.
-    expect(calls.find((c) => c.op === "insert")?.payload).toMatchObject({ template_id: "t1" });
+    // The snapshot records which template's bytes it was built from, so the
+    // render stays reproducible from files rather than from a description.
+    const payload = calls.find((c) => c.op === "insert")?.payload as { template_id: string; template_snapshot: { engine: string; templateHash: string } };
+    expect(payload).toMatchObject({ template_id: "t1" });
+    expect(payload.template_snapshot.engine).toBe("reskin");
+    expect(payload.template_snapshot.templateHash).toMatch(/^[0-9a-f]{64}$/);
   });
 });
 
