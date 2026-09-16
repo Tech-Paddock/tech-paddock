@@ -382,9 +382,40 @@ history.
 
 **Any branch cut before that rewrite still carries the un-scrubbed files.** A local copy of
 `claude/techpad-gen-admin-in-shell` was discarded rather than pushed for exactly this reason: its
-entire content difference from the rebuilt remote was those three `apps/tracker` files. If you find
-an old branch, do not push it and do not cherry-pick from it until
-`git diff origin/main <branch> -- apps/tracker` comes back empty.
+entire content difference from the rebuilt remote was those three `apps/tracker` files.
+
+### The test, and what #68 did to it
+
+The test used to be `git diff origin/main <branch> -- apps/tracker` coming back empty. **That no
+longer discriminates, and #68 is why.** The theme system added `lib/theme.css`, `lib/theme.ts`,
+`lib/livery.ts` and `app/ThemeControl.tsx` to every app and rewrote the colour classes, so *every*
+branch cut before 2026-09-16 now differs under `apps/tracker` whether or not it carries anything
+sensitive. Run against the five stale branches in one container it flagged all five, including two
+that were provably clean — a test that answers yes to everything answers nothing.
+
+Three files are the actual signal, because they are the three the scrub touched. Narrow to them:
+
+```
+git diff --name-only origin/main <branch> -- \
+  apps/tracker/lib/matchMeetings.ts apps/tracker/tests/
+```
+
+Empty means clean. Non-empty means the branch still carries the entities: do not push it and do not
+cherry-pick from it.
+
+**Pushing one under its own name is the worst case, not the safest.** Those remotes are deleted, so
+a push does not update a branch — it *recreates* one, which is the resurrected-branch incident in
+the ledger except that it republishes personal information. The trap has a name attached: the
+harness opens a session on a branch like `claude/techpad-gen-kickoff-qjnbws` and the session prompt
+names it as the branch to develop on. That branch was one of the three carrying un-scrubbed
+fixtures. `CLAUDE.md` already says to cut a fresh branch once the change is agreed, and following it
+is what avoids this — the kickoff branch is not the branch the work belongs on.
+
+**Cleared on 2026-09-16.** All five stale local branches were deleted and local `main` — stranded 56
+commits back at #32 on pre-rewrite history — was reset to `origin/main`, on Joel's instruction. The
+container now holds no ref carrying the un-scrubbed fixtures. This stays written down because the
+next container starts from a fresh clone and the hazard returns the moment anyone revives an old
+branch from elsewhere.
 
 The rewrite also orphaned every original commit, so GitHub reports #43 and #51–#57 as
 `merged: false` even though their content is plainly on `main`. That is cosmetic for those. It was
