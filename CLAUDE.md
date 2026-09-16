@@ -194,26 +194,26 @@ wrong or the rule is, and that is a conversation before any code exists.
   not the plan — what is now done. **`None.` is the correct answer when you only answered a
   question**, and it is written.
 
-  **2 · DevOps.** The promotion pipeline: work that exists and is not on `main` yet, one line each,
-  with a light and **the next step it is waiting on** — that is the useful half, not the colour.
-  Work moves working tree → commit → push → pull request → merge → live, and every line names where
-  it is stuck.
+  **2 · DevOps.** What exists and is not live yet, one line each, naming **the stage it is parked
+  at.** Four stages, in the order work moves through them, and the words are the ones Joel reads —
+  not git's:
 
-  | Light | Means |
-  |---|---|
-  | 🟢 Green | **Ready to promote.** The next step is available right now — finished and needs a pull request, or the pull request is green and ready to merge. |
-  | 🟡 Yellow | **Still moving.** Uncommitted in the working tree, pushed with CI still running, or waiting on an answer. |
-  | 🔴 Red | **Stuck.** CI failing, a merge conflict, or a step that errored. **Say what is broken, not just that it is.** |
+  | | Stage | Means |
+  |---|---|---|
+  | 🟡 | **In progress** | Still being worked on. Covers everything before it is finished, saved or not — that distinction is the agent's business, never his. |
+  | 🟢 | **Needs a PR** | Finished, pushed, CI green. Waiting on Joel's word to open one. |
+  | 🟢 | **Ready to merge** | Pull request open and green. Waiting on the technical director. |
+  | 🔴 | **Stuck** | CI failing, a merge conflict, or a step that errored. **Say what is broken, not just that it is.** |
 
-  **Every agent reports its own work, all the way through**: uncommitted changes, a finished branch
-  with no pull request yet, and its pull request until that merges. **The technical director reports
-  every pushed branch and every open pull request**, because the merge queue is the job.
+  **Every agent reports its own work, all the way through** — from in progress to merged. **The
+  technical director reports every pushed branch and every open pull request**, because the merge
+  queue is the job.
 
-  **It cannot report anyone's uncommitted work but its own.** That lives in the other agent's
-  session and never reaches the repo until it is pushed, so a line about it would be invented. This
-  is the same rule as the ledger's: what you have not measured does not get a row.
+  **It cannot report another agent's in-progress work.** That lives in the other agent's session and
+  never reaches the repo until it is pushed, so a line about it would be invented. This is the same
+  rule as the ledger's: what you have not measured does not get a row.
 
-  **A colour comes from `git status` and a live check run in this session — never from memory.** If
+  **A stage comes from `git status` and a live check run in this session — never from memory.** If
   you could not check, the line reads `unchecked` rather than guessing.
 
   **3 · Open Items.** The ledger. **The technical director prints every row; every other agent
