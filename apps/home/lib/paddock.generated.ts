@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-16T00:12:58.312Z",
+  bakedAt: "2026-09-16T00:24:48.642Z",
   waiting: [
   {
     "title": "Send the GitHub Support request",

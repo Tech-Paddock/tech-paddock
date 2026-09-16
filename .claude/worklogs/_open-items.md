@@ -87,6 +87,13 @@ work. Something here moves only when Joel says so.
 
 ## Done since this ledger was last written
 
+- **2026-09-16 — Draft pull requests: proposed, declined, settled.** The TD put up letting agents
+  open a draft when a branch is finished, on the argument that GitHub disables the merge button on a
+  draft and that is mechanical where the present rule is honesty-only. Joel declined — *"I'm fine
+  having them wait for me to instruct on PRs. It feels cleaner."* **`CLAUDE.md` is unchanged and no
+  workflow moved.** The reasoning, and what a revival would have to carry with it, is in the TD
+  handoff under *Decisions made today* so it is recognised rather than rediscovered.
+
 - **2026-09-16 — All fifteen orphaned worklogs deleted, on Joel's instruction.** Every branch is
   merged and deleted except this one, so every worklog named a branch that no longer existed, which
   is exactly what the README says to clear: `read-all.sh` is meant to show what is claimed *right

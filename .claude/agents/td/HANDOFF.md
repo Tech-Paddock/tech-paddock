@@ -200,6 +200,21 @@ Live infrastructure and one-time credentials. None of it is yours.
 
 ## Decisions made today
 
+- **Draft pull requests were proposed and declined. The rule is unchanged: agents push a finished
+  branch and wait for Joel to ask.** Raised by the TD on 2026-09-16 — let agents open a draft when
+  work is finished, since GitHub disables the merge button on a draft and that is a *mechanical*
+  guard where today there is only honesty. Joel declined: **"I'm fine having them wait for me to
+  instruct on PRs. It feels cleaner."**
+  **This is settled. Do not re-propose it**, and do not treat the argument below as an open question
+  — it is recorded so the next session recognises the idea instead of rediscovering it.
+  What the proposal got right and still does not change the outcome: a finished branch is invisible
+  in the GitHub UI, so the only record one exists is a chat message. That cost is accepted.
+  **What it would have required, if it is ever revived:** `pr-requested.yml` fires on
+  `opened/reopened/edited/synchronize` and would go red on every draft, because no request exists at
+  open time. It would need `ready_for_review` added and a skip while `draft == true`. Landing the
+  brief change without the workflow change teaches agents to ignore a red `requested-by-joel`, which
+  is worse than the rule it replaces. **Both or neither.**
+
 - **The re-extract fix is approved, and it is the Resume Formatter's to build.** Joel said yes on
   2026-09-15. Resolving a template's spec by re-extracting from the stored `.docx` at render time,
   instead of reading the `spec` column, ends the re-upload-after-every-spec-change step for good;
