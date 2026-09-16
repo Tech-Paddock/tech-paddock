@@ -224,21 +224,37 @@ what the fallback goes through, and what keeps an old stored spec from throwing.
 **A one-off template attached on Reformat is unchanged** — it always re-extracted, which is why it
 was the way to test a template before committing it to a version.
 
+**Joel approved this on 2026-09-15, in the conversation that merged #67, and again on 2026-09-16.**
+The technical director recorded the first in this file, because no other agent can see that
+conversation and the repo is the only channel. It is built on
+`claude/resume-extract-spec-at-render`.
+
+**What this does not remove, and the distinction is worth being exact about.** It ends re-uploading a
+template to pick up a **code** change — a new spec field, a better reading of an old one. It does
+nothing about a change to the **template itself**: if the active row points at an older `.docx`, the
+render reflects that older design, because the file is now what is read. So #67's outstanding
+re-upload still stands unless the active row already points at the current template file. Uploading a
+template you have redesigned is not a workaround; it is just uploading the template.
+
 ## Next steps
 
-0. **Ask Joel whether the contact line should be grey or accent.** His template hyperlinks the email
-   and the LinkedIn in the accent colour and sets the phone number grey; the output has to pick one,
-   and it picks grey. Offered to him twice, 2026-09-15 and 2026-09-16, and not taken up either time.
-   One rule either way, so it stays as it is until he says otherwise.
-1. **Run real generated output through a free ATS checker.** Still the highest-value open item and
+The technical director's item 0 — build the re-extract fix — is **done**, on
+`claude/resume-extract-spec-at-render`, and has left this list.
+
+1. **Ask Joel whether the contact line should be grey or accent.** His template hyperlinks the email
+   and the LinkedIn in the accent colour and sets the phone number grey; the output renders that line
+   as one run and has to pick one, and it picks grey. Offered to him twice, 2026-09-15 and
+   2026-09-16, and not taken up either time. One rule either way, so it stays as it is until he says
+   otherwise — do not keep re-asking.
+2. **Run real generated output through a free ATS checker.** Still the highest-value open item and
    still untouched: every check in this app verifies it does what it was designed to do, and none
    verifies the design was right. Note the constraint that turned up on 2026-09-14 — doing this
    with a real resume uploads Joel's personal data to a third party, which is his decision alone.
    A synthetic document exercises the structure without that.
-2. **Link a render to a shared contact.** Still open from the rebuild.
-3. **Decide whether `/api/health` should be reachable by an external monitor.** TD and Platform as
+3. **Link a render to a shared contact.** Still open from the rebuild.
+4. **Decide whether `/api/health` should be reachable by an external monitor.** TD and Platform as
    much as you.
-4. **Watch the version numbering now deletion exists.** `version` is unique and computed as
+5. **Watch the version numbering now deletion exists.** `version` is unique and computed as
    max+1 across all rows including archived ones. Delete the newest template and the next upload
    reuses that number, so v3 can name two different files over time. Harmless today — renders keep
    a `template_snapshot` — but it is the kind of thing that reads as a bug later.

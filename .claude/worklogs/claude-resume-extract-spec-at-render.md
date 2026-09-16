@@ -108,3 +108,27 @@ instead of once per upload, so a bug in it becomes a render-time failure. That i
 exists and why `extractSpec` has to stay total: it must not throw on a `.docx` that reads. The cost
 is one extra storage read per saved render — a template is tens of kilobytes, against the two
 uploads the same request already performs.
+
+## 2026-09-16 — brought onto current main, and a correction I owe Joel
+Merged `origin/main` (#69, #70). One real conflict, in my own `HANDOFF.md`, and it was a genuine
+disagreement rather than a squash artifact: the technical director had added "build the re-extract
+fix" as next-step 0 while this branch had already built it. Resolved to my side — the work is done —
+and the item has left the list.
+
+**But the TD's side carried a correction, and it is one I had already got wrong out loud.** I told
+Joel this change means the active template "will start rendering in the template's own colours
+without you touching it". That is only true if the active row already points at the current template
+file. Re-extracting at render time ends re-uploading to pick up a **code** change; it does nothing
+about a change to the **template itself**, because the file is now what is read. So #67's outstanding
+re-upload still stands. The handoff now states the distinction rather than implying the broader claim.
+
+Also inherited #70's new rule: every message to Joel ends with a four-column open-items footer, and
+**never a row the agent cannot see** — the ledger it was handed, its own handoff, live worklogs on
+unmerged branches, and the conversation. Noted here because it changes how this area reports, not
+what it builds.
+
+The merge also deletes the stale worklogs this branch was still carrying, including
+`claude-resume-template-colour-fidelity.md`, whose branch merged as #67. Correct by the worklog rule,
+and it was on my list to do.
+
+Re-verified on the merged tree: 120 tests, `tsc --noEmit` and `npm run build` clean.
