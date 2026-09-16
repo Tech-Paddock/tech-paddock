@@ -71,20 +71,44 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css"]) {
   );
 }
 
-/* 2 ── middleware.ts is THREE deliberate variants, not five identical copies.
-   home/resume/coffee share one, editor adds /api/draft, tracker adds
-   /api/summary and waves /api/cron/* through. An agent who checks, finds three
-   and concludes the rule is wrong has been handed that conclusion by the rule
-   itself — so measure the shape, not just the count. */
+/* 2 ── middleware.ts is deliberately NOT uniform, and the shape is the rule:
+   `editor` adds a scoped /api/draft bypass, `tracker` adds /api/summary and
+   waves /api/cron/* through, and every other app shares one base copy. An agent
+   who checks, finds three variants and concludes the rule is wrong has been
+   handed that conclusion by the rule itself — so measure the shape, not a count.
+
+   The two exceptions are named because they are a documented fact about those
+   two apps, not a roster: adding a sixth app does not change what editor's
+   bypass is for. The base group is deliberately unnamed, so a new app that
+   copies it is correct work and passes. A new app that brings its OWN variant
+   fails here on purpose — that is a fourth version of the password gate, and
+   it either belongs in CLAUDE.md in the same pull request or it should not
+   exist. Collapsing everything to one copy fails for the opposite reason. */
 {
   const present = APPS.map((a) => [a, md5(R("apps", a, "middleware.ts"))]).filter(([, h]) => h);
   const groups = new Map();
   for (const [a, h] of present) groups.set(h, [...(groups.get(h) ?? []), a]);
   const shape = [...groups.values()].map((g) => g.sort().join("+")).sort();
-  const expected = ["coffee+home+resume", "editor", "tracker"].sort();
-  const same = shape.length === expected.length && shape.every((g, i) => g === expected[i]);
-  add("middleware.ts: three deliberate variants", same ? "ok" : "fail",
-    same ? shape.join(" | ") : `expected ${expected.join(" | ")} — measured ${shape.join(" | ")}`);
+  const name = "middleware.ts: a base copy plus the two scoped bypasses";
+
+  const owns = (app) => [...groups.values()].some((g) => g.length === 1 && g[0] === app);
+  const missing = ["editor", "tracker"].filter((a) => !present.some(([app]) => app === a));
+  const base = [...groups.values()].filter((g) => !(g.length === 1 && (g[0] === "editor" || g[0] === "tracker")));
+
+  if (present.length === 0) add(name, "warn", "no middleware.ts in any app — cannot measure");
+  else if (missing.length) add(name, "warn", `cannot measure: no middleware.ts in ${missing.join(", ")}`);
+  else if (!owns("editor") || !owns("tracker"))
+    add(name, "fail",
+      "editor and tracker must each have a variant of their own — measured " + shape.join(" | ") +
+      ". A shared one means a scoped bypass was copied into an app that was never reviewed for it.");
+  else if (base.length > 1)
+    add(name, "fail",
+      "a fourth version of the password gate — measured " + shape.join(" | ") +
+      ". Use the base copy, or document the new variant in CLAUDE.md in this same pull request.");
+  else if (base.length === 0)
+    add(name, "fail", "only editor and tracker have middleware.ts; nothing is running the base copy");
+  else
+    add(name, "ok", `${base[0].length} on the base copy, editor and tracker scoped — ${shape.join(" | ")}`);
 }
 
 /* 3 ── CI builds whatever is on disk, and one fixed name gates it.

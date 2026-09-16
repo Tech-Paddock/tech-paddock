@@ -6,7 +6,9 @@ import { LIVERY } from "@/lib/livery";
 import ThemeControl from "./ThemeControl";
 
 type Tab = "reformat" | "templates" | "history" | "check";
-const TABS: Tab[] = ["reformat", "templates", "history", "check"];
+// Check leads, and is the landing tab: formatting happens in Word now, and the
+// last thing before sending is the one this app is for.
+const TABS: Tab[] = ["check", "reformat", "templates", "history"];
 
 type Finding = { code: string; severity: "blocking" | "warning"; message: string };
 type Coverage = { totalParagraphs: number; placed: number; dropped: string[]; percent: number };
@@ -46,6 +48,8 @@ type RenderRow = {
   thread: { company: string; stage: string } | null;
 };
 
+type ContentCheck = { totalLines: number; present: number; missing: string[]; percent: number };
+
 type Inspection = {
   filename: string;
   sizeBytes: number;
@@ -53,6 +57,9 @@ type Inspection = {
   namedStyles: number;
   outline: { title: string | null; sections: { heading: string; lines: number; bullets: number }[]; preamble: string[] };
   findings: Finding[];
+  /** Null until the document the text came from is attached too. */
+  sourceFilename: string | null;
+  content: ContentCheck | null;
 };
 
 const DOCX = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -153,7 +160,7 @@ function ReformatShell() {
   const highlightRender = params.get("render");
 
   const [tab, setTab] = useState<Tab>(
-    TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : "reformat"
+    TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : "check"
   );
   const [renders, setRenders] = useState<RenderRow[] | null>(null);
   const [job, setJob] = useState({ company: "", role: "", jobUrl: "" });
@@ -164,6 +171,7 @@ function ReformatShell() {
   const [template, setTemplate] = useState<File | null>(null);
   const [source, setSource] = useState<File | null>(null);
   const [single, setSingle] = useState<File | null>(null);
+  const [checkSource, setCheckSource] = useState<File | null>(null);
   const [result, setResult] = useState<Reformatted | null>(null);
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -305,16 +313,30 @@ function ReformatShell() {
     }
   }
 
-  async function check(file: File) {
-    setSingle(file);
+  /**
+   * Re-runs whenever either document changes, so the comparison appears the
+   * moment the second one lands rather than waiting to be asked for.
+   */
+  async function runCheck(finished: File, against: File | null) {
     setInspection(null);
     const body = new FormData();
-    body.append("file", file);
+    body.append("file", finished);
+    if (against) body.append("source", against);
     try {
       setInspection(await post<Inspection>("/api/inspect", body, "Reading document…"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't read that file.");
     }
+  }
+
+  function checkFinished(file: File) {
+    setSingle(file);
+    void runCheck(file, checkSource);
+  }
+
+  function checkAgainst(file: File) {
+    setCheckSource(file);
+    if (single) void runCheck(single, file);
   }
 
   function download() {
@@ -339,7 +361,7 @@ function ReformatShell() {
       <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold">Resume Formatter</h1>
         <p className="text-sm text-ink-soft">
-          Put a tailored resume into your own template, without losing a word of it.
+          The last look before you send it: what a parser will actually read, and whether you lost a word on the way.
         </p>
         <ThemeControl livery={LIVERY} />
       </header>
@@ -645,8 +667,19 @@ function ReformatShell() {
         </section>
       ) : (
         <>
-          <section className="flex flex-col gap-3">
-            <FilePick label="Any .docx" hint="See how a parser reads it" file={single} onPick={check} />
+          <section className="grid sm:grid-cols-2 gap-3">
+            <FilePick
+              label="Finished resume"
+              hint="The .docx you're about to send"
+              file={single}
+              onPick={checkFinished}
+            />
+            <FilePick
+              label="Jobright export (optional)"
+              hint="Checks nothing was dropped"
+              file={checkSource}
+              onPick={checkAgainst}
+            />
           </section>
 
           {inspection && (
@@ -662,6 +695,50 @@ function ReformatShell() {
               <section className="flex flex-col gap-3">
                 <h2 className="text-lg font-semibold">ATS check</h2>
                 <Findings findings={inspection.findings} />
+              </section>
+
+              <section className="flex flex-col gap-3">
+                <h2 className="text-lg font-semibold">Nothing dropped</h2>
+                {inspection.content === null ? (
+                  <p className="text-sm bg-surface border border-line rounded-xl px-4 py-3 opacity-70">
+                    Attach the Jobright export above and every line of it gets checked against this document. Its
+                    exact wording is the keyword optimisation, so a line lost while copying is lost coverage —
+                    and nothing about the finished file shows it used to be there.
+                  </p>
+                ) : (
+                  <div className="bg-surface border border-line rounded-xl p-4 flex flex-col gap-3">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="font-medium">
+                        {inspection.content.present} of {inspection.content.totalLines} lines carried across
+                      </p>
+                      <span
+                        className={`text-sm whitespace-nowrap ${
+                          inspection.content.missing.length > 0 ? "text-urgent font-medium" : "opacity-60"
+                        }`}
+                      >
+                        {inspection.content.percent}%
+                      </span>
+                    </div>
+                    <p className="text-xs opacity-60 break-all">against {inspection.sourceFilename}</p>
+                    {inspection.content.missing.length === 0 ? (
+                      <p className="text-sm">Every line of the export appears in the finished document.</p>
+                    ) : (
+                      <>
+                        <p className="text-sm text-urgent font-medium">
+                          {inspection.content.missing.length} line
+                          {inspection.content.missing.length === 1 ? "" : "s"} reached the finished document nowhere:
+                        </p>
+                        <ul className="flex flex-col divide-y divide-line">
+                          {inspection.content.missing.map((line) => (
+                            <li key={line} className="py-2 text-sm">
+                              {line}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </div>
+                )}
               </section>
 
               <section className="flex flex-col gap-3">

@@ -6,20 +6,47 @@ You own `apps/resume`, live at `resume.techpaddock.io`. Nothing else in this rep
 
 ## Your job
 
-Reformat a Jobright-tailored resume into Joel's own template, optimised for ATS readability, and
-record the submission.
+Check a finished resume before it is sent, and record the submission.
 
-**This is not a content store.** Jobright authors and tailors the content. You own formatting,
-history, and the application record. Both inputs are `.docx`, output is `.docx`, and there is no
-copy-paste path.
+**This is not a content store, and as of 2026-09-16 it is not a formatter either.** Jobright authors
+and tailors the content. Joel formats it in Word. You own **verification, history and the
+application record**.
 
-**Why it exists:** Jobright does the tailoring and the ATS keyword work, but its output formatting
-is unusable — every run bold+italic, section rules drawn as images, a mangled Education section, and
-about 900KB of direct formatting on a two-page resume.
+**Pipeline:** upload the finished `.docx`, optionally with the Jobright export it came from → lint
+it the way a parser will read it → compare it against the source so nothing was dropped → record the
+submission against its Pipeline Tracker thread.
 
-**Pipeline:** upload a Jobright `.docx` → extract paragraphs deterministically → label them → render
-into the active template → review the coverage report → save, with the application details written
-through to the Pipeline Tracker.
+### Why formatting left the app — approved by Joel 2026-09-16
+
+> *"I'm fine downloading a template and editing in Word or gdrive and iterating within Claude. What
+> is the value add to doing it in app."* … *"It stops being a formatter and becomes a pre-flight
+> check and filing cabinet." — yes.*
+
+The app existed because Jobright's output formatting is unusable — every run bold+italic, section
+rules drawn as images, a mangled Education section, 900KB of direct formatting on two pages. All
+true, and none of it required *this* app to fix: Word fixes it by being the format.
+
+**The renderer was measurably not doing its job.** It never read the template's XML in any version
+ever committed; it built a new document from a 17-scalar summary and hardcoded the rest. Measured
+against the real template on 2026-09-16: **every render came out A4 against a US Letter template**,
+inherited body text was 10pt against 10.5pt, the centred Career Highlights block rendered
+left-aligned with its shading dropped, the bullet glyph and indent were both invented, and the
+section rule was drawn under each heading where the template draws three above. The constants that
+*did* match matched because they were fitted to one file.
+
+**What does not survive the move to Word, and is therefore the whole job now:**
+
+1. **The header trap.** Both current templates keep the name and contact block in `word/header1.xml`,
+   and a `w:type="first"` header with no `<w:titlePg/>` **is not displayed by Word at all**. Edit in
+   Word and you will ship a resume whose contact block a parser never sees, with nothing on screen
+   to tell you. `auditAts` raises it as blocking. This is the highest-stakes thing the app does.
+2. **The content guarantee.** Jobright's exact wording *is* the ATS keyword optimisation. Copy
+   between two documents by hand and a dropped bullet is invisible in the result.
+3. **The submission record.** What exactly was sent, to whom, when.
+
+**The renderer has not been deleted yet.** Stopping-use and removal are separate changes, in that
+order, for the same reason a destructive migration splits in two: the safe order is that the thing
+still works while the new path is proven. See the handoff for where that stands.
 
 ## What you own
 
@@ -61,30 +88,42 @@ never created.
 
 ## The two rules that define this tool
 
-### Pure formatting. No model calls, ever.
+### No model calls, ever.
 
-Labelling is fully deterministic on both document families. **A model escalation was designed and
-deliberately dropped**: it would have had nothing to decide, and it would have made output
-non-deterministic — which is exactly what a saved render must not be.
+Every check here is fully deterministic on both document families. **A model escalation was designed
+and deliberately dropped**: it would have had nothing to decide, and it would have made the output
+non-deterministic — which is exactly what a saved record must not be.
 
-The signal that would have triggered it is still worth having and still measured — coverage below
-100%, or an `unknown_heading` finding — but it surfaces in the UI for a human rather than routing to
-a model.
+**This survived the 2026-09-16 amendment unchanged, and was re-tested by it.** An AI pass before
+submission was proposed and declined on the merits, not on the rule: every defect the renderer had
+was a value sitting in the file — a page size, a fill colour, an indent — and every check that
+replaced it is a comparison between two documents. There is nothing here for a model to judge.
 
-**Do not reintroduce a model call.** If a document defeats the rules, the coverage report names what
-it could not place and you fix it by hand.
+The signal that would have triggered it is still worth having and still measured — a line the source
+has and the finished document does not, or an `unknown_heading` finding — but it surfaces in the UI
+for a human rather than routing to a model.
 
-### Lossless: labelling moves text, it never rewrites it.
+**Do not reintroduce a model call.** If a document defeats the rules, the report names what it could
+not account for and you fix it by hand.
 
-Every string comes from the source docx; labelling only assigns each paragraph a role. Content loss
-is therefore **structurally impossible** rather than something verified after the fact. This matters
-because Jobright's specific wording *is* the ATS optimisation — a silently dropped line is lost
-keyword coverage.
+### Lossless: every string comes from a document, never from this app.
+
+Labelling only assigns a paragraph a role, and the content check only says whether a line arrived.
+Neither ever rewrites a word. This matters because Jobright's specific wording *is* the ATS
+optimisation — a silently dropped line is lost keyword coverage.
 
 **That rule was broken once and fixed.** A bullet appearing before the first employer line was
 discarded while still being counted as placed, so the coverage report claimed 100% over text the
-output did not contain. **The coverage claim is the whole point of the design; it must not be able
-to lie.**
+output did not contain. **The claim is the whole point of the design; it must not be able to lie.**
+
+**It must not be able to cry wolf either, and that is the same rule.** The content check first
+matched whole lines, which called nine lines of forty-two missing on real files — every word present,
+the line merely split across two table cells or interrupted by a job title. A report that
+false-alarms that often is one you learn to ignore, which costs exactly what an overstatement costs.
+It now matches the longest run of consecutive words it can. **Runs, not loose words:** every word of
+"Delivered a representative accomplishment" occurs somewhere in a resume full of similar bullets, so
+counting words independently would report a deleted bullet as present. Both failure modes have a
+named regression test in `tests/compare.test.ts`.
 
 ---
 

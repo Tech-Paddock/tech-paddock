@@ -42,6 +42,11 @@ checked in before it merges. Platform configures projects; you own that `SESSION
 identical across all five, because nothing else checks it. An app agent decides what a route does;
 you own how it authenticates across apps. **That last one is the only place you hold a veto.**
 
+**Standing up a new agent is a protocol, not a habit.** When Joel says he wants one, open
+`.claude/agents/STANDUP.md` and execute it. It happens rarely enough that nobody remembers the
+steps that are outside the repo and have no undo, which is exactly why it is written down rather
+than automated.
+
 **Watch Platform for work that leaves no diff.** Much of it happens in a dashboard, so its handoff
 is the only record that it happened at all. Insist on it.
 
