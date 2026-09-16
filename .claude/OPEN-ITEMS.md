@@ -39,9 +39,9 @@ pull request that would undo it.** Harmless until then, and it must be done firs
    Contents, Metadata, Pull requests, Actions. `VERCEL_TOKEN` read-only, `tech-paddock` team.
    **The redeploy is not optional** — Vercel bakes the environment in at build time. Until both are
    set the Pit Wall names the missing sources under "not reported", the designed degraded state.
-4. **Re-upload the active resume template.** #71 ended re-uploads for *code* changes; the template
-   file itself is untouched by that. It is the Word workflow's starting document, so an old one
-   renders old and blocks that workflow's first step.
+4. **Re-upload the active resume template.** #96 made it **the substrate every render is built on** —
+   the renderer edits the template's own bytes rather than working from a description of it — so an
+   out-of-date one renders an out-of-date design on every job. Open before; it matters more now.
 5. **What is the Feed?** In the settled tab order and nowhere else, so it ships as a labelled empty
    slot. **A feed is rows** — the same hub rule the tracker's move already bends. Nothing is blocked.
 6. **Raise the hairline contrast bar?** `--line` on `--surface` is 1.82:1 in production, short of
