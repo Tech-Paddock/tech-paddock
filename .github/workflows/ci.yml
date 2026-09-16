@@ -13,11 +13,42 @@ on:
     types: [opened, reopened]
 
 jobs:
+  # The roster is whatever is on disk under apps/, read once, here.
+  #
+  # It used to be a hardcoded list of five names, and CLAUDE.md documented the
+  # cost honestly: a sixth app was never tested, and it did not fail — it simply
+  # never ran. That is fine for a roster that never changes and wrong for one
+  # that does. Apps get added and deprecated here, so the list derives from the
+  # thing that physically exists instead of from a copy of it.
+  roster:
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.list.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Which apps exist?
+        id: list
+        run: |
+          set -euo pipefail
+          apps="$(ls -d apps/*/ 2>/dev/null | xargs -n1 basename | sort | jq -R . | jq -sc .)"
+
+          # An empty matrix builds nothing and reports success, which is the
+          # silent-skip failure this job exists to remove. Fail loudly instead.
+          if [ -z "$apps" ] || [ "$apps" = "[]" ]; then
+            echo "::error::No app folders found under apps/. Refusing to report a green build for nothing."
+            exit 1
+          fi
+
+          echo "apps=$apps" >> "$GITHUB_OUTPUT"
+          echo "Roster: $apps"
+
   build:
+    needs: roster
     strategy:
       fail-fast: false
       matrix:
-        app: [home, editor, resume, tracker, coffee]
+        app: ${{ fromJson(needs.roster.outputs.apps) }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -127,3 +158,41 @@ jobs:
 
       - name: Rules match the repo they describe
         run: node scripts/drift-check.mjs
+
+  # THE required check, and the only one whose name has to stay stable.
+  #
+  # Branch protection requires checks BY NAME, so a per-app matrix meant the
+  # required-check list changed shape every time an app was added or removed —
+  # and no agent here can read a ruleset to confirm it. Deprecating an app was
+  # worse than adding one: the matrix still named the deleted folder, its job
+  # failed on a missing working directory, and the required check stuck red.
+  #
+  # One fixed name in front of everything fixes both. The per-app jobs still
+  # report individually so a reader can see which app broke; they are just no
+  # longer what the ruleset names.
+  #
+  # `if: always()` is load-bearing. Without it this job is SKIPPED when a
+  # dependency fails, and a skipped required check never reports at all — the
+  # pull request would block forever on a green-looking board.
+  gate:
+    needs: [roster, build, drift]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Everything that has to pass, passed
+        run: |
+          roster="${{ needs.roster.result }}"
+          build="${{ needs.build.result }}"
+          drift="${{ needs.drift.result }}"
+
+          printf '  roster  %s\n  build   %s\n  drift   %s\n' "$roster" "$build" "$drift"
+
+          fail=0
+          for pair in "roster:$roster" "build:$build" "drift:$drift"; do
+            name="${pair%%:*}"; result="${pair#*:}"
+            if [ "$result" != "success" ]; then
+              echo "::error::$name did not pass — it reported '$result'."
+              fail=1
+            fi
+          done
+          exit "$fail"

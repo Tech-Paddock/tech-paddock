@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-16T02:36:07.738Z",
+  bakedAt: "2026-09-16T03:14:05.085Z",
   waiting: [
   {
     "title": "Two tokens on `tp-home`, then redeploy",
@@ -27,7 +27,7 @@ export const PADDOCK = {
   },
   {
     "title": "Decide whether to raise the hairline contrast bar",
-    "detail": "--line against --surface is 1.82:1 in the theme running in production, short of the 3:1 bar for a non-text component. Every new theme matches or beats the shipped figure, and raising the bar changes the look of all five apps. A decision, no",
+    "detail": "--line against --surface is 1.82:1 in the theme running in production, short of the 3:1 bar for a non-text component. Every new theme matches or beats the shipped figure, and raising the bar changes the look of every app. A decision, not a ",
     "ref": "—",
     "state": "box"
   }

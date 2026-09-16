@@ -41,12 +41,37 @@ function hasRoute(appDir, route) {
   return existsSync(join(appDir, "app", "api", route, "route.ts"));
 }
 
-/** The CI matrix is hardcoded to a list of app names; an app missing from it builds untested. */
+/**
+ * Which apps CI will actually build.
+ *
+ * This used to parse a hardcoded `app: [a, b, c]` list, because that is what the
+ * matrix was, and an app missing from it built untested without failing. The
+ * workflow now derives the roster from `apps/` at run time, so there is no list
+ * to read and the two can no longer disagree.
+ *
+ * Both shapes are handled: a literal list is still parsed where one exists, and
+ * a derived roster reports the folders on disk, which is what CI will enumerate.
+ * Same shape either way, so the page comparing this against `apps` is unchanged.
+ */
 function ciMatrix() {
   const file = join(repoRoot, ".github", "workflows", "ci.yml");
   if (!existsSync(file)) return [];
-  const match = readFileSync(file, "utf8").match(/app:\s*\[([^\]]+)\]/);
-  return match ? match[1].split(",").map((s) => s.trim()).filter(Boolean) : [];
+  const yml = readFileSync(file, "utf8");
+
+  const literal = yml.match(/app:\s*\[([^\]]+)\]/);
+  if (literal) return literal[1].split(",").map((s) => s.trim()).filter(Boolean);
+
+  const derived = /matrix:\s*\n\s*app:\s*\$\{\{\s*fromJson\(/.test(yml);
+  if (!derived) return [];
+
+  try {
+    return readdirSync(appsDir, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      .sort();
+  } catch {
+    return [];
+  }
 }
 
 function migrationCount() {

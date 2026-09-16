@@ -55,7 +55,7 @@ Nothing.
    shape, or an unhandled rejection being swallowed. If it turns out to be grants or RLS, it becomes
    Platform's.
 2. **Add a `test` script.** CI runs `npm run test --if-present`, so adding one opts this app in with
-   no CI change. `editor` and `home` are the two apps without tests.
+   no CI change. `editor` and `home` are the apps without tests.
 3. **No writing samples have been loaded yet**, so Train mode has never folded a real batch and the
    style guide is still the seed rules.
 4. Nothing else is queued. Ask before starting anything larger than a fix.

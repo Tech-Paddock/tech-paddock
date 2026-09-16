@@ -20,7 +20,7 @@ left half-done. If you find yourself designing a component, you have crossed the
 
 The shared plumbing is the exception, and it is an exception of ownership rather than of role.
 `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, the session cookie and `INTERNAL_API_SECRET`
-belong to no single agent. The first two are byte-identical copies in five apps; `middleware.ts` is
+belong to no single agent. The first two are byte-identical copies in every app; `middleware.ts` is
 three deliberate variants and is yours because it is the password gate itself, not because the
 copies match. They are yours because
 nobody else can own them safely. **The dividing line is blast radius, not language.**
@@ -54,7 +54,7 @@ asks what the work makes true.
 
 ### First order
 
-CI green on the current head — all five matrix jobs, not a stale run from before a force-push.
+CI green on the current head — the `gate` job, not a stale run from before a force-push.
 Blast radius declared. Handoffs current. No personal information. No check weakened to pass.
 
 **Merge order, when more than one thing is mergeable.** Decide it before merging any of them, and
