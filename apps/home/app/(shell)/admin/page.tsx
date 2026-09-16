@@ -1,5 +1,6 @@
 import { DECLARED } from "@/lib/declared.generated";
-import { PROJECTS } from "@/lib/platform";
+import { DRIFT } from "@/lib/drift.generated";
+import { PROJECTS, type DriftCheck, type DriftState } from "@/lib/platform";
 import { countByStatus, runDiagnostics, severityFor, type Probe } from "@/lib/diagnostics";
 
 /**
@@ -29,11 +30,41 @@ function ProbeRow({ probe }: { probe: Probe }) {
   );
 }
 
+/**
+ * A drift check reads like a probe, so it renders like one — same row, same
+ * severity grammar. `warn` covers two different things and is deliberately not
+ * split: a budget being approached, and a check that could not measure its own
+ * subject. Both mean "look at this", and the detail says which it was.
+ */
+const DRIFT_SEVERITY: Record<DriftState, string> = {
+  fail: "urgent",
+  warn: "warn",
+  ok: "info",
+};
+
+function DriftRow({ check }: { check: DriftCheck }) {
+  return (
+    <div className={`slot slot-static sev-${DRIFT_SEVERITY[check.state]}`}>
+      <span className="slot-label">{check.state}</span>
+      <span className="slot-body">
+        <span className="slot-title">{check.name}</span>
+        <span className="slot-detail">{check.detail}</span>
+      </span>
+    </div>
+  );
+}
+
 export default async function AdminPage() {
   const diag = await runDiagnostics();
   const live = countByStatus(diag.liveness);
   const missingEnv = diag.hubEnv.filter((e) => !e.set);
   const declaredFor = (slug: string) => DECLARED.apps.find((a) => a.slug === slug);
+
+  // Worst first, and the passing ones are listed by name below rather than
+  // dropped — a panel showing only problems reads as the whole set of checks.
+  const notable = DRIFT.checks.filter((c) => c.state !== "ok");
+  notable.sort((a, b) => (a.state === b.state ? 0 : a.state === "fail" ? -1 : 1));
+  const passing = DRIFT.checks.filter((c) => c.state === "ok");
 
   return (
     <div className="admin">
@@ -159,6 +190,67 @@ export default async function AdminPage() {
       )}
 
       <h2 className="admin-section">
+        Rules drift <span className="admin-qualifier">measured from the repo at build time</span>
+      </h2>
+      <p className="admin-note">
+        Every rule in <code>CLAUDE.md</code> that can be measured, measured — checksums, the
+        deliberate <code>middleware.ts</code> variants, the file budgets, whether each handoff has
+        been updated since its own area last changed. <code>scripts/drift-check.mjs</code> answers each one by
+        looking rather than by reading a document that claims to know, and{" "}
+        <strong>never reports a pass for something it could not look at</strong>: a check that cannot
+        measure its own subject warns and says so.
+      </p>
+      <p className="admin-note">
+        <strong>This is the one thing on this page that is neither committed nor live.</strong> It is
+        the repo as it stood when this deployment was built, so after a merge that changes a rule it
+        is stale until <code>tp-home</code> next deploys. The timestamp at the foot of the page is
+        what says how old it is. CI runs the same check on every push, and that is what fails a
+        pull request.
+      </p>
+
+      {DRIFT.complete ? (
+        <>
+          <div className="stat-strip">
+            <div className="stat">
+              <span className="slot-label">Holding</span>
+              <span className="stat-value">{DRIFT.counts.ok}</span>
+              <span className="stat-sub">measured, and matching the rule</span>
+            </div>
+            <div className="stat">
+              <span className="slot-label">Drifting</span>
+              <span className="stat-value">{DRIFT.counts.warn}</span>
+              <span className="stat-sub">near a budget, going stale, or not measurable here</span>
+            </div>
+            <div className="stat">
+              <span className="slot-label">False</span>
+              <span className="stat-value">{DRIFT.counts.fail}</span>
+              <span className="stat-sub">
+                {DRIFT.counts.fail === 0
+                  ? "no rule is currently untrue"
+                  : "a rule in CLAUDE.md is no longer true"}
+              </span>
+            </div>
+          </div>
+
+          {notable.length > 0 && (
+            <div className="slots">
+              {notable.map((check) => (
+                <DriftRow key={check.name} check={check} />
+              ))}
+            </div>
+          )}
+
+          {passing.length > 0 && (
+            <p className="slot-note">
+              Also measured and holding: {passing.map((c) => c.name).join(" · ")}.
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="admin-note">{DRIFT.reason}</p>
+      )}
+
+      <h2 className="admin-section">
         Blind spots <span className="admin-qualifier">what this page cannot see</span>
       </h2>
       <div className="slots">
@@ -199,7 +291,8 @@ export default async function AdminPage() {
 
       <p className="admin-foot">
         Probed {new Date(diag.checkedAt).toUTCString()} · declared manifest generated{" "}
-        {new Date(DECLARED.generatedAt).toUTCString()}
+        {new Date(DECLARED.generatedAt).toUTCString()} · drift measured{" "}
+        {new Date(DRIFT.generatedAt).toUTCString()}
       </p>
     </div>
   );

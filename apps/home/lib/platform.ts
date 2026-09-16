@@ -45,6 +45,36 @@ export type Declared = {
 };
 
 /**
+ * One rules-drift check, as `scripts/drift-check.mjs --json` reports it.
+ *
+ * `ok` means measured and matching. `warn` means measured and drifting, and it
+ * is also what a check reports when it could not measure its own subject —
+ * deliberately, because the one thing it must never do is report `ok` for
+ * something it did not look at. `fail` means a rule in `CLAUDE.md` is now false.
+ *
+ * The shape is the technical director's, not this app's. Changing it changes
+ * what The Garage can render.
+ */
+export type DriftState = "ok" | "warn" | "fail";
+
+export type DriftCheck = {
+  name: string;
+  state: DriftState;
+  detail: string;
+};
+
+export type Drift = {
+  /** When the check ran — which is this deployment's build, not now. */
+  generatedAt: string;
+  /** False when the check could not be run or its output could not be read. */
+  complete: boolean;
+  /** Why it could not be measured. Empty when complete. */
+  reason: string;
+  checks: DriftCheck[];
+  counts: Record<DriftState, number>;
+};
+
+/**
  * The four embeddable tools, as a closed set. Keeping the slugs a union rather
  * than plain strings is what lets the hub's tile table be checked for
  * completeness at compile time — add a tool here and the shell stops building
