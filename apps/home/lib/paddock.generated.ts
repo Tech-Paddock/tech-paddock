@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-16T17:55:33.989Z",
+  bakedAt: "2026-09-16T18:07:33.178Z",
   waiting: [
   {
     "title": "Two tokens on `tp-home`, then redeploy",

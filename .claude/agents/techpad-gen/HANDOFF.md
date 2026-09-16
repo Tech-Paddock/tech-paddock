@@ -8,33 +8,24 @@ Read `RULES.md` first. This file is only what is true right now.
 
 ## What is live
 
-**The Pit Wall** — `/` is the hub landing and answers "what needs me, right now, with several agents
-out". It renders the ledger's `Waiting on Joel` and `Parked` sections plus one row per agent, baked
-at build time by `scripts/collect-paddock.mjs` because files above `apps/home` are not readable at
-runtime. Its spec is retired: the thing is built, so the spec stopped being read.
+**The Pit Wall** — answering "what needs me, right now, with several agents out". It renders the
+ledger's `Waiting on Joel` and `Parked` sections plus one row per agent, baked at build time by
+`scripts/collect-paddock.mjs` because files above `apps/home` are not readable at runtime.
 
-**The Garage** — `/admin`. What the repo declares against what the platform reports. Declared is
-generated at `prebuild` from `.env.example` names, the CI matrix and `supabase/migrations`; reported
-is probed live. **It never guesses** — anything unreachable reads "unknown" with the reason.
-`CLAUDE.md` now makes this a rule for everyone: any fact that can be computed is computed, never
-written in prose. The Garage is where those facts live.
-
-**It is not a place anything is typed.** That was the central decision and it should survive whatever
-gets built next: a page agents write config into is a second source of truth, and this project has
-been injured twice by exactly that.
+**The Garage** — `/admin`. Three panels: *Declared*, generated at `prebuild` from `.env.example`
+names, the CI matrix and `supabase/migrations`; *Reported*, probed live; *Rules drift*, the TD's
+`scripts/drift-check.mjs --json`, passing checks named rather than dropped. **None of it guesses** —
+anything unreachable reads "unknown" with the reason. **Nothing is ever typed into it**: a page
+agents write config into is a second source of truth, which has injured this project twice.
 
 **The theme system** — ten palettes, five liveries, both polarities, the light/dark control in every
 header that is not framed (below). `lib/theme.css` holds every token and is byte-identical in every
-app; `lib/livery.ts` differs per app and holds one constant. No tool's `tailwind.config.ts` contains
-a colour — every entry reads `rgb(var(--token-rgb) / <alpha-value>)`, and the triplet form is
-required, not preferred: it is the only shape Tailwind's alpha modifier can interpolate.
+app; `lib/livery.ts` is the one file that differs per app. No `tailwind.config.ts` contains a colour
+any more — every entry reads `rgb(var(--token-rgb) / <alpha-value>)`, and the triplet form is
+required rather than preferred: it is the only shape Tailwind's alpha modifier can interpolate.
 
-**One switch per page — two halves that must stay together.** Framed, a tool hides its own
-Light/Dark (`[data-embedded] .pd-modes`, stamped by each layout before paint) and keeps its livery
-badge. Safe only because the hub posts `{type:"paddock-mode", mode}` into every frame and
-`ThemeControl` listens behind `isPaddockOrigin()`. **A cross-app contract now: a tool that drops
-`ThemeControl.tsx` silently ignores the hub's switch.** The origin check is defence in depth —
-`frame-ancestors` already lets only the hub frame a tool, measured, not assumed.
+**The Morning Paper** — `/` lands on Paper, with Board and Feed alongside. There is no privacy fold:
+Joel lifted it. The Feed is still undefined and renders a labelled slot.
 
 **The chrome is a layout, not a component.** `app/(shell)/` is a route group holding `/` and
 `/admin`; its `layout.tsx` renders `Chrome.tsx` with each page as `children`. `/login` is
@@ -42,37 +33,47 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## Traps specific to this app
 
-- **Before adding a third route to the shell:** the shell was built around an iframe at
-  `height: 100%`, so nothing had ever needed to scroll and there was no `overflow-y` anywhere. A
-  document-length page escapes into *document* scroll, dragging the topbar off the top. `.content`
-  now has `min-height: 0` and `overflow-y: auto`. Measured, not eyeballed.
+- **Before adding a route to the shell:** it was built around an iframe at `height: 100%`, so
+  nothing had ever needed to scroll and there was no `overflow-y` anywhere. A document-length page
+  escapes into *document* scroll, dragging the topbar off the top. `.content` now has
+  `min-height: 0` and `overflow-y: auto`. Measured, not eyeballed.
 - **`children` rather than props is what makes the shell possible.** `/admin` is an async server
-  component running live probes, so it can never be rendered *by* a client component — but it can be
-  passed *through* one.
+  component running live probes, so it can never be rendered *by* a client component — only through one.
+- **One switch per page is two halves that must stay together.** Framed, a tool hides its own
+  Light/Dark (`[data-embedded] .pd-modes`) and keeps its badge — safe only because the hub posts
+  `{type:"paddock-mode", mode}` into every frame and `ThemeControl` listens behind
+  `isPaddockOrigin()`. **A tool that drops `ThemeControl.tsx` silently ignores the hub's switch.**
 - **The glance gets counts and singles, never rows.** A hub handed thread arrays slowly becomes a
   worse copy of the tracker. `SOURCES` holds one entry today — a fact about the present, not a
   design limit.
+- **One Garage panel is not live, and it is the one that looks most authoritative.** Rules drift is
+  the repo as it stood when *this deployment* was built, so it goes stale after any merge until
+  `tp-home` redeploys. The panel says so on its face; keep that if it is ever rewritten.
+- **The drift JSON shape is the TD's, not this app's** — `{checks:[{name,state,detail}], counts}`.
+  `collect-drift.mjs` will not render a partial read: anything it cannot parse becomes
+  `complete: false` with the reason printed, never a panel quietly missing a row.
 
 ## In flight
 
-`claude/home-one-toggle-per-page` — the two halves above. **Three of my branches now edit this file**
-(also `claude/home-garage-drift-panel`, `claude/home-morning-paper-prototype`), so all but the first
-to merge pay a conflict here. No real disagreement: each describes its own work, keep all of it.
+`claude/home-one-toggle-per-page` — one switch per page, both halves. Pushed, **no PR yet**.
+`claude/home-paper-gutter` — the Paper ran flush into the sidebar; `.tabbed` now carries the 24px
+`.landing` used to supply. Pushed, **no PR yet**.
 
 ## Next
 
-1. **The hub's mobile login bug.** Both cheap explanations are ruled out from the code: `APPS`
-   hardcodes the custom domains, and the cookie attributes are sound. Needs a live repro with
-   devtools, **in Chrome** — the WebKit theory is ruled out and cost a round already.
-2. **`apps/home` still has no `test` script.** CI runs `npm run test --if-present`, so adding one
-   opts the app in with no CI change. `lib/glance.ts`, `lib/diagnostics.ts` and `lib/pitwall.ts` are
-   pure and untested; `isPaddockOrigin` now too. `editor` and `home` are the apps without tests.
-3. **A style pass, deferred by Joel** — a monospace stack, a type scale to replace ten ad-hoc pixel
-   values, and collapsing the three drifted copies of the micro-label rule (`.eyebrow`,
-   `.sidebar-label`, `.slot-label`). Pick it up when he returns to it.
-4. **`/api/version` is designed and undecided** — public, or behind the internal secret. Recommend
-   public: it exposes a commit hash and nothing else, and public is what lets an external monitor
-   notice an outage, since `/api/health` sits behind the password gate. Joel's call.
+1. **The hub's mobile login bug.** Both cheap explanations are ruled out from the code. Needs a
+   live repro with devtools, **in Chrome** — the WebKit theory is ruled out and cost a round.
+2. **The Feed is undefined and deliberately unbuilt.** It is in the settled tab order and nowhere
+   else. The open questions are with Joel; the sharpest is that a feed is rows and this app's rule
+   is counts and singles, never rows. **Do not invent one.**
+3. **`apps/home` still has no `test` script.** CI runs `npm run test --if-present`, so adding one
+   opts it in with no CI change. `glance.ts`, `diagnostics.ts`, `pitwall.ts` are pure and untested.
+4. **A style pass, deferred by Joel** — a monospace stack, a type scale to replace the ad-hoc pixel
+   values, and collapsing the drifted copies of the micro-label rule. Pick it up when he returns.
+5. **`/api/version` is designed and undecided** — public, or behind the internal secret. Recommend
+   public: it exposes a commit hash and nothing else, and that is what lets an external monitor
+   notice an outage. Joel's call.
 
-Waiting on Joel: the hairline contrast bar — stated in full in `.claude/OPEN-ITEMS.md`, not restated
-here. That file is printed into every session, so a second copy can only drift out of step with it.
+Still the TD's to record, both settled by Joel today and both still open in the ledger: **polarity**
+(one site-wide switch; density does not carry it) and **the lifted fold**, which amends a decision
+`DECISIONS.md` still states the old way. The hairline contrast bar is in `.claude/OPEN-ITEMS.md`.

@@ -765,3 +765,166 @@ a.slot:hover {
     margin-left: 36px;
   }
 }
+
+/* ------------------------------------------------------------ the Morning Paper
+   PROTOTYPE. Every colour here is an existing token — no new hue is introduced,
+   because the palette is one decision and this page is not the place to reopen
+   it.
+
+   The two densities are the same markup with a different class on the root, so
+   nothing below may depend on an element existing in one and not the other.
+   Dispatch sets the type and spacing; Timing only overrides what has to shrink.
+   -------------------------------------------------------------------------- */
+.tabbed { display: flex; flex-direction: column; gap: 14px; }
+
+.tabstrip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--ink-soft);
+  padding-bottom: 2px;
+}
+
+.tab {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid transparent;
+  border-bottom: none;
+}
+
+.tab:hover { color: var(--ink); }
+
+.tab.active {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--ink-soft);
+}
+
+/* Pushed to the far end, the way the theme control is in the topbar. */
+.tab-densities { margin-left: auto; display: flex; gap: 4px; }
+
+.tab-density {
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border: 1px solid var(--ink-soft);
+  border-radius: 999px;
+}
+
+.tab-density.active { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+
+.tab-empty { max-width: 60ch; }
+
+.paper { display: flex; flex-direction: column; gap: 18px; max-width: 80ch; }
+
+.paper-masthead { border-bottom: 2px solid var(--ink); padding-bottom: 10px; }
+.paper-masthead h1 { margin: 2px 0 0; font-size: 34px; line-height: 1.05; letter-spacing: -0.02em; }
+.paper-date { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+
+.paper-slot {
+  border: 1px dashed var(--ink-soft);
+  border-radius: 12px;
+  padding: 18px 20px;
+  background: var(--surface);
+}
+
+.paper-slot-label { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
+.paper-slot-body { margin: 0; font-size: 14px; line-height: 1.5; max-width: 62ch; }
+.paper-slot-ask { margin: 10px 0 0; font-size: 12px; font-weight: 600; color: var(--accent); }
+
+/* The fold is gone: Joel manages privacy himself rather than having the layout
+   do it, so what is owed leads and nothing is held back to a second screen.
+   `.paper-deferred` is what used to be the lead, now sitting after the day. */
+.paper-deferred { margin-top: 6px; }
+
+.paper-below { display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; }
+.paper-column { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+.paper-head {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 4px;
+}
+
+.paper-owed-list { display: flex; flex-direction: column; gap: 8px; }
+
+.paper-owed {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+.paper-owed:hover { border-color: var(--accent); }
+.paper-owed-label { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-soft); }
+.paper-owed-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.paper-owed-title { font-size: 14px; font-weight: 600; line-height: 1.3; }
+.paper-owed-detail { font-size: 11px; color: var(--ink-soft); line-height: 1.35; }
+
+.paper-figure { display: flex; flex-direction: column; gap: 1px; padding: 8px 0; border-top: 1px solid var(--line); }
+.paper-figure-count { font-size: 26px; font-weight: 700; line-height: 1; }
+.paper-figure-name { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
+.paper-figure-top { font-size: 12px; color: var(--ink-soft); line-height: 1.35; }
+
+.paper-note { margin: 0; font-size: 12px; color: var(--ink-soft); line-height: 1.5; max-width: 60ch; }
+
+.paper-source { margin: 0; display: flex; flex-direction: column; gap: 1px; padding: 6px 0; }
+.paper-source-name { font-size: 12px; font-weight: 600; }
+.paper-source-when { font-size: 11px; color: var(--ink-soft); }
+
+/* Loud, per the decision: struck through rather than quietly timestamped. */
+.paper-stale .paper-source-name { text-decoration: line-through; }
+.paper-stale .paper-source-when { color: var(--sev-urgent); font-weight: 600; }
+.paper-degraded .paper-source-when { color: var(--sev-warn); }
+
+.paper-banner {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--sev-urgent);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* --- Timing: the same tree, tightened. Nothing appears or disappears. ------ */
+.paper-timing { gap: 10px; max-width: none; }
+.paper-timing .paper-masthead { padding-bottom: 6px; }
+.paper-timing .paper-masthead h1 { font-size: 22px; }
+.paper-timing .paper-slot { padding: 12px 14px; }
+.paper-timing .paper-slot-body { font-size: 13px; }
+.paper-timing .paper-below { grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+.paper-timing .paper-owed { padding: 6px 10px; border-radius: 8px; }
+.paper-timing .paper-owed-title { font-size: 12.5px; }
+.paper-timing .paper-owed-list { gap: 5px; }
+.paper-timing .paper-figure { padding: 5px 0; }
+.paper-timing .paper-figure-count { font-size: 19px; }
+.paper-timing .paper-deferred { margin-top: 2px; }
+
+@media (max-width: 760px) {
+  .paper-below, .paper-timing .paper-below { grid-template-columns: 1fr; gap: 18px; }
+  .paper-masthead h1 { font-size: 26px; }
+  .tabstrip { flex-wrap: wrap; }
+  .tab-densities { margin-left: 0; }
+}

@@ -34,6 +34,15 @@ export type ToolSummary = {
   degraded: string[];
 };
 
+/**
+ * When a source last spoke for itself, so the page can say how old its answer
+ * is rather than presenting a cached number as if it were current.
+ *
+ * `generatedAt` is null when the tool answered without stamping one, which is
+ * different from not answering at all — that case is `unavailable` below.
+ */
+export type SourceFreshness = { tool: string; generatedAt: string | null };
+
 export type Glance = {
   commitments: SummaryItem[];
   commitmentOverflow: number;
@@ -45,7 +54,29 @@ export type Glance = {
   unavailable: string[];
   /** Partial-data warnings the tools reported about themselves. */
   degraded: string[];
+  /** One entry per source that answered, for the staleness rule. */
+  sources: SourceFreshness[];
 };
+
+/**
+ * How often a source is expected to speak. Past three times this it is treated
+ * as stale and says so loudly, which is the settled rule.
+ *
+ * One value for every source today because no tool declares its own cadence.
+ * When one does, this moves next to that source rather than growing a table
+ * here — the hub is not supposed to know a tool's habits.
+ */
+export const SOURCE_CADENCE_MS = 15 * 60 * 1000;
+
+export const STALE_AFTER = 3;
+
+/** Older than three cadences, or answered without saying when. */
+export function isStale(source: SourceFreshness, now = Date.now()): boolean {
+  if (!source.generatedAt) return true;
+  const at = Date.parse(source.generatedAt);
+  if (Number.isNaN(at)) return true;
+  return now - at > STALE_AFTER * SOURCE_CADENCE_MS;
+}
 
 const SEVERITY_RANK: Record<Severity, number> = { urgent: 3, warn: 2, info: 1 };
 
@@ -69,6 +100,7 @@ export const EMPTY_GLANCE: Glance = {
   health: [],
   unavailable: [],
   degraded: [],
+  sources: [],
 };
 
 async function fetchSummary(url: string): Promise<ToolSummary | null> {
@@ -100,7 +132,15 @@ export async function loadGlance(): Promise<Glance> {
     SOURCES.map(async (source) => ({ source, summary: await fetchSummary(source.url) }))
   );
 
-  const glance: Glance = { ...EMPTY_GLANCE, commitments: [], rhythm: [], health: [], unavailable: [], degraded: [] };
+  const glance: Glance = {
+    ...EMPTY_GLANCE,
+    commitments: [],
+    rhythm: [],
+    health: [],
+    unavailable: [],
+    degraded: [],
+    sources: [],
+  };
 
   for (const { source, summary } of results) {
     if (!summary) {
@@ -108,6 +148,7 @@ export async function loadGlance(): Promise<Glance> {
       continue;
     }
 
+    glance.sources.push({ tool: source.tool, generatedAt: summary.generatedAt ?? null });
     glance.commitments.push(...summary.commitments.items);
     glance.commitmentOverflow += summary.commitments.overflow;
 
