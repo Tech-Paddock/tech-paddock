@@ -6,7 +6,7 @@ than hidden.
 
 Agents: read this, do not edit it. If you need something on this list, say so in your own worklog.
 
-**Last reviewed: 2026-09-16 00:05 UTC.**
+**Last reviewed: 2026-09-16 00:20 UTC.**
 
 Detail lives in the agent handoffs — `.claude/agents/<agent>/HANDOFF.md`. This file is the index
 and the things that belong to nobody else.
@@ -36,7 +36,20 @@ the reasoning underneath. The generator takes the first bold run as the row titl
    change does not reach a running deployment. Until both are set the Pit Wall runs on repo rows and
    names the two missing sources under "not reported", which is the designed degraded state rather
    than a failure.
-3. **Decide who moves colours out of `tailwind.config.ts`.** Joel narrowed theme ownership to
+3. **Re-upload the active resume template.** #67 teaches the extractor to read colour out of a
+   `.docx`, but `/api/reformat` renders from the spec stored on the template row rather than from the
+   stored file, so the colours cannot appear until a fresh upload re-extracts them. **Skipping it
+   breaks nothing** — `normalizeSpec` fills the missing fields and existing templates render exactly
+   as they do today; the change is simply invisible. This is the third re-upload in a week and you
+   have approved the fix that ends them, which is now the Resume Formatter's next change.
+4. **Nine orphaned worklogs to clear.** Each agent clears its own on its next session, unless you say
+   sweep them. Every branch is merged and deleted except this one, so every worklog names a branch
+   that no longer exists. The TD's
+   own six are gone. The other nine are Coffee's seven, TechPad Gen's and the Resume Formatter's, and
+   the README says to move anything durable into that agent's `HANDOFF.md` *before* deleting — which
+   the TD cannot assert on someone else's behalf. **Nothing is broken meanwhile**; the cost is noise
+   in `read-all.sh`. Left as a decision rather than done quietly.
+5. **Decide who moves colours out of `tailwind.config.ts`.** Joel narrowed theme ownership to
    colours and aesthetic decisions, **not config** — and that line cannot be drawn today, because the
    four tools' colours live inside `tailwind.config.ts`. Making it real means moving the values to
    CSS custom properties with Tailwind referencing `var(--token)`, after which colour values are
@@ -75,6 +88,21 @@ work. Something here moves only when Joel says so.
   request's own state, and this ledger.
 
 ## Done since this ledger was last written
+
+- **2026-09-15 — #67 merged: the reformatter reproduces the template's own colours.** The Resume
+  Formatter's work; the gate only checked it. Confirmed it does not touch the theme rule that landed
+  an hour earlier despite the branch name — no `globals.css`, no `tailwind.config.ts`, no
+  `layout.tsx`, no new hex; every colour comes out of the user's `.docx` at extraction time.
+  `tp-resume` rebuilt to production on `76971bf` and is READY. **The re-upload it needs is item 3
+  above.**
+  **Worth keeping from the gate:** they brought `main` in and updated their handoff while the TD was
+  preparing to do it for them, so the local merge was discarded rather than force-pushed over live
+  work. Force-pushing in that situation is what caused the resurrected-branch incident earlier the
+  same night.
+  **Also recorded here because only the TD heard it:** Joel approved the re-extract fix — resolving
+  the spec from the stored `.docx` at render time instead of the `spec` column. It is written into
+  `.claude/agents/resume/HANDOFF.md` as that area's next step, not started by the TD, because
+  `apps/resume` is theirs and the `apps/home` override was a single bypass.
 
 - **2026-09-15 — Five merged in one ordered run: #62 to #66.** TechPad Gen's livery record first,
   because it was finished and *Require branches to be up to date* means whichever merges second pays

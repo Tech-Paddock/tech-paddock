@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-15, 00:05 UTC.
+State as of 2026-09-16, 00:20 UTC.
 
 Read `RULES.md` first for the role. This is the workload.
 
@@ -28,27 +28,53 @@ GitHub.** And the general form of the mistake — read the thing itself, not the
 it. Every correction tonight came from a build log, a route, or an API response contradicting a
 document that sounded authoritative.
 
-## One pull request open, not yet gated
+## Nothing is open. One branch is pushed and waiting for Joel to ask
 
-**#56 — template archive, delete and download, plus three renderer bugs, from Resume.** Opened
-2026-09-14 22:33, green on all five matrix jobs and on `requested-by-joel`, request line present,
-one app plus one migration. **Joel has not asked for it to be merged, so it has not been gated.**
+**No pull request is open.** #56 and #57 merged on 09-14/15, and #62 to #67 merged in one ordered run
+late on 09-15. `main` is at `76971bf` and every Vercel project has rebuilt from it.
 
-**It carries a migration and the order is not optional.** `20260914221259_resume_template_archive.sql`
-adds `archived_at` to `resume.templates`. Every templates query selects that column, so if the code
-deploys before the migration runs, `GET /api/templates` returns 500 and takes out both the Templates
-tab and the active-template lookup Reformat depends on. Apply the migration first. The pull request
-body says this itself, which is what the Deployment rule was written to produce.
+**`claude/brief-ledger-current` is pushed with no pull request, and that is correct.** It carries this
+ledger's current state and nothing else. The rule is that a finished branch is the deliverable and
+Joel decides when a pull request exists, so it waits. CI runs on every branch push, so it is built and
+tested while it waits, and a branch affects no deployed app.
+**One consequence is visible rather than merely filed:** the Pit Wall renders the ledger's *Waiting on
+Joel* section from `main` at build time, so until this branch merges the homepage shows the older
+list. That is the cost of the rule, not a bug, and it is worth saying out loud to Joel when he next
+asks what is outstanding.
 
-It also asks for a charter amendment: `resume.templates` stops being append-only. Joel approved the
-behaviour on 2026-09-14; the charter edit is in the pull request and nobody has ratified it. That is
-a gate decision when the gate happens.
+**The ordering lesson from that run is the part to keep.** Five branches, none touching the same file,
+and the only real constraint was that the theme-ownership rule merged **last** — landing a rule change
+before the finished work written under the old rule fails that work against a rule that did not exist
+when it was written. TechPad Gen's branch merged **first** for the mirror-image reason: *Require
+branches to be up to date* means whichever merges second pays the re-take, and the cost belongs on the
+branches still in hand, which were all mine.
 
-**#43 closed out.** The hub re-theme merged on 2026-09-12 after TechPad Gen brought the branch
-current; #54 then deleted the worklog it orphaned. The three failures recorded here — the handoff
-conflict, CI absent rather than red because GitHub cannot build a conflicted merge ref, and a body
-restating production's commit from a stale branch — are kept in the ledger as the case that proved
-the handoff rule, not as live work.
+**#56 and #43 are closed out.** The template archive merged with its migration applied at the gate
+first, and the charter amendment it asked for was ratified in #63. The hub re-theme's three failures —
+the handoff conflict, CI absent rather than red because GitHub cannot build a conflicted merge ref,
+and a body restating production's commit from a stale branch — are kept in the ledger as the case that
+proved the handoff rule, not as live work.
+
+## Nine orphaned worklogs are left, and they are not the TD's to clear
+
+Every branch in the repo is merged and deleted except `claude/brief-ledger-current`, so every file in
+`.claude/worklogs/` names a branch that no longer exists. The README is explicit that a worklog dies
+with its branch, and that the point is keeping `read-all.sh` a signal about what is claimed *right
+now* rather than a pile of history.
+
+**The technical director's own six were deleted on 09-15** — `kickoff-pxdz0f`,
+`doc-brief-migration-conventions`, `tracker-scrub-real-names`, `home-pit-wall`, `home-pit-wall-spec`
+and `brief-techpad-gen-owns-themes`. Everything durable in them is in this file or in `CLAUDE.md`, and
+git keeps the text regardless.
+
+**The remaining nine were deliberately left.** Seven are Coffee's, one is TechPad Gen's
+(`home-theme-ownership`) and one is the Resume Formatter's (`resume-template-colour-fidelity`). The
+README says to move anything durable into that agent's `HANDOFF.md` *before* deleting, and the TD
+cannot assert on another agent's behalf that it happened — a handoff the TD writes is a second-hand
+reading of someone else's work, which is exactly what handoffs exist to replace. **So the right move
+is each agent clearing its own on its next session**, and the ledger carries it rather than a bulk
+delete doing it quietly. Nothing is broken meanwhile: the Pit Wall declares `worklog` as a source type
+but does not read these files yet, so the only cost is noise in `read-all.sh`.
 
 ## A merged branch can come back, and it comes back carrying everything
 
@@ -159,17 +185,26 @@ Live infrastructure and one-time credentials. None of it is yours.
    the dashboard, so parity cannot be confirmed by inspection, and a dashboard change does not reach
    a running deployment until it rebuilds. Setting one fresh known value on all five and then
    redeploying is the only way to establish it.
-3. **Set `CRON_SECRET` first, then `MS_GRAPH_*`** on `tp-tracker` — the order is not cosmetic. The
+2. **Set `CRON_SECRET` first, then `MS_GRAPH_*`** on `tp-tracker` — the order is not cosmetic. The
    middleware exempts `/api/cron/*` from the password gate and the route's guard fails open when
    `CRON_SECRET` is unset, so setting the Graph credentials alone publishes an unauthenticated
    endpoint that creates To Do items on demand. Harmless today only because Graph is unconfigured.
-4. **Add `build (coffee)` to branch protection's required checks.** The matrix is five jobs; the
+3. **Add `build (coffee)` to branch protection's required checks.** The matrix is five jobs; the
    rule names four.
-5. **Run `supabase link` and `migration list` once, locally.** Expect eight local matching remote
+4. **Run `supabase link` and `migration list` once, locally.** Expect eight local matching remote
    with `20260908235234` remote-only. That gap is deliberate. Do not repair it.
 
 ## Decisions made today
 
+- **The re-extract fix is approved, and it is the Resume Formatter's to build.** Joel said yes on
+  2026-09-15. Resolving a template's spec by re-extracting from the stored `.docx` at render time,
+  instead of reading the `spec` column, ends the re-upload-after-every-spec-change step for good;
+  `renders.template_snapshot` already preserves reproducibility. **Recorded in
+  `.claude/agents/resume/HANDOFF.md` as their next step and deliberately not started here** —
+  `apps/resume` is theirs, and the `apps/home` override Joel gave for the Pit Wall was a single
+  bypass, not a precedent. The handoff previously said the fix was "not built: he did not ask", which
+  became wrong the moment he asked; correcting a sentence only the TD could have heard is the TD's
+  job, because the repo is the only channel between agents.
 - **Google Tasks → Microsoft To Do: approved.** One Azure registration serves both calendar and
   tasks; Google would have meant a second OAuth setup for no extra capability.
 - **The `tp-` prefix on Vercel project names stays.** A proposal to rename live projects to bare

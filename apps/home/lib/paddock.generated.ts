@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-15T23:53:54.617Z",
+  bakedAt: "2026-09-16T00:07:45.423Z",
   waiting: [
   {
     "title": "Send the GitHub Support request",
@@ -16,6 +16,18 @@ export const PADDOCK = {
   {
     "title": "Two tokens on `tp-home`, then redeploy",
     "detail": "GITHUB_TOKEN fine-grained, this repo, read-only: Contents, Metadata, Pull requests, Actions. VERCEL_TOKEN read-only, tech-paddock team. The redeploy is not optional — Vercel bakes the environment in at build time, so a dashboard change does",
+    "ref": "—",
+    "state": "box"
+  },
+  {
+    "title": "Re-upload the active resume template",
+    "detail": "#67 teaches the extractor to read colour out of a .docx, but /api/reformat renders from the spec stored on the template row rather than from the stored file, so the colours cannot appear until a fresh upload re-extracts them. Skipping it br",
+    "ref": "—",
+    "state": "box"
+  },
+  {
+    "title": "Nine orphaned worklogs to clear",
+    "detail": "Each agent clears its own on its next session, unless you say sweep them. Every branch is merged and deleted except this one, so every worklog names a branch that no longer exists. The TD's own six are gone. The other nine are Coffee's seve",
     "ref": "—",
     "state": "box"
   },
@@ -59,12 +71,12 @@ export const PADDOCK = {
   {
     "id": "resume",
     "name": "Resume Formatter",
-    "asOf": "2026-09-14"
+    "asOf": "2026-09-16"
   },
   {
     "id": "td",
     "name": "Technical Director",
-    "asOf": "2026-09-15, 00:05 UTC"
+    "asOf": "2026-09-16, 00:20 UTC"
   },
   {
     "id": "techpad-gen",
