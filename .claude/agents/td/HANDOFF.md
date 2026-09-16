@@ -8,12 +8,15 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**`claude/brief-communication-layer`** — this change. It defines the communication layer in
-`CLAUDE.md`, splits state from decisions, retires worklogs and `read-all.sh`, collapses the seven
-kickoffs into one, deletes the five app READMEs, and adds a CI budget check so the files cannot
-grow back. Approved by Joel on 2026-09-16 after a full sweep of all 38 documents.
+**`claude/brief-agent-standup-protocol`** — the rails for standing up a new agent. Adds
+`.claude/agents/STANDUP.md`, the protocol to open and execute when Joel wants a new one, and points
+this charter at it. Also rewrites the `drift` middleware check so it is roster-independent:
+**it used to fail a correct sixth app**, because the base group was hardcoded as
+`coffee+home+resume`. It now asserts a base copy plus editor's and tracker's scoped bypasses, and
+was exercised against four roster shapes rather than reasoned about.
+**Deployment: nothing — no app code changed.**
 
-Nothing else is open. `origin` carries only `main`.
+Nothing else of mine is open.
 
 ## What is true now
 
@@ -23,6 +26,11 @@ jobs and `requested-by-joel`. **`Require branches to be up to date before mergin
 what gives the merge-order rule teeth: after any merge every other open pull request is behind and
 must take `main` again. So the order you pick decides who pays. `Block force pushes` and
 `Restrict deletions` are also on.
+
+**A new app needs no CI change.** The matrix derives the roster from `apps/` and one fixed-name
+`gate` sits in front of it, so branch protection needs a single check that never changes shape.
+**The required-check list has not been switched over yet** — that is Joel's, in the repository
+settings, and until it happens a deprecated app still leaves a required check that can never report.
 
 **No agent can read rulesets**, so *which* checks are required is unverifiable from a session. The
 list above came from Joel.
