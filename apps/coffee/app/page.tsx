@@ -694,6 +694,26 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
 
       {open && (
         <div className="border-t border-line p-4 flex flex-col gap-4">
+          {/* Where the coffee came from, first rather than last. This was a
+              12px "Bag page" under the guide table and read as a footnote,
+              which is the wrong weight for the one link you actually follow —
+              to buy the same bag again. */}
+          {(bag.product_url || bag.guide_url) && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {bag.product_url && (
+                <a href={bag.product_url} target="_blank" rel="noreferrer" className="text-sm text-accent underline">
+                  The beans ↗
+                </a>
+              )}
+              {/* At tier 1 these are the same page, so one link, not two. */}
+              {bag.guide_url && bag.guide_url !== bag.product_url && (
+                <a href={bag.guide_url} target="_blank" rel="noreferrer" className="text-sm text-accent underline">
+                  The brew guide ↗
+                </a>
+              )}
+            </div>
+          )}
+
           <div>
             <p className="text-sm font-semibold mb-1">{GUIDE_LABELS[bag.guide_status]}</p>
             {bag.guide_status === "coffee_specific" && (
@@ -710,16 +730,6 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
               </dl>
             ) : (
               <p className="text-sm text-ink/60">Nothing recorded from the roaster.</p>
-            )}
-            {bag.product_url && (
-              <a href={bag.product_url} target="_blank" rel="noreferrer" className="text-xs text-accent underline break-all block mt-2">
-                Bag page
-              </a>
-            )}
-            {bag.guide_url && bag.guide_url !== bag.product_url && (
-              <a href={bag.guide_url} target="_blank" rel="noreferrer" className="text-xs text-accent underline break-all block">
-                Brew guide
-              </a>
             )}
           </div>
 
@@ -935,7 +945,7 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
           </div>
 
           <label className="text-sm text-ink/70 flex flex-col gap-1">
-            Rating
+            Rating <span className="text-ink-soft">(optional)</span>
             <Stars value={rating} onChange={setRating} />
           </label>
 
