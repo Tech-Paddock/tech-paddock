@@ -775,7 +775,25 @@ a.slot:hover {
    nothing below may depend on an element existing in one and not the other.
    Dispatch sets the type and spacing; Timing only overrides what has to shrink.
    -------------------------------------------------------------------------- */
-.tabbed { display: flex; flex-direction: column; gap: 14px; }
+/* The gutter lives here, and it did not used to need to.
+   `.content` carries no padding of its own — it was built around an iframe that
+   fills it edge to edge, and the only other thing that ever lived here was
+   `.landing`, which brought its own 24px. Putting tabs above that broke the
+   assumption: `.tabbed` had none, so the Paper ran flush into the sidebar's
+   border with no gap at all.
+   24px rather than the topbar's 16px because it matches `.landing`, which keeps
+   the Board pixel-identical to what it was before the tabs arrived. `.landing`
+   drops its own below, so nothing pays the gutter twice. */
+.tabbed {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+  padding: 24px;
+}
+
+.tabbed .landing { padding: 0; }
 
 .tabstrip {
   display: flex;
