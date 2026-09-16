@@ -8,12 +8,26 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**`claude/brief-communication-layer`** — this change. It defines the communication layer in
-`CLAUDE.md`, splits state from decisions, retires worklogs and `read-all.sh`, collapses the seven
-kickoffs into one, deletes the five app READMEs, and adds a CI budget check so the files cannot
-grow back. Approved by Joel on 2026-09-16 after a full sweep of all 38 documents.
+Two branches of mine, both finished, both behind #79 / #80 / #81 in the queue at Joel's direction.
 
-Nothing else is open. `origin` carries only `main`.
+**`claude/brief-agent-standup-protocol`** — the rails for standing up a new agent. Adds
+`.claude/agents/STANDUP.md`, the protocol to open and execute when Joel wants one, and points this
+charter at it. Also rewrites the `drift` middleware check so it is roster-independent:
+**it used to fail a correct sixth app**, because the base group was hardcoded as
+`coffee+home+resume`. It now asserts a base copy plus editor's and tracker's scoped bypasses, and
+was exercised against four roster shapes rather than reasoned about.
+
+**`claude/brief-three-part-footer`** — the sign-off every agent ends a message with is now three
+sections: Work Brief, DevOps, Open Items. DevOps is the promotion pipeline in four stages named in
+Joel's words — in progress, needs a PR, ready to merge, stuck — because committed-versus-uncommitted
+is how an agent saves work, not a stage of getting something live.
+**The scoping is the part to preserve:** you report every pushed branch and every ledger row; every
+other agent reports only its own. **You cannot see another agent's in-progress work** — it never
+reaches the repo until it is pushed — so it appears only in its author's section. Approved by Joel
+on 2026-09-16 and dialled in over three rounds of his feedback.
+
+**Deployment, both: nothing — no app code changed.** They touch the same `td/HANDOFF.md`, so
+whichever merges second pays a conflict. That is yours, not the author's.
 
 ## What is true now
 
