@@ -65,7 +65,7 @@ function entries(block) {
   return out;
 }
 
-const ledger = read(join(claude, "worklogs", "_open-items.md"));
+const ledger = read(join(claude, "OPEN-ITEMS.md"));
 const waiting = entries(section(ledger, "Waiting on Joel")).map((e) => ({ ...e, state: "box" }));
 const parked = entries(section(ledger, "Parked")).map((e) => ({ ...e, state: "clear" }));
 

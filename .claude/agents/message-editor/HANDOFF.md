@@ -1,89 +1,61 @@
 # Message Editor — handoff
 
-State as of 2026-09-11, end of day.
+State as of 2026-09-16.
 
 Read `RULES.md` first. This file is only what is true right now.
 
 ---
 
-## Your last branch landed
+## What is true now
 
-**#27 merged**, squashed to `fdbc4bf`. Five CI jobs green on the exact head. It carried:
+**`editor.techpaddock.io` is live and serving current `main`.** Everything this agent has built is
+merged; nothing is in flight and no branch of yours exists.
 
-- `shared.contacts.position` wired into contact creation and the drafting context
-- Tone changed from free text to a picklist
-- A new Context input, passed to the model
-- A growing input box
-- Your worklog, opened at `.claude/worklogs/claude-message-editor-agent-wetwv6.md`
+**Your tool's specification lives in your own `RULES.md`**, not in `CLAUDE.md`. That matters: you may
+**propose** a change to it in a pull request. Under the old layout the spec sat in a file you were
+forbidden to touch, so an agent finding its spec outdated had no move except to build the
+contradiction and flag it afterwards. That dead end is gone.
 
-That branch is now merged and **must not be reused**. Delete it and start every subsequent change
-on a fresh branch named for the change.
+**Three decisions are settled and recorded in your charter** — tone is a picklist, there is no Effort
+toggle and there will not be one, and Context is a supported input. The original brief said otherwise
+on all three. Do not "correct" them back.
 
-**Two rules you were breaking are now fixed, by you.** You had edited `CLAUDE.md` and kept no
-worklog. Both landed as rules after your session started, and you rebased, restored `CLAUDE.md`
-byte for byte, opened a worklog, and raised the brief changes for approval instead of making them
-quietly. That is exactly the right handling and it is worth repeating next time the rules move
-under you.
+**The cross-app contract you host:** the Pipeline Tracker calls your `/api/draft` server to server
+with an `INTERNAL_API_SECRET` header, and your `middleware.ts` lets that through for `/api/draft`
+only, matched as an exact path. **That scoping is load-bearing and is not yours to widen.** If
+another agent needs a second route exempted, that is their pull request to argue and the TD's to
+approve.
 
----
+## Traps specific to this app
 
-## The three brief changes you raised: all ratified
+- **Training is batched and never per-message.** Folding one message into the style guide via a model
+  call every time you hit send would drift the rules on a sample size of one. If you find yourself
+  reaching for "call the model to regenerate the whole artifact" on a write path, you have taken a
+  wrong turn.
+- **The draft renders as an editable textarea, not read-only.** It exists to be edited to match what
+  was actually sent before logging — the corpus this tool learns from is only as good as the edits it
+  captures. That principle generalises: anywhere you are tempted to make output read-only, don't.
+- **`style_guide` inserts a new version and never overwrites**, so past guides stay recoverable.
+- **Do not swap the pinned model on your own initiative.** A new model can carry API-shape changes
+  worth reading first — exactly what happened when `effort` moved under `output_config`.
+- **This is the tool most likely to have real contact data pass through it.** Every fixture is a
+  place a real name could hide. Keep them synthetic.
 
-Joel approved all three on 2026-09-11. They are settled and now live in `RULES.md` as the
-specification rather than as open questions: tone is a picklist, there is no Effort toggle and there
-will not be one, and Context is a supported input.
+## In flight
 
-You were right to raise them rather than make them. **The handling afterwards was wrong, and that
-is worth knowing** because it changed the rules you work under: the TD merged #27 first and asked
-for ratification second. Code already written applies pressure to approve it, so the brief ends up
-following the code. Joel's correction was that the pull request should have been held and sent back
-to you with the question put to him.
+Nothing.
 
-Two rules came out of that, both now in `CLAUDE.md`:
+## Next
 
-- **Ask before you build**, when what you are about to build contradicts the brief or your charter.
-  Raising it in the pull request is the backstop for something you only discover late, not the
-  normal path.
-- **Answer the second-order questions** before a change is agreed — what does it contradict, who
-  depends on it, what becomes true afterwards, what does it make harder to change, who decides.
-
-The structural fix is in your favour: your tool's specification now lives in `RULES.md`, in your own
-folder, which you may **propose** changes to in a pull request. Under the old layout the spec sat in
-`CLAUDE.md`, which you were forbidden to touch — so an agent finding its spec outdated had no move
-except to build the contradiction and flag it afterwards. That dead end is gone.
-
----
-
-## The oldest unexplained thing here
-
-**`editor.model_status` has zero rows.** The login-time model drift check has never once
-successfully written. Either nobody has logged in since it shipped, or it is failing silently.
-
-Nobody has diagnosed it. **This is your highest-value next task** — a check that has never fired is
-not a check, and it is the only safety net against the pinned model quietly going stale.
-
-Start by confirming whether `/api/login` reaches `lib/modelCheck.ts` at all, then whether the write
-fails on permissions, shape, or an unhandled rejection that is being swallowed.
-
----
-
-## Your app is deployed and current again
-
-**Fixed 2026-09-12.** `editor.techpaddock.io` serves `0c7d882`. The outage that pinned every app to
-`92c1ec1` for six and a half hours is over, and your merged work went out with it.
-
-You can verify against the live site again. Note the agent roster changed while this was stale:
-Vercel and Supabase are now one **Platform Config** agent, and the diagnosis lives in
-`.claude/agents/platform/HANDOFF.md`. If deployments ever appear to stop, check the Vercel project's
-`link.org` before anything else.
-
----
-
-## Next steps
-
-1. Delete `claude/message-editor-agent-wetwv6`. It is merged.
-2. Diagnose `model_status`. See above.
-3. Consider adding a `test` script to `apps/editor`. CI runs `npm run test --if-present` before
-   every build, so adding one opts the app in with no CI change. `resume`, `tracker` and `coffee`
-   have tests; `editor` and `home` do not.
+1. **Diagnose `editor.model_status`.** It has **zero rows** — the login-time model drift check has
+   never once successfully written, and it is the oldest unexplained thing in the project. A check
+   that has never fired is not a check, and it is the only safety net against the pinned model
+   quietly going stale. **This is your highest-value task.** Start by confirming whether
+   `/api/login` reaches `lib/modelCheck.ts` at all, then whether the write fails on permissions,
+   shape, or an unhandled rejection being swallowed. If it turns out to be grants or RLS, it becomes
+   Platform's.
+2. **Add a `test` script.** CI runs `npm run test --if-present`, so adding one opts this app in with
+   no CI change. `editor` and `home` are the two apps without tests.
+3. **No writing samples have been loaded yet**, so Train mode has never folded a real batch and the
+   style guide is still the seed rules.
 4. Nothing else is queued. Ask before starting anything larger than a fix.

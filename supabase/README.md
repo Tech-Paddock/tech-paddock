@@ -13,7 +13,7 @@ Six of the first seven migrations were applied directly to the project and only 
 afterwards, on 2026-09-11. Their contents are copied verbatim out of
 `supabase_migrations.schema_migrations`, so the files match what actually ran, not what someone
 remembers running. File timestamps are therefore much later than the migration versions — that is
-expected. Everything from `20260911203000` onward was written first and applied second, which is
+expected. Everything from `20260911202805` onward was written first and applied second, which is
 the order this directory exists to enforce.
 
 | Version | What it does |
@@ -139,14 +139,14 @@ that did not exist when it ran, so **every new schema arrives with no USAGE for 
 every query against it fails on permissions — not on anything visible in the application code.
 
 This already bit once: `coffee` was created with a correct, RLS-enabled migration and was still
-unreachable until `20260911203100` granted it. Note also that `ALTER DEFAULT PRIVILEGES` only
+unreachable until `20260911202901` granted it. Note also that `ALTER DEFAULT PRIVILEGES` only
 affects tables created *after* it runs, so a schema's existing tables need `GRANT ALL ON ALL TABLES`
 as well.
 
 **Adding a schema means two migrations and one dashboard setting — three steps, not two.**
 
 1. The schema and its tables.
-2. Its grants. Copy `20260911203100_grant_coffee_schema_usage.sql` and change the schema name.
+2. Its grants. Copy `20260911202901_grant_coffee_schema_usage.sql` and change the schema name.
 3. **Add it to the hosted project's exposed schemas, in the Supabase dashboard**: Project Settings →
    API → Exposed schemas. PostgREST only answers for schemas on that list, and it is not in this
    repo. Adding the schema to `[api] schemas` in `config.toml` is *also* worth doing, but it

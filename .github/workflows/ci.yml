@@ -102,3 +102,28 @@ jobs:
           APP_PASSWORD_HASH: dummy
           EDITOR_BASE_URL: https://editor.techpaddock.io
           INTERNAL_API_SECRET: dummy
+
+  # The mechanical half of the weekly rules-drift audit, run on every push.
+  #
+  # Every one of these files grew monotonically for five days: the ledger from
+  # 76 lines to 588, of which 401 were an archive of finished work that every
+  # agent read at the start of every session. "Overwrite it" was already the
+  # written rule and it failed, because nothing bounded it. This is the bound —
+  # and it now also measures the facts CLAUDE.md asserts, rather than trusting
+  # the document that asserts them.
+  #
+  # The ceilings are deliberately generous. You cannot hit one writing a real
+  # handoff, only by letting a file become a log again. A check that fires on
+  # good work teaches agents to route around checks, which costs more than it
+  # catches.
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The handoff-staleness check compares each file's stated date against
+          # the newest commit in that agent's area, so it needs real history.
+          fetch-depth: 0
+
+      - name: Rules match the repo they describe
+        run: node scripts/drift-check.mjs

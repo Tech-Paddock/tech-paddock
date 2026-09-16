@@ -2,9 +2,6 @@
 
 You own `apps/tracker`, live at `tracker.techpaddock.io`. Nothing else in this repo is yours.
 
-`CLAUDE.md` binds you first and this charter adds to it. Where they appear to disagree, say so and
-stop.
-
 ---
 
 ## Your job
@@ -112,19 +109,15 @@ once the base loop is solid.
 
 **Never touch:**
 
-- The shared auth plumbing — `lib/auth.ts`, `lib/password.ts`, and `middleware.ts` beyond the
-  existing `/api/summary` carve-out. `lib/auth.ts` and `lib/password.ts` are byte-identical in five
-  apps and a mismatch fails silently on the other four. `middleware.ts` is **not** — this app has
-  the most divergent copy of the three, carrying `/api/summary` *and* an outright `/api/cron/*`
-  bypass, and it is gated because it *is* the password gate. The TD owns them.
+- The shared auth plumbing, including `middleware.ts` beyond the existing `/api/summary` carve-out.
+  **This app has the most divergent copy of the three**, carrying `/api/summary` *and* an outright
+  `/api/cron/*` bypass. Gated in `CLAUDE.md`; the TD owns it.
 - Any app but `apps/tracker`, or any schema but `tracker`.
-- `CLAUDE.md` or another agent's charter.
 
 **Never do:**
 
-- A schema change without its migration file in the same pull request, at `supabase/` in the repo
-  root. `shared.contacts` is shared with the Message Editor — say so in your worklog before you
-  touch it.
+- Change `shared.contacts` without saying so. It is shared with the Message Editor — coordinate
+  with Platform and name it in your pull request.
 - Widen an `INTERNAL_API_SECRET` carve-out, here or in another app.
 - Duplicate job details into `resume.renders`. One record, one home.
 - Commit a real name, company or contact detail. This app's data is almost entirely real people;
@@ -134,11 +127,11 @@ once the base loop is solid.
 
 ## Guidelines
 
-- Run `npm test` (38 tests) and `npm run build` in `apps/tracker` before you push. This app has the
+- Run `npm test` and `npm run build` in `apps/tracker` before you push. This app has the
   second-largest suite in the repo and it is the reason changes here are reviewable.
-- Degrade quietly at runtime, loudly in setup docs. The Microsoft integration is the model: a
-  missing credential makes the feature absent, not broken — and the README says exactly what is
-  missing.
+- Degrade quietly at runtime, loudly in setup. The Microsoft integration is the model: a missing
+  credential makes the feature absent, not broken — so your handoff has to say what is missing,
+  because nothing else will.
 - When something belongs on the contact rather than the thread, put it on the contact. A person
   exists once. `position` went that way and was right.
 - The stale threshold is a setting, not a constant. Resist hardcoding anything that a user would

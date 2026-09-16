@@ -10,9 +10,20 @@
 - [ ] `npm run build` passes in every touched app
 - [ ] CI is green (all five matrix jobs), and any new app under `apps/` was added to the matrix in `.github/workflows/ci.yml`
 - [ ] No personal information anywhere in the diff — names, addresses, phone numbers, emails, employers, schools, resume content. For any `.docx`, that includes hyperlink targets in `.rels` parts and the author fields in `docProps/`, not just `document.xml`.
-- [ ] Worklog updated at `.claude/worklogs/<branch>.md`
+- [ ] `HANDOFF.md` updated for every area this touches, and it describes what this change leaves behind
 - [ ] Second-order questions answered before this was built, not after — see `CLAUDE.md`
-- [ ] Any schema change has its migration file in this PR
+- [ ] Any schema change has its migration file in this PR, and its shape is stated below
+
+## Deployment
+<!--
+Four things, every time. "Nothing — it deploys itself on merge" is a valid answer and must be
+written; a blank section is indistinguishable from a forgotten one.
+
+- What happens by itself when this merges?
+- What does a human have to do, and in what order?
+- How do you verify it is genuinely live?
+- What breaks if the steps are skipped?
+-->
 
 ## Brief impact
 <!--

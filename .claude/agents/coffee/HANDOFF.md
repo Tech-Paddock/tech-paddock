@@ -1,184 +1,77 @@
 # Coffee — handoff
 
-State as of 2026-09-12, 15:10 UTC.
+State as of 2026-09-16.
 
 Read `RULES.md` first. This file is only what is true right now.
 
 ---
 
-## It is live, and the whole flow has run
+## What is true now
 
-`coffee.techpaddock.io` serves the app behind the password gate. `GET /api/health` returned
-`{"ok":true}` at 03:00 — `coffee` schema reachable, `coffee-files` bucket reachable,
-`ANTHROPIC_API_KEY` set. All five environment variables are right.
+**It is live at `coffee.techpaddock.io`**, behind the password gate, on current `main`.
+`GET /api/health` returns ok on all three checks. The whole flow has run end to end against a real
+bag: identify 200, search 200, three-tier retrieval against a live roaster site. `npm test` is green.
 
-The flow has been exercised end to end against a real bag: `POST /api/identify` 200,
-`POST /api/search` 200. The three-tier retrieval has run against a live roaster site. What has
-**not** happened is a comparison worth reading — see "What to do next".
+**Save comes before the search, and that is deliberate.** Confirm the label → the bag row is written
+→ the search runs against that row and updates it → the page polls the row. The search reads real
+roaster pages and takes thirty seconds to a few minutes with nothing travelling on the connection,
+so a phone concludes the request is dead — that happened on the first live run, twice, and the
+answer was correct and unreachable both times. Now it lands in a row rather than in a response, so a
+dropped connection costs nothing and the tab can be closed mid-search.
 
-## The flow, as the code now has it
+**The search is a comparison harness.** Model and effort are selectable per search and recorded on
+the bag as `guide_model` and `guide_effort`. Default is Haiku 4.5, and that is safe for a specific
+reason: `validateGuide` enforces quote-backing **in code**, so a weaker model cannot invent a recipe
+— it can only fail to find one and report `none`. Going cheap costs recall, never a wrong recipe you
+would brew.
 
-**Save comes before the search.** Confirm the label → the bag row is written → the search runs
-against that row and updates it → the page polls the row. `guide_status` stays `not_searched` while
-it is in flight.
+`lib/models.ts` is a registry rather than a list of names because the three models do not take the
+same request: the dynamic-filtering web tools need Sonnet 4.6 or better, Haiku 4.5 rejects
+`output_config.effort` outright, and `xhigh` exists on Sonnet 5 but not Sonnet 4.6. Each is a 400,
+not a degraded result. The route **refuses** a level the chosen model cannot take rather than
+dropping it — a silently ignored setting would report a comparison that never ran.
 
-This is the opposite of the original order and it is deliberate. The search reads real roaster pages
-and takes thirty seconds to a few minutes with nothing travelling on the connection, so a phone
-concludes the request is dead. That happened on the first live run: two searches returned 200 and
-the browser showed "load failed" both times. The answer was correct and unreachable. Now it lands in
-a row rather than in a response, so a dropped connection costs nothing and the tab can be closed
-mid-search.
+**A bag is a purchase; a brew is one attempt at it.** The dial-in moved off the bag entirely, because
+one set of columns can only hold the last thing you tried. `extraction_yield` is a generated column
+and ppm is never stored — both exist to stop one measurement being recorded twice in forms that can
+disagree. If you add a field, ask first whether it is a measurement or a function of measurements.
 
-## The search is a comparison harness
+## Traps specific to this app
 
-The model and its effort are selectable per search and recorded on the bag — `guide_model` and
-`guide_effort`. Default is **Haiku 4.5**.
-
-Haiku is a safe default for a specific reason, and it is the reason to trust the whole idea:
-`validateGuide` enforces quote-backing **in code**, so a weaker model cannot invent a recipe. It can
-only fail to find one and report `none`. Going cheap costs recall, never a wrong recipe you would
-brew.
-
-The three models do not take the same request, which is why `lib/models.ts` is a registry rather
-than a list of names: the dynamic-filtering web tools need Sonnet 4.6 or better, Haiku 4.5 rejects
-`output_config.effort` outright, and `xhigh` exists on Sonnet 5 but not Sonnet 4.6. Every one of
-those is a 400 rather than a degraded result. The route refuses a level the chosen model cannot
-take rather than dropping it — a silently ignored setting would report a comparison that never ran.
-
-## Columns added since #23
-
-`guide_search_started_at`, `guide_search_error`, `guide_model`, `guide_effort`, `guide_dropped`.
-All five are live in Postgres, verified directly. `guide_dropped` is not bookkeeping: dropped
-values used to live only in the search response, and backgrounding would have discarded them
-silently — which is the thing `RULES.md` says they exist to prevent.
-
-## Failures are legible now
-
-`findPreviousBag` and `findRoasterDomain` used to destructure only `data` and throw the error away.
-Both answer `null` legitimately, so an unreachable database was indistinguishable from "no previous
-purchase" and "no verified domain yet" — and an hour of debugging went to the Anthropic key because
-two call sites reported success while only the library list told the truth. Both now throw
-`LookupError` carrying the Postgres message.
-
-**The trap that caused it is not in this app's code and will hit the next new schema too:** `coffee`
-had a correct migration, correct grants, and was listed in `config.toml`, and PostgREST still
-answered `Invalid schema: coffee`, because the hosted project's **exposed schemas** list is a
-dashboard setting that lives nowhere in this repo. `supabase/README.md` documents it as step three
-of three.
-
-## Two brewer vocabularies
-
-`guide_method` records what the roaster published and stays broad; the list in `lib/brewers.ts`
-names what is on the shelf. They were one list until the first real bags arrived and every one was
-Sweet Bloom publishing "ORIGAMI AIR" — unplaceable against any five-item list, and correctly
-recorded as "other" rather than guessed at as a V60. Origami is in the roaster's vocabulary now.
-
-`myBrewerFor` crosses between them only on an exact match. A bare "V60" does not map, because two
-of them are on the shelf and the roaster did not say which.
-
-## The page, and deleting a bag
-
-One page, not two tabs: the shelf is the page and scanning is a collapsible section above it.
-"Shelf" is what the library is called — every bag is on it, not a subset. Splitting finished bags
-from open ones was scoped and parked; it would be one nullable `finished_at` and a filter, and the
-column is deliberately absent until that is wanted.
-
-`DELETE /api/bags/[id]` removes the row and then its photo, in that order. The save path writes the
-file before the row that points at it, so deleting in the same order means a row never references
-an object that is gone. A leftover object is the lesser failure and the delete is best-effort about
-it. Deleting an id that matches no row is a 404, not a success.
-
-## The shape of the data
-
-`coffee.bags` 1 ──< `coffee.brews`. A bag is a purchase and what the roaster published; a brew is
-one attempt at it. The dial-in — brewer, brew method, grinder, grind setting — moved off the bag
-entirely, because one set of columns can only hold the last thing you tried.
-
-Two things on `coffee.brews` are deliberately not writable and should stay that way:
-`extraction_yield` is a generated column, and ppm is never stored at all. Both exist to stop one
-measurement being recorded twice in forms that can disagree. If you add a field here, ask first
-whether it is a measurement or a function of measurements.
-
-`findPreviousBag` reads the most recent brew of the previous bag, not columns on the bag.
-
-## Deploying the brew log
-
-**Nothing here needs a new environment variable, a Vercel setting, a project or a DNS record.**
-That is worth saying first, because every Coffee deploy so far has been slowed by assuming
-otherwise. Coffee's five variables are set and correct; the `coffee` schema is already exposed to
-the Data API.
-
-The one thing that is not automatic is the migration. `20260912200000_coffee_brews_shelf_and_bag_fields.sql`
-adds `purchased_date`, drops the bag's four dial-in columns, and creates `coffee.brews`.
-
-**Order matters, and there is a short window either way.** The new code needs `purchased_date` and
-`coffee.brews`; the old code writes the columns this migration drops. So:
-
-1. Merge the three branches in order — vocabulary, page shell, brew log. Squash, CI green on each
-   head.
-2. **Apply the migration as soon as the merge lands**, while Vercel is still building. A deploy
-   takes a couple of minutes and the exposure is that long.
-3. Apply it through Supabase's `apply_migration`, not by pasting into the SQL editor. The editor
-   changes the database without recording the migration as applied, and then `migration list`
-   shows a file the remote has never heard of — which is how six migrations came to live only in
-   the database the first time.
-4. `NOTIFY pgrst, 'reload schema'` is the last line of the file. Do not drop it: a new table can be
-   invisible to the API while plainly present in SQL, and it reads as "relation does not exist"
-   against a table you can see in the dashboard.
-
-**Applying it before the merge breaks the running app**, because the deployed code still inserts
-`my_grinder` and `my_rating` on every scan. Reads keep working; saving a new bag does not.
-
-**Verify in this order, and stop at the first failure:**
-
-- `GET /api/health` → 200. It does not check `coffee.brews`, so this only proves the old surface.
-- Open a bag → the Brews panel says "No brews logged yet" rather than an error. An error here is
-  the schema cache or the grants, not the code.
-- Log a brew with a dose, a cup weight and a TDS reading → the extraction figure appears on the
-  row. That exercises the generated column, which no test can reach.
-- Scan a bag → still saves. That is what the dropped columns would break.
-
-**Rollback:** the code is a Vercel rollback to the previous deployment. The migration is not
-reversible — it drops four columns — but the data loss is already known to be nil: the only value
-ever held across all three bags was a single `my_method` of 'other'.
+- **An empty result and an unread result must not render the same.** This same defect appeared three
+  times in this one app — `findPreviousBag`, `findRoasterDomain`, and the library loader all turned
+  a failure into a plausible empty answer. Both lookups now throw `LookupError` carrying the
+  Postgres message. **If you are adding a read path here, check this first.**
+- **The search step cannot be exercised from a Claude Code sandbox** — roaster domains are blocked by
+  the egress proxy. Tests cover validation against recorded response shapes. **Do not conclude the
+  feature works because the tests pass**; it has to be verified on a deploy preview with a real bag.
+- **Two brewer vocabularies, and `myBrewerFor` crosses only on an exact match.** A bare "V60" does
+  not map, because two are on the shelf and the roaster did not say which. Rounding to the nearest
+  thing on the shelf, on the roaster's authority, is the same species of invention this tool refuses
+  about brewing parameters.
+- **The icon is a static import** so it is served from `/_next/static`, the one prefix the middleware
+  matcher excludes. Next's own `app/apple-icon.png` convention is served from a gated route, and iOS
+  would take a screenshot of the login page as the home screen icon instead.
+- **An installed app has its own cookie jar**, so signing in inside it is expected rather than a
+  session bug. It is reached directly, not through the hub's iframe.
 
 ## In flight
 
-**Library load failures are now visible (branch `claude/coffee-surface-library-errors`).** The
-library tab rendered "No bags yet. Scan one." whenever `GET /api/bags` failed, because the loader
-only assigned on `res.ok` and silently kept an empty list — a confident statement about data it had
-never read. Joel hit it with two bags saved. It also fixes the cause: a search term went into a
-PostgREST `or=(...)` filter unquoted, so a comma in "Sweet Bloom, Colombia" started a new filter
-term rather than being searched for, and returned a 500.
+Nothing.
 
-**This is the same defect three times in one app** — `findPreviousBag`, `findRoasterDomain`, and now
-the library loader all turned a failure into a plausible empty answer. If you are adding a read
-path here, that is the thing to check first: an empty result and an unread result must not render
-the same.
-
-**#42 — installable on the iPhone home screen.** Add to Home Screen in Safari gives it an icon,
-full screen and no browser chrome. An installed iOS app has **its own cookie jar**, so signing in
-once inside it is expected rather than a session bug, and it is reached directly rather than
-through the hub's iframe. iOS only, on purpose: a web app manifest is
-fetched without credentials, so the password gate returns the login redirect and the install
-silently never offers itself. Allowing it through means editing `middleware.ts`, which is
-byte-identical in five apps and not Coffee's. If every tool should be installable, that pattern is
-TechPad Gen's.
-
-## What to do next
+## Next
 
 1. **Run the same coffee twice — Haiku, then Sonnet 5 at `high`** — and compare which tier each
    reports. That is the open question the harness was built to answer and nothing in the repo can
-   answer it. `guide_model` and `guide_effort` are on the row so the comparison stays readable
-   afterwards.
+   answer it.
 2. **Expect `normalizeMethod` to need alias tuning** once there are real guides to look at. The
    vocabulary is right; the regexes were written against how roasters *tend* to word things, not
    against a sample.
-3. **Seeding roaster domains is proposed and not started.** It would let the first search for a
-   known roaster pin `allowed_domains` instead of running unpinned. It needs its own table — `bags`
-   rows are purchases and phantom rows would break that — and the domains must be verified through
-   the deployed app, where `web_fetch` has real egress. **No agent in the sandbox can verify one:**
-   roaster domains are blocked by the egress proxy, so a list produced here would be recalled from
-   training, which is the exact guess `findRoasterDomain` refuses.
-4. Nothing else is queued. The deliberately-unbuilt list — brew log, timer, inventory, method lookup
-   table — stays unbuilt until asked for.
+3. **Seeding roaster domains is proposed, not started.** It needs its own table — `bags` rows are
+   purchases and phantom rows would break that. **No agent in the sandbox can verify a domain**, so
+   a list produced here would be recalled from training, which is the exact guess
+   `findRoasterDomain` refuses. It has to come from the deployed app.
+4. The deliberately-unbuilt list — timer, inventory, method lookup table — stays unbuilt until asked.
+
+Waiting on Joel: whether the iOS install works on a real iPhone. The meta tags and insets are
+verified against the built HTML; whether iOS takes the icon needs a phone. It is in the ledger.

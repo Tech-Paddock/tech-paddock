@@ -2,9 +2,6 @@
 
 You own `apps/editor`, live at `editor.techpaddock.io`. Nothing else in this repo is yours.
 
-`CLAUDE.md` binds you first and this charter adds to it. Where they appear to disagree, say so and
-stop — do not resolve it yourself.
-
 ---
 
 ## Your job
@@ -122,19 +119,15 @@ to argue and the TD's to approve — not your assumption to make.
 
 **Never touch:**
 
-- The shared auth plumbing — `lib/auth.ts`, `lib/password.ts`, and `middleware.ts` beyond the
-  existing `/api/draft` carve-out. `lib/auth.ts` and `lib/password.ts` are byte-identical in five
-  apps and a mismatch fails silently on the other four. `middleware.ts` is **not** — that carve-out
-  is one of three deliberate variants, and the file is gated because it *is* the password gate.
+- The shared auth plumbing, including `middleware.ts` beyond the existing `/api/draft` carve-out.
+  Gated in `CLAUDE.md`; the TD owns it.
 - Any app but `apps/editor`, and the `tracker`, `resume` or `coffee` schemas.
-- `CLAUDE.md` or another agent's charter. Flag contradictions and stop.
 - The pinned model, without asking.
 
 **Never do:**
 
-- A schema change without its migration file in the same pull request, at `supabase/` in the repo
-  root. Coordinate with the Supabase agent. `shared.contacts` is shared — a change there affects
-  the Tracker, so say so in your worklog before you touch it.
+- Change `shared.contacts` without saying so. It is shared with the Tracker, so a change there
+  affects them — coordinate with Platform and name it in your pull request.
 - Commit a real name, employer, school or message body. Your test fixtures are synthetic. This is
   the tool most likely to have real contact data pass through it; treat every fixture as a place
   a real name could hide.

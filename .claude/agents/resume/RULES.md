@@ -2,9 +2,6 @@
 
 You own `apps/resume`, live at `resume.techpaddock.io`. Nothing else in this repo is yours.
 
-`CLAUDE.md` binds you first and this charter adds to it. Where they appear to disagree, say so and
-stop.
-
 ---
 
 ## Your job
@@ -143,8 +140,8 @@ test enforces exactly one table; a table anywhere else fails the build.**
 
 ## Testing
 
-This app has the largest suite in the repo — 60 tests, `npm test`. CI runs
-`npm run test --if-present`, so these tests are a large part of why CI means anything here.
+This app has the largest suite in the repo — `npm test`. CI runs `npm run test --if-present`, so
+these tests are a large part of why CI means anything here.
 
 - **Golden file:** fixed content + fixed spec renders byte-identical twice. This is what makes a
   saved render trustworthy as a record of what was actually sent.
@@ -165,10 +162,8 @@ the endpoint at 200 — that is a setup step, not a broken dependency.
 
 ## Guardrails
 
-**Never touch:** the shared auth plumbing (`lib/auth.ts`, `lib/password.ts` — byte-identical in
-five apps, fails silently on the other four — and `middleware.ts`, three deliberate variants, gated
-because it *is* the password gate); any app but `apps/resume`; any
-schema but `resume`; `CLAUDE.md` or another agent's charter.
+**Never touch:** the shared auth plumbing (gated in `CLAUDE.md`; the TD owns it); any app but
+`apps/resume`; any schema but `resume`.
 
 **Never do:**
 
@@ -176,17 +171,17 @@ schema but `resume`; `CLAUDE.md` or another agent's charter.
 - Let the coverage report overstate what the output contains.
 - Delete a template any render points at, or make the archived one active.
 - Emit a second table, a text box, an image, or contact details in a header or footer.
-- A schema change without its migration at `supabase/` in the repo root. Migrations were moved
-  there from `apps/resume/` deliberately — one project, one history.
-- **Commit personal information**, and for a `.docx` that means every part of the archive:
-  hyperlink targets in `.rels`, author fields in `docProps/`, not just `document.xml`. The committed
-  fixtures are scrubbed copies with synthetic substitutes. Keep them that way — a real company name
-  has already had to be scrubbed from this app once.
+- Put a migration under `apps/resume/`. They were moved to `supabase/` in the repo root
+  deliberately — one project, one history.
+- **Commit personal information.** For a `.docx` that means every part of the archive: hyperlink
+  targets in `.rels`, author fields in `docProps/`, not just `document.xml`. The committed fixtures
+  are scrubbed copies with synthetic substitutes. Keep them that way — a real company name has
+  already had to be scrubbed from this app once.
 
 ## Guidelines
 
-- Run `npm test` before every push. Sixty tests is not a burden here, it is the reason changes to a
-  deterministic renderer are safe to make at all.
+- Run `npm test` before every push. The largest suite in the repo is not a burden here, it is the
+  reason changes to a deterministic renderer are safe to make at all.
 - When a document defeats the rules, improve the rules or report it honestly. Never widen an
   assertion to make a fixture pass.
 - Prefer a named regression test over a comment. The `<w:sdt>` trap has one and it is why nobody has
