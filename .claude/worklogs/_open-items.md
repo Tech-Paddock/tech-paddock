@@ -47,13 +47,12 @@ the reasoning underneath. The generator takes the first bold run as the row titl
    answered elsewhere. The apple-touch-icon, the web-app meta tags and the safe-area insets were
    verified against the built HTML; **whether iOS actually takes the icon needs a deploy and a
    phone**, which is you. Open it in Safari, add to home screen, and see whether the icon is right.
-5. **Decide who moves colours out of `tailwind.config.ts`.** Joel narrowed theme ownership to
-   colours and aesthetic decisions, **not config** — and that line cannot be drawn today, because the
-   four tools' colours live inside `tailwind.config.ts`. Making it real means moving the values to
-   CSS custom properties with Tailwind referencing `var(--token)`, after which colour values are
-   TechPad Gen's and the wiring stays the app agent's. **That refactor is itself a config change in
-   four apps, so it cannot be TechPad Gen's first act under the rule** — it is the TD's, or theirs
-   with explicit authorisation.
+5. **Decide whether to raise the hairline contrast bar.** `--line` against `--surface` is 1.82:1 in
+   the theme running in production right now, short of the 3:1 bar for a non-text component. TechPad
+   Gen flagged it in #68 rather than fixing it quietly, because every new theme matches or beats the
+   shipped figure and raising the bar **changes the look of all five apps**. A decision, not a
+   cleanup. Replaces the "who moves colours out of `tailwind.config.ts`" item, which #68 closed by
+   doing it.
 
 ## Parked
 
@@ -86,6 +85,32 @@ work. Something here moves only when Joel says so.
   request's own state, and this ledger.
 
 ## Done since this ledger was last written
+
+- **2026-09-16 — #71 and #73 merged in a decided order, and the order was the work.** #71 is the
+  Resume Formatter's re-extract fix: `/api/reformat` now downloads the template's stored `.docx` and
+  extracts the spec from it, so **a spec change no longer needs a re-upload to take effect**. #73 is
+  TechPad Gen narrowing the history-rewrite safety test, which #68 had silently broken by adding
+  theme files to every app — the old form flagged all five stale branches including two that were
+  provably clean, and a test that answers yes to everything answers nothing.
+  **Four branches, and the ordering was decided before any of them moved.** The two other agents'
+  branches first, so neither paid a re-take under require-branches-up-to-date. Then the TD's own
+  record, third, because it and #73 both deleted the same worklog and the second to merge pays — the
+  cost belongs on the branch still in hand. Then the rule change last. The shared delete resolved as
+  a no-op, which is what the ordering was for.
+  **#71 corrects a thing worth keeping:** it ends re-uploading to pick up a *code* change and does
+  nothing about a change to the *template file* — so the outstanding re-upload below still stands.
+
+- **2026-09-16 — #68 merged: the livery theme system is live in all five apps.** TechPad Gen's work;
+  the gate only checked it. One livery per app, both polarities, the switch in every header, and one
+  `paddock_mode` cookie on `.techpaddock.io` so polarity follows you across subdomains. Colour left
+  `tailwind.config.ts`, which **closes the open question of who should move it** — they did, on
+  Joel's instruction, and declared the crossing in the pull request, the worklog and the handoff
+  rather than leaving it to be found in the diff.
+  **The gate's own mistake is recorded here, not buried.** #68 was open while #69 and #70 were
+  merged, and the TD did not re-check the open list — #70's body asserted #69 was the only thing
+  open, which was false when written. The branch list had been verified clean twenty minutes earlier
+  and the TD reasoned from that memory. It cost nothing because no file overlapped, which is luck.
+  **The fix is procedural: check the open list with a live call as the first step of every merge.**
 
 - **2026-09-16 — Draft pull requests: proposed, declined, settled.** The TD put up letting agents
   open a draft when a branch is finished, on the argument that GitHub disables the merge button on a

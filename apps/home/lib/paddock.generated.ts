@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-16T00:24:48.642Z",
+  bakedAt: "2026-09-16T01:22:50.736Z",
   waiting: [
   {
     "title": "Send the GitHub Support request",
@@ -32,8 +32,8 @@ export const PADDOCK = {
     "state": "box"
   },
   {
-    "title": "Decide who moves colours out of `tailwind.config.ts`",
-    "detail": "Joel narrowed theme ownership to colours and aesthetic decisions, not config — and that line cannot be drawn today, because the four tools' colours live inside tailwind.config.ts. Making it real means moving the values to CSS custom propert",
+    "title": "Decide whether to raise the hairline contrast bar",
+    "detail": "--line against --surface is 1.82:1 in the theme running in production right now, short of the 3:1 bar for a non-text component. TechPad Gen flagged it in #68 rather than fixing it quietly, because every new theme matches or beats the shippe",
     "ref": "—",
     "state": "box"
   }
