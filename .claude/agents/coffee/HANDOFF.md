@@ -55,7 +55,7 @@ page. The label now says where it came from instead of claiming it was written f
 
 ## In flight
 
-**`claude/coffee-bean-link-and-optional-rating` — pushed, no pull request; Joel has not asked.**
+**#79 `claude/coffee-bean-link-and-optional-rating` — open, awaiting the gate.**
 "The beans" links out from the top of the bag card instead of a footnote at the bottom, and the
 rating says it is optional — which it always was. **Deployment: nothing, it deploys itself on merge.**
 
