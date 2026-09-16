@@ -8,26 +8,18 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-Two branches of mine, both finished, both behind #79 / #80 / #81 in the queue at Joel's direction.
-
-**`claude/brief-agent-standup-protocol`** — the rails for standing up a new agent. Adds
-`.claude/agents/STANDUP.md`, the protocol to open and execute when Joel wants one, and points this
-charter at it. Also rewrites the `drift` middleware check so it is roster-independent:
-**it used to fail a correct sixth app**, because the base group was hardcoded as
-`coffee+home+resume`. It now asserts a base copy plus editor's and tracker's scoped bypasses, and
-was exercised against four roster shapes rather than reasoned about.
-
 **`claude/brief-three-part-footer`** — the sign-off every agent ends a message with is now three
 sections: Work Brief, DevOps, Open Items. DevOps is the promotion pipeline in four stages named in
 Joel's words — in progress, needs a PR, ready to merge, stuck — because committed-versus-uncommitted
-is how an agent saves work, not a stage of getting something live.
+is how an agent saves work, not a stage of getting something live. It also gives him three phrases
+that mean three specific things: **close out**, **park it**, **pick up: X**.
 **The scoping is the part to preserve:** you report every pushed branch and every ledger row; every
 other agent reports only its own. **You cannot see another agent's in-progress work** — it never
 reaches the repo until it is pushed — so it appears only in its author's section. Approved by Joel
-on 2026-09-16 and dialled in over three rounds of his feedback.
+on 2026-09-16 and dialled in over four rounds of his feedback.
+**Deployment: nothing — no app code changed.**
 
-**Deployment, both: nothing — no app code changed.** They touch the same `td/HANDOFF.md`, so
-whichever merges second pays a conflict. That is yours, not the author's.
+Nothing else of mine is open.
 
 ## What is true now
 
@@ -37,6 +29,15 @@ jobs and `requested-by-joel`. **`Require branches to be up to date before mergin
 what gives the merge-order rule teeth: after any merge every other open pull request is behind and
 must take `main` again. So the order you pick decides who pays. `Block force pushes` and
 `Restrict deletions` are also on.
+
+**Standing up a new agent has a written protocol**, `.claude/agents/STANDUP.md`, landed in #83.
+Open and execute it when Joel asks for one; `RULES.md` says the same. The `drift` middleware check
+is roster-independent as of the same pull request, so a sixth app sharing the base copy passes.
+
+**A new app needs no CI change.** The matrix derives the roster from `apps/` and one fixed-name
+`gate` sits in front of it, so branch protection needs a single check that never changes shape.
+**The required-check list has not been switched over yet** — that is Joel's, in the repository
+settings, and until it happens a deprecated app still leaves a required check that can never report.
 
 **No agent can read rulesets**, so *which* checks are required is unverifiable from a session. The
 list above came from Joel.
