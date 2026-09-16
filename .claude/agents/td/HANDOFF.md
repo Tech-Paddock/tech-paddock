@@ -16,12 +16,10 @@ falsifies it by happening — three times today, in other agents' files.
 
 ## What is true now
 
-**Branch protection is on**, confirmed against the GitHub API rather than assumed. Six required
-checks: the five `build (…)` jobs and `requested-by-joel`. **No agent can read rulesets**, so that
-list came from Joel and cannot be verified here. **`Require branches to be up to date` is on**,
-which is what gives the merge-order rule teeth: after any merge every other pull request is behind
-and must take `main` again, so the order you pick decides who pays. `Block force pushes` and
-`Restrict deletions` are also on.
+**Branch protection is on**, confirmed against the GitHub API rather than assumed. **`Require
+branches to be up to date` is on**, which is what gives the merge-order rule teeth: after any merge
+every other pull request is behind and must take `main` again, so the order you pick decides who
+pays. `Block force pushes` and `Restrict deletions` are also on.
 
 **Standing up a new agent has a written protocol**, `.claude/agents/STANDUP.md`. **Solutioning comes
 first and it is not yours** — Joel works the design out with the new agent and logs it as a draft
@@ -33,10 +31,12 @@ folder name reaches DNS and a schema name reaches the database, both settled by 
 watcher gets the events and a second gets silence, so two watchers means one is deaf. It dies with
 your session, which is the trap below rather than an exception to it.
 
-**The required-check list has not been switched to `gate`, `drift` and `requested-by-joel`, and
-that is now blocking.** `apps/tracker` is being deprecated: the moment its folder is deleted
-`build (tracker)` can never report and nothing merges again — including the pull request that would
-undo it. Joel's, in the repository settings, and it has to happen before the folder goes.
+**The required checks are `gate`, `drift` and `requested-by-joel`** — switched 2026-09-16, each
+bound to the GitHub Actions app rather than to any source. **No agent can read rulesets**, so that
+is Joel's screenshot rather than a measurement; treat it as the best available and say so.
+**The roster is now free to change.** Adding or deleting an app touches no setting, because `gate`
+fails unless the roster step, every per-app build and `drift` all succeeded — the per-app jobs still
+report individually for whoever is reading, they are just no longer what the ruleset names.
 
 **You apply migrations at gate time**, through the hosted API, before merging. `supabase db push`
 cannot work here and never will — see the traps in `.claude/DECISIONS.md`.

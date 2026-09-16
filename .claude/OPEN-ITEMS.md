@@ -22,10 +22,7 @@ each entry as its title — so lead with a short bold phrase and put the reasoni
 
 ## Blocking everything else
 
-**Switch the required checks to `gate`, `drift` and `requested-by-joel`**, dropping every per-app
-entry. Repository settings; no agent can read or change them. **`build (tracker)` is required, so
-the moment `apps/tracker` is deleted it can never report and nothing merges again — including the
-pull request that would undo it.** Harmless until then, and it must be done first.
+Nothing.
 
 ## Waiting on Joel
 
@@ -33,19 +30,22 @@ pull request that would undo it.** Harmless until then, and it must be done firs
    `.claude/agents/macros/RULES.md`, worked out with the new agent. Paste it or have that session
    push it; either way it lands in the repo before anything is scaffolded. **Macro Tracker and
    Pipeline Tracker collide in speech**, and the folder is not what gets said out loud.
+   *LoE: a session.*
 2. **Delete the `tp-tracker` Vercel project and its DNS record** — last step of the deprecation, not
-   the first, and there is no undo. Only after the Pit Wall serves what the tool served.
+   the first, and there is no undo. Only after the Pit Wall serves what the tool served. Safe to do
+   at all now that the required checks no longer name a per-app job. *LoE: minutes.*
 3. **Two tokens on `tp-home`, then redeploy.** `GITHUB_TOKEN` fine-grained, this repo, read-only:
    Contents, Metadata, Pull requests, Actions. `VERCEL_TOKEN` read-only, `tech-paddock` team.
-   **The redeploy is not optional** — Vercel bakes the environment in at build time. Until both are
-   set the Pit Wall names the missing sources under "not reported", the designed degraded state.
+   **The redeploy is not optional** — Vercel bakes the environment in at build time. *LoE: minutes.*
 4. **Re-upload the active resume template.** #96 made it **the substrate every render is built on** —
    the renderer edits the template's own bytes rather than working from a description of it — so an
-   out-of-date one renders an out-of-date design on every job. Open before; it matters more now.
+   out-of-date one renders an out-of-date design on every job. *LoE: minutes.*
 5. **What is the Feed?** In the settled tab order and nowhere else, so it ships as a labelled empty
-   slot. **A feed is rows** — the same hub rule the tracker's move already bends. Nothing is blocked.
+   slot. **A feed is rows** — the same hub rule the tracker's move already bends. Deciding is
+   minutes; building it is not. *LoE: minutes.*
 6. **Raise the hairline contrast bar?** `--line` on `--surface` is 1.82:1 in production, short of
-   the 3:1 bar for a non-text component. Raising it **changes the look of every app**.
+   the 3:1 bar for a non-text component. Raising it **changes the look of every app**, so the answer
+   is minutes and the consequence is not. *LoE: minutes.*
 
 ## Waiting on an agent
 
@@ -55,13 +55,13 @@ the start of its next session, because the hook prints this file into every one.
 
 1. **Build `packages/shared`.** *Owner: TD.* One real copy of the five five-way files, a script that
    stamps each app's copy from it, and `drift` failing a copy that disagrees. **This was on Joel's
-   list and should not have been** — it changes no Vercel setting and no deploy, so it is the TD's.
+   list and should not have been** — it changes no Vercel setting and no deploy. *LoE: a session.*
 2. **The Pit Wall must serve what the tracker served before `apps/tracker` goes.** *Owner: TechPad
    Gen.* `SOURCES` in `apps/home/lib/glance.ts` holds exactly one entry — the tracker's
    `/api/summary` — so deleting the tool empties the hub's glance. **The hub gains database
-   credentials for the first time**, which its own file says it does not have.
+   credentials for the first time**, which its own file says it does not have. *LoE: multi-session.*
 3. **`shared.contacts` needs its other owner named.** *Owner: Message Editor.* It is deliberately
-   shared between the editor and the tracker; one of the two is going away.
+   shared between the editor and the tracker; one of the two is going away. *LoE: minutes.*
 
 ## Parked
 
