@@ -28,32 +28,53 @@ GitHub.** And the general form of the mistake — read the thing itself, not the
 it. Every correction tonight came from a build log, a route, or an API response contradicting a
 document that sounded authoritative.
 
-## Nothing is open. One branch is pushed and waiting for Joel to ask
+## Nothing is open, and the last time that was written it was wrong
 
-**No pull request is open.** #56 and #57 merged on 09-14/15, and #62 to #67 merged in one ordered run
-late on 09-15. `main` is at `76971bf` and every Vercel project has rebuilt from it.
+`main` is at the livery merge. #67, #68, #69 and #70 are in and every branch is deleted. Nothing is
+open, nothing is pushed and unmerged.
 
-**`claude/brief-ledger-current` is pushed with no pull request, and that is correct.** It carries this
-ledger's current state and nothing else. The rule is that a finished branch is the deliverable and
-Joel decides when a pull request exists, so it waits. CI runs on every branch push, so it is built and
-tested while it waits, and a branch affects no deployed app.
-**One consequence is visible rather than merely filed:** the Pit Wall renders the ledger's *Waiting on
-Joel* section from `main` at build time, so until this branch merges the homepage shows the older
-list. That is the cost of the rule, not a bug, and it is worth saying out loud to Joel when he next
-asks what is outstanding.
+**Read the next paragraph before trusting that sentence again.** The identical claim sat in this
+file an hour earlier and was false: #68 was opened by TechPad Gen at 00:28 while the TD was working,
+and the TD merged #69 and #70 at 00:37 and 00:39 **without re-checking what else was open.** #70's
+own body asserted "#69 was the only thing open, and it is in." Nobody had looked.
 
-**The ordering lesson from that run is the part to keep.** Five branches, none touching the same file,
-and the only real constraint was that the theme-ownership rule merged **last** — landing a rule change
-before the finished work written under the old rule fails that work against a rule that did not exist
-when it was written. TechPad Gen's branch merged **first** for the mirror-image reason: *Require
-branches to be up to date* means whichever merges second pays the re-take, and the cost belongs on the
-branches still in hand, which were all mine.
+**The rule that was broken is already written down twice.** *Decide the order when more than one
+change is mergeable, before merging any of them*, and *after each merge the rest are behind —
+re-check them*. What made it easy to skip is worth naming: the TD had personally verified the branch
+list was clean at 00:20, and then reasoned from that memory instead of re-reading it. **A branch list
+is not a fact you check once a session.** Other agents open pull requests while the TD works, the TD
+cannot see them happen, and the only way to know is to look immediately before merging — every time,
+including when you looked twenty minutes ago.
 
-**#56 and #43 are closed out.** The template archive merged with its migration applied at the gate
-first, and the charter amendment it asked for was ratified in #63. The hub re-theme's three failures —
-the handoff conflict, CI absent rather than red because GitHub cannot build a conflicted merge ref,
-and a body restating production's commit from a stale branch — are kept in the ledger as the case that
-proved the handoff rule, not as live work.
+**It cost nothing this time and that is luck, not process.** #68 touched 47 files across all five
+apps and shared not one file with #69 or #70, so it merged cleanly once brought up to date with
+GitHub's own update-branch (a merge commit, never a force-push on another agent's branch). Had it
+overlapped, a finished 6,000-line change would have paid a conflict it did not earn — which is
+exactly the cost the ordering rule exists to place on the branch still being worked.
+
+**Check the open list with a live call, not from memory, as the first step of every merge.**
+
+## The livery system is live, and it closed a ledger item by doing the thing
+
+#68 put one livery per app on all five — Martini, Clark, Senna, MP4/4, John Player Special — both
+polarities, with the switch in every header. Polarity is one `paddock_mode` cookie on
+`.techpaddock.io`, so it follows Joel across subdomains; absent means follow the system.
+
+**`lib/theme.css` is a sixth byte-identical five-way copy**, joining `lib/auth.ts` and
+`lib/password.ts`. Verified by checksum at the gate rather than asserted. Unlike the auth pair,
+drift here is loud — it shows up as one app looking wrong beside another inside an iframe — so it
+does not carry the same silent-failure risk, but it is one more file that must be edited five times.
+
+**The ledger's "who moves colours out of `tailwind.config.ts`" question is closed by being done.**
+TechPad Gen did it, on Joel's instruction, and declared the crossing in the pull request, the worklog
+*and* the handoff rather than leaving it to be found in the diff. The ledger had said it was the TD's
+or theirs with explicit authorisation; the authorisation is what settles it. **The declaration is the
+part worth copying** — a boundary crossed and announced in three places is a decision; the same
+crossing found in a diff is a problem.
+
+**One thing they flagged rather than fixed, and it is Joel's:** `--line` against `--surface` is
+1.82:1 in the theme running in production right now, short of the 3:1 bar. Every new theme matches or
+beats it. Raising the bar changes the look of all five apps, so it is a decision, not a cleanup.
 
 ## `.claude/worklogs/` is empty of worklogs, and that is the baseline now
 
