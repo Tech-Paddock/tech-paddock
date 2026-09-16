@@ -236,6 +236,46 @@ between configuring something that exists and creating, destroying, or re-pointi
   Say what is now true, not what you did: the commit already records the what. If the change alters
   a flow, a contract, or a constraint your handoff describes, the old description is now wrong and
   correcting it is part of the change, not follow-up work.
+- **End every message to Joel with the open-items footer.** Every message — not only the ones that
+  finish something, and not only the long ones. The point is that he never has to go looking for what
+  is outstanding, and a footer that appears only when an agent judges it worth appearing is one he has
+  to go looking for. Four columns, one line each, no prose underneath:
+
+  ```
+  | Item | Urgency | Blocking | Agent |
+  |---|---|---|---|
+  | Re-upload the active resume template | Now | #67's colours stay invisible until this | Resume |
+  | Two tokens on tp-home, then redeploy | Now | Pit Wall runs on repo rows only | TD |
+  | Re-extract the spec at render time | Soon | nothing | Resume |
+  ```
+
+  **Urgency is one of three words.** `Now` — Joel is the blocker and something waits on him. `Soon` —
+  real work, not blocked on him, the next session's. `Whenever` — parked, or worth doing and nothing
+  turns on it. Three words rather than a scale, because a scale invites an agent to grade its own work
+  upward and Joel then has to re-sort it, which is the searching this exists to remove.
+  **`Blocking` names what the item holds up, or the word `nothing`.** That is the column that tells
+  him what he buys by doing it, and `nothing` is an answer — it is how an item earns being ignored
+  tonight rather than re-read tomorrow.
+
+  **Never fill in a row you cannot see.** This is the rule that matters, and it is not the obvious
+  one. Agents never run at the same time, and a worklog dies with its branch — so what an agent
+  genuinely knows is the ledger it was handed at session start, its own `HANDOFF.md`, any worklog
+  still live on an unmerged branch, and the conversation in front of it. **That is the whole visible
+  set, and a worklog in it records what was true when it was written rather than where that work has
+  got to since.** Report the ledger's items
+  with the owning agent named from the ledger, and your own area's from your handoff — do not report
+  on another agent's behalf, do not infer that their work has moved, and do not invent a row to make
+  the table look complete. A guess in a status footer is worse than a missing row, because a table
+  reads as verified whether or not anybody verified it. Same rule the Pit Wall already runs on: never
+  claim more than the source supports.
+
+  **"Nothing open" is a valid footer and must be written.** A missing footer is indistinguishable from
+  a forgotten one, for exactly the reason a blank Deployment section is.
+
+  **Keep it scannable or it defeats itself.** One line per item, no paragraph underneath, and the
+  detail stays in the ledger where it already lives. If there are more rows than fit a glance, show
+  every `Now`, then the rest as a count with a pointer to the Pit Wall. A footer nobody reads is worse
+  than no footer, because it looks like the question has been answered.
 
 ### Merging
 
