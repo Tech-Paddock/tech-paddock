@@ -30,15 +30,21 @@ just been bitten by something and want to know whether it is known.
   Paper`, Paper landing. Moving the board to The Garage was proposed and rejected: the board answers
   *what needs me now*, The Garage answers *declared versus reported*, and one label cannot carry both.
 - **2026-09-16 — The Paper leads with what is owed, not what arrived.** Threads gone quiet are a
-  task; replies received are a statistic. Above the fold carries no job-search content at all —
-  a privacy requirement, because two days a week the screen is in an office.
+  task; replies received are a statistic. **The privacy fold was lifted the same day**, by Joel:
+  *"drop above the fold below, ill manage privacy."* So what is owed leads the page, job search
+  included, and **the layout enforces no privacy boundary** — he manages that himself, two days a
+  week, by choosing when to open it. Do not reintroduce a fold as a safety feature; it was removed
+  on purpose and the first half of this decision is what survives.
 - **2026-09-16 — Stale must be loud.** Past 3× its cadence a panel is struck through and banners
   itself. Cached data is fine; an honest timestamp nobody reads is not the fix.
 - **2026-09-16 — X/Twitter parked before it was built.** Access was never the hard part — Owned
   Reads cover the reverse-chronological timeline at $0.001 per resource. Ranking is, and it is ours.
 - **2026-09-15 — One livery per app, both polarities, toggle in every header.** Fixed per app, so it
   is a build-time constant; only polarity is shared, as one `paddock_mode` cookie. A Martini hub
-  framing a Clark editor is the design, not a defect.
+  framing a Clark editor is the design, not a defect. **Confirmed 2026-09-16 against the Morning
+  Paper**, whose Dispatch and Timing densities read like a polarity switch and are not one: density
+  is a separate axis, both densities get both polarities, and the site-wide toggle still carries
+  polarity alone.
 - **2026-09-15 — The branch-name action prefix: parked.** `claude/<area>-<description>` stands. The
   part worth keeping if it is ever revived: `pr` and `mrg` are *states*, and a state cannot live in a
   branch name — the name is fixed for the life of the branch while the state moves several times a
