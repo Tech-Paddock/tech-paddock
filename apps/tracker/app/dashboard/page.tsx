@@ -3,6 +3,8 @@ import { loadDashboard } from "@/lib/dashboard";
 import StageSuggestions from "./StageSuggestions";
 import { links } from "@/lib/links";
 import type { Severity, TouchSource } from "@/lib/signals";
+import { LIVERY } from "@/lib/livery";
+import ThemeControl from "../ThemeControl";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +17,8 @@ export const metadata = {
  * rather than an interpolated class name.
  */
 const SEVERITY: Record<Severity, { border: string; chip: string }> = {
-  urgent: { border: "border-red-300", chip: "bg-red-50 text-red-800" },
-  warn: { border: "border-amber-300", chip: "bg-amber-50 text-amber-900" },
+  urgent: { border: "border-urgent", chip: "bg-urgent text-ink-invert" },
+  warn: { border: "border-warn", chip: "bg-warn text-accent-ink" },
   info: { border: "border-line", chip: "bg-paper text-ink/70" },
 };
 
@@ -39,7 +41,7 @@ function Section({
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink/50">{title}</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-soft">{title}</h2>
         {hint && <p className="text-xs text-ink/40">{hint}</p>}
       </div>
       {children}
@@ -65,20 +67,21 @@ export default async function DashboardPage() {
       <header className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-ink/50">
+          <p className="text-sm text-ink-soft">
             {data.threads.length} thread{data.threads.length === 1 ? "" : "s"} tracked
           </p>
+          <ThemeControl livery={LIVERY} />
         </div>
         <Link
           href="/"
-          className="px-3 py-2 rounded-lg border border-line bg-white text-sm font-medium"
+          className="px-3 py-2 rounded-lg border border-line bg-surface text-sm font-medium"
         >
           All threads →
         </Link>
       </header>
 
       {data.degraded.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-lg px-4 py-3">
+        <div className="bg-surface border border-warn text-warn text-sm rounded-lg px-4 py-3">
           <p className="font-medium">Some sources did not load, so these numbers are incomplete.</p>
           <ul className="mt-1 list-disc pl-5">
             {data.degraded.map((d) => (
@@ -101,13 +104,13 @@ export default async function DashboardPage() {
               <a
                 key={c.meetingId}
                 href={c.threadId ? links.thread(c.threadId) : "#"}
-                className="border border-red-300 rounded-xl p-4 bg-white flex items-center justify-between gap-4"
+                className="border border-urgent rounded-xl p-4 bg-surface flex items-center justify-between gap-4"
               >
                 <div>
                   <p className="font-semibold">{c.company ?? c.label}</p>
                   <p className="text-sm text-ink/60">{c.company ? c.label : "Calendar event"}</p>
                 </div>
-                <span className="text-xs font-medium text-red-800 bg-red-50 px-2 py-1 rounded-full whitespace-nowrap">
+                <span className="text-xs font-medium text-ink-invert bg-urgent px-2 py-1 rounded-full whitespace-nowrap">
                   in {c.hoursAway}h
                 </span>
               </a>
@@ -125,7 +128,7 @@ export default async function DashboardPage() {
               <a
                 key={thread.id}
                 href={links.thread(thread.id)}
-                className={`border rounded-xl p-4 bg-white flex flex-col gap-1 ${SEVERITY[severity].border}`}
+                className={`border rounded-xl p-4 bg-surface flex flex-col gap-1 ${SEVERITY[severity].border}`}
               >
                 <div className="flex items-center justify-between gap-4">
                   <p className="font-semibold">{thread.company}</p>
@@ -172,7 +175,7 @@ export default async function DashboardPage() {
                         ? links.thread(end.threadId)
                         : "#"
                 }
-                className={`border rounded-xl p-4 bg-white flex flex-col gap-1 ${SEVERITY[end.severity].border}`}
+                className={`border rounded-xl p-4 bg-surface flex flex-col gap-1 ${SEVERITY[end.severity].border}`}
               >
                 <p className="font-medium">{end.label}</p>
                 <p className="text-sm text-ink/60">{end.detail}</p>
@@ -190,9 +193,9 @@ export default async function DashboardPage() {
             { label: "Threads opened", value: data.rhythm.threadsOpened },
             { label: "Meetings", value: data.rhythm.meetings },
           ].map((stat) => (
-            <div key={stat.label} className="border border-line rounded-xl p-4 bg-white">
+            <div key={stat.label} className="border border-line rounded-xl p-4 bg-surface">
               <p className="text-2xl font-semibold tabular-nums">{stat.value}</p>
-              <p className="text-xs text-ink/50">{stat.label}</p>
+              <p className="text-xs text-ink-soft">{stat.label}</p>
             </div>
           ))}
         </div>
@@ -208,7 +211,7 @@ export default async function DashboardPage() {
             {data.health.map((h) => (
               <div
                 key={h.kind}
-                className={`border rounded-xl p-4 bg-white ${SEVERITY[h.severity].border}`}
+                className={`border rounded-xl p-4 bg-surface ${SEVERITY[h.severity].border}`}
               >
                 <p className="font-medium">{h.label}</p>
                 <p className="text-sm text-ink/60">{h.detail}</p>

@@ -36,7 +36,7 @@ function LoginForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full max-w-sm bg-white border border-line rounded-2xl p-8 flex flex-col gap-4"
+      className="w-full max-w-sm bg-surface border border-line rounded-2xl p-8 flex flex-col gap-4"
     >
       <h1 className="text-xl font-semibold">Resume Formatter</h1>
       <p className="text-sm text-ink/70">Enter the password to continue.</p>
@@ -58,11 +58,11 @@ function LoginForm() {
           {showPassword ? "Hide" : "Show"}
         </button>
       </div>
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      {error && <p className="text-sm text-urgent">{error}</p>}
       <button
         type="submit"
         disabled={loading}
-        className="bg-accent text-white rounded-lg px-3 py-2 font-medium disabled:opacity-60"
+        className="bg-accent text-accent-ink rounded-lg px-3 py-2 font-medium disabled:opacity-60"
       >
         {loading ? "Checking…" : "Enter"}
       </button>
