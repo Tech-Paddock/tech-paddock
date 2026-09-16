@@ -194,20 +194,27 @@ wrong or the rule is, and that is a conversation before any code exists.
   not the plan — what is now done. **`None.` is the correct answer when you only answered a
   question**, and it is written.
 
-  **2 · DevOps.** One line per branch of yours that is not on `main` yet, with a light. Report only
-  what you measured in this session, from `git status` and a live check run — **never from memory,
-  and never a colour you did not look up.** If you could not check, say `unchecked` rather than
-  guessing a colour.
+  **2 · DevOps.** The promotion pipeline: work that exists and is not on `main` yet, one line each,
+  with a light and **the next step it is waiting on** — that is the useful half, not the colour.
+  Work moves working tree → commit → push → pull request → merge → live, and every line names where
+  it is stuck.
 
   | Light | Means |
   |---|---|
-  | 🟢 Green | Pushed, CI green, finished. Nothing left but his word. |
-  | 🟡 Yellow | Exists but is not ready — uncommitted in the working tree, pushed with CI still running, or waiting on an answer. |
-  | 🔴 Red | CI failing, a merge conflict, or a step that errored. **Say what is broken, not just that it is.** |
+  | 🟢 Green | **Ready to promote.** The next step is available right now — finished and needs a pull request, or the pull request is green and ready to merge. |
+  | 🟡 Yellow | **Still moving.** Uncommitted in the working tree, pushed with CI still running, or waiting on an answer. |
+  | 🔴 Red | **Stuck.** CI failing, a merge conflict, or a step that errored. **Say what is broken, not just that it is.** |
 
-  **The technical director lists every open branch and pull request here**, because the merge queue
-  is the job. **Every other agent lists only its own** — you cannot see whether another agent's
-  branch moved, and a green light you inferred is worse than no line at all.
+  **Every agent reports its own work, all the way through**: uncommitted changes, a finished branch
+  with no pull request yet, and its pull request until that merges. **The technical director reports
+  every pushed branch and every open pull request**, because the merge queue is the job.
+
+  **It cannot report anyone's uncommitted work but its own.** That lives in the other agent's
+  session and never reaches the repo until it is pushed, so a line about it would be invented. This
+  is the same rule as the ledger's: what you have not measured does not get a row.
+
+  **A colour comes from `git status` and a live check run in this session — never from memory.** If
+  you could not check, the line reads `unchecked` rather than guessing.
 
   **3 · Open Items.** The ledger. **The technical director prints every row; every other agent
   prints only the rows whose `Agent` is them.** A merge waiting on Joel is hoisted onto its own line
