@@ -73,6 +73,14 @@ just been bitten by something and want to know whether it is known.
   nothing**, so two agents offering to watch means one of them is quietly deaf to the thing it
   promised to watch. The subscription also dies with the session that made it, and the technical
   director is the one who has to be there at the merge anyway. No other agent offers it.
+- **2026-09-16 — `apps/tracker` is deprecated into the Pit Wall.** Joel's call, made after the
+  contradiction was put to him: `glance.ts` says the hub *"holds no database credentials and talks
+  to no schema"* and serves *counts and singles, never rows*. **Both halves are amended by decision
+  rather than eroded by a feature**, and that file is corrected when the work lands. The `tracker`
+  schema keeps its name. **The order is not optional**: drop `build (tracker)` from the required
+  checks before the folder goes or nothing merges again; the Pit Wall serves what the tool served
+  before the Vercel project and DNS record go, and those have no undo; `shared.contacts` needs its
+  other owner named. The parked `CRON_SECRET` hazard retires with it — that window is this app's.
 
 ## Mistakes — do not repeat
 
