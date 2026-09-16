@@ -79,27 +79,37 @@ database, and a ledger asserting a deployment state nobody re-verified.
 
 ---
 
-## For the technical director — theme ownership, 2026-09-15
+## The theme system — granted 2026-09-15, built 2026-09-16
 
-**Status: asked for by Joel, not yet written into any document. Until it is, this agent does not own
-themes outside `apps/home` and has not acted as if it does.**
+**Status: live in all five apps.** `CLAUDE.md` names TechPad Gen the owner of *the visual theme of
+every app* (#66), and `claude/ui-livery-themes` implements it. The ownership ask that used to fill
+this section is answered and has been cut; what is kept below is the part that outlives it — the
+assignment, why Silver Arrows was dropped, and the standing override.
 
-Joel asked the TD to update the markdown so TechPad Gen owns the theme system across all five apps.
-It is recorded here because **he said he may have previously told the TD to undo it**, and because
-nothing in the repo currently authorises it — which is the point. The repo is the only channel
-between agents, so an instruction that lives in a chat nobody else can read did not happen.
+**What shipped.** Ten palettes, five liveries, both polarities each, and the light/dark switch in
+every header with the livery name and what it is drawn from. 290 contrast pairs, 0 failing.
 
-### Why it is needed
+**Where the mechanism lives.** `lib/theme.css` holds every token and is byte-identical in all five
+apps, alongside `lib/theme.ts` and `app/ThemeControl.tsx`; `lib/livery.ts` is the one file that
+differs per app and it holds a single constant. The four tools' `tailwind.config.ts` no longer
+contains a colour — every entry reads `rgb(var(--token-rgb) / <alpha-value>)`, and the triplet form
+is required rather than preferred, because it is the only shape Tailwind's alpha modifier can
+interpolate.
 
-A fifteen-theme system was designed and gate-passed on 2026-09-15 — 464 contrast pairs across the
-29 places `globals.css` actually paints one token on another, 0 failing. `apps/home` can take it
-with **no rule changes at all**: every rule there already reads through `var()`.
+**The one boundary this crossed, recorded so nobody has to reconstruct it.** The TD's note on #66
+said moving colours out of `tailwind.config.ts` "cannot be TechPad Gen's first act under this
+rule", and his ledger carries it as an open question of who should do it. It was this agent, on
+Joel's instruction, because there is no way to theme a Tailwind app without it: `bg-paper` compiles
+to a literal hex and no stylesheet can reach it afterwards. Said in the worklog and the pull request
+too, not only here.
 
-The four tools cannot. They are Tailwind with colour compiled in at build time — `bg-paper` becomes
-`background-color: #FBF4EC`, not a variable — plus 69 literal `bg-white`, 23 `text-white`, and ~40
-stock `red-*`/`amber-*` severity classes. Converting them means editing `tailwind.config.ts`,
-`globals.css`, `layout.tsx` and colour utilities **inside four other agents' folders**, which
-`RULES.md` permits only as a declared exception, not as ownership.
+### Why it needed the rule first
+
+`apps/home` could always have taken a theme: every rule there already read through `var()`. The
+four tools could not. They were Tailwind with colour compiled in at build time, so converting them
+meant editing `tailwind.config.ts`, `globals.css`, `layout.tsx` and the colour classes **inside
+four other agents' folders** — which `RULES.md` permits only as a declared exception, not as
+ownership. #66 is what turned that from an exception into the job.
 
 ### The assignment Joel settled on 2026-09-15
 
@@ -155,10 +165,10 @@ three passed the 29-pair gate first time; two needed their hairline lifted to th
 bar. Senna light is arguably the truer Senna — the helmet is a yellow ground with the chevrons on
 top, so the dark version is the one that inverts it.
 
-All five apps already have a `<header>`, so the toggle has somewhere to go in each.
-`editor` and `tracker` are `flex items-center justify-between` with an empty right-hand slot;
-`coffee` is a horizontal bar; **`resume` is `flex flex-col` and needs a small restructure** to take
-a control on the right.
+All five apps had a `<header>` already, so the control had somewhere to go in each.
+**`apps/resume` needed no restructure after all** — it is `flex flex-col` where the others are
+horizontal, and the control simply sits under the description line rather than beside the title.
+That was flagged here as a risk before the work and turned out not to be one.
 
 **What goes in the header's right-hand slot**, settled 2026-09-15 and the same in all five apps:
 
@@ -172,41 +182,21 @@ then the two-state light/dark control. Both states stay visible so it reads as a
 a button whose meaning depends on the state it is currently in.
 
 **The inspiration string is not the palette's `source` field.** That is written to be read in a spec
-line and runs too long for chrome — Martini's is three cars. Each livery gets a short one instead:
-Lotus 79, 1978 · Brabham BT44B, 1975 · Ayrton Senna's helmet · Mercedes W196, 1954 ·
-McLaren MP4/4, 1988.
+line and runs too long for chrome — Martini's is three cars. The short ones shipped in
+`lib/theme.ts`: Brabham BT44B, 1975 · Lotus 25, 1963 · Ayrton Senna's helmet · McLaren MP4/4, 1988 ·
+Lotus 79, 1978. Below 560px the line is hidden entirely and only the livery name stays, because on a
+phone all three parts together pushed the app's own title into a corner.
 
 No new contrast pairs: the name reuses accent-on-paper and the active toggle segment reuses
 accent-on-`--surface-raised`, both already in the 29-pair gate.
 
-### Three edits, and the second is the one that gets missed
+### What the grant covers, now that it exists
 
-1. **`CLAUDE.md`, the "Who you are" table.** Extend the TechPad Gen row to `apps/home`,
-   cross-cutting UI, shared conventions, **the theme system in all five apps**.
-
-2. **The four tool charters.** Each currently assigns its agent a team livery — Scuderia red, Aston
-   green, Silver Arrows, McLaren papaya. Ownership without a matching prohibition over there is half
-   a rule: the next Coffee or Tracker session adds a hex, and a theme then breaks in one app only,
-   so nothing tells anyone. Proposed wording:
-
-   > **Colour is not yours.** Do not add a hex, a Tailwind stock colour utility (`bg-white`,
-   > `text-red-800`), or a `theme.extend.colors` entry. Paint through the shared tokens. Needing a
-   > colour that does not exist means asking TechPad Gen for a token, not inventing one.
-
-3. **`CLAUDE.md`, the shared foundation.** `lib/theme.css` becomes a byte-identical five-way copy
-   alongside `lib/auth.ts` and `lib/password.ts`. Drift here is visible immediately rather than
-   silent, but it belongs written down beside them. With the warning that comes with it: **`paper`
-   and `ink` mean near-white and near-black in the four tools and the exact opposite in the hub**,
-   so unifying them inverts four apps at once. This app has already paid for that — `globals.css`
-   still carries the comment about a token whose name survived a theme flip while its meaning
-   inverted, painting black on black.
-
-### What should *not* be granted
-
-Themes need `app/globals.css`, `tailwind.config.ts`, the `<html>` attribute and viewport export in
-`app/layout.tsx`, the colour-bearing utility classes, and the new `lib/theme.css`. They do **not**
-need `middleware.ts`, `lib/auth.ts`, `lib/password.ts`, `lib/supabase.ts`, or any API route. Those
-stay exactly as gated as they are. A grant wider than the job is how a gate gets talked past later.
+Themes reach `app/globals.css`, `tailwind.config.ts`, the `<html>` attributes and viewport export
+in `app/layout.tsx`, the colour-bearing utility classes, and the new `lib/theme.*` files. They do
+**not** reach `middleware.ts`, `lib/auth.ts`, `lib/password.ts`, `lib/supabase.ts`, or any API
+route, and the implementation touched none of them — verified against the diff rather than asserted.
+A grant wider than the job is how a gate gets talked past later.
 
 ### Joel's standing override, and the one condition on it
 

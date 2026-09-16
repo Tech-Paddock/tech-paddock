@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { downscale } from "@/lib/image";
+import { LIVERY } from "@/lib/livery";
+import ThemeControl from "./ThemeControl";
 import { METHOD_LABELS, type BrewMethod } from "@/lib/methods";
 import {
   extractionYield,
@@ -128,13 +130,16 @@ export default function CoffeePage() {
 
   return (
     <main className="min-h-screen">
-      <header className="bg-ink text-paper px-4 py-3 flex items-center gap-2 border-b-4 border-accent">
+      <header className="bg-bar text-bar-ink px-4 py-3 flex items-center gap-2 border-b-4 border-accent">
         <span aria-hidden>☕</span>
         <h1 className="font-semibold">Coffee</h1>
+        <div className="ml-auto">
+          <ThemeControl livery={LIVERY} onBar />
+        </div>
       </header>
 
       <div className="px-4 py-5 max-w-2xl mx-auto flex flex-col gap-5">
-        <section className="bg-white border border-line rounded-2xl overflow-hidden">
+        <section className="bg-surface border border-line rounded-2xl overflow-hidden">
           <button
             onClick={() => setScanning((open) => !open)}
             aria-expanded={scanning}
@@ -324,7 +329,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
   if (stage === "idle") {
     return (
       <div className="flex flex-col gap-4">
-        <label className="border-2 border-dashed border-line rounded-2xl bg-white py-14 text-center cursor-pointer">
+        <label className="border-2 border-dashed border-line rounded-2xl bg-surface py-14 text-center cursor-pointer">
           {/* No `capture` attribute: on iOS that forces the camera and removes
               the photo library, and a bag you already photographed is a normal
               way to add one. */}
@@ -370,14 +375,14 @@ function Scan({ onSaved }: { onSaved: () => void }) {
 
   return (
     <div className="flex flex-col gap-5">
-      {error && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+      {error && <p className="text-sm text-urgent bg-surface border border-urgent rounded-lg px-3 py-2">{error}</p>}
 
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={preview} alt="The bag" className="rounded-xl w-full max-h-64 object-contain bg-white border border-line" />
+        <img src={preview} alt="The bag" className="rounded-xl w-full max-h-64 object-contain bg-surface border border-line" />
       )}
 
-      <section className="bg-white border border-line rounded-2xl p-4 flex flex-col gap-3">
+      <section className="bg-surface border border-line rounded-2xl p-4 flex flex-col gap-3">
         <h2 className="font-medium">
           {stage === "confirm" ? "Check what's on the bag" : "The bag"}
         </h2>
@@ -406,7 +411,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value as SearchModel)}
-                className="border border-line rounded-lg px-2 py-1 bg-white"
+                className="border border-line rounded-lg px-2 py-1 bg-surface"
               >
                 {(Object.keys(MODEL_LABELS) as SearchModel[]).map((m) => (
                   <option key={m} value={m}>
@@ -424,7 +429,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
                 <select
                   value={isEffortFor(model, effort) ? effort : DEFAULT_EFFORT}
                   onChange={(e) => setEffort(e.target.value)}
-                  className="border border-line rounded-lg px-2 py-1 bg-white"
+                  className="border border-line rounded-lg px-2 py-1 bg-surface"
                 >
                   {effortsFor(model).map((level) => (
                     <option key={level} value={level}>
@@ -439,7 +444,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
           </div>
           <button
             onClick={() => void findAndSave()}
-            className="bg-accent text-white rounded-xl px-4 py-3 font-medium"
+            className="bg-accent text-accent-ink rounded-xl px-4 py-3 font-medium"
           >
             Save and find brewing instructions
           </button>
@@ -449,7 +454,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
       {stage !== "confirm" && guide && <GuideCard guide={guide} />}
 
       {stage !== "confirm" && previous && (
-        <section className="bg-white border border-accent rounded-2xl p-4 flex flex-col gap-2">
+        <section className="bg-surface border border-accent rounded-2xl p-4 flex flex-col gap-2">
           <h2 className="font-medium">You&apos;ve had this before</h2>
           <p className="text-sm text-ink/70">
             Bought {new Date(previous.created_at).toLocaleDateString()}, last brewed on{" "}
@@ -463,14 +468,14 @@ function Scan({ onSaved }: { onSaved: () => void }) {
               .join(" · ")}
             .
           </p>
-          <p className="text-xs text-ink/50">
+          <p className="text-xs text-ink-soft">
             That dial-in belongs to a brew, not to the bag — log a brew on this one when you make it.
           </p>
         </section>
       )}
 
       {stage !== "confirm" && (
-        <section className="bg-white border border-line rounded-2xl p-4 flex flex-col gap-3">
+        <section className="bg-surface border border-line rounded-2xl p-4 flex flex-col gap-3">
           <h2 className="font-medium">The purchase</h2>
           <label className="text-sm text-ink/70 flex flex-col gap-1">
             Purchased
@@ -478,10 +483,10 @@ function Scan({ onSaved }: { onSaved: () => void }) {
               type="date"
               value={purchased}
               onChange={(e) => setPurchased(e.target.value)}
-              className="border border-line rounded-lg px-3 py-2 bg-white"
+              className="border border-line rounded-lg px-3 py-2 bg-surface"
             />
           </label>
-          <p className="text-xs text-ink/50">
+          <p className="text-xs text-ink-soft">
             How you brew it is recorded per brew, on the bag in your shelf — a bag holds many brews.
           </p>
         </section>
@@ -491,7 +496,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
         <button
           onClick={() => void save()}
           disabled={stage === "saving"}
-          className="bg-accent text-white rounded-xl px-4 py-3 font-medium disabled:opacity-60"
+          className="bg-accent text-accent-ink rounded-xl px-4 py-3 font-medium disabled:opacity-60"
         >
           {stage === "saving" ? "Saving…" : "Save this bag"}
         </button>
@@ -512,7 +517,7 @@ function GuideCard({ guide }: { guide: Guide }) {
   ].filter(([, v]) => v) as [string, string][];
 
   return (
-    <section className="bg-white border border-line rounded-2xl p-4 flex flex-col gap-3">
+    <section className="bg-surface border border-line rounded-2xl p-4 flex flex-col gap-3">
       <div>
         <h2 className="font-medium">{GUIDE_LABELS[guide.status]}</h2>
         {guide.guide_url && (
@@ -552,7 +557,7 @@ function GuideCard({ guide }: { guide: Guide }) {
       )}
 
       {guide.dropped.length > 0 && (
-        <p className="text-xs text-ink/50">
+        <p className="text-xs text-ink-soft">
           {guide.dropped.length} value{guide.dropped.length === 1 ? "" : "s"} discarded for having no source on the
           page.
         </p>
@@ -580,10 +585,10 @@ function Library({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search roaster, coffee, origin, notes"
-        className="w-full border border-line rounded-xl px-3 py-2 bg-white outline-none focus:border-accent"
+        className="w-full border border-line rounded-xl px-3 py-2 bg-surface outline-none focus:border-accent"
       />
       {error ? (
-        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+        <p className="text-sm text-urgent bg-surface border border-urgent rounded-lg px-3 py-2">
           The library could not be read, so this is not a statement about what is in it: {error}
         </p>
       ) : bags.length === 0 ? (
@@ -649,7 +654,7 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
   ].filter(([, v]) => v) as [string, string][];
 
   return (
-    <article className="bg-white border border-line rounded-2xl overflow-hidden">
+    <article className="bg-surface border border-line rounded-2xl overflow-hidden">
       <button onClick={() => setOpen(!open)} className="w-full flex gap-3 p-3 text-left items-center">
         {bag.photo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -669,7 +674,7 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
       {open && (
         <div className="border-t border-line p-4 flex flex-col gap-4">
           <div>
-            <p className="text-xs uppercase tracking-wide text-ink/50 mb-1">{GUIDE_LABELS[bag.guide_status]}</p>
+            <p className="text-xs uppercase tracking-wide text-ink-soft mb-1">{GUIDE_LABELS[bag.guide_status]}</p>
             {guideRows.length ? (
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                 {guideRows.map(([k, v]) => (
@@ -716,7 +721,7 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
                 type="date"
                 value={draft.purchased_date}
                 onChange={(e) => setDraft({ ...draft, purchased_date: e.target.value })}
-                className="border border-line rounded-lg px-3 py-2 bg-white"
+                className="border border-line rounded-lg px-3 py-2 bg-surface"
               />
             </label>
             <label className="text-sm text-ink/70 flex flex-col gap-1">
@@ -725,20 +730,20 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
                 rows={3}
                 value={draft.my_notes}
                 onChange={(e) => setDraft({ ...draft, my_notes: e.target.value })}
-                className="border border-line rounded-lg px-3 py-2 bg-white"
+                className="border border-line rounded-lg px-3 py-2 bg-surface"
               />
-              <span className="text-xs text-ink/50">
+              <span className="text-xs text-ink-soft">
                 What the coffee tastes like, which outlives any one brew. Per-brew observations go on the brew.
               </span>
             </label>
             {error && (
-              <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+              <p className="text-sm text-urgent bg-surface border border-urgent rounded-lg px-3 py-2">{error}</p>
             )}
 
             <button
               onClick={() => void save()}
               disabled={saving || deleting}
-              className="bg-accent text-white rounded-lg px-3 py-2 font-medium disabled:opacity-60"
+              className="bg-accent text-accent-ink rounded-lg px-3 py-2 font-medium disabled:opacity-60"
             >
               {saving ? "Saving…" : "Save"}
             </button>
@@ -759,7 +764,7 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
                     <button
                       onClick={() => void remove()}
                       disabled={deleting}
-                      className="flex-1 bg-red-700 text-white rounded-lg px-3 py-2 font-medium disabled:opacity-60"
+                      className="flex-1 bg-urgent text-ink-invert rounded-lg px-3 py-2 font-medium disabled:opacity-60"
                     >
                       {deleting ? "Deleting…" : "Yes, delete"}
                     </button>
@@ -775,7 +780,7 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
               ) : (
                 <button
                   onClick={() => setConfirmingDelete(true)}
-                  className="text-sm text-red-700 underline"
+                  className="text-sm text-urgent underline"
                 >
                   Delete this bag
                 </button>
@@ -872,7 +877,7 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
       <h3 className="font-medium">Brews{brews?.length ? ` (${brews.length})` : ""}</h3>
 
       {error && (
-        <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+        <p className="text-sm text-urgent bg-surface border border-urgent rounded-lg px-3 py-2">{error}</p>
       )}
 
       {brews?.length === 0 && !error && <p className="text-sm text-ink/60">No brews logged yet.</p>}
@@ -894,7 +899,7 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
               <select
                 value={draft.brewer}
                 onChange={(e) => setDraft({ ...draft, brewer: e.target.value })}
-                className="border border-line rounded-lg px-3 py-2 bg-white"
+                className="border border-line rounded-lg px-3 py-2 bg-surface"
               >
                 <option value="">—</option>
                 {MY_BREWERS.map((b) => (
@@ -913,7 +918,7 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
               <select
                 value={draft.grinder}
                 onChange={(e) => setDraft({ ...draft, grinder: e.target.value })}
-                className="border border-line rounded-lg px-3 py-2 bg-white"
+                className="border border-line rounded-lg px-3 py-2 bg-surface"
               >
                 <option value="">—</option>
                 {GRINDERS.map((g) => (
@@ -936,7 +941,7 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
           {live != null && (
             <p className="text-sm">
               <strong>{live}%</strong> extraction —{" "}
-              <span className={band(live, YIELD_TARGET) === "in" ? "text-ink/70" : "text-red-700"}>
+              <span className={band(live, YIELD_TARGET) === "in" ? "text-ink/70" : "text-urgent"}>
                 {readBrew({ tdsPercent: pct, yieldPercent: live })}
               </span>
             </p>
@@ -950,7 +955,7 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
               rows={2}
               value={draft.notes}
               onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-              className="border border-line rounded-lg px-3 py-2 bg-white"
+              className="border border-line rounded-lg px-3 py-2 bg-surface"
             />
           </label>
 
@@ -958,7 +963,7 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
             <button
               onClick={() => void add()}
               disabled={saving}
-              className="flex-1 bg-accent text-white rounded-lg px-3 py-2 font-medium disabled:opacity-60"
+              className="flex-1 bg-accent text-accent-ink rounded-lg px-3 py-2 font-medium disabled:opacity-60"
             >
               {saving ? "Saving…" : "Log this brew"}
             </button>
@@ -988,7 +993,7 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
           {brew.brewer ? MY_BREWER_LABELS[brew.brewer as MyBrewer] : "Brew"}
           {brew.brew_method ? ` · ${brew.brew_method}` : ""}
         </span>
-        <span className="text-xs text-ink/50 shrink-0">{new Date(brew.brewed_at).toLocaleDateString()}</span>
+        <span className="text-xs text-ink-soft shrink-0">{new Date(brew.brewed_at).toLocaleDateString()}</span>
       </div>
 
       {(brew.grinder || brew.grind_setting) && (
@@ -997,11 +1002,11 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
 
       {pct != null && (
         <span className="text-sm">
-          TDS <strong>{pct}%</strong> <span className="text-ink/50">({percentToPpm(pct)} ppm)</span>
+          TDS <strong>{pct}%</strong> <span className="text-ink-soft">({percentToPpm(pct)} ppm)</span>
           {ey != null && (
             <>
               {" · "}
-              <strong className={band(ey, YIELD_TARGET) === "in" ? "" : "text-red-700"}>{ey}%</strong> extraction
+              <strong className={band(ey, YIELD_TARGET) === "in" ? "" : "text-urgent"}>{ey}%</strong> extraction
             </>
           )}
         </span>
@@ -1010,7 +1015,7 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
       {brew.rating ? <span className="text-sm text-accent">{"★".repeat(brew.rating)}</span> : null}
       {brew.notes && <span className="text-sm text-ink/70">{brew.notes}</span>}
 
-      <button onClick={onDelete} className="self-start text-xs text-red-700 underline mt-1">
+      <button onClick={onDelete} className="self-start text-xs text-urgent underline mt-1">
         Remove
       </button>
     </div>
@@ -1032,7 +1037,7 @@ function TdsInput({ percent, onPercent }: { percent: string; onPercent: (v: stri
             const ppm = Number(e.target.value);
             onPercent(e.target.value && Number.isFinite(ppm) ? String(ppmToPercent(ppm)) : "");
           }}
-          className="border border-line rounded-lg px-3 py-2 bg-white"
+          className="border border-line rounded-lg px-3 py-2 bg-surface"
         />
       </label>
     </Inline>
@@ -1042,7 +1047,7 @@ function TdsInput({ percent, onPercent }: { percent: string; onPercent: (v: stri
 /** The margin notes: how to take the reading, and what it means. */
 function BrewNotes() {
   return (
-    <details className="text-xs text-ink/60 bg-white border border-line rounded-lg px-3 py-2">
+    <details className="text-xs text-ink/60 bg-surface border border-line rounded-lg px-3 py-2">
       <summary className="cursor-pointer">How to measure this</summary>
       <ul className="list-disc pl-4 mt-2 flex flex-col gap-1">
         <li>
@@ -1086,7 +1091,7 @@ function Field({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="border border-line rounded-lg px-3 py-2 bg-white disabled:bg-paper disabled:text-ink/70 normal-case"
+        className="border border-line rounded-lg px-3 py-2 bg-surface disabled:bg-paper disabled:text-ink/70 normal-case"
       />
     </label>
   );
@@ -1114,7 +1119,7 @@ function Stars({ value, onChange }: { value: number | null; onChange: (v: number
         </button>
       ))}
       {value ? (
-        <button type="button" onClick={() => onChange(null)} className="text-xs text-ink/50 underline ml-2">
+        <button type="button" onClick={() => onChange(null)} className="text-xs text-ink-soft underline ml-2">
           clear
         </button>
       ) : (

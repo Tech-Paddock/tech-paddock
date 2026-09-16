@@ -1,0 +1,90 @@
+/**
+ * Paddock theme — the shared half.
+ *
+ * Byte-identical in all five apps, the arrangement lib/auth.ts and
+ * lib/password.ts already use. It holds no secret and touches no session.
+ *
+ * Two axes, and they are deliberately different kinds of thing.
+ *
+ * **Livery is per app and fixed at build time.** Coffee is John Player
+ * Special, the hub is Martini, and neither can become the other. That is why
+ * there is no livery cookie and no picker: the app names its own livery in its
+ * layout, the layout stays statically renderable, and the tokens arrive from
+ * lib/theme.css. The hub embedding a tool whose livery differs is the design
+ * rather than a defect — you are looking at two cars.
+ *
+ * **Polarity is per person and shared across every subdomain.** One cookie on
+ * .techpaddock.io, so switching to light in Coffee switches the hub too.
+ */
+
+export type Mode = "light" | "dark";
+
+export type Livery = "martini" | "clark" | "senna" | "mp44" | "jps";
+
+/**
+ * Name and inspiration, shown in every app's header beside the switch.
+ *
+ * The inspiration line is deliberately not the palette's own `source` field.
+ * That one is written to be read in a spec and runs long — Martini's names three
+ * cars across two decades — where this has to sit in a bar beside an app title.
+ */
+export const LIVERIES: Record<Livery, { name: string; source: string }> = {
+  martini: {
+    name: "Martini",
+    source: "Brabham BT44B, 1975",
+  },
+  clark: {
+    name: "Clark",
+    source: "Lotus 25, 1963",
+  },
+  senna: {
+    name: "Senna",
+    source: "Ayrton Senna's helmet",
+  },
+  mp44: {
+    name: "MP4/4",
+    source: "McLaren MP4/4, 1988",
+  },
+  jps: {
+    name: "John Player Special",
+    source: "Lotus 79, 1978",
+  },
+};
+
+export const THEME_COOKIE = "paddock_mode";
+
+const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
+
+/**
+ * Absent is not the same as light. No cookie means "follow the system", which
+ * lib/theme.css answers with a prefers-color-scheme media query — no blocking
+ * script, and nothing to flash.
+ */
+export function readMode(cookieValue: string | undefined): Mode | null {
+  return cookieValue === "light" || cookieValue === "dark" ? cookieValue : null;
+}
+
+/**
+ * Built for document.cookie, not for a Set-Cookie header, and deliberately not
+ * httpOnly — it carries a preference, never a credential. Writing it from the
+ * browser is what makes the switch instant: the attribute flips on <html> in
+ * the same tick and nothing round-trips to the server.
+ *
+ * The domain logic mirrors sessionCookieOptions in lib/auth.ts rather than
+ * importing it, because that file is gated and this one must not reach into
+ * it. A host may only set a cookie for a domain it belongs to, so off
+ * techpaddock.io — localhost, *.vercel.app previews — this falls back to a
+ * host-only cookie instead of setting nothing at all.
+ */
+export function themeCookieString(hostname: string, protocol: string, mode: Mode) {
+  const shared = hostname === "techpaddock.io" || hostname.endsWith(".techpaddock.io");
+  const parts = [
+    `${THEME_COOKIE}=${mode}`,
+    "path=/",
+    `max-age=${ONE_YEAR_SECONDS}`,
+    "samesite=lax",
+  ];
+  if (shared) parts.push("domain=.techpaddock.io");
+  if (protocol === "https:") parts.push("secure");
+  return parts.join("; ");
+}

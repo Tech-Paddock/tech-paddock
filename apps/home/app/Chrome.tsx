@@ -4,6 +4,8 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { TOOLS, type ToolSlug } from "@/lib/platform";
+import { LIVERY } from "@/lib/livery";
+import ThemeControl from "./ThemeControl";
 
 /**
  * The hub's chrome — topbar, sidebar, and the box everything else renders into.
@@ -78,6 +80,11 @@ function Bar({ children }: { children: React.ReactNode }) {
                   : `Working in ${APPS[selected].name}`}
             </span>
           </div>
+          {/* Pushed to the far end of the bar by .topbar-brand's auto margin.
+              The livery is fixed for this app; only the light/dark half of this
+              control does anything, and what it does is shared with the other
+              four subdomains. */}
+          <ThemeControl livery={LIVERY} />
         </div>
       </header>
       <div className="shell">

@@ -2,6 +2,8 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { LIVERY } from "@/lib/livery";
+import ThemeControl from "./ThemeControl";
 
 type Contact = {
   id: string;
@@ -282,15 +284,16 @@ function DraftShell() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-10 flex flex-col gap-8">
-      <header className="flex items-center justify-between">
-        <div>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold">Message Editor</h1>
+          <ThemeControl livery={LIVERY} />
         </div>
-        <div className="flex gap-1 bg-white border border-line rounded-lg p-1">
+        <div className="flex gap-1 bg-surface border border-line rounded-lg p-1">
           <button
             onClick={() => setMode("draft")}
             className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-              mode === "draft" ? "bg-accent text-white" : "text-ink/70"
+              mode === "draft" ? "bg-accent text-accent-ink" : "text-ink/70"
             }`}
           >
             Draft
@@ -298,7 +301,7 @@ function DraftShell() {
           <button
             onClick={() => setMode("train")}
             className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-              mode === "train" ? "bg-accent text-white" : "text-ink/70"
+              mode === "train" ? "bg-accent text-accent-ink" : "text-ink/70"
             }`}
           >
             Train
@@ -307,7 +310,7 @@ function DraftShell() {
       </header>
 
       {modelDrift && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-sm rounded-lg px-4 py-3">
+        <div className="bg-surface border border-warn text-warn text-sm rounded-lg px-4 py-3">
           New Sonnet model{modelDrift.newly_detected.length > 1 ? "s" : ""} detected:{" "}
           <span className="font-medium">{modelDrift.newly_detected.join(", ")}</span> — still
           drafting on Sonnet 5 until this is reviewed.
@@ -315,7 +318,7 @@ function DraftShell() {
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg px-4 py-3">
+        <div className="bg-surface border border-urgent text-urgent text-sm rounded-lg px-4 py-3">
           {error}
         </div>
       )}
@@ -336,19 +339,19 @@ function DraftShell() {
                   onFocus={() => setContactMenuOpen(true)}
                   onBlur={() => setTimeout(() => setContactMenuOpen(false), 150)}
                   placeholder="Search contacts, or leave blank"
-                  className="flex-1 border border-line rounded-lg px-3 py-2 bg-white"
+                  className="flex-1 border border-line rounded-lg px-3 py-2 bg-surface"
                 />
                 <button
                   type="button"
                   onClick={() => setNewContactOpen((v) => !v)}
-                  className="px-3 py-2 rounded-lg border border-line bg-white text-sm font-medium text-ink/70 whitespace-nowrap"
+                  className="px-3 py-2 rounded-lg border border-line bg-surface text-sm font-medium text-ink/70 whitespace-nowrap"
                 >
                   + New contact
                 </button>
               </div>
 
               {contactMenuOpen && (
-                <div className="absolute top-full left-0 right-[104px] mt-1 bg-white border border-line rounded-lg shadow-sm max-h-56 overflow-y-auto z-10">
+                <div className="absolute top-full left-0 right-[104px] mt-1 bg-surface border border-line rounded-lg shadow-sm max-h-56 overflow-y-auto z-10">
                   <button
                     type="button"
                     onMouseDown={() => selectContact(null)}
@@ -364,18 +367,18 @@ function DraftShell() {
                       className="w-full text-left px-3 py-2 text-sm hover:bg-paper"
                     >
                       {c.name}
-                      {c.org ? <span className="text-ink/50"> — {c.org}</span> : null}
+                      {c.org ? <span className="text-ink-soft"> — {c.org}</span> : null}
                     </button>
                   ))}
                   {filteredContacts.length === 0 && (
-                    <p className="px-3 py-2 text-sm text-ink/50">No matches</p>
+                    <p className="px-3 py-2 text-sm text-ink-soft">No matches</p>
                   )}
                 </div>
               )}
             </div>
 
             {newContactOpen && (
-              <div className="col-span-2 border border-line rounded-lg p-4 bg-white flex flex-col gap-3">
+              <div className="col-span-2 border border-line rounded-lg p-4 bg-surface flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     value={newContact.name}
@@ -398,7 +401,7 @@ function DraftShell() {
                   <select
                     value={newContact.relationship_type}
                     onChange={(e) => setNewContact({ ...newContact, relationship_type: e.target.value })}
-                    className="border border-line rounded-lg px-3 py-2 text-sm bg-white"
+                    className="border border-line rounded-lg px-3 py-2 text-sm bg-surface"
                   >
                     {RELATIONSHIP_TYPES.map((r) => (
                       <option key={r} value={r}>
@@ -409,7 +412,7 @@ function DraftShell() {
                   <select
                     value={newContact.preferred_channel}
                     onChange={(e) => setNewContact({ ...newContact, preferred_channel: e.target.value })}
-                    className="border border-line rounded-lg px-3 py-2 text-sm bg-white"
+                    className="border border-line rounded-lg px-3 py-2 text-sm bg-surface"
                   >
                     {CHANNELS.map((c) => (
                       <option key={c.value} value={c.value}>
@@ -422,7 +425,7 @@ function DraftShell() {
                   type="button"
                   onClick={handleCreateContact}
                   disabled={savingContact || !newContact.name.trim()}
-                  className="self-start bg-accent text-white rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+                  className="self-start bg-accent text-accent-ink rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-60"
                 >
                   {savingContact ? "Saving…" : "Save contact"}
                 </button>
@@ -434,7 +437,7 @@ function DraftShell() {
               <select
                 value={channel}
                 onChange={(e) => setChannel(e.target.value as typeof channel)}
-                className="border border-line rounded-lg px-3 py-2 bg-white"
+                className="border border-line rounded-lg px-3 py-2 bg-surface"
               >
                 <option value="" disabled>
                   Select…
@@ -452,7 +455,7 @@ function DraftShell() {
               <select
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value as typeof purpose)}
-                className="border border-line rounded-lg px-3 py-2 bg-white"
+                className="border border-line rounded-lg px-3 py-2 bg-surface"
               >
                 <option value="" disabled>
                   Select…
@@ -470,7 +473,7 @@ function DraftShell() {
               <select
                 value={toneChoice}
                 onChange={(e) => setToneChoice(e.target.value)}
-                className="border border-line rounded-lg px-3 py-2 bg-white"
+                className="border border-line rounded-lg px-3 py-2 bg-surface"
               >
                 <option value="">No particular tone</option>
                 {TONES.map((t) => (
@@ -490,7 +493,7 @@ function DraftShell() {
                   onChange={(e) => setToneOther(e.target.value)}
                   autoFocus
                   placeholder="e.g. rueful but not grovelling"
-                  className="border border-line rounded-lg px-3 py-2 bg-white"
+                  className="border border-line rounded-lg px-3 py-2 bg-surface"
                 />
               </label>
             )}
@@ -507,7 +510,7 @@ function DraftShell() {
               onChange={(e) => setContext(e.target.value)}
               rows={3}
               placeholder="e.g. We met at a conference panel in March. They offered to make an intro and never followed up."
-              className="border border-line rounded-lg px-3 py-2 bg-white resize-y min-h-20"
+              className="border border-line rounded-lg px-3 py-2 bg-surface resize-y min-h-20"
             />
           </label>
 
@@ -517,8 +520,8 @@ function DraftShell() {
               <span className="inline-flex items-center gap-1.5 text-xs font-normal text-ink/60">
                 Model: Sonnet 5
                 <span
-                  className={`px-2 py-0.5 rounded-full text-white font-medium ${
-                    modelDrift ? "bg-red-500" : "bg-green-500"
+                  className={`px-2 py-0.5 rounded-full font-medium ${
+                    modelDrift ? "bg-urgent text-ink-invert" : "bg-accent text-accent-ink"
                   }`}
                 >
                   {modelDrift ? "Outdated" : "Current"}
@@ -530,14 +533,14 @@ function DraftShell() {
               onChange={(e) => setInput(e.target.value)}
               rows={4}
               placeholder="e.g. Following up on our call last week, asking if there's an update on the role."
-              className="border border-line rounded-lg px-3 py-2 bg-white resize-y min-h-24"
+              className="border border-line rounded-lg px-3 py-2 bg-surface resize-y min-h-24"
             />
           </label>
 
           <button
             onClick={handleDraft}
             disabled={loading || !input || !channel || !purpose}
-            className="self-start bg-accent text-white rounded-lg px-4 py-2 font-medium disabled:opacity-60"
+            className="self-start bg-accent text-accent-ink rounded-lg px-4 py-2 font-medium disabled:opacity-60"
           >
             {loading ? "Drafting…" : "Draft message"}
           </button>
@@ -551,17 +554,17 @@ function DraftShell() {
                   setCommitted(false);
                 }}
                 rows={6}
-                className="bg-white border border-line rounded-xl p-5 text-sm leading-relaxed resize-y"
+                className="bg-surface border border-line rounded-xl p-5 text-sm leading-relaxed resize-y"
               />
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleCommit}
                   disabled={committing || committed || !draft.trim()}
-                  className="self-start bg-ink text-white rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
+                  className="self-start bg-ink text-ink-invert rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
                 >
                   {committing ? "Saving…" : committed ? "Logged ✓" : "Sent this — log it"}
                 </button>
-                <p className="text-xs text-ink/50">
+                <p className="text-xs text-ink-soft">
                   Edit the draft above to match exactly what you sent, then log it — it's appended to history
                   (used as context for future drafts to this contact) without touching the style guide. Refine
                   the guide itself, in batches, from the Train tab whenever you want.
@@ -572,7 +575,7 @@ function DraftShell() {
         </div>
       ) : (
         <div className="flex flex-col gap-6">
-          <div className="bg-white border border-line rounded-xl p-5">
+          <div className="bg-surface border border-line rounded-xl p-5">
             <p className="text-xs font-medium text-ink/60 uppercase tracking-wide">
               Current style guide{styleGuide ? ` — v${styleGuide.version}` : ""}
             </p>
@@ -597,18 +600,18 @@ function DraftShell() {
             onChange={(e) => setSamples(e.target.value)}
             rows={10}
             placeholder="Paste a few messages you've actually sent, or load from logged history above — the more, the better it learns your voice."
-            className="border border-line rounded-lg px-3 py-2 bg-white resize-none"
+            className="border border-line rounded-lg px-3 py-2 bg-surface resize-none"
           />
 
           <button
             onClick={handleTrain}
             disabled={training || !samples}
-            className="self-start bg-accent text-white rounded-lg px-4 py-2 font-medium disabled:opacity-60"
+            className="self-start bg-accent text-accent-ink rounded-lg px-4 py-2 font-medium disabled:opacity-60"
           >
             {training ? "Refining…" : "Refine style guide"}
           </button>
 
-          <p className="text-xs text-ink/50">
+          <p className="text-xs text-ink-soft">
             Refining is deliberate and batched on purpose — it rewrites the whole guide via Claude, so doing it
             per-message would drift the rules based on a sample size of one. Log messages from the Draft tab as
             you send them, then come back here occasionally to fold a real batch in at once.
