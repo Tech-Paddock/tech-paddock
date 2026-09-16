@@ -171,8 +171,17 @@ function toHighlights(members: Para[]): { items: Highlight[]; scaffolding?: Para
 const isPipeRow = (text: string) => /^\|.*\|$/.test(text.trim());
 const splitCells = (text: string) =>
   text.trim().slice(1, -1).split("|").map((c) => c.trim());
-/** `:---`, `---`, `:---:` — markdown's column alignment row. */
-const isAlignmentRow = (text: string) => {
+/**
+ * `:---`, `---`, `:---:` — markdown's column alignment row.
+ *
+ * Exported because the content check has to exclude it on the same terms this
+ * file already does: it is scaffolding carrying no words, so counting it as
+ * either present or missing would put a number on text no document ever had.
+ * The pipe-row guard is redundant at the call site below, which has already
+ * filtered to pipe rows, and load-bearing for callers that have not.
+ */
+export const isAlignmentRow = (text: string) => {
+  if (!isPipeRow(text)) return false;
   const cells = splitCells(text);
   return cells.length > 0 && cells.every((c) => /^:?-{3,}:?$/.test(c));
 };
