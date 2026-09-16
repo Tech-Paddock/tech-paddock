@@ -10,6 +10,8 @@ Read `RULES.md` first. This file is only what is true right now.
 
 **It is live at `coffee.techpaddock.io`**, behind the password gate. The whole flow has run end to
 end against a real bag: identify 200, search 200, three-tier retrieval against a live roaster site.
+**It installs to the iPhone home screen and runs standalone** — confirmed by Joel on a real phone
+2026-09-16, which was the one thing the built HTML could not prove. Nothing about it is open.
 
 **Save comes before the search**, and the page polls the row rather than waiting on a response. The
 search takes minutes with nothing travelling on the connection, so a phone concludes the request is
@@ -72,6 +74,3 @@ are siblings rather than nested, because an `<a>` inside a `<button>` is invalid
 4. The deliberately-unbuilt list — timer, inventory, method lookup table — stays unbuilt until asked.
    **Parked with it:** the beans link's size. It has moved once, onto the pill; Joel may want the
    sizing changed too, and that is not an action until he says so.
-
-Waiting on Joel: whether the iOS install works on a real iPhone — the meta tags and insets are
-verified against the built HTML, the icon needs a phone. In the ledger.
