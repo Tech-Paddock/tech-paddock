@@ -8,9 +8,8 @@ Read `RULES.md` first. This file is only what is true right now.
 
 ## What is true now
 
-**It is live at `coffee.techpaddock.io`**, behind the password gate, on current `main`.
-`GET /api/health` returns ok on all three checks. The whole flow has run end to end against a real
-bag: identify 200, search 200, three-tier retrieval against a live roaster site. `npm test` is green.
+**It is live at `coffee.techpaddock.io`**, behind the password gate. The whole flow has run end to
+end against a real bag: identify 200, search 200, three-tier retrieval against a live roaster site.
 
 **Save comes before the search**, and the page polls the row rather than waiting on a response. The
 search takes minutes with nothing travelling on the connection, so a phone concludes the request is
@@ -20,8 +19,7 @@ dead — two correct answers were unreachable that way on the first live run. Re
 `guide_model` and `guide_effort`; the Haiku 4.5 default is safe because `validateGuide` enforces
 quote-backing in code, so a weaker model can only fail to find a recipe, never invent one.
 `lib/models.ts` is a registry because the three models do not take the same request and each
-mismatch is a 400 rather than a degraded result — the route refuses a level the chosen model cannot
-take rather than dropping it.
+mismatch is a 400 — the route refuses a level the model cannot take rather than dropping it.
 
 **A bag is a purchase; a brew is one attempt at it.** The dial-in moved off the bag entirely, because
 one set of columns can only hold the last thing you tried. `extraction_yield` is a generated column
@@ -75,6 +73,8 @@ reachable. Force-push and branch deletion are both blocked for me.
    purchases. **No agent in the sandbox can verify a domain**, so a list produced here is recalled
    from training, the exact guess `findRoasterDomain` refuses. It has to come from the deployed app.
 4. The deliberately-unbuilt list — timer, inventory, method lookup table — stays unbuilt until asked.
+   **Parked with it:** where "The beans" link sits and how big it is. Joel may want it moved or
+   resized; it is not an action until he says so.
 
 Waiting on Joel: whether the iOS install works on a real iPhone — the meta tags and insets are
 verified against the built HTML, the icon needs a phone. In the ledger.
