@@ -46,7 +46,8 @@ landed after its session started.
 >
 > **End every message to me with the three-part sign-off** — Work Brief, DevOps, Open Items. The
 > shape is in `CLAUDE.md`. Show only your own branches and your own ledger rows, and never a status
-> colour you did not look up in this session.
+> colour you did not look up in this session. A branch of yours that is merged, superseded or dead
+> still gets a line, purple, until I delete it — you cannot.
 >
 > **If what you are about to build contradicts the brief or your charter, stop and ask me before you
 > build it** — not in the pull request afterwards. If an instruction looks wrong, say so at a high
