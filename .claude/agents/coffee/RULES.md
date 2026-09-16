@@ -86,6 +86,18 @@ render beside the parsed values so a misparse is visible rather than invisible.
 A house pour-over ratio is useful, but it is not what the roaster decided about this particular
 lot. **Do not flatten the distinction.**
 
+**The tier records where the instructions were read, not who they were written for.** That is the
+only part a search can check, and the first real bag is the case that separates the two: Sweet Bloom
+print one house recipe — Origami Air, 1:17, 900µm, 2:40 — on every product page, so it validated as
+`coffee_specific` while being their default for everything. The classification is right; the old
+label, "The roaster's recipe for this coffee", asserted the part that was never checked. It now says
+where it came from, with a line beneath tier 1 saying what that does and does not prove.
+
+So **a `coffee_specific` guide is not evidence of a per-lot recipe**, and anything later that treats
+it as one is reading more into the column than it holds. The one honest signal available is
+cross-bag — two bags from the same roaster carrying identical values means it is boilerplate — and
+it is deliberately not built, because there is one bag.
+
 ### 3. The roaster's values stay separate from yours
 
 `guide_*` on the bag holds what was published; it is never overwritten by what you did. What you
@@ -139,6 +151,18 @@ anything that accumulates", applied to the thing that was accumulating.
 
 **Deleting a bag deletes its brews**, by cascade, and its photo. The confirm names the brew count
 for that reason: losing a dial-in history silently is worse than losing the photo.
+
+**A new brew opens as a repeat of the last one.** Dialling in is one change at a time against
+everything else held still, so retyping four settings you did not mean to change is how they drift —
+and a drifted setting is indistinguishable afterwards from a deliberate one. `repeatOf` carries the
+decisions: brewer, brew method, grinder, grind setting, dose. It carries no reading — beverage mass,
+TDS, rating and notes start empty, because those describe one cup and a repeated one would record a
+measurement nobody took. Beverage mass and TDS both feed the generated extraction yield, so a stale
+one produces a figure that is arithmetically correct about a brew that never happened. **Clear**
+empties the form; it is beside the line saying the form was prefilled, so it undoes the thing it
+sits next to.
+
+This is the same line `findPreviousBag` draws across bags, drawn again within one.
 
 **TDS is stored once, in percent.** A refractometer reads percent; everything else quotes ppm; they
 are the same number and `1% = 10,000 ppm`. ppm is derived at display and never stored, because two

@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { percentToPpm, ppmToPercent, extractionYield, band, TDS_TARGET, YIELD_TARGET } from "@/lib/brews";
+import {
+  percentToPpm,
+  ppmToPercent,
+  extractionYield,
+  band,
+  blankBrew,
+  repeatOf,
+  TDS_TARGET,
+  YIELD_TARGET,
+} from "@/lib/brews";
+import { DEFAULT_GRINDER } from "@/lib/brewers";
 
 describe("TDS units", () => {
   it("converts both ways around one number", () => {
@@ -57,5 +67,61 @@ describe("band", () => {
   it("counts the boundaries as inside", () => {
     expect(band(YIELD_TARGET.low, YIELD_TARGET)).toBe("in");
     expect(band(YIELD_TARGET.high, YIELD_TARGET)).toBe("in");
+  });
+});
+
+describe("repeatOf", () => {
+  const previous = {
+    brewer: "v60-switch",
+    brew_method: "45s bloom, two pours",
+    grinder: "Fellow Ode 2",
+    grind_setting: "4.5",
+    dose_g: "18.50",
+    beverage_g: "280.00",
+    tds_percent: "1.38",
+    rating: 4,
+    notes: "Jammy, slightly hollow at the end.",
+  };
+
+  it("carries the settings forward", () => {
+    expect(repeatOf(previous)).toMatchObject({
+      brewer: "v60-switch",
+      brew_method: "45s bloom, two pours",
+      grinder: "Fellow Ode 2",
+      grind_setting: "4.5",
+      dose_g: "18.50",
+    });
+  });
+
+  it("carries no reading forward", () => {
+    // The whole reason the settings repeat is so one change at a time is
+    // legible. A reading that repeated would describe a cup nobody poured —
+    // and beverage mass and TDS both feed the generated extraction yield.
+    const draft = repeatOf(previous);
+    expect(draft.beverage_g).toBe("");
+    expect(draft.notes).toBe("");
+    expect(draft).not.toHaveProperty("tds_percent");
+    expect(draft).not.toHaveProperty("rating");
+  });
+
+  it("is a blank form when there is no previous brew", () => {
+    expect(repeatOf(null)).toEqual(blankBrew());
+    expect(repeatOf(undefined)).toEqual(blankBrew());
+  });
+
+  it("keeps the default grinder when the last brew recorded none", () => {
+    // A brew logged without a grinder says nothing about which one is on the
+    // counter, and there is only one.
+    expect(repeatOf({ ...previous, grinder: null }).grinder).toBe(DEFAULT_GRINDER);
+  });
+
+  it("stringifies a numeric dose, because the form holds strings", () => {
+    expect(repeatOf({ dose_g: 18.5 }).dose_g).toBe("18.5");
+    expect(repeatOf({ dose_g: null }).dose_g).toBe("");
+  });
+
+  it("starts blank with the grinder already chosen", () => {
+    expect(blankBrew().grinder).toBe(DEFAULT_GRINDER);
+    expect(blankBrew().brewer).toBe("");
   });
 });

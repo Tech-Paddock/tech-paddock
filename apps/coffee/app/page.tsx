@@ -11,14 +11,16 @@ import {
   ppmToPercent,
   readBrew,
   band,
+  blankBrew,
+  repeatOf,
   TDS_TARGET,
   YIELD_TARGET,
+  type BrewDraft,
 } from "@/lib/brews";
 import {
   MY_BREWERS,
   MY_BREWER_LABELS,
   GRINDERS,
-  DEFAULT_GRINDER,
   myBrewerFor,
   type MyBrewer,
 } from "@/lib/brewers";
@@ -92,11 +94,27 @@ const EMPTY: Identity = {
 };
 
 const GUIDE_LABELS: Record<GuideStatus, string> = {
-  coffee_specific: "The roaster's recipe for this coffee",
-  roaster_generic: "The roaster's house method — not specific to this coffee",
+  coffee_specific: "The roaster's recipe, from this coffee's own page",
+  roaster_generic: "The roaster's house method, from elsewhere on their site",
   none: "No published instructions",
   not_searched: "Not searched",
 };
+
+/**
+ * The tier is decided by **where** the instructions were read, because that is
+ * the only part a search can verify. It is not a claim that the roaster wrote
+ * them for this lot, and the first real bag is exactly the case that shows the
+ * difference: Sweet Bloom print one house recipe — Origami Air, 1:17, 900µm,
+ * 2:40 — on every product page, so it validated as `coffee_specific` while
+ * being the same recipe they give for everything.
+ *
+ * The label used to read "The roaster's recipe for this coffee", which asserted
+ * the part that was never checked. It now says where it came from, and this
+ * says out loud what that does and does not prove. Surfacing the uncertainty
+ * beats resolving it in code: nothing in one page can tell the two apart.
+ */
+const PRODUCT_PAGE_CAVEAT =
+  "Published on this coffee's page, which is not the same as written for it — plenty of roasters print one default recipe on all of them. The quote below is the check.";
 
 export default function CoffeePage() {
   // Scanning is an action you take occasionally; the library is the thing you
@@ -519,7 +537,10 @@ function GuideCard({ guide }: { guide: Guide }) {
   return (
     <section className="bg-surface border border-line rounded-2xl p-4 flex flex-col gap-3">
       <div>
-        <h2 className="font-medium">{GUIDE_LABELS[guide.status]}</h2>
+        <h2 className="font-semibold">{GUIDE_LABELS[guide.status]}</h2>
+        {guide.status === "coffee_specific" && (
+          <p className="text-xs text-ink-soft mt-1">{PRODUCT_PAGE_CAVEAT}</p>
+        )}
         {guide.guide_url && (
           <a href={guide.guide_url} target="_blank" rel="noreferrer" className="text-xs text-accent underline break-all">
             {guide.guide_url}
@@ -674,7 +695,10 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
       {open && (
         <div className="border-t border-line p-4 flex flex-col gap-4">
           <div>
-            <p className="text-xs uppercase tracking-wide text-ink-soft mb-1">{GUIDE_LABELS[bag.guide_status]}</p>
+            <p className="text-sm font-semibold mb-1">{GUIDE_LABELS[bag.guide_status]}</p>
+            {bag.guide_status === "coffee_specific" && (
+              <p className="text-xs text-ink-soft mb-2">{PRODUCT_PAGE_CAVEAT}</p>
+            )}
             {guideRows.length ? (
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                 {guideRows.map(([k, v]) => (
@@ -806,15 +830,8 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [draft, setDraft] = useState({
-    brewer: "",
-    brew_method: "",
-    grinder: DEFAULT_GRINDER,
-    grind_setting: "",
-    dose_g: "",
-    beverage_g: "",
-    notes: "",
-  });
+  const [draft, setDraft] = useState<BrewDraft>(blankBrew());
+  const [repeated, setRepeated] = useState(false);
   const [tdsPercent, setTdsPercent] = useState("");
   const [rating, setRating] = useState<number | null>(null);
 
@@ -856,15 +873,35 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Couldn't log that brew.");
       setAdding(false);
-      setDraft({ brewer: "", brew_method: "", grinder: DEFAULT_GRINDER, grind_setting: "", dose_g: "", beverage_g: "", notes: "" });
-      setTdsPercent("");
-      setRating(null);
+      clear();
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't log that brew.");
     } finally {
       setSaving(false);
     }
+  }
+
+  /**
+   * Opening the form repeats the last brew on this bag. Dialling in is one
+   * change at a time, so the settings you did not mean to touch should already
+   * be there — see `repeatOf` for which fields carry and why the readings do
+   * not.
+   */
+  function startAdding() {
+    const previous = brews?.[0] ?? null;
+    setDraft(repeatOf(previous));
+    setRepeated(Boolean(previous));
+    setTdsPercent("");
+    setRating(null);
+    setAdding(true);
+  }
+
+  function clear() {
+    setDraft(blankBrew());
+    setRepeated(false);
+    setTdsPercent("");
+    setRating(null);
   }
 
   async function removeBrew(id: string) {
@@ -888,6 +925,15 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
 
       {adding ? (
         <div className="flex flex-col gap-3 bg-paper border border-line rounded-xl p-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-xs text-ink-soft">
+              {repeated ? "Settings repeated from your last brew." : "A fresh brew."}
+            </p>
+            <button onClick={clear} className="text-xs text-accent underline shrink-0">
+              Clear
+            </button>
+          </div>
+
           <label className="text-sm text-ink/70 flex flex-col gap-1">
             Rating
             <Stars value={rating} onChange={setRating} />
@@ -973,7 +1019,7 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
           </div>
         </div>
       ) : (
-        <button onClick={() => setAdding(true)} className="self-start text-sm text-accent underline">
+        <button onClick={startAdding} className="self-start text-sm text-accent underline">
           Log a brew
         </button>
       )}
