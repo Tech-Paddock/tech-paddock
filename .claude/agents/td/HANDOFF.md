@@ -22,14 +22,14 @@ every other pull request is behind and must take `main` again, so the order you 
 pays. `Block force pushes` and `Restrict deletions` are also on.
 
 **Standing up a new agent has a written protocol**, `.claude/agents/STANDUP.md`. **Solutioning comes
-first and it is not yours** — Joel works the design out with the new agent and logs it as a draft
-`RULES.md`, and that draft is the handoff into the protocol. **Do not scaffold before it exists**: a
-folder name reaches DNS and a schema name reaches the database, both settled by being typed. The
-`drift` middleware check is roster-independent, so a new app sharing the base copy passes.
+first and it is not yours**, and its record is the handoff into the protocol. **Do not scaffold
+before it exists**: a folder name reaches DNS and a schema name reaches the database, both settled
+by being typed. The `drift` middleware check is roster-independent, so a new app on the base copy
+passes.
 
-**Only you watch a pull request.** Joel settled it — no other agent subscribes or offers to. One
-watcher gets the events and a second gets silence, so two watchers means one is deaf. It dies with
-your session, which is the trap below rather than an exception to it.
+**Only you watch a pull request.** Joel settled it. One watcher gets the events and a second gets
+silence, so two watchers means one is deaf — and it dies with your session, which is the trap below
+rather than an exception to it.
 
 **The required checks are `gate`, `drift` and `requested-by-joel`** — switched 2026-09-16, each
 bound to the GitHub Actions app rather than to any source. **No agent can read rulesets**, so that
@@ -68,11 +68,13 @@ something untested, which is the right way round.
 
 **`packages/shared` is yours to build, not Joel's to approve.** One source at `packages/shared`, a
 script that stamps each app's copy from it, `drift` failing a copy that disagrees. It changes no
-Vercel setting, no deploy and no build, which is what makes it this seat's — it sat on Joel's ledger
-for a day because the technical director put it there, and that was the error. **Not npm
-workspaces**: a root install would cost the per-app independence the derived CI matrix rests on.
+Vercel setting, no deploy and no build, which is what makes it this seat's. **Not npm workspaces**:
+a root install would cost the per-app independence the derived CI matrix rests on.
 
-**Macro Tracker is ready to stand up** and waits only on its draft charter reaching the repo. When
-it lands, execute `STANDUP.md` from step 3 — do not re-solution it.
+**The macro tracker's design is in the repo**, at `.claude/MACRO-TRACKER-PLAN.md` — Joel's, and not
+a charter. **Missing and blocking the scaffold: the name, and what it must never do.** Supply
+neither. The gate's reading of it is issue #98, kept out of the file so the recommendations stay
+the technical director's and the design stays Joel's. When those two land, execute `STANDUP.md`
+from step 3 rather than re-solutioning what is already agreed.
 
 Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.

@@ -27,10 +27,10 @@ Nothing.
 ## Waiting on Joel
 
 1. **Settle the macro tracker's name and guardrails.** The plan is in
-   `.claude/MACRO-TRACKER-PLAN.md` — design agreed, nothing built. **Two things still block the
-   scaffold**: the name, which fixes the folder, subdomain, Vercel project and schema at once, and
-   *what it must never do*, which no one else can infer for you. Six open questions sit at the
-   bottom of that file. *LoE: a session.*
+   `.claude/MACRO-TRACKER-PLAN.md` — design agreed, nothing built, and the hub glance is settled
+   as off. **Two things still block the scaffold**: the name, which fixes the folder, subdomain,
+   Vercel project and schema at once, and *what it must never do*, which no one else can infer for
+   you. The gate's own reading is issue #98. *LoE: a session.*
 2. **Delete the `tp-tracker` Vercel project and its DNS record** — last step of the deprecation, not
    the first, and there is no undo. Only after the Pit Wall serves what the tool served. Safe to do
    at all now that the required checks no longer name a per-app job. *LoE: minutes.*

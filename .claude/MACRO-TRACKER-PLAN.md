@@ -3,6 +3,9 @@
 A dictated food log for the iPhone. Say what you ate, Claude works out what it means, you approve
 it, it is logged.
 
+Joel, on what it is for: **"it is used to record input and track macro nutrients across the day."**
+Macros here are macronutrients — protein, carbohydrate, fat — and calories beside them.
+
 **Status: agreed in conversation on 2026-09-16, nothing built and nothing approved. Not a charter**
 — a charter is approved before it is written and there is no agent folder yet. This is the record of
 what was decided while the shape was being talked through, so the session that eventually builds it
@@ -84,6 +87,12 @@ earlier draft is unnecessary and dropped.
 
 Correcting the draft before approving is the easy case. Correcting something already logged resolves
 to the most recent matching row.
+
+### It does not appear on the hub's glance
+
+Joel, asked whether it belongs there: **"leave it off for now."** So no `/api/summary`, no line in
+`SOURCES` in `apps/home/lib/glance.ts`, and no request to TechPad Gen. It is a tool you click into.
+Adding it later is one endpoint and one ledger row, so nothing here forecloses it.
 
 ### Claude guesses the meal slot
 
@@ -176,28 +185,13 @@ surface must never need it.
 
 ---
 
-## Open questions the technical director raised, and Joel has not answered
+## What the technical director would raise at the gate
 
-These are not decisions. They are what a gate would ask, recorded here rather than in a conversation
-that ends.
+**In [issue #98](https://github.com/Tech-Paddock/tech-paddock/issues/98)**, at Joel's request, rather
+than in this file — so the recommendations stay plainly the technical director's and this document
+stays plainly Joel's. One home, and this line is the pointer to it.
 
-1. **A winning pick overwrites the row the design calls authoritative.** Database-first exists so
-   your approved numbers are "never relitigated by a source that does not know your habits" — and
-   then a debug run is allowed to replace one. The provenance stamp records what changed it; it does
-   not preserve what was there. **Appending the correction rather than overwriting in place** keeps
-   both, costs one table, and is what `CLAUDE.md` already prefers for anything that accumulates.
-2. **Every overwrite shrinks the pool of real ground truth.** The plan already names the
-   contamination — Haiku-then against Haiku-now looks like agreement — and an overwrite converts a
-   hand-entered row into a model-derived one permanently. After enough debug runs, "Haiku matched 46
-   of 50" is measured mostly against Haiku.
-3. **What it must never do is not written.** A charter's guardrails. Candidates are visible in the
-   plan — never write without approval, never let a failed lookup degrade into internet-first, never
-   replace a hand-entered number silently — but inferring an agent's guardrails is the thing the
-   standup protocol says not to do for Joel.
-4. **Does it belong on the hub's glance?** "One screen" suggests standalone. If it does belong, it
-   needs `/api/summary` and a line in `SOURCES` in `apps/home/lib/glance.ts`, which is TechPad Gen's
-   file — a ledger row, not an edit the scaffolding makes.
-5. **Test fixtures must be invented food.** The app stores what Joel actually eats, which is fine in
-   Postgres and forbidden in the repo. The résumé port paid this cost already.
-6. **`lib/models.ts` copied here is another five-way file.** Not a reason to delay; a reason the
-   `packages/shared` work should land before this app has been copied from for the second time.
+The two worth reading before any schema is written are the same finding from opposite ends: **a
+winning debug pick overwrites the very row this design calls authoritative**, and **every such
+overwrite converts hand-entered ground truth into a model-derived number**, so the statistic the
+harness exists to produce is measured against a pool the harness itself keeps shrinking.
