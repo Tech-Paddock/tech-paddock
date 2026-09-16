@@ -46,7 +46,7 @@ apps/coffee/
   lib/storage.ts               photo upload, signed URLs
 ```
 
-Database: the `coffee` schema — one table, `coffee.bags`. Storage: the private `coffee-files`
+Database: the `coffee` schema — `coffee.bags` and `coffee.brews`, one to many. Storage: the private `coffee-files`
 bucket.
 
 ---
@@ -88,9 +88,14 @@ lot. **Do not flatten the distinction.**
 
 ### 3. The roaster's values stay separate from yours
 
-`guide_*` holds what was published. `my_*` holds what you dialled in. `my_method` defaults to
-`guide_method` when a guide was found but stays editable — brewing their filter coffee as espresso
-should record what you did without erasing what they suggested.
+`guide_*` on the bag holds what was published; it is never overwritten by what you did. What you
+dialled in lives on `coffee.brews`, one row per attempt — **the bag's own `my_grinder`,
+`my_grind_setting`, `my_method` and `my_rating` columns were dropped on 2026-09-12** because one set
+of columns can only hold the last thing you tried, which is the opposite of dialling in. `my_notes`
+stays on the bag: it describes the coffee and outlives any one attempt at it.
+
+Brewing their filter coffee as espresso records what you did without erasing what they suggested.
+Keep it that way.
 
 ---
 

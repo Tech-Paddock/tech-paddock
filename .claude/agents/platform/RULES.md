@@ -82,8 +82,15 @@ clean, passed CI, and failed at runtime on permissions with nothing in its own c
 **Adding a schema is three steps, not one:**
 
 1. the schema and its tables, RLS enabled
-2. a grants migration — copy `20260911203100_grant_coffee_schema_usage.sql`
-3. add it to `[api] schemas` in `supabase/config.toml`
+2. a grants migration — copy `20260911202901_grant_coffee_schema_usage.sql`
+3. **add it to the hosted project's Exposed schemas**, in the Supabase dashboard: Project Settings
+   → API → Exposed schemas. PostgREST only answers for schemas on that list and it lives nowhere in
+   this repo. **This is the step that is easy to miss and it fails looking exactly like a
+   credentials problem** — it cost an hour on `coffee`, which had a correct migration, correct
+   grants and was already in `config.toml`.
+
+Adding it to `[api] schemas` in `supabase/config.toml` is also worth doing, but **that configures
+the local stack only and does nothing to the hosted project.** Do not mistake it for step 3.
 
 ## Never
 

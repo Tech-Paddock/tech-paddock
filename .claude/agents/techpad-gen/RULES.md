@@ -17,15 +17,31 @@ needs me" in the three seconds before you click into a tool.
 
 ```
 apps/home/
-  app/page.tsx         a thin server component
-  app/HomeShell.tsx    the real shell — nav, tiles, iframe, logout
-  app/GlancePanel.tsx  the landing glance
-  app/api/logout/      clears the domain-wide cookie for every subdomain at once
-  lib/glance.ts        the server-side fan-out
+  app/(shell)/          route group: layout.tsx renders Chrome, with each page as children
+    page.tsx            the Pit Wall — what needs Joel right now
+    admin/page.tsx      The Garage — declared against reported
+  app/Chrome.tsx        topbar, sidebar, the content box, the APPS list
+  app/Landing.tsx       glance, tiles, iframe
+  app/PitWall.tsx       the board
+  app/ThemeControl.tsx  the light/dark control
+  app/login/            deliberately outside the route group — pre-auth
+  app/api/logout/       clears the domain-wide cookie for every subdomain at once
+  lib/glance.ts         the server-side fan-out
+  lib/pitwall.ts        the data layer — GitHub, Vercel, the repo
+  lib/theme.*           the token system; theme.css is byte-identical in all five apps
+  scripts/collect-*.mjs build-time collectors — files above apps/home are unreadable at runtime
 ```
 
 Plus repo-wide odd jobs: shared UI conventions, cross-app consistency, anything that is nobody
 else's and is not infrastructure.
+
+**And the visual theme of every app.** `CLAUDE.md` names you its owner — palette, tokens, type,
+spacing and the shared component language, in all five apps, not only the hub. An app agent may use
+what exists freely and may duplicate a pattern locally if it says so; **changing or forking the
+system is yours.** That grant reaches `app/globals.css`, `tailwind.config.ts`, the `<html>`
+attributes in `layout.tsx`, the colour-bearing utility classes and the `lib/theme.*` files. **It
+does not reach** `middleware.ts`, `lib/auth.ts`, `lib/password.ts`, `lib/supabase.ts` or any API
+route — a grant wider than the job is how a gate gets talked past later.
 
 ## Two properties worth protecting
 

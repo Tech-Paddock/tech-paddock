@@ -91,16 +91,32 @@ Each folder holds `RULES.md` and `HANDOFF.md`. The prompts that start a session 
 
 These bind every agent. Your charter adds to them; it never overrides them.
 
-### Never, without the technical director
+### Never — and nobody can authorise it
+
+Not the technical director, and not Joel in passing. If one of these looks necessary, the change is
+wrong or the rule is, and that is a conversation before any code exists.
 
 - **Push to `main`.** Every change goes through a pull request, including small ones.
-- **Create or delete a Vercel project, add or remove a domain, or change a DNS record.** No undo and
-  no test catches them. Changing settings on a project that already exists is fine — the line is
-  between configuring something that exists and creating, destroying or re-pointing it.
+- **Commit personal information or secrets.** Names, employers, schools, addresses, contact details,
+  resume content. For a `.docx` that means every part of the archive — hyperlink targets in `.rels`
+  and the author fields in `docProps/`, not just `document.xml`.
+- **Make a check pass by weakening it.** No skipping or disabling a test, no loosening an assertion,
+  no repairing the migration history, no empty commit to re-trigger CI. When something is red, either
+  the code is wrong or the check is wrong. Say which one, and fix that.
 - **Apply a schema change without its migration file in the same pull request.** The database is not
   allowed to be the only record of its own shape again.
-- **Edit the shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, or anything
-  touching `SESSION_SECRET` and the shared cookie. **These are gated for two different reasons, and
+
+### Never without asking first — and who to ask
+
+- **Joel: create or delete a Vercel project, add or remove a domain, or change a DNS record.** No
+  undo, and no test catches them. Changing settings on a project that already exists is fine — the
+  line is between configuring something that exists and creating, destroying or re-pointing it.
+- **Joel: edit this file, or any charter but your own.** Both are approved before they change. **If
+  what you are about to build contradicts either, stop and ask before you build it.** Raising it in
+  the pull request is the backstop for something discovered late, not the normal path — code already
+  written applies pressure to approve it, which is what this rule exists to prevent.
+- **The technical director: the shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`,
+  `middleware.ts`, or anything touching `SESSION_SECRET` and the shared cookie. **These are gated for two different reasons, and
   merging them is how the rule gets talked past.** `lib/auth.ts` and `lib/password.ts` genuinely are
   byte-identical in all five apps — checksummed, not assumed — and a mismatch does not throw, it
   silently rejects valid sessions on the other four. `middleware.ts` is **three distinct versions**:
@@ -109,16 +125,6 @@ These bind every agent. Your charter adds to them; it never overrides them.
   all the same" is not the reason to leave it alone — and an agent who checks, finds three, and
   concludes the rule is wrong has been handed that conclusion by the rule itself. **It is gated
   because it *is* the password gate.** A bad edit does not break a login; it publishes an endpoint.
-- **Edit this file, or any charter but your own.** Both are approved before they change. **If what
-  you are about to build contradicts either, stop and ask before you build it.** Raising it in the
-  pull request is the backstop for something discovered late, not the normal path — code already
-  written applies pressure to approve it, which is what this rule exists to prevent.
-- **Commit personal information or secrets.** Names, employers, schools, addresses, contact details,
-  resume content. For a `.docx` that means every part of the archive — hyperlink targets in `.rels`
-  and the author fields in `docProps/`, not just `document.xml`.
-- **Make a check pass by weakening it.** No skipping or disabling a test, no loosening an assertion,
-  no repairing the migration history, no empty commit to re-trigger CI. When something is red, either
-  the code is wrong or the check is wrong. Say which one, and fix that.
 
 ### Always
 
