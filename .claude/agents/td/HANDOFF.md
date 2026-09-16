@@ -8,25 +8,13 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-Two branches, both finished, both mine. **Merge the ledger one first** — until it lands, the
-`SessionStart` hook prints a ledger that is wrong in five places into every agent's session.
+**Nothing, by the time you read this.** The two branches this file landed with —
+`claude/brief-standup-solution-first` and `claude/brief-ledger-macros` — were merged as they landed,
+because the gate is the same session that wrote them.
 
-**`claude/brief-record-paper-decisions`** — `DECISIONS.md` said the Paper's above-the-fold carries
-no job-search content, a privacy requirement; **Joel lifted it** — *"drop above the fold below, ill
-manage privacy"* — and #82 shipped the code before the record caught up. Amended in place, not
-appended beside: a correction under a contradicting entry leaves two answers in one file. The
-polarity entry is confirmed rather than changed — density is a separate axis. The ledger is
-rewritten to what is true after #80, #82 and #85.
-
-**`claude/brief-status-check-refreshes`** — the sign-off gains a purple **Needs deletion** stage,
-*Needs a PR* turns yellow (colour tracks work left, not who is blocking), and **a status check
-re-measures all three sections.** Open Items specifically is re-read off disk: the hook prints the
-ledger once and every table written after that is a memory of a file other agents' merges have been
-changing underneath you. Three branches were editing this paragraph at once and were folded into
-one before they cost a three-way conflict.
-
-**Deployment, both: nothing — no app code changed.** They touch the same `td/HANDOFF.md`, written
-identically on each so the second merge does not conflict.
+**Written that way on purpose.** A handoff describes the moment *before* the merge, and the merge
+falsifies it by happening — three times today, in other agents' files. The gate checks a handoff is
+current as reviewed; nothing checks it five minutes later.
 
 ## What is true now
 
@@ -37,9 +25,15 @@ what gives the merge-order rule teeth: after any merge every other open pull req
 must take `main` again. So the order you pick decides who pays. `Block force pushes` and
 `Restrict deletions` are also on.
 
-**Standing up a new agent has a written protocol**, `.claude/agents/STANDUP.md`, landed in #83.
-Open and execute it when Joel asks for one; `RULES.md` says the same. The `drift` middleware check
-is roster-independent as of the same pull request, so a sixth app sharing the base copy passes.
+**Standing up a new agent has a written protocol**, `.claude/agents/STANDUP.md`. **Solutioning comes
+first and it is not yours** — Joel works the design out with the new agent and logs it as a draft
+`RULES.md`, and that draft is the handoff into the protocol. **Do not scaffold before it exists**: a
+folder name reaches DNS and a schema name reaches the database, both settled by being typed. The
+`drift` middleware check is roster-independent, so a new app sharing the base copy passes.
+
+**Only you watch a pull request.** Joel settled it — no other agent subscribes or offers to. One
+watcher gets the events and a second gets silence, so two watchers means one is deaf. It dies with
+your session, which is the trap below rather than an exception to it.
 
 **A new app needs no CI change.** The matrix derives the roster from `apps/` and one fixed-name
 `gate` sits in front of it, so branch protection needs a single check that never changes shape.
@@ -52,10 +46,9 @@ list above came from Joel.
 **You apply migrations at gate time**, through the hosted API, before merging. `supabase db push`
 cannot work here and never will — see the traps in `.claude/DECISIONS.md`.
 
-**A green `build (app)` no longer means that app was built.** Per-app scoping landed in #57. The
-skip path still has not executed in CI: every commit on the branch that introduced it touched
-`.github/workflows`, which is in scope for all five. If it is wrong it fails loudly rather than
-passing something untested, which is the right way round.
+**A green `build (app)` no longer means that app was built** — per-app scoping landed in #57, and
+its skip path has still never executed in CI. If it is wrong it fails loudly rather than passing
+something untested, which is the right way round.
 
 ## Traps specific to this seat
 
@@ -75,5 +68,10 @@ passing something untested, which is the right way round.
 
 ## Next
 
-Nothing queued. Four items wait on Joel and one is parked; they are in the ledger, which the
-`SessionStart` hook prints for you.
+**`packages/shared` is the open architectural call**, and the recommendation is on the table: one
+source at `packages/shared`, a script that writes each app's copy, and `drift` failing a copy that
+differs — rather than npm workspaces, which would force a root install and cost the per-app
+independence the derived CI matrix rests on. **The deadline is the next app folder**, not a date.
+Whether `apps/tracker` deprecates into the Pit Wall is Joel's and lands on a settled hub rule.
+
+Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.
