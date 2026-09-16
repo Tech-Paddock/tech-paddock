@@ -676,42 +676,55 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
 
   return (
     <article className="bg-surface border border-line rounded-2xl overflow-hidden">
-      <button onClick={() => setOpen(!open)} className="w-full flex gap-3 p-3 text-left items-center">
-        {bag.photo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={bag.photo_url} alt="" className="w-14 h-14 rounded-lg object-cover bg-paper shrink-0" />
-        ) : (
-          <span className="w-14 h-14 rounded-lg bg-paper grid place-items-center shrink-0" aria-hidden>☕</span>
-        )}
-        <span className="min-w-0 flex-1">
-          <span className="block font-medium truncate">{bag.coffee_name}</span>
-          <span className="block text-sm text-ink/60 truncate">
-            {bag.roaster}
-            {bag.origin ? ` · ${bag.origin}` : ""}
+      {/* The toggle and the link are siblings, never nested. An <a> inside a
+          <button> is invalid markup and browsers disagree about what a tap on
+          it should do — as siblings the link cannot bubble to the toggle, so
+          neither needs to know about the other. */}
+      <div className="flex items-stretch">
+        <button
+          onClick={() => setOpen(!open)}
+          className="min-w-0 flex-1 flex gap-3 p-3 text-left items-center"
+        >
+          {bag.photo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={bag.photo_url} alt="" className="w-14 h-14 rounded-lg object-cover bg-paper shrink-0" />
+          ) : (
+            <span className="w-14 h-14 rounded-lg bg-paper grid place-items-center shrink-0" aria-hidden>☕</span>
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium truncate">{bag.coffee_name}</span>
+            <span className="block text-sm text-ink/60 truncate">
+              {bag.roaster}
+              {bag.origin ? ` · ${bag.origin}` : ""}
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+
+        {/* Full height and generously padded: this sits against the toggle on
+            a phone, and a narrow target here opens the wrong thing. */}
+        {bag.product_url && (
+          <a
+            href={bag.product_url}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Open ${bag.coffee_name ?? "this coffee"} on the roaster's site`}
+            className="shrink-0 flex items-center px-4 text-sm text-accent underline"
+          >
+            Beans ↗
+          </a>
+        )}
+      </div>
 
       {open && (
         <div className="border-t border-line p-4 flex flex-col gap-4">
-          {/* Where the coffee came from, first rather than last. This was a
-              12px "Bag page" under the guide table and read as a footnote,
-              which is the wrong weight for the one link you actually follow —
-              to buy the same bag again. */}
-          {(bag.product_url || bag.guide_url) && (
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {bag.product_url && (
-                <a href={bag.product_url} target="_blank" rel="noreferrer" className="text-sm text-accent underline">
-                  The beans ↗
-                </a>
-              )}
-              {/* At tier 1 these are the same page, so one link, not two. */}
-              {bag.guide_url && bag.guide_url !== bag.product_url && (
-                <a href={bag.guide_url} target="_blank" rel="noreferrer" className="text-sm text-accent underline">
-                  The brew guide ↗
-                </a>
-              )}
-            </div>
+          {/* The beans link lives on the pill above, so it is reachable without
+              opening the card. Only a brew guide on a *different* page needs
+              one here — at tier 1 the two URLs are the same, and a second link
+              to the same place is how that distinction gets lost. */}
+          {bag.guide_url && bag.guide_url !== bag.product_url && (
+            <a href={bag.guide_url} target="_blank" rel="noreferrer" className="text-sm text-accent underline">
+              The brew guide ↗
+            </a>
           )}
 
           <div>
