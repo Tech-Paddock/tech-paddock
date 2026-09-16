@@ -27,3 +27,23 @@ Landed: Owner as the second column, the Owner-versus-Agent distinction spelled o
 then contradicts the table three lines below it.
 Open: nothing.
 Need from TD: nothing — the TD wrote it.
+
+## 2026-09-16 01:00 — Joel pushed back on the column, correctly
+"Owner may not be right. If you're waiting on me to approve a merge I need to see that front and
+centre."
+
+He is right and the evidence was in the footer that prompted it: `Owner` read `Joel` on seven of nine
+rows. A column whose values are nearly all identical carries no information and costs a column's
+width to say nothing, which makes the table harder to scan rather than easier.
+
+The real problem was not the column though. It was that two pending merges sat as ordinary rows among
+nine, reading as chores, when a merge is the one item that is purely his yes or no and that nothing
+else can move without.
+
+So a pending merge is hoisted out of the table onto its own line above it, named by branch and with
+its CI state, and never appears as a row. The line is always written — "nothing" included — for the
+same reason a blank Deployment section is indistinguishable from a forgotten one.
+
+`Owner` is kept, because it still does real work on the rows where it differs from `Agent`. What is
+added is the warning that produced this correction: if Owner comes out the same on nearly every row,
+the fix is not a better column, it is that something belongs above the table.

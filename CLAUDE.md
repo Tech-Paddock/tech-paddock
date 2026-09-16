@@ -239,7 +239,21 @@ between configuring something that exists and creating, destroying, or re-pointi
 - **End every message to Joel with the open-items footer.** Every message — not only the ones that
   finish something, and not only the long ones. The point is that he never has to go looking for what
   is outstanding, and a footer that appears only when an agent judges it worth appearing is one he has
-  to go looking for. Five columns, one line each, no prose underneath:
+  to go looking for.
+
+  **A merge waiting on Joel is hoisted out of the table and stated on its own line above it**, named
+  by branch, with whether it is green. It never appears as a table row. A merge is the one thing that
+  is purely his yes or no and that nothing else can move without — and the first version of this
+  footer proved the point by burying two of them among nine rows, where they read as chores. The line
+  is always written, including when there is nothing:
+
+  ```
+  **Waiting on your word:** nothing.
+  **Waiting on your word — 2 merges:** `claude/brief-record-livery-merge` and
+  `claude/brief-footer-owner-column`, both green, both one word from live.
+  ```
+
+  Then the table. Five columns, one line each, no prose underneath:
 
   ```
   | Item | Owner | Urgency | Blocking | Agent |
@@ -255,6 +269,10 @@ between configuring something that exists and creating, destroying, or re-pointi
   directly after the item, so that reading what it is and knowing whose it is happen in one movement;
   the far right of a table is where a column goes to be missed. `Owner` is `Joel` whenever he is the
   one who has to act, and an agent otherwise.
+  **Watch for `Owner` reading `Joel` on nearly every row**, which is what the first version did. A
+  column whose values are almost all the same carries no information and quietly makes the table
+  harder to scan rather than easier. When that happens the fix is not a better column — it is that
+  something belongs above the table, the way a pending merge now does.
 
   **Urgency is one of three words.** `Now` — Joel is the blocker and something waits on him. `Soon` —
   real work, not blocked on him, the next session's. `Whenever` — parked, or worth doing and nothing
