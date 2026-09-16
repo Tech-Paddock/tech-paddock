@@ -8,13 +8,13 @@ Read `RULES.md` first, then `supabase/README.md`. This file is only what is true
 
 ## What is true now
 
-**All five projects deploy and all five domains serve.** `techpaddock.io`, `editor.`, `tracker.`,
+**Every project deploys and every domain serves.** `techpaddock.io`, `editor.`, `tracker.`,
 `resume.` and `coffee.` all return 200 behind the password gate. The six-and-a-half-hour outage of
 2026-09-11 is long closed; its cause is a trap in `.claude/DECISIONS.md` and the one line worth
 carrying is **if deployments stop again, read `link.org` on the Vercel project before touching
 anything on GitHub.**
 
-**DNS is uniform.** All four subdomains are CNAMEs to `d1317e1174061c29.vercel-dns-017.com`. The
+**DNS is uniform.** Every subdomain is a CNAME to `d1317e1174061c29.vercel-dns-017.com`. The
 apex stays an A record at `76.76.21.21` because an apex cannot be a CNAME — correct, not a leftover.
 All four still send `frame-ancestors 'self' https://techpaddock.io https://*.techpaddock.io`.
 
@@ -35,18 +35,17 @@ should hold. Local files were verified against remote history by normalized hash
 
 - **Environment variables are baked in at build time.** Changing one has no effect until that project
   redeploys. This catches people out constantly.
-- **Adding a schema is three steps, not two**: the schema and its tables with RLS, a grants
-  migration, and the hosted project's **Exposed schemas** list in the dashboard. Step three lives
-  nowhere in this repo and fails looking exactly like a credentials problem — it cost an hour.
-  **Checking it without dashboard access:** `postgrest_logs` prints a relation count on every
-  reload; count the tables you expect exposed and compare.
+- **Adding a schema is three steps** — the recipe is in `RULES.md` and `supabase/README.md`; do not
+  add a fourth copy here. The one worth carrying: **`postgrest_logs` prints a relation count on
+  every reload**, so you can check the dashboard's Exposed schemas list without dashboard access.
 - **Supabase's value living in a Vercel field.** The project has both key systems enabled — legacy
   `eyJ…` JWTs and modern `sb_secret_…` — and the code needs the legacy `service_role` JWT.
   `Invalid Compact JWS` is the decisive tell, because a merely *wrong* JWT parses fine and fails
   differently.
-- **Branch protection's required-checks list is separate from the CI matrix** and does not update
-  itself. When the matrix changes, the ruleset needs the same change by hand. No agent can read
-  rulesets to verify it.
+- **Branch protection's required-checks list does not update itself**, and no agent can read a
+  ruleset to verify it. It should now name only `gate`, `drift` and `requested-by-joel` — none of
+  which change when an app is added or deprecated. A leftover per-app entry is invisible from here
+  and blocks every pull request until Joel removes it.
 - **If you switch a subdomain to a CNAME, take the target from that project's own Domains tab.** The
   per-project hashed targets are not interchangeable.
 - **Before claiming a deployment problem is fixed, check that a deployment actually happened.** A
@@ -70,8 +69,10 @@ Nothing.
    Use `VERCEL_GIT_PREVIOUS_SHA`, not Vercel's documented `HEAD^`: `HEAD^` examines only the latest
    commit, so when two pushes land close together the older one's changes never deploy. Do not plan
    around the dashboard's *Skip deployments* toggle — see `.claude/DECISIONS.md`.
-2. **Add `build (coffee)` to branch protection's required checks** if it is still missing. The matrix
-   is five jobs and the ruleset has been one short. Joel's to set; you cannot read it back.
+2. **Switch branch protection's required checks to `gate`, `drift` and `requested-by-joel`**, and
+   remove every per-app `build (…)` entry. This supersedes the old "add `build (coffee)`" item: the
+   ruleset was one short, and chasing it per app was the wrong fix. Joel's to set, and you cannot
+   read it back — until he does, a per-app entry for a deprecated app would block every pull request.
 3. **Run `supabase link` and `migration list` once, locally.** Expect one remote-only version.
 4. **`editor.model_status` has zero rows.** It is the Message Editor's table and task, but if it
    turns out to be a grants or RLS problem it becomes yours.

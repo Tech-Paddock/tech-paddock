@@ -40,7 +40,7 @@ Nothing.
    the icon needs a deploy and a phone.** Open it in Safari, Add to Home Screen, check the icon.
 4. **Decide whether to raise the hairline contrast bar.** `--line` against `--surface` is 1.82:1 in
    the theme running in production, short of the 3:1 bar for a non-text component. Every new theme
-   matches or beats the shipped figure, and raising the bar **changes the look of all five apps**.
+   matches or beats the shipped figure, and raising the bar **changes the look of every app**.
    A decision, not a cleanup.
 5. **Morning Paper: polarity or density?** Its two modes are light Dispatch and dark Timing, so the
    switch *is* the polarity switch — contradicting "one livery per app, both polarities" in

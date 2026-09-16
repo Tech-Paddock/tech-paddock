@@ -26,7 +26,7 @@ unauthenticated endpoint that writes into Joel's Outlook on demand. This is in t
 Parked and moves only when Joel says so.
 
 **Your `/api/summary` carve-out stands.** It was once flagged as widening `INTERNAL_API_SECRET`
-across four apps — read from design notes rather than from the route — and the objection was
+across several apps — read from design notes rather than from the route — and the objection was
 withdrawn. It is `pathname === "/api/summary"` exactly, read-only, fails closed without the secret,
 four-second timeout. **Your narrow-shape discipline is what made it reviewable.**
 

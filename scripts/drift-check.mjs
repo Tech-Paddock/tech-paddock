@@ -87,18 +87,32 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css"]) {
     same ? shape.join(" | ") : `expected ${expected.join(" | ")} — measured ${shape.join(" | ")}`);
 }
 
-/* 3 ── The CI matrix is hardcoded. An app missing from it is not failed, it is
-   never run at all, which is the silent half. */
+/* 3 ── CI builds whatever is on disk, and one fixed name gates it.
+   A hardcoded matrix does not fail when an app is missing from it — the app is
+   simply never built. A per-app required-check list has the same shape of
+   problem from the other side: deprecating an app leaves a required check that
+   can never report. Both are fixed by deriving the roster and putting one
+   stable job in front, so this checks that neither has been undone. */
 {
   const ci = read(R(".github/workflows/ci.yml"));
-  const m = ci?.match(/app:\s*\[([^\]]+)\]/);
-  const matrix = m ? m[1].split(",").map((s) => s.trim()).filter(Boolean).sort() : null;
-  if (!matrix) add("CI matrix covers every app", "warn", "could not read the matrix from ci.yml");
+  if (!ci) add("CI derives its roster from apps/", "warn", "ci.yml not readable");
   else {
-    const missing = APPS.filter((a) => !matrix.includes(a));
-    add("CI matrix covers every app", missing.length === 0 ? "ok" : "fail",
-      missing.length === 0 ? `${matrix.length} apps, all in the matrix`
-        : `untested and silent about it: ${missing.join(", ")}`);
+    const literal = ci.match(/app:\s*\[([^\]]+)\]/);
+    if (literal) {
+      const matrix = literal[1].split(",").map((s) => s.trim()).filter(Boolean);
+      const missing = APPS.filter((a) => !matrix.includes(a));
+      add("CI derives its roster from apps/", missing.length === 0 ? "warn" : "fail",
+        missing.length === 0
+          ? "matrix is hardcoded again — it matches today, but a new app will be skipped in silence"
+          : `matrix is hardcoded AND already wrong — untested: ${missing.join(", ")}`);
+    } else if (/app:\s*\$\{\{\s*fromJson\(/.test(ci)) {
+      add("CI derives its roster from apps/", "ok", `derived — ${APPS.length} app folders will build`);
+    } else {
+      add("CI derives its roster from apps/", "fail", "no matrix found in ci.yml at all");
+    }
+    add("one stable gate in front of CI", /^\s{2}gate:/m.test(ci) ? "ok" : "fail",
+      /^\s{2}gate:/m.test(ci) ? "gate job present — branch protection needs only that name"
+        : "the gate job is gone; required checks are per-app again and break on every roster change");
   }
 }
 
@@ -120,20 +134,50 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css"]) {
 }
 
 /* 5 ── Handoff staleness, measured rather than asserted. A handoff dated before
-   the newest commit in its own area is describing a repo that has moved. */
+   the newest commit in its own area is describing a repo that has moved.
+
+   The agent list is ENUMERATED, not hardcoded. The first version of this file
+   named five agents, which is the same bug it was written to catch: a new agent
+   would not have failed the check, it would simply never have been checked.
+   Most agents own the app that shares their name; the two that do not are named
+   below, and an agent matching neither is reported as unmapped rather than
+   skipped in silence. */
 {
-  const areas = { "techpad-gen": "apps/home", "message-editor": "apps/editor", tracker: "apps/tracker", resume: "apps/resume", coffee: "apps/coffee" };
-  for (const [agent, path] of Object.entries(areas)) {
+  const NAMED = { "techpad-gen": "apps/home", "message-editor": "apps/editor" };
+  const agents = existsSync(R(".claude/agents"))
+    ? readdirSync(R(".claude/agents")).filter((d) => statSync(R(".claude/agents", d)).isDirectory()).sort()
+    : [];
+
+  for (const agent of agents) {
     const f = R(".claude/agents", agent, "HANDOFF.md");
     const body = read(f);
-    if (!body) { add(`fresh: ${agent}/HANDOFF.md`, "warn", "missing"); continue; }
+    if (!body) { add(`fresh: ${agent}`, "warn", "no HANDOFF.md — the Pit Wall lists an agent by that file"); continue; }
+
     const stated = body.match(/State as of (\d{4}-\d{2}-\d{2})/)?.[1];
+    if (!stated) { add(`fresh: ${agent}`, "warn", "no 'State as of <date>' line — the Pit Wall reads that field"); continue; }
+
+    const path = NAMED[agent] ?? (APPS.includes(agent) ? `apps/${agent}` : null);
+    if (!path) {
+      // td and platform own no folder, so there is nothing to date them
+      // against. Say so rather than reporting ok for something unmeasured.
+      add(`fresh: ${agent}`, "ok", `${stated}; owns no app folder, so freshness is not measurable here`);
+      continue;
+    }
+
     const newest = git("log", "-1", "--format=%ad", "--date=short", "--", path);
-    if (!stated) add(`fresh: ${agent}/HANDOFF.md`, "warn", "no 'State as of <date>' line — the Pit Wall reads that field");
-    else if (!newest) add(`fresh: ${agent}/HANDOFF.md`, "warn", `stated ${stated}; no commits found under ${path}`);
-    else add(`fresh: ${agent}/HANDOFF.md`, stated >= newest ? "ok" : "warn",
+    if (!newest) add(`fresh: ${agent}`, "warn", `stated ${stated}; no commits found under ${path}`);
+    else add(`fresh: ${agent}`, stated >= newest ? "ok" : "warn",
       stated >= newest ? `${stated}, current with ${path}` : `says ${stated}; ${path} last changed ${newest}`);
   }
+
+  /* An app with no agent is nobody's, and an agent's app that has been
+     deprecated leaves a charter describing a folder that is gone. Both are the
+     roster changing underneath the documentation, which is the thing this file
+     exists to notice. */
+  const owned = new Set(Object.values(NAMED).map((p) => p.replace("apps/", "")).concat(agents));
+  const orphans = APPS.filter((a) => !owned.has(a));
+  add("every app has an owning agent", orphans.length === 0 ? "ok" : "warn",
+    orphans.length === 0 ? `${APPS.length} apps, all owned` : `no agent owns: ${orphans.join(", ")}`);
 }
 
 /* 6 ── Migration filenames named in prose, against the directory. Four were
@@ -187,6 +231,29 @@ add("worklogs stay retired", existsSync(R(".claude/worklogs")) ? "fail" : "ok",
       if (/^\s*[|>]/.test(line)) return; // tables and quotes carry examples
       if (/\b\d+\s+tests?\b/i.test(line)) hits.push(`${rel}:${i + 1} names a test count`);
       else if (/\b[0-9a-f]{7,40}\b/.test(line) && /commit|sha|serves|deployed/i.test(line)) hits.push(`${rel}:${i + 1} names a commit`);
+      /* A ROSTER count — "all five apps", "the four tools", "in five projects".
+         These go stale the day an app is added or deprecated, which now happens
+         routinely, so they are claims with a shelf life.
+
+         Two things are deliberately NOT matched, and the pattern is narrow on
+         purpose rather than thorough. **A check that fires on good writing is
+         one that gets routed around**, which costs more than the drift it
+         catches — the same reason the hooks here stayed narrow.
+
+         Not matched, first: counts describing a STRUCTURE rather than the
+         roster. "three distinct versions" of middleware.ts, "three steps" to add
+         a schema, "three things enforce". There the number is the content, and
+         if it changed the rule should be re-read rather than quietly updated.
+
+         Not matched, second: HISTORY. "used to be two agents", "six schema
+         migrations that lived only in the database", "granted USAGE by naming
+         four schemas". Those describe something that happened, and what happened
+         does not drift.
+
+         So the trigger is the shape of a present-tense claim about the whole
+         set — `all N`, `the N`, `in N`, `across N` — not any number near a noun. */
+      else if (/\b(all|the|in|across|on)\s+(all\s+)?(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(apps|projects|agents|tools|copies|schemas|subdomains|domains|tables)\b/i.test(line))
+        hits.push(`${rel}:${i + 1} names a roster count`);
     });
   }
   add("no computable facts written as prose", hits.length === 0 ? "ok" : "warn",
