@@ -24,8 +24,8 @@ app; `lib/livery.ts` is the one file that differs per app. No `tailwind.config.t
 any more — every entry reads `rgb(var(--token-rgb) / <alpha-value>)`, and the triplet form is
 required rather than preferred: it is the only shape Tailwind's alpha modifier can interpolate.
 
-**The Morning Paper** — `/` lands on Paper, with Board and Feed alongside. There is no privacy fold:
-Joel lifted it. The Feed is still undefined and renders a labelled slot.
+**The Morning Paper** — `/` lands on Paper, Board and Feed alongside, held 24px clear of the sidebar
+by `.tabbed`. No privacy fold: Joel lifted it. The Feed is undefined and renders a labelled slot.
 
 **The chrome is a layout, not a component.** `app/(shell)/` is a route group holding `/` and
 `/admin`; its `layout.tsx` renders `Chrome.tsx` with each page as `children`. `/login` is
@@ -55,9 +55,7 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-`claude/home-one-toggle-per-page` — one switch per page, both halves. **Open as #86, merge first**:
-it corrects this file, which `main` still carries stale from #82's squash.
-`claude/home-paper-gutter` — the Paper's 24px gutter, moved onto `.tabbed`. **Open as #87**, after #86.
+Nothing.
 
 ## Next
 
@@ -74,6 +72,5 @@ it corrects this file, which `main` still carries stale from #82's squash.
    public: it exposes a commit hash and nothing else, and that is what lets an external monitor
    notice an outage. Joel's call.
 
-Still the TD's to record, both settled by Joel today and both still open in the ledger: **polarity**
-(one site-wide switch; density does not carry it) and **the lifted fold**, which amends a decision
-`DECISIONS.md` still states the old way. The hairline contrast bar is in `.claude/OPEN-ITEMS.md`.
+Both decisions Joel settled on 2026-09-16 are recorded in `DECISIONS.md` by #89 — the lifted fold
+and polarity against the Paper. Read them there; a second copy here could only drift.
