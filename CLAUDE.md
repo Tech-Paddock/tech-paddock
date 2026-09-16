@@ -237,6 +237,19 @@ wrong or the rule is, and that is a conversation before any code exists.
   **A stage comes from `git status` and a live check run in this session — never from memory.** If
   you could not check, the line reads `unchecked` rather than guessing.
 
+  **When Joel asks for status, all three are re-measured — never reprinted.** A status check is a
+  request to go and look, and the last sign-off is the one thing that cannot answer it.
+
+  - **Work Brief** becomes what has landed since his last message, not what was in the previous
+    footer. `- None.` when nothing has.
+  - **DevOps** comes from a live branch list, a live pull request list and check runs read *now*. A
+    colour measured earlier in the same session is memory by the time it is reprinted.
+  - **Open Items** is **re-read from `.claude/OPEN-ITEMS.md` on disk.** The `SessionStart` hook
+    prints it once, at the start; after that every table you write from context is a memory of a
+    file that merges have been changing underneath you. **This is the one that actually goes wrong**
+    — a long session's footer quietly drifts from the ledger it claims to be reporting, and because
+    a table reads as verified, nothing says so.
+
   **3 · Open Items.** The ledger. **The technical director prints every row; every other agent
   prints only the rows whose `Agent` is them.** A merge waiting on Joel is hoisted onto its own line
   above the table, named by branch and whether it is green — it is the one thing that is purely his
