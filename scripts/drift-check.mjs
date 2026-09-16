@@ -252,7 +252,7 @@ add("worklogs stay retired", existsSync(R(".claude/worklogs")) ? "fail" : "ok",
 
          So the trigger is the shape of a present-tense claim about the whole
          set — `all N`, `the N`, `in N`, `across N` — not any number near a noun. */
-      else if (/\b(all|the|in|across|on)\s+(all\s+)?(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(apps|projects|agents|tools|copies|schemas|subdomains|domains)\b/i.test(line))
+      else if (/\b(all|the|in|across|on)\s+(all\s+)?(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(apps|projects|agents|tools|copies|schemas|subdomains|domains|tables)\b/i.test(line))
         hits.push(`${rel}:${i + 1} names a roster count`);
     });
   }

@@ -183,7 +183,7 @@ So every table created in these schemas is automatically granted to `anon` — i
 TRUNCATE — whether or not the migration that creates it says anything about grants.
 
 That is intended, but it means **Row Level Security is the only control between a leaked
-publishable key and this data.** RLS is enabled on all eight tables with zero policies, which is
+publishable key and this data.** RLS is enabled on every table with zero policies, which is
 deny-by-default and is why Supabase's advisor reports one `rls_enabled_no_policy` notice per table:
 those are the design working, not a warning to fix.
 
