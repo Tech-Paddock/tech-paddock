@@ -57,9 +57,9 @@ page. The label now says where it came from instead of claiming it was written f
 
 ## In flight
 
-**#78 `claude/coffee-brew-repeat-and-guide-label` — open, awaiting the gate.**
-Repeat-the-last-brew with a Clear button, and the guide label stops over-claiming. `apps/coffee`
-only, no shared files, no schema change. **Deployment: nothing — it deploys itself on merge.**
+**`claude/coffee-bean-link-and-optional-rating` — pushed, no pull request; Joel has not asked.**
+"The beans" links out from the top of the bag card instead of a footnote at the bottom, and the
+rating says it is optional — which it always was. **Deployment: nothing, it deploys itself on merge.**
 
 **Needs the technical director: delete the remote branch `claude/coffee-repeat-the-last-brew`.** Same
 work, pushed onto pre-rewrite history by mistake, so that ref keeps the scrubbed tracker names
