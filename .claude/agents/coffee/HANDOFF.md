@@ -56,8 +56,8 @@ page. The label now says where it came from instead of claiming it was written f
 ## In flight
 
 **#79 `claude/coffee-bean-link-and-optional-rating` — open, awaiting the gate.**
-"The beans" links out from the top of the bag card instead of a footnote at the bottom, and the
-rating says it is optional — which it always was. **Deployment: nothing, it deploys itself on merge.**
+"Beans ↗" links out from the collapsed pill, reachable without opening the card, and the rating says
+it is optional — which it always was. **Deployment: nothing, it deploys itself on merge.**
 
 ## Next
 
@@ -69,8 +69,8 @@ rating says it is optional — which it always was. **Deployment: nothing, it de
    purchases. **No agent in the sandbox can verify a domain**, so a list produced here is recalled
    from training, the exact guess `findRoasterDomain` refuses. It has to come from the deployed app.
 4. The deliberately-unbuilt list — timer, inventory, method lookup table — stays unbuilt until asked.
-   **Parked with it:** where "The beans" link sits and how big it is. Joel may want it moved or
-   resized; it is not an action until he says so.
+   **Parked with it:** the beans link's size. It has moved once, onto the pill; Joel may want the
+   sizing changed too, and that is not an action until he says so.
 
 Waiting on Joel: whether the iOS install works on a real iPhone — the meta tags and insets are
 verified against the built HTML, the icon needs a phone. In the ledger.
