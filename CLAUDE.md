@@ -210,9 +210,14 @@ wrong or the rule is, and that is a conversation before any code exists.
   not the plan; what is now done. **`- None.` is the correct answer when the message only answered a
   question**, and it is written rather than dropped.
 
-  **2 · DevOps.** What exists and is not live yet, one line each, naming **the stage it is parked
-  at.** Four stages, in the order work moves through them, and the words are the ones Joel reads —
-  not git's:
+  **2 · DevOps.** What exists and is not live yet, one line each, carrying **what it is, whose it
+  is, and the stage it is parked at** — the owning agent is a column so he can see at a glance who a
+  branch belongs to, because a branch name does not always say. Four stages, in the order work moves
+  through them, and the words are the ones Joel reads — not git's:
+
+  ```
+  | | Branch or PR | Agent | Stage |
+  ```
 
   | | Stage | Means |
   |---|---|---|
