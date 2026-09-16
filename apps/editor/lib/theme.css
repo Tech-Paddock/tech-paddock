@@ -1,0 +1,949 @@
+/* Paddock theme tokens.
+ *
+ * GENERATED — do not hand-edit. Source of truth is the palette set the contrast
+ * gate checks; every value here has passed 4.5:1 for text and 3:1 for non-text
+ * against the ground it is actually painted on.
+ *
+ * This file is byte-identical in all five apps, the same arrangement lib/auth.ts
+ * and lib/password.ts already use. Unlike those, drift here is loud rather than
+ * silent: it shows up as one app looking wrong next to another in an iframe.
+ *
+ * How a theme is chosen
+ *   data-livery  set by the app's own layout. A build-time constant. Coffee is
+ *                always JPS; the hub is always Martini. There is no picker.
+ *   data-mode    "light" or "dark", stamped server-side from the shared
+ *                .techpaddock.io cookie. Absent means follow the system, which
+ *                the media query below handles with no script and no flash.
+ */
+
+/* ====================================================================
+   Martini
+   ==================================================================== */
+
+[data-livery="martini"] {
+  color-scheme: light;
+
+  --paper-rgb: 242 245 249;
+  --paper: rgb(var(--paper-rgb));
+  --surface-rgb: 255 255 255;
+  --surface: rgb(var(--surface-rgb));
+  --surface-raised-rgb: 221 229 239;
+  --surface-raised: rgb(var(--surface-raised-rgb));
+
+  --ink-rgb: 10 16 32;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft-rgb: 77 90 112;
+  --ink-soft: rgb(var(--ink-soft-rgb));
+  --ink-invert-rgb: 255 255 255;
+  --ink-invert: rgb(var(--ink-invert-rgb));
+
+  --line-rgb: 143 163 184;
+  --line: rgb(var(--line-rgb));
+  --accent-rgb: 29 63 143;
+  --accent: rgb(var(--accent-rgb));
+  --accent-ink-rgb: 255 255 255;
+  --accent-ink: rgb(var(--accent-ink-rgb));
+  --pinstripe-rgb: 200 16 46;
+  --pinstripe: rgb(var(--pinstripe-rgb));
+
+  --sev-urgent-rgb: 198 40 40;
+  --sev-urgent: rgb(var(--sev-urgent-rgb));
+  --sev-info-rgb: 125 139 161;
+  --sev-info: rgb(var(--sev-info-rgb));
+  --danger-rgb: 179 38 30;
+  --danger: rgb(var(--danger-rgb));
+  --sev-warn-rgb: var(--accent-rgb);
+  --sev-warn: var(--accent);
+
+  --bar-rgb: 10 16 32;
+  --bar: rgb(var(--bar-rgb));
+  --bar-ink-rgb: 242 245 249;
+  --bar-ink: rgb(var(--bar-ink-rgb));
+
+  --tone-1-bg: #eef3f9;
+  --tone-1-ink: #0a1020;
+  --tone-1-lip: #abafb3;
+  --tone-2-bg: #7fb2e0;
+  --tone-2-ink: #0a1020;
+  --tone-2-lip: #5b80a1;
+  --tone-3-bg: #1d3f8f;
+  --tone-3-ink: #ffffff;
+  --tone-3-lip: #152d67;
+  --tone-4-bg: #c8102e;
+  --tone-4-ink: #ffffff;
+  --tone-4-lip: #900c21;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-livery="martini"]:not([data-mode="light"]) {
+    color-scheme: dark;
+
+    --paper-rgb: 7 12 24;
+    --paper: rgb(var(--paper-rgb));
+    --surface-rgb: 16 26 46;
+    --surface: rgb(var(--surface-rgb));
+    --surface-raised-rgb: 30 44 69;
+    --surface-raised: rgb(var(--surface-raised-rgb));
+
+    --ink-rgb: 234 240 248;
+    --ink: rgb(var(--ink-rgb));
+    --ink-soft-rgb: 151 166 191;
+    --ink-soft: rgb(var(--ink-soft-rgb));
+    --ink-invert-rgb: 7 12 24;
+    --ink-invert: rgb(var(--ink-invert-rgb));
+
+    --line-rgb: 56 72 99;
+    --line: rgb(var(--line-rgb));
+    --accent-rgb: 127 178 224;
+    --accent: rgb(var(--accent-rgb));
+    --accent-ink-rgb: 7 12 24;
+    --accent-ink: rgb(var(--accent-ink-rgb));
+    --pinstripe-rgb: 226 65 93;
+    --pinstripe: rgb(var(--pinstripe-rgb));
+
+    --sev-urgent-rgb: 239 95 120;
+    --sev-urgent: rgb(var(--sev-urgent-rgb));
+    --sev-info-rgb: 94 109 135;
+    --sev-info: rgb(var(--sev-info-rgb));
+    --danger-rgb: 255 138 128;
+    --danger: rgb(var(--danger-rgb));
+    --sev-warn-rgb: var(--accent-rgb);
+    --sev-warn: var(--accent);
+
+    --bar-rgb: 7 12 24;
+    --bar: rgb(var(--bar-rgb));
+    --bar-ink-rgb: 234 240 248;
+    --bar-ink: rgb(var(--bar-ink-rgb));
+
+    --tone-1-bg: #e6eef7;
+    --tone-1-ink: #0a1020;
+    --tone-1-lip: #a6abb2;
+    --tone-2-bg: #7fb2e0;
+    --tone-2-ink: #0a1020;
+    --tone-2-lip: #5b80a1;
+    --tone-3-bg: #2a5fae;
+    --tone-3-ink: #eaf0f8;
+    --tone-3-lip: #1e447d;
+    --tone-4-bg: #b5182f;
+    --tone-4-ink: #eaf0f8;
+    --tone-4-lip: #821122;
+  }
+}
+
+[data-livery="martini"][data-mode="dark"] {
+  color-scheme: dark;
+
+  --paper-rgb: 7 12 24;
+  --paper: rgb(var(--paper-rgb));
+  --surface-rgb: 16 26 46;
+  --surface: rgb(var(--surface-rgb));
+  --surface-raised-rgb: 30 44 69;
+  --surface-raised: rgb(var(--surface-raised-rgb));
+
+  --ink-rgb: 234 240 248;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft-rgb: 151 166 191;
+  --ink-soft: rgb(var(--ink-soft-rgb));
+  --ink-invert-rgb: 7 12 24;
+  --ink-invert: rgb(var(--ink-invert-rgb));
+
+  --line-rgb: 56 72 99;
+  --line: rgb(var(--line-rgb));
+  --accent-rgb: 127 178 224;
+  --accent: rgb(var(--accent-rgb));
+  --accent-ink-rgb: 7 12 24;
+  --accent-ink: rgb(var(--accent-ink-rgb));
+  --pinstripe-rgb: 226 65 93;
+  --pinstripe: rgb(var(--pinstripe-rgb));
+
+  --sev-urgent-rgb: 239 95 120;
+  --sev-urgent: rgb(var(--sev-urgent-rgb));
+  --sev-info-rgb: 94 109 135;
+  --sev-info: rgb(var(--sev-info-rgb));
+  --danger-rgb: 255 138 128;
+  --danger: rgb(var(--danger-rgb));
+  --sev-warn-rgb: var(--accent-rgb);
+  --sev-warn: var(--accent);
+
+  --bar-rgb: 7 12 24;
+  --bar: rgb(var(--bar-rgb));
+  --bar-ink-rgb: 234 240 248;
+  --bar-ink: rgb(var(--bar-ink-rgb));
+
+  --tone-1-bg: #e6eef7;
+  --tone-1-ink: #0a1020;
+  --tone-1-lip: #a6abb2;
+  --tone-2-bg: #7fb2e0;
+  --tone-2-ink: #0a1020;
+  --tone-2-lip: #5b80a1;
+  --tone-3-bg: #2a5fae;
+  --tone-3-ink: #eaf0f8;
+  --tone-3-lip: #1e447d;
+  --tone-4-bg: #b5182f;
+  --tone-4-ink: #eaf0f8;
+  --tone-4-lip: #821122;
+}
+
+/* ====================================================================
+   Clark
+   ==================================================================== */
+
+[data-livery="clark"] {
+  color-scheme: light;
+
+  --paper-rgb: 241 246 242;
+  --paper: rgb(var(--paper-rgb));
+  --surface-rgb: 255 255 255;
+  --surface: rgb(var(--surface-rgb));
+  --surface-raised-rgb: 219 233 223;
+  --surface-raised: rgb(var(--surface-raised-rgb));
+
+  --ink-rgb: 10 26 17;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft-rgb: 77 100 86;
+  --ink-soft: rgb(var(--ink-soft-rgb));
+  --ink-invert-rgb: 255 255 255;
+  --ink-invert: rgb(var(--ink-invert-rgb));
+
+  --line-rgb: 139 176 154;
+  --line: rgb(var(--line-rgb));
+  --accent-rgb: 15 92 51;
+  --accent: rgb(var(--accent-rgb));
+  --accent-ink-rgb: 255 255 255;
+  --accent-ink: rgb(var(--accent-ink-rgb));
+  --pinstripe-rgb: 154 117 0;
+  --pinstripe: rgb(var(--pinstripe-rgb));
+
+  --sev-urgent-rgb: 198 40 40;
+  --sev-urgent: rgb(var(--sev-urgent-rgb));
+  --sev-info-rgb: 124 150 134;
+  --sev-info: rgb(var(--sev-info-rgb));
+  --danger-rgb: 179 38 30;
+  --danger: rgb(var(--danger-rgb));
+  --sev-warn-rgb: var(--accent-rgb);
+  --sev-warn: var(--accent);
+
+  --bar-rgb: 10 26 17;
+  --bar: rgb(var(--bar-rgb));
+  --bar-ink-rgb: 241 246 242;
+  --bar-ink: rgb(var(--bar-ink-rgb));
+
+  --tone-1-bg: #dcece1;
+  --tone-1-ink: #0a1a11;
+  --tone-1-lip: #9eaaa2;
+  --tone-2-bg: #6fae87;
+  --tone-2-ink: #0a1a11;
+  --tone-2-lip: #507d61;
+  --tone-3-bg: #0f5c33;
+  --tone-3-ink: #ffffff;
+  --tone-3-lip: #0b4225;
+  --tone-4-bg: #ffd84d;
+  --tone-4-ink: #141203;
+  --tone-4-lip: #b89c37;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-livery="clark"]:not([data-mode="light"]) {
+    color-scheme: dark;
+
+    --paper-rgb: 5 17 12;
+    --paper: rgb(var(--paper-rgb));
+    --surface-rgb: 12 27 20;
+    --surface: rgb(var(--surface-rgb));
+    --surface-raised-rgb: 25 48 36;
+    --surface-raised: rgb(var(--surface-raised-rgb));
+
+    --ink-rgb: 230 240 233;
+    --ink: rgb(var(--ink-rgb));
+    --ink-soft-rgb: 144 168 154;
+    --ink-soft: rgb(var(--ink-soft-rgb));
+    --ink-invert-rgb: 5 17 12;
+    --ink-invert: rgb(var(--ink-invert-rgb));
+
+    --line-rgb: 53 81 63;
+    --line: rgb(var(--line-rgb));
+    --accent-rgb: 255 216 77;
+    --accent: rgb(var(--accent-rgb));
+    --accent-ink-rgb: 20 18 3;
+    --accent-ink: rgb(var(--accent-ink-rgb));
+    --pinstripe-rgb: 255 216 77;
+    --pinstripe: rgb(var(--pinstripe-rgb));
+
+    --sev-urgent-rgb: 239 95 120;
+    --sev-urgent: rgb(var(--sev-urgent-rgb));
+    --sev-info-rgb: 92 115 102;
+    --sev-info: rgb(var(--sev-info-rgb));
+    --danger-rgb: 255 138 128;
+    --danger: rgb(var(--danger-rgb));
+    --sev-warn-rgb: var(--accent-rgb);
+    --sev-warn: var(--accent);
+
+    --bar-rgb: 5 17 12;
+    --bar: rgb(var(--bar-rgb));
+    --bar-ink-rgb: 230 240 233;
+    --bar-ink: rgb(var(--bar-ink-rgb));
+
+    --tone-1-bg: #dfeae1;
+    --tone-1-ink: #05110c;
+    --tone-1-lip: #a1a8a2;
+    --tone-2-bg: #7fb391;
+    --tone-2-ink: #05110c;
+    --tone-2-lip: #5b8168;
+    --tone-3-bg: #1d5c36;
+    --tone-3-ink: #e6f0e9;
+    --tone-3-lip: #154227;
+    --tone-4-bg: #0c3a20;
+    --tone-4-ink: #e6f0e9;
+    --tone-4-lip: #092a17;
+  }
+}
+
+[data-livery="clark"][data-mode="dark"] {
+  color-scheme: dark;
+
+  --paper-rgb: 5 17 12;
+  --paper: rgb(var(--paper-rgb));
+  --surface-rgb: 12 27 20;
+  --surface: rgb(var(--surface-rgb));
+  --surface-raised-rgb: 25 48 36;
+  --surface-raised: rgb(var(--surface-raised-rgb));
+
+  --ink-rgb: 230 240 233;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft-rgb: 144 168 154;
+  --ink-soft: rgb(var(--ink-soft-rgb));
+  --ink-invert-rgb: 5 17 12;
+  --ink-invert: rgb(var(--ink-invert-rgb));
+
+  --line-rgb: 53 81 63;
+  --line: rgb(var(--line-rgb));
+  --accent-rgb: 255 216 77;
+  --accent: rgb(var(--accent-rgb));
+  --accent-ink-rgb: 20 18 3;
+  --accent-ink: rgb(var(--accent-ink-rgb));
+  --pinstripe-rgb: 255 216 77;
+  --pinstripe: rgb(var(--pinstripe-rgb));
+
+  --sev-urgent-rgb: 239 95 120;
+  --sev-urgent: rgb(var(--sev-urgent-rgb));
+  --sev-info-rgb: 92 115 102;
+  --sev-info: rgb(var(--sev-info-rgb));
+  --danger-rgb: 255 138 128;
+  --danger: rgb(var(--danger-rgb));
+  --sev-warn-rgb: var(--accent-rgb);
+  --sev-warn: var(--accent);
+
+  --bar-rgb: 5 17 12;
+  --bar: rgb(var(--bar-rgb));
+  --bar-ink-rgb: 230 240 233;
+  --bar-ink: rgb(var(--bar-ink-rgb));
+
+  --tone-1-bg: #dfeae1;
+  --tone-1-ink: #05110c;
+  --tone-1-lip: #a1a8a2;
+  --tone-2-bg: #7fb391;
+  --tone-2-ink: #05110c;
+  --tone-2-lip: #5b8168;
+  --tone-3-bg: #1d5c36;
+  --tone-3-ink: #e6f0e9;
+  --tone-3-lip: #154227;
+  --tone-4-bg: #0c3a20;
+  --tone-4-ink: #e6f0e9;
+  --tone-4-lip: #092a17;
+}
+
+/* ====================================================================
+   Senna
+   ==================================================================== */
+
+[data-livery="senna"] {
+  color-scheme: light;
+
+  --paper-rgb: 251 249 239;
+  --paper: rgb(var(--paper-rgb));
+  --surface-rgb: 255 255 255;
+  --surface: rgb(var(--surface-rgb));
+  --surface-raised-rgb: 240 234 208;
+  --surface-raised: rgb(var(--surface-raised-rgb));
+
+  --ink-rgb: 20 22 12;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft-rgb: 88 90 69;
+  --ink-soft: rgb(var(--ink-soft-rgb));
+  --ink-invert-rgb: 255 255 255;
+  --ink-invert: rgb(var(--ink-invert-rgb));
+
+  --line-rgb: 179 174 142;
+  --line: rgb(var(--line-rgb));
+  --accent-rgb: 0 105 62;
+  --accent: rgb(var(--accent-rgb));
+  --accent-ink-rgb: 255 255 255;
+  --accent-ink: rgb(var(--accent-ink-rgb));
+  --pinstripe-rgb: 13 71 161;
+  --pinstripe: rgb(var(--pinstripe-rgb));
+
+  --sev-urgent-rgb: 198 40 40;
+  --sev-urgent: rgb(var(--sev-urgent-rgb));
+  --sev-info-rgb: 143 138 112;
+  --sev-info: rgb(var(--sev-info-rgb));
+  --danger-rgb: 179 38 30;
+  --danger: rgb(var(--danger-rgb));
+  --sev-warn-rgb: var(--accent-rgb);
+  --sev-warn: var(--accent);
+
+  --bar-rgb: 20 22 12;
+  --bar: rgb(var(--bar-rgb));
+  --bar-ink-rgb: 251 249 239;
+  --bar-ink: rgb(var(--bar-ink-rgb));
+
+  --tone-1-bg: #ffd900;
+  --tone-1-ink: #14160c;
+  --tone-1-lip: #b89c00;
+  --tone-2-bg: #00a550;
+  --tone-2-ink: #08160e;
+  --tone-2-lip: #00773a;
+  --tone-3-bg: #1565c0;
+  --tone-3-ink: #ffffff;
+  --tone-3-lip: #0f498a;
+  --tone-4-bg: #0b3d91;
+  --tone-4-ink: #ffffff;
+  --tone-4-lip: #082c68;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-livery="senna"]:not([data-mode="light"]) {
+    color-scheme: dark;
+
+    --paper-rgb: 10 12 16;
+    --paper: rgb(var(--paper-rgb));
+    --surface-rgb: 19 24 33;
+    --surface: rgb(var(--surface-rgb));
+    --surface-raised-rgb: 38 48 60;
+    --surface-raised: rgb(var(--surface-raised-rgb));
+
+    --ink-rgb: 244 241 228;
+    --ink: rgb(var(--ink-rgb));
+    --ink-soft-rgb: 154 166 178;
+    --ink-soft: rgb(var(--ink-soft-rgb));
+    --ink-invert-rgb: 10 12 16;
+    --ink-invert: rgb(var(--ink-invert-rgb));
+
+    --line-rgb: 62 73 86;
+    --line: rgb(var(--line-rgb));
+    --accent-rgb: 255 217 0;
+    --accent: rgb(var(--accent-rgb));
+    --accent-ink-rgb: 18 20 12;
+    --accent-ink: rgb(var(--accent-ink-rgb));
+    --pinstripe-rgb: 255 217 0;
+    --pinstripe: rgb(var(--pinstripe-rgb));
+
+    --sev-urgent-rgb: 239 95 120;
+    --sev-urgent: rgb(var(--sev-urgent-rgb));
+    --sev-info-rgb: 95 107 120;
+    --sev-info: rgb(var(--sev-info-rgb));
+    --danger-rgb: 255 138 128;
+    --danger: rgb(var(--danger-rgb));
+    --sev-warn-rgb: var(--accent-rgb);
+    --sev-warn: var(--accent);
+
+    --bar-rgb: 10 12 16;
+    --bar: rgb(var(--bar-rgb));
+    --bar-ink-rgb: 244 241 228;
+    --bar-ink: rgb(var(--bar-ink-rgb));
+
+    --tone-1-bg: #ffd900;
+    --tone-1-ink: #12140c;
+    --tone-1-lip: #b89c00;
+    --tone-2-bg: #00a550;
+    --tone-2-ink: #08160e;
+    --tone-2-lip: #00773a;
+    --tone-3-bg: #1565c0;
+    --tone-3-ink: #f4f1e4;
+    --tone-3-lip: #0f498a;
+    --tone-4-bg: #0b3d91;
+    --tone-4-ink: #f4f1e4;
+    --tone-4-lip: #082c68;
+  }
+}
+
+[data-livery="senna"][data-mode="dark"] {
+  color-scheme: dark;
+
+  --paper-rgb: 10 12 16;
+  --paper: rgb(var(--paper-rgb));
+  --surface-rgb: 19 24 33;
+  --surface: rgb(var(--surface-rgb));
+  --surface-raised-rgb: 38 48 60;
+  --surface-raised: rgb(var(--surface-raised-rgb));
+
+  --ink-rgb: 244 241 228;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft-rgb: 154 166 178;
+  --ink-soft: rgb(var(--ink-soft-rgb));
+  --ink-invert-rgb: 10 12 16;
+  --ink-invert: rgb(var(--ink-invert-rgb));
+
+  --line-rgb: 62 73 86;
+  --line: rgb(var(--line-rgb));
+  --accent-rgb: 255 217 0;
+  --accent: rgb(var(--accent-rgb));
+  --accent-ink-rgb: 18 20 12;
+  --accent-ink: rgb(var(--accent-ink-rgb));
+  --pinstripe-rgb: 255 217 0;
+  --pinstripe: rgb(var(--pinstripe-rgb));
+
+  --sev-urgent-rgb: 239 95 120;
+  --sev-urgent: rgb(var(--sev-urgent-rgb));
+  --sev-info-rgb: 95 107 120;
+  --sev-info: rgb(var(--sev-info-rgb));
+  --danger-rgb: 255 138 128;
+  --danger: rgb(var(--danger-rgb));
+  --sev-warn-rgb: var(--accent-rgb);
+  --sev-warn: var(--accent);
+
+  --bar-rgb: 10 12 16;
+  --bar: rgb(var(--bar-rgb));
+  --bar-ink-rgb: 244 241 228;
+  --bar-ink: rgb(var(--bar-ink-rgb));
+
+  --tone-1-bg: #ffd900;
+  --tone-1-ink: #12140c;
+  --tone-1-lip: #b89c00;
+  --tone-2-bg: #00a550;
+  --tone-2-ink: #08160e;
+  --tone-2-lip: #00773a;
+  --tone-3-bg: #1565c0;
+  --tone-3-ink: #f4f1e4;
+  --tone-3-lip: #0f498a;
+  --tone-4-bg: #0b3d91;
+  --tone-4-ink: #f4f1e4;
+  --tone-4-lip: #082c68;
+}
+
+/* ====================================================================
+   MP4/4
+   ==================================================================== */
+
+[data-livery="mp44"] {
+  color-scheme: light;
+
+  --paper-rgb: 247 245 242;
+  --paper: rgb(var(--paper-rgb));
+  --surface-rgb: 255 255 255;
+  --surface: rgb(var(--surface-rgb));
+  --surface-raised-rgb: 236 231 225;
+  --surface-raised: rgb(var(--surface-raised-rgb));
+
+  --ink-rgb: 26 22 20;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft-rgb: 99 89 82;
+  --ink-soft: rgb(var(--ink-soft-rgb));
+  --ink-invert-rgb: 255 255 255;
+  --ink-invert: rgb(var(--ink-invert-rgb));
+
+  --line-rgb: 168 156 143;
+  --line: rgb(var(--line-rgb));
+  --accent-rgb: 200 16 46;
+  --accent: rgb(var(--accent-rgb));
+  --accent-ink-rgb: 255 255 255;
+  --accent-ink: rgb(var(--accent-ink-rgb));
+  --pinstripe-rgb: 200 16 46;
+  --pinstripe: rgb(var(--pinstripe-rgb));
+
+  --sev-urgent-rgb: 198 40 40;
+  --sev-urgent: rgb(var(--sev-urgent-rgb));
+  --sev-info-rgb: 144 131 119;
+  --sev-info: rgb(var(--sev-info-rgb));
+  --danger-rgb: 179 38 30;
+  --danger: rgb(var(--danger-rgb));
+  --sev-warn-rgb: var(--accent-rgb);
+  --sev-warn: var(--accent);
+
+  --bar-rgb: 26 22 20;
+  --bar: rgb(var(--bar-rgb));
+  --bar-ink-rgb: 247 245 242;
+  --bar-ink: rgb(var(--bar-ink-rgb));
+
+  --tone-1-bg: #fbe9e7;
+  --tone-1-ink: #1a1614;
+  --tone-1-lip: #b5a8a6;
+  --tone-2-bg: #ef5350;
+  --tone-2-ink: #1a0405;
+  --tone-2-lip: #ac3c3a;
+  --tone-3-bg: #c8102e;
+  --tone-3-ink: #ffffff;
+  --tone-3-lip: #900c21;
+  --tone-4-bg: #7f0e1e;
+  --tone-4-ink: #ffffff;
+  --tone-4-lip: #5b0a16;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-livery="mp44"]:not([data-mode="light"]) {
+    color-scheme: dark;
+
+    --paper-rgb: 13 11 11;
+    --paper: rgb(var(--paper-rgb));
+    --surface-rgb: 22 18 18;
+    --surface: rgb(var(--surface-rgb));
+    --surface-raised-rgb: 46 36 36;
+    --surface-raised: rgb(var(--surface-raised-rgb));
+
+    --ink-rgb: 245 240 238;
+    --ink: rgb(var(--ink-rgb));
+    --ink-soft-rgb: 169 156 152;
+    --ink-soft: rgb(var(--ink-soft-rgb));
+    --ink-invert-rgb: 13 11 11;
+    --ink-invert: rgb(var(--ink-invert-rgb));
+
+    --line-rgb: 78 64 64;
+    --line: rgb(var(--line-rgb));
+    --accent-rgb: 242 99 94;
+    --accent: rgb(var(--accent-rgb));
+    --accent-ink-rgb: 26 4 5;
+    --accent-ink: rgb(var(--accent-ink-rgb));
+    --pinstripe-rgb: 242 99 94;
+    --pinstripe: rgb(var(--pinstripe-rgb));
+
+    --sev-urgent-rgb: 239 95 120;
+    --sev-urgent: rgb(var(--sev-urgent-rgb));
+    --sev-info-rgb: 122 106 106;
+    --sev-info: rgb(var(--sev-info-rgb));
+    --danger-rgb: 255 138 128;
+    --danger: rgb(var(--danger-rgb));
+    --sev-warn-rgb: var(--accent-rgb);
+    --sev-warn: var(--accent);
+
+    --bar-rgb: 13 11 11;
+    --bar: rgb(var(--bar-rgb));
+    --bar-ink-rgb: 245 240 238;
+    --bar-ink: rgb(var(--bar-ink-rgb));
+
+    --tone-1-bg: #f0e9e1;
+    --tone-1-ink: #1a1614;
+    --tone-1-lip: #ada8a2;
+    --tone-2-bg: #ef5350;
+    --tone-2-ink: #1a0405;
+    --tone-2-lip: #ac3c3a;
+    --tone-3-bg: #c8102e;
+    --tone-3-ink: #ffffff;
+    --tone-3-lip: #900c21;
+    --tone-4-bg: #7f0e1e;
+    --tone-4-ink: #ffffff;
+    --tone-4-lip: #5b0a16;
+  }
+}
+
+[data-livery="mp44"][data-mode="dark"] {
+  color-scheme: dark;
+
+  --paper-rgb: 13 11 11;
+  --paper: rgb(var(--paper-rgb));
+  --surface-rgb: 22 18 18;
+  --surface: rgb(var(--surface-rgb));
+  --surface-raised-rgb: 46 36 36;
+  --surface-raised: rgb(var(--surface-raised-rgb));
+
+  --ink-rgb: 245 240 238;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft-rgb: 169 156 152;
+  --ink-soft: rgb(var(--ink-soft-rgb));
+  --ink-invert-rgb: 13 11 11;
+  --ink-invert: rgb(var(--ink-invert-rgb));
+
+  --line-rgb: 78 64 64;
+  --line: rgb(var(--line-rgb));
+  --accent-rgb: 242 99 94;
+  --accent: rgb(var(--accent-rgb));
+  --accent-ink-rgb: 26 4 5;
+  --accent-ink: rgb(var(--accent-ink-rgb));
+  --pinstripe-rgb: 242 99 94;
+  --pinstripe: rgb(var(--pinstripe-rgb));
+
+  --sev-urgent-rgb: 239 95 120;
+  --sev-urgent: rgb(var(--sev-urgent-rgb));
+  --sev-info-rgb: 122 106 106;
+  --sev-info: rgb(var(--sev-info-rgb));
+  --danger-rgb: 255 138 128;
+  --danger: rgb(var(--danger-rgb));
+  --sev-warn-rgb: var(--accent-rgb);
+  --sev-warn: var(--accent);
+
+  --bar-rgb: 13 11 11;
+  --bar: rgb(var(--bar-rgb));
+  --bar-ink-rgb: 245 240 238;
+  --bar-ink: rgb(var(--bar-ink-rgb));
+
+  --tone-1-bg: #f0e9e1;
+  --tone-1-ink: #1a1614;
+  --tone-1-lip: #ada8a2;
+  --tone-2-bg: #ef5350;
+  --tone-2-ink: #1a0405;
+  --tone-2-lip: #ac3c3a;
+  --tone-3-bg: #c8102e;
+  --tone-3-ink: #ffffff;
+  --tone-3-lip: #900c21;
+  --tone-4-bg: #7f0e1e;
+  --tone-4-ink: #ffffff;
+  --tone-4-lip: #5b0a16;
+}
+
+/* ====================================================================
+   John Player Special
+   ==================================================================== */
+
+[data-livery="jps"] {
+  color-scheme: light;
+
+  --paper-rgb: 244 241 232;
+  --paper: rgb(var(--paper-rgb));
+  --surface-rgb: 255 253 246;
+  --surface: rgb(var(--surface-rgb));
+  --surface-raised-rgb: 230 224 205;
+  --surface-raised: rgb(var(--surface-raised-rgb));
+
+  --ink-rgb: 20 18 12;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft-rgb: 92 85 68;
+  --ink-soft: rgb(var(--ink-soft-rgb));
+  --ink-invert-rgb: 255 253 246;
+  --ink-invert: rgb(var(--ink-invert-rgb));
+
+  --line-rgb: 179 168 135;
+  --line: rgb(var(--line-rgb));
+  --accent-rgb: 111 85 18;
+  --accent: rgb(var(--accent-rgb));
+  --accent-ink-rgb: 255 253 246;
+  --accent-ink: rgb(var(--accent-ink-rgb));
+  --pinstripe-rgb: 168 132 42;
+  --pinstripe: rgb(var(--pinstripe-rgb));
+
+  --sev-urgent-rgb: 198 40 40;
+  --sev-urgent: rgb(var(--sev-urgent-rgb));
+  --sev-info-rgb: 145 136 104;
+  --sev-info: rgb(var(--sev-info-rgb));
+  --danger-rgb: 179 38 30;
+  --danger: rgb(var(--danger-rgb));
+  --sev-warn-rgb: var(--accent-rgb);
+  --sev-warn: var(--accent);
+
+  --bar-rgb: 20 18 12;
+  --bar: rgb(var(--bar-rgb));
+  --bar-ink-rgb: 244 241 232;
+  --bar-ink: rgb(var(--bar-ink-rgb));
+
+  --tone-1-bg: #ece5d0;
+  --tone-1-ink: #14120c;
+  --tone-1-lip: #aaa596;
+  --tone-2-bg: #c9a227;
+  --tone-2-ink: #14120c;
+  --tone-2-lip: #91751c;
+  --tone-3-bg: #7d6218;
+  --tone-3-ink: #f4f1e8;
+  --tone-3-lip: #5a4711;
+  --tone-4-bg: #1c1a12;
+  --tone-4-ink: #f0dfa8;
+  --tone-4-lip: #14130d;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-livery="jps"]:not([data-mode="light"]) {
+    color-scheme: dark;
+
+    --paper-rgb: 10 10 10;
+    --paper: rgb(var(--paper-rgb));
+    --surface-rgb: 20 18 16;
+    --surface: rgb(var(--surface-rgb));
+    --surface-raised-rgb: 58 50 38;
+    --surface-raised: rgb(var(--surface-raised-rgb));
+
+    --ink-rgb: 242 234 214;
+    --ink: rgb(var(--ink-rgb));
+    --ink-soft-rgb: 163 154 128;
+    --ink-soft: rgb(var(--ink-soft-rgb));
+    --ink-invert-rgb: 20 18 12;
+    --ink-invert: rgb(var(--ink-invert-rgb));
+
+    --line-rgb: 71 64 50;
+    --line: rgb(var(--line-rgb));
+    --accent-rgb: 201 162 39;
+    --accent: rgb(var(--accent-rgb));
+    --accent-ink-rgb: 20 18 12;
+    --accent-ink: rgb(var(--accent-ink-rgb));
+    --pinstripe-rgb: 212 175 55;
+    --pinstripe: rgb(var(--pinstripe-rgb));
+
+    --sev-urgent-rgb: 229 83 75;
+    --sev-urgent: rgb(var(--sev-urgent-rgb));
+    --sev-info-rgb: 107 99 80;
+    --sev-info: rgb(var(--sev-info-rgb));
+    --danger-rgb: 255 138 128;
+    --danger: rgb(var(--danger-rgb));
+    --sev-warn-rgb: var(--accent-rgb);
+    --sev-warn: var(--accent);
+
+    --bar-rgb: 10 10 10;
+    --bar: rgb(var(--bar-rgb));
+    --bar-ink-rgb: 242 234 214;
+    --bar-ink: rgb(var(--bar-ink-rgb));
+
+    --tone-1-bg: #f0dfa8;
+    --tone-1-ink: #14120c;
+    --tone-1-lip: #ada179;
+    --tone-2-bg: #c9a227;
+    --tone-2-ink: #14120c;
+    --tone-2-lip: #91751c;
+    --tone-3-bg: #a8842a;
+    --tone-3-ink: #14120c;
+    --tone-3-lip: #795f1e;
+    --tone-4-bg: #7d5f1e;
+    --tone-4-ink: #f2ead6;
+    --tone-4-lip: #5a4416;
+  }
+}
+
+[data-livery="jps"][data-mode="dark"] {
+  color-scheme: dark;
+
+  --paper-rgb: 10 10 10;
+  --paper: rgb(var(--paper-rgb));
+  --surface-rgb: 20 18 16;
+  --surface: rgb(var(--surface-rgb));
+  --surface-raised-rgb: 58 50 38;
+  --surface-raised: rgb(var(--surface-raised-rgb));
+
+  --ink-rgb: 242 234 214;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft-rgb: 163 154 128;
+  --ink-soft: rgb(var(--ink-soft-rgb));
+  --ink-invert-rgb: 20 18 12;
+  --ink-invert: rgb(var(--ink-invert-rgb));
+
+  --line-rgb: 71 64 50;
+  --line: rgb(var(--line-rgb));
+  --accent-rgb: 201 162 39;
+  --accent: rgb(var(--accent-rgb));
+  --accent-ink-rgb: 20 18 12;
+  --accent-ink: rgb(var(--accent-ink-rgb));
+  --pinstripe-rgb: 212 175 55;
+  --pinstripe: rgb(var(--pinstripe-rgb));
+
+  --sev-urgent-rgb: 229 83 75;
+  --sev-urgent: rgb(var(--sev-urgent-rgb));
+  --sev-info-rgb: 107 99 80;
+  --sev-info: rgb(var(--sev-info-rgb));
+  --danger-rgb: 255 138 128;
+  --danger: rgb(var(--danger-rgb));
+  --sev-warn-rgb: var(--accent-rgb);
+  --sev-warn: var(--accent);
+
+  --bar-rgb: 10 10 10;
+  --bar: rgb(var(--bar-rgb));
+  --bar-ink-rgb: 242 234 214;
+  --bar-ink: rgb(var(--bar-ink-rgb));
+
+  --tone-1-bg: #f0dfa8;
+  --tone-1-ink: #14120c;
+  --tone-1-lip: #ada179;
+  --tone-2-bg: #c9a227;
+  --tone-2-ink: #14120c;
+  --tone-2-lip: #91751c;
+  --tone-3-bg: #a8842a;
+  --tone-3-ink: #14120c;
+  --tone-3-lip: #795f1e;
+  --tone-4-bg: #7d5f1e;
+  --tone-4-ink: #f2ead6;
+  --tone-4-lip: #5a4416;
+}
+
+/* ====================================================================
+   The header control — the livery's name, what it is drawn from, and the
+   light/dark switch. Plain CSS rather than utility classes so the markup is
+   identical in the hub (hand-written CSS) and in the four tools (Tailwind).
+   ==================================================================== */
+
+.pd-theme {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.pd-theme-id {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1.2;
+}
+
+.pd-livery {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pd-source {
+  color: var(--ink-soft);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+/* On the inverted bar the two tokens above have nothing like enough contrast,
+   so anything inside a .pd-on-bar takes the bar's own ink instead. */
+.pd-on-bar .pd-livery { color: var(--bar-ink); }
+.pd-on-bar .pd-source { color: var(--bar-ink); opacity: 0.72; }
+
+.pd-modes {
+  display: inline-flex;
+  /* --ink-soft rather than --line. This is a control boundary, which WCAG puts
+     at 3:1, and --line is a decorative hairline that has measured under 2.5:1
+     in every theme this project has shipped. */
+  border: 1px solid var(--ink-soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.pd-on-bar .pd-modes { border-color: rgb(var(--bar-ink-rgb) / 0.4); }
+
+.pd-modes button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 4px 11px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.pd-on-bar .pd-modes button { color: rgb(var(--bar-ink-rgb) / 0.75); }
+
+/* Both states stay visible and legible. A single toggle that shows only the
+   state you are not in is the control everyone reads backwards. */
+.pd-modes button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.pd-modes button:focus-visible {
+  outline: 2px solid var(--pinstripe);
+  outline-offset: -2px;
+}
+
+/* On a phone the bar has room for one line of identity beside the switch, and
+   the inspiration is the half that gives way — the livery name still says what
+   you are looking at, which is the part that stops meaning anything if it
+   wraps into three lines behind the title. */
+@media (max-width: 560px) {
+  .pd-source {
+    display: none;
+  }
+
+  .pd-theme {
+    gap: 10px;
+  }
+}
