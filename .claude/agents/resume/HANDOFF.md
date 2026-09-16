@@ -9,41 +9,32 @@ is true right now.
 
 ## What is true now
 
-**The app is becoming a pre-flight check, not a formatter.** Joel approved this on 2026-09-16; the
-reasoning and his words are in `RULES.md`. Formatting happens in Word. The app lints the finished
-document the way a parser reads it, compares it against the Jobright export so nothing was dropped,
-and records the submission.
+**The app is a pre-flight check, not a formatter.** Joel approved this on 2026-09-16; the reasoning
+and his words are in `RULES.md`. Formatting happens in Word. The app lints the finished document the
+way a parser reads it, compares it against the Jobright export so nothing was dropped, and records
+the submission.
 
-**Branch `claude/resume-preflight-check` is finished and pushed, and no pull request is open.** It is
-additive only: the Check tab now takes both documents and reports what did not arrive, and it is the
-landing tab. **Nothing was deleted.** `/api/reformat`, `spec.ts` and `build.ts` still work and the
-Reformat tab still renders.
+**#81 is merged and live.** `tp-resume`'s production deployment carries it — confirmed against the
+deployment record, not assumed from the merge. The Check tab takes both documents, reports what did
+not arrive, and is the landing tab.
 
-**That split is deliberate and is the safe order** — stop using, prove the new path, then remove —
-the same discipline a destructive migration follows. Removal is the next change, not this one.
+**Nothing was deleted, and that is the half still to do.** `/api/reformat`, `spec.ts`, `build.ts` and
+the Reformat tab all still work and still ship. The split is the safe order — stop using, prove,
+then remove — the same discipline a destructive migration follows. **Removal is the next change**,
+and it is blocked on one decision rather than on effort: see Next.
+
+**In flight: nothing.**
 
 ## Why the renderer is going
 
-Measured against the real fixture on 2026-09-16, not inferred from the design notes:
+**`RULES.md` carries the measured defect list** — the A4 page, the 10pt/10.5pt body, the dropped
+centring and shading, the invented bullet, the misplaced rule, the three dead spec fields. It is not
+repeated here; a second copy is a copy that drifts.
 
-- **Every render came out A4 from a US Letter template.** `TemplateSpec` has no page-size field and
-  `build.ts` sets only `page.margin`, so the `docx` library's own default wins. This alone reflows
-  every line and moves the page break.
-- Inherited body text renders 10pt where the template's `docDefaults` says 10.5pt.
-- The centred Career Highlights block renders left-aligned, its cell shading dropped entirely —
-  there is no alignment or shading field anywhere in the spec.
-- The bullet glyph and indent are both invented: the template's list is an en dash at 480/240,
-  the output a filled circle at a hardcoded 260/200.
-- The section rule is drawn under every heading; the template draws three, above.
-- `spec.entrySize`, `spacing.before` and `spacing.line` are extracted and **never read by the
-  builder** — dead fields that read as supported.
-
-**The constants that do match were fitted to one file.** `CCCCCC` and the 9360 tab stop are this
-template's own values, hardcoded. That is why it looked close and why it drifts the moment the
-template changes.
-
-**No version of this engine, in any commit, has ever read the template's XML.** It always
-synthesised a new document from a scalar summary. That is the root cause, not any one of the above.
+**The one thing worth carrying in both places is the root cause**, because every one of those
+defects is a symptom of it and a fix aimed at a symptom will not hold: **no version of this engine,
+in any commit, has ever read the template's XML.** It always synthesised a new document from a
+scalar summary and hardcoded the geometry. The constants that *do* match were fitted to one file.
 
 ## Traps specific to this app
 
