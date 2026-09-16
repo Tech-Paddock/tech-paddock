@@ -55,9 +55,9 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-`claude/home-one-toggle-per-page` — one switch per page, both halves. Pushed, **no PR yet**.
-`claude/home-paper-gutter` — the Paper ran flush into the sidebar; `.tabbed` now carries the 24px
-`.landing` used to supply. Pushed, **no PR yet**.
+`claude/home-one-toggle-per-page` — one switch per page, both halves. **Open as #86, merge first**:
+it corrects this file, which `main` still carries stale from #82's squash.
+`claude/home-paper-gutter` — the Paper's 24px gutter, moved onto `.tabbed`. **Open as #87**, after #86.
 
 ## Next
 
