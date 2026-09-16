@@ -8,11 +8,9 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**Nothing, by the time you read this.** Every branch this file has landed with was merged as it
-landed, because the gate is the same session that wrote them.
-
-**Written that way on purpose.** A handoff describes the moment *before* the merge, and the merge
-falsifies it by happening — three times today, in other agents' files.
+**Nothing, by the time you read this** — every branch this file landed with was merged as it landed,
+because the gate is the same session that wrote them. **Written that way on purpose:** a handoff
+describes the moment *before* the merge, and the merge falsifies it by happening.
 
 ## What is true now
 
