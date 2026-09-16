@@ -26,26 +26,30 @@ Nothing.
 
 ## Waiting on Joel
 
-1. **Two tokens on `tp-home`, then redeploy.** `GITHUB_TOKEN` fine-grained, this repo, read-only:
+1. **Delete `claude/home-morning-paper-prototype`.** #82 squash-merged it; a later push put it back.
+   **Its tree reverts #80 and #85** — merging it would drop `drift.generated.ts`,
+   `collect-drift.mjs`, the platform types and the `prebuild` step, and undo Coffee's pill link.
+   Harmless while no pull request is open on it. No agent can delete a remote branch here.
+2. **Two tokens on `tp-home`, then redeploy.** `GITHUB_TOKEN` fine-grained, this repo, read-only:
    Contents, Metadata, Pull requests, Actions. `VERCEL_TOKEN` read-only, `tech-paddock` team.
    **The redeploy is not optional** — Vercel bakes the environment in at build time. Until both are
-   set the Pit Wall runs on repo rows and names the two missing sources under "not reported", which
-   is the designed degraded state rather than a failure.
-2. **Re-upload the active resume template.** #71 ended re-uploads for *code* changes — the renderer
-   now re-extracts from the stored `.docx`. It does nothing about the template file itself, so if
-   the active row points at an older design, that is what renders. #67's colours need the current
-   file uploaded once.
-3. **Confirm Coffee's iOS install works on a real iPhone.** The `apple-touch-icon`, the web-app meta
-   tags and the safe-area insets are verified against the built HTML; **whether iOS actually takes
-   the icon needs a deploy and a phone.** Open it in Safari, Add to Home Screen, check the icon.
-4. **Decide whether to raise the hairline contrast bar.** `--line` against `--surface` is 1.82:1 in
-   the theme running in production, short of the 3:1 bar for a non-text component. Every new theme
-   matches or beats the shipped figure, and raising the bar **changes the look of every app**.
-   A decision, not a cleanup.
-5. **Morning Paper: polarity or density?** Its two modes are light Dispatch and dark Timing, so the
-   switch *is* the polarity switch — contradicting "one livery per app, both polarities" in
-   `DECISIONS.md`. Either both densities get both polarities, or amend the decision for the hub.
-   **Blocks the build below.**
+   set the Pit Wall runs on repo rows and names the missing sources under "not reported", which is
+   the designed degraded state rather than a failure.
+3. **Re-upload the active resume template.** #71 ended re-uploads for *code* changes — the renderer
+   re-extracts from the stored `.docx`. It does nothing about the template file itself, so if the
+   active row points at an older design, that is what renders. #67's colours need it uploaded once.
+4. **What is the Feed?** In the settled tab order and nowhere else in the repo, so it ships as a
+   labelled empty slot rather than an invented one. **A feed is rows, and the hub's rule is counts
+   and singles, never rows** — so a Feed either bends that rule or is not what the word means.
+   Nothing is blocked on it.
+5. **Switch the required checks to `gate`, `drift` and `requested-by-joel`**, dropping every per-app
+   entry. The matrix is derived now, so a per-app required check breaks on every roster change —
+   deprecating an app leaves one that can never report. Repository settings, unverifiable from here.
+6. **The pull-request watcher rule.** An agent may subscribe to its own PR, own app only. **Only one
+   watcher gets the events** — a second subscriber silently receives nothing — and the subscription
+   dies with that session, so the offer is only honest said out loud. Yes or no.
+7. **Raise the hairline contrast bar?** `--line` on `--surface` is 1.82:1 in production, short of
+   the 3:1 bar for a non-text component. Raising it **changes the look of every app**.
 
 ## Waiting on an agent
 
@@ -53,16 +57,10 @@ Requests with an owner who is not Joel. This is how one agent asks another for s
 never run at the same time, so it lands here or it does not happen. The owning agent picks it up at
 the start of its next session, because the hook prints this file into every one.
 
-1. **Render the drift check in The Garage.** *Owner: TechPad Gen.* `scripts/drift-check.mjs --json`
-   emits `{checks: [{name, state, detail}], counts}` where state is `ok` / `warn` / `fail`, and it
-   never reports `ok` for something it could not measure. It wants a panel beside Declared and
-   Reported, baked at build time the way `collect-declared.mjs` already does — **computed, never
-   typed**, which is the property that page exists to protect. The TD wrote the script and the
-   contract; the page is yours.
-2. **Build the Morning Paper.** *Owner: TechPad Gen.* A third Pit Wall tab — `Board · Feed · Paper`,
-   Paper landing — in two densities off one markup tree. The board does not move. The hub holds no
-   keys: everything about jobs and mail comes from `tracker`'s `/api/summary`. Joel has the full
-   brief and the prototype and pastes them at kickoff. **Waiting on Joel item 5 first.**
+1. **Trim `techpad-gen/HANDOFF.md` off the ceiling.** *Owner: TechPad Gen.* It sits at exactly
+   80 of 80 after #82, so **the next line anyone adds turns `drift` red**, and that agent will not
+   have caused it. The gate left it alone on purpose: trimming your own account of your area is
+   yours, not the merge's.
 
 ## Parked
 
