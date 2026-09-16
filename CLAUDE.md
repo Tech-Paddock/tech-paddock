@@ -146,6 +146,21 @@ wrong or the rule is, and that is a conversation before any code exists.
   **No other agent can see the conversation where he asked**, so the request lands in the repo or it
   did not happen. `requested-by-joel` fails a body without that line. What no check can see is
   whether the quote is real, so **this rule rests further on honesty than the ones around it.**
+- **Three phrases from Joel mean three specific things.** They exist so he can move work without
+  spelling out the steps each time, and so the steps are the same for every agent.
+
+  **"Close out."** Finish what you are on, commit and push, update your `HANDOFF.md`, and **open the
+  pull request** — body carrying `Requested by Joel on YYYY-MM-DD — "close out"`, blast radius, and
+  the Deployment section. Then say you are at a compaction point and stop. **This is the ask the
+  rule above requires**; there is no separate permission to wait for.
+
+  **"Park it."** The same, without the pull request. Stop at the pushed branch. He uses this when he
+  wants the work safe but not in the queue.
+
+  **"Pick up: <thing>."** New work. Come back with what you understand the job to be, what you would
+  do first, and the second-order answers. **Do not cut a branch or write code until he answers** —
+  until then you do not know what the change is, and the branch would be named after a guess.
+
 - **State your blast radius in the pull request:** which apps, which shared files.
 - **Adding or deprecating an app under `apps/` needs no CI change.** The matrix is derived from the
   folders on disk, and one fixed-name `gate` job sits in front of it, so branch protection requires
@@ -185,11 +200,48 @@ wrong or the rule is, and that is a conversation before any code exists.
   signal anyone gets that the work is on disk rather than still in your head. A handoff written after
   a compaction is composed from a summary of a summary: fluent, second-hand, and confidently wrong,
   which is the single failure this project has paid for most.
-- **End every message to Joel with the open-items footer.** Every message, so he never has to go
-  looking. **A merge waiting on him is hoisted onto its own line above the table**, named by branch
-  and whether it is green — it is the one thing that is purely his yes or no. The line is always
-  written, including `**Waiting on your word:** nothing.`
-  Then the table, one line per item, no prose underneath:
+- **End every message to Joel with the three-part sign-off.** Every message, so he never has to go
+  looking and never has to ask what state anything is in. Three headings, always in this order,
+  always all three — a section with nothing in it says so rather than being dropped, because a
+  missing section and a quiet one are indistinguishable.
+
+  **1 · Work Brief.** What you finished in this message, as **dashed bullets, one per thing** — the
+  dashes are the point, because a paragraph of three accomplishments reads as one. Not the session,
+  not the plan; what is now done. **`- None.` is the correct answer when the message only answered a
+  question**, and it is written rather than dropped.
+
+  **2 · DevOps.** What exists and is not live yet, one line each, carrying **what it is, whose it
+  is, and the stage it is parked at** — the owning agent is a column so he can see at a glance who a
+  branch belongs to, because a branch name does not always say. Four stages, in the order work moves
+  through them, and the words are the ones Joel reads — not git's:
+
+  ```
+  | | Branch or PR | Agent | Stage |
+  ```
+
+  | | Stage | Means |
+  |---|---|---|
+  | 🟡 | **In progress** | Still being worked on. Covers everything before it is finished, saved or not — that distinction is the agent's business, never his. |
+  | 🟢 | **Needs a PR** | Finished, pushed, CI green. Waiting on Joel's word to open one. |
+  | 🟢 | **Ready to merge** | Pull request open and green. Waiting on the technical director. |
+  | 🔴 | **Stuck** | CI failing, a merge conflict, or a step that errored. **Say what is broken, not just that it is.** |
+
+  **Every agent reports its own work, all the way through** — from in progress to merged. **The
+  technical director reports every pushed branch and every open pull request**, because the merge
+  queue is the job.
+
+  **It cannot report another agent's in-progress work.** That lives in the other agent's session and
+  never reaches the repo until it is pushed, so a line about it would be invented. This is the same
+  rule as the ledger's: what you have not measured does not get a row.
+
+  **A stage comes from `git status` and a live check run in this session — never from memory.** If
+  you could not check, the line reads `unchecked` rather than guessing.
+
+  **3 · Open Items.** The ledger. **The technical director prints every row; every other agent
+  prints only the rows whose `Agent` is them.** A merge waiting on Joel is hoisted onto its own line
+  above the table, named by branch and whether it is green — it is the one thing that is purely his
+  yes or no, and the line is always written, including `**Waiting on your word:** nothing.` Then the
+  table, one line per item, no prose underneath:
 
   ```
   | Item | Owner | Urgency | Blocking | Agent |
@@ -202,7 +254,7 @@ wrong or the rule is, and that is a conversation before any code exists.
   **Never fill in a row you cannot see.** What you genuinely know is the ledger, your own handoff,
   and the conversation in front of you. Do not report on another agent's behalf or infer that their
   work has moved. A guess in a status footer is worse than a missing row, because a table reads as
-  verified whether or not anybody verified it. **"Nothing open" is a valid footer and must be
+  verified whether or not anybody verified it. **"Nothing open" is a valid answer and must be
   written.**
 
 ### Ask the second-order questions first
