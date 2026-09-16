@@ -24,11 +24,17 @@ gets built next: a page agents write config into is a second source of truth, an
 been injured twice by exactly that.
 
 **The theme system** — ten palettes, five liveries, both polarities, the light/dark control in every
-header. `lib/theme.css` holds every token and is byte-identical in every app; `lib/livery.ts` is
-the one file that differs per app and holds a single constant. The tools' `tailwind.config.ts`
-no longer contains a colour — every entry reads `rgb(var(--token-rgb) / <alpha-value>)`, and the
-triplet form is required, not preferred: it is the only shape Tailwind's alpha modifier can
-interpolate.
+header that is not framed (below). `lib/theme.css` holds every token and is byte-identical in every
+app; `lib/livery.ts` differs per app and holds one constant. No tool's `tailwind.config.ts` contains
+a colour — every entry reads `rgb(var(--token-rgb) / <alpha-value>)`, and the triplet form is
+required, not preferred: it is the only shape Tailwind's alpha modifier can interpolate.
+
+**One switch per page — two halves that must stay together.** Framed, a tool hides its own
+Light/Dark (`[data-embedded] .pd-modes`, stamped by each layout before paint) and keeps its livery
+badge. Safe only because the hub posts `{type:"paddock-mode", mode}` into every frame and
+`ThemeControl` listens behind `isPaddockOrigin()`. **A cross-app contract now: a tool that drops
+`ThemeControl.tsx` silently ignores the hub's switch.** The origin check is defence in depth —
+`frame-ancestors` already lets only the hub frame a tool, measured, not assumed.
 
 **The chrome is a layout, not a component.** `app/(shell)/` is a route group holding `/` and
 `/admin`; its `layout.tsx` renders `Chrome.tsx` with each page as `children`. `/login` is
@@ -43,34 +49,30 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 - **`children` rather than props is what makes the shell possible.** `/admin` is an async server
   component running live probes, so it can never be rendered *by* a client component — but it can be
   passed *through* one.
-- **Never name the production commit in prose.** An earlier version of this file did and was wrong by
-  the time it was read; at one point four documents each named a different production commit, every
-  one correct when written. Name where to look.
 - **The glance gets counts and singles, never rows.** A hub handed thread arrays slowly becomes a
   worse copy of the tracker. `SOURCES` holds one entry today — a fact about the present, not a
   design limit.
 
 ## In flight
 
-Nothing.
+`claude/home-one-toggle-per-page` — the two halves above. **Three of my branches now edit this file**
+(also `claude/home-garage-drift-panel`, `claude/home-morning-paper-prototype`), so all but the first
+to merge pay a conflict here. No real disagreement: each describes its own work, keep all of it.
 
 ## Next
 
 1. **The hub's mobile login bug.** Both cheap explanations are ruled out from the code: `APPS`
-   hardcodes the custom domains, and the cookie attributes are sound. It needs a live repro with
-   devtools. **Reproduce in Chrome** — see `CLAUDE.md`; the WebKit cookie-policy theory is ruled out
-   and cost a round already.
+   hardcodes the custom domains, and the cookie attributes are sound. Needs a live repro with
+   devtools, **in Chrome** — the WebKit theory is ruled out and cost a round already.
 2. **`apps/home` still has no `test` script.** CI runs `npm run test --if-present`, so adding one
    opts the app in with no CI change. `lib/glance.ts`, `lib/diagnostics.ts` and `lib/pitwall.ts` are
-   pure and untested. `editor` and `home` are the apps without tests.
+   pure and untested; `isPaddockOrigin` now too. `editor` and `home` are the apps without tests.
 3. **A style pass, deferred by Joel** — a monospace stack, a type scale to replace ten ad-hoc pixel
    values, and collapsing the three drifted copies of the micro-label rule (`.eyebrow`,
    `.sidebar-label`, `.slot-label`). Pick it up when he returns to it.
-4. **`/api/version` is designed and undecided** — public, or behind the internal secret. The
-   recommendation is public: it exposes a commit hash of a private repo and nothing else, and public
-   is what lets an external monitor notice an outage, since `/api/health` sits behind the password
-   gate. Joel's call.
+4. **`/api/version` is designed and undecided** — public, or behind the internal secret. Recommend
+   public: it exposes a commit hash and nothing else, and public is what lets an external monitor
+   notice an outage, since `/api/health` sits behind the password gate. Joel's call.
 
-Waiting on Joel: whether to raise the hairline contrast bar. `--line` against `--surface` is 1.82:1
-in production, short of the 3:1 bar. Every new theme matches or beats it, so raising the bar changes
-the look of every app — a decision, not a cleanup. It is in the ledger.
+Waiting on Joel: the hairline contrast bar — stated in full in `.claude/OPEN-ITEMS.md`, not restated
+here. That file is printed into every session, so a second copy can only drift out of step with it.
