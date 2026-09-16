@@ -59,10 +59,6 @@ page. The label now says where it came from instead of claiming it was written f
 "The beans" links out from the top of the bag card instead of a footnote at the bottom, and the
 rating says it is optional — which it always was. **Deployment: nothing, it deploys itself on merge.**
 
-**Needs the technical director: delete the remote branch `claude/coffee-repeat-the-last-brew`.** Same
-work, pushed onto pre-rewrite history by mistake, so that ref keeps the scrubbed tracker names
-reachable. Force-push and branch deletion are both blocked for me.
-
 ## Next
 
 1. **Run the same coffee twice — Haiku, then Sonnet 5 at `high`** — and compare which tier each
