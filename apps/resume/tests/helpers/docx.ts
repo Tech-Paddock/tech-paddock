@@ -90,3 +90,46 @@ export const para = (text: string, halfPoints?: number, opts: { list?: boolean }
 /** One row of `n` cells, each holding the paragraphs given for it. */
 export const table = (cellsPerRow: string[][]) =>
   `<w:tbl><w:tblPr/><w:tr>${cellsPerRow.map((ps) => `<w:tc>${ps.join("")}</w:tc>`).join("")}</w:tr></w:tbl>`;
+
+/** One run's formatting, written the way a template writes it. `sz` is
+ *  half-points and `color` is six hex digits; leaving either out is the case that
+ *  matters most, since that is how a run inherits the document default. */
+export type RunSpec = {
+  text: string;
+  sz?: number;
+  color?: string;
+  bold?: boolean;
+  italic?: boolean;
+  /** Wrap the run in a `<w:hyperlink>`, which is what Word does to an email
+   *  address or a URL — and why a contact line has a link colour in it that is not
+   *  the colour of the line. */
+  link?: boolean;
+};
+
+/** A paragraph of several runs — the only shape that can express the
+ *  employer/title/dates line, which is one paragraph telling three roles apart by
+ *  nothing but their run properties. */
+export const runs = (specs: RunSpec[], opts: { list?: boolean } = {}) =>
+  `<w:p>
+    ${opts.list ? '<w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr>' : ""}
+    ${specs
+      .map((r) => {
+        const props = [
+          r.bold ? "<w:b/>" : "",
+          r.italic ? "<w:i/>" : "",
+          r.color === undefined ? "" : `<w:color w:val="${r.color}"/>`,
+          r.sz === undefined ? "" : `<w:sz w:val="${r.sz}"/>`,
+        ].join("");
+        const run = `<w:r>${props ? `<w:rPr>${props}</w:rPr>` : ""}<w:t xml:space="preserve">${r.text}</w:t></w:r>`;
+        return r.link ? `<w:hyperlink r:id="rId9">${run}</w:hyperlink>` : run;
+      })
+      .join("")}
+  </w:p>`;
+
+/** A styles part whose docDefaults state a colour and a size, which is where a
+ *  run that states neither gets both. */
+export const stylesWithDefaults = (color: string, halfPoints: number) =>
+  `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri"/><w:color w:val="${color}"/><w:sz w:val="${halfPoints}"/><w:szCs w:val="${halfPoints}"/></w:rPr></w:rPrDefault><w:pPrDefault/></w:docDefaults>
+</w:styles>`;

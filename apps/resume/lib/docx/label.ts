@@ -26,7 +26,11 @@ export type Coverage = {
 const DATE_RANGE =
   /((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4}|\d{4})\s*[–—-]\s*((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4}|Present|Current|\d{4})/i;
 
-const looksLikeContact = (t: string) =>
+/** Exported because spec extraction has to agree with the labeller about which
+ *  line is the contact line: one decides what colour to render it in, the other
+ *  decides what text goes there, and two different answers would be a line set in
+ *  the colour of a different line. */
+export const looksLikeContact = (t: string) =>
   /@/.test(t) || (t.match(/[|·]/g) ?? []).length >= 2 || /linkedin\.com/i.test(t);
 
 /**
