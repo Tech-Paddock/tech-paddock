@@ -5,8 +5,14 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-16T18:07:33.178Z",
+  bakedAt: "2026-09-16T18:59:41.841Z",
   waiting: [
+  {
+    "title": "Delete `claude/home-morning-paper-prototype`",
+    "detail": "#82 squash-merged it; a later push put it back. Its tree reverts #80 and #85 — merging it would drop drift.generated.ts, collect-drift.mjs, the platform types and the prebuild step, and undo Coffee's pill link. Harmless while no pull reques",
+    "ref": "—",
+    "state": "box"
+  },
   {
     "title": "Two tokens on `tp-home`, then redeploy",
     "detail": "GITHUB_TOKEN fine-grained, this repo, read-only: Contents, Metadata, Pull requests, Actions. VERCEL_TOKEN read-only, tech-paddock team. The redeploy is not optional — Vercel bakes the environment in at build time. Until both are set the Pit",
@@ -15,25 +21,31 @@ export const PADDOCK = {
   },
   {
     "title": "Re-upload the active resume template",
-    "detail": "#71 ended re-uploads for *code* changes — the renderer now re-extracts from the stored .docx. It does nothing about the template file itself, so if the active row points at an older design, that is what renders. #67's colours need the curre",
+    "detail": "#71 ended re-uploads for *code* changes — the renderer re-extracts from the stored .docx. It does nothing about the template file itself, so if the active row points at an older design, that is what renders. #67's colours need it uploaded o",
     "ref": "—",
     "state": "box"
   },
   {
-    "title": "Confirm Coffee's iOS install works on a real iPhone",
-    "detail": "The apple-touch-icon, the web-app meta tags and the safe-area insets are verified against the built HTML; whether iOS actually takes the icon needs a deploy and a phone. Open it in Safari, Add to Home Screen, check the icon.",
+    "title": "What is the Feed?",
+    "detail": "In the settled tab order and nowhere else in the repo, so it ships as a labelled empty slot rather than an invented one. A feed is rows, and the hub's rule is counts and singles, never rows — so a Feed either bends that rule or is not what ",
     "ref": "—",
     "state": "box"
   },
   {
-    "title": "Decide whether to raise the hairline contrast bar",
-    "detail": "--line against --surface is 1.82:1 in the theme running in production, short of the 3:1 bar for a non-text component. Every new theme matches or beats the shipped figure, and raising the bar changes the look of every app. A decision, not a ",
+    "title": "Switch the required checks to `gate`, `drift` and `requested-by-joel`",
+    "detail": ", dropping every per-app entry. The matrix is derived now, so a per-app required check breaks on every roster change — deprecating an app leaves one that can never report. Repository settings, unverifiable from here.",
     "ref": "—",
     "state": "box"
   },
   {
-    "title": "Morning Paper: polarity or density?",
-    "detail": "Its two modes are light Dispatch and dark Timing, so the switch *is* the polarity switch — contradicting \"one livery per app, both polarities\" in DECISIONS.md. Either both densities get both polarities, or amend the decision for the hub. Bl",
+    "title": "The pull-request watcher rule",
+    "detail": "An agent may subscribe to its own PR, own app only. Only one watcher gets the events — a second subscriber silently receives nothing — and the subscription dies with that session, so the offer is only honest said out loud. Yes or no.",
+    "ref": "—",
+    "state": "box"
+  },
+  {
+    "title": "Raise the hairline contrast bar?",
+    "detail": "--line on --surface is 1.82:1 in production, short of the 3:1 bar for a non-text component. Raising it changes the look of every app.",
     "ref": "—",
     "state": "box"
   }

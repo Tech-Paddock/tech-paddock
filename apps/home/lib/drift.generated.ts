@@ -6,7 +6,7 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-16T18:07:33.322Z",
+  "generatedAt": "2026-09-16T18:59:41.984Z",
   "complete": true,
   "reason": "",
   "checks": [
@@ -43,7 +43,7 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/agents/coffee/HANDOFF.md",
       "state": "warn",
-      "detail": "76 / 80"
+      "detail": "77 / 80"
     },
     {
       "name": "budget: .claude/agents/message-editor/HANDOFF.md",
@@ -57,13 +57,13 @@ export const DRIFT: Drift = {
     },
     {
       "name": "budget: .claude/agents/resume/HANDOFF.md",
-      "state": "warn",
-      "detail": "77 / 80"
+      "state": "ok",
+      "detail": "68 / 80"
     },
     {
       "name": "budget: .claude/agents/td/HANDOFF.md",
       "state": "warn",
-      "detail": "72 / 80"
+      "detail": "79 / 80"
     },
     {
       "name": "budget: .claude/agents/techpad-gen/HANDOFF.md",
@@ -78,12 +78,12 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/OPEN-ITEMS.md",
       "state": "warn",
-      "detail": "79 / 80"
+      "detail": "77 / 80"
     },
     {
       "name": "budget: .claude/DECISIONS.md",
       "state": "ok",
-      "detail": "174 / 200"
+      "detail": "180 / 200"
     },
     {
       "name": "fresh: coffee",
@@ -147,8 +147,8 @@ export const DRIFT: Drift = {
     }
   ],
   "counts": {
-    "ok": 21,
-    "warn": 6,
+    "ok": 22,
+    "warn": 5,
     "fail": 0
   }
 };
