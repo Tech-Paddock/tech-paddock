@@ -39,6 +39,10 @@ landed after its session started.
 > is the deliverable. Update your `HANDOFF.md` before you hand it over, and say in as many words
 > that you are at a compaction point.
 >
+> **End every message to me with the three-part sign-off** — Work Brief, DevOps, Open Items. The
+> shape is in `CLAUDE.md`. Show only your own branches and your own ledger rows, and never a status
+> colour you did not look up in this session.
+>
 > **If what you are about to build contradicts the brief or your charter, stop and ask me before you
 > build it** — not in the pull request afterwards. If an instruction looks wrong, say so at a high
 > level and stop. If I say go anyway, go fully, and ask whatever you need to execute it correctly.

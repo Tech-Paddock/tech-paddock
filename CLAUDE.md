@@ -185,11 +185,35 @@ wrong or the rule is, and that is a conversation before any code exists.
   signal anyone gets that the work is on disk rather than still in your head. A handoff written after
   a compaction is composed from a summary of a summary: fluent, second-hand, and confidently wrong,
   which is the single failure this project has paid for most.
-- **End every message to Joel with the open-items footer.** Every message, so he never has to go
-  looking. **A merge waiting on him is hoisted onto its own line above the table**, named by branch
-  and whether it is green — it is the one thing that is purely his yes or no. The line is always
-  written, including `**Waiting on your word:** nothing.`
-  Then the table, one line per item, no prose underneath:
+- **End every message to Joel with the three-part sign-off.** Every message, so he never has to go
+  looking and never has to ask what state anything is in. Three headings, always in this order,
+  always all three — a section with nothing in it says so rather than being dropped, because a
+  missing section and a quiet one are indistinguishable.
+
+  **1 · Work Brief.** One or two lines on what you just finished, in this message. Not the session,
+  not the plan — what is now done. **`None.` is the correct answer when you only answered a
+  question**, and it is written.
+
+  **2 · DevOps.** One line per branch of yours that is not on `main` yet, with a light. Report only
+  what you measured in this session, from `git status` and a live check run — **never from memory,
+  and never a colour you did not look up.** If you could not check, say `unchecked` rather than
+  guessing a colour.
+
+  | Light | Means |
+  |---|---|
+  | 🟢 Green | Pushed, CI green, finished. Nothing left but his word. |
+  | 🟡 Yellow | Exists but is not ready — uncommitted in the working tree, pushed with CI still running, or waiting on an answer. |
+  | 🔴 Red | CI failing, a merge conflict, or a step that errored. **Say what is broken, not just that it is.** |
+
+  **The technical director lists every open branch and pull request here**, because the merge queue
+  is the job. **Every other agent lists only its own** — you cannot see whether another agent's
+  branch moved, and a green light you inferred is worse than no line at all.
+
+  **3 · Open Items.** The ledger. **The technical director prints every row; every other agent
+  prints only the rows whose `Agent` is them.** A merge waiting on Joel is hoisted onto its own line
+  above the table, named by branch and whether it is green — it is the one thing that is purely his
+  yes or no, and the line is always written, including `**Waiting on your word:** nothing.` Then the
+  table, one line per item, no prose underneath:
 
   ```
   | Item | Owner | Urgency | Blocking | Agent |
@@ -202,7 +226,7 @@ wrong or the rule is, and that is a conversation before any code exists.
   **Never fill in a row you cannot see.** What you genuinely know is the ledger, your own handoff,
   and the conversation in front of you. Do not report on another agent's behalf or infer that their
   work has moved. A guess in a status footer is worse than a missing row, because a table reads as
-  verified whether or not anybody verified it. **"Nothing open" is a valid footer and must be
+  verified whether or not anybody verified it. **"Nothing open" is a valid answer and must be
   written.**
 
 ### Ask the second-order questions first
