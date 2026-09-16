@@ -51,8 +51,8 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-`claude/home-garage-drift-panel` — the drift panel above, finished and pushed. No pull request
-asked for yet.
+`claude/home-garage-drift-panel` — the drift panel above. Finished, CI green, and open as a pull
+request at Joel's request. Nothing in it is live until the TD merges it and `tp-home` redeploys.
 
 ## Next
 
