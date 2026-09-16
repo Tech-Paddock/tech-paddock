@@ -88,3 +88,41 @@ export function themeCookieString(hostname: string, protocol: string, mode: Mode
   if (protocol === "https:") parts.push("secure");
   return parts.join("; ");
 }
+
+/**
+ * Whether a postMessage origin is one of ours.
+ *
+ * The hub embeds each tool in a cross-origin iframe, so writing the cookie and
+ * stamping <html> in the hub's document does not reach a frame that has already
+ * loaded. The hub posts `{ type: "paddock-mode", mode }` to each frame instead
+ * and the tool restamps itself; this is the guard on the receiving end.
+ *
+ * **It is defence in depth, not the control.** Posting into a frame requires
+ * framing it first, and every tool already sends `frame-ancestors 'self'
+ * https://techpaddock.io https://*.techpaddock.io` — so the hub is the only
+ * page that can be the sender. What travels is a display preference: no
+ * credential, no data read, and the worst a forged message could do is flip the
+ * colours of a page whoever sent it had already embedded.
+ *
+ * `.vercel.app` is admitted deliberately rather than by oversight — preview
+ * deployments are where this gets exercised before it reaches the domain, and
+ * the paragraph above is why that costs nothing.
+ *
+ * The host logic mirrors themeCookieString above rather than sharing a helper
+ * with it: that one answers "may I set a cookie for this domain", which is a
+ * browser rule, and this one answers "do I trust this sender". They agree today
+ * and are not the same question.
+ */
+export function isPaddockOrigin(origin: string): boolean {
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (protocol !== "https:" && protocol !== "http:") return false;
+    if (hostname === "techpaddock.io" || hostname.endsWith(".techpaddock.io")) return true;
+    if (hostname === "localhost" || hostname === "127.0.0.1") return true;
+    return hostname.endsWith(".vercel.app");
+  } catch {
+    // An opaque origin arrives as the string "null" — a sandboxed frame or a
+    // data: URL. Not ours, and never a parse this should throw on.
+    return false;
+  }
+}
