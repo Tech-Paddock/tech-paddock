@@ -6,7 +6,7 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-16T17:27:10.300Z",
+  "generatedAt": "2026-09-16T18:07:33.322Z",
   "complete": true,
   "reason": "",
   "checks": [
@@ -23,7 +23,7 @@ export const DRIFT: Drift = {
     {
       "name": "identical: lib/theme.css",
       "state": "ok",
-      "detail": "5 copies, all ab55a1a4"
+      "detail": "5 copies, all 768f450c"
     },
     {
       "name": "middleware.ts: a base copy plus the two scoped bypasses",
@@ -68,7 +68,7 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/agents/techpad-gen/HANDOFF.md",
       "state": "warn",
-      "detail": "80 / 80"
+      "detail": "79 / 80"
     },
     {
       "name": "budget: .claude/agents/tracker/HANDOFF.md",
