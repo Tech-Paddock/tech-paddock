@@ -212,7 +212,7 @@ wrong or the rule is, and that is a conversation before any code exists.
 
   **2 · DevOps.** What exists and is not live yet, one line each, carrying **what it is, whose it
   is, and the stage it is parked at** — the owning agent is a column so he can see at a glance who a
-  branch belongs to, because a branch name does not always say. Four stages, in the order work moves
+  branch belongs to, because a branch name does not always say. Five stages, in the order work moves
   through them, and the words are the ones Joel reads — not git's:
 
   ```
@@ -225,6 +225,7 @@ wrong or the rule is, and that is a conversation before any code exists.
   | 🟡 | **Needs a PR** | Finished and pushed, CI green — but the pull request is still work, so it is yellow until Joel asks and the agent writes it. |
   | 🟢 | **Ready to merge** | Pull request open and green. Waiting on the technical director. |
   | 🔴 | **Stuck** | CI failing, a merge conflict, or a step that errored. **Say what is broken, not just that it is.** |
+  | 🟣 | **Needs deletion** | Merged, superseded or dead, and the remote branch is still there. |
 
   **Every agent reports its own work, all the way through** — from in progress to merged. **The
   technical director reports every pushed branch and every open pull request**, because the merge
@@ -233,6 +234,14 @@ wrong or the rule is, and that is a conversation before any code exists.
   **It cannot report another agent's in-progress work.** That lives in the other agent's session and
   never reaches the repo until it is pushed, so a line about it would be invented. This is the same
   rule as the ledger's: what you have not measured does not get a row.
+
+  **Needs deletion is nearly always Joel's action, which is why it gets its own colour.** No agent
+  can delete a remote branch here — the proxy refuses it — so a dead branch stays listed until he
+  removes it, and a line that never changes colour is one everybody stops reading. It covers three
+  cases: a merge that did not delete its branch, a duplicate of work that is already somewhere else,
+  and **a branch that is a liability rather than clutter** — one carrying something scrubbed from
+  `main`, which stays reachable through that ref for as long as the ref exists. **Say which of the
+  three it is**, because only the last one is urgent.
 
   **Colour tracks whether an agent still has work, not who is blocking.** That is why *Needs a PR*
   is yellow: the branch is finished, but writing the pull request — body, blast radius, Deployment
