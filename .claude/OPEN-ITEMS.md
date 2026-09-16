@@ -42,10 +42,10 @@ Nothing.
    the theme running in production, short of the 3:1 bar for a non-text component. Every new theme
    matches or beats the shipped figure, and raising the bar **changes the look of every app**.
    A decision, not a cleanup.
-5. **Morning Paper: polarity or density?** Its two modes are light Dispatch and dark Timing, so the
-   switch *is* the polarity switch — contradicting "one livery per app, both polarities" in
-   `DECISIONS.md`. Either both densities get both polarities, or amend the decision for the hub.
-   **Blocks the build below.**
+5. **What is the Feed?** It is in the settled tab order and nowhere else in the repo, so it ships as
+   a labelled empty slot rather than an invented one. The sharpest question: **a feed is rows, and
+   the hub's rule is counts and singles, never rows** — so a Feed either bends that rule or is not
+   what the word usually means. Nothing is blocked on it; the slot says what it is.
 
 ## Waiting on an agent
 
@@ -53,16 +53,11 @@ Requests with an owner who is not Joel. This is how one agent asks another for s
 never run at the same time, so it lands here or it does not happen. The owning agent picks it up at
 the start of its next session, because the hook prints this file into every one.
 
-1. **Render the drift check in The Garage.** *Owner: TechPad Gen.* `scripts/drift-check.mjs --json`
-   emits `{checks: [{name, state, detail}], counts}` where state is `ok` / `warn` / `fail`, and it
-   never reports `ok` for something it could not measure. It wants a panel beside Declared and
-   Reported, baked at build time the way `collect-declared.mjs` already does — **computed, never
-   typed**, which is the property that page exists to protect. The TD wrote the script and the
-   contract; the page is yours.
-2. **Build the Morning Paper.** *Owner: TechPad Gen.* A third Pit Wall tab — `Board · Feed · Paper`,
-   Paper landing — in two densities off one markup tree. The board does not move. The hub holds no
-   keys: everything about jobs and mail comes from `tracker`'s `/api/summary`. Joel has the full
-   brief and the prototype and pastes them at kickoff. **Waiting on Joel item 5 first.**
+1. **Trim `techpad-gen/HANDOFF.md` off the ceiling.** *Owner: TechPad Gen.* It sits at exactly
+   80 of 80 after #82, so **the next line anyone adds turns `drift` red**, and that agent will not
+   have caused it. The gate left it alone on purpose: trimming your own account of your area is
+   yours, not the merge's.
+2. **Trim `coffee/HANDOFF.md` off the ceiling.** *Owner: Coffee.* Same wedge, at 80 of 80 since #78.
 
 ## Parked
 

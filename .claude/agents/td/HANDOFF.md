@@ -8,15 +8,13 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**`claude/brief-three-part-footer`** — the sign-off every agent ends a message with is now three
-sections: Work Brief, DevOps, Open Items. DevOps is the promotion pipeline in four stages named in
-Joel's words — in progress, needs a PR, ready to merge, stuck — because committed-versus-uncommitted
-is how an agent saves work, not a stage of getting something live. It also gives him three phrases
-that mean three specific things: **close out**, **park it**, **pick up: X**.
-**The scoping is the part to preserve:** you report every pushed branch and every ledger row; every
-other agent reports only its own. **You cannot see another agent's in-progress work** — it never
-reaches the repo until it is pushed — so it appears only in its author's section. Approved by Joel
-on 2026-09-16 and dialled in over four rounds of his feedback.
+**`claude/brief-record-paper-decisions`** — records two decisions Joel made today and clears what
+they answered. `DECISIONS.md` said the Paper's above-the-fold carries no job-search content as a
+privacy requirement; **he lifted that** — *"drop above the fold below, ill manage privacy"* — and
+#82 shipped the code before the record caught up. The polarity entry is confirmed rather than
+changed: density is a separate axis and does not carry polarity.
+The ledger drops both agent requests, which landed as #80 and #82, and gains the two handoffs
+sitting at their 80-line ceiling.
 **Deployment: nothing — no app code changed.**
 
 Nothing else of mine is open.
