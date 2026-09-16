@@ -3,6 +3,8 @@
  * be tested without a database or a browser.
  */
 
+import { DEFAULT_GRINDER } from "@/lib/brewers";
+
 /** A refractometer reads percent. Everything else quotes ppm. They are the same number. */
 export const PPM_PER_PERCENT = 10_000;
 
@@ -71,4 +73,70 @@ export function readBrew(input: { tdsPercent: number | null; yieldPercent: numbe
         : "well extracted";
 
   return `${strength[0].toUpperCase()}${strength.slice(1)}, and ${extraction}.`;
+}
+
+/**
+ * The form for a new brew, all strings because that is what an input holds.
+ */
+export type BrewDraft = {
+  brewer: string;
+  brew_method: string;
+  grinder: string;
+  grind_setting: string;
+  dose_g: string;
+  beverage_g: string;
+  notes: string;
+};
+
+/** What a brew looks like coming back from the API, in the fields worth repeating. */
+type PreviousBrew = {
+  brewer?: string | null;
+  brew_method?: string | null;
+  grinder?: string | null;
+  grind_setting?: string | null;
+  dose_g?: string | number | null;
+};
+
+export function blankBrew(): BrewDraft {
+  return {
+    brewer: "",
+    brew_method: "",
+    grinder: DEFAULT_GRINDER,
+    grind_setting: "",
+    dose_g: "",
+    beverage_g: "",
+    notes: "",
+  };
+}
+
+/**
+ * A new brew starts as a repeat of the last one on the same bag, because
+ * dialling in is one change at a time against everything else held still.
+ * Retyping the four settings you did not mean to change is how they drift.
+ *
+ * **Settings carry forward. Readings do not.** Brewer, brew method, grinder,
+ * grind setting and dose are decisions — you make them again deliberately, and
+ * repeating them is the point. Beverage mass, TDS, rating and notes are
+ * observations of one cup. Carrying a reading forward would record a
+ * measurement nobody took, and beverage mass and TDS both feed the generated
+ * extraction yield, so a stale one produces a figure that is arithmetically
+ * correct about a brew that never happened.
+ *
+ * This is the same line `findPreviousBag` draws across bags — the dial-in
+ * carries, what you thought of the cup does not.
+ */
+export function repeatOf(previous: PreviousBrew | null | undefined): BrewDraft {
+  const blank = blankBrew();
+  if (!previous) return blank;
+
+  return {
+    ...blank,
+    brewer: previous.brewer ?? "",
+    brew_method: previous.brew_method ?? "",
+    // The grinder keeps its default rather than blanking, because a previous
+    // brew that recorded none says nothing about which one is on the counter.
+    grinder: previous.grinder ?? blank.grinder,
+    grind_setting: previous.grind_setting ?? "",
+    dose_g: previous.dose_g == null ? "" : String(previous.dose_g),
+  };
 }
