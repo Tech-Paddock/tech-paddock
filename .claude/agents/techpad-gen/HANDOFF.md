@@ -43,9 +43,11 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
   Light/Dark (`[data-embedded] .pd-modes`) and keeps its badge — safe only because the hub posts
   `{type:"paddock-mode", mode}` into every frame and `ThemeControl` listens behind
   `isPaddockOrigin()`. **A tool that drops `ThemeControl.tsx` silently ignores the hub's switch.**
-- **The glance gets counts and singles, never rows.** A hub handed thread arrays slowly becomes a
-  worse copy of the tracker. `SOURCES` holds one entry today — a fact about the present, not a
-  design limit.
+- **The sidebar is the only list of tools; the `--tone-*` ramp is now unused here.** The Board's
+  tool tiles duplicated it and Joel removed them. The ramp's tokens still sit in the five-way
+  `lib/theme.css`, so retiring them is a theme call rather than a hub one.
+- **The glance gets counts and singles, never rows** — a hub handed thread arrays slowly becomes a
+  worse copy of the tracker. `SOURCES` holds one entry: a fact about the present, not a design limit.
 - **One Garage panel is not live, and it is the one that looks most authoritative.** Rules drift is
   the repo as it stood when *this deployment* was built, so it goes stale after any merge until
   `tp-home` redeploys. The panel says so on its face; keep that if it is ever rewritten.
@@ -55,7 +57,8 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-Nothing.
+`claude/home-remove-app-tiles` — the Board's tool tiles deleted, with the `tone` plumbing and tile
+CSS they were the only user of. Pushed, no pull request yet.
 
 ## Next
 
@@ -69,8 +72,7 @@ Nothing.
 4. **A style pass, deferred by Joel** — a monospace stack, a type scale to replace the ad-hoc pixel
    values, and collapsing the drifted copies of the micro-label rule. Pick it up when he returns.
 5. **`/api/version` is designed and undecided** — public, or behind the internal secret. Recommend
-   public: it exposes a commit hash and nothing else, and that is what lets an external monitor
-   notice an outage. Joel's call.
+   public: it exposes a commit hash and nothing else, which is what lets a monitor see an outage.
 
 Both decisions Joel settled on 2026-09-16 are recorded in `DECISIONS.md` by #89 — the lifted fold
 and polarity against the Paper. Read them there; a second copy here could only drift.
