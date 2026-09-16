@@ -907,6 +907,20 @@
 
 .pd-on-bar .pd-modes { border-color: rgb(var(--bar-ink-rgb) / 0.4); }
 
+/* One switch per page. The hub embeds the tools, so without this a hub page
+   showing a tool carried two of these inches apart — its own and the tool's.
+   [data-embedded] is stamped on <html> before paint by a line in each app's
+   layout, so nothing renders and then vanishes.
+
+   The pair goes; .pd-theme-id stays. The badge is not a control, it is the
+   label naming which car that panel is wearing, and with two liveries on one
+   screen it is doing more work than usual.
+
+   Safe only because the hub posts the mode into each frame — see ThemeControl.
+   Hide this without that half and the one remaining switch stops governing
+   most of the page. */
+[data-embedded] .pd-modes { display: none; }
+
 .pd-modes button {
   appearance: none;
   background: transparent;

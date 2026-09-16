@@ -32,6 +32,10 @@ disagree. If you add a field, ask first whether it is a measurement or a functio
 grinder, grind setting, dose. Readings do not: beverage mass, TDS, rating and notes start empty, and
 Clear empties the whole form. `repeatOf` in `lib/brews.ts`; the reasoning is in `RULES.md`.
 
+**The bag pill carries "Beans ↗" to the roaster's page**, as a *sibling* of the expand toggle rather
+than nested inside it: an `<a>` inside a `<button>` is invalid markup and browsers disagree about
+what a tap does. Keep them siblings if this row is ever restructured.
+
 **`guide_status` records where the instructions were read, not who they were written for.** The one
 bag in the database is the proof: Sweet Bloom's Jhonny Alvarado is `coffee_specific` because 1:17,
 900µm and 2:40 were read on the product page — and that is the recipe they print on every product
@@ -57,10 +61,7 @@ page. The label now says where it came from instead of claiming it was written f
 
 ## In flight
 
-**#85 `claude/coffee-beans-link-on-the-pill` — open, awaiting the gate.**
-"Beans ↗" moves onto the collapsed pill, reachable without opening the card. The toggle and the link
-are siblings rather than nested, because an `<a>` inside a `<button>` is invalid markup.
-**Deployment: nothing, it deploys itself on merge.**
+Nothing. #85 merged, so the shelf, the brew log and the bag pill are all live as described above.
 
 ## Next
 
