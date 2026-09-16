@@ -6,7 +6,7 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-16T15:37:28.921Z",
+  "generatedAt": "2026-09-16T16:44:23.739Z",
   "complete": true,
   "reason": "",
   "checks": [
@@ -68,7 +68,7 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/agents/techpad-gen/HANDOFF.md",
       "state": "warn",
-      "detail": "77 / 80"
+      "detail": "78 / 80"
     },
     {
       "name": "budget: .claude/agents/tracker/HANDOFF.md",

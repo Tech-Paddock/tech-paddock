@@ -51,14 +51,15 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-`claude/home-garage-drift-panel` — the drift panel above. Finished, CI green, and open as a pull
-request at Joel's request. Nothing in it is live until the TD merges it and `tp-home` redeploys.
+`claude/home-morning-paper-prototype` — a Morning Paper prototype, built from the settled decisions
+rather than from Joel's brief, for him to approve. No pull request. Two things in it are guesses and
+are labelled as such on the page: the lead above the fold, and what the Feed is.
 
 ## Next
 
-1. **The Morning Paper**, the ledger's other request to this agent — a third Pit Wall tab,
-   `Board · Feed · Paper`, two densities off one markup tree. **Do not start it.** Joel holds the
-   brief and the prototype, and it is behind his decision below.
+1. **The Morning Paper**, the ledger's other request to this agent. A prototype exists on the branch
+   above and as an artifact Joel can open, and it is **not approved**. Do not widen it: the lead above
+   the fold and the Feed are both unanswered, and Joel holds the brief.
 2. **The hub's mobile login bug.** Both cheap explanations are ruled out from the code: `APPS`
    hardcodes the custom domains, and the cookie attributes are sound. It needs a live repro with
    devtools. **Reproduce in Chrome** — the WebKit cookie-policy theory is ruled out and cost a round.
@@ -71,7 +72,7 @@ request at Joel's request. Nothing in it is live until the TD merges it and `tp-
    recommendation is public: it exposes a commit hash of a private repo and nothing else, and that
    is what lets an external monitor notice an outage. Joel's call.
 
-Two decisions of his are in the ledger: whether to raise the hairline contrast bar (`--line` on
-`--surface` is under the 3:1 bar for a non-text component, and raising it changes every app's look),
-and whether the Morning Paper's density switch may also carry polarity, which the settled
-one-livery-per-app decision says it may not.
+The hairline contrast bar is still his: `--line` on `--surface` is under the 3:1 bar for a non-text
+component, and raising it changes every app's look. **Polarity is now answered** — one site-wide
+toggle, kept in every header, and density does not carry it — but the ledger still reads that as
+open, so it is the TD's to record and clear.
