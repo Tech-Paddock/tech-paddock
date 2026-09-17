@@ -58,7 +58,11 @@ type Inspection = {
   sizeBytes: number;
   paragraphCount: number;
   namedStyles: number;
-  outline: { title: string | null; sections: { heading: string; lines: number; bullets: number }[]; preamble: string[] };
+  outline: {
+    title: string | null;
+    sections: { heading: string; lines: number; bullets: number; entries: number }[];
+    preamble: string[];
+  };
   findings: Finding[];
   /** Null until the document the text came from is attached too. */
   sourceFilename: string | null;
@@ -778,6 +782,7 @@ function ReformatShell() {
                       <li key={s.heading} className="py-2 flex items-baseline justify-between gap-3">
                         <span className="font-medium">{s.heading}</span>
                         <span className="text-sm opacity-60 whitespace-nowrap">
+                          {s.entries > 0 && `${s.entries} job${s.entries === 1 ? "" : "s"} · `}
                           {s.lines} line{s.lines === 1 ? "" : "s"}
                           {s.bullets > 0 && ` · ${s.bullets} bullet${s.bullets === 1 ? "" : "s"}`}
                         </span>
