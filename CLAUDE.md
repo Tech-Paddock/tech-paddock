@@ -232,7 +232,7 @@ wrong or the rule is, and that is a conversation before any code exists.
   |---|---|---|
   | 🟡 | **In progress** | Still being worked on. Covers everything before it is finished, saved or not — that distinction is the agent's business, never his. |
   | 🟡 | **Needs a PR** | Finished and pushed, CI green — but the pull request is still work, so it is yellow until Joel asks and the agent writes it. |
-  | 🟢 | **Ready to merge** | Pull request open and green. Waiting on the technical director. |
+  | 🟢 | **Ready to merge** | Pull request open, CI green on its head. **The agent's work is finished here** — the only thing left is the technical director's merge. |
   | 🔴 | **Stuck** | CI failing, a merge conflict, or a step that errored. **Say what is broken, not just that it is.** |
   | 🟣 | **Needs deletion** | Merged, superseded or dead, and the remote branch is still there. |
 
@@ -257,6 +257,17 @@ wrong or the rule is, and that is a conversation before any code exists.
   section — is real work that has not happened yet. **Green means nothing is left but the merge.**
   Reading the colours alone should answer "is anything of mine still to do", and the stage name
   beside it says who moves next.
+
+  **Ready to merge is an agent's finish line, and it is reported as one.** Committed, pushed, pull
+  request open, checks green: from that agent's side and from Joel's, **the task is complete**. So
+  the row is green, the Work Brief says the thing is finished, and it is not carried as though
+  something were still owed. **The merge is never the agent's**, and waiting on someone else is not
+  the same as having work left. An agent that reports its own finished work as though it were still
+  outstanding teaches Joel to read green as "not yet", which costs the colour its meaning in every
+  other row.
+  **What does come back to that agent is a red check or a review comment on its own pull request.**
+  That is the row turning 🔴 *Stuck* and becoming work again — not green having meant less than it
+  said.
 
   **A stage comes from `git status` and a live check run in this session — never from memory.** If
   you could not check, the line reads `unchecked` rather than guessing.
