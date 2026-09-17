@@ -1,4 +1,4 @@
-# Macro tracker — plan
+# Health — plan
 
 A dictated food log for the iPhone. Say what you ate, Claude works out what it means, you approve
 it, it is logged.
@@ -11,8 +11,8 @@ Macros here are macronutrients — protein, carbohydrate, fat — and calories b
 what was decided while the shape was being talked through, so the session that eventually builds it
 does not start from a summary of a summary.
 
-**No app folder, no schema, no Vercel project, no branch. Naming is still open**, so "macro tracker"
-is a description rather than a name.
+**No app folder, no schema, no Vercel project, no branch.** The name is settled — see below — so
+`health` is the name and not a description, but nothing has been built under it yet.
 
 **This file is temporary.** It lives here rather than under `.claude/agents/` because creating that
 folder before the agent exists makes `drift` warn about a missing handoff, and because the channel
@@ -117,6 +117,25 @@ Sonnet 4.6 deliberately left out — two models is a clean experiment.
   item is a Haiku job at any setting. Coffee puts its toggle on `/api/search`, not `/api/identify` —
   parse pinned to Haiku, the estimate is what varies.
 
+## The name — settled 2026-09-17
+
+**`health`.** It fixes the folder `apps/health`, the subdomain `health.techpaddock.io`, the Vercel
+project `tp-health` and the Postgres schema `health`, all at once, and all of them are expensive to
+change afterwards.
+
+**Joel's reason is the design constraint, not a footnote:** *"health, I see this expanding."* He
+rejected the narrower candidates deliberately. `fuel` and `intake` both name the *macro* feature,
+and a name that describes one feature is a ceiling on the app the moment a second one arrives.
+
+**So everything below is the first feature of `health`, not the whole of it.** Read it that way.
+Where a decision here would be wrong for a second kind of record — weight, sleep, a workout — it is
+a decision about the macro tables specifically and says so, or it needs revisiting before the schema
+is written. The schema is named for the app, so it holds many tables by design; what must not happen
+is the first tables being shaped as though they were the only ones.
+
+**This file was `MACRO-TRACKER-PLAN.md` until the name was settled.** Renamed rather than left
+alone, because the app is not the macro tracker.
+
 ## Guardrails — approved 2026-09-17
 
 **A guardrail is something that stays wrong even when it would make the app better.** That is the
@@ -141,10 +160,6 @@ inside a feature.
    settled.
 6. **Never estimate when the table already knows.** Database-first is a correctness rule, not a cost
    optimisation — bypass is a deliberate tap and never a default.
-
-**What is still open is the name**, which fixes the folder, the subdomain, the Vercel project and
-the schema at once. Nothing is scaffolded until it is settled, because every one of those is
-expensive to change afterwards.
 
 ## The debug harness
 

@@ -5,14 +5,8 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-17T17:15:23.205Z",
+  bakedAt: "2026-09-17T19:22:34.080Z",
   waiting: [
-  {
-    "title": "Settle the macro tracker's name",
-    "detail": "The plan is in .claude/MACRO-TRACKER-PLAN.md, and the six guardrails are approved and recorded there. The name is the last thing blocking the scaffold — it fixes the folder, subdomain, Vercel project and schema at once, and every one of tho",
-    "ref": "—",
-    "state": "box"
-  },
   {
     "title": "Delete the `tp-tracker` Vercel project and its DNS record",
     "detail": "— last step of the deprecation, not the first, and there is no undo. Only after the Pit Wall serves what the tool served. Safe to do at all now that the required checks no longer name a per-app job. *LoE: minutes.*",
@@ -21,13 +15,7 @@ export const PADDOCK = {
   },
   {
     "title": "Two tokens on `tp-home`, then redeploy",
-    "detail": "GITHUB_TOKEN fine-grained, this repo, read-only: Contents, Metadata, Pull requests, Actions. VERCEL_TOKEN read-only, tech-paddock team. The redeploy is not optional — Vercel bakes the environment in at build time. *LoE: minutes.*",
-    "ref": "—",
-    "state": "box"
-  },
-  {
-    "title": "Re-upload the active resume template",
-    "detail": "#96 made it the substrate every render is built on — the renderer edits the template's own bytes rather than working from a description of it — so an out-of-date one renders an out-of-date design on every job. *LoE: minutes.*",
+    "detail": "GITHUB_TOKEN fine-grained, this repo, read-only: Contents, Metadata, Pull requests — measured against lib/pitwall.ts, which calls /pulls and /branches and nothing else. VERCEL_TOKEN scoped to the tech-paddock team, with an expiry; a Vercel ",
     "ref": "—",
     "state": "box"
   },
@@ -71,7 +59,7 @@ export const PADDOCK = {
   {
     "id": "resume",
     "name": "Resume Formatter",
-    "asOf": "2026-09-16"
+    "asOf": "2026-09-17"
   },
   {
     "id": "td",

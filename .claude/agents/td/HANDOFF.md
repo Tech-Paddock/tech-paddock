@@ -25,9 +25,8 @@ before it exists**: a folder name reaches DNS and a schema name reaches the data
 by being typed. The `drift` middleware check is roster-independent, so a new app on the base copy
 passes.
 
-**Only you watch a pull request.** Joel settled it. One watcher gets the events and a second gets
-silence, so two watchers means one is deaf — and it dies with your session, which is the trap below
-rather than an exception to it.
+**Only you watch a pull request** — the rule and its reasoning are in `CLAUDE.md`. What that does
+not say: the subscription dies with your session, which is the "session, not a service" trap below.
 
 **The required checks are `gate`, `drift` and `requested-by-joel`** — switched 2026-09-16, each
 bound to the GitHub Actions app rather than to any source. **No agent can read rulesets**, so that
@@ -56,6 +55,9 @@ something untested, which is the right way round.
 - **`DECISIONS.md` is append-only against a hard ceiling, and `drift` already warns on it.** There
   is no trimming rule for that file, so the wall arrives with no plan behind it. Read the live
   number from `drift` or The Garage, and raise it with Joel before the entry that will not fit.
+- **Regenerating another agent's collector output ages their handoff.** `drift` dates freshness from
+  `git log -- apps/<app>`, so your commit touching `apps/home/lib/*.generated.ts` makes TechPad Gen
+  read stale. Warn only, clears on their next session — say so rather than letting them hunt.
 - **You are a session, not a service.** You do not persist and you do not monitor. Tell Joel which
   mode is live rather than letting him assume the faster one.
 - **The `supabase migration repair` hook matches the string in any Bash command**, including one
@@ -64,16 +66,15 @@ something untested, which is the right way round.
 
 ## Next
 
-**`packages/shared` is yours to build, not Joel's to approve.** One source at `packages/shared`, a
-script that stamps each app's copy from it, `drift` failing a copy that disagrees. It changes no
-Vercel setting, no deploy and no build, which is what makes it this seat's. **Not npm workspaces**:
-a root install would cost the per-app independence the derived CI matrix rests on.
+**`packages/shared` is yours to build, not Joel's to approve.** One source, a script that stamps
+each app's copy from it, `drift` failing a copy that disagrees. No Vercel setting, no deploy, no
+build — which is what makes it this seat's. **Not npm workspaces**: a root install would cost the
+per-app independence the derived CI matrix rests on.
 
-**The macro tracker's design is in the repo**, at `.claude/MACRO-TRACKER-PLAN.md` — Joel's, and not
-a charter. **The six guardrails are approved and recorded in it** and become the `Never` section of
-the new agent's `RULES.md` verbatim. **Blocking the scaffold now: the name, and only the name.** Do
-not supply it. The gate's reading of the design is issue #98, kept out of the file so the
-recommendations stay the technical director's and the design stays Joel's. When the name lands,
-execute `STANDUP.md` from step 3 rather than re-solutioning what is already agreed.
+**The health tracker is yours to stand up and nothing is blocked on Joel.** `health` settled
+2026-09-17 — folder, subdomain, `tp-health` and schema at once — guardrails approved, plan at
+`.claude/HEALTH-PLAN.md` (Joel's, not a charter), the gate's reading of it in issue #98. **Execute
+`STANDUP.md` from step 3**, read the plan as the first feature of `health` rather than the whole
+app, and remember the Vercel project and DNS record inside that protocol are Joel's alone.
 
 Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.
