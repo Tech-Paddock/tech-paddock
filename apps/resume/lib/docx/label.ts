@@ -23,7 +23,11 @@ export type Coverage = {
   percent: number;
 };
 
-const DATE_RANGE =
+/** Exported because the ATS lint has to agree with the labeller about which
+ *  line is an employment entry rather than a section heading. In Joel's template
+ *  both are set at the same point size, so size alone cannot tell them apart and
+ *  the lint reported all five jobs as unrecognised headings. */
+export const DATE_RANGE =
   /((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4}|\d{4})\s*[–—-]\s*((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4}|Present|Current|\d{4})/i;
 
 /** Exported because spec extraction has to agree with the labeller about which

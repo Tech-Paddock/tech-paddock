@@ -82,13 +82,31 @@ function hasTag(nodes: Node[], tag: string): boolean {
   return findFirst(nodes, tag) !== null;
 }
 
+/**
+ * Formatting containers, never descended into for text.
+ *
+ * **`<w:tabs>` is the reason this set exists.** Inside `<w:pPr>` it declares tab
+ * *stops*, and its children are also called `<w:tab>` — the same tag name a tab
+ * *character* inside a run uses, distinguished only by its parent. Walking the
+ * whole paragraph therefore emitted one `\t` per declared stop, so Joel's
+ * headings extracted as `"\tProfessional Experience"` and his competency rows as
+ * `"\tSalesforce:\t…"` — a character the document does not contain, invented by
+ * this app in the one place whose contract is that it never invents text.
+ *
+ * It read as harmless only because a `<w:pPr>` precedes its runs, so the fake
+ * tab always landed at the front where `.trim()` removed it again.
+ */
+const PROPERTY_CONTAINERS = new Set([
+  "w:pPr", "w:rPr", "w:sectPr", "w:tblPr", "w:trPr", "w:tcPr", "w:tblGrid", "w:tblPrEx",
+]);
+
 /** Concatenate every <w:t> in document order. Text always comes from here — the
  *  model only ever labels these paragraphs, it never reproduces their text. */
 function textOf(nodes: Node[]): string {
   let out = "";
   for (const node of nodes) {
     const t = tagOf(node);
-    if (!t) continue;
+    if (!t || PROPERTY_CONTAINERS.has(t)) continue;
     if (t === "w:t") {
       for (const child of kidsOf(node, "w:t")) {
         if (typeof child["#text"] === "string") out += child["#text"];

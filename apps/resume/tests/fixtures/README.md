@@ -1,12 +1,29 @@
 # Parse fixtures
 
-Two real `.docx` files, **scrubbed of all personal information**, used by the parser and
+Three real `.docx` files, **scrubbed of all personal information**, used by the parser and
 spec-extraction tests.
 
 | File | What it is |
 |---|---|
 | `jobright-sample.docx` | A Jobright export — the tool's content input |
-| `template-sample.docx` | The formatting template — the tool's style input |
+| `template-sample.docx` | An older template, kept for **the defects it carries** |
+| `template-flat-sample.docx` | The current template's structure — the realistic one |
+
+**The two templates are not a duplicate, and picking the wrong one hides bugs.**
+
+`template-sample.docx` has a second table and a `<w:sdt>` content control, and
+`tests/reformat-route.test.ts` asserts both survive into the output. That is not a defect
+waiting to be fixed — it pins the guarantee that nothing rewrites the template silently. Its
+scrub also hoisted each paragraph's text into the first run and left the rest empty, so
+**run-granular replacement cannot be exercised against it at all**; two bugs hid there and
+both were found by accident.
+
+`template-flat-sample.docx` is built from the template actually in use. It keeps one run per
+field on the entry lines, real tab stops, Core Competencies as flat `Label:⇥items` paragraphs
+rather than a table, and the name and contact block in the **body**. It audits clean, so it is
+the fixture a new test should reach for unless it needs a defect to bite on.
+
+Its embedded font binaries were removed — 6.2 MB of licensed font subsets that no test reads.
 
 Every name, email, phone number, address, employer, school, and accomplishment has been
 replaced with synthetic equivalents. Hyperlink targets in `.rels` and the author fields in
