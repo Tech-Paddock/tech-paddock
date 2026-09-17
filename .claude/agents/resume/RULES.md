@@ -173,12 +173,23 @@ them made every positioned paragraph extract with a leading tab this app had inv
 precisely what `lib/docx/paragraphs.ts` must never do. It hid for as long as it did because `pPr`
 precedes its runs, so the fake tab always landed where `.trim()` took it away again.
 
-**A template may keep the name and contact in `word/header1.xml`.** Both 2026-09 templates do, and
-it is the worst ATS defect either of them has — a resume a parser cannot attach a name or a phone
-number to is worse off than one with an ugly heading. Spec extraction ranks body prose sizes, so
-when the name is not in the body every rank shifts and the render comes out with no hierarchy at
-all — the name set in body text. `extractSpec` therefore takes the name and contact sizes from the
-header when it finds them there, and shifts the body ranks up by one.
+**A template may keep the name and contact in `word/header1.xml`**, and it is the worst ATS defect a
+template can have — a resume a parser cannot attach a name or a phone number to is worse off than
+one with an ugly heading. **Joel's template did until 2026-09-17, when he moved the block into the
+body**; its header parts are now present and empty, which is why the lint reads header *text*
+rather than checking whether the part exists. The machinery for the header case stays because the
+next template may do it again: spec extraction ranks body prose sizes, so when the name is not in
+the body every rank shifts and the render comes out with no hierarchy at all — the name set in body
+text. `extractSpec` therefore takes the name and contact sizes from the header when it finds them
+there, and shifts the body ranks up by one.
+
+**What is a section heading is decided in exactly one place — `lib/docx/headings.ts`.** It was
+decided in three, and the third was wrong: the check page reported `Professional Experience — 0
+lines` and each of Joel's five jobs as a sibling section, because it ranked by run size and his
+headings and entry lines are both 11pt. A heading is a bare label — no date range, no interior tab.
+**A job is narrower than that: the date range alone makes one**, because a `Systems:⇥…` competency
+row is tabbed identically and is not a job. Treating the two questions as one reported three jobs
+under Core Competencies, and there is a test on that line.
 
 **Whether Word displays that header is a separate question from whether a parser reads it, and the
 two have opposite answers.** A `w:type="first"` header needs `<w:titlePg/>` to be displayed at all;
@@ -222,10 +233,11 @@ So a finding on a render is almost always a finding about the template. Fix it t
 future render inherits the fix. **Do not make the renderer rewrite the document to clear a finding** —
 that is the old failure with a new justification.
 
-**The header finding is the one that matters most.** Both current templates keep the name and contact
-block in `word/header1.xml`, and many parsers skip headers entirely. The renderer preserves it
-faithfully, which means it preserves the problem. `header_footer_content` is the only thing that
-will ever tell anyone. See the note above on why Word's own display says nothing about this.
+**The header finding is the one that matters most, and it is the one that has been cleared.** Many
+parsers skip headers entirely, and the renderer preserves a header faithfully — which means it
+preserves the problem. `header_footer_content` is the only thing that will ever say so. Joel's
+template now keeps its contact block in the body and **audits with no findings at all**; do not
+read that as the finding being unimportant, read it as the finding having worked.
 
 **A finding must be believable or it is worth nothing.** The heading check ranked by run size alone,
 and in Joel's template the section headings and the `Company   Title ⇥ Dates` lines are set at the

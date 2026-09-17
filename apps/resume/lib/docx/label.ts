@@ -1,4 +1,9 @@
 import type { Para } from "./paragraphs";
+// The labeller is a consumer of "what is an entry line", not its owner. That rule
+// and its date pattern live in ./headings, so the lint, the outline and this file
+// cannot drift apart again — they did, and it cost a check page that read
+// "Professional Experience — 0 lines".
+import { DATE_RANGE } from "./headings";
 
 export type Entry = { company: string; title: string | null; dates: string | null; bullets: string[] };
 export type Highlight = { metric: string; description: string };
@@ -22,13 +27,6 @@ export type Coverage = {
   dropped: string[];
   percent: number;
 };
-
-/** Exported because the ATS lint has to agree with the labeller about which
- *  line is an employment entry rather than a section heading. In Joel's template
- *  both are set at the same point size, so size alone cannot tell them apart and
- *  the lint reported all five jobs as unrecognised headings. */
-export const DATE_RANGE =
-  /((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4}|\d{4})\s*[–—-]\s*((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s*\d{4}|Present|Current|\d{4})/i;
 
 /** Exported because spec extraction has to agree with the labeller about which
  *  line is the contact line: one decides what colour to render it in, the other
