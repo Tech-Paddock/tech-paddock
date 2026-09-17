@@ -21,18 +21,21 @@ import ThemeControl from "./ThemeControl";
  * sidebar offering links it cannot follow.
  */
 
-/** A step on the hub's gold ramp. Each has a `.tone-*` rule in globals.css. */
-export type Tone = "champagne" | "gold" | "brass" | "bronze";
-
-// Names and URLs come from lib/platform.ts so the chrome, the tiles and the
-// admin page cannot drift apart; only presentation lives here. Typing this as a
-// Record over ToolSlug means adding a tool to that file breaks this build until
-// it is given a colour and an icon — rather than rendering an unstyled tile.
-const PRESENTATION: Record<ToolSlug, { tone: Tone; icon: string }> = {
-  editor: { tone: "champagne", icon: "✉️" },
-  tracker: { tone: "gold", icon: "📊" },
-  resume: { tone: "brass", icon: "📄" },
-  coffee: { tone: "bronze", icon: "☕" },
+// Names and URLs come from lib/platform.ts so the chrome and the admin page
+// cannot drift apart; only presentation lives here. Typing this as a Record over
+// ToolSlug means adding a tool to that file breaks this build until it is given
+// an icon — rather than rendering a nameless blank in the sidebar.
+//
+// It carried a `tone` off the livery's four-step gold ramp until the landing's
+// tiles were removed: the sidebar is the only place a tool is listed now, and it
+// draws every row the same. The --tone-*-bg tokens those steps read still exist
+// in lib/theme.css, which is byte-identical in all five apps — retiring them is a
+// theme change across all of them rather than part of removing this app's tiles.
+const PRESENTATION: Record<ToolSlug, { icon: string }> = {
+  editor: { icon: "✉️" },
+  tracker: { icon: "📊" },
+  resume: { icon: "📄" },
+  coffee: { icon: "☕" },
 };
 
 export const APPS = TOOLS.map((tool) => ({
