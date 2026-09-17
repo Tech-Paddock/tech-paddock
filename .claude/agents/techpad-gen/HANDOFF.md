@@ -1,6 +1,6 @@
 # TechPad Gen — handoff
 
-State as of 2026-09-16.
+State as of 2026-09-17.
 
 Read `RULES.md` first. This file is only what is true right now.
 
@@ -58,7 +58,7 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 ## In flight
 
 `claude/home-remove-app-tiles` — the Board's tool tiles deleted, with the `tone` plumbing and tile
-CSS they were the only user of. Pushed, no pull request yet.
+CSS they were the only user of. Open as a pull request; nothing of mine is left on it but the gate.
 
 ## Next
 
