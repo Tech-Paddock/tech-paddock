@@ -7,6 +7,41 @@ import { extractParagraphs } from "../lib/docx/paragraphs";
 const fixture = (name: string) => readFileSync(join(__dirname, "fixtures", name));
 const load = async (name: string) => extractParagraphs((await readDocxParts(fixture(name))).document);
 
+/**
+ * `<w:tab>` means two different things depending on its parent. Inside a run it
+ * is a tab character; inside `<w:pPr><w:tabs>` it *declares a tab stop* and no
+ * text exists at all. Walking the whole paragraph for text conflated them, so
+ * every paragraph that positioned anything came out with a leading tab this app
+ * had invented — in the one function whose contract is that it never invents
+ * text.
+ *
+ * It looked harmless because `<w:pPr>` precedes its runs, so the fake tab always
+ * landed where `.trim()` removed it. The real tabs, the ones separating a date
+ * from a job title, are interior and must survive.
+ */
+describe("tab stops are not tab characters", () => {
+  it("does not prepend a tab to a heading that declares one", async () => {
+    const paras = await load("template-flat-sample.docx");
+    const heading = paras.find((p) => p.text.includes("Professional Experience"))!;
+    expect(heading.text.startsWith("\t")).toBe(false);
+    expect(heading.text.trim()).toBe("Professional Experience");
+  });
+
+  it("keeps the real tab that sets a date against its right stop", async () => {
+    const paras = await load("template-flat-sample.docx");
+    const entry = paras.find((p) => p.text.includes("Lakeside Systems"))!;
+    expect(entry.text).toContain("\tJan 2026 - Present");
+    expect(entry.text.startsWith("\t")).toBe(false);
+  });
+
+  it("leaves a competency row with exactly the one tab between label and items", async () => {
+    const paras = await load("template-flat-sample.docx");
+    const row = paras.find((p) => p.text.includes("Systems:"))!;
+    expect((row.text.match(/\t/g) ?? []).length).toBe(1);
+    expect(row.text.startsWith("Systems:\t")).toBe(true);
+  });
+});
+
 describe("Jobright export", () => {
   it("carries no named styles, so run size is the only structural signal", async () => {
     const parts = await readDocxParts(fixture("jobright-sample.docx"));

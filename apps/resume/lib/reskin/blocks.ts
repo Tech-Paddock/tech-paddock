@@ -156,6 +156,24 @@ export function clearRunText(runRaw: string): string {
 }
 
 /**
+ * Replace a run's text, carrying over whatever trailing whitespace it had.
+ *
+ * **The whitespace at the end of a run is usually the gap to the next field, and
+ * it belongs to the template.** `Salesforce: ` and `Sr. Administrator ` both
+ * hold their separator that way, and overwriting the run drops it — the first
+ * renders as `Platform:Alpha Suite`, the second matters more than it looks:
+ * where a `<w:tab/>` is the only thing between the title and the date, the two
+ * fields are separated by no character at all, and an extractor that
+ * concatenates `<w:t>` elements without handling tabs — which is most of the
+ * simple ones — reads `AdministratorJan 2026`. A trailing space is invisible
+ * against a right tab stop and survives every extractor.
+ */
+function replaceRunTextKeepingGap(runRaw: string, newText: string): string {
+  const trailing = extractText(runRaw).match(/\s+$/)?.[0] ?? "";
+  return replaceRunText(runRaw, `${newText}${trailing}`);
+}
+
+/**
  * Some templates pack company, title and date onto one line against a right tab
  * stop — **Acme Corp** *Consultant*⇥*Jan 2020 – Present* — with each field set
  * differently. Replacing the paragraph whole would collapse all three onto the
@@ -189,16 +207,16 @@ export function replaceInlineHeaderLine(
     if (seenTab) {
       if (dateDone) return clearRunText(run);
       dateDone = true;
-      return replaceRunText(run, date);
+      return replaceRunTextKeepingGap(run, date);
     }
     if (isItalic(run)) {
       if (titleDone) return clearRunText(run);
       titleDone = true;
-      return replaceRunText(run, title);
+      return replaceRunTextKeepingGap(run, title);
     }
     if (companyDone) return clearRunText(run);
     companyDone = true;
-    return replaceRunText(run, company);
+    return replaceRunTextKeepingGap(run, company);
   });
 
   // Which fields found no run to live in.
@@ -220,6 +238,48 @@ export function replaceInlineHeaderLine(
 /** Does this paragraph carry company, title and date on one line? */
 export function looksLikeInlineHeaderLine(raw: string): boolean {
   return /<w:tab\s*\/>/.test(raw) && isItalic(raw);
+}
+
+/**
+ * A `Label:⇥items` line — what Core Competencies becomes once its table is gone.
+ *
+ * The same run-granular rule as the experience header line, and here for the
+ * same reason: the label is bold and the items are not, so writing the line
+ * whole would set the items in the label's weight. Only the first run of each
+ * field is rewritten; the tab and any spacer runs are left exactly as they are.
+ *
+ * Reports what it could not place rather than dropping it, so the caller can
+ * fall back to writing the line whole. A row that arrives in the wrong weight is
+ * a formatting loss; a row that does not arrive is a correctness one.
+ */
+export function replaceLabelledLine(
+  paragraphRaw: string,
+  label: string,
+  items: string
+): { raw: string; unplaced: string[] } {
+  const pPrMatch = paragraphRaw.match(/^<w:p\b[^>]*>(?:\s*<w:pPr>[\s\S]*?<\/w:pPr>)?/);
+  const head = pPrMatch ? pPrMatch[0] : paragraphRaw.slice(0, paragraphRaw.indexOf(">") + 1);
+
+  let labelDone = false;
+  let itemsDone = false;
+
+  const newRuns = splitRuns(paragraphRaw).map((run) => {
+    if (/<w:tab\s*\/>/.test(run)) return run;
+    if (extractText(run).trim() === "") return run; // spacer run — untouched
+    if (!labelDone) {
+      labelDone = true;
+      return replaceRunTextKeepingGap(run, label);
+    }
+    if (itemsDone) return clearRunText(run);
+    itemsDone = true;
+    return replaceRunTextKeepingGap(run, items);
+  });
+
+  const unplaced: string[] = [];
+  if (label && !labelDone) unplaced.push("label");
+  if (items && !itemsDone) unplaced.push("items");
+
+  return { raw: `${head}${newRuns.join("")}</w:p>`, unplaced };
 }
 
 /**

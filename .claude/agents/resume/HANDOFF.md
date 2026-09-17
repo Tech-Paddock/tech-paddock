@@ -1,72 +1,80 @@
 # Resume Formatter — handoff
 
-State as of 2026-09-16.
+State as of 2026-09-17.
 
-Read `RULES.md` first — it was rewritten today and the change is the headline. This file is only
-what is true right now.
+Read `RULES.md` first. This file is only what is true right now; #101's body carries the reasoning.
 
 ---
 
 ## What is true now
 
-**The app formats again, and this time it edits the template instead of rebuilding it.** Joel's own
-earlier tool — `resume-reskin`, which ran locally on his desktop and never lived in this repo — did
-it that way and got it right. Its engine is ported into `lib/reskin/`. He approved the port today;
-his words are in `RULES.md`.
+**The engine is merged and live.** `tp-resume`'s production deployment opens the template's zip,
+rewrites only the body of `word/document.xml`, and writes the same zip back out. #96 shipped it.
 
-**This reverses the amendment made earlier the same day**, which had taken formatting out of the app
-on the grounds that fixing it was expensive. That was wrong: working code already existed, so
-porting beat both rebuilding and abandoning. The pre-flight check from #81 was not discarded — it
-became the verification step that runs on every render.
+**The real template has been run through it, and it works.** Before 2026-09-17 everything was
+measured against a fixture whose scrub had hoisted each paragraph's text into its first run — the one
+shape that cannot exercise run-granular replacement. Against the real file: 100% coverage, every
+look-defining part byte-identical, US Letter kept, company/title/date each in their own run.
 
-**In flight:** branch `claude/resume-port-reskin-engine`, pushed, no pull request asked for.
+**#101 is open and green** with four defects only the real file could surface:
 
-## Why it works now, in one line
+1. **Core Competencies reads as flat paragraphs as well as a table.** The renderer tested for a
+   table and passed anything else through, so flattening the template — which is what clears
+   `too_many_tables` — would have dropped every tailored skill at a reported 100% coverage.
+2. **The heading check cried wolf five times.** Headings and entry lines are the same point size
+   here, so entry lines are told apart by a date range or an interior tab, and the heading size is
+   the largest *recurring* one.
+3. **`<w:tab>` inside `<w:pPr><w:tabs>` was extracted as a tab character.** It declares a stop and
+   carries no text, so every positioned paragraph gained a leading tab this app invented.
+4. **A run's trailing whitespace is the gap to the next field**, and overwriting the run dropped it:
+   `Salesforce: ` rendered `Platform:Alpha Suite`, and `AdministratorJan 2026` where a `<w:tab/>`
+   was all that separated title from dates.
 
-`lib/reskin/container.ts` opens the template's zip, rewrites only the body of `word/document.xml`,
-and writes the same zip back. Everything that decides how the document looks is never read, so it
-cannot be read wrongly. Measured against the fixture: page size, `styles.xml`, `numbering.xml`,
-`theme1.xml`, alignment, shading, borders and underline all match the template exactly, where the
-previous renderer got every one of them wrong.
+**`renderSummary` no longer takes the first non-empty paragraph** — it picks the longest preamble
+paragraph that is neither a contact line nor too short for prose. Once the contact block moves into
+the body the old rule wrote the summary over the name and deleted it, silently, because coverage
+checks that the input's text arrived and never that the template's survived.
 
-## Where the old renderer stands
+## Waiting on Joel
 
-**`lib/docx/build.ts` is dead in production** — nothing outside tests imports it. `lib/docx/spec.ts`
-is still imported by `app/api/templates/route.ts`, which writes a spec into `templates.spec` that
-nothing now renders from.
+**Joel did the template edits himself on 2026-09-17** — contact out of the header, Core Competencies
+out of its table — and his version **audits clean, no findings**. A tidied copy went back to him to
+upload; that closes ledger item 4. **No copy of his template is ever committed**: they carry his
+name, employers and contact details, so they live in the chat and in Storage, never in git.
 
-Removing both is one change, and it is gated on a schema decision rather than on effort:
-`templates.spec` is `not null`, so dropping it is destructive and splits into two pull requests.
-`tests/{spec,colour,roundtrip,highlights}.test.ts` exercise the dead path and go with it.
+The tidy: Core Competencies and Hobbies carried `pStyle="ListParagraph"`, whose 720-twip indent
+overrode the numbering's 480, so two of four bullet lists sat 1/6" right of the others while
+`contextualSpacing` swallowed the gaps between rows. Dropping it aligns all four. 3 MB of embedded
+Calibri, Georgia and Cambria went too — all ship with Word.
+
+**Still his, flagged twice:** Hobbies reads "Golf, College Football Reading". Passthrough, so the
+missing comma ships on every render.
 
 ## Traps specific to this app
 
-- **`tests/fixtures/template-sample.docx` is scrubbed in a way that hides bugs.** The scrubber
-  hoisted each paragraph's text into its first run and left the rest empty, so run-granular
-  replacement can place only the company and the old `isEntryLine` matched nothing at all. Both were
-  found by accident. Regenerate it so runs survive.
-- **`String.replace` interprets `$&` and `` $` `` in the replacement even with a string pattern**, so
-  splicing by index is the only safe way to swap a cell. A tool whose headline section is dollar
-  figures cannot have a `$` hazard in its rewrite path.
-- **Content is not always a direct child of `<w:body>`.** Walk the tree or whole sections read as
-  empty. There is a named regression test.
-- **The content check must not overstate or cry wolf**, and both are the same rule. It compares
-  against what the renderer *took*, not the whole source — the name, contact and static sections are
-  left behind deliberately, and counting them would flag the design as a defect every time.
-- **Every new fixture is a place a real name can hide** — `.rels` and `docProps/`, not just
-  `document.xml`. The original tool's own tests assert against real employers and a real address;
-  none of that came across.
+- **A run-granular rewrite keeps the runs and drops what wrapped them.** `replaceInlineHeaderLine`
+  and `replaceLabelledLine` rebuild the paragraph as `head + runs`, so a `<w:hyperlink>`,
+  `<w:bookmarkStart>` or tracked change *on a rewritten line* is lost while its text survives.
+  Measured, not feared, and no effect on either current template — their only hyperlinks sit in the
+  contact paragraph, passed through whole. But it is silent, and the rule is that a loss is logged.
+- **Two template fixtures, and the wrong one hides bugs.** `template-sample.docx` keeps a second
+  table and a `<w:sdt>` *on purpose* — `reformat-route.test.ts` pins that they survive.
+  `template-flat-sample.docx` is the current structure and audits clean; reach for it by default.
+- **`String.replace` interprets `$&` and `` $` `` even with a string pattern** — splice by index.
+- **The rest live in `RULES.md` and are deliberately not copied here** — walking the tree for
+  content, the content check's two failure modes, and where a real name hides in a new fixture.
 
 ## Next
 
-1. **Run a real resume through it.** Everything here is measured against a scrubbed fixture whose
-   runs are degenerate. The real template exercises the run-granular path that the fixture cannot.
-2. **Fix the template's two blocking ATS findings** — a second table and a `<w:sdt>` — in the
-   template itself. Joel's, not code.
-3. **Remove the old renderer**, per the schema note above.
-4. **Regenerate `template-sample.docx`** so runs survive the scrub.
-5. **Persist the change log.** It is returned and shown, not stored; `renders.template_snapshot`
-   carries it today, which is a stopgap rather than a home.
+1. **Run a real Jobright export through it.** The source side is still only fixture-tested.
+2. **Splice runs in place rather than concatenating them**, so a rewritten line keeps its hyperlinks
+   and bookmarks — the trap above. Touches the engine's most load-bearing function, so it is its own
+   change with its own tests, never a rider on something else.
+3. **Remove the old renderer.** `lib/docx/build.ts` is dead in production; `lib/docx/spec.ts` only
+   fills `templates.spec`, which is `not null`, so dropping it is destructive and splits into two
+   pull requests. `tests/{spec,colour,roundtrip,highlights}.test.ts` go with it.
+4. **Persist the change log.** Shown, not stored; `renders.template_snapshot` is a stopgap.
+5. **One date-range regex, not two.** `lib/docx/label.ts` and `lib/reskin/sections.ts` each define
+   one. The lint imports the first; the second is still a second copy of the same fact.
 
-**I am at a compaction point.** The branch is pushed and the charter and this file describe it; none
-of it lives only in the session.
+**I am at a compaction point.** The branch is pushed and this file and `RULES.md` describe it.
