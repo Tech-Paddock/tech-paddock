@@ -1,5 +1,6 @@
 import type { DocxParts } from "./read";
 import type { Para } from "./paragraphs";
+import { DATE_RANGE } from "./label";
 
 export type AtsFinding = {
   code: string;
@@ -96,11 +97,54 @@ export function headerFooterText(xml: string | undefined): string {
   return [...xml.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((m) => m[1]).join("").trim();
 }
 
-/** Headings are the largest recurring run size below the name, and never list items. */
+/**
+ * Could this paragraph be a section heading at all, before size is considered?
+ *
+ * **The entry-line clause is not defensive, it is the whole difficulty.** In
+ * Joel's template the section headings and the `Company   Title ⇥ Dates` lines
+ * are set at the same point size, so size alone called all five jobs
+ * unrecognised headings — five false findings in one document, on a warning
+ * whose entire job is to be believed. A check that cries wolf that often is one
+ * you learn to ignore, and then it is worth nothing on the day it is right.
+ *
+ * An entry line is told apart by two things a section heading never has: a date
+ * range, or an interior tab holding a right-aligned field. A heading is a bare
+ * label. The leading tab both carry is stripped first, so it decides nothing.
+ */
+function isHeadingCandidate(p: Para): boolean {
+  const text = p.text.trim();
+  if (!text || p.listId || p.inTable) return false;
+  return !DATE_RANGE.test(text) && !text.includes("\t");
+}
+
+/**
+ * The run size the headings are set in: **the largest one that recurs.**
+ *
+ * Recurrence is what separates a heading from a name, and it is the part the
+ * previous implementation described but did not do — it took the second-largest
+ * size in the whole document, headings and table cells alike, then classified
+ * only the non-table paragraphs. That worked on one file by coincidence: the
+ * Career Highlights metrics happen to be set larger than the headings, so the
+ * second rank landed on the headings by luck rather than by rule. Move the name
+ * into the body, or change the metrics' size, and it silently ranks something
+ * else — or nothing, which reads identically to a clean document.
+ *
+ * Counting only the paragraphs that could be headings makes the population and
+ * the classification the same set. A name appears once; headings repeat. So the
+ * largest recurring size is the headings' whether or not the name is in the
+ * body — and both of Joel's templates are one of each.
+ */
+function headingSize(all: Para[]): number | null {
+  const counts = new Map<number, number>();
+  for (const p of all) {
+    if (!isHeadingCandidate(p) || p.size === null) continue;
+    counts.set(p.size, (counts.get(p.size) ?? 0) + 1);
+  }
+  const recurring = [...counts.entries()].filter(([, n]) => n > 1).map(([size]) => size);
+  return recurring.length === 0 ? null : Math.max(...recurring);
+}
+
 function isHeadingLike(p: Para, all: Para[]): boolean {
-  if (!p.text.trim() || p.listId || p.inTable) return false;
-  const sizes = all.map((x) => x.size).filter((s): s is number => s !== null);
-  if (sizes.length === 0 || p.size === null) return false;
-  const distinct = [...new Set(sizes)].sort((a, b) => b - a);
-  return distinct.length > 1 && p.size === distinct[1];
+  if (!isHeadingCandidate(p) || p.size === null) return false;
+  return p.size === headingSize(all);
 }

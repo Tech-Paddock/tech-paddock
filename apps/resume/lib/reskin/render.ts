@@ -10,10 +10,12 @@ import {
   splitCells,
   cellParagraphs,
   replaceCellParagraphText,
+  replaceLabelledLine,
   spliceCell,
 } from "./blocks";
 import { matchSectionKey, normalizeForCompare, type SectionKey } from "./sections";
-import type { SourceContent, ChangeLogEntry, ExperienceEntry } from "./types";
+import { looksLikeContact } from "../docx/label";
+import type { SourceContent, ChangeLogEntry, ExperienceEntry, CompetencyRow } from "./types";
 
 interface TemplateSection {
   key: SectionKey | "preamble";
@@ -108,34 +110,76 @@ const sectionLabel = (key: SectionKey | "preamble") => LABELS[key] ?? key;
 
 // ---- Summary --------------------------------------------------------------
 
+/**
+ * Prose reads as a summary; a name or a credentials line does not. Eight words
+ * is below every summary either real template has carried and above every name,
+ * and the lines in between — `Certified Administrator · Certified Business
+ * Analyst`, `name@example.com · 555.0100 · linkedin.com/in/x` — are already
+ * excluded as contact lines by their separators.
+ */
+const SUMMARY_MIN_WORDS = 8;
+
+/** The preamble paragraph the input's summary belongs in, or null if there is none. */
+function summarySlot(blocks: Block[], idxs: number[]): number | null {
+  let best: { idx: number; length: number } | null = null;
+  for (const idx of idxs) {
+    const block = blocks[idx];
+    if (block.type !== "p") continue;
+    const text = extractText(block.raw).trim();
+    if (!text || looksLikeContact(text)) continue;
+    if (text.split(/\s+/).length < SUMMARY_MIN_WORDS) continue;
+    if (!best || text.length > best.length) best = { idx, length: text.length };
+  }
+  return best === null ? null : best.idx;
+}
+
+/**
+ * Replace the summary, and leave every other preamble paragraph alone.
+ *
+ * **The rule this replaced was "the first non-empty paragraph", and it held only
+ * while the name and contact block lived in `word/header1.xml`.** That placement
+ * is the template's worst ATS defect — many parsers never read a header — so the
+ * fix is to move the block into the body, and the moment it moves, the first
+ * non-empty paragraph is the name. The old rule would have written the summary
+ * over it and deleted it, *silently*: coverage checks that the input's text
+ * arrived, never that the template's survived, so nothing on screen would have
+ * said the name was gone.
+ *
+ * The slot is therefore chosen rather than assumed. Where nothing qualifies, the
+ * template has no summary paragraph and the input's summary is reported as
+ * unplaced instead of being forced into a paragraph that means something else —
+ * the content check then counts it missing, which is the honest answer.
+ */
 function renderSummary(
   blocks: Block[],
   idxs: number[],
   content: SourceContent,
   log: ChangeLogEntry[]
 ): Block[] {
-  const out: Block[] = [];
-  let replaced = false;
-  for (const idx of idxs) {
-    const block = blocks[idx];
-    if (!replaced && block.type === "p" && extractText(block.raw).trim()) {
-      if (content.summary) {
-        out.push({ type: "p", raw: replaceParagraphText(block.raw, content.summary) });
-        log.push({ section: "Summary", action: "replaced", detail: "Replaced from the input." });
-      } else {
-        out.push(block);
-        log.push({
-          section: "Summary",
-          action: "not-found-in-input",
-          detail: "No summary in the input — the template's was kept.",
-        });
-      }
-      replaced = true;
-    } else {
-      out.push(block);
-    }
+  if (!content.summary) {
+    log.push({
+      section: "Summary",
+      action: "not-found-in-input",
+      detail: "No summary in the input — the template's was kept.",
+    });
+    return idxs.map((i) => blocks[i]);
   }
-  return out;
+
+  const slot = summarySlot(blocks, idxs);
+  if (slot === null) {
+    log.push({
+      section: "Summary",
+      action: "not-found-in-input",
+      detail:
+        "The template has no summary paragraph above its first heading, so the input's summary was not placed. Add one to the template.",
+    });
+    return idxs.map((i) => blocks[i]);
+  }
+
+  log.push({ section: "Summary", action: "replaced", detail: "Replaced from the input." });
+  return idxs.map((i) =>
+    i === slot ? { type: "p" as const, raw: replaceParagraphText(blocks[i].raw, content.summary!) } : blocks[i]
+  );
 }
 
 // ---- Career Highlights ----------------------------------------------------
@@ -267,10 +311,128 @@ function replaceRowLabelItems(rowRaw: string, label: string, items: string): str
   return newRow;
 }
 
+/**
+ * Core Competencies arrives in either shape, and the shape is the template's to
+ * decide.
+ *
+ * **A table here is the template's one blocking ATS defect that is also easy to
+ * fix**: `CLAUDE.md` allows exactly one table, Career Highlights, whose content
+ * is repeated in the body bullets so a parser that drops it loses nothing. Core
+ * Competencies as a second table is keyword coverage a parser may scramble or
+ * skip, and those keywords are the whole point of the section.
+ *
+ * So the template's own table was flattened into `Label:⇥items` paragraphs. The
+ * renderer reads both because a template is a file Joel edits, not a shape this
+ * code gets to assume — and because the alternative was worse than a defect: the
+ * table branch simply passed paragraphs through, so a flattened template would
+ * have rendered the *template's* competencies on every job while the input's were
+ * dropped, with a clean 100% coverage report over text that never arrived.
+ */
 function renderCompetencies(
   blocks: Block[],
   idxs: number[],
   content: SourceContent,
+  log: ChangeLogEntry[]
+): Block[] {
+  const rowsContent = content.competencies;
+  if (!rowsContent || rowsContent.length === 0) {
+    log.push({
+      section: "Core Competencies",
+      action: "not-found-in-input",
+      detail: "No competencies in the input — the template's were kept.",
+    });
+    return idxs.map((i) => blocks[i]);
+  }
+  return idxs.some((i) => blocks[i].type === "tbl")
+    ? renderCompetenciesTable(blocks, idxs, rowsContent, log)
+    : renderCompetenciesParagraphs(blocks, idxs, rowsContent, log);
+}
+
+/** One paragraph per row, written at run granularity so the label keeps its weight. */
+function writeCompetencyLine(templateRaw: string, row: CompetencyRow, log: ChangeLogEntry[]): string {
+  const label = row.label.endsWith(":") ? row.label : `${row.label}:`;
+  const sep = detectListSeparator(extractText(templateRaw));
+  const items = sep ? reformatListSeparators(row.items, sep) : row.items;
+
+  const inline = replaceLabelledLine(templateRaw, label, items);
+  if (inline.unplaced.length === 0) return inline.raw;
+
+  // The same trade as the experience header line, for the same reason: the
+  // template's line does not supply a run per field, so it is written whole and
+  // the label's own weight is lost. A row in the wrong weight beats a row that
+  // never arrives.
+  log.push({
+    section: "Core Competencies",
+    action: "replaced",
+    detail: `${row.label}: the template's line has no separate run for the ${inline.unplaced.join(" or ")}, so it was written whole and the label's own formatting was not kept.`,
+  });
+  const gap = /<w:tab\s*\/>/.test(templateRaw) ? "\t" : " ";
+  return replaceParagraphText(templateRaw, `${label}${gap}${items}`);
+}
+
+function renderCompetenciesParagraphs(
+  blocks: Block[],
+  idxs: number[],
+  rowsContent: CompetencyRow[],
+  log: ChangeLogEntry[]
+): Block[] {
+  // Blank paragraphs in this section are the rule above the next heading and the
+  // spacing around it. They are layout, not rows, and keep their places.
+  const rowIdxs = idxs.filter((i) => blocks[i].type === "p" && extractText(blocks[i].raw).trim() !== "");
+  if (rowIdxs.length === 0) {
+    log.push({
+      section: "Core Competencies",
+      action: "kept-unchanged",
+      detail: "No competency lines found in the template — kept as-is.",
+    });
+    return idxs.map((i) => blocks[i]);
+  }
+
+  const rewritten = new Map<number, Block | null>();
+  rowIdxs.forEach((idx, i) => {
+    const row = rowsContent[i];
+    if (!row) {
+      rewritten.set(idx, null);
+      log.push({
+        section: "Core Competencies",
+        action: "trimmed-surplus",
+        detail: `Template line ${i + 1} dropped — no matching input row.`,
+      });
+      return;
+    }
+    rewritten.set(idx, { type: "p", raw: writeCompetencyLine(blocks[idx].raw, row, log) });
+    log.push({ section: "Core Competencies", action: "replaced", detail: `Row ${i + 1} (${row.label}).` });
+  });
+
+  const lastRowIdx = rowIdxs[rowIdxs.length - 1];
+  const overflow: Block[] = [];
+  for (let i = rowIdxs.length; i < rowsContent.length; i += 1) {
+    const row = rowsContent[i];
+    overflow.push({ type: "p", raw: writeCompetencyLine(blocks[lastRowIdx].raw, row, log) });
+    log.push({
+      section: "Core Competencies",
+      action: "cloned-overflow",
+      detail: `Extra row "${row.label}" cloned from the template's last line.`,
+    });
+  }
+
+  const out: Block[] = [];
+  for (const idx of idxs) {
+    if (rewritten.has(idx)) {
+      const block = rewritten.get(idx);
+      if (block) out.push(block);
+      if (idx === lastRowIdx) out.push(...overflow);
+      continue;
+    }
+    out.push(blocks[idx]);
+  }
+  return out;
+}
+
+function renderCompetenciesTable(
+  blocks: Block[],
+  idxs: number[],
+  rowsContent: CompetencyRow[],
   log: ChangeLogEntry[]
 ): Block[] {
   const out: Block[] = [];
@@ -278,16 +440,6 @@ function renderCompetencies(
     const block = blocks[idx];
     if (block.type !== "tbl") {
       out.push(block);
-      continue;
-    }
-    const rowsContent = content.competencies;
-    if (!rowsContent || rowsContent.length === 0) {
-      out.push(block);
-      log.push({
-        section: "Core Competencies",
-        action: "not-found-in-input",
-        detail: "No competencies in the input — the template's were kept.",
-      });
       continue;
     }
 
