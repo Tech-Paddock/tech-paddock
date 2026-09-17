@@ -223,6 +223,48 @@ export function looksLikeInlineHeaderLine(raw: string): boolean {
 }
 
 /**
+ * A `Label:⇥items` line — what Core Competencies becomes once its table is gone.
+ *
+ * The same run-granular rule as the experience header line, and here for the
+ * same reason: the label is bold and the items are not, so writing the line
+ * whole would set the items in the label's weight. Only the first run of each
+ * field is rewritten; the tab and any spacer runs are left exactly as they are.
+ *
+ * Reports what it could not place rather than dropping it, so the caller can
+ * fall back to writing the line whole. A row that arrives in the wrong weight is
+ * a formatting loss; a row that does not arrive is a correctness one.
+ */
+export function replaceLabelledLine(
+  paragraphRaw: string,
+  label: string,
+  items: string
+): { raw: string; unplaced: string[] } {
+  const pPrMatch = paragraphRaw.match(/^<w:p\b[^>]*>(?:\s*<w:pPr>[\s\S]*?<\/w:pPr>)?/);
+  const head = pPrMatch ? pPrMatch[0] : paragraphRaw.slice(0, paragraphRaw.indexOf(">") + 1);
+
+  let labelDone = false;
+  let itemsDone = false;
+
+  const newRuns = splitRuns(paragraphRaw).map((run) => {
+    if (/<w:tab\s*\/>/.test(run)) return run;
+    if (extractText(run).trim() === "") return run; // spacer run — untouched
+    if (!labelDone) {
+      labelDone = true;
+      return replaceRunText(run, label);
+    }
+    if (itemsDone) return clearRunText(run);
+    itemsDone = true;
+    return replaceRunText(run, items);
+  });
+
+  const unplaced: string[] = [];
+  if (label && !labelDone) unplaced.push("label");
+  if (items && !itemsDone) unplaced.push("items");
+
+  return { raw: `${head}${newRuns.join("")}</w:p>`, unplaced };
+}
+
+/**
  * Add Word's keep-lines-together and keep-with-next, so a job entry — its header
  * and every bullet — moves to the next page whole rather than splitting across
  * one. Chain `keepNext` on every paragraph of the entry except the last.

@@ -123,8 +123,9 @@ not account for and you fix it by hand.
 The two ways text is written are not equal, and when they conflict the ugly one wins.
 
 Run-granular replacement — used where company, title and date share one line against a right tab
-stop — keeps each field's own weight, slant and colour by rewriting only the first run of each. It
-needs one non-empty run per field. **Where the template does not supply them, the fields with
+stop, and again for a `Label:⇥items` competency row whose label is bold and items are not — keeps
+each field's own weight, slant and colour by rewriting only the first run of each. It needs one
+non-empty run per field. **Where the template does not supply them, the fields with
 nowhere to go were silently dropped**, which is how a job shipped with no title and no dates. The
 renderer now reports which fields it could not place and composes the line whole instead: the
 per-field formatting is lost and the change log says so. A formatting loss is visible in the
@@ -154,21 +155,36 @@ named regression test in `tests/compare.test.ts`.
 ## Things that will catch you out
 
 **Content is not always a direct child of `<w:body>`.** Walk the tree, never just the body's direct
-children, or whole sections read as empty. There is a named regression test for this. The shape
-varies by template and is not worth memorising: the `<w:sdt>` content control the older template
-wrapped Core Competencies in is gone from the 2026-09 templates, which instead use two tables —
-Career Highlights as one row of columns, Core Competencies as label/value rows. **The output still
-emits exactly one table**, so Core Competencies renders as flat paragraphs whatever the template
-does. That is the ATS rule in `CLAUDE.md`, not a preference.
+children, or whole sections read as empty. There is a named regression test for this.
 
-**A template may keep the name and contact in `word/header1.xml`.** Both 2026-09 templates do.
-Spec extraction ranks body prose sizes, so when the name is not in the body every rank shifts and
-the render comes out with no hierarchy at all — the name set in body text. `extractSpec` therefore
-takes the name and contact sizes from the header when it finds them there, and shifts the body
-ranks up by one. The blocking `header_footer_content` finding stays: it is the only thing reporting
-that the contact block is somewhere a parser may never read. Note that a `w:type="first"` header
-with no `<w:titlePg/>` is not displayed by Word at all, so this reads as absent while being fully
-present in the archive.
+**Core Competencies arrives as a table or as `Label:⇥items` paragraphs, and the renderer reads
+both.** The shape is the template's to choose, because the template is a file Joel edits rather
+than a shape this code may assume. **It is not a nicety: the renderer used to test for a table and
+pass anything else straight through**, so a flattened template would have shipped the *template's*
+skills on every application while the tailored ones were dropped — reporting 100% coverage while
+doing it, because coverage asks whether the input's text arrived and never whether it was allowed
+to leave. Flat is the better shape (`CLAUDE.md` allows one table, and Career Highlights is it), but
+the renderer never flattens a table itself — that is the template's fix, not a rewrite at render
+time.
+
+**`<w:tab>` means two different things and the parent decides which.** In a run it is a tab
+character; in `<w:pPr><w:tabs>` it declares a tab *stop* and there is no text at all. Conflating
+them made every positioned paragraph extract with a leading tab this app had invented, which is
+precisely what `lib/docx/paragraphs.ts` must never do. It hid for as long as it did because `pPr`
+precedes its runs, so the fake tab always landed where `.trim()` took it away again.
+
+**A template may keep the name and contact in `word/header1.xml`.** Both 2026-09 templates do, and
+it is the worst ATS defect either of them has — a resume a parser cannot attach a name or a phone
+number to is worse off than one with an ugly heading. Spec extraction ranks body prose sizes, so
+when the name is not in the body every rank shifts and the render comes out with no hierarchy at
+all — the name set in body text. `extractSpec` therefore takes the name and contact sizes from the
+header when it finds them there, and shifts the body ranks up by one.
+
+**Whether Word displays that header is a separate question from whether a parser reads it, and the
+two have opposite answers.** A `w:type="first"` header needs `<w:titlePg/>` to be displayed at all;
+the 2026-09-17 template has it and the earlier one did not, so one looked fine on screen and the
+other looked empty — while both were fully present in the archive and equally invisible to a parser
+that skips headers. **Never reason from what Word shows.** `header_footer_content` reads the text.
 
 **Jobright pastes Career Highlights in as a markdown table** — a row of metrics, a `| :--- |`
 alignment row, and a row of descriptions, all as ordinary paragraphs. Transposed into pairs only
@@ -207,15 +223,25 @@ future render inherits the fix. **Do not make the renderer rewrite the document 
 that is the old failure with a new justification.
 
 **The header finding is the one that matters most.** Both current templates keep the name and contact
-block in `word/header1.xml`, and a `w:type="first"` header with no `<w:titlePg/>` **is not displayed
-by Word at all** — so it reads as absent while being fully present in the archive, and many parsers
-skip headers entirely. The renderer preserves it faithfully, which means it preserves the problem.
-`header_footer_content` is the only thing that will ever tell anyone.
+block in `word/header1.xml`, and many parsers skip headers entirely. The renderer preserves it
+faithfully, which means it preserves the problem. `header_footer_content` is the only thing that
+will ever tell anyone. See the note above on why Word's own display says nothing about this.
 
-**The committed template fixture carries two blocking findings** — a second table and a `<w:sdt>`
-content control — and `tests/reformat-route.test.ts` asserts they survive into the output. That test
-is not describing a defect to be fixed in code. It pins the guarantee that nothing rewrites the
-template silently.
+**A finding must be believable or it is worth nothing.** The heading check ranked by run size alone,
+and in Joel's template the section headings and the `Company   Title ⇥ Dates` lines are set at the
+same size — so it reported all five of his jobs as unrecognised headings. Five false findings in one
+document teaches you to skip the warning, which costs exactly what an overstatement costs. An entry
+line is now told apart by what a heading never has: a date range, or an interior tab. And the
+heading size is **the largest one that recurs** — a name appears once, headings repeat — rather than
+the second-largest size in the whole document, which landed on the headings by coincidence on one
+file and on nothing at all once the name moved into the body.
+
+**Two template fixtures, and choosing the wrong one hides bugs.** `template-sample.docx` carries two
+blocking findings — a second table and a `<w:sdt>` — and `tests/reformat-route.test.ts` asserts they
+survive into the output; that is not a defect awaiting a fix, it pins the guarantee that nothing
+rewrites the template silently. `template-flat-sample.docx` is the current template's structure: one
+run per field, real tab stops, flat competencies, contact in the body, and it audits clean. Reach
+for the flat one unless the test needs a defect to bite on.
 
 ## Testing
 
