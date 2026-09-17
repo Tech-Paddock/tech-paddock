@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-17T19:22:34.080Z",
+  bakedAt: "2026-09-17T20:11:13.644Z",
   waiting: [
   {
     "title": "Delete the `tp-tracker` Vercel project and its DNS record",
@@ -15,7 +15,7 @@ export const PADDOCK = {
   },
   {
     "title": "Two tokens on `tp-home`, then redeploy",
-    "detail": "GITHUB_TOKEN fine-grained, this repo, read-only: Contents, Metadata, Pull requests — measured against lib/pitwall.ts, which calls /pulls and /branches and nothing else. VERCEL_TOKEN scoped to the tech-paddock team, with an expiry; a Vercel ",
+    "detail": "GITHUB_TOKEN fine-grained, this repo, read-only Contents + Metadata + Pull requests — not Actions, measured against lib/pitwall.ts. VERCEL_TOKEN scoped to the tech-paddock team with an expiry; there is no read-only switch. The redeploy is n",
     "ref": "—",
     "state": "box"
   },
@@ -35,7 +35,7 @@ export const PADDOCK = {
   parked: [
   {
     "title": "`CRON_SECRET` and the Microsoft Graph integration",
-    "detail": "Parked 2026-09-15. Why parking is the safe state: a scheduled job cannot log in, so tracker's middleware.ts waves /api/cron/* past the password gate, and the route's own guard reads if (secret && …) — an unset CRON_SECRET skips the check en",
+    "detail": "Parked 2026-09-15. Why parking is the safe state: tracker's middleware.ts waves /api/cron/* past the password gate, and the route's guard reads if (secret && …) — an unset CRON_SECRET skips the check and the endpoint is public, harmless *on",
     "ref": "—",
     "state": "clear"
   }
@@ -69,7 +69,7 @@ export const PADDOCK = {
   {
     "id": "techpad-gen",
     "name": "TechPad Gen",
-    "asOf": "2026-09-16"
+    "asOf": "2026-09-17"
   },
   {
     "id": "tracker",
