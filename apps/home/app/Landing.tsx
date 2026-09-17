@@ -20,8 +20,14 @@ import Paper, { DENSITIES, type Density } from "./Paper";
  * them owning the others.
  *
  * **Paper is the landing**, per the settled decision, so an absent `?tab=` means
- * Paper rather than Board. The board did not move: it is the same PitWall,
- * glance and tiles that were here before, one tab along.
+ * Paper rather than Board. The board did not move: it is the same PitWall and
+ * glance that were here before, one tab along.
+ *
+ * **No tool tiles anywhere in here.** A grid of them sat under the glance on the
+ * Board and duplicated the sidebar, which lists every tool from the same `APPS`
+ * and is reachable from every route in the group. Joel removed the tiles: one
+ * home for that list, and it is the sidebar. `APPS` is still imported — it is
+ * what resolves `?app=` to the frame this renders.
  *
  * Density rides in the query string too. That is a prototype decision rather
  * than a settled one — it makes the two densities trivially comparable and
@@ -50,19 +56,6 @@ function Board({ glance, pit }: { glance: Glance; pit: PitWallData }) {
     <div className="landing">
       <PitWall data={pit} />
       <GlancePanel glance={glance} />
-      <div className="app-buttons">
-        {APPS.map((a) => (
-          <Link
-            key={a.slug}
-            className={`app-button tone-${a.tone}`}
-            href={`/?app=${a.slug}`}
-            replace
-          >
-            <span className="app-button-icon icon">{a.icon}</span>
-            {a.name}
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }
