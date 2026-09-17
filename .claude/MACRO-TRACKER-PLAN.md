@@ -117,6 +117,35 @@ Sonnet 4.6 deliberately left out — two models is a clean experiment.
   item is a Haiku job at any setting. Coffee puts its toggle on `/api/search`, not `/api/identify` —
   parse pinned to Haiku, the estimate is what varies.
 
+## Guardrails — approved 2026-09-17
+
+**A guardrail is something that stays wrong even when it would make the app better.** That is the
+test each of these had to pass, and it is why they are written here rather than left to judgement:
+every one of them is a rule the agent will at some point have a good local reason to break.
+
+Drafted by the technical director from what Joel had already written or decided, put to him as six
+candidates to strike or approve, and approved in full — **none struck**. They become the `Never`
+section of the new agent's `RULES.md` when the charter is written, and they do not get renegotiated
+inside a feature.
+
+1. **Never write without approval.** The draft is not the log. Approving is the only thing that
+   writes.
+2. **Never let a failed lookup look like "not found."** A database error surfaces; it never falls
+   through to the web. This is Coffee's trap and the one that would quietly undo the whole design —
+   nothing on screen changes, the numbers just start drifting again.
+3. **Never replace a hand-entered number without keeping the old one.** The correction made by hand
+   is the only real ground truth in the system.
+4. **Never put real food-log data in the repo.** Fixtures are invented food. The database is the
+   right home for what was actually eaten.
+5. **Never read or write another tool's schema.** Settled already; writing it down is what keeps it
+   settled.
+6. **Never estimate when the table already knows.** Database-first is a correctness rule, not a cost
+   optimisation — bypass is a deliberate tap and never a default.
+
+**What is still open is the name**, which fixes the folder, the subdomain, the Vercel project and
+the schema at once. Nothing is scaffolded until it is settled, because every one of those is
+expensive to change afterwards.
+
 ## The debug harness
 
 Not the model toggle. Normal mode runs Haiku alone. **Debug mode runs both on the same input, in

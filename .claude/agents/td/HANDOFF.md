@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-16.
+State as of 2026-09-17.
 
 Read `RULES.md` first for the role and the gate. This file is only what is true right now.
 
@@ -70,9 +70,10 @@ Vercel setting, no deploy and no build, which is what makes it this seat's. **No
 a root install would cost the per-app independence the derived CI matrix rests on.
 
 **The macro tracker's design is in the repo**, at `.claude/MACRO-TRACKER-PLAN.md` — Joel's, and not
-a charter. **Missing and blocking the scaffold: the name, and what it must never do.** Supply
-neither. The gate's reading of it is issue #98, kept out of the file so the recommendations stay
-the technical director's and the design stays Joel's. When those two land, execute `STANDUP.md`
-from step 3 rather than re-solutioning what is already agreed.
+a charter. **The six guardrails are approved and recorded in it** and become the `Never` section of
+the new agent's `RULES.md` verbatim. **Blocking the scaffold now: the name, and only the name.** Do
+not supply it. The gate's reading of the design is issue #98, kept out of the file so the
+recommendations stay the technical director's and the design stays Joel's. When the name lands,
+execute `STANDUP.md` from step 3 rather than re-solutioning what is already agreed.
 
 Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.

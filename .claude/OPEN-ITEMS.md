@@ -16,7 +16,7 @@ director writes it. An item with an owner who is not Joel is a request to that a
 **The Pit Wall renders `Waiting on Joel` and `Parked`** at build time, taking the first bold run of
 each entry as its title — so lead with a short bold phrase and put the reasoning underneath.
 
-**Last reviewed: 2026-09-16.**
+**Last reviewed: 2026-09-17.**
 
 ---
 
@@ -26,11 +26,11 @@ Nothing.
 
 ## Waiting on Joel
 
-1. **Settle the macro tracker's name and guardrails.** The plan is in
-   `.claude/MACRO-TRACKER-PLAN.md` — design agreed, nothing built, and the hub glance is settled
-   as off. **Two things still block the scaffold**: the name, which fixes the folder, subdomain,
-   Vercel project and schema at once, and *what it must never do*, which no one else can infer for
-   you. The gate's own reading is issue #98. *LoE: a session.*
+1. **Settle the macro tracker's name.** The plan is in `.claude/MACRO-TRACKER-PLAN.md`, and the
+   six guardrails are approved and recorded there. **The name is the last thing blocking the
+   scaffold** — it fixes the folder, subdomain, Vercel project and schema at once, and every one of
+   those is expensive to change afterwards. Candidates: `fuel`, `macros`, `intake`. The gate's own
+   reading is issue #98. *LoE: minutes.*
 2. **Delete the `tp-tracker` Vercel project and its DNS record** — last step of the deprecation, not
    the first, and there is no undo. Only after the Pit Wall serves what the tool served. Safe to do
    at all now that the required checks no longer name a per-app job. *LoE: minutes.*
@@ -53,14 +53,14 @@ Requests with an owner who is not Joel. This is how one agent asks another for s
 never run at the same time, so it lands here or it does not happen. The owning agent picks it up at
 the start of its next session, because the hook prints this file into every one.
 
-1. **Build `packages/shared`.** *Owner: TD.* One real copy of the five five-way files, a script that
+7. **Build `packages/shared`.** *Owner: TD.* One real copy of the five five-way files, a script that
    stamps each app's copy from it, and `drift` failing a copy that disagrees. **This was on Joel's
    list and should not have been** — it changes no Vercel setting and no deploy. *LoE: a session.*
-2. **The Pit Wall must serve what the tracker served before `apps/tracker` goes.** *Owner: TechPad
+8. **The Pit Wall must serve what the tracker served before `apps/tracker` goes.** *Owner: TechPad
    Gen.* `SOURCES` in `apps/home/lib/glance.ts` holds exactly one entry — the tracker's
    `/api/summary` — so deleting the tool empties the hub's glance. **The hub gains database
    credentials for the first time**, which its own file says it does not have. *LoE: multi-session.*
-3. **`shared.contacts` needs its other owner named.** *Owner: Message Editor.* It is deliberately
+9. **`shared.contacts` needs its other owner named.** *Owner: Message Editor.* It is deliberately
    shared between the editor and the tracker; one of the two is going away. *LoE: minutes.*
 
 ## Parked
@@ -68,11 +68,11 @@ the start of its next session, because the hook prints this file into every one.
 Deliberately deferred. Not waiting on anyone, not forgotten, **not to be picked up as background
 work.** Something here moves only when Joel says so.
 
-- **`CRON_SECRET` and the Microsoft Graph integration.** Parked 2026-09-15.
-  **Why parking is the safe state:** a scheduled job cannot log in, so `tracker`'s `middleware.ts`
-  waves `/api/cron/*` past the password gate, and the route's own guard reads `if (secret && …)` —
-  an unset `CRON_SECRET` skips the check entirely and the endpoint is public. It is harmless *only*
-  because the next line returns early while Graph is unconfigured.
-  **Un-parking is the dangerous moment and the order is not optional.** Set `CRON_SECRET`, redeploy
-  so it is live, and only then set `MS_GRAPH_*`. Setting the Graph credentials first publishes an
-  unauthenticated endpoint that writes into Joel's Outlook on demand.
+10. **`CRON_SECRET` and the Microsoft Graph integration.** Parked 2026-09-15.
+   **Why parking is the safe state:** a scheduled job cannot log in, so `tracker`'s `middleware.ts`
+   waves `/api/cron/*` past the password gate, and the route's own guard reads `if (secret && …)` —
+   an unset `CRON_SECRET` skips the check entirely and the endpoint is public. It is harmless *only*
+   because the next line returns early while Graph is unconfigured.
+   **Un-parking is the dangerous moment and the order is not optional.** Set `CRON_SECRET`, redeploy
+   so it is live, and only then set `MS_GRAPH_*`. Setting the Graph credentials first publishes an
+   unauthenticated endpoint that writes into Joel's Outlook on demand.

@@ -5,47 +5,41 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-16T18:59:41.841Z",
+  bakedAt: "2026-09-17T17:15:23.205Z",
   waiting: [
   {
-    "title": "Delete `claude/home-morning-paper-prototype`",
-    "detail": "#82 squash-merged it; a later push put it back. Its tree reverts #80 and #85 — merging it would drop drift.generated.ts, collect-drift.mjs, the platform types and the prebuild step, and undo Coffee's pill link. Harmless while no pull reques",
+    "title": "Settle the macro tracker's name",
+    "detail": "The plan is in .claude/MACRO-TRACKER-PLAN.md, and the six guardrails are approved and recorded there. The name is the last thing blocking the scaffold — it fixes the folder, subdomain, Vercel project and schema at once, and every one of tho",
+    "ref": "—",
+    "state": "box"
+  },
+  {
+    "title": "Delete the `tp-tracker` Vercel project and its DNS record",
+    "detail": "— last step of the deprecation, not the first, and there is no undo. Only after the Pit Wall serves what the tool served. Safe to do at all now that the required checks no longer name a per-app job. *LoE: minutes.*",
     "ref": "—",
     "state": "box"
   },
   {
     "title": "Two tokens on `tp-home`, then redeploy",
-    "detail": "GITHUB_TOKEN fine-grained, this repo, read-only: Contents, Metadata, Pull requests, Actions. VERCEL_TOKEN read-only, tech-paddock team. The redeploy is not optional — Vercel bakes the environment in at build time. Until both are set the Pit",
+    "detail": "GITHUB_TOKEN fine-grained, this repo, read-only: Contents, Metadata, Pull requests, Actions. VERCEL_TOKEN read-only, tech-paddock team. The redeploy is not optional — Vercel bakes the environment in at build time. *LoE: minutes.*",
     "ref": "—",
     "state": "box"
   },
   {
     "title": "Re-upload the active resume template",
-    "detail": "#71 ended re-uploads for *code* changes — the renderer re-extracts from the stored .docx. It does nothing about the template file itself, so if the active row points at an older design, that is what renders. #67's colours need it uploaded o",
+    "detail": "#96 made it the substrate every render is built on — the renderer edits the template's own bytes rather than working from a description of it — so an out-of-date one renders an out-of-date design on every job. *LoE: minutes.*",
     "ref": "—",
     "state": "box"
   },
   {
     "title": "What is the Feed?",
-    "detail": "In the settled tab order and nowhere else in the repo, so it ships as a labelled empty slot rather than an invented one. A feed is rows, and the hub's rule is counts and singles, never rows — so a Feed either bends that rule or is not what ",
-    "ref": "—",
-    "state": "box"
-  },
-  {
-    "title": "Switch the required checks to `gate`, `drift` and `requested-by-joel`",
-    "detail": ", dropping every per-app entry. The matrix is derived now, so a per-app required check breaks on every roster change — deprecating an app leaves one that can never report. Repository settings, unverifiable from here.",
-    "ref": "—",
-    "state": "box"
-  },
-  {
-    "title": "The pull-request watcher rule",
-    "detail": "An agent may subscribe to its own PR, own app only. Only one watcher gets the events — a second subscriber silently receives nothing — and the subscription dies with that session, so the offer is only honest said out loud. Yes or no.",
+    "detail": "In the settled tab order and nowhere else, so it ships as a labelled empty slot. A feed is rows — the same hub rule the tracker's move already bends. Deciding is minutes; building it is not. *LoE: minutes.*",
     "ref": "—",
     "state": "box"
   },
   {
     "title": "Raise the hairline contrast bar?",
-    "detail": "--line on --surface is 1.82:1 in production, short of the 3:1 bar for a non-text component. Raising it changes the look of every app.",
+    "detail": "--line on --surface is 1.82:1 in production, short of the 3:1 bar for a non-text component. Raising it changes the look of every app, so the answer is minutes and the consequence is not. *LoE: minutes.*",
     "ref": "—",
     "state": "box"
   }
@@ -82,7 +76,7 @@ export const PADDOCK = {
   {
     "id": "td",
     "name": "Technical Director",
-    "asOf": "2026-09-16"
+    "asOf": "2026-09-17"
   },
   {
     "id": "techpad-gen",
