@@ -83,7 +83,8 @@ describe("the render is built from the template file", () => {
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.code).toBe("no_template_file");
-    expect(body.error).toMatch(/Templates tab/);
+    expect(body.error).toMatch(/Upload it again/);
+    expect(body.error).not.toMatch(/Templates tab/);
   });
 
   it("surfaces a storage failure rather than substituting anything for it", async () => {
@@ -117,21 +118,38 @@ describe("the render is built from the template file", () => {
     expect((await res.json()).error).toMatch(/template/i);
   });
 
-  it("still takes a one-off template straight from the upload, and saves nothing", async () => {
+  /**
+   * There is no path through this route that does not read the stored file.
+   *
+   * A one-off template used to be one: it rendered from the upload and saved
+   * nothing, which meant the template could be absent and the render still
+   * succeed. Removed on Joel's instruction 2026-09-17, so the refusals above are
+   * the only answers when the file cannot be read — there is nothing left to
+   * fall through to.
+   */
+  it("reads the stored file even when a template is attached to the request", async () => {
     const { client, calls } = fakeSupabase(activeRow());
-    mockModules({ resume: client, download: async () => fixture("template-sample.docx") });
+    const asked: unknown[] = [];
+    mockModules({
+      resume: client,
+      download: async (path) => {
+        asked.push(path);
+        return fixture("template-sample.docx");
+      },
+    });
 
     const body = new FormData();
     body.append("source", new File([new Uint8Array(fixture("jobright-sample.docx"))], "jobright.docx"));
-    body.append("template", new File([new Uint8Array(fixture("template-sample.docx"))], "one-off.docx"));
+    body.append("template", new File([new Uint8Array(fixture("template-flat-sample.docx"))], "one-off.docx"));
 
     const { POST } = await import("../app/api/reformat/route");
     const res = await POST(new NextRequest("http://localhost/api/reformat", { method: "POST", body }));
 
     expect(res.status).toBe(200);
+    expect(asked).toEqual(["templates/4.docx"]);
     const json = await res.json();
-    expect(json.templateLabel).toContain("one-off");
-    expect(json.renderId).toBeNull();
-    expect(calls.some((c) => c.op === "insert")).toBe(false);
+    expect(json.templateLabel).toContain("v4");
+    expect(json.renderId).toBe("r1");
+    expect(calls.some((c) => c.op === "insert")).toBe(true);
   });
 });
