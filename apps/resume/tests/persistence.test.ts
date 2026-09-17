@@ -117,7 +117,11 @@ describe("reformat against the stored template", () => {
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.code).toBe("no_template");
-    expect(body.error).toMatch(/Templates tab/);
+    // Points at where the upload now is. It said "Templates tab" until the
+    // upload moved to Reformat; a refusal that sends you to the wrong screen is
+    // worse than a terse one.
+    expect(body.error).toMatch(/Add one above/);
+    expect(body.error).not.toMatch(/Templates tab/);
   });
 
   it("stores source and output before recording the render", async () => {

@@ -264,11 +264,21 @@ function ReformatShell() {
     }
   }
 
-  async function uploadTemplate(file: File) {
+  /**
+   * Staged, then committed — never triggered by the drop itself.
+   *
+   * Dropping a file used to upload it immediately, which made the gesture the
+   * decision: there was no moment between "here is a file" and "this is now the
+   * house style every render is built on". Joel asked for the confirm, and a
+   * template is exactly the wrong thing to change by accident.
+   */
+  async function saveTemplate() {
+    if (!template) return;
     const body = new FormData();
-    body.append("file", file);
+    body.append("file", template);
     try {
       await post<unknown>("/api/templates", body, "Reading template…");
+      setTemplate(null);
       await refreshTemplates();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save that template.");
@@ -304,14 +314,12 @@ function ReformatShell() {
   }
 
   async function reformat() {
-    if (!source || (!template && !active)) return;
+    if (!source || !active) return;
     setResult(null);
     // Without this the previous render's confirmation sticks around and hides
     // the job form for the new one.
     setSaved(null);
     const body = new FormData();
-    // A one-off template overrides the stored one and saves nothing.
-    if (template) body.append("template", template);
     body.append("source", source);
     try {
       setResult(await post<Reformatted>("/api/reformat", body, "Reading both documents…"));
@@ -404,7 +412,7 @@ function ReformatShell() {
               </div>
             ) : (
               <p className="text-sm bg-surface border border-warn text-warn rounded-xl px-4 py-3">
-                No template saved yet. Add one on the Templates tab, or attach a one-off below.
+                No template saved yet. Add one below — it saves and becomes the house style.
               </p>
             )}
             {pinnedOlder && (
@@ -419,22 +427,49 @@ function ReformatShell() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
               <FilePick label="Tailored resume" hint="The Jobright export to reformat" file={source} onPick={setSource} />
               <FilePick
-                label={active ? "One-off template (optional)" : "Template"}
-                hint={active ? "Overrides the saved template, saves nothing" : "Your resume, whose formatting to copy"}
+                label={active ? "Replace the template" : "Template"}
+                hint={active ? "A new version, which becomes the house style" : "Your resume, whose formatting to copy"}
                 file={template}
                 onPick={setTemplate}
               />
             </div>
+
+            {/* The confirm step. Dropping a file stages it; this commits it. */}
+            {template && (
+              <div className="bg-surface border border-accent rounded-xl px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm">
+                  Save <span className="font-medium break-all">{template.name}</span> as the template? It becomes the new
+                  version, and every render from now on is built on it.
+                </p>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => setTemplate(null)}
+                    disabled={busy !== null}
+                    className="border border-line rounded-lg px-4 py-2 text-sm disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveTemplate}
+                    disabled={busy !== null}
+                    className="bg-accent text-accent-ink rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+                  >
+                    Save and activate
+                  </button>
+                </div>
+              </div>
+            )}
+
             <button
               onClick={reformat}
-              disabled={!source || (!template && !active) || busy !== null}
+              disabled={!source || !active || busy !== null}
               className="w-full bg-accent text-accent-ink rounded-xl px-5 py-4 text-base font-medium disabled:opacity-50"
             >
               {busy ?? "Reformat"}
             </button>
             <p className="text-xs opacity-60">
-              Saved renders keep the source, the output, and the template as it was — so what you sent stays
-              reproducible. A one-off template renders a preview and saves nothing.
+              Every render is saved: the source, the output, and which template it was built on — so what you sent
+              stays reproducible.
             </p>
           </section>
 
@@ -568,15 +603,11 @@ function ReformatShell() {
       ) : tab === "templates" ? (
         <>
           <section className="flex flex-col gap-3">
-            <FilePick
-              label="Add a template"
-              hint="A .docx whose formatting becomes the house style"
-              file={null}
-              onPick={uploadTemplate}
-            />
+            {/* The upload moved to the Reformat tab, where the template is
+                actually used. This tab is the list. */}
             <p className="text-xs opacity-60">
-              Every upload is a new version and becomes active. Archiving hides one without touching the
-              renders built from it; deleting is only possible when there are none.
+              Add a template on the Reformat tab. Every upload is a new version and becomes active. Archiving hides
+              one without touching the renders built from it; deleting is only possible when there are none.
             </p>
           </section>
 
