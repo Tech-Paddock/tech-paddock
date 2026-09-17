@@ -156,6 +156,24 @@ export function clearRunText(runRaw: string): string {
 }
 
 /**
+ * Replace a run's text, carrying over whatever trailing whitespace it had.
+ *
+ * **The whitespace at the end of a run is usually the gap to the next field, and
+ * it belongs to the template.** `Salesforce: ` and `Sr. Administrator ` both
+ * hold their separator that way, and overwriting the run drops it — the first
+ * renders as `Platform:Alpha Suite`, the second matters more than it looks:
+ * where a `<w:tab/>` is the only thing between the title and the date, the two
+ * fields are separated by no character at all, and an extractor that
+ * concatenates `<w:t>` elements without handling tabs — which is most of the
+ * simple ones — reads `AdministratorJan 2026`. A trailing space is invisible
+ * against a right tab stop and survives every extractor.
+ */
+function replaceRunTextKeepingGap(runRaw: string, newText: string): string {
+  const trailing = extractText(runRaw).match(/\s+$/)?.[0] ?? "";
+  return replaceRunText(runRaw, `${newText}${trailing}`);
+}
+
+/**
  * Some templates pack company, title and date onto one line against a right tab
  * stop — **Acme Corp** *Consultant*⇥*Jan 2020 – Present* — with each field set
  * differently. Replacing the paragraph whole would collapse all three onto the
@@ -189,16 +207,16 @@ export function replaceInlineHeaderLine(
     if (seenTab) {
       if (dateDone) return clearRunText(run);
       dateDone = true;
-      return replaceRunText(run, date);
+      return replaceRunTextKeepingGap(run, date);
     }
     if (isItalic(run)) {
       if (titleDone) return clearRunText(run);
       titleDone = true;
-      return replaceRunText(run, title);
+      return replaceRunTextKeepingGap(run, title);
     }
     if (companyDone) return clearRunText(run);
     companyDone = true;
-    return replaceRunText(run, company);
+    return replaceRunTextKeepingGap(run, company);
   });
 
   // Which fields found no run to live in.
@@ -250,11 +268,11 @@ export function replaceLabelledLine(
     if (extractText(run).trim() === "") return run; // spacer run — untouched
     if (!labelDone) {
       labelDone = true;
-      return replaceRunText(run, label);
+      return replaceRunTextKeepingGap(run, label);
     }
     if (itemsDone) return clearRunText(run);
     itemsDone = true;
-    return replaceRunText(run, items);
+    return replaceRunTextKeepingGap(run, items);
   });
 
   const unplaced: string[] = [];

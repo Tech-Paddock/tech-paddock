@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
 import { getBodyInner, loadDocx } from "../lib/reskin/container";
-import { extractText, joinBody, splitBody, type Block } from "../lib/reskin/blocks";
+import { extractText, joinBody, replaceInlineHeaderLine, splitBody, type Block } from "../lib/reskin/blocks";
 import { extractSourceContent } from "../lib/reskin/extract";
 import { renderIntoTemplate } from "../lib/reskin/render";
 import { reskin } from "../lib/reskin/generate";
@@ -104,6 +104,33 @@ describe("Core Competencies without a table", () => {
     expect(changeLog.some((c) => c.section === "Core Competencies" && c.action === "trimmed-surplus")).toBe(true);
   });
 
+  /**
+   * A template writes the gap between label and items one of two ways: a tab run
+   * of its own, or a trailing space inside the label run itself. The second kind
+   * is what you get by typing `Salesforce: ` in Word, and overwriting that run
+   * takes the space with it — so the line renders `Platform:Alpha Suite`.
+   *
+   * Found on the real template, not here. The gap is the template's to specify,
+   * so it is carried over rather than supplied by this code.
+   */
+  it("keeps the space after the colon when the template writes it into the label run", () => {
+    const { blocks } = renderIntoTemplate(
+      [
+        para("Core Competencies"),
+        {
+          type: "p",
+          raw:
+            "<w:p><w:pPr><w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"1\"/></w:numPr></w:pPr>" +
+            '<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Salesforce: </w:t></w:r>' +
+            "<w:r><w:t>Sales Cloud · Service Cloud</w:t></w:r></w:p>",
+        },
+      ],
+      content({ competencies: [{ label: "Platform", items: "Alpha Suite" }] })
+    );
+
+    expect(texts(blocks)).toContain("Platform: Alpha Suite");
+  });
+
   it("keeps the template's own rows when the input has none", async () => {
     const { blocks, changeLog } = renderIntoTemplate(await blocksOf(TEMPLATE()), content());
     expect(joinBody(blocks)).toContain("Systems:");
@@ -167,6 +194,37 @@ describe("front matter in the body", () => {
     const lines = texts(blocks);
     expect(lines[1]).toContain("jordan.avery@example.com");
     expect(lines[2]).toBe("REPLACED SUMMARY TEXT");
+  });
+});
+
+/**
+ * Where a `<w:tab/>` is the only thing between the job title and the dates, the
+ * two fields are separated by **no character at all** — the tab is an element,
+ * not text. A tab-aware extractor (python-docx) copes; an extractor that simply
+ * concatenates `<w:t>` elements, which is most of the simple ones, reads
+ * `Sr. AdministratorJan 2026 - Present` and parses neither field.
+ *
+ * The template answers this with a trailing space on the title run, invisible
+ * against a right tab stop. The renderer has to carry it over, or the fix is
+ * undone on the first render.
+ */
+describe("the gap a template writes into a run", () => {
+  const headerLine =
+    '<w:p><w:pPr><w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs></w:pPr>' +
+    "<w:r><w:t>Lakeside Systems</w:t></w:r>" +
+    '<w:r><w:t xml:space="preserve">   </w:t></w:r>' +
+    '<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">Senior Administrator </w:t></w:r>' +
+    "<w:r><w:tab/></w:r>" +
+    "<w:r><w:t>Jan 2026 - Present</w:t></w:r></w:p>";
+
+  it("survives a company, title and date rewrite", () => {
+    const { raw, unplaced } = replaceInlineHeaderLine(headerLine, "Harbor Point", "Consultant", "Oct 2024 - Present");
+    expect(unplaced).toEqual([]);
+
+    // What an extractor that ignores <w:tab/> sees.
+    const concatenated = [...raw.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((m) => m[1]).join("");
+    expect(concatenated).toBe("Harbor Point   Consultant Oct 2024 - Present");
+    expect(concatenated).not.toContain("ConsultantOct");
   });
 });
 
