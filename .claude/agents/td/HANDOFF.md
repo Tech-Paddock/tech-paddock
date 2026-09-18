@@ -8,11 +8,11 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**One branch, `claude/brief-board-is-the-sign-off`, pushed and not yet a pull request.** It cuts the
-chat copy of the three-part sign-off — Joel found agents printing it *and* publishing the board —
-adds `.claude/agents/BOARD.html` as the one home for the board design, and folds in two stale lists
-Coffee caught in `CLAUDE.md`: `health` was missing from the branch-area list and from the Postgres
-schema list. **Check it live before assuming its state**; it may have merged since this was written.
+**One branch, `claude/brief-close-items-1-and-2`.** It closes the two wiring items — `tp-health` is
+live and Joel has logged in — renumbers the ledger 1–14, and opens item 12 for the deploy race that
+left `techpaddock.io` on the wrong build. **The merge queue behind it is empty**: #117, #118 and
+#119 all landed, every branch deleted, `origin/main` the only remote ref.
+**Check it live before assuming its state**; it may have merged since this was written.
 
 ## What is true now
 

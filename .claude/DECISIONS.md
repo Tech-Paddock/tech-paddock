@@ -209,3 +209,17 @@ cross-owner additions, so a running session cannot repair itself.
   passing its URL. So each agent gets a durable URL, carried in its kickoff block, and the real
   risk was never the link count but sprawl from agents that do not know their own URL. **A row an
   agent did not measure is left untouched**, which is what lets a board carry state across sessions.
+- **2026-09-18 — `tp-health` is wired and ledger items 1 and 2 are closed, with step (d) never
+  proved.** Root Directory, the domain, all four environment variables and a successful login are
+  each measured. **What is not**: whether `health` is on Supabase's exposed-schemas list. Nothing
+  queries yet, so nothing can fail yet — `/api/health` is the first route that imports
+  `getServiceClient` and is therefore the test. **If a Health query ever returns a permissions error
+  that reads like a bad key, this is the cause and no further diagnosis is needed.** Closed on Joel's
+  word rather than on evidence, recorded here so the gap is findable rather than forgotten.
+- **2026-09-18 — Merging and deploying came apart, and `ignoreCommand` is why.** Each app's
+  `vercel.json` says *skip previews, build everything else*; it cannot see which folder changed, so
+  **every merge to `main` rebuilds every app**. Three merges four minutes apart raced, and
+  **Vercel aliases whichever build finishes last, not whichever commit is newest** — `techpaddock.io`
+  ended up on the Coffee-icon build rather than the hub change that merged after it. The fix was to
+  promote the correct deployment. **The trap generalises: any two merges close together can leave an
+  app serving the older one**, silently, with CI green and the branch deleted. Now ledger item 12.
