@@ -25,7 +25,7 @@ of them has an undo.
    is skipped. **That list is short on purpose.** Everything that can be automated already is; what
    is left is genuinely outside the repo's reach.
 
-**Before step 3, the two things only Joel decides:**
+**Before step 3, the three things only Joel decides:**
 
 1. **The name.** It fixes three things at once: the folder `apps/<name>`, the subdomain, and the
    Vercel project. Changing it later means touching DNS, so settle it before any folder exists.
@@ -34,6 +34,11 @@ of them has an undo.
 2. **Does it need its own Postgres schema?** If yes, that is **two migrations and one dashboard
    setting** — read `supabase/README.md` before writing either. A new schema inherits no grants at
    all, and the failure looks like a credentials problem.
+3. **Which surface — site or app?** A site is a thin index grouped by verb wrapping one long page; an
+   app is one screen, thumb-first, with no index because there is nowhere else to go. It decides the
+   shell, the navigation and whether there is a home-screen install, so it is expensive to change
+   once a screen exists. **A tool that fits neither gets its surface designed here, with Joel**, and
+   the answer is written into the draft charter before anything is scaffolded.
 
 ## What is already automatic — do not build these
 
