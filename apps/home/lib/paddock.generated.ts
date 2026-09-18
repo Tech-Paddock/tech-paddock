@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-18T03:38:19.584Z",
+  bakedAt: "2026-09-18T04:33:49.442Z",
   waiting: [
   {
     "title": "Two tokens on `tp-home`, then redeploy",
@@ -14,14 +14,26 @@ export const PADDOCK = {
     "state": "box"
   },
   {
+    "title": "`tp-health` exists but is not wired up",
+    "detail": "The project is named right; nothing else is. Two settings, both yours because no agent may touch domains: attach health.techpaddock.io, which has a Cloudflare record pointing at a host Vercel does not claim, and set the Root Directory, whic",
+    "ref": "—",
+    "state": "box"
+  },
+  {
+    "title": "`DECISIONS.md` is seven lines from its ceiling",
+    "detail": "Append-only, 193 of 200, and no trimming rule exists — so the wall arrives with nothing behind it. The migration-version finding below fits once; the one after it will not. Raise the ceiling or agree what may be cut. *LoE: minutes.*",
+    "ref": "—",
+    "state": "box"
+  },
+  {
     "title": "What is the Feed?",
-    "detail": "In the settled tab order and nowhere else, so it ships as a labelled empty slot. A feed is rows — the same hub rule the tracker's move already bends. Deciding is minutes; building it is not. *LoE: minutes.*",
+    "detail": "In the settled tab order and nowhere else, so it ships as a labelled empty slot. A feed is rows — the same hub rule the tracker's move already bends. *LoE: minutes.*",
     "ref": "—",
     "state": "box"
   },
   {
     "title": "Raise the hairline contrast bar?",
-    "detail": "--line on --surface is 1.82:1 in production, short of the 3:1 bar for a non-text component. Raising it changes the look of every app, so the answer is minutes and the consequence is not. *LoE: minutes.*",
+    "detail": "--line on --surface is 1.82:1, short of the 3:1 bar for a non-text component. Raising it changes the look of every app. *LoE: minutes.*",
     "ref": "—",
     "state": "box"
   }
@@ -29,13 +41,13 @@ export const PADDOCK = {
   parked: [
   {
     "title": "`tp-tracker` stays paused",
-    "detail": "Tabled 2026-09-18, paused the same day — verified, it reads live: false. Paused is reversible and deleted is not, so this is a safe place to leave it indefinitely: the subdomain serves nothing, the cron no longer fires, its builds have stop",
+    "detail": "Tabled 2026-09-18, paused the same day — verified, live: false. Paused is reversible and deleted is not, so this is a safe place to leave it indefinitely. Un-parking means deleting it and its DNS record — no undo, and it needs item 6 first.",
     "ref": "—",
     "state": "clear"
   },
   {
     "title": "`CRON_SECRET` and the Microsoft Graph integration",
-    "detail": "Parked 2026-09-15. Why parking is the safe state: tracker's middleware.ts waves /api/cron/* past the password gate, and the route's guard reads if (secret && …) — an unset CRON_SECRET skips the check and the endpoint is public, harmless *on",
+    "detail": "Parked 2026-09-15. Why parking is safe: tracker's middleware.ts waves /api/cron/* past the password gate and the route's guard reads if (secret && …), so an unset CRON_SECRET skips the check and the endpoint is public — harmless *only* whil",
     "ref": "—",
     "state": "clear"
   }
@@ -59,12 +71,12 @@ export const PADDOCK = {
   {
     "id": "resume",
     "name": "Resume Formatter",
-    "asOf": "2026-09-17"
+    "asOf": "2026-09-18"
   },
   {
     "id": "td",
     "name": "Technical Director",
-    "asOf": "2026-09-17"
+    "asOf": "2026-09-18"
   },
   {
     "id": "techpad-gen",
