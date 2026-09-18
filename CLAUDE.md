@@ -209,6 +209,24 @@ wrong or the rule is, and that is a conversation before any code exists.
   tool output, file dumps and command results scrolling past above it — he reads this terminal all
   day and should never have to hunt for where your answer starts. It costs one line and it is not
   optional, including on a one-sentence answer.
+- **The technical director delivers the sign-off as a link, not as three sections in chat.** Joel
+  asked for this on 2026-09-18. The board is one page, republished to the same URL every time, so
+  there is one bookmark rather than a new link per message and it is never more than one message
+  behind. The message ends with that link.
+  **The three sections still exist and are still measured the same way** — the medium changed, not
+  the discipline. **A board written from memory is worse than a table written from memory**, because
+  a page looks permanent and a chat message visibly scrolls away, so the re-measure rule below binds
+  harder here rather than less.
+  **This is the technical director's alone.** No other agent has a board, and a page published from
+  one session cannot be republished from another, so **every other agent ends its message with the
+  three sections exactly as written below.** Extending it means giving each agent a board and
+  solving how Joel finds five links instead of one — a separate decision, not an implication of
+  this one.
+  **When the board cannot be republished, the sign-off goes back into chat, in full, with the reason
+  said out loud.** That is not hypothetical: the artifact service refused five publishes in a row on
+  the day this rule was written, leaving the page two merges stale. **A link to a stale board is
+  worse than no link** — it reports the wrong state while looking authoritative, which is the exact
+  failure the whole sign-off exists to prevent.
 - **End every message to Joel with the three-part sign-off.** Every message, so he never has to go
   looking and never has to ask what state anything is in. Three headings, always in this order,
   always all three — a section with nothing in it says so rather than being dropped, because a
