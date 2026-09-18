@@ -46,7 +46,10 @@ landed after its session started.
 >
 > **End every message to me with your debrief board, not three sections in chat** — Work Brief,
 > DevOps, Open Items, published to the URL below and linked at the end of the message. One publish
-> per response. The shape is in `CLAUDE.md`. Show only your own branches and your own ledger rows,
+> per response. **Do not also print the three sections underneath it**; the chat message carries the
+> answer, the publish time and the link, and nothing more. The shape is in `CLAUDE.md` and the page
+> itself is `.claude/agents/BOARD.html` — fill its placeholders rather than inventing a layout, so
+> seven boards stay one board. Show only your own branches and your own ledger rows,
 > and never a status colour you did not look up in this session. **A row you did not measure this
 > session is left exactly as it is** — not rewritten, not re-dated. A branch of yours that is
 > merged, superseded or dead still gets a line, purple, until I delete it — you cannot.

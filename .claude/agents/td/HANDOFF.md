@@ -8,11 +8,11 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**Two pull requests, open and green, waiting on Joel's word rather than on you.** This is the first
-time this file has landed with work unmerged — previously the gate was the same session that wrote
-them. `claude/platform-previews-off` turns preview deployments off; `claude/brief-tracker-paused`
-records the tracker pause and tables it to Parked. **Check both live before assuming either state**:
-they may have merged, or moved, since this sentence was written.
+**One branch, `claude/brief-board-is-the-sign-off`, pushed and not yet a pull request.** It cuts the
+chat copy of the three-part sign-off — Joel found agents printing it *and* publishing the board —
+adds `.claude/agents/BOARD.html` as the one home for the board design, and folds in two stale lists
+Coffee caught in `CLAUDE.md`: `health` was missing from the branch-area list and from the Postgres
+schema list. **Check it live before assuming its state**; it may have merged since this was written.
 
 ## What is true now
 
