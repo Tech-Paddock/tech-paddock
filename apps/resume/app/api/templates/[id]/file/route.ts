@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
-import { StorageError, downloadDocx } from "@/lib/storage";
+import { serveDocx } from "@/lib/serveDocx";
 
 export const dynamic = "force-dynamic";
-
-const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 /**
  * Download a template's original .docx — the bytes as uploaded, never a
@@ -29,21 +27,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ code: "not_found", error: "That template has no stored file." }, { status: 404 });
   }
 
-  try {
-    const bytes = await downloadDocx(data.file_path as string);
-    // Prefer the uploaded filename over the storage key, which carries a
-    // timestamp prefix and a slugged name that nobody wants to see.
-    const name = (data.name as string | null) ?? (data.file_path as string).split("/").pop() ?? "template.docx";
-    return new NextResponse(new Uint8Array(bytes), {
-      headers: {
-        "Content-Type": DOCX_TYPE,
-        "Content-Disposition": `attachment; filename="${name.replace(/"/g, "")}"`,
-      },
-    });
-  } catch (err) {
-    if (err instanceof StorageError) {
-      return NextResponse.json({ code: "storage_error", error: err.message }, { status: 502 });
-    }
-    throw err;
-  }
+  // Prefer the uploaded filename over the storage key, which carries a
+  // timestamp prefix and a slugged name that nobody wants to see.
+  return serveDocx(data.file_path as string, data.name as string | null);
 }

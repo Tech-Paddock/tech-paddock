@@ -1,14 +1,34 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { LIVERY } from "@/lib/livery";
+import { KIND_LABEL, type ResumeFile, type ResumeKind } from "@/lib/resumes";
 import ThemeControl from "./ThemeControl";
 
-type Tab = "reformat" | "templates" | "history" | "check";
-// Check leads, and is the landing tab: formatting happens in Word now, and the
-// last thing before sending is the one this app is for.
-const TABS: Tab[] = ["check", "reformat", "templates", "history"];
+/**
+ * Three tabs, not four.
+ *
+ * Templates and History were two lists of the same thing — files this app is
+ * holding — split by which table they happened to live in, which is the app's
+ * business and not the reader's. They are one tab with a type filter now;
+ * `/api/resumes` merges the view without merging the tables.
+ *
+ * **Reformat leads and is the landing tab.** Check led for a while on the
+ * reasoning that formatting happens in Word and the last step before sending is
+ * the one this app is for. That was wrong about how the app is actually opened:
+ * it is opened to run a Jobright export through the house style, and Check is
+ * where you go afterwards.
+ */
+type Tab = "reformat" | "resume" | "check";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "reformat", label: "Reformat" },
+  { id: "resume", label: "Resume" },
+  { id: "check", label: "Check" },
+];
+
+/** The two retired tab names still resolve, so an old link lands somewhere sensible. */
+const TAB_ALIASES: Record<string, Tab> = { templates: "resume", history: "resume" };
 
 type Finding = { code: string; severity: "blocking" | "warning"; message: string };
 /** How much of what the renderer took from the source reached the document. The
@@ -32,25 +52,6 @@ type Reformatted = {
   docxBase64: string;
 };
 
-type Template = {
-  id: string;
-  version: number;
-  name: string;
-  is_active: boolean;
-  archived_at: string | null;
-  created_at: string;
-  spec: { font: string; bodySize: number; headingSize: number; margins: { left: number; top: number } };
-};
-
-type RenderRow = {
-  id: string;
-  created_at: string;
-  submitted_at: string | null;
-  thread_id: string | null;
-  coverage: Coverage;
-  thread: { company: string; stage: string } | null;
-};
-
 type ContentCheck = { totalLines: number; present: number; missing: string[]; percent: number };
 
 type Inspection = {
@@ -71,6 +72,11 @@ type Inspection = {
 
 const DOCX = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
+const shortDate = (iso: string) =>
+  new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+/* ── pieces ──────────────────────────────────────────────────────────────── */
+
 /**
  * The upload control, used for every file this app takes in.
  *
@@ -78,11 +84,18 @@ const DOCX = ".docx,application/vnd.openxmlformats-officedocument.wordprocessing
  * the two tools do not ask for a file in two different ways. The <label> wraps a
  * visually hidden input, which keeps the keyboard and screen-reader behaviour of
  * a real file input — a div with a click handler has neither.
- *
- * Fixed height, because these sit side by side and a long filename in one must
- * not make it taller than its neighbour.
  */
-function FilePick({ label, hint, file, onPick }: { label: string; hint: string; file: File | null; onPick: (f: File) => void }) {
+function FilePick({
+  label,
+  hint,
+  file,
+  onPick,
+}: {
+  label: string;
+  hint: string;
+  file: File | null;
+  onPick: (f: File) => void;
+}) {
   const [over, setOver] = useState(false);
 
   // Only ever the first file: every input here takes exactly one document, and
@@ -104,8 +117,8 @@ function FilePick({ label, hint, file, onPick }: { label: string; hint: string; 
         setOver(false);
         take(e.dataTransfer.files);
       }}
-      className={`h-full min-h-[10.5rem] border-2 border-dashed rounded-2xl bg-surface px-4 py-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${
-        over ? "border-accent bg-accent/5" : "border-line"
+      className={`border border-dashed rounded-xl px-3 py-4 flex items-center gap-3 cursor-pointer transition-colors ${
+        over ? "border-accent bg-accent/5" : "border-line bg-surface"
       }`}
     >
       <input
@@ -118,14 +131,13 @@ function FilePick({ label, hint, file, onPick }: { label: string; hint: string; 
           e.target.value = "";
         }}
       />
-      <span className="text-3xl block mb-2" aria-hidden>
+      <span className="text-xl leading-none shrink-0" aria-hidden>
         📄
       </span>
-      <span className="text-xs uppercase tracking-wide opacity-60">{label}</span>
-      <span className={`text-sm mt-1 break-all line-clamp-2 ${file ? "font-medium" : "opacity-60"}`}>
-        {file ? file.name : hint}
+      <span className="min-w-0">
+        <span className="block text-[0.7rem] uppercase tracking-wide opacity-60">{label}</span>
+        <span className={`block text-sm truncate ${file ? "font-medium" : "opacity-60"}`}>{file ? file.name : hint}</span>
       </span>
-      <span className="text-xs opacity-50 mt-1">{file ? "Choose another, or drop one in" : "Drop it here, or choose a file"}</span>
     </label>
   );
 }
@@ -135,7 +147,7 @@ function Findings({ findings }: { findings: Finding[] }) {
   const warnings = findings.filter((f) => f.severity === "warning");
   if (findings.length === 0) {
     return (
-      <p className="text-sm bg-surface border border-line rounded-xl px-4 py-3">
+      <p className="text-sm opacity-70">
         No structural problems. Single column, contact details in the body, no stray tables.
       </p>
     );
@@ -145,36 +157,83 @@ function Findings({ findings }: { findings: Finding[] }) {
       {[...blocking, ...warnings].map((f) => (
         <div
           key={f.code}
-          className={`rounded-xl px-4 py-3 border text-sm ${
-            f.severity === "blocking" ? "bg-surface border-urgent text-urgent" : "bg-surface border-warn text-warn"
+          className={`rounded-lg px-3 py-2 border text-sm ${
+            f.severity === "blocking" ? "border-urgent text-urgent" : "border-warn text-warn"
           }`}
         >
-          <p className="font-medium mb-1">
+          <p className="font-medium">
             {f.severity === "blocking" ? "Blocking" : "Warning"} · {f.code.replace(/_/g, " ")}
           </p>
-          <p>{f.message}</p>
+          <p className="opacity-90">{f.message}</p>
         </div>
       ))}
     </div>
   );
 }
 
+/** A titled box. One shape for every block of content, so a screen reads as a
+ *  page of panels rather than a stack of differently-styled cards. */
+function Panel({ title, aside, children }: { title?: string; aside?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="bg-surface border border-line rounded-xl overflow-hidden">
+      {title && (
+        <div className="flex items-baseline justify-between gap-3 px-4 py-2.5 border-b border-line">
+          <h2 className="text-sm font-semibold">{title}</h2>
+          {aside}
+        </div>
+      )}
+      <div className="px-4 py-3">{children}</div>
+    </section>
+  );
+}
+
+/** One number, read at a glance. The three of them replace three full-width
+ *  paragraphs that each said one number. */
+function Stat({ value, label, tone = "plain" }: { value: string; label: string; tone?: "plain" | "good" | "warn" }) {
+  const colour = tone === "good" ? "text-accent" : tone === "warn" ? "text-warn" : "";
+  return (
+    <div className="bg-surface border border-line rounded-xl px-3 py-2.5">
+      <p className={`text-xl font-semibold leading-tight ${colour}`}>{value}</p>
+      <p className="text-[0.7rem] uppercase tracking-wide opacity-60">{label}</p>
+    </div>
+  );
+}
+
+/** Left rail, right work. One column below `lg`, which is also how it renders
+ *  inside the hub's iframe — that width is the narrow case, not an edge case. */
+function Workbench({ rail, children }: { rail: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-5 lg:grid-cols-[20rem_minmax(0,1fr)] items-start">
+      <div className="flex flex-col gap-3 lg:sticky lg:top-4">{rail}</div>
+      <div className="flex flex-col gap-4 min-w-0">{children}</div>
+    </div>
+  );
+}
+
+const KIND_STYLE: Record<ResumeKind, string> = {
+  template: "border-accent text-accent",
+  output: "border-line",
+  input: "border-line opacity-70",
+};
+
+/* ── the app ─────────────────────────────────────────────────────────────── */
+
 function ReformatShell() {
-  // Deep links from the dashboard point at a specific tab, usually history —
-  // "the resume you never sent" is only actionable if it opens where it lives.
   const params = useSearchParams();
-  const requestedTab = params.get("tab");
+  const requestedTab = params.get("tab") ?? "";
   const highlightRender = params.get("render");
 
   const [tab, setTab] = useState<Tab>(
-    TABS.includes(requestedTab as Tab) ? (requestedTab as Tab) : "check"
+    TABS.some((t) => t.id === requestedTab) ? (requestedTab as Tab) : TAB_ALIASES[requestedTab] ?? "reformat"
   );
-  const [renders, setRenders] = useState<RenderRow[] | null>(null);
+
+  const [files, setFiles] = useState<ResumeFile[] | null>(null);
+  const [listStale, setListStale] = useState<string | null>(null);
+  const [kindFilter, setKindFilter] = useState<ResumeKind | "all">("all");
+  const [showArchived, setShowArchived] = useState(false);
+
   const [job, setJob] = useState({ company: "", role: "", jobUrl: "" });
   const [saved, setSaved] = useState<string | null>(null);
-  const [templates, setTemplates] = useState<Template[] | null>(null);
-  const [archived, setArchived] = useState<Template[] | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
   const [template, setTemplate] = useState<File | null>(null);
   const [source, setSource] = useState<File | null>(null);
   const [single, setSingle] = useState<File | null>(null);
@@ -182,20 +241,74 @@ function ReformatShell() {
   const [result, setResult] = useState<Reformatted | null>(null);
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  useEffect(() => {
-    refreshTemplates();
-    refreshRenders();
+  /**
+   * The list is a projection of the server, never a memory of it.
+   *
+   * It used to be two lists refreshed only on success, and on 2026-09-18 the
+   * screen showed nine files while `resume.templates` held one row — every
+   * delete had worked, and every one of them had left the row on screen, so the
+   * next click on it came back "No template with that id." and the drift grew.
+   * `cache: "no-store"` is belt and braces on the same failure: a list served
+   * from the browser's cache is stale by construction.
+   */
+  const reload = useCallback(async () => {
+    try {
+      const res = await fetch("/api/resumes", { cache: "no-store" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? `Couldn't read the list (${res.status}).`);
+      setFiles(data.files as ResumeFile[]);
+      setListStale(null);
+    } catch (err) {
+      // The rows stay, but they are labelled — a table that reads as verified
+      // when nobody verified it is the failure this whole change is about.
+      setListStale(err instanceof Error ? err.message : "Couldn't read the list.");
+    }
   }, []);
 
-  async function refreshRenders() {
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  /**
+   * Every write goes through here, so none of them can forget the reload.
+   *
+   * A 404 is success, not failure: it means the thing is already gone, which is
+   * what the click asked for. Reporting it as an error taught the screen to
+   * argue with the database.
+   */
+  async function mutate(url: string, init: RequestInit, gone: string) {
+    setError(null);
+    setNote(null);
     try {
-      const res = await fetch("/api/renders");
-      const data = await res.json();
-      if (res.ok) setRenders(data.renders as RenderRow[]);
-    } catch {
-      // The tab shows its own empty state.
+      const res = await fetch(url, { ...init, cache: "no-store" });
+      if (res.status === 404) {
+        setNote(gone);
+        return true;
+      }
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "That didn't work.");
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That didn't work.");
+      return false;
+    } finally {
+      await reload();
+    }
+  }
+
+  async function post<T>(url: string, body: FormData, stage: string): Promise<T> {
+    setBusy(stage);
+    setError(null);
+    setNote(null);
+    try {
+      const res = await fetch(url, { method: "POST", body });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? `Request failed (${res.status}).`);
+      return data as T;
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -212,80 +325,9 @@ function ReformatShell() {
       if (!res.ok) throw new Error(data?.error ?? "Couldn't record that.");
       setSaved(`Logged against ${job.company.trim()} and added to the tracker.`);
       setJob({ company: "", role: "", jobUrl: "" });
-      await refreshRenders();
+      await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't record that.");
-    }
-  }
-
-  async function refreshTemplates() {
-    try {
-      const [live, gone] = await Promise.all([fetch("/api/templates"), fetch("/api/templates?archived=1")]);
-      const liveData = await live.json();
-      if (live.ok) setTemplates(liveData.templates as Template[]);
-      const goneData = await gone.json();
-      if (gone.ok) setArchived(goneData.templates as Template[]);
-    } catch {
-      // The tab shows its own empty state; a failed refresh is not worth a banner.
-    }
-  }
-
-  async function setArchivedState(id: string, archive: boolean) {
-    setError(null);
-    try {
-      const res = await fetch(`/api/templates/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ archived: archive }),
-      });
-      if (!res.ok) {
-        throw new Error((await res.json().catch(() => null))?.error ?? "Couldn't change that template.");
-      }
-      await refreshTemplates();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't change that template.");
-    }
-  }
-
-  /**
-   * The confirmation says what deletion actually does, and it changed on
-   * 2026-09-17: it used to warn that the API would refuse if any render was
-   * built from the template. It no longer refuses — the renders survive with a
-   * null template and their own snapshot of what produced them — so saying so
-   * would be describing a rule that is gone.
-   */
-  async function remove(t: Template) {
-    setError(null);
-    const ok = window.confirm(
-      `Delete ${t.name} (v${t.version})? The file goes too. Renders built from it stay, and keep their record of what made them.`
-    );
-    if (!ok) return;
-    try {
-      const res = await fetch(`/api/templates/${t.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Couldn't delete that template.");
-      await refreshTemplates();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't delete that template.");
-    }
-  }
-
-  /** The source and the output both go. Archiving is the normal path; this is
-   *  for clearing out test runs. */
-  async function removeRender(r: RenderRow) {
-    setError(null);
-    const what = r.thread?.company ? `the render for ${r.thread.company}` : "that render";
-    const ok = window.confirm(
-      `Delete ${what}? Both files go — the resume you uploaded and the one that came out.${
-        r.thread_id ? " The tracker thread stays." : ""
-      }`
-    );
-    if (!ok) return;
-    try {
-      const res = await fetch(`/api/renders/${r.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Couldn't delete that render.");
-      await refreshRenders();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't delete that render.");
     }
   }
 
@@ -304,37 +346,11 @@ function ReformatShell() {
     try {
       await post<unknown>("/api/templates", body, "Reading template…");
       setTemplate(null);
-      await refreshTemplates();
+      setNote("Saved as the new version, and it is now the active template.");
+      await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save that template.");
-    }
-  }
-
-  async function activate(id: string) {
-    setError(null);
-    try {
-      const res = await fetch(`/api/templates/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_active: true }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Couldn't switch template.");
-      await refreshTemplates();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't switch template.");
-    }
-  }
-
-  async function post<T>(url: string, body: FormData, stage: string): Promise<T> {
-    setBusy(stage);
-    setError(null);
-    try {
-      const res = await fetch(url, { method: "POST", body });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? `Request failed (${res.status}).`);
-      return data as T;
-    } finally {
-      setBusy(null);
+      await reload();
     }
   }
 
@@ -348,6 +364,7 @@ function ReformatShell() {
     body.append("source", source);
     try {
       setResult(await post<Reformatted>("/api/reformat", body, "Reading both documents…"));
+      await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reformatting failed.");
     }
@@ -369,16 +386,6 @@ function ReformatShell() {
     }
   }
 
-  function checkFinished(file: File) {
-    setSingle(file);
-    void runCheck(file, checkSource);
-  }
-
-  function checkAgainst(file: File) {
-    setCheckSource(file);
-    if (single) void runCheck(single, file);
-  }
-
   function download() {
     if (!result) return;
     const bytes = Uint8Array.from(atob(result.docxBase64), (c) => c.charCodeAt(0));
@@ -392,457 +399,548 @@ function ReformatShell() {
     URL.revokeObjectURL(url);
   }
 
-  const active = templates?.find((t) => t.is_active) ?? null;
-  const newest = templates && templates.length > 0 ? templates[0] : null;
+  /* ── what the list says ─────────────────────────────────────────────── */
+
+  const templates = files?.filter((f) => f.kind === "template") ?? null;
+  const active = templates?.find((t) => t.active) ?? null;
+  const newest =
+    templates
+      ?.filter((t) => !t.archived)
+      .reduce<ResumeFile | null>((best, t) => (best && (best.version ?? 0) >= (t.version ?? 0) ? best : t), null) ??
+    null;
   const pinnedOlder = active && newest && active.id !== newest.id ? { active, newest } : null;
+  const archivedCount = templates?.filter((t) => t.archived).length ?? 0;
+
+  const visible = (files ?? [])
+    .filter((f) => kindFilter === "all" || f.kind === kindFilter)
+    .filter((f) => showArchived || !f.archived);
+
+  const counts = {
+    all: (files ?? []).filter((f) => showArchived || !f.archived).length,
+    template: (files ?? []).filter((f) => f.kind === "template" && (showArchived || !f.archived)).length,
+    input: (files ?? []).filter((f) => f.kind === "input").length,
+    output: (files ?? []).filter((f) => f.kind === "output").length,
+  };
+
+  /* ── actions on a row ───────────────────────────────────────────────── */
+
+  /**
+   * The confirmation says what deletion actually does, and it changed on
+   * 2026-09-17: it used to warn that the API would refuse if any render was
+   * built from the template. It no longer refuses — the renders survive with a
+   * null template and their own snapshot of what produced them — so saying so
+   * would be describing a rule that is gone.
+   */
+  function removeFile(f: ResumeFile) {
+    if (f.kind === "template") {
+      const ok = window.confirm(
+        `Delete ${f.name} (v${f.version})? The file goes too. Renders built from it stay, and keep their record of what made them.`
+      );
+      if (!ok) return;
+      void mutate(`/api/templates/${f.id}`, { method: "DELETE" }, "That template was already gone.");
+      return;
+    }
+
+    // Both rows of a render delete the render. Saying so is the point of the
+    // confirm — the other row is on screen and would otherwise look orphaned.
+    const ok = window.confirm(
+      `Delete this render? Both files go — the resume you uploaded and the one that came out.${
+        f.company ? ` The tracker thread for ${f.company} stays.` : ""
+      }`
+    );
+    if (!ok) return;
+    void mutate(`/api/renders/${f.id}`, { method: "DELETE" }, "That render was already gone.");
+  }
+
+  const patchTemplate = (id: string, body: Record<string, unknown>) =>
+    mutate(
+      `/api/templates/${id}`,
+      { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+      "That template was already gone."
+    );
+
+  /* ── render ─────────────────────────────────────────────────────────── */
 
   return (
-    <main className="min-h-screen px-5 py-8 max-w-3xl mx-auto flex flex-col gap-6">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">Resume Formatter</h1>
-        <p className="text-sm text-ink-soft">
-          The last look before you send it: what a parser will actually read, and whether you lost a word on the way.
-        </p>
-        <ThemeControl livery={LIVERY} />
-      </header>
-
-      <nav className="flex gap-1 bg-surface border border-line rounded-xl p-1">
-        {(["reformat", "templates", "history", "check"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => {
-              setTab(t);
-              setError(null);
-            }}
-            className={`flex-1 rounded-lg px-2 py-2 text-xs sm:text-sm font-medium ${
-              tab === t ? "bg-accent text-accent-ink" : "opacity-70"
-            }`}
-          >
-            {t === "reformat" ? "Reformat" : t === "templates" ? "Templates" : t === "history" ? "History" : "Check"}
-          </button>
-        ))}
-      </nav>
-
-      {error && <p className="text-sm text-urgent bg-surface border border-urgent rounded-lg px-4 py-3">{error}</p>}
-
-      {tab === "reformat" ? (
-        <>
-          <section className="flex flex-col gap-3">
-            {active ? (
-              <div className="bg-surface border border-line rounded-xl px-4 py-3">
-                <p className="text-xs uppercase tracking-wide opacity-60">Template</p>
-                <p className="text-sm font-medium">
-                  {active.name} <span className="opacity-60 font-normal">v{active.version}</span>
-                </p>
-              </div>
-            ) : (
-              <p className="text-sm bg-surface border border-warn text-warn rounded-xl px-4 py-3">
-                No template saved yet. Add one below — it saves and becomes the house style.
-              </p>
-            )}
-            {pinnedOlder && (
-              <p className="text-sm bg-surface border border-warn text-warn rounded-xl px-4 py-3">
-                Rendering with v{pinnedOlder.active.version} ({pinnedOlder.active.name}). Your most recent is v
-                {pinnedOlder.newest.version}.
-              </p>
-            )}
-            {/* Side by side from sm up, stacked on a phone. `items-stretch` with
-                the control's own h-full is what keeps the two the same height
-                when one holds a long filename and the other holds a hint. */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
-              <FilePick label="Tailored resume" hint="The Jobright export to reformat" file={source} onPick={setSource} />
-              <FilePick
-                label={active ? "Replace the template" : "Template"}
-                hint={active ? "A new version, which becomes the house style" : "Your resume, whose formatting to copy"}
-                file={template}
-                onPick={setTemplate}
-              />
-            </div>
-
-            {/* The confirm step. Dropping a file stages it; this commits it. */}
-            {template && (
-              <div className="bg-surface border border-accent rounded-xl px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm">
-                  Save <span className="font-medium break-all">{template.name}</span> as the template? It becomes the new
-                  version, and every render from now on is built on it.
-                </p>
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    onClick={() => setTemplate(null)}
-                    disabled={busy !== null}
-                    className="border border-line rounded-lg px-4 py-2 text-sm disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={saveTemplate}
-                    disabled={busy !== null}
-                    className="bg-accent text-accent-ink rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
-                  >
-                    Save and activate
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <button
-              onClick={reformat}
-              disabled={!source || !active || busy !== null}
-              className="w-full bg-accent text-accent-ink rounded-xl px-5 py-4 text-base font-medium disabled:opacity-50"
-            >
-              {busy ?? "Reformat"}
-            </button>
-            <p className="text-xs opacity-60">
-              Every render is saved: the source, the output, and which template it was built on — so what you sent
-              stays reproducible.
-            </p>
-          </section>
-
-          {result && (
-            <>
-              <section
-                className={`rounded-xl px-4 py-3 border text-sm ${
-                  result.coverage.percent === 100
-                    ? "bg-surface border-line"
-                    : "bg-surface border-warn text-warn"
+    <div className="min-h-screen flex flex-col">
+      <header className="bg-bar text-bar-ink border-b-4 border-accent">
+        <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3 flex-wrap">
+          <h1 className="font-semibold whitespace-nowrap">Resume Formatter</h1>
+          <nav className="flex gap-0.5 order-last w-full sm:order-none sm:w-auto sm:ml-2">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => {
+                  setTab(t.id);
+                  setError(null);
+                  setNote(null);
+                }}
+                aria-current={tab === t.id ? "page" : undefined}
+                className={`flex-1 sm:flex-none rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  tab === t.id ? "bg-accent text-accent-ink" : "opacity-70 hover:opacity-100"
                 }`}
               >
-                <p className="font-medium">
-                  {result.coverage.present} of {result.coverage.totalLines} lines carried across (
-                  {result.coverage.percent}%)
-                </p>
-                {result.coverage.missing.length > 0 ? (
-                  <div className="mt-2 flex flex-col gap-1">
-                    <p>Not carried across — check these before you send it:</p>
-                    <ul className="list-disc pl-5">
-                      {result.coverage.missing.map((d, i) => (
-                        <li key={i} className="break-words">{d}</li>
-                      ))}
-                    </ul>
+                {t.label}
+              </button>
+            ))}
+          </nav>
+          <div className="ml-auto">
+            <ThemeControl livery={LIVERY} onBar />
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-5 flex flex-col gap-4">
+        {error && <p className="text-sm text-urgent bg-surface border border-urgent rounded-lg px-4 py-2.5">{error}</p>}
+        {note && <p className="text-sm bg-surface border border-line rounded-lg px-4 py-2.5">{note}</p>}
+        {listStale && (
+          <p className="text-sm text-warn bg-surface border border-warn rounded-lg px-4 py-2.5">
+            {listStale} What is listed below is the last answer that arrived, not the current one.
+          </p>
+        )}
+
+        {tab === "reformat" && (
+          <Workbench
+            rail={
+              <>
+                {active ? (
+                  <div className="bg-surface border border-line rounded-xl px-4 py-3">
+                    <p className="text-[0.7rem] uppercase tracking-wide opacity-60">House style</p>
+                    <p className="text-sm font-medium break-all">
+                      {active.name} <span className="opacity-60 font-normal">v{active.version}</span>
+                    </p>
                   </div>
                 ) : (
-                  <p className="opacity-70 mt-1">
-                    Every line taken from the source reached the document, wording untouched. Your name, contact
-                    block and the static sections come from the template on purpose, so they are not counted here.
+                  <p className="text-sm bg-surface border border-warn text-warn rounded-xl px-4 py-3">
+                    No template saved yet. Add one below — it saves and becomes the house style.
                   </p>
                 )}
-              </section>
 
-              <section className="flex flex-col gap-3">
-                <h2 className="text-lg font-semibold">ATS check on the output</h2>
-                <p className="text-xs opacity-60">
-                  The output is your template with the text swapped, so a finding here is almost always about the
-                  template. Fix it there and every future render inherits the fix.
-                </p>
-                <Findings findings={result.findings} />
-              </section>
-
-              <section className="flex flex-col gap-3">
-                <h2 className="text-lg font-semibold">What went in</h2>
-                <div className="bg-surface border border-line rounded-xl p-4 flex flex-col gap-2">
-                  <p className="text-sm opacity-70">
-                    {result.summary.hasSummary ? "Summary" : "No summary"} · {result.summary.highlights} highlight
-                    {result.summary.highlights === 1 ? "" : "s"} · {result.summary.competencies} competency row
-                    {result.summary.competencies === 1 ? "" : "s"}
+                {pinnedOlder && (
+                  <p className="text-sm bg-surface border border-warn text-warn rounded-xl px-4 py-3">
+                    Rendering with v{pinnedOlder.active.version}. Your most recent is v{pinnedOlder.newest.version}.
                   </p>
-                  <ul className="flex flex-col divide-y divide-line">
+                )}
+
+                <FilePick label="Tailored resume" hint="The Jobright export to reformat" file={source} onPick={setSource} />
+                <FilePick
+                  label={active ? "Replace the template" : "Template"}
+                  hint={active ? "A new version, which becomes the house style" : "Your resume, whose formatting to copy"}
+                  file={template}
+                  onPick={setTemplate}
+                />
+
+                {/* The confirm step. Dropping a file stages it; this commits it. */}
+                {template && (
+                  <div className="bg-surface border border-accent rounded-xl px-4 py-3 flex flex-col gap-3">
+                    <p className="text-sm">
+                      Save <span className="font-medium break-all">{template.name}</span> as the template? It becomes the
+                      new version, and every render from now on is built on it.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setTemplate(null)}
+                        disabled={busy !== null}
+                        className="border border-line rounded-lg px-3 py-1.5 text-sm disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={saveTemplate}
+                        disabled={busy !== null}
+                        className="bg-accent text-accent-ink rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                      >
+                        Save and activate
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={reformat}
+                  disabled={!source || !active || busy !== null}
+                  className="w-full bg-accent text-accent-ink rounded-xl px-5 py-3 font-medium disabled:opacity-50"
+                >
+                  {busy ?? "Reformat"}
+                </button>
+                <p className="text-xs opacity-60">
+                  Every render is saved — the source, the output and which template built it — so what you sent stays
+                  reproducible. Both files are on the Resume tab.
+                </p>
+              </>
+            }
+          >
+            {!result ? (
+              <Panel title="What comes back">
+                <p className="text-sm opacity-70">
+                  Your template with this resume&apos;s text in it, plus how much of the source reached the document, an
+                  ATS check on the output, and what the renderer changed. Nothing is generated: every line is moved
+                  across word for word.
+                </p>
+              </Panel>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <Stat
+                    value={`${result.coverage.percent}%`}
+                    label="Lines carried"
+                    tone={result.coverage.percent === 100 ? "good" : "warn"}
+                  />
+                  <Stat
+                    value={`${result.findings.length}`}
+                    label="ATS findings"
+                    tone={result.findings.length === 0 ? "good" : "warn"}
+                  />
+                  <Stat value={`${result.summary.experience.length}`} label="Roles" />
+                  <Stat value={`${result.summary.highlights}`} label="Highlights" />
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <button
+                    onClick={download}
+                    className="flex-1 bg-accent text-accent-ink rounded-xl px-5 py-3 font-medium"
+                  >
+                    Download {result.filename}
+                  </button>
+                  <p className="text-xs opacity-60 sm:max-w-[16rem]">
+                    Rendered with {result.templateLabel}. {result.renderId ? "Saved to the Resume tab." : "Not saved."}
+                  </p>
+                </div>
+
+                {result.coverage.missing.length > 0 && (
+                  <Panel title="Not carried across" aside={<span className="text-xs text-warn">check before sending</span>}>
+                    <ul className="list-disc pl-5 text-sm flex flex-col gap-1">
+                      {result.coverage.missing.map((d, i) => (
+                        <li key={i} className="break-words">
+                          {d}
+                        </li>
+                      ))}
+                    </ul>
+                  </Panel>
+                )}
+
+                <Panel title="ATS check on the output">
+                  <div className="flex flex-col gap-2">
+                    <Findings findings={result.findings} />
+                    <p className="text-xs opacity-60">
+                      The output is your template with the text swapped, so a finding here is almost always about the
+                      template. Fix it there and every future render inherits the fix.
+                    </p>
+                  </div>
+                </Panel>
+
+                <details className="bg-surface border border-line rounded-xl overflow-hidden">
+                  <summary className="px-4 py-2.5 text-sm font-semibold cursor-pointer">
+                    What went in · {result.summary.hasSummary ? "summary" : "no summary"}, {result.summary.competencies}{" "}
+                    competenc{result.summary.competencies === 1 ? "y" : "ies"}
+                  </summary>
+                  <ul className="border-t border-line divide-y divide-line">
                     {result.summary.experience.map((e, i) => (
-                      <li key={`${e.company}-${i}`} className="py-2 flex items-baseline justify-between gap-3">
-                        <span>
+                      <li key={`${e.company}-${i}`} className="px-4 py-2 flex items-baseline justify-between gap-3">
+                        <span className="min-w-0">
                           <span className="font-medium">{e.company}</span>
                           {e.title && <span className="opacity-70"> — {e.title}</span>}
                         </span>
-                        <span className="text-sm opacity-60 whitespace-nowrap">
+                        <span className="text-xs opacity-60 whitespace-nowrap">
                           {e.date || "no date"} · {e.bullets} bullet{e.bullets === 1 ? "" : "s"}
                         </span>
                       </li>
                     ))}
                   </ul>
-                </div>
-              </section>
+                </details>
 
-              <section className="flex flex-col gap-3">
-                <h2 className="text-lg font-semibold">What it did to the template</h2>
-                <ul className="bg-surface border border-line rounded-xl p-4 flex flex-col divide-y divide-line">
-                  {result.changeLog.map((c, i) => (
-                    <li key={i} className="py-2 flex items-baseline justify-between gap-3">
-                      <span className="text-sm">
-                        <span className="font-medium">{c.section}</span> <span className="opacity-70">{c.detail}</span>
-                      </span>
-                      <span className="text-xs opacity-60 whitespace-nowrap">{c.action}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+                <details className="bg-surface border border-line rounded-xl overflow-hidden">
+                  <summary className="px-4 py-2.5 text-sm font-semibold cursor-pointer">
+                    What it did to the template · {result.changeLog.length} change
+                    {result.changeLog.length === 1 ? "" : "s"}
+                  </summary>
+                  <ul className="border-t border-line divide-y divide-line">
+                    {result.changeLog.map((c, i) => (
+                      <li key={i} className="px-4 py-2 flex items-baseline justify-between gap-3">
+                        <span className="text-sm min-w-0">
+                          <span className="font-medium">{c.section}</span> <span className="opacity-70">{c.detail}</span>
+                        </span>
+                        <span className="text-xs opacity-60 whitespace-nowrap">{c.action}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
 
-              <div className="flex flex-col gap-2">
-                <button onClick={download} className="w-full bg-accent text-accent-ink rounded-xl px-5 py-4 text-base font-medium">
-                  Download {result.filename}
-                </button>
-                <p className="text-xs opacity-60">
-                  Rendered with {result.templateLabel}.{" "}
-                  {result.renderId ? "Saved to your render history." : "Preview only — nothing was saved."}
-                </p>
-              </div>
-
-              {result.renderId && (
-                <section className="flex flex-col gap-3">
-                  <h2 className="text-lg font-semibold">Where did this go?</h2>
-                  {saved ? (
-                    <p className="text-sm bg-surface border border-line rounded-xl px-4 py-3">{saved}</p>
-                  ) : (
-                    <div className="bg-surface border border-line rounded-xl p-4 flex flex-col gap-3">
-                      <p className="text-xs opacity-60">
-                        Naming a company creates the thread in Pipeline Tracker. Leave it blank if you have not sent
-                        this yet — it stays in history either way.
-                      </p>
-                      {([
-                        ["company", "Company", "Northwind"],
-                        ["role", "Role", "Product Analyst II"],
-                        ["jobUrl", "Posting URL", "https://…"],
-                      ] as const).map(([key, label, placeholder]) => (
-                        <label key={key} className="flex flex-col gap-1">
-                          <span className="text-xs uppercase tracking-wide opacity-60">{label}</span>
-                          <input
-                            value={job[key]}
-                            onChange={(e) => setJob({ ...job, [key]: e.target.value })}
-                            placeholder={placeholder}
-                            className="border border-line rounded-lg px-3 py-2 text-sm"
-                          />
-                        </label>
-                      ))}
-                      <button
-                        onClick={recordJob}
-                        disabled={!job.company.trim()}
-                        className="w-full bg-accent text-accent-ink rounded-xl px-5 py-3 text-sm font-medium disabled:opacity-50"
-                      >
-                        Log as submitted
-                      </button>
-                    </div>
-                  )}
-                </section>
-              )}
-            </>
-          )}
-        </>
-      ) : tab === "templates" ? (
-        <>
-          <section className="flex flex-col gap-3">
-            {/* The upload moved to the Reformat tab, where the template is
-                actually used. This tab is the list. */}
-            <p className="text-xs opacity-60">
-              Add a template on the Reformat tab. Every upload is a new version and becomes active. Archiving hides
-              one without touching the renders built from it; deleting is only possible when there are none.
-            </p>
-          </section>
-
-          {pinnedOlder && (
-            <p className="text-sm bg-surface border border-warn text-warn rounded-xl px-4 py-3">
-              v{pinnedOlder.active.version} is pinned active, but v{pinnedOlder.newest.version} is newer.
-            </p>
-          )}
-
-          <section className="flex flex-col gap-2">
-            {templates === null && <p className="text-sm opacity-60">Loading…</p>}
-            {templates?.length === 0 && (
-              <p className="text-sm bg-surface border border-line rounded-xl px-4 py-3">
-                No templates yet. Add the resume whose look you want everything to match.
-              </p>
+                {result.renderId && (
+                  <Panel title="Where did this go?">
+                    {saved ? (
+                      <p className="text-sm">{saved}</p>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        <p className="text-xs opacity-60">
+                          Naming a company creates the thread in Pipeline Tracker. Leave it blank if you have not sent
+                          this yet — it stays on the Resume tab either way.
+                        </p>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          {(
+                            [
+                              ["company", "Company", "Northwind"],
+                              ["role", "Role", "Product Analyst II"],
+                              ["jobUrl", "Posting URL", "https://…"],
+                            ] as const
+                          ).map(([key, label, placeholder]) => (
+                            <label key={key} className="flex flex-col gap-1">
+                              <span className="text-[0.7rem] uppercase tracking-wide opacity-60">{label}</span>
+                              <input
+                                value={job[key]}
+                                onChange={(e) => setJob({ ...job, [key]: e.target.value })}
+                                placeholder={placeholder}
+                                className="border border-line rounded-lg px-3 py-2 text-sm bg-paper"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                        <button
+                          onClick={recordJob}
+                          disabled={!job.company.trim()}
+                          className="bg-accent text-accent-ink rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 w-fit"
+                        >
+                          Log as submitted
+                        </button>
+                      </div>
+                    )}
+                  </Panel>
+                )}
+              </>
             )}
-            {templates?.map((t) => (
-              <div key={t.id} className="bg-surface border border-line rounded-xl px-4 py-3 flex flex-col gap-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium break-all">
-                      {t.name} <span className="opacity-60 font-normal">v{t.version}</span>
-                    </p>
-                    <p className="text-xs opacity-60 mt-0.5">
-                      {t.spec.font} {t.spec.bodySize}pt · headings {t.spec.headingSize}pt · margins{" "}
-                      {t.spec.margins.left}&quot; as uploaded · {new Date(t.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  {t.is_active ? (
-                    <span className="text-xs bg-accent text-accent-ink rounded-full px-2.5 py-1 whitespace-nowrap">Active</span>
-                  ) : (
-                    <button
-                      onClick={() => activate(t.id)}
-                      className="text-xs underline whitespace-nowrap opacity-80"
-                    >
-                      Make active
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                  {/* A plain link, not fetch: the browser saves the file itself
-                      and the response never has to pass through React. */}
-                  <a href={`/api/templates/${t.id}/file`} className="underline opacity-80">
-                    Download
-                  </a>
-                  <button onClick={() => setArchivedState(t.id, true)} className="underline opacity-80">
-                    Archive
-                  </button>
-                  <button onClick={() => remove(t)} className="underline text-urgent">
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </section>
+          </Workbench>
+        )}
 
-          {archived && archived.length > 0 && (
-            <section className="flex flex-col gap-2">
-              <button
-                onClick={() => setShowArchived((v) => !v)}
-                className="text-sm underline opacity-70 w-fit"
-              >
-                {showArchived ? "Hide" : "Show"} archived ({archived.length})
-              </button>
-              {showArchived &&
-                archived.map((t) => (
-                  <div key={t.id} className="bg-surface border border-line rounded-xl px-4 py-3 flex flex-col gap-2 opacity-70">
-                    <p className="font-medium break-all">
-                      {t.name} <span className="opacity-60 font-normal">v{t.version}</span>
-                    </p>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                      <a href={`/api/templates/${t.id}/file`} className="underline opacity-80">
-                        Download
-                      </a>
-                      <button onClick={() => setArchivedState(t.id, false)} className="underline opacity-80">
-                        Restore
-                      </button>
-                      <button onClick={() => remove(t)} className="underline text-urgent">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-            </section>
-          )}
-        </>
-      ) : tab === "history" ? (
-        <section className="flex flex-col gap-2">
-          {renders === null && <p className="text-sm opacity-60">Loading…</p>}
-          {renders?.length === 0 && (
-            <p className="text-sm bg-surface border border-line rounded-xl px-4 py-3">
-              No renders yet. Reformat a resume and it lands here.
-            </p>
-          )}
-          {renders?.map((r) => (
-            <div
-              key={r.id}
-              className={`bg-surface border rounded-xl px-4 py-3 flex flex-col gap-1 ${
-                r.id === highlightRender ? "border-accent ring-2 ring-accent/30" : "border-line"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <p className="font-medium">{r.thread?.company ?? "No job recorded"}</p>
-                <span className="text-xs opacity-60 whitespace-nowrap">
-                  {new Date(r.created_at).toLocaleDateString()}
-                </span>
-              </div>
-              <p className="text-xs opacity-60">
-                {r.submitted_at ? `Submitted ${new Date(r.submitted_at).toLocaleDateString()}` : "Rendered, not sent"}
-                {r.thread?.stage ? ` · ${r.thread.stage}` : ""} · {r.coverage.percent}% coverage
-              </p>
-              <div className="flex items-center gap-3 mt-1">
-                <a href={`/api/renders/${r.id}/file`} className="text-sm underline">
-                  Download what was sent
-                </a>
-                <button onClick={() => removeRender(r)} className="text-sm underline text-urgent">
-                  Delete
+        {tab === "resume" && (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              {(
+                [
+                  ["all", "All"],
+                  ["template", "Templates"],
+                  ["input", "Inputs"],
+                  ["output", "Outputs"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setKindFilter(id)}
+                  className={`rounded-full border px-3 py-1 text-sm ${
+                    kindFilter === id ? "bg-accent text-accent-ink border-accent" : "border-line bg-surface opacity-80"
+                  }`}
+                >
+                  {label} <span className="opacity-60">{counts[id]}</span>
                 </button>
-              </div>
+              ))}
+              {archivedCount > 0 && (
+                <label className="ml-auto flex items-center gap-2 text-sm opacity-80">
+                  <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+                  Show archived ({archivedCount})
+                </label>
+              )}
             </div>
-          ))}
-        </section>
-      ) : (
-        <>
-          <section className="grid sm:grid-cols-2 gap-3">
-            <FilePick
-              label="Finished resume"
-              hint="The .docx you're about to send"
-              file={single}
-              onPick={checkFinished}
-            />
-            <FilePick
-              label="Jobright export (optional)"
-              hint="Checks nothing was dropped"
-              file={checkSource}
-              onPick={checkAgainst}
-            />
-          </section>
 
-          {inspection && (
-            <>
-              <section className="bg-surface border border-line rounded-xl p-4 flex flex-col gap-1">
-                <p className="font-medium break-all">{inspection.filename}</p>
-                <p className="text-sm opacity-70">
-                  {(inspection.sizeBytes / 1024 / 1024).toFixed(2)} MB · {inspection.paragraphCount} paragraphs ·{" "}
-                  {inspection.namedStyles === 0 ? "no named styles" : `${inspection.namedStyles} named styles`}
+            <p className="text-xs opacity-60">
+              Every file this app is holding. A template is the house style; an input is what you uploaded and an output
+              is what came out, and those two belong to one render — deleting either deletes both. Archiving is the
+              gentle way to retire a template; deleting takes the file, and the renders built from it stay.
+            </p>
+
+            {files === null ? (
+              <p className="text-sm opacity-60">Loading…</p>
+            ) : visible.length === 0 ? (
+              <Panel>
+                <p className="text-sm">
+                  {files.length === 0
+                    ? "Nothing here yet. Save a template on the Reformat tab, then run a resume through it."
+                    : "Nothing of that type."}
                 </p>
-              </section>
-
-              <section className="flex flex-col gap-3">
-                <h2 className="text-lg font-semibold">ATS check</h2>
-                <Findings findings={inspection.findings} />
-              </section>
-
-              <section className="flex flex-col gap-3">
-                <h2 className="text-lg font-semibold">Nothing dropped</h2>
-                {inspection.content === null ? (
-                  <p className="text-sm bg-surface border border-line rounded-xl px-4 py-3 opacity-70">
-                    Attach the Jobright export above and every line of it gets checked against this document. Its
-                    exact wording is the keyword optimisation, so a line lost while copying is lost coverage —
-                    and nothing about the finished file shows it used to be there.
-                  </p>
-                ) : (
-                  <div className="bg-surface border border-line rounded-xl p-4 flex flex-col gap-3">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="font-medium">
-                        {inspection.content.present} of {inspection.content.totalLines} lines carried across
-                      </p>
+              </Panel>
+            ) : (
+              <ul className="bg-surface border border-line rounded-xl divide-y divide-line overflow-hidden">
+                {visible.map((f) => (
+                  <li
+                    key={f.key}
+                    className={`px-4 py-3 flex flex-col gap-1.5 ${
+                      f.id === highlightRender ? "bg-accent/5 border-l-2 border-l-accent" : ""
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <span
-                        className={`text-sm whitespace-nowrap ${
-                          inspection.content.missing.length > 0 ? "text-urgent font-medium" : "opacity-60"
+                        className={`text-[0.65rem] uppercase tracking-wide border rounded px-1.5 py-0.5 shrink-0 ${
+                          KIND_STYLE[f.kind]
                         }`}
                       >
-                        {inspection.content.percent}%
+                        {KIND_LABEL[f.kind]}
+                      </span>
+                      <span className="font-medium truncate min-w-0 flex-1" title={f.name}>
+                        {f.name}
+                      </span>
+                      {f.version !== null && <span className="text-sm opacity-60 shrink-0">v{f.version}</span>}
+                      {f.active && (
+                        <span className="text-[0.65rem] bg-accent text-accent-ink rounded-full px-2 py-0.5 shrink-0">
+                          Active
+                        </span>
+                      )}
+                      {f.archived && <span className="text-[0.65rem] opacity-60 shrink-0">Archived</span>}
+                      <span className="text-xs opacity-60 whitespace-nowrap shrink-0">{shortDate(f.createdAt)}</span>
+                    </div>
+
+                    {/* Detail left, actions right on a wide screen; two stacked
+                        lines in the hub's frame, where wrapping them into one
+                        row put Download and Delete on different lines. */}
+                    <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                      <span className="opacity-60 min-w-0">
+                        {f.kind === "template"
+                          ? f.spec
+                            ? `${f.spec.font} ${f.spec.bodySize}pt · headings ${f.spec.headingSize}pt · margins ${f.spec.margins.left}" as uploaded`
+                            : "No spec recorded"
+                          : [
+                              f.company ?? "No job recorded",
+                              f.stage,
+                              f.submittedAt ? `submitted ${shortDate(f.submittedAt)}` : "not sent",
+                              f.coverage === null ? null : `${f.coverage}% coverage`,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                      </span>
+                      <span className="flex items-center gap-3 shrink-0">
+                        {/* A plain link, not fetch: the browser saves the file itself
+                            and the response never has to pass through React. */}
+                        <a href={f.downloadHref} className="underline opacity-80">
+                          Download
+                        </a>
+                        {f.kind === "template" && !f.active && !f.archived && (
+                          <button
+                            onClick={() => void patchTemplate(f.id, { is_active: true })}
+                            className="underline opacity-80"
+                          >
+                            Make active
+                          </button>
+                        )}
+                        {f.kind === "template" && (
+                          <button
+                            onClick={() => void patchTemplate(f.id, { archived: !f.archived })}
+                            className="underline opacity-80"
+                          >
+                            {f.archived ? "Restore" : "Archive"}
+                          </button>
+                        )}
+                        <button onClick={() => removeFile(f)} className="underline text-urgent">
+                          Delete
+                        </button>
                       </span>
                     </div>
-                    <p className="text-xs opacity-60 break-all">against {inspection.sourceFilename}</p>
-                    {inspection.content.missing.length === 0 ? (
-                      <p className="text-sm">Every line of the export appears in the finished document.</p>
-                    ) : (
-                      <>
-                        <p className="text-sm text-urgent font-medium">
-                          {inspection.content.missing.length} line
-                          {inspection.content.missing.length === 1 ? "" : "s"} reached the finished document nowhere:
-                        </p>
-                        <ul className="flex flex-col divide-y divide-line">
-                          {inspection.content.missing.map((line) => (
-                            <li key={line} className="py-2 text-sm">
-                              {line}
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    )}
-                  </div>
-                )}
-              </section>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
 
-              <section className="flex flex-col gap-3">
-                <h2 className="text-lg font-semibold">What the parser read</h2>
-                <div className="bg-surface border border-line rounded-xl p-4 flex flex-col gap-2">
-                  <p className="text-sm">
-                    <span className="opacity-60">Name detected:</span>{" "}
-                    <span className="font-medium">{inspection.outline.title ?? "none"}</span>
-                  </p>
+        {tab === "check" && (
+          <Workbench
+            rail={
+              <>
+                <FilePick
+                  label="Finished resume"
+                  hint="The .docx you're about to send"
+                  file={single}
+                  onPick={(f) => {
+                    setSingle(f);
+                    void runCheck(f, checkSource);
+                  }}
+                />
+                <FilePick
+                  label="Jobright export (optional)"
+                  hint="Checks nothing was dropped"
+                  file={checkSource}
+                  onPick={(f) => {
+                    setCheckSource(f);
+                    if (single) void runCheck(single, f);
+                  }}
+                />
+                {busy && <p className="text-xs opacity-60">{busy}</p>}
+              </>
+            }
+          >
+            {!inspection ? (
+              <Panel title="What this reads">
+                <p className="text-sm opacity-70">
+                  Drop the finished document in and you get what a parser actually sees: the name it detects, the
+                  sections it finds, and anything structural that would trip it up. Add the Jobright export and every
+                  line of it is checked against the document — its exact wording is the keyword optimisation, so a line
+                  lost while copying is lost coverage, and nothing about the finished file shows it used to be there.
+                </p>
+              </Panel>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <Stat
+                    value={inspection.content ? `${inspection.content.percent}%` : "—"}
+                    label="Lines carried"
+                    tone={!inspection.content ? "plain" : inspection.content.percent === 100 ? "good" : "warn"}
+                  />
+                  <Stat
+                    value={`${inspection.findings.length}`}
+                    label="ATS findings"
+                    tone={inspection.findings.length === 0 ? "good" : "warn"}
+                  />
+                  <Stat value={`${inspection.outline.sections.length}`} label="Sections" />
+                  <Stat value={`${inspection.paragraphCount}`} label="Paragraphs" />
+                </div>
+
+                <Panel
+                  title="ATS check"
+                  aside={
+                    <span className="text-xs opacity-60 truncate max-w-[14rem]" title={inspection.filename}>
+                      {inspection.filename}
+                    </span>
+                  }
+                >
+                  <Findings findings={inspection.findings} />
+                </Panel>
+
+                <Panel title="Nothing dropped">
+                  {inspection.content === null ? (
+                    <p className="text-sm opacity-70">
+                      Attach the Jobright export on the left and every line of it gets checked against this document.
+                    </p>
+                  ) : inspection.content.missing.length === 0 ? (
+                    <p className="text-sm">
+                      Every line of {inspection.sourceFilename} appears in the finished document.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <p className="text-sm text-urgent font-medium">
+                        {inspection.content.missing.length} line
+                        {inspection.content.missing.length === 1 ? "" : "s"} of {inspection.sourceFilename} reached the
+                        finished document nowhere:
+                      </p>
+                      <ul className="flex flex-col divide-y divide-line">
+                        {inspection.content.missing.map((line) => (
+                          <li key={line} className="py-1.5 text-sm">
+                            {line}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </Panel>
+
+                <Panel
+                  title="What the parser read"
+                  aside={
+                    <span className="text-xs opacity-60">
+                      name: <span className="font-medium">{inspection.outline.title ?? "none"}</span>
+                    </span>
+                  }
+                >
                   <ul className="flex flex-col divide-y divide-line">
                     {inspection.outline.sections.map((s) => (
-                      <li key={s.heading} className="py-2 flex items-baseline justify-between gap-3">
-                        <span className="font-medium">{s.heading}</span>
-                        <span className="text-sm opacity-60 whitespace-nowrap">
+                      <li key={s.heading} className="py-1.5 flex items-baseline justify-between gap-3">
+                        <span className="font-medium text-sm">{s.heading}</span>
+                        <span className="text-xs opacity-60 whitespace-nowrap">
                           {s.entries > 0 && `${s.entries} job${s.entries === 1 ? "" : "s"} · `}
                           {s.lines} line{s.lines === 1 ? "" : "s"}
                           {s.bullets > 0 && ` · ${s.bullets} bullet${s.bullets === 1 ? "" : "s"}`}
@@ -850,13 +948,13 @@ function ReformatShell() {
                       </li>
                     ))}
                   </ul>
-                </div>
-              </section>
-            </>
-          )}
-        </>
-      )}
-    </main>
+                </Panel>
+              </>
+            )}
+          </Workbench>
+        )}
+      </main>
+    </div>
   );
 }
 
