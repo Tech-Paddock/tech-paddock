@@ -1,6 +1,6 @@
 # TechPad Gen — handoff
 
-State as of 2026-09-17.
+State as of 2026-09-18.
 
 Read `RULES.md` first. This file is only what is true right now.
 
@@ -43,9 +43,9 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
   Light/Dark (`[data-embedded] .pd-modes`) and keeps its badge — safe only because the hub posts
   `{type:"paddock-mode", mode}` into every frame and `ThemeControl` listens behind
   `isPaddockOrigin()`. **A tool that drops `ThemeControl.tsx` silently ignores the hub's switch.**
-- **The sidebar is the only list of tools; the `--tone-*` ramp is now unused here.** The Board's
-  tool tiles duplicated it and Joel removed them. The ramp's tokens still sit in the five-way
-  `lib/theme.css`, so retiring them is a theme call rather than a hub one.
+- **`TOOLS` in `lib/platform.ts` is the only list of tools, and its array order is Joel's** — it
+  drives the sidebar, the `?app=` frame and The Garage at once. **The tracker is not in it**, so
+  nothing here records that `tp-tracker` exists; un-parking means putting the entry back.
 - **The glance gets counts and singles, never rows** — a hub handed thread arrays slowly becomes a
   worse copy of the tracker. `SOURCES` holds one entry: a fact about the present, not a design limit.
 - **One Garage panel is not live, and it is the one that looks most authoritative.** Rules drift is
@@ -57,8 +57,8 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-`claude/home-remove-app-tiles` — the Board's tool tiles deleted, with the `tone` plumbing and tile
-CSS they were the only user of. Open as a pull request; nothing of mine is left on it but the gate.
+`claude/home-drop-tracker-from-roster` — the tracker out of `TOOLS`, the sidebar reordered to
+Joel's, and The Garage's shared-secret probe derived from `hasSummaryRoute` rather than a slug.
 
 ## Next
 

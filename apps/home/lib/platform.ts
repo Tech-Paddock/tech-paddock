@@ -75,21 +75,32 @@ export type Drift = {
 };
 
 /**
- * The four embeddable tools, as a closed set. Keeping the slugs a union rather
- * than plain strings is what lets the hub's tile table be checked for
+ * The embeddable tools, as a closed set. Keeping the slugs a union rather than
+ * plain strings is what lets the hub's presentation table be checked for
  * completeness at compile time — add a tool here and the shell stops building
- * until it has been given a colour and an icon.
+ * until it has been given an icon.
+ *
+ * **Array order is the sidebar's order**, and it is Joel's, not alphabetical
+ * and not the order these were built in.
+ *
+ * **The Pipeline Tracker is deliberately absent.** `tp-tracker` is paused, so
+ * every entry it had here pointed somewhere that does not answer: a sidebar row,
+ * an iframe target, and a row in The Garage's table. Joel removed it from all
+ * three on 2026-09-18 rather than from the sidebar alone.
+ * **The cost of that is recorded rather than hidden**: the hub no longer states
+ * anywhere that `tp-tracker` is supposed to exist, so un-parking it means
+ * putting this entry back. `apps/tracker` is untouched and still builds in CI —
+ * the roster CI derives comes from the folders on disk, never from this file.
  */
-export type ToolSlug = "editor" | "tracker" | "resume" | "coffee";
+export type ToolSlug = "resume" | "coffee" | "editor";
 
 export type Tool = Project & { slug: ToolSlug };
 
 /** The tools the hub embeds — everything except the hub itself. */
 export const TOOLS: Tool[] = [
-  { slug: "editor", name: "Message Editor", url: "https://editor.techpaddock.io", vercelProject: "tp-message-editor" },
-  { slug: "tracker", name: "Pipeline Tracker", url: "https://tracker.techpaddock.io", vercelProject: "tp-tracker" },
   { slug: "resume", name: "Resume Formatter", url: "https://resume.techpaddock.io", vercelProject: "tp-resume" },
   { slug: "coffee", name: "Coffee", url: "https://coffee.techpaddock.io", vercelProject: "tp-coffee-app" },
+  { slug: "editor", name: "Message Editor", url: "https://editor.techpaddock.io", vercelProject: "tp-message-editor" },
 ];
 
 export const HUB: Project = {

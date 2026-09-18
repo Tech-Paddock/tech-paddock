@@ -32,10 +32,9 @@ import ThemeControl from "./ThemeControl";
 // in lib/theme.css, which is byte-identical in all five apps — retiring them is a
 // theme change across all of them rather than part of removing this app's tiles.
 const PRESENTATION: Record<ToolSlug, { icon: string }> = {
-  editor: { icon: "✉️" },
-  tracker: { icon: "📊" },
   resume: { icon: "📄" },
   coffee: { icon: "☕" },
+  editor: { icon: "✉️" },
 };
 
 export const APPS = TOOLS.map((tool) => ({
