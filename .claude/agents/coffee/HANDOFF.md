@@ -60,7 +60,7 @@ a `<button>` is invalid markup and browsers disagree about what a tap does. Keep
 
 ## In flight
 
-`claude/coffee-ratio-water-and-recipe-labels` — pushed, CI green, no PR yet. The ratio/water form,
+**#114** `claude/coffee-ratio-water-and-recipe-labels` — open at the gate. The ratio/water form,
 roaster-seeded defaults, the commented-out TDS half, the brew log under the Save button, the quote
 above the parsed recipe, all three tier headings, and **an additive `coffee.brews.water_g` migration**.
 
