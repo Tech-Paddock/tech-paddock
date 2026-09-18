@@ -6,16 +6,18 @@ import { LIVERY } from "@/lib/livery";
 import ThemeControl from "./ThemeControl";
 import { METHOD_LABELS, type BrewMethod } from "@/lib/methods";
 import {
-  extractionYield,
   percentToPpm,
-  ppmToPercent,
-  readBrew,
   band,
   blankBrew,
-  repeatOf,
-  TDS_TARGET,
+  ratioFor,
+  openingBrew,
+  withDose,
+  withRatio,
+  withWater,
   YIELD_TARGET,
   type BrewDraft,
+  type BrewSource,
+  type GuideNumbers,
 } from "@/lib/brews";
 import {
   MY_BREWERS,
@@ -68,6 +70,7 @@ type Brew = {
   grinder: string | null;
   grind_setting: string | null;
   dose_g: string | number | null;
+  water_g: string | number | null;
   beverage_g: string | number | null;
   tds_percent: string | number | null;
   extraction_yield: string | number | null;
@@ -93,10 +96,19 @@ const EMPTY: Identity = {
   roast_date: "",
 };
 
+/**
+ * Short labels, because the heading is read at a glance in a kitchen and the
+ * caveat underneath is where the nuance belongs.
+ *
+ * `coffee_specific` still reads long, and deliberately: "Bag specific" was
+ * asked for, and it asserts the one thing the tier does not check — see
+ * `PRODUCT_PAGE_CAVEAT` and `RULES.md` §2. Changing it is a question for Joel
+ * rather than a rename, so this one waits and the other two do not.
+ */
 const GUIDE_LABELS: Record<GuideStatus, string> = {
   coffee_specific: "The roaster's recipe, from this coffee's own page",
-  roaster_generic: "The roaster's house method, from elsewhere on their site",
-  none: "No published instructions",
+  roaster_generic: "Roaster's generic recipe",
+  none: "No recipe provided by roaster.",
   not_searched: "Not searched",
 };
 
@@ -548,6 +560,8 @@ function GuideCard({ guide }: { guide: Guide }) {
         )}
       </div>
 
+      <Quotes quotes={guide.quotes} />
+
       {guide.status === "none" ? (
         <p className="text-sm text-ink/70">
           Nothing published for this coffee, and no general brew guide on the roaster&apos;s site. Dial it in
@@ -562,19 +576,6 @@ function GuideCard({ guide }: { guide: Guide }) {
             </div>
           ))}
         </dl>
-      )}
-
-      {guide.quotes.length > 0 && (
-        <details className="text-sm">
-          <summary className="cursor-pointer text-ink/60">What the page actually said</summary>
-          <ul className="mt-2 flex flex-col gap-2">
-            {guide.quotes.map((q, i) => (
-              <li key={i} className="border-l-2 border-line pl-3 text-ink/70 italic">
-                &ldquo;{q.text}&rdquo;
-              </li>
-            ))}
-          </ul>
-        </details>
       )}
 
       {guide.dropped.length > 0 && (
@@ -732,6 +733,13 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
             {bag.guide_status === "coffee_specific" && (
               <p className="text-xs text-ink-soft mb-2">{PRODUCT_PAGE_CAVEAT}</p>
             )}
+            {/* The quote first, the parse second. The parsed row is a reading
+                of the quote, so the quote is the thing with authority — and a
+                misparse is only visible if you meet the source before the
+                summary of it. */}
+            <div className="mb-3">
+              <Quotes quotes={bag.guide_quotes ?? []} />
+            </div>
             {guideRows.length ? (
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
                 {guideRows.map(([k, v]) => (
@@ -745,21 +753,6 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
               <p className="text-sm text-ink/60">Nothing recorded from the roaster.</p>
             )}
           </div>
-
-          {bag.guide_quotes?.length > 0 && (
-            <details className="text-sm">
-              <summary className="cursor-pointer text-ink/60">What the page actually said</summary>
-              <ul className="mt-2 flex flex-col gap-2">
-                {bag.guide_quotes.map((q, i) => (
-                  <li key={i} className="border-l-2 border-line pl-3 text-ink/70 italic">
-                    &ldquo;{q.text}&rdquo;
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-
-          <Brews bagId={bag.id} onCount={setBrewCount} />
 
           <div className="flex flex-col gap-3 border-t border-line pt-4">
             <label className="text-sm text-ink/70 flex flex-col gap-1">
@@ -794,6 +787,18 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
             >
               {saving ? "Saving…" : "Save"}
             </button>
+
+            {/* The brew log is its own section under the bag, not a block
+                inside the bag's own details. What the roaster said and what
+                you bought are fixed the moment you buy it; the brews are the
+                part that keeps growing, and they read as a log rather than as
+                one more field once they sit below the button that saves the
+                bag. */}
+            <Brews
+              bagId={bag.id}
+              onCount={setBrewCount}
+              guide={{ dose: bag.guide_dose, water: bag.guide_water, ratio: bag.guide_ratio }}
+            />
 
             {/* Deleting a bag also deletes its photo and cannot be undone, so
                 it asks once. The confirm replaces the button rather than
@@ -843,19 +848,33 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
 /**
  * The brews of one bag, and the form for adding another.
  *
- * TDS is entered in either unit and shown in both, because the reading is one
- * number — a refractometer says percent, everything else quotes ppm, and
- * 1% is 10,000ppm. Only percent is ever sent to the server; ppm is derived
- * here and derived again for display, so the two can never disagree.
+ * The form works in dose, ratio and water, because that is the shape of the
+ * decision you actually make: you pick a dose and a strength, and the water
+ * follows. Any two of the three give the third, and only dose and water are
+ * sent — the ratio is water over dose and has no column, for the same reason
+ * extraction yield is generated in Postgres rather than accepted from here.
+ *
+ * The refractometer half of the form — beverage mass, TDS and the extraction
+ * read-out — is commented out below rather than deleted. It is a real
+ * measurement path with a column, a generated column and tests behind it, and
+ * none of that changed; what changed is that it is not what this form is for
+ * today. Uncommenting it is the whole of putting it back.
  */
-function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void }) {
+function Brews({
+  bagId,
+  onCount,
+  guide,
+}: {
+  bagId: string;
+  onCount: (n: number) => void;
+  guide: GuideNumbers;
+}) {
   const [brews, setBrews] = useState<Brew[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState<BrewDraft>(blankBrew());
-  const [repeated, setRepeated] = useState(false);
-  const [tdsPercent, setTdsPercent] = useState("");
+  const [source, setSource] = useState<BrewSource>("blank");
   const [rating, setRating] = useState<number | null>(null);
 
   const load = useCallback(async () => {
@@ -877,21 +896,18 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
     void load();
   }, [load]);
 
-  const pct = tdsPercent ? Number(tdsPercent) : null;
-  const live = extractionYield({
-    doseG: draft.dose_g ? Number(draft.dose_g) : null,
-    beverageG: draft.beverage_g ? Number(draft.beverage_g) : null,
-    tdsPercent: pct,
-  });
-
   async function add() {
     setSaving(true);
     setError(null);
     try {
+      // The ratio is left behind deliberately: it is water over dose, the
+      // server has no column for it, and sending a derived number is how a
+      // second copy of one fact gets born.
+      const { ratio: _ratio, ...row } = draft;
       const res = await fetch(`/api/bags/${bagId}/brews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...draft, tds_percent: tdsPercent || null, rating }),
+        body: JSON.stringify({ ...row, rating }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Couldn't log that brew.");
@@ -906,24 +922,24 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
   }
 
   /**
-   * Opening the form repeats the last brew on this bag. Dialling in is one
-   * change at a time, so the settings you did not mean to touch should already
-   * be there — see `repeatOf` for which fields carry and why the readings do
-   * not.
+   * Opening the form repeats the last brew on this bag, and falls back to the
+   * roaster's own numbers where there is no last brew to repeat. Dialling in
+   * is one change at a time, so the settings you did not mean to touch should
+   * already be there — see `openingBrew` for which fields carry, which
+   * defer, and why no reading carries at all.
    */
   function startAdding() {
     const previous = brews?.[0] ?? null;
-    setDraft(repeatOf(previous));
-    setRepeated(Boolean(previous));
-    setTdsPercent("");
+    const opened = openingBrew(previous, guide);
+    setDraft(opened.draft);
+    setSource(opened.source);
     setRating(null);
     setAdding(true);
   }
 
   function clear() {
     setDraft(blankBrew());
-    setRepeated(false);
-    setTdsPercent("");
+    setSource("blank");
     setRating(null);
   }
 
@@ -950,7 +966,11 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
         <div className="flex flex-col gap-3 bg-paper border border-line rounded-xl p-3">
           <div className="flex items-baseline justify-between gap-2">
             <p className="text-xs text-ink-soft">
-              {repeated ? "Settings repeated from your last brew." : "A fresh brew."}
+              {source === "repeat"
+                ? "Settings repeated from your last brew."
+                : source === "guide"
+                  ? "Starting from the roaster's own numbers. Nothing is saved until you log it."
+                  : "A fresh brew."}
             </p>
             <button onClick={clear} className="text-xs text-accent underline shrink-0">
               Clear
@@ -958,7 +978,7 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
           </div>
 
           <label className="text-sm text-ink/70 flex flex-col gap-1">
-            Rating <span className="text-ink-soft">(optional)</span>
+            Rating
             <Stars value={rating} onChange={setRating} />
           </label>
 
@@ -1000,8 +1020,22 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
             <Field label="grind setting" value={draft.grind_setting} onChange={(v) => setDraft({ ...draft, grind_setting: v })} />
           </Inline>
 
+          {/* Three fields, one decision. Changing the dose holds the ratio
+              and moves the water, because scaling a recipe is the reason to
+              brew to a ratio at all; typing a water mass states the ratio
+              instead, so that direction re-derives it. The arithmetic is in
+              lib/brews.ts so it can be tested without a browser. */}
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="dose (g)" value={draft.dose_g} onChange={(v) => setDraft(withDose(draft, v))} />
+            <Field label="ratio 1:" value={draft.ratio} onChange={(v) => setDraft(withRatio(draft, v))} />
+            <Field label="water (g)" value={draft.water_g} onChange={(v) => setDraft(withWater(draft, v))} />
+          </div>
+
+          {/* The refractometer half, commented out rather than removed. The
+              columns, the generated extraction_yield and their tests are all
+              still there; this is the form choosing not to ask today.
+
           <Inline>
-            <Field label="dose (g)" value={draft.dose_g} onChange={(v) => setDraft({ ...draft, dose_g: v })} />
             <Field label="in the cup (g)" value={draft.beverage_g} onChange={(v) => setDraft({ ...draft, beverage_g: v })} />
           </Inline>
 
@@ -1017,6 +1051,8 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
           )}
 
           <BrewNotes />
+
+          */}
 
           <label className="text-sm text-ink/70 flex flex-col gap-1">
             Notes on this brew
@@ -1054,6 +1090,11 @@ function Brews({ bagId, onCount }: { bagId: string; onCount: (n: number) => void
 function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
   const pct = brew.tds_percent == null ? null : Number(brew.tds_percent);
   const ey = brew.extraction_yield == null ? null : Number(brew.extraction_yield);
+  const dose = brew.dose_g == null ? null : Number(brew.dose_g);
+  const water = brew.water_g == null ? null : Number(brew.water_g);
+  // Derived here for the same reason it is derived in the form: water over
+  // dose is one fact, and a stored copy is a second one that can disagree.
+  const ratio = ratioFor(dose, water);
 
   return (
     <div className="bg-paper border border-line rounded-xl p-3 flex flex-col gap-1">
@@ -1067,6 +1108,14 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
 
       {(brew.grinder || brew.grind_setting) && (
         <span className="text-sm text-ink/60">{[brew.grinder, brew.grind_setting].filter(Boolean).join(" · ")}</span>
+      )}
+
+      {(dose || water) && (
+        <span className="text-sm">
+          {[dose ? `${dose}g` : null, water ? `${water}g water` : null, ratio ? `1:${ratio}` : null]
+            .filter(Boolean)
+            .join(" · ")}
+        </span>
       )}
 
       {pct != null && (
@@ -1091,54 +1140,84 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
   );
 }
 
-/** One reading, two units. Type either; percent is what gets stored. */
-function TdsInput({ percent, onPercent }: { percent: string; onPercent: (v: string) => void }) {
-  const asNumber = percent ? Number(percent) : null;
-  return (
-    <Inline>
-      <Field label="TDS (%)" value={percent} onChange={onPercent} />
-      <label className="text-sm text-ink/70 flex flex-col gap-1">
-        TDS (ppm)
-        <input
-          inputMode="numeric"
-          value={asNumber ? String(percentToPpm(asNumber)) : ""}
-          onChange={(e) => {
-            const ppm = Number(e.target.value);
-            onPercent(e.target.value && Number.isFinite(ppm) ? String(ppmToPercent(ppm)) : "");
-          }}
-          className="border border-line rounded-lg px-3 py-2 bg-surface"
-        />
-      </label>
-    </Inline>
-  );
-}
+// Commented out with the TDS half of the brew form, not deleted. Both of
+// these describe a measurement path that still exists in full — the
+// tds_percent column, the generated extraction_yield, percentToPpm and its
+// tests are all untouched — so uncommenting them and the block in the form
+// above is the whole of putting it back.
+// /** One reading, two units. Type either; percent is what gets stored. */
+// function TdsInput({ percent, onPercent }: { percent: string; onPercent: (v: string) => void }) {
+//   const asNumber = percent ? Number(percent) : null;
+//   return (
+//     <Inline>
+//       <Field label="TDS (%)" value={percent} onChange={onPercent} />
+//       <label className="text-sm text-ink/70 flex flex-col gap-1">
+//         TDS (ppm)
+//         <input
+//           inputMode="numeric"
+//           value={asNumber ? String(percentToPpm(asNumber)) : ""}
+//           onChange={(e) => {
+//             const ppm = Number(e.target.value);
+//             onPercent(e.target.value && Number.isFinite(ppm) ? String(ppmToPercent(ppm)) : "");
+//           }}
+//           className="border border-line rounded-lg px-3 py-2 bg-surface"
+//         />
+//       </label>
+//     </Inline>
+//   );
+// }
+//
+// /** The margin notes: how to take the reading, and what it means. */
+// function BrewNotes() {
+//   return (
+//     <details className="text-xs text-ink/60 bg-surface border border-line rounded-lg px-3 py-2">
+//       <summary className="cursor-pointer">How to measure this</summary>
+//       <ul className="list-disc pl-4 mt-2 flex flex-col gap-1">
+//         <li>
+//           <strong>Extraction = (cup grams × TDS%) ÷ dose grams.</strong> Weigh the cup, not the kettle — the bed
+//           keeps roughly 2g of water per gram of coffee, and using water-in overstates extraction by about a tenth.
+//         </li>
+//         <li>
+//           <strong>TDS is strength; extraction is how much you pulled out.</strong> A drink can be strong and
+//           under-extracted at once. Ratio moves strength, grind moves extraction.
+//         </li>
+//         <li>
+//           Filter targets: TDS {TDS_TARGET.low}–{TDS_TARGET.high}%, extraction {YIELD_TARGET.low}–{YIELD_TARGET.high}%.
+//           Under is sour and thin, over is bitter and drying.
+//         </li>
+//         <li>
+//           <strong>1% = 10,000 ppm.</strong> A refractometer reads percent. Cheap conductivity pens read ppm and are
+//           not measuring coffee TDS — they measure dissolved ions against a water calibration, and most of what is in
+//           coffee is not ionic.
+//         </li>
+//         <li>Let the sample cool and filter it before reading, or it reads high.</li>
+//       </ul>
+//     </details>
+//   );
+// }
 
-/** The margin notes: how to take the reading, and what it means. */
-function BrewNotes() {
+/**
+ * What the page actually said, above the parsed values rather than folded
+ * away beneath them.
+ *
+ * The parsed row is a reading of the quote, so the quote is the thing with
+ * authority — and a misparse is only visible if you meet the source before
+ * the summary of it. It was a collapsed `<details>` under the table, which
+ * put the evidence one tap away from the claim it backs.
+ */
+function Quotes({ quotes }: { quotes: { text: string }[] }) {
+  if (!quotes?.length) return null;
   return (
-    <details className="text-xs text-ink/60 bg-surface border border-line rounded-lg px-3 py-2">
-      <summary className="cursor-pointer">How to measure this</summary>
-      <ul className="list-disc pl-4 mt-2 flex flex-col gap-1">
-        <li>
-          <strong>Extraction = (cup grams × TDS%) ÷ dose grams.</strong> Weigh the cup, not the kettle — the bed
-          keeps roughly 2g of water per gram of coffee, and using water-in overstates extraction by about a tenth.
-        </li>
-        <li>
-          <strong>TDS is strength; extraction is how much you pulled out.</strong> A drink can be strong and
-          under-extracted at once. Ratio moves strength, grind moves extraction.
-        </li>
-        <li>
-          Filter targets: TDS {TDS_TARGET.low}–{TDS_TARGET.high}%, extraction {YIELD_TARGET.low}–{YIELD_TARGET.high}%.
-          Under is sour and thin, over is bitter and drying.
-        </li>
-        <li>
-          <strong>1% = 10,000 ppm.</strong> A refractometer reads percent. Cheap conductivity pens read ppm and are
-          not measuring coffee TDS — they measure dissolved ions against a water calibration, and most of what is in
-          coffee is not ionic.
-        </li>
-        <li>Let the sample cool and filter it before reading, or it reads high.</li>
+    <div className="flex flex-col gap-2">
+      <p className="text-xs text-ink-soft">What the page actually said</p>
+      <ul className="flex flex-col gap-2">
+        {quotes.map((q, i) => (
+          <li key={i} className="border-l-2 border-line pl-3 text-sm text-ink/70 italic">
+            &ldquo;{q.text}&rdquo;
+          </li>
+        ))}
       </ul>
-    </details>
+    </div>
   );
 }
 

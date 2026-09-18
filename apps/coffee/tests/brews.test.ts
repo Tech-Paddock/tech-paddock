@@ -6,6 +6,15 @@ import {
   band,
   blankBrew,
   repeatOf,
+  waterFor,
+  ratioFor,
+  withDose,
+  withRatio,
+  withWater,
+  parseGrams,
+  parseRatio,
+  fromGuide,
+  openingBrew,
   TDS_TARGET,
   YIELD_TARGET,
 } from "@/lib/brews";
@@ -123,5 +132,165 @@ describe("repeatOf", () => {
   it("starts blank with the grinder already chosen", () => {
     expect(blankBrew().grinder).toBe(DEFAULT_GRINDER);
     expect(blankBrew().brewer).toBe("");
+  });
+});
+
+describe("ratio and water", () => {
+  it("turns a ratio into water at a dose", () => {
+    expect(waterFor(18, 17)).toBe(306);
+    expect(waterFor(15, 16)).toBe(240);
+  });
+
+  it("turns water into a ratio at a dose", () => {
+    expect(ratioFor(18, 306)).toBe(17);
+    expect(ratioFor(18, 300)).toBe(16.7);
+  });
+
+  it("is null wherever a number is missing or not a number", () => {
+    expect(waterFor(null, 17)).toBeNull();
+    expect(waterFor(18, null)).toBeNull();
+    expect(waterFor(0, 17)).toBeNull();
+    expect(ratioFor(18, 0)).toBeNull();
+    expect(ratioFor(-18, 300)).toBeNull();
+  });
+
+  it("rounds water to whole grams, because that is what a scale resolves", () => {
+    expect(waterFor(18, 16.7)).toBe(301);
+  });
+});
+
+describe("editing the three linked fields", () => {
+  const base = { ...blankBrew(), dose_g: "18", ratio: "17", water_g: "306" };
+
+  it("holds the ratio when the dose changes, and moves the water", () => {
+    // Scaling a recipe is the whole reason to brew to a ratio: the strength
+    // stays and the water follows.
+    expect(withDose(base, "20")).toMatchObject({ dose_g: "20", ratio: "17", water_g: "340" });
+  });
+
+  it("re-derives the ratio when the dose changes and no ratio was set", () => {
+    const noRatio = { ...blankBrew(), water_g: "300" };
+    expect(withDose(noRatio, "20")).toMatchObject({ water_g: "300", ratio: "15" });
+  });
+
+  it("moves the water when the ratio changes", () => {
+    expect(withRatio(base, "16")).toMatchObject({ ratio: "16", water_g: "288" });
+  });
+
+  it("moves the ratio when the water changes", () => {
+    expect(withWater(base, "270")).toMatchObject({ water_g: "270", ratio: "15" });
+  });
+
+  it("keeps what was typed even when the other field cannot be computed", () => {
+    const empty = blankBrew();
+    expect(withRatio(empty, "17")).toMatchObject({ ratio: "17", water_g: "" });
+    expect(withWater(empty, "300")).toMatchObject({ water_g: "300", ratio: "" });
+    // Half-typed numbers must survive, or the field cannot be typed into.
+    expect(withRatio(base, "1").ratio).toBe("1");
+  });
+});
+
+describe("reading a roaster's own wording", () => {
+  it("takes a mass out of the way roasters write one", () => {
+    expect(parseGrams("18g")).toBe(18);
+    expect(parseGrams("18 grams")).toBe(18);
+    expect(parseGrams("300 g water")).toBe(300);
+    expect(parseGrams("18-20g")).toBe(18);
+  });
+
+  it("refuses a string with a colon, which is a ratio or a time", () => {
+    // Reading "1:17" as one gram of coffee is exactly the confident nonsense
+    // this app exists not to produce.
+    expect(parseGrams("1:17")).toBeNull();
+    expect(parseGrams("2:40")).toBeNull();
+  });
+
+  it("is null for nothing, and for text carrying no number", () => {
+    expect(parseGrams(null)).toBeNull();
+    expect(parseGrams(undefined)).toBeNull();
+    expect(parseGrams("to taste")).toBeNull();
+  });
+
+  it("divides a ratio rather than reading the second half off", () => {
+    expect(parseRatio("1:17")).toBe(17);
+    expect(parseRatio("1 : 16.5")).toBe(16.5);
+    expect(parseRatio("60:1000")).toBe(16.7);
+    expect(parseRatio("2:1")).toBe(0.5);
+  });
+
+  it("is null for a ratio that is not one", () => {
+    expect(parseRatio(null)).toBeNull();
+    expect(parseRatio("golden ratio")).toBeNull();
+    expect(parseRatio("0:17")).toBeNull();
+  });
+});
+
+describe("fromGuide", () => {
+  it("takes the roaster's three numbers as they stand", () => {
+    expect(fromGuide({ dose: "18g", water: "300g", ratio: "1:17" })).toEqual({
+      dose_g: "18",
+      water_g: "300",
+      ratio: "17",
+    });
+  });
+
+  it("derives the water from a ratio when they published only a ratio and a dose", () => {
+    expect(fromGuide({ dose: "18g", ratio: "1:17" })).toEqual({
+      dose_g: "18",
+      water_g: "306",
+      ratio: "17",
+    });
+  });
+
+  it("keeps a lone ratio, so typing a dose fills the water", () => {
+    // Sweet Bloom publish 1:17 and no dose. The ratio is still the thing they
+    // decided, and it has to survive to the form for the dose to act on.
+    expect(fromGuide({ ratio: "1:17" })).toEqual({ ratio: "17" });
+  });
+
+  it("is empty when the roaster published nothing usable", () => {
+    expect(fromGuide(null)).toEqual({});
+    expect(fromGuide({})).toEqual({});
+    expect(fromGuide({ dose: "to taste" })).toEqual({});
+  });
+});
+
+describe("openingBrew", () => {
+  const previous = { brewer: "v60-02", dose_g: 18, water_g: 300 };
+  const guide = { dose: "22g", water: "374g", ratio: "1:17" };
+
+  it("prefers your last brew over what the roaster published", () => {
+    // What you did on this bag is the dial-in; their number is where it
+    // started. Overwriting yours would undo the last attempt every time.
+    const { draft, source } = openingBrew(previous, guide);
+    expect(draft).toMatchObject({ dose_g: "18", water_g: "300", ratio: "16.7" });
+    expect(source).toBe("repeat");
+  });
+
+  it("falls back to the roaster field by field", () => {
+    const { draft } = openingBrew({ brewer: "v60-02", dose_g: 18 }, { ratio: "1:17" });
+    expect(draft.dose_g).toBe("18");
+    // Their ratio filled the gap the repeat left, and the water follows from
+    // your dose and their ratio together.
+    expect(draft.ratio).toBe("17");
+    expect(draft.water_g).toBe("306");
+  });
+
+  it("opens on the roaster's recipe for the first brew of a bag", () => {
+    const { draft, source } = openingBrew(null, guide);
+    expect(draft).toMatchObject({ dose_g: "22", water_g: "374", ratio: "17" });
+    expect(source).toBe("guide");
+  });
+
+  it("is blank, and says so, when there is neither", () => {
+    const { draft, source } = openingBrew(null, null);
+    expect(draft).toEqual(blankBrew());
+    expect(source).toBe("blank");
+  });
+
+  it("carries no reading from either source", () => {
+    const { draft } = openingBrew({ ...previous, brewer: "v60-02" }, guide);
+    expect(draft.beverage_g).toBe("");
+    expect(draft.notes).toBe("");
   });
 });
