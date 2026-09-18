@@ -76,16 +76,23 @@ async function setArchived(id: string, target: { is_active: boolean }, archived:
 }
 
 /**
- * Delete a template outright.
+ * Delete a template outright. **Its renders survive it.**
  *
- * Only ever permitted for a template no render points at. `renders.template_id`
- * is a not-null foreign key with no delete action, so the database would refuse
- * anyway — this checks first to return a sentence explaining the alternative
- * instead of a foreign key violation.
+ * This was refused for any template a render pointed at, on the reasoning that a
+ * render is the record of what was actually sent and archiving is how such a
+ * template leaves the list. Joel amended it on 2026-09-17 — *"Generally I want
+ * the renders to stay even if the templates go"* — and the amendment is sound
+ * rather than merely authorised: the objection was that deleting the template
+ * would destroy what a render was built on, and that has not been true since the
+ * renderer started recording `template_snapshot`, which carries the template's
+ * id, version and a hash of its exact bytes at render time.
  *
- * This is the duplicate-upload case and nothing wider: a template with renders
- * behind it is the record of what was actually sent to somebody, and archiving
- * is how that one leaves the list.
+ * So `renders.template_id` is nullable with `on delete set null` (migration
+ * 20260918014500), and the render keeps its own account of its origin. Archiving
+ * remains the normal path; this is for clearing out test runs.
+ *
+ * **Still refused for the active template** — that guard is untouched, because
+ * deleting it leaves every future render with nothing to build on.
  */
 export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
   const supabase = getServiceClient();
@@ -100,20 +107,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
 
   if (target.is_active) {
     return fail(409, "active_template", "That is the active template. Make another one active before deleting it.");
-  }
-
-  const { count, error: countError } = await supabase
-    .from("renders")
-    .select("id", { count: "exact", head: true })
-    .eq("template_id", params.id);
-  if (countError) return fail(500, "db_error", countError.message);
-
-  if ((count ?? 0) > 0) {
-    return fail(
-      409,
-      "has_renders",
-      `${count} render${count === 1 ? "" : "s"} were built from v${target.version}, and each one is the record of what was actually sent. Archive it instead — it leaves the list and the history stays intact.`
-    );
   }
 
   const { error } = await supabase.from("templates").delete().eq("id", params.id);

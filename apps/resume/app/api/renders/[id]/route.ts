@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient, getTrackerClient } from "@/lib/supabase";
+import { StorageError, removeDocx } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,53 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   if (error) return fail(500, "db_error", error.message);
   return NextResponse.json({ render: data });
+}
+
+/**
+ * Delete a render, and the two files it points at.
+ *
+ * **Archiving is the normal way one leaves the list; this is for the test runs.**
+ * Joel asked for it on 2026-09-17 with fifteen of them on screen — and asked for
+ * exactly this much: one at a time, no cascade, no bulk tool. *"i don't mind
+ * clicking though it no need to build in complexity for a 1 off."*
+ *
+ * The tracker thread is deliberately **not** touched. It is the record of an
+ * application, owned by the Pipeline Tracker and reachable from it; deleting a
+ * render here would silently delete somebody else's row. The thread simply stops
+ * having a resume attached.
+ *
+ * Row first, then the objects — the same order the template route uses, and for
+ * the same reason. The reverse leaves a row pointing at bytes that are gone,
+ * which breaks the download; this way a failure only strands an object nothing
+ * references.
+ */
+export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+  const supabase = getServiceClient();
+
+  const { data: target, error: findError } = await supabase
+    .from("renders")
+    .select("id, source_file_path, output_file_path")
+    .eq("id", params.id)
+    .maybeSingle();
+  if (findError) return fail(500, "db_error", findError.message);
+  if (!target) return fail(404, "not_found", "No render with that id.");
+
+  const { error } = await supabase.from("renders").delete().eq("id", params.id);
+  if (error) return fail(500, "db_error", error.message);
+
+  for (const path of [target.source_file_path, target.output_file_path]) {
+    if (typeof path !== "string" || !path) continue;
+    try {
+      await removeDocx(path);
+    } catch (err) {
+      if (!(err instanceof StorageError)) throw err;
+      // The render is gone as far as the app is concerned. Saying so beats
+      // reporting a failure the user cannot act on and would retry pointlessly.
+      console.error("render row deleted but its file remains", path, err);
+    }
+  }
+
+  return NextResponse.json({ deleted: params.id });
 }
 
 function fail(status: number, code: string, error: string) {

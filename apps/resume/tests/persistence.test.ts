@@ -262,6 +262,90 @@ describe("recording where a render went", () => {
   });
 });
 
+/**
+ * Deleting a render.
+ *
+ * Archiving is the normal way anything leaves these lists; this exists because
+ * Joel had fifteen test runs on screen on 2026-09-17 and asked for exactly this
+ * much — one at a time, no cascade, no bulk tool.
+ */
+describe("deleting a render", () => {
+  const RENDER = { id: "r1", source_file_path: "sources/a.docx", output_file_path: "renders/a.docx" };
+  const del = () => new NextRequest("http://localhost/x", { method: "DELETE" });
+
+  it("removes the row and then both of its files", async () => {
+    const removed: string[] = [];
+    const { client, calls } = fakeSupabase({
+      "renders.select": { data: RENDER, error: null },
+      "renders.delete": { data: null, error: null },
+    });
+    mockModules({ resume: client, remove: async (p) => void removed.push(p as string) });
+
+    const { DELETE } = await import("../app/api/renders/[id]/route");
+    const res = await DELETE(del(), { params: { id: "r1" } });
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).deleted).toBe("r1");
+    expect(calls.map((c) => `${c.table}.${c.op}`)).toContain("renders.delete");
+    // A render points at two files, not one — the source that came in and the
+    // output that went out. Leaving either behind strands bytes nothing knows
+    // about, and the source is the easier one to forget.
+    expect(removed.sort()).toEqual(["renders/a.docx", "sources/a.docx"]);
+  });
+
+  /**
+   * The tracker thread is somebody else's row.
+   *
+   * A render that was sent somewhere carries `thread_id` into
+   * `tracker.pipeline_threads` — the canonical record of that application, owned
+   * by the Pipeline Tracker and reachable from it. Deleting the resume must not
+   * delete the application; the thread just stops having a resume attached.
+   */
+  it("never touches the tracker thread", async () => {
+    const { client } = fakeSupabase({
+      "renders.select": { data: { ...RENDER, thread_id: "th9" }, error: null },
+      "renders.delete": { data: null, error: null },
+    });
+    const { client: tracker, calls: trackerCalls } = fakeSupabase({});
+    mockModules({ resume: client, tracker });
+
+    const { DELETE } = await import("../app/api/renders/[id]/route");
+    expect((await DELETE(del(), { params: { id: "r1" } })).status).toBe(200);
+    expect(trackerCalls).toEqual([]);
+  });
+
+  it("404s for a render that does not exist, and deletes nothing", async () => {
+    const { client, calls } = fakeSupabase({ "renders.select": { data: null, error: null } });
+    mockModules({ resume: client });
+
+    const { DELETE } = await import("../app/api/renders/[id]/route");
+    const res = await DELETE(del(), { params: { id: "ghost" } });
+
+    expect(res.status).toBe(404);
+    expect(calls.map((c) => `${c.table}.${c.op}`)).not.toContain("renders.delete");
+  });
+
+  // The row is gone as far as the app is concerned, so reporting a failure the
+  // user cannot act on would only invite a pointless retry. Same trade the
+  // template route already makes.
+  it("still reports success when a file could not be removed", async () => {
+    const { client } = fakeSupabase({
+      "renders.select": { data: RENDER, error: null },
+      "renders.delete": { data: null, error: null },
+    });
+    mockModules({
+      resume: client,
+      remove: async () => {
+        const { StorageError } = await import("@/lib/storage");
+        throw new StorageError("bucket unreachable");
+      },
+    });
+
+    const { DELETE } = await import("../app/api/renders/[id]/route");
+    expect((await DELETE(del(), { params: { id: "r1" } })).status).toBe(200);
+  });
+});
+
 describe("downloading a stored render", () => {
   it("404s cleanly when nothing was stored", async () => {
     const { client } = fakeSupabase({ "renders.select": { data: { output_file_path: null }, error: null } });

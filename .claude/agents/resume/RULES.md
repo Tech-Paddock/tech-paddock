@@ -72,16 +72,33 @@ is_active, `archived_at` (nullable), created_at
 persistent banner on the render screen naming both versions.
 
 **Templates leave the list two ways, and the difference is history.** Archiving (`archived_at`)
-hides one and keeps both the row and its stored `.docx`, because a render that points at it has to
-stay explainable. Deleting removes both, and is **refused for any template a render was built
-from** — `renders.template_id` is a not-null foreign key with no delete action, so the database
-refuses it too; the API checks first only to return a sentence instead of a constraint violation.
-The archived template and the active template are disjoint by constraint: neither can be the other.
+hides one and keeps both the row and its stored `.docx`. Deleting removes both. The archived
+template and the active template are disjoint by constraint: neither can be the other, and
+**deleting the active one is still refused** — it would leave every future render with nothing to
+build on.
 
 This was append-only until 2026-09-14. Joel asked for deletion so a duplicate upload could be
 removed, and the reasoning behind append-only never covered that case: a template with no renders
 is nobody's history. **Approved by Joel 2026-09-14; ratified by the technical director 2026-09-15**, in the act of
 merging #56, which carried this amendment.
+
+**Deleting a template no longer takes its renders with it, and is no longer refused because of
+them** — amended by Joel on 2026-09-17: *"Generally I want the renders to stay even if the templates
+go."* `renders.template_id` is nullable with `on delete set null` (migration `20260918014500`).
+
+**The amendment is sound rather than merely authorised, and that distinction is the point.** The
+old rule's premise was that deleting a template destroyed the account of what a render was built
+on. That stopped being true when the renderer started writing `template_snapshot` — the engine, the
+template's id, its version and a sha256 of its exact bytes at render time. A render keeps its own
+account of its origin, so the row it points at is no longer load-bearing for explaining it. **A
+guard whose reason has expired should be removed, not kept out of habit** — but check the reason
+before you remove it, which is what happened here.
+
+**Renders delete too**, one at a time, taking both stored files with them. No cascade and no bulk
+delete: asked for and declined in the same breath — *"i don't mind clicking though it no need to
+build in complexity for a 1 off."* **A render's tracker thread is never touched.** It belongs to the
+Pipeline Tracker and is the record of an application; deleting the resume must not delete the
+application.
 
 **The template file is itself a deliverable**: it doubles as the general-purpose resume to hand
 someone when there is no specific job, so the original bytes are kept, not just the spec — and
