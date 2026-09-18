@@ -46,7 +46,8 @@ keeps things in one place. When you have something to say, find the reader first
 | `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | overwrite, Joel approves |
 | `agents/<you>/HANDOFF.md` | **your area's state right now** | every session | **overwrite · ≤80 lines** |
 | `.claude/OPEN-ITEMS.md` | **open requests, each with an owner** | every session, via hook | **overwrite · ≤80 lines** |
-| `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append · ≤200 lines** |
+| `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append; supersede in place · ≤260 lines** |
+| your debrief board | **your sign-off, published** | Joel reads it instead of chat | **overwrite · URL in your kickoff** |
 | `/admin` — The Garage | facts about the running system | when you need a fact | **computed, never written** |
 | commits and pull request bodies | what landed, why, blast radius, who asked | at the gate, and afterwards | the event log |
 
@@ -74,8 +75,8 @@ message in one had a better home. `read-all.sh` went with them.
 
 | Agent | Owns | Charter |
 |---|---|---|
-| Technical Director | ops, gatekeeping, the ledger, merges | `.claude/agents/td/` |
-| TechPad Gen | `apps/home`, **the visual theme of every app**, cross-cutting UI | `.claude/agents/techpad-gen/` |
+| Technical Director | ops, gatekeeping, the ledger, merges, **app surface** | `.claude/agents/td/` |
+| TechPad Gen | `apps/home`, **the visual theme of every app**, shared components | `.claude/agents/techpad-gen/` |
 | Message Editor | `apps/editor` | `.claude/agents/message-editor/` |
 | Pipeline Tracker | `apps/tracker` | `.claude/agents/tracker/` |
 | Resume Formatter | `apps/resume` | `.claude/agents/resume/` |
@@ -173,7 +174,9 @@ wrong or the rule is, and that is a conversation before any code exists.
   **What still cannot be automated is the Vercel project and the DNS record** — both outside the
   repo, both without an undo. Everything else The Garage will tell you is missing.
 - **TechPad Gen owns the theme, in every app.** Palette, tokens, type, spacing, and the shared
-  component language. **Using what exists is free and needs nobody** — build with the tokens already
+  component language. **Surface is not the theme and is the technical director's** — whether a tool
+  is a site or an app decides its shell and its navigation, which is architecture, and it is settled
+  at standup rather than in a feature. **Using what exists is free and needs nobody** — build with the tokens already
   there. **What needs TechPad Gen is changing or forking it.** One owner rather than five because the
   hub embeds the tools in iframes, so two apps' buttons sit inches apart on one screen; drift there
   is visible and makes one product look like several.
@@ -210,22 +213,24 @@ wrong or the rule is, and that is a conversation before any code exists.
   tool output, file dumps and command results scrolling past above it — he reads this terminal all
   day and should never have to hunt for where your answer starts. It costs one line and it is not
   optional, including on a one-sentence answer.
-- **The technical director delivers the sign-off as a link, not as three sections in chat.** Joel
-  asked for this on 2026-09-18. The board is one page, republished to the same URL every time, so
-  there is one bookmark rather than a new link per message and it is never more than one message
-  behind. The message ends with that link.
-  **The three sections still exist and are still measured the same way** — the medium changed, not
-  the discipline. **A board written from memory is worse than a table written from memory**, because
-  a page looks permanent and a chat message visibly scrolls away, so the re-measure rule below binds
-  harder here rather than less.
-  **This is the technical director's alone.** No other agent has a board, and a page published from
-  one session cannot be republished from another, so **every other agent ends its message with the
-  three sections exactly as written below.** Extending it means giving each agent a board and
-  solving how Joel finds five links instead of one — a separate decision, not an implication of
-  this one.
+- **Every agent delivers the sign-off as its own board, not as three sections in chat.** Joel asked
+  for this on 2026-09-18, extending what had been the technical director's alone. **Your board's URL
+  is in your kickoff block** — publish to *that* URL. Publishing without it creates a second board,
+  and a fortnight of that is thirty pages with no way to tell which is current.
+  **One publish per response, at the end, and the message ends with the link.** The three sections
+  still exist and are still measured the same way — the medium changed, not the discipline. **A
+  board written from memory is worse than a table written from memory**, because a page looks
+  permanent and a chat message visibly scrolls away, so the re-measure rule below binds harder here
+  rather than less.
+  **Update only what you measured.** A row you did not touch this session is left exactly as it is —
+  not rewritten, not re-dated, not re-worded. This is the same rule as "never fill in a row you
+  cannot see", and it is what makes a board safe to carry state a later session did not produce.
+  **Every board carries the time it was published**, and the agent states that same time in chat.
+  That is the only thing that makes a stale board visible rather than silently authoritative.
+  **The technical director's board is the rollup** and is the only one that reports every agent.
   **When the board cannot be republished, the sign-off goes back into chat, in full, with the reason
-  said out loud.** That is not hypothetical: the artifact service refused five publishes in a row on
-  the day this rule was written, leaving the page two merges stale. **A link to a stale board is
+  said out loud.** That is not hypothetical: the artifact service refused twelve publishes in a row
+  on the day this rule was written, leaving the page two merges stale. **A link to a stale board is
   worse than no link** — it reports the wrong state while looking authoritative, which is the exact
   failure the whole sign-off exists to prevent.
 - **End every message to Joel with the three-part sign-off.** Every message, so he never has to go

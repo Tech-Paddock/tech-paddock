@@ -26,9 +26,10 @@ just been bitten by something and want to know whether it is known.
   disqualify a livery: mass casualties and a regime. Le Mans 1955 killed 83 spectators, and the name
   belongs to the Nazi-funded 1934-39 teams. **This is not a no-dead-drivers rule** — Senna stayed,
   and Peterson, Villeneuve and Rindt are all in the book.
-- **2026-09-16 — The Morning Paper is a Pit Wall tab, not a route and not an app.** `Board · Feed ·
-  Paper`, Paper landing. Moving the board to The Garage was proposed and rejected: the board answers
-  *what needs me now*, The Garage answers *declared versus reported*, and one label cannot carry both.
+- **2026-09-16 — The Morning Paper is a Pit Wall tab, not a route and not an app.** Moving it to The
+  Garage was proposed and rejected: it answers *what needs me now*, The Garage answers *declared
+  versus reported*, and one label cannot carry both. **Superseded 2026-09-18 on the tab order** —
+  `Pit Wall · Paper`. Feed is deleted, and the tab that was called Board is called Pit Wall.
 - **2026-09-16 — The Paper leads with what is owed, not what arrived.** Threads gone quiet are a
   task; replies received are a statistic. **The privacy fold was lifted the same day**, by Joel:
   *"drop above the fold below, ill manage privacy."* So what is owed leads the page, job search
@@ -191,3 +192,20 @@ Install Claude's **and** Vercel's GitHub Apps on the destination org first, with
 repositories" — the org holds unrelated repos. Then stop every running session. Then move. In that
 order. A session's authorized repository set is fixed when it starts, and `add_repo` refuses
 cross-owner additions, so a running session cannot repair itself.
+
+- **2026-09-18 — Feed is deleted, not parked.** It lived in the settled tab order and nowhere else,
+  and shipped as a labelled empty slot that said so. Joel: *"drop the feed completely, not parked
+  deprecated."* **Board is renamed Pit Wall** in the same breath, because the hub's Board tab and
+  the technical director's published board were two things wearing one word, and that collision is
+  what made the hub hard to talk about.
+- **2026-09-18 — App surface belongs to the technical director, not TechPad Gen.** Surface is
+  site-or-app: shell, navigation, whether there is an index. That is architecture with visual
+  consequences, not palette — and `CLAUDE.md` enumerates the theme as *palette, tokens, type,
+  spacing, component language*, none of which it is. **It is settled at standup**, alongside the
+  name and the schema, because it fixes things that are expensive to change afterwards.
+- **2026-09-18 — Every agent publishes its own debrief board; the sign-off leaves chat.** The old
+  rule reserved a board for the technical director because *"a page published from one session
+  cannot be republished from another"* — **that was wrong**: another session updates a page by
+  passing its URL. So each agent gets a durable URL, carried in its kickoff block, and the real
+  risk was never the link count but sprawl from agents that do not know their own URL. **A row an
+  agent did not measure is left untouched**, which is what lets a board carry state across sessions.

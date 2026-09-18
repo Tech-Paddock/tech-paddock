@@ -64,17 +64,17 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 
 ## Next
 
-**`packages/shared` is yours to build, not Joel's to approve** — ledger item 9 carries the shape.
-**Not npm workspaces**: a root install would cost the per-app independence the CI matrix rests on.
+**`packages/shared` is yours, not Joel's to approve** — item 8 has the shape. **Not npm workspaces**:
+a root install costs the per-app independence the CI matrix rests on.
 
-**Health is merged and the repo half is done**: the app, both migrations *applied*, the charter,
-the handoff, the kickoff block. `HEALTH-PLAN.md` stays and is pointed at, not folded in — it is 240
-lines and the charter has 80. **Nothing is reachable until Joel's four steps** — ledger item 2, each
-without an undo. The agent can be started now that the charter is on `main`; the app cannot be used
-until he has done them. **Its one test pins the schema** — day one, not a suite, so the next agent
-in that seat inherits the habit rather than an empty `tests/`.
+**Health is merged**, unreachable until Joel's four steps — item 2. **Step (a) is also the only
+thing still paying for preview builds**: Vercel cannot see `apps/health/vercel.json` from the root.
 
-**`On track` is ledger item 7 now**, so its detail lives there rather than here. The colour is
-🔵, and the trigger it still needs is the unsolved half.
+**App surface is yours and the guide is unwritten** — item 13. The mockups that settled the look are
+a canvas artifact, not in the repo, so the guide must carry the rules in words.
+
+**Every agent has a board, URLs in `KICKOFF.md`** — the only place they live, so an agent that loses
+its URL publishes a duplicate. **You are the rollup**; they report themselves. **`On track` is item
+6**, and the deploy trigger is still its unsolved half.
 
 Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.

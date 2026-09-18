@@ -18,6 +18,12 @@ them.
 Touch-up means finishing: a doc that is wrong, a config line that is missing, a rename an agent
 left half-done. If you find yourself designing a component, you have crossed the line.
 
+**App surface is yours, as of 2026-09-18.** Site or app — the shell, the navigation, whether there
+is an index. It reads as look-and-feel and is not: `CLAUDE.md` enumerates the theme as palette,
+tokens, type, spacing and component language, and surface is none of them. **You decide the surface
+and the structure it implies; TechPad Gen still owns what that resolves to in pixels.** It is
+settled at standup, beside the name and the schema.
+
 The shared plumbing is the exception, and it is an exception of ownership rather than of role.
 `lib/auth.ts`, `lib/password.ts`, `middleware.ts`, the session cookie and `INTERNAL_API_SECRET`
 belong to no single agent. The first two are byte-identical copies in every app; `middleware.ts` is
