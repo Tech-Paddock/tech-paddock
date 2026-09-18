@@ -149,6 +149,21 @@ export function ratioFor(doseG: number | null, waterG: number | null): number | 
   return Math.round((waterG / doseG) * 10) / 10;
 }
 
+/**
+ * A stored measurement as the form should show it.
+ *
+ * Postgres hands back `numeric(6,2)` with its scale intact, so an 18g dose
+ * arrives as the string "18.00" and a repeated brew opened with "18.00" and
+ * "306.00" in its boxes. They are the right numbers typed in a way nobody
+ * types them, and the trailing zeros make a prefilled field look like
+ * something already fiddled with rather than something carried over.
+ */
+function numText(value: string | number | null | undefined): string {
+  if (value == null || value === "") return "";
+  const n = Number(value);
+  return Number.isFinite(n) ? String(n) : String(value);
+}
+
 /** A field as a number, or null when it is blank or not one. */
 function num(value: string): number | null {
   if (!value.trim()) return null;
@@ -254,8 +269,8 @@ export function repeatOf(previous: PreviousBrew | null | undefined): BrewDraft {
   const blank = blankBrew();
   if (!previous) return blank;
 
-  const dose = previous.dose_g == null ? "" : String(previous.dose_g);
-  const water = previous.water_g == null ? "" : String(previous.water_g);
+  const dose = numText(previous.dose_g);
+  const water = numText(previous.water_g);
   const ratio = ratioFor(num(dose), num(water));
 
   return {

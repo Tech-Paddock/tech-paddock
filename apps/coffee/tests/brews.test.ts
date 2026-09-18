@@ -98,7 +98,9 @@ describe("repeatOf", () => {
       brew_method: "45s bloom, two pours",
       grinder: "Fellow Ode 2",
       grind_setting: "4.5",
-      dose_g: "18.50",
+      // The fixture's "18.50" is how Postgres returns numeric(6,2); the form
+      // shows the number you typed.
+      dose_g: "18.5",
     });
   });
 
@@ -127,6 +129,18 @@ describe("repeatOf", () => {
   it("stringifies a numeric dose, because the form holds strings", () => {
     expect(repeatOf({ dose_g: 18.5 }).dose_g).toBe("18.5");
     expect(repeatOf({ dose_g: null }).dose_g).toBe("");
+  });
+
+  it("shows a stored measurement the way it was typed, not the way it was stored", () => {
+    // Postgres hands numeric(6,2) back with its scale, so the row says
+    // "18.00". A repeated brew should open on 18, which is what you typed.
+    expect(repeatOf({ dose_g: "18.00" }).dose_g).toBe("18");
+    expect(repeatOf({ dose_g: "18.00", water_g: "306.00" })).toMatchObject({
+      dose_g: "18",
+      water_g: "306",
+      ratio: "17",
+    });
+    expect(repeatOf({ dose_g: "18.50" }).dose_g).toBe("18.5");
   });
 
   it("starts blank with the grinder already chosen", () => {
