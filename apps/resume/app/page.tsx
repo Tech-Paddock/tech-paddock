@@ -247,12 +247,17 @@ function ReformatShell() {
     }
   }
 
-  /** Deletion is refused by the API for any template a render points at, so the
-   *  confirmation says what it actually does rather than promising more. */
+  /**
+   * The confirmation says what deletion actually does, and it changed on
+   * 2026-09-17: it used to warn that the API would refuse if any render was
+   * built from the template. It no longer refuses — the renders survive with a
+   * null template and their own snapshot of what produced them — so saying so
+   * would be describing a rule that is gone.
+   */
   async function remove(t: Template) {
     setError(null);
     const ok = window.confirm(
-      `Delete ${t.name} (v${t.version})? The file goes too. This is refused if any render was built from it — archive those instead.`
+      `Delete ${t.name} (v${t.version})? The file goes too. Renders built from it stay, and keep their record of what made them.`
     );
     if (!ok) return;
     try {
@@ -261,6 +266,26 @@ function ReformatShell() {
       await refreshTemplates();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't delete that template.");
+    }
+  }
+
+  /** The source and the output both go. Archiving is the normal path; this is
+   *  for clearing out test runs. */
+  async function removeRender(r: RenderRow) {
+    setError(null);
+    const what = r.thread?.company ? `the render for ${r.thread.company}` : "that render";
+    const ok = window.confirm(
+      `Delete ${what}? Both files go — the resume you uploaded and the one that came out.${
+        r.thread_id ? " The tracker thread stays." : ""
+      }`
+    );
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/renders/${r.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Couldn't delete that render.");
+      await refreshRenders();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't delete that render.");
     }
   }
 
@@ -719,9 +744,14 @@ function ReformatShell() {
                 {r.submitted_at ? `Submitted ${new Date(r.submitted_at).toLocaleDateString()}` : "Rendered, not sent"}
                 {r.thread?.stage ? ` · ${r.thread.stage}` : ""} · {r.coverage.percent}% coverage
               </p>
-              <a href={`/api/renders/${r.id}/file`} className="text-sm underline w-fit mt-1">
-                Download what was sent
-              </a>
+              <div className="flex items-center gap-3 mt-1">
+                <a href={`/api/renders/${r.id}/file`} className="text-sm underline">
+                  Download what was sent
+                </a>
+                <button onClick={() => removeRender(r)} className="text-sm underline text-urgent">
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </section>

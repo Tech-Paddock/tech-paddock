@@ -5,9 +5,10 @@ import { fakeSupabase, mockModules } from "./helpers/fakeSupabase";
  * Archiving, deleting and downloading a template.
  *
  * The database double covers write ordering and branch selection, not SQL. The
- * foreign key from `renders.template_id` is what ultimately makes a destructive
- * delete impossible, and it is only ever exercised against the real project —
- * these tests cover the check that turns it into a sentence the user can act on.
+ * foreign key from `renders.template_id` is what actually decides what happens
+ * to a render when its template goes — `on delete set null` since migration
+ * 20260918014500 — and it is only ever exercised against the real project. These
+ * tests cover what this route does and does not do around it.
  */
 
 const TEMPLATE = { id: "t1", version: 3, name: "house-style.docx", is_active: false, file_path: "templates/3.docx", archived_at: null };
@@ -38,7 +39,23 @@ describe("deleting a template", () => {
     expect(ops).toContain("templates.delete");
   });
 
-  it("refuses, with the alternative, when renders were built from it", async () => {
+  /**
+   * **This asserted the opposite until 2026-09-17**, and the rule it pinned was
+   * a real one: a render is the record of what was actually sent, so deleting
+   * the template it was built from destroyed the account of what produced it.
+   *
+   * Joel amended it — *"Generally I want the renders to stay even if the
+   * templates go"* — and the premise had already stopped being true. A render
+   * carries `template_snapshot`: the engine, the template's id, its version and
+   * a hash of its exact bytes at render time. Deleting the row takes nothing
+   * the render needed. `renders.template_id` is nullable with `on delete set
+   * null` as of migration 20260918014500, and the render survives with a null
+   * there and its snapshot intact.
+   *
+   * The route no longer counts renders at all, which is the assertion below:
+   * not "it deletes anyway" but "it never asks".
+   */
+  it("deletes a template that renders were built from, and leaves them standing", async () => {
     const { client, calls } = fakeSupabase({
       "templates.select": { data: TEMPLATE, error: null },
       "renders.select": { data: null, error: null, count: 2 },
@@ -47,12 +64,15 @@ describe("deleting a template", () => {
 
     const { DELETE } = await import("@/app/api/templates/[id]/route");
     const res = await DELETE(req(), { params: { id: "t1" } });
-    const body = await res.json();
 
-    expect(res.status).toBe(409);
-    expect(body.code).toBe("has_renders");
-    expect(body.error).toContain("Archive it instead");
-    expect(calls.map((c) => `${c.table}.${c.op}`)).not.toContain("templates.delete");
+    expect(res.status).toBe(200);
+    expect((await res.json()).deleted).toBe("t1");
+
+    const ops = calls.map((c) => `${c.table}.${c.op}`);
+    expect(ops).toContain("templates.delete");
+    // No render is read, counted or written. Their survival is the database's
+    // job — `on delete set null` — not something this route arranges.
+    expect(ops.some((op) => op.startsWith("renders."))).toBe(false);
   });
 
   it("refuses to delete the active template", async () => {

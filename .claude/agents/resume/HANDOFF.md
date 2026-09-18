@@ -1,26 +1,19 @@
 # Resume Formatter — handoff
 
-State as of 2026-09-17.
+State as of 2026-09-18.
 
 Read `RULES.md` first. This file is only what is true right now.
 
 ---
 
-## Two branches in flight, in this order
+## In flight
 
-Both pushed, both green, neither merged. They touch `app/page.tsx` in different regions, so this
-file is their only real conflict — resolve it by keeping both entries.
-
-1. **`claude/resume-outline-headings`.** The check page read `Professional Experience — 0 lines` and
-   showed each job as a sibling section, because "what is a section heading" was decided in three
-   places and `outline.ts`'s copy went by run size — and Joel's headings and entry lines are both
-   11pt. `lib/docx/headings.ts` is the one home now; `ats.ts`, `outline.ts` and `label.ts` ask it.
-   Sections gained `entries`, so the per-job count the bug showed by accident survives the fix.
-2. **`claude/resume-upload-and-activate`.** The one-off template path is gone, and the template
-   upload moved to the Reformat tab where it **saves and activates** rather than rendering a
-   preview. **Dropping a file stages it; a button commits it** — the drop is no longer the decision,
-   which is what Joel asked for and what a file every render is built on should never have had.
-   Every render now has a `renderId`, so nothing downstream is conditional on having one.
+**`claude/resume-delete-any-resume`** — deletion, the third of five plan items. **It carries a
+migration**, `20260918014500_resume_renders_outlive_templates.sql`: `renders.template_id` becomes
+nullable with `on delete set null`, so a template can be deleted while its renders stand. **Shape:
+additive** — every statement relaxes a constraint, so it is safe to apply before merging, and the
+TD applies it at gate time. Renders gain a `DELETE` route; the templates route stops counting
+renders at all.
 
 ## What is true now
 
@@ -38,11 +31,7 @@ every look-defining part byte-identical, US Letter kept.
 Approved by Joel on 2026-09-17, ordering mine. **Structure first, styling last** — restyling before
 the screens settle means styling them twice. Items 1 and 2 are the two branches above.
 
-3. **Delete any resume type.** Renders have no DELETE today, only PATCH; templates have one but it
-   is refused when a render points at them. **Joel approved the charter amendment on 2026-09-17:
-   renders survive their template.** So `renders.template_id` stops being not-null — a *relaxation*,
-   safe before the code, so it rides in one PR rather than two. Provenance survives in
-   `renders.template_snapshot`. No cascade, no bulk tool: he clicks through.
+3. ~~Delete any resume type~~ — in flight above.
 4. **One Resume tab, filtered by type** — Template / Input / Output. **Merge the view, not the
    tables** (his words). `templates` are files; `renders` are *events* holding an input file, an
    output file, coverage, a hash and a thread. One endpoint projects both into a typed list, no
@@ -77,4 +66,4 @@ threads there is a Joel/TD call.
 - **Persist the change log.** Shown, not stored; `renders.template_snapshot` is a stopgap.
 - **`lib/reskin/sections.ts` defines its own date range**; `lib/docx/headings.ts` owns the other.
 
-**I am at a compaction point** once both branches above are pushed.
+**I am at a compaction point** once the branch above is pushed.
