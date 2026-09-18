@@ -46,6 +46,8 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 - **`TOOLS` in `lib/platform.ts` is the only list of tools, and its array order is Joel's** — it
   drives the sidebar, the `?app=` frame and The Garage at once. **The tracker is not in it**, so
   nothing here records that `tp-tracker` exists; un-parking means putting the entry back.
+  **Health is in it and does not serve yet** — a dead sidebar row until `tp-health` is wired up, and
+  that is the design: a tool missing from this file is invisible, a tool listed and down is a question.
 - **The glance gets counts and singles, never rows** — a hub handed thread arrays slowly becomes a
   worse copy of the tracker. `SOURCES` holds one entry: a fact about the present, not a design limit.
 - **One Garage panel is not live, and it is the one that looks most authoritative.** Rules drift is
@@ -57,21 +59,18 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-`claude/home-drop-tracker-from-roster` — the tracker out of `TOOLS`, the sidebar reordered to
-Joel's, and The Garage's shared-secret probe derived from `hasSummaryRoute` rather than a slug.
+`claude/home-drop-tracker-from-roster` — the tracker out of `TOOLS` and Health in, the sidebar in
+Joel's order, and The Garage's shared-secret probe derived from `hasSummaryRoute` rather than a slug.
 
 ## Next
 
 1. **The hub's mobile login bug.** Both cheap explanations are ruled out from the code. Needs a
    live repro with devtools, **in Chrome** — the WebKit theory is ruled out and cost a round.
-2. **The Feed is undefined and deliberately unbuilt.** It is in the settled tab order and nowhere
-   else. The open questions are with Joel; the sharpest is that a feed is rows and this app's rule
-   is counts and singles, never rows. **Do not invent one.**
-3. **`apps/home` still has no `test` script.** CI runs `npm run test --if-present`, so adding one
+2. **`apps/home` still has no `test` script.** CI runs `npm run test --if-present`, so adding one
    opts it in with no CI change. `glance.ts`, `diagnostics.ts`, `pitwall.ts` are pure and untested.
-4. **A style pass, deferred by Joel** — a monospace stack, a type scale to replace the ad-hoc pixel
+3. **A style pass, deferred by Joel** — a monospace stack, a type scale to replace the ad-hoc pixel
    values, and collapsing the drifted copies of the micro-label rule. Pick it up when he returns.
-5. **`/api/version` is designed and undecided** — public, or behind the internal secret. Recommend
+4. **`/api/version` is designed and undecided** — public, or behind the internal secret. Recommend
    public: it exposes a commit hash and nothing else, which is what lets a monitor see an outage.
 
 Both decisions Joel settled on 2026-09-16 are recorded in `DECISIONS.md` by #89 — the lifted fold

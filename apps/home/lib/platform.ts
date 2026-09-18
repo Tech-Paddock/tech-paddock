@@ -87,12 +87,19 @@ export type Drift = {
  * every entry it had here pointed somewhere that does not answer: a sidebar row,
  * an iframe target, and a row in The Garage's table. Joel removed it from all
  * three on 2026-09-18 rather than from the sidebar alone.
+ *
+ * **Health is deliberately present before it serves.** `tp-health` has no Root
+ * Directory and no domain attached yet, so until those are set its sidebar row
+ * and frame lead nowhere. That is the intended state rather than an oversight:
+ * this file is what the platform is *supposed* to be, and The Garage's job is to
+ * show the gap. A tool missing from here is invisible; a tool listed and down is
+ * a question with an answer.
  * **The cost of that is recorded rather than hidden**: the hub no longer states
  * anywhere that `tp-tracker` is supposed to exist, so un-parking it means
  * putting this entry back. `apps/tracker` is untouched and still builds in CI —
  * the roster CI derives comes from the folders on disk, never from this file.
  */
-export type ToolSlug = "resume" | "coffee" | "editor";
+export type ToolSlug = "resume" | "coffee" | "editor" | "health";
 
 export type Tool = Project & { slug: ToolSlug };
 
@@ -101,6 +108,7 @@ export const TOOLS: Tool[] = [
   { slug: "resume", name: "Resume Formatter", url: "https://resume.techpaddock.io", vercelProject: "tp-resume" },
   { slug: "coffee", name: "Coffee", url: "https://coffee.techpaddock.io", vercelProject: "tp-coffee-app" },
   { slug: "editor", name: "Message Editor", url: "https://editor.techpaddock.io", vercelProject: "tp-message-editor" },
+  { slug: "health", name: "Health", url: "https://health.techpaddock.io", vercelProject: "tp-health" },
 ];
 
 export const HUB: Project = {
