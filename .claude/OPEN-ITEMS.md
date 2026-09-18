@@ -55,8 +55,8 @@ Nothing.
 9. **Build `packages/shared`.** *Owner: TD.* One real copy of the five five-way files, a stamping
    script, and `drift` failing a copy that disagrees. *LoE: a session.*
 10. **The `\$` escaping warning needs a home.** *Owner: TD.* `@next/env` strips quotes and expands
-   anyway, cutting a 60-character bcrypt hash to 44 and failing every login silently. Its home is the
-   five `.env.example` files, one line under the command that generates the hash. *LoE: minutes.*
+   anyway, cutting a 60-character bcrypt hash to 44 and failing every login silently. Its home is
+   every `.env.example`, one line under the command that generates the hash. *LoE: minutes.*
 11. **`shared.contacts` needs its other owner named.** *Owner: Message Editor.* Deliberately shared
    between the editor and the tracker; one of the two is going away. *LoE: minutes.*
 12. **Three corrections in charters I may not edit.** *Owner: TD.* Carry each to its agent next
