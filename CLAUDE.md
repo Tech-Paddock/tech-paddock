@@ -131,8 +131,9 @@ wrong or the rule is, and that is a conversation before any code exists.
 ### Always
 
 - **One branch per change, named `claude/<area>-<description>`.** Area is the app folder where there
-  is one — `home`, `editor`, `tracker`, `resume`, `coffee` — otherwise the layer it touches: `ci`,
-  `db`, `brief`, `platform`. What has to be readable at a glance is **which area and what change**.
+  is one — `home`, `editor`, `tracker`, `resume`, `coffee`, `health` — otherwise the layer it
+  touches: `ci`, `db`, `brief`, `platform`. What has to be readable at a glance is **which area and
+  what change**.
   A session's opening branch is named by the harness (`claude/kickoff-…`) and names neither; that is
   expected and it is not the branch the work belongs on.
 - **Commit and push your work. Do not open a pull request until Joel asks for one.** This binds every
@@ -233,10 +234,20 @@ wrong or the rule is, and that is a conversation before any code exists.
   on the day this rule was written, leaving the page two merges stale. **A link to a stale board is
   worse than no link** — it reports the wrong state while looking authoritative, which is the exact
   failure the whole sign-off exists to prevent.
-- **End every message to Joel with the three-part sign-off.** Every message, so he never has to go
-  looking and never has to ask what state anything is in. Three headings, always in this order,
-  always all three — a section with nothing in it says so rather than being dropped, because a
+- **The board carries the three-part sign-off. Do not repeat it in chat.** Joel cut the chat copy
+  on 2026-09-18, having found agents publishing the board *and* printing the same three sections
+  underneath it. **Two copies of one report is how the two come to disagree**, and the page is the
+  copy that survives the scrollback.
+  **What your message to him carries instead**: the answer to what he actually asked, the time you
+  published, and the link. Nothing else is owed — no Work Brief, no DevOps table, no Open Items
+  table. **`- None.` has no place in chat any more**; it lives on the board, where a quiet section
+  still has to say it is quiet.
+  **The three sections below are the board's specification.** They are still measured the same way,
+  to the same standard, in the same order — the medium changed, not the discipline. Three headings,
+  always all three, and a section with nothing in it says so rather than being dropped, because a
   missing section and a quiet one are indistinguishable.
+  **The one time they go back into chat is when the board cannot be published**, which the rule
+  above already requires, in full and with the reason said out loud.
 
   **1 · Work Brief.** What you finished in this message, as **dashed bullets, one per thing** — the
   dashes are the point, because a paragraph of three accomplishments reads as one. Not the session,
@@ -296,8 +307,10 @@ wrong or the rule is, and that is a conversation before any code exists.
   **A stage comes from `git status` and a live check run in this session — never from memory.** If
   you could not check, the line reads `unchecked` rather than guessing.
 
-  **When Joel asks for status, all three are re-measured — never reprinted.** A status check is a
-  request to go and look, and the last sign-off is the one thing that cannot answer it.
+  **When Joel asks for status, all three are re-measured and the board is republished — never
+  reprinted.** A status check is a request to go and look, and the last sign-off is the one thing
+  that cannot answer it. **A board republished without re-measuring is the same failure wearing a
+  fresh timestamp**, and worse than the stale one, because the stamp now vouches for it.
 
   - **Work Brief** becomes what has landed since his last message, not what was in the previous
     footer. `- None.` when nothing has.
@@ -398,8 +411,8 @@ Per-tool detail lives in that tool's charter. Live facts about what is deployed 
   wrong beside another in an iframe. **A session or lockout fix is the same edit once per app**, and
   there is one more app than there was. Worth consolidating before the auth logic changes again.
 - **One Supabase project**, each tool in its own Postgres schema — `shared`, `editor`, `tracker`,
-  `resume`, `coffee` — never the default `public`. One migration history, at `supabase/` in the repo
-  root, never under an app. **Read `supabase/README.md` before writing one.** A new schema inherits
+  `resume`, `coffee`, `health` — never the default `public`. One migration history, at `supabase/`
+  in the repo root, never under an app. **Read `supabase/README.md` before writing one.** A new schema inherits
   no grants at all, so adding one means two migrations and a dashboard setting — three steps.
 - **Row Level Security on every table, deny-by-default, zero policies.** The server uses the service
   role key, which bypasses RLS. RLS exists purely as the fallback if a key ever leaks — and because
