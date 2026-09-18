@@ -40,6 +40,11 @@ a `<button>` is invalid markup and browsers disagree about what a tap does. Keep
 
 **The roaster's quote sits above the parsed recipe**, in both cards: the parse is a reading of it.
 
+**The icon is a pour-over in the JPS livery**, every colour a token from `theme.css`'s `jps` block.
+**Its two gold rules are structural:** a near-black tile loses its edge on a dark wallpaper and the
+phone runs dark. Source and re-render recipe are in `apps/coffee/design/`, kept out of `app/` where
+a folder is a route. The PNG has **no alpha** — iOS composites one onto black.
+
 ## Traps specific to this app
 
 - **An empty result and an unread result must not render the same.** Three times in this one app —
@@ -60,13 +65,8 @@ a `<button>` is invalid markup and browsers disagree about what a tap does. Keep
 
 ## In flight
 
-**#114** `claude/coffee-ratio-water-and-recipe-labels` — open at the gate. The ratio/water form,
-roaster-seeded defaults, the commented-out TDS half, the brew log under the Save button, the quote
-above the parsed recipe, all three tier headings, and **an additive `coffee.brews.water_g` migration**.
-
-**The tier headings name the place, not the audience.** Tier 1 reads "From this bag's own page":
-"Bag specific" was asked for first and dropped, because a heading its own caption walks back is
-worse than a longer one.
+`claude/coffee-pour-over-icon` — pushed, CI green, no PR yet. The home screen icon only; no code,
+no schema, no route.
 
 ## Next
 
