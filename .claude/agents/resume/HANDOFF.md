@@ -8,44 +8,47 @@ Read `RULES.md` first. This file is only what is true right now.
 
 ## In flight
 
-**`claude/resume-delete-any-resume`** — deletion, the third of five plan items. **It carries a
-migration**, `20260918014500_resume_renders_outlive_templates.sql`: `renders.template_id` becomes
-nullable with `on delete set null`, so a template can be deleted while its renders stand. **Shape:
-additive** — every statement relaxes a constraint, so it is safe to apply before merging, and the
-TD applies it at gate time. Renders gain a `DELETE` route; the templates route stops counting
-renders at all.
+**`claude/resume-one-resume-tab-and-layout`** — the last two items of the agreed plan, built together
+because they rewrite the same screen. No migration. Nothing to do at deploy time.
 
 ## What is true now
 
-**The engine is merged and live.** #101 landed it: the template's zip is opened, only the body of
-`word/document.xml` is rewritten, and the same zip written back. Everything deciding how the
-document looks is never read, so it cannot be read wrongly.
+**The screen is three tabs: Reformat · Resume · Check, and Reformat is the landing tab.** Templates
+and History were two lists of the same thing split by which table it lived in, which is the app's
+business and not the reader's. They are one tab with a type filter — Template / Input / Output —
+over one endpoint, `/api/resumes`, which projects both tables. **The view is merged; the tables are
+not.** A render contributes two rows sharing the render's id, so deleting either deletes the event
+and both its files, and the confirm says so.
 
-**Joel's template audits with no findings at all.** He moved the contact block out of
-`word/header1.xml` and Core Competencies out of its table himself on 2026-09-17, and uploaded it —
-ledger item 4 is done, pending the TD clearing the row. Renders against it carry 100% coverage,
-every look-defining part byte-identical, US Letter kept.
+**The layout is a workbench**: a left rail of inputs, a right column of results, collapsing to one
+column below `lg` — which is also the hub's iframe width, so that is the narrow case rather than an
+edge case. The header is the shared bar with the tabs on it. `lib/livery.ts` still pins MP4/4 and no
+theme token changed, so TechPad Gen is not involved.
 
-## The agreed plan
+**Deleting used to leave the row on screen, and that was the client, not the API.** Measured on
+2026-09-18: nine files listed, one row in `resume.templates`. Every delete had worked; each one
+errored *after* the row was gone, and the old code only refreshed on success, so the list drifted
+further from the database with every click and the next click on a dead row returned "No template
+with that id." Now every write goes through one `mutate` that reloads in a `finally`, a 404 is
+treated as success — the thing is already gone, which is what the click asked for — and a failed
+reload labels the list as unverified instead of leaving it looking authoritative.
 
-Approved by Joel on 2026-09-17, ordering mine. **Structure first, styling last** — restyling before
-the screens settle means styling them twice. Items 1 and 2 are the two branches above.
+**The engine is merged and live** (#101): only the body of `word/document.xml` is rewritten and the
+same zip written back, so everything deciding how the document looks is never read and cannot be
+read wrongly. **Joel's template audits with no findings at all.**
 
-3. ~~Delete any resume type~~ — in flight above.
-4. **One Resume tab, filtered by type** — Template / Input / Output. **Merge the view, not the
-   tables** (his words). `templates` are files; `renders` are *events* holding an input file, an
-   output file, coverage, a hash and a thread. One endpoint projects both into a typed list, no
-   migration. The Templates tab is already only a list, so it folds in here.
-5. **Layout: sleeker, built for a browser.** `lib/livery.ts` pins MP4/4 at build time and stays —
-   layout and density only, no tokens, so TechPad Gen is not involved. The whole UI is one 800-line
-   `app/page.tsx`, which is why it reads as a long scroll. **It must work at hub-iframe width too.**
+**New since #107:** `/api/resumes` (the merged list), `/api/renders/[id]/source` — the uploaded
+document has been stored since renders were first persisted and until now there was no way to get it
+back out — and `lib/serveDocx.ts`, which is the one home for serving stored bytes now that three
+routes do it.
 
-**Open, and not mine alone:** `renders.thread_id` is a cross-schema FK into
-`tracker.pipeline_threads`, and that tool is being deprecated. Whether this app keeps writing
-threads there is a Joel/TD call.
+**The agreed plan is complete.** All five items Joel listed on 2026-09-17 are built.
 
 ## Traps specific to this app
 
+- **A list is a projection of the server, never a memory of it.** See above; the code comment on
+  `reload` in `app/page.tsx` carries the measurement. This belongs in `.claude/DECISIONS.md` and is
+  not there — that file is at 193 of its 200 lines, so it needs a trim before it takes another entry.
 - **A run-granular rewrite keeps the runs and drops what wrapped them.** `replaceInlineHeaderLine`
   and `replaceLabelledLine` rebuild a paragraph as `head + runs`, so a `<w:hyperlink>`,
   `<w:bookmarkStart>` or tracked change *on a rewritten line* is lost while its text survives.
@@ -65,5 +68,11 @@ threads there is a Joel/TD call.
   `templates.spec`, which is `not null`, so dropping it is destructive and splits into two PRs.
 - **Persist the change log.** Shown, not stored; `renders.template_snapshot` is a stopgap.
 - **`lib/reskin/sections.ts` defines its own date range**; `lib/docx/headings.ts` owns the other.
+- **`/api/renders` has no reader left** now the UI reads `/api/resumes`; it stays as the collection
+  endpoint its `PATCH`/`DELETE` siblings hang off.
+
+**Open, and not mine alone:** `renders.thread_id` is a cross-schema FK into
+`tracker.pipeline_threads`, and that tool is being deprecated. Whether this app keeps writing
+threads there is a Joel/TD call.
 
 **I am at a compaction point** once the branch above is pushed.
