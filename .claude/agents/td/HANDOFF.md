@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-17.
+State as of 2026-09-18.
 
 Read `RULES.md` first for the role and the gate. This file is only what is true right now.
 
@@ -8,39 +8,37 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**Nothing, by the time you read this** — every branch this file landed with was merged as it landed,
-because the gate is the same session that wrote them. **Written that way on purpose:** a handoff
-describes the moment *before* the merge, and the merge falsifies it by happening.
+**Two pull requests, open and green, waiting on Joel's word rather than on you.** This is the first
+time this file has landed with work unmerged — previously the gate was the same session that wrote
+them. `claude/platform-previews-off` turns preview deployments off; `claude/brief-tracker-paused`
+records the tracker pause and tables it to Parked. **Check both live before assuming either state**:
+they may have merged, or moved, since this sentence was written.
 
 ## What is true now
 
-**Branch protection is on**, confirmed against the GitHub API rather than assumed. **`Require
-branches to be up to date` is on**, which is what gives the merge-order rule teeth: after any merge
-every other pull request is behind and must take `main` again, so the order you pick decides who
-pays. `Block force pushes` and `Restrict deletions` are also on.
+**Branch protection is on**, confirmed against the GitHub API. **`Require branches to be up to
+date` is on**, which gives the merge-order rule teeth: after any merge every other pull request is
+behind and must take `main` again. `Block force pushes` and `Restrict deletions` are also on.
 
-**Standing up a new agent has a written protocol**, `.claude/agents/STANDUP.md`. **Solutioning comes
-first and it is not yours**, and its record is the handoff into the protocol. **Do not scaffold
-before it exists**: a folder name reaches DNS and a schema name reaches the database, both settled
-by being typed. The `drift` middleware check is roster-independent, so a new app on the base copy
-passes.
-
-**Only you watch a pull request** — the rule and its reasoning are in `CLAUDE.md`. What that does
-not say: the subscription dies with your session, which is the "session, not a service" trap below.
+**Standing up a new agent has a written protocol**, `.claude/agents/STANDUP.md`. **Solutioning is
+not yours, and do not scaffold before it exists** — a folder name reaches DNS and a schema name
+reaches the database, both settled by being typed. `drift`'s middleware check is roster-independent.
 
 **The required checks are `gate`, `drift` and `requested-by-joel`** — switched 2026-09-16, each
 bound to the GitHub Actions app rather than to any source. **No agent can read rulesets**, so that
 is Joel's screenshot rather than a measurement; treat it as the best available and say so.
-**The roster is now free to change.** Adding or deleting an app touches no setting, because `gate`
-fails unless the roster step, every per-app build and `drift` all succeeded — the per-app jobs still
-report individually for whoever is reading, they are just no longer what the ruleset names.
+
+**Preview deployments are off**, as of 2026-09-18, through `ignoreCommand` in each app's
+`vercel.json` rather than a dashboard setting — so it is in the repo and reviewable. **Read the test
+before changing it.** It skips only an explicit `preview`, so production, development *and an unset*
+`VERCEL_ENV` all build. Written the obvious way round it would skip production too whenever that
+variable went missing, which is a change that merges and silently never goes live.
 
 **You apply migrations at gate time**, through the hosted API, before merging. `supabase db push`
 cannot work here and never will — see the traps in `.claude/DECISIONS.md`.
 
-**A green `build (app)` no longer means that app was built** — per-app scoping landed in #57, and
-its skip path has still never executed in CI. If it is wrong it fails loudly rather than passing
-something untested, which is the right way round.
+**A green `build (app)` no longer means that app was built** — per-app scoping landed in #57 and
+its skip path has still never executed in CI. It fails loudly rather than passing something untested.
 
 ## Traps specific to this seat
 
@@ -66,15 +64,17 @@ something untested, which is the right way round.
 
 ## Next
 
-**`packages/shared` is yours to build, not Joel's to approve.** One source, a script that stamps
-each app's copy from it, `drift` failing a copy that disagrees. No Vercel setting, no deploy, no
-build — which is what makes it this seat's. **Not npm workspaces**: a root install would cost the
-per-app independence the derived CI matrix rests on.
+**`packages/shared` is yours to build, not Joel's to approve.** One source, a stamping script,
+`drift` failing a copy that disagrees. **Not npm workspaces**: a root install would cost the per-app
+independence the derived CI matrix rests on.
 
-**The health tracker is yours to stand up and nothing is blocked on Joel.** `health` settled
-2026-09-17 — folder, subdomain, `tp-health` and schema at once — guardrails approved, plan at
-`.claude/HEALTH-PLAN.md` (Joel's, not a charter), the gate's reading of it in issue #98. **Execute
-`STANDUP.md` from step 3**, read the plan as the first feature of `health` rather than the whole
-app, and remember the Vercel project and DNS record inside that protocol are Joel's alone.
+**The health tracker is yours to stand up and nothing is blocked on Joel.** Plan at
+`.claude/HEALTH-PLAN.md` (Joel's, not a charter), gate's reading in issue #98. **Execute `STANDUP.md`
+from step 3**, and read the plan as the first feature of `health` rather than the whole app.
+
+**`On track` is agreed and unbuilt, and it is not on the ledger** — this file is its only home
+until it is. A fourth phrase from Joel and a sixth DevOps colour, 🔵, for a branch deployed and
+waiting on him to drive it. **It needs a deliberate deploy trigger of its own now that automatic
+previews are gone**, and a trigger that is not an empty commit, which the rules forbid.
 
 Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.
