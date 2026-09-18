@@ -5,17 +5,11 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-17T20:11:13.644Z",
+  bakedAt: "2026-09-18T03:38:19.584Z",
   waiting: [
   {
-    "title": "Delete the `tp-tracker` Vercel project and its DNS record",
-    "detail": "— last step of the deprecation, not the first, and there is no undo. Only after the Pit Wall serves what the tool served. Safe to do at all now that the required checks no longer name a per-app job. *LoE: minutes.*",
-    "ref": "—",
-    "state": "box"
-  },
-  {
     "title": "Two tokens on `tp-home`, then redeploy",
-    "detail": "GITHUB_TOKEN fine-grained, this repo, read-only Contents + Metadata + Pull requests — not Actions, measured against lib/pitwall.ts. VERCEL_TOKEN scoped to the tech-paddock team with an expiry; there is no read-only switch. The redeploy is n",
+    "detail": "GITHUB_TOKEN fine-grained, read-only Contents + Metadata + Pull requests — not Actions. VERCEL_TOKEN team-scoped, with an expiry. The redeploy is not optional — Vercel bakes the environment in at build time. *LoE: minutes.*",
     "ref": "—",
     "state": "box"
   },
@@ -33,6 +27,12 @@ export const PADDOCK = {
   }
 ] as BakedItem[],
   parked: [
+  {
+    "title": "`tp-tracker` stays paused",
+    "detail": "Tabled 2026-09-18, paused the same day — verified, it reads live: false. Paused is reversible and deleted is not, so this is a safe place to leave it indefinitely: the subdomain serves nothing, the cron no longer fires, its builds have stop",
+    "ref": "—",
+    "state": "clear"
+  },
   {
     "title": "`CRON_SECRET` and the Microsoft Graph integration",
     "detail": "Parked 2026-09-15. Why parking is the safe state: tracker's middleware.ts waves /api/cron/* past the password gate, and the route's guard reads if (secret && …) — an unset CRON_SECRET skips the check and the endpoint is public, harmless *on",
