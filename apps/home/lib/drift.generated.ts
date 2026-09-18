@@ -6,34 +6,34 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-16T20:37:09.504Z",
+  "generatedAt": "2026-09-18T14:08:39.775Z",
   "complete": true,
   "reason": "",
   "checks": [
     {
       "name": "identical: lib/auth.ts",
       "state": "ok",
-      "detail": "5 copies, all 315c0915"
+      "detail": "6 copies, all 315c0915"
     },
     {
       "name": "identical: lib/password.ts",
       "state": "ok",
-      "detail": "5 copies, all 6e97e2de"
+      "detail": "6 copies, all 6e97e2de"
     },
     {
       "name": "identical: lib/theme.css",
       "state": "ok",
-      "detail": "5 copies, all 768f450c"
+      "detail": "6 copies, all 768f450c"
     },
     {
       "name": "middleware.ts: a base copy plus the two scoped bypasses",
       "state": "ok",
-      "detail": "3 on the base copy, editor and tracker scoped — coffee+home+resume | editor | tracker"
+      "detail": "4 on the base copy, editor and tracker scoped — coffee+health+home+resume | editor | tracker"
     },
     {
       "name": "CI derives its roster from apps/",
       "state": "ok",
-      "detail": "derived — 5 app folders will build"
+      "detail": "derived — 6 app folders will build"
     },
     {
       "name": "one stable gate in front of CI",
@@ -44,6 +44,11 @@ export const DRIFT: Drift = {
       "name": "budget: .claude/agents/coffee/HANDOFF.md",
       "state": "warn",
       "detail": "77 / 80"
+    },
+    {
+      "name": "budget: .claude/agents/health/HANDOFF.md",
+      "state": "ok",
+      "detail": "65 / 80"
     },
     {
       "name": "budget: .claude/agents/message-editor/HANDOFF.md",
@@ -58,17 +63,17 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/agents/resume/HANDOFF.md",
       "state": "warn",
-      "detail": "72 / 80"
+      "detail": "78 / 80"
     },
     {
       "name": "budget: .claude/agents/td/HANDOFF.md",
       "state": "warn",
-      "detail": "78 / 80"
+      "detail": "80 / 80"
     },
     {
       "name": "budget: .claude/agents/techpad-gen/HANDOFF.md",
       "state": "warn",
-      "detail": "76 / 80"
+      "detail": "78 / 80"
     },
     {
       "name": "budget: .claude/agents/tracker/HANDOFF.md",
@@ -78,7 +83,7 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/OPEN-ITEMS.md",
       "state": "warn",
-      "detail": "78 / 80"
+      "detail": "80 / 80"
     },
     {
       "name": "budget: .claude/DECISIONS.md",
@@ -87,13 +92,18 @@ export const DRIFT: Drift = {
     },
     {
       "name": "fresh: coffee",
-      "state": "ok",
-      "detail": "2026-09-16, current with apps/coffee"
+      "state": "warn",
+      "detail": "says 2026-09-16; apps/coffee last changed 2026-09-17"
+    },
+    {
+      "name": "fresh: health",
+      "state": "warn",
+      "detail": "stated 2026-09-18; no commits found under apps/health"
     },
     {
       "name": "fresh: message-editor",
-      "state": "ok",
-      "detail": "2026-09-16, current with apps/editor"
+      "state": "warn",
+      "detail": "says 2026-09-16; apps/editor last changed 2026-09-17"
     },
     {
       "name": "fresh: platform",
@@ -103,32 +113,32 @@ export const DRIFT: Drift = {
     {
       "name": "fresh: resume",
       "state": "ok",
-      "detail": "2026-09-16, current with apps/resume"
+      "detail": "2026-09-18, current with apps/resume"
     },
     {
       "name": "fresh: td",
       "state": "ok",
-      "detail": "2026-09-16; owns no app folder, so freshness is not measurable here"
+      "detail": "2026-09-18; owns no app folder, so freshness is not measurable here"
     },
     {
       "name": "fresh: techpad-gen",
       "state": "ok",
-      "detail": "2026-09-16, current with apps/home"
+      "detail": "2026-09-17, current with apps/home"
     },
     {
       "name": "fresh: tracker",
-      "state": "ok",
-      "detail": "2026-09-16, current with apps/tracker"
+      "state": "warn",
+      "detail": "says 2026-09-16; apps/tracker last changed 2026-09-17"
     },
     {
       "name": "every app has an owning agent",
       "state": "ok",
-      "detail": "5 apps, all owned"
+      "detail": "6 apps, all owned"
     },
     {
       "name": "migration versions named in prose exist",
-      "state": "ok",
-      "detail": "11 migrations, every reference resolves"
+      "state": "warn",
+      "detail": "names no file in supabase/migrations: .claude/agents/resume/RULES.md → 20260918014500"
     },
     {
       "name": "worklogs stay retired",
@@ -147,8 +157,8 @@ export const DRIFT: Drift = {
     }
   ],
   "counts": {
-    "ok": 20,
-    "warn": 7,
+    "ok": 17,
+    "warn": 12,
     "fail": 0
   }
 };

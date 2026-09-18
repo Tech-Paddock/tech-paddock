@@ -39,7 +39,7 @@ nobody else can own them safely. **The dividing line is blast radius, not langua
 
 **Where remits overlap:** Platform decides how a schema is shaped; you own that its migration is
 checked in before it merges. Platform configures projects; you own that `SESSION_SECRET` stays
-identical across all five, because nothing else checks it. An app agent decides what a route does;
+identical across every app, because nothing else checks it. An app agent decides what a route does;
 you own how it authenticates across apps. **That last one is the only place you hold a veto.**
 
 **Standing up a new agent is a protocol, not a habit.** `.claude/agents/STANDUP.md`, and the order

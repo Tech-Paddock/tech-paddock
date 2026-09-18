@@ -1,6 +1,6 @@
 # Paddock — how to work here
 
-techpaddock.io is a personal command center: one shared foundation supporting five standalone
+techpaddock.io is a personal command center: one shared foundation supporting a set of standalone
 tools, each independently deployed. This file is the highest level, and it is the only file loaded
 into every session automatically.
 
@@ -80,6 +80,7 @@ message in one had a better home. `read-all.sh` went with them.
 | Pipeline Tracker | `apps/tracker` | `.claude/agents/tracker/` |
 | Resume Formatter | `apps/resume` | `.claude/agents/resume/` |
 | Coffee | `apps/coffee` | `.claude/agents/coffee/` |
+| Health | `apps/health` | `.claude/agents/health/` |
 | Platform Config | Postgres, Vercel, DNS, CI | `.claude/agents/platform/` |
 
 Each folder holds `RULES.md` and `HANDOFF.md`. The prompts that start a session are in
@@ -175,7 +176,7 @@ wrong or the rule is, and that is a conversation before any code exists.
   component language. **Using what exists is free and needs nobody** — build with the tokens already
   there. **What needs TechPad Gen is changing or forking it.** One owner rather than five because the
   hub embeds the tools in iframes, so two apps' buttons sit inches apart on one screen; drift there
-  is visible and makes one product look like five.
+  is visible and makes one product look like several.
   **It is deliberately not a bottleneck.** You never wait on TechPad Gen to ship: duplicate the
   pattern locally, name it in your pull request, and let them decide later whether it becomes shared.
   A copy that is flagged is a decision deferred; a copy that is quiet is drift.
@@ -382,12 +383,12 @@ the change back; it does not get fixed by the TD on the way past.
 
 Per-tool detail lives in that tool's charter. Live facts about what is deployed are at `/admin`.
 
-- **One repo, monorepo layout.** `apps/{home,editor,tracker,resume,coffee}`, each with its own
+- **One repo, monorepo layout.** One folder per tool under `apps/`, each with its own
   `package.json`, each pointed at by its own Vercel project via that project's Root Directory. There
   is no root `package.json`; work inside the relevant app folder. `packages/shared` was never
   created: `lib/auth.ts` and `lib/password.ts` are byte-identical copies in every app and
-  `lib/supabase.ts` is a per-app variant. **`lib/theme.css` is a sixth byte-identical five-way
-  copy** — unlike the auth pair its drift is loud, showing up as one app looking wrong beside
+  `lib/supabase.ts` is a per-app variant. **`lib/theme.css` and `lib/theme.ts` are byte-identical in every app too** — and only the first of
+  those is checksummed, so `theme.ts` can drift silently. **`lib/theme.css`'s** drift — unlike the auth pair its drift is loud, showing up as one app looking wrong beside
   another in an iframe, but it is one more file that must be edited five times. A session or lockout
   fix is the same edit five times. Worth consolidating before the auth logic changes again.
 - **One Supabase project**, each tool in its own Postgres schema — `shared`, `editor`, `tracker`,
@@ -403,7 +404,7 @@ Per-tool detail lives in that tool's charter. Live facts about what is deployed 
 - **No secrets reach the browser.** Every Supabase read/write and every Anthropic call happens
   through the app's own server-side API routes.
 - **One login covers every subdomain.** The session cookie is scoped to `.techpaddock.io`;
-  `SESSION_SECRET` must be byte-identical across all five Vercel projects or the others silently
+  `SESSION_SECRET` must be byte-identical across every Vercel project or the others silently
   reject valid sessions. The tools send
   `frame-ancestors 'self' https://techpaddock.io https://*.techpaddock.io` so only the hub embeds them.
 - **Every deployed app sits behind a password**, with lockout after repeated failed attempts.
@@ -437,6 +438,7 @@ subdomain. Verified against the live account; the table gets corrected, not the 
 | `tracker.techpaddock.io` | Pipeline Tracker | `tp-tracker` |
 | `resume.techpaddock.io` | Resume Formatter | `tp-resume` |
 | `coffee.techpaddock.io` | Coffee | `tp-coffee-app` |
+| `health.techpaddock.io` | Health | `tp-health` |
 
 ---
 

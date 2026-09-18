@@ -5,16 +5,17 @@
 import type { Declared } from "./platform";
 
 export const DECLARED: Declared = {
-  "generatedAt": "2026-09-16T18:59:41.790Z",
+  "generatedAt": "2026-09-18T14:08:39.615Z",
   "complete": true,
   "ciMatrix": [
     "coffee",
     "editor",
+    "health",
     "home",
     "resume",
     "tracker"
   ],
-  "migrationCount": 11,
+  "migrationCount": 14,
   "apps": [
     {
       "slug": "coffee",
@@ -42,6 +43,19 @@ export const DECLARED: Declared = {
       "hasHealthRoute": false,
       "hasSummaryRoute": false,
       "hasTestScript": false
+    },
+    {
+      "slug": "health",
+      "envNames": [
+        "ANTHROPIC_API_KEY",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "APP_PASSWORD_HASH",
+        "SESSION_SECRET"
+      ],
+      "hasHealthRoute": true,
+      "hasSummaryRoute": false,
+      "hasTestScript": true
     },
     {
       "slug": "home",
