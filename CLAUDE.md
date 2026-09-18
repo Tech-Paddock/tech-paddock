@@ -387,10 +387,11 @@ Per-tool detail lives in that tool's charter. Live facts about what is deployed 
   `package.json`, each pointed at by its own Vercel project via that project's Root Directory. There
   is no root `package.json`; work inside the relevant app folder. `packages/shared` was never
   created: `lib/auth.ts` and `lib/password.ts` are byte-identical copies in every app and
-  `lib/supabase.ts` is a per-app variant. **`lib/theme.css` and `lib/theme.ts` are byte-identical in every app too** — and only the first of
-  those is checksummed, so `theme.ts` can drift silently. **`lib/theme.css`'s** drift — unlike the auth pair its drift is loud, showing up as one app looking wrong beside
-  another in an iframe, but it is one more file that must be edited five times. A session or lockout
-  fix is the same edit five times. Worth consolidating before the auth logic changes again.
+  `lib/supabase.ts` is a per-app variant. **`lib/theme.css` and `lib/theme.ts` are byte-identical in
+  every app too, and only `theme.css` is checksummed** — so `theme.ts` is the one that can drift
+  without anything saying so. `theme.css`'s drift is at least loud, showing up as one app looking
+  wrong beside another in an iframe. **A session or lockout fix is the same edit once per app**, and
+  there is one more app than there was. Worth consolidating before the auth logic changes again.
 - **One Supabase project**, each tool in its own Postgres schema — `shared`, `editor`, `tracker`,
   `resume`, `coffee` — never the default `public`. One migration history, at `supabase/` in the repo
   root, never under an app. **Read `supabase/README.md` before writing one.** A new schema inherits
