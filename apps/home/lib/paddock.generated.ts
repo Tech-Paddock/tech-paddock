@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-18T04:33:49.442Z",
+  bakedAt: "2026-09-18T14:08:39.563Z",
   waiting: [
   {
     "title": "Two tokens on `tp-home`, then redeploy",
@@ -14,8 +14,8 @@ export const PADDOCK = {
     "state": "box"
   },
   {
-    "title": "`tp-health` exists but is not wired up",
-    "detail": "The project is named right; nothing else is. Two settings, both yours because no agent may touch domains: attach health.techpaddock.io, which has a Cloudflare record pointing at a host Vercel does not claim, and set the Root Directory, whic",
+    "title": "Wire up `tp-health` — four steps, in order, none with an undo",
+    "detail": "The app is built and gated; none of it is reachable until these are done. (a) Root Directory → apps/health, or it keeps building the repo root. (b) Attach health.techpaddock.io — your DNS record points at a host Vercel does not claim. (c) E",
     "ref": "—",
     "state": "box"
   },
@@ -57,6 +57,11 @@ export const PADDOCK = {
     "id": "coffee",
     "name": "Coffee",
     "asOf": "2026-09-16"
+  },
+  {
+    "id": "health",
+    "name": "Health",
+    "asOf": "2026-09-18"
   },
   {
     "id": "message-editor",

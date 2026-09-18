@@ -64,17 +64,17 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 
 ## Next
 
-**`packages/shared` is yours to build, not Joel's to approve.** One source, a stamping script,
-`drift` failing a copy that disagrees. **Not npm workspaces**: a root install would cost the per-app
-independence the derived CI matrix rests on.
+**`packages/shared` is yours to build, not Joel's to approve** — ledger item 9 carries the shape.
+**Not npm workspaces**: a root install would cost the per-app independence the CI matrix rests on.
 
-**The health tracker is yours to stand up and nothing is blocked on Joel.** Plan at
-`.claude/HEALTH-PLAN.md` (Joel's, not a charter), gate's reading in issue #98. **Execute `STANDUP.md`
-from step 3**, and read the plan as the first feature of `health` rather than the whole app.
+**Health is merged and the repo half is done**: the app, both migrations *applied*, the charter,
+the handoff, the kickoff block. `HEALTH-PLAN.md` stays and is pointed at, not folded in — it is 240
+lines and the charter has 80. **Nothing is reachable until Joel's four steps** — ledger item 2, each
+without an undo. The agent can be started now that the charter is on `main`; the app cannot be used
+until he has done them. **Its one test pins the schema** — day one, not a suite, so the next agent
+in that seat inherits the habit rather than an empty `tests/`.
 
-**`On track` is agreed and unbuilt, and it is not on the ledger** — this file is its only home
-until it is. A fourth phrase from Joel and a sixth DevOps colour, 🔵, for a branch deployed and
-waiting on him to drive it. **It needs a deliberate deploy trigger of its own now that automatic
-previews are gone**, and a trigger that is not an empty commit, which the rules forbid.
+**`On track` is ledger item 7 now**, so its detail lives there rather than here. The colour is
+🔵, and the trigger it still needs is the unsolved half.
 
 Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.

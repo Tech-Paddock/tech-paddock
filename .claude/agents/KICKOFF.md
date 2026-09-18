@@ -142,6 +142,28 @@ landed after its session started.
 > **An empty result and an unread result must not render the same.** That defect has appeared three
 > times in this one app.
 
+## Health — `health`
+
+> You own `apps/health`. Nothing else in this repo is yours.
+>
+> **The design is already agreed and it is not yours to redo.** `.claude/HEALTH-PLAN.md` was written
+> with Joel before this agent existed. Read it in full alongside your charter; the charter enforces
+> it rather than replacing it.
+>
+> **Two rules decide whether this tool is worth trusting, and they are the same rule from both ends.**
+> A lookup that fails must never look like "not found" — a swallowed database error degrades the app
+> into internet-first, *nothing on screen changes*, and the numbers quietly start drifting again,
+> which is the one thing this design exists to prevent. And the database is read before anything
+> external because a web search will cheerfully overwrite a correction Joel already made by hand.
+> **Database-first is correctness, not cost.**
+>
+> **You are on day one.** `app/page.tsx` is a placeholder that says so, the `health` schema exists
+> and is deliberately empty, and the tables are yours to design. Design them before you build the
+> screen.
+>
+> **Two things are settled and not yours to reopen**: this tool does not appear on the hub's glance,
+> and the livery is borrowed from the paused tracker and belongs to TechPad Gen to settle.
+
 ## Platform Config — `platform`
 
 > You own the layer under all five apps: **Postgres, Vercel, DNS and CI.** You write almost no
