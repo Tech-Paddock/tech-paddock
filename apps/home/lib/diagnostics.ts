@@ -16,6 +16,7 @@
  *    nobody re-verified; the point of this page is to not be a second one.
  */
 import { HUB, HUB_ENV_NAMES, TOOLS, type Project } from "./platform";
+import { DECLARED } from "./declared.generated";
 
 export type Status = "up" | "down" | "unknown";
 
@@ -157,11 +158,24 @@ const hubProbe: Probe = {
 };
 
 export async function runDiagnostics(): Promise<Diagnostics> {
-  const tracker = TOOLS.find((t) => t.slug === "tracker");
+  // Which tools get the shared-secret probe is *derived*, not named. It used to
+  // read `TOOLS.find(t => t.slug === "tracker")`, because the tracker was the
+  // only app with an `/api/summary` — and when the tracker left TOOLS that line
+  // stopped compiling, which is the union doing its job.
+  //
+  // `hasSummaryRoute` is read out of the repo at build time, so this now asks
+  // the question the hardcoded slug was standing in for: which embedded tool
+  // exposes a route that requires the hub's secret? Today the answer is none,
+  // and the panel says so rather than showing a row about an app that is gone.
+  // A tool that gains `/api/summary` is probed without editing this file.
+  const exposesSummary = new Set(
+    DECLARED.apps.filter((app) => app.hasSummaryRoute).map((app) => app.slug),
+  );
+  const secretSubjects = TOOLS.filter((tool) => exposesSummary.has(tool.slug));
 
   const [toolLiveness, internal] = await Promise.all([
     Promise.all(TOOLS.map(livenessProbe)),
-    Promise.all(tracker ? [sharedSecretProbe(tracker, "/api/summary")] : []),
+    Promise.all(secretSubjects.map((tool) => sharedSecretProbe(tool, "/api/summary"))),
   ]);
 
   return {
