@@ -6,18 +6,19 @@ it, it is logged.
 Joel, on what it is for: **"it is used to record input and track macro nutrients across the day."**
 Macros here are macronutrients — protein, carbohydrate, fat — and calories beside them.
 
-**Status: agreed in conversation on 2026-09-16, nothing built and nothing approved. Not a charter**
-— a charter is approved before it is written and there is no agent folder yet. This is the record of
-what was decided while the shape was being talked through, so the session that eventually builds it
-does not start from a summary of a summary.
+**This is the design, not the state. Not a charter either** — it is the record of what was decided
+with Joel on 2026-09-16 while the shape was being talked through, so the session that builds a
+feature does not start from a summary of a summary. `.claude/agents/health/RULES.md` is the charter
+and binds; this explains the reasoning behind it. Where the two ever disagree, the charter wins.
 
-**No app folder, no schema, no Vercel project, no branch.** The name is settled — see below — so
-`health` is the name and not a description, but nothing has been built under it yet.
+**What is built is not written here.** `.claude/agents/health/HANDOFF.md` says what is true right
+now and `/admin` reads the running system live — a build-state paragraph in this file went stale
+the day the app was scaffolded, which is why there is no longer one.
 
-**This file is temporary.** It lives here rather than under `.claude/agents/` because creating that
-folder before the agent exists makes `drift` warn about a missing handoff, and because the channel
-table in `CLAUDE.md` describes standing channels rather than one-off planning notes. When the
-charter is written and approved it absorbs this file, and this file is deleted.
+**It was meant to be temporary and it is not.** The plan was to fold it into the charter and delete
+it; the charter has an 80-line budget and this is 240 lines of Joel's reasoning, so folding it in
+would have meant throwing most of it away. It stays, the charter points at it, and it is read as
+the *first feature* of `health` rather than the whole of the app.
 
 ---
 

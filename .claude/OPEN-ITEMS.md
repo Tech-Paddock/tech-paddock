@@ -59,9 +59,9 @@ Nothing.
    five `.env.example` files, one line under the command that generates the hash. *LoE: minutes.*
 11. **`shared.contacts` needs its other owner named.** *Owner: Message Editor.* Deliberately shared
    between the editor and the tracker; one of the two is going away. *LoE: minutes.*
-12. **Two charters still say five apps.** *Owner: TD.* `STANDUP.md` step 7 is mine, but
-   `platform/RULES.md` and `techpad-gen/RULES.md` are **charters I may not edit** — carry it to each
-   agent when they next run. `CLAUDE.md`, `README.md` and `td/RULES.md` are done. *LoE: minutes.*
+12. **Three corrections in charters I may not edit.** *Owner: TD.* Carry each to its agent next
+   session. `platform/RULES.md` and `techpad-gen/RULES.md` still say five apps; `resume/RULES.md`
+   names the migration version I renamed at #107's gate, which `drift` warns on. *LoE: minutes.*
 13. **`Paper.tsx` throws a hydration error on every load.** *Owner: TechPad Gen.* `today()` renders
    the date with a comma on the server and without it in the browser. *LoE: minutes.*
 
