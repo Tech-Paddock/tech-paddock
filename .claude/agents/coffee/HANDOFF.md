@@ -61,12 +61,12 @@ a `<button>` is invalid markup and browsers disagree about what a tap does. Keep
 ## In flight
 
 `claude/coffee-ratio-water-and-recipe-labels` — pushed, CI green, no PR yet. The ratio/water form,
-roaster-seeded defaults, the commented-out TDS half, the brew log moved below the bag's Save button,
-the quote above the parsed recipe, and **an additive migration adding `coffee.brews.water_g`**.
+roaster-seeded defaults, the commented-out TDS half, the brew log under the Save button, the quote
+above the parsed recipe, all three tier headings, and **an additive `coffee.brews.water_g` migration**.
 
-**One thing in it is unbuilt and waiting on Joel.** He asked the tier-1 heading to read "Bag
-specific"; tiers 2 and 3 were renamed and tier 1 was not, because that label asserts the one thing
-the tier does not check. One line the moment he answers.
+**The tier headings name the place, not the audience.** Tier 1 reads "From this bag's own page":
+"Bag specific" was asked for first and dropped, because a heading its own caption walks back is
+worse than a longer one.
 
 ## Next
 
@@ -77,4 +77,4 @@ the tier does not check. One line the moment he answers.
 3. **Seeding roaster domains is proposed, not started.** It needs its own table — `bags` rows are
    purchases, and **no agent in the sandbox can verify a domain**, which is the guess it refuses.
 4. The deliberately-unbuilt list — timer, inventory, method lookup table — stays unbuilt until asked.
-   **Parked with it:** the beans link's size, which Joel may want changed and has not said so.
+   The beans link's size is **settled**, not parked: Joel looked at it and asked for nothing further.

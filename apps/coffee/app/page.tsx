@@ -100,13 +100,15 @@ const EMPTY: Identity = {
  * Short labels, because the heading is read at a glance in a kitchen and the
  * caveat underneath is where the nuance belongs.
  *
- * `coffee_specific` still reads long, and deliberately: "Bag specific" was
- * asked for, and it asserts the one thing the tier does not check — see
- * `PRODUCT_PAGE_CAVEAT` and `RULES.md` §2. Changing it is a question for Joel
- * rather than a rename, so this one waits and the other two do not.
+ * Tier 1 names the *place* rather than the audience. "Bag specific" was the
+ * first wording asked for and it asserts the one thing the tier does not
+ * check — whether the roaster wrote the recipe for this lot or prints the
+ * same one everywhere. `PRODUCT_PAGE_CAVEAT` sits directly beneath it saying
+ * so, and a heading its own caption has to walk back is worse than a longer
+ * heading. Where it was read is the part a search can actually establish.
  */
 const GUIDE_LABELS: Record<GuideStatus, string> = {
-  coffee_specific: "The roaster's recipe, from this coffee's own page",
+  coffee_specific: "From this bag's own page",
   roaster_generic: "Roaster's generic recipe",
   none: "No recipe provided by roaster.",
   not_searched: "Not searched",
