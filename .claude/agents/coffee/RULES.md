@@ -152,12 +152,22 @@ anything that accumulates", applied to the thing that was accumulating.
 **Deleting a bag deletes its brews**, by cascade, and its photo. The confirm names the brew count
 for that reason: losing a dial-in history silently is worse than losing the photo.
 
-**A new brew opens as a repeat of the last one.** Dialling in is one change at a time against
-everything else held still, so retyping four settings you did not mean to change is how they drift —
-and a drifted setting is indistinguishable afterwards from a deliberate one. `repeatOf` carries the
-decisions: brewer, brew method, grinder, grind setting, dose. It carries no reading — beverage mass,
-TDS, rating and notes start empty, because those describe one cup and a repeated one would record a
-measurement nobody took. Beverage mass and TDS both feed the generated extraction yield, so a stale
+**A new brew opens as a repeat of the last one, and as the roaster's numbers before that.** Dialling
+in is one change at a time against everything else held still, so retyping four settings you did not
+mean to change is how they drift — and a drifted setting is indistinguishable afterwards from a
+deliberate one. `repeatOf` carries the decisions: brewer, brew method, grinder, grind setting, dose,
+water and ratio. It carries no reading — beverage mass, TDS, rating and notes start empty, because
+those describe one cup and a repeated one would record a measurement nobody took.
+
+`openingBrew` then fills whatever the repeat left blank from the bag's own `guide_dose`,
+`guide_water` and `guide_ratio`, so the first brew of a bag starts where the roaster said to start.
+**Your last brew wins field by field**: once you have brewed it, their number is a fact about the
+bag rather than an instruction, and letting it overwrite your setting would undo the previous
+attempt every time the form opened. Grind is deliberately not carried across — "900µm" is a
+particle size and the field it would land in is a dial position, and translating one into the other
+is the rounding `myBrewerFor` refuses. **Nothing here is written**: these are prefilled inputs, and
+only logging the brew stores them, which is what keeps a published number out of `coffee.brews`
+unless you actually brewed it. Beverage mass and TDS both feed the generated extraction yield, so a stale
 one produces a figure that is arithmetically correct about a brew that never happened. **Clear**
 empties the form; it is beside the line saying the form was prefilled, so it undoes the thing it
 sits next to.
@@ -169,6 +179,20 @@ are the same number and `1% = 10,000 ppm`. ppm is derived at display and never s
 columns for one measurement is two things that can disagree. **Extraction yield is a generated
 column**, not an input — it is a function of dose, beverage mass and TDS, and an editable copy
 would be free to drift from the brew it claims to describe.
+
+**The refractometer half of the form is commented out, on Joel's word, and none of the above
+changed.** `tds_percent`, `beverage_g` and the generated `extraction_yield` keep their columns,
+their comments and their tests; the form simply does not ask for them today, and a logged brew
+still shows a reading it already carries. This is a decision about what is worth typing in a
+kitchen, not about what is worth recording — so it is reversed by uncommenting, never by a
+migration.
+
+**A brew is planned in dose, ratio and water, and the ratio is not stored.** It is `water_g /
+dose_g`, so a column for it would be the same mistake as a column for ppm or an editable extraction
+yield: one fact with two homes. It is derived in `lib/brews.ts`, shown in the form, and dropped
+before the POST. **`water_g` is water into the brew and `beverage_g` is what came out of it** — the
+bed keeps roughly two grams per gram of coffee, and filling either from the other overstates the
+yield by about a tenth, which is enough to relabel a brew that has not changed.
 
 **Each purchase is its own row.** Roasters re-release the same coffee each crop, so "have I had
 this before" is a lookup on `(lower(roaster), lower(coffee_name))`, not a uniqueness constraint.

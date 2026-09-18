@@ -77,6 +77,12 @@ export function readBrew(input: { tdsPercent: number | null; yieldPercent: numbe
 
 /**
  * The form for a new brew, all strings because that is what an input holds.
+ *
+ * `ratio` is the one field here with no column behind it. It is water over
+ * dose, so storing it would be a second home for one fact — the same reason
+ * ppm is derived from the TDS reading and extraction yield is generated in
+ * Postgres rather than accepted from a client. It lives in the draft because
+ * a form has to hold what you typed, and it is dropped before the POST.
  */
 export type BrewDraft = {
   brewer: string;
@@ -84,6 +90,8 @@ export type BrewDraft = {
   grinder: string;
   grind_setting: string;
   dose_g: string;
+  ratio: string;
+  water_g: string;
   beverage_g: string;
   notes: string;
 };
@@ -95,6 +103,14 @@ type PreviousBrew = {
   grinder?: string | null;
   grind_setting?: string | null;
   dose_g?: string | number | null;
+  water_g?: string | number | null;
+};
+
+/** The roaster's published numbers, as free text, exactly as they were quoted. */
+export type GuideNumbers = {
+  dose?: string | null;
+  water?: string | null;
+  ratio?: string | null;
 };
 
 export function blankBrew(): BrewDraft {
@@ -104,9 +120,133 @@ export function blankBrew(): BrewDraft {
     grinder: DEFAULT_GRINDER,
     grind_setting: "",
     dose_g: "",
+    ratio: "",
+    water_g: "",
     beverage_g: "",
     notes: "",
   };
+}
+
+/**
+ * Ratio and water are two views of one decision, and the dose turns each into
+ * the other: water = dose x ratio.
+ *
+ * Water rounds to whole grams because that is what a kettle and a scale
+ * resolve, and the ratio to one decimal because 1:16.7 is how a recipe is
+ * written and 1:16.67 is not. Editing one field and then the other can
+ * therefore move the water by up to a gram, which is below the accuracy of
+ * the pour and well below anything the cup can tell you.
+ */
+export function waterFor(doseG: number | null, ratio: number | null): number | null {
+  if (!doseG || !ratio) return null;
+  if (doseG <= 0 || ratio <= 0) return null;
+  return Math.round(doseG * ratio);
+}
+
+export function ratioFor(doseG: number | null, waterG: number | null): number | null {
+  if (!doseG || !waterG) return null;
+  if (doseG <= 0 || waterG <= 0) return null;
+  return Math.round((waterG / doseG) * 10) / 10;
+}
+
+/**
+ * A stored measurement as the form should show it.
+ *
+ * Postgres hands back `numeric(6,2)` with its scale intact, so an 18g dose
+ * arrives as the string "18.00" and a repeated brew opened with "18.00" and
+ * "306.00" in its boxes. They are the right numbers typed in a way nobody
+ * types them, and the trailing zeros make a prefilled field look like
+ * something already fiddled with rather than something carried over.
+ */
+function numText(value: string | number | null | undefined): string {
+  if (value == null || value === "") return "";
+  const n = Number(value);
+  return Number.isFinite(n) ? String(n) : String(value);
+}
+
+/** A field as a number, or null when it is blank or not one. */
+function num(value: string): number | null {
+  if (!value.trim()) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * The three edits, each keeping the other two consistent.
+ *
+ * **The ratio is what holds when the dose changes.** That is the whole point
+ * of brewing to a ratio: scaling a recipe up or down keeps the strength and
+ * moves the water. Typing a water mass instead states the ratio implicitly,
+ * so that direction re-derives the ratio rather than the water.
+ *
+ * Each returns a new draft rather than mutating, and each is a pure function
+ * of what was typed, so the arithmetic is testable without a browser.
+ */
+export function withDose(draft: BrewDraft, value: string): BrewDraft {
+  const next = { ...draft, dose_g: value };
+  const dose = num(value);
+  const ratio = num(draft.ratio);
+  if (dose && ratio) {
+    const water = waterFor(dose, ratio);
+    return { ...next, water_g: water == null ? "" : String(water) };
+  }
+  const water = num(draft.water_g);
+  if (dose && water) {
+    const derived = ratioFor(dose, water);
+    return { ...next, ratio: derived == null ? "" : String(derived) };
+  }
+  return next;
+}
+
+export function withRatio(draft: BrewDraft, value: string): BrewDraft {
+  const next = { ...draft, ratio: value };
+  const water = waterFor(num(draft.dose_g), num(value));
+  if (water == null) return next;
+  return { ...next, water_g: String(water) };
+}
+
+export function withWater(draft: BrewDraft, value: string): BrewDraft {
+  const next = { ...draft, water_g: value };
+  const ratio = ratioFor(num(draft.dose_g), num(value));
+  if (ratio == null) return next;
+  return { ...next, ratio: String(ratio) };
+}
+
+/**
+ * A mass out of a roaster's own wording — "18g", "18 grams", "300 g water".
+ *
+ * The first number in the string wins, because roasters lead with the value
+ * and trail with the qualifier. A range like "18-20g" therefore takes the
+ * low end, which is the one you would start at anyway.
+ *
+ * A string containing a colon is refused outright: that is a ratio or a
+ * brew time, and reading "1:17" as one gram of coffee is the kind of
+ * confident nonsense this app exists not to produce.
+ */
+export function parseGrams(text: string | null | undefined): number | null {
+  if (!text || text.includes(":")) return null;
+  const match = /(\d+(?:\.\d+)?)/.exec(text);
+  if (!match) return null;
+  const n = Number(match[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * The second half of a ratio — "1:17" is 17, "2:1" is 0.5.
+ *
+ * Divided rather than read off, because a roaster writing "2:30" for a brew
+ * time and a roaster writing "1:17" for a ratio are indistinguishable by
+ * shape. Only `guide_ratio` is ever passed here, and dividing at least keeps
+ * a "60:1000" style statement correct instead of returning 1000.
+ */
+export function parseRatio(text: string | null | undefined): number | null {
+  if (!text) return null;
+  const match = /(\d+(?:\.\d+)?)\s*[:/]\s*(\d+(?:\.\d+)?)/.exec(text);
+  if (!match) return null;
+  const left = Number(match[1]);
+  const right = Number(match[2]);
+  if (!Number.isFinite(left) || !Number.isFinite(right) || left <= 0 || right <= 0) return null;
+  return Math.round((right / left) * 10) / 10;
 }
 
 /**
@@ -115,12 +255,12 @@ export function blankBrew(): BrewDraft {
  * Retyping the four settings you did not mean to change is how they drift.
  *
  * **Settings carry forward. Readings do not.** Brewer, brew method, grinder,
- * grind setting and dose are decisions — you make them again deliberately, and
- * repeating them is the point. Beverage mass, TDS, rating and notes are
- * observations of one cup. Carrying a reading forward would record a
- * measurement nobody took, and beverage mass and TDS both feed the generated
- * extraction yield, so a stale one produces a figure that is arithmetically
- * correct about a brew that never happened.
+ * grind setting, dose and water are decisions — you make them again
+ * deliberately, and repeating them is the point. Beverage mass, TDS, rating
+ * and notes are observations of one cup. Carrying a reading forward would
+ * record a measurement nobody took, and beverage mass and TDS both feed the
+ * generated extraction yield, so a stale one produces a figure that is
+ * arithmetically correct about a brew that never happened.
  *
  * This is the same line `findPreviousBag` draws across bags — the dial-in
  * carries, what you thought of the cup does not.
@@ -128,6 +268,10 @@ export function blankBrew(): BrewDraft {
 export function repeatOf(previous: PreviousBrew | null | undefined): BrewDraft {
   const blank = blankBrew();
   if (!previous) return blank;
+
+  const dose = numText(previous.dose_g);
+  const water = numText(previous.water_g);
+  const ratio = ratioFor(num(dose), num(water));
 
   return {
     ...blank,
@@ -137,6 +281,91 @@ export function repeatOf(previous: PreviousBrew | null | undefined): BrewDraft {
     // brew that recorded none says nothing about which one is on the counter.
     grinder: previous.grinder ?? blank.grinder,
     grind_setting: previous.grind_setting ?? "",
-    dose_g: previous.dose_g == null ? "" : String(previous.dose_g),
+    dose_g: dose,
+    water_g: water,
+    ratio: ratio == null ? "" : String(ratio),
   };
+}
+
+/**
+ * What the roaster published, as a starting point for the form.
+ *
+ * Only the three numbers that describe the same decision the form now asks
+ * for: dose, water, ratio. Grind is deliberately absent — "900µm" is a
+ * particle size and the field below it is a dial position on a Fellow Ode,
+ * and translating one into the other is the rounding this app refuses
+ * everywhere else. Temperature and time have no field to land in.
+ *
+ * Water is taken from their own water figure where they gave one and derived
+ * from the ratio otherwise, so a roaster who publishes only "1:17" still
+ * fills the form the moment you type a dose.
+ */
+export function fromGuide(guide: GuideNumbers | null | undefined): Partial<BrewDraft> {
+  if (!guide) return {};
+
+  const dose = parseGrams(guide.dose);
+  const statedWater = parseGrams(guide.water);
+  const statedRatio = parseRatio(guide.ratio);
+
+  const water = statedWater ?? waterFor(dose, statedRatio);
+  const ratio = statedRatio ?? ratioFor(dose, water);
+
+  const draft: Partial<BrewDraft> = {};
+  if (dose != null) draft.dose_g = String(dose);
+  if (water != null) draft.water_g = String(water);
+  if (ratio != null) draft.ratio = String(ratio);
+  return draft;
+}
+
+/** Where the numbers in an opened brew form came from, so the form can say. */
+export type BrewSource = "repeat" | "guide" | "blank";
+
+/**
+ * The form as it opens: your last brew first, the roaster's recipe in
+ * whatever it left blank.
+ *
+ * **Your last brew wins, field by field.** What you did on this bag is the
+ * dial-in; what the roaster published is where the dial-in started. Once you
+ * have brewed it once, their number is a fact about the bag rather than an
+ * instruction, and overwriting your own setting with it would undo the
+ * previous attempt every time you opened the form.
+ *
+ * Nothing here is written anywhere. These are prefilled inputs you can see
+ * and change, and only pressing the button stores them — which is what keeps
+ * a roaster's published number out of `coffee.brews` unless you brewed it.
+ */
+export function openingBrew(
+  previous: PreviousBrew | null | undefined,
+  guide: GuideNumbers | null | undefined,
+): { draft: BrewDraft; source: BrewSource } {
+  const repeated = repeatOf(previous);
+  const suggested = fromGuide(guide);
+
+  let usedGuide = false;
+  const draft = { ...repeated };
+  for (const key of ["dose_g", "water_g", "ratio"] as const) {
+    if (draft[key]) continue;
+    const value = suggested[key];
+    if (!value) continue;
+    draft[key] = value;
+    usedGuide = true;
+  }
+
+  // The two sources can each supply half of the arithmetic — your dose from
+  // last time, their ratio — so the third field is closed out once rather
+  // than left blank beside the two that determine it.
+  if (!draft.water_g) {
+    const water = waterFor(num(draft.dose_g), num(draft.ratio));
+    if (water != null) draft.water_g = String(water);
+  }
+  if (!draft.ratio) {
+    const ratio = ratioFor(num(draft.dose_g), num(draft.water_g));
+    if (ratio != null) draft.ratio = String(ratio);
+  }
+
+  // A form that says where its numbers came from is the same habit as showing
+  // the quote beside the parsed value: a prefill you cannot account for is one
+  // you brew by accident.
+  const source: BrewSource = previous ? "repeat" : usedGuide ? "guide" : "blank";
+  return { draft, source };
 }
