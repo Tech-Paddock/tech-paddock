@@ -1,6 +1,6 @@
 # Paddock
 
-A personal command center — one shared foundation supporting five standalone tools, each
+A personal command center — one shared foundation supporting a set of standalone tools, each
 independently deployed off `techpaddock.io`.
 
 See **[CLAUDE.md](./CLAUDE.md)** for the architecture, the rules every agent works under, and how
@@ -19,6 +19,7 @@ apps/
   tracker/   → Pipeline Tracker → tracker.techpaddock.io
   resume/    → Resume Formatter → resume.techpaddock.io
   coffee/    → Coffee         → coffee.techpaddock.io
+  health/    → Health         → health.techpaddock.io
 ```
 
 The hub opens on what is live rather than on a list of links. It holds no database credentials: each
