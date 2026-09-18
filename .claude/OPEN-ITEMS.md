@@ -1,18 +1,15 @@
 # Open items
 
-**What is open, and who owns the next action. Nothing else.** The shape of this file — overwritten,
-never appended, ≤80 lines — is in `CLAUDE.md`'s channel table and is not restated here. It grew to
-588 lines once, of which 401 were finished work every agent then read at the start of every session.
+**What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
+channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
+**Last reviewed: 2026-09-18.**
 
 - Finished work is not here. Git log is the archive.
 - Settled calls, mistakes and traps are in `.claude/DECISIONS.md`. Live facts are computed, at `/admin`.
 - **An item whose owner is not Joel is a request to that agent**, picked up next session — a
   `SessionStart` hook prints this file into every one.
-
-**The Pit Wall renders `Waiting on Joel` and `Parked`** at build time, taking the first bold run of
-each entry as its title — so lead with a short bold phrase and put the reasoning underneath.
-
-**Last reviewed: 2026-09-18.**
+- **The Pit Wall renders `Waiting on Joel` and `Parked`** at build time, taking each entry's first
+  bold run as its title — lead with a short bold phrase, reasoning underneath.
 
 ---
 
@@ -64,15 +61,18 @@ Nothing.
    names the migration version I renamed at #107's gate, which `drift` warns on. *LoE: minutes.*
 13. **`Paper.tsx` throws a hydration error on every load.** *Owner: TechPad Gen.* `today()` renders
    the date with a comma on the server and without it in the browser. *LoE: minutes.*
+14. **Classify each tool by surface — site or app — and design to it.** *Owner: TechPad Gen.*
+   Joel, 2026-09-18: most of these are websites; **Coffee is the only real app**, and Health will be.
+   The split is his; the vocabulary, where it is declared, and the guide are TechPad Gen's to settle.
 
 ## Parked
 
 Deliberately deferred. **Not background work** — something here moves only when Joel says so.
 
-14. **`tp-tracker` stays paused.** Tabled 2026-09-18, paused the same day — verified, `live: false`.
+15. **`tp-tracker` stays paused.** Tabled 2026-09-18, paused the same day — verified, `live: false`.
    **Paused is reversible and deleted is not**, so this is a safe place to leave it indefinitely.
    Un-parking means deleting it and its DNS record — no undo, and it needs item 6 first.
-15. **`CRON_SECRET` and the Microsoft Graph integration.** Parked 2026-09-15.
+16. **`CRON_SECRET` and the Microsoft Graph integration.** Parked 2026-09-15.
    **Why parking is safe:** `tracker`'s `middleware.ts` waves `/api/cron/*` past the password gate
    and the route's guard reads `if (secret && …)`, so an unset `CRON_SECRET` skips the check and the
    endpoint is public — harmless *only* while Graph is unconfigured, and unreachable while paused.
