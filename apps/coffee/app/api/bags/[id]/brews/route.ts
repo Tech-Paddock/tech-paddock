@@ -5,7 +5,11 @@ import { isMyBrewer } from "@/lib/brewers";
 export const dynamic = "force-dynamic";
 
 const BREW_FIELDS = ["brewer", "brew_method", "grinder", "grind_setting", "notes"] as const;
-const NUMERIC_FIELDS = ["dose_g", "beverage_g", "tds_percent"] as const;
+// water_g is water into the brew; beverage_g is what came out of it. They
+// are different measurements and the bed retains the difference, so one is
+// never filled from the other. The ratio is water_g / dose_g and is derived
+// on the page, never sent and never stored.
+const NUMERIC_FIELDS = ["dose_g", "water_g", "beverage_g", "tds_percent"] as const;
 
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await getServiceClient()
