@@ -64,15 +64,15 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 
 ## Next
 
-**`packages/shared` is yours to build, not Joel's to approve.** One source, a stamping script,
-`drift` failing a copy that disagrees. **Not npm workspaces**: a root install would cost the per-app
-independence the derived CI matrix rests on.
+**`packages/shared` is yours to build, not Joel's to approve** — ledger item 9 carries the shape.
+**Not npm workspaces**: a root install would cost the per-app independence the CI matrix rests on.
 
-**Health is stood up as far as the repo can take it**, on `claude/health-standup`: the app, both
-migrations *applied*, the charter, the handoff, the kickoff block. `HEALTH-PLAN.md` stays and is
-pointed at, not folded in — it is 240 lines and the charter has 80. **Nothing is reachable until
-Joel's four steps** — ledger item 2,
-each without an undo. The agent can be started before they are done; the app cannot be used.
+**Health is merged and the repo half is done**: the app, both migrations *applied*, the charter,
+the handoff, the kickoff block. `HEALTH-PLAN.md` stays and is pointed at, not folded in — it is 240
+lines and the charter has 80. **Nothing is reachable until Joel's four steps** — ledger item 2, each
+without an undo. The agent can be started now that the charter is on `main`; the app cannot be used
+until he has done them. **Its one test pins the schema** — day one, not a suite, so the next agent
+in that seat inherits the habit rather than an empty `tests/`.
 
 **`On track` is ledger item 7 now**, so its detail lives there rather than here. The colour is
 🔵, and the trigger it still needs is the unsolved half.

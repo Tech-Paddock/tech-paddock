@@ -14,7 +14,7 @@ your tool.
 
 ## What is true now
 
-**`apps/health` builds, deploys and sits behind the password gate.** It was copied from
+**`apps/health` builds and is gated by password in code — it is not deployed yet.** It was copied from
 `apps/coffee`, the nearest existing app in kind. `lib/auth.ts`, `lib/password.ts` and `lib/theme.css`
 are **byte-identical** copies, verified by checksum rather than assumed, and `middleware.ts` is the
 **base** copy — a fourth variant fails `drift` deliberately, because that would be a fourth version
@@ -28,7 +28,7 @@ both applied before the scaffold merged. **Zero tables, on purpose** — the pla
 yours to design, and it says in its own words that everything in it is the first feature of `health`
 rather than the whole of it.
 
-**`/api/health` is live and probes three things**: the schema is reachable, the Anthropic key is
+**`/api/health` probes three things** once the app is reachable: the schema is reachable, the Anthropic key is
 present and shaped right, and `SESSION_SECRET` is set. The database probe **names the exposed-schemas
 dashboard list in its failure message**, because that step is outside this repo and is the one the
 standup protocol says gets missed.
