@@ -5,14 +5,8 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-18T02:13:11.730Z",
+  bakedAt: "2026-09-18T03:38:19.584Z",
   waiting: [
-  {
-    "title": "`tp-tracker` is paused, not deleted",
-    "detail": "Paused 2026-09-18; verified, the project reads live: false. Pausing is reversible and deleting is not, so there is no hurry to leave it. The subdomain still points at it and serves nothing, the daily cron no longer fires, and its builds hav",
-    "ref": "—",
-    "state": "box"
-  },
   {
     "title": "Two tokens on `tp-home`, then redeploy",
     "detail": "GITHUB_TOKEN fine-grained, read-only Contents + Metadata + Pull requests — not Actions. VERCEL_TOKEN team-scoped, with an expiry. The redeploy is not optional — Vercel bakes the environment in at build time. *LoE: minutes.*",
@@ -33,6 +27,12 @@ export const PADDOCK = {
   }
 ] as BakedItem[],
   parked: [
+  {
+    "title": "`tp-tracker` stays paused",
+    "detail": "Tabled 2026-09-18, paused the same day — verified, it reads live: false. Paused is reversible and deleted is not, so this is a safe place to leave it indefinitely: the subdomain serves nothing, the cron no longer fires, its builds have stop",
+    "ref": "—",
+    "state": "clear"
+  },
   {
     "title": "`CRON_SECRET` and the Microsoft Graph integration",
     "detail": "Parked 2026-09-15. Why parking is the safe state: tracker's middleware.ts waves /api/cron/* past the password gate, and the route's guard reads if (secret && …) — an unset CRON_SECRET skips the check and the endpoint is public, harmless *on",
