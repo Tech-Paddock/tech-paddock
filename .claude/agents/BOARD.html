@@ -15,6 +15,12 @@
     {{WORK_BRIEF}} / {{DEVOPS}} / {{LEDGER_ROWS}} / {{PROVENANCE}}
                      the three sections, specified in CLAUDE.md
 
+  The ledger table sorts by any heading. Each <td> carries data-v with the value to
+  sort on: the row number, the item text lowercased and stripped of tags, the owner
+  lowercased, and a RANK for Urgency (Now 0, Soon 1, Whenever 2) and LoE (Minutes 0,
+  A session 1, Multi-session 2) — so those two sort by what they mean rather than by
+  spelling. Ledger order is the default and breaks every tie.
+
   Two rules this file cannot enforce and CLAUDE.md does: update only what you
   measured, and never fill in a row you cannot see.
 -->
@@ -159,6 +165,31 @@
   details.nextwrap li { font-size: 12.5px; color: var(--ink); margin: 2px 0; }
   details.nextwrap > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+  thead th.sortable { padding: 0; }
+  thead th.sortable button {
+    all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 5px;
+    width: 100%; padding: 10px 12px; cursor: pointer;
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 10px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--faint);
+    font-weight: 500; white-space: nowrap;
+  }
+  thead th.sortable button:hover { color: var(--ink); }
+  thead th.sortable button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  thead th.sortable button::after { content: "\2195"; font-size: 11px; opacity: .3; line-height: 1; }
+  thead th[aria-sort="ascending"]  button::after { content: "\2191"; opacity: 1; color: var(--accent); }
+  thead th[aria-sort="descending"] button::after { content: "\2193"; opacity: 1; color: var(--accent); }
+  thead th[aria-sort] button { color: var(--ink); }
+  .sortnote {
+    font-size: 12px; color: var(--faint); margin: 8px 0 0;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  }
+  .sortnote button {
+    font: 500 11.5px/1 "IBM Plex Mono", monospace; color: var(--accent);
+    background: none; border: 1px solid var(--line); border-radius: 4px;
+    padding: 4px 9px; cursor: pointer;
+  }
+  .sortnote button:hover { border-color: var(--accent); }
+
   footer.provenance {
     margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--line);
     color: var(--ink-soft); font-size: 12.5px;
@@ -181,7 +212,7 @@
       <span class="eyebrow">{{AGENT}}</span>
       <span class="stamp">{{PUBLISHED}}</span>
     </div>
-    <h1>{{AGENT}} Debrief</h1>
+    <h1>Platform Config Debrief</h1>
     <div class="rule"></div>
     <p class="lede">{{LEDE}}</p>
   </header>
@@ -206,8 +237,12 @@
       <table>
         <thead>
           <tr>
-            <th scope="col">#</th><th scope="col">Item</th><th scope="col">Owner</th>
-            <th scope="col">Urgency</th><th scope="col">LoE</th><th scope="col">Blocking</th>
+            <th scope="col" class="sortable"><button type="button">#</button></th>
+            <th scope="col" class="sortable"><button type="button">Item</button></th>
+            <th scope="col" class="sortable"><button type="button">Owner</button></th>
+            <th scope="col" class="sortable"><button type="button">Urgency</button></th>
+            <th scope="col" class="sortable"><button type="button">LoE</button></th>
+            <th scope="col" class="sortable"><button type="button">Blocking</button></th>
           </tr>
         </thead>
         <tbody>
@@ -215,12 +250,75 @@
         </tbody>
       </table>
     </div>
+    <p class="sortnote">
+      <span>Click a heading to sort. <b>Urgency and LoE sort by what they mean</b> &mdash; Now before
+      Soon before Whenever &mdash; not alphabetically.</span>
+      <button type="button" id="resetsort">Back to ledger order</button>
+    </p>
   </section>
 
   <footer class="provenance">
 {{PROVENANCE}}
   </footer>
 </div>
+
+<script>
+  // Ledger order is the default and the thing to get back to: the numbers are the
+  // ledger's own, so any other order is a view of it, never a renumbering of it.
+  (function () {
+    var tb = document.querySelector("tbody");
+    if (!tb) return;
+    var original = Array.prototype.slice.call(tb.rows);
+    var ths = document.querySelectorAll("th.sortable");
+    var key = -1, dir = 1;
+
+    function val(row, i) {
+      var cell = row.cells[i];
+      if (!cell) return "";
+      var v = cell.getAttribute("data-v");
+      if (v === null) return cell.textContent.trim().toLowerCase();
+      return /^-?\d+$/.test(v) ? parseInt(v, 10) : v;
+    }
+
+    function paint() {
+      for (var i = 0; i < ths.length; i++) {
+        if (i === key) ths[i].setAttribute("aria-sort", dir === 1 ? "ascending" : "descending");
+        else ths[i].removeAttribute("aria-sort");
+      }
+    }
+
+    function draw(rows) {
+      for (var i = 0; i < rows.length; i++) tb.appendChild(rows[i]);
+    }
+
+    function apply() {
+      if (key < 0) return draw(original.slice());
+      var rows = original.slice().sort(function (a, b) {
+        var x = val(a, key), y = val(b, key);
+        if (x < y) return -1 * dir;
+        if (x > y) return 1 * dir;
+        return val(a, 0) - val(b, 0);   // ledger order breaks every tie
+      });
+      draw(rows);
+    }
+
+    for (var i = 0; i < ths.length; i++) {
+      (function (th, idx) {
+        var btn = th.querySelector("button");
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+          if (key === idx) dir = -dir; else { key = idx; dir = 1; }
+          paint(); apply();
+        });
+      })(ths[i], i);
+    }
+
+    var reset = document.getElementById("resetsort");
+    if (reset) reset.addEventListener("click", function () {
+      key = -1; dir = 1; paint(); apply();
+    });
+  })();
+</script>
 
 </body>
 </html>
