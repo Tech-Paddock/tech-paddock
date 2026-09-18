@@ -63,7 +63,7 @@ Nothing.
    the date with a comma on the server and without it in the browser. *LoE: minutes.*
 14. **Classify each tool by surface — site or app — and design to it.** *Owner: TechPad Gen.*
    Joel, 2026-09-18: most of these are websites; **Coffee is the only real app**, and Health will be.
-   The split is his; the vocabulary, where it is declared, and the guide are TechPad Gen's to settle.
+   The split is his; vocabulary, declaration and guide are TechPad Gen's. *LoE: a session.*
 
 ## Parked
 
@@ -71,10 +71,10 @@ Deliberately deferred. **Not background work** — something here moves only whe
 
 15. **`tp-tracker` stays paused.** Tabled 2026-09-18, paused the same day — verified, `live: false`.
    **Paused is reversible and deleted is not**, so this is a safe place to leave it indefinitely.
-   Un-parking means deleting it and its DNS record — no undo, and it needs item 6 first.
+   Un-parking means deleting it and its DNS record — no undo, and needs item 6 first. *LoE: minutes.*
 16. **`CRON_SECRET` and the Microsoft Graph integration.** Parked 2026-09-15.
    **Why parking is safe:** `tracker`'s `middleware.ts` waves `/api/cron/*` past the password gate
    and the route's guard reads `if (secret && …)`, so an unset `CRON_SECRET` skips the check and the
    endpoint is public — harmless *only* while Graph is unconfigured, and unreachable while paused.
    **Un-parking is the dangerous moment and the order is not optional.** Set `CRON_SECRET`, redeploy,
-   then `MS_GRAPH_*`. Graph first publishes an unauthenticated endpoint that writes to Outlook.
+   then `MS_GRAPH_*`. Graph first publishes an unauthenticated endpoint writing to Outlook. *LoE: minutes.*
