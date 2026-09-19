@@ -60,8 +60,8 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 ## In flight
 
 Six, all presentation, none blocking another, with an identical handoff on each so they cannot
-conflict. Ledger row in brackets where there is one; the rest came straight from Joel.
-`home-paper-date-hydration` (10) · `theme-hairline-contrast` (1) · `home-delete-feed-tab` (3)
+conflict. Named, not numbered — the ledger renumbers and a number written here outlives its row.
+`home-paper-date-hydration` · `theme-hairline-contrast` · `home-delete-feed-tab`
 `theme-tab-titles` · `home-drop-editor-from-roster` · `theme-livery-badge`
 
 ## Next
