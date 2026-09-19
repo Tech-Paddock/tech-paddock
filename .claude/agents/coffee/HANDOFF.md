@@ -37,8 +37,9 @@ Joel, 2026-09-19. You read it and type it, and typing it is where you decide to 
 
 **Beverage mass, TDS and extraction are commented out in the form**, not deleted — uncomment to restore.
 
-**Roast date is a real date field**, on the confirm screen and editable on the card. What the label
-printed goes through `lib/dates.ts` first; an ambiguous `05/06/2026` is refused and shown as text.
+**Roast date is a real date field**, and it sits beside Purchased on one row — the gap between the
+two is the age of the coffee. What the label printed goes through `lib/dates.ts` first; an ambiguous
+`05/06/2026` is refused and shown as text rather than guessed.
 
 **The bag pill carries "Beans ↗"** as a *sibling* of the expand toggle, never nested: an `<a>` inside
 a `<button>` is invalid markup and browsers disagree about what a tap does. Keep them siblings.
@@ -67,13 +68,13 @@ are structural** — a near-black tile loses its edge on a dark wallpaper. It ha
 
 ## In flight
 
-`claude/coffee-roast-date-and-suggested-recipe` — **PR #138 open**, CI green on its head. Roast date
-as a field, the save that now names the missing field, the suggested recipe. **It carries migration
-`20260919175624`** — two nullable columns on `coffee.bags`, additive, applied by the TD at gate time
-**before** the merge. Skipping it breaks only the suggestion write, and applying it later fixes that.
+**#138 merged at 19:20 UTC**, migration and all. `claude/coffee-dates-side-by-side` is my only open
+branch: the two date fields share a row. **`claude/coffee-roast-date-and-suggested-recipe` is back on
+the remote and should not be** — a push landed after the merge deleted it. Clutter, Joel's to remove.
 
 ## Next
 
-1. **Verify the suggestion on a preview with a real bag.** Nothing in the sandbox can.
+1. **Confirm `20260919175624` was applied and the suggestion works on a real bag.** Nothing in the
+   sandbox can, and a missing column fails only the suggestion write — quietly, on the live site.
 2. **Run one coffee twice, Haiku then Sonnet 5 at `high`**, and compare the tiers. The open question.
 3. The deliberately-unbuilt list — timer, inventory, method lookup table — stays unbuilt until asked.
