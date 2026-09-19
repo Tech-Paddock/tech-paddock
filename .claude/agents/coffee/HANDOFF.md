@@ -32,8 +32,8 @@ column** — water over dose, derived in `lib/brews.ts` and dropped before the P
 `beverage_g`: water in, not what came out of the bed.
 
 **A new brew opens as a repeat of the last one, then as the roaster's numbers** — `openingBrew`, your
-last brew winning field by field, no reading carried. **A suggestion does not feed it**: that would
-make the two interchangeable at the one point where you act on them.
+last brew winning field by field, no reading carried. **A suggestion does not feed it, settled** —
+Joel, 2026-09-19. You read it and type it, and typing it is where you decide to use it.
 
 **Beverage mass, TDS and extraction are commented out in the form**, not deleted — uncomment to restore.
 
@@ -53,9 +53,9 @@ are structural** — a near-black tile loses its edge on a dark wallpaper. It ha
 
 - **An empty result and an unread result must not render the same.** Four times in this one app a
   failure rendered as a plausible empty answer. **Adding a read path here? Check this first.**
-- **A PATCH that changes nothing is not a failed save.** The review screen sent `{}` whenever the
-  purchase date was left alone and rendered the route's correct 400 as "Couldn't save that bag", on
-  a bag saved minutes earlier. `lib/patch.ts` sends only what moved, and nothing when nothing did.
+- **A bag needs a purchase date, and the error names it.** That empty field sent `{}`, the route
+  correctly refused it, and the page said "Couldn't save that bag" about a bag saved minutes
+  earlier. `lib/patch.ts` holds both halves: the requirement, and sending only what moved.
 - **Neither model call can be exercised from a Claude Code sandbox.** Roaster domains are blocked by
   the egress proxy and the suggestion needs a real key. Tests cover the validation and the coercion
   against recorded shapes. **Do not conclude either feature works because the tests pass.**
@@ -76,5 +76,4 @@ exist there. Carries migration `20260919175624` — additive, so it rides with i
 
 1. **Verify the suggestion on a preview with a real bag.** Nothing in the sandbox can.
 2. **Run one coffee twice, Haiku then Sonnet 5 at `high`**, and compare the tiers. The open question.
-3. **Should a suggestion prefill a brew?** Deliberately not built; Joel's call.
-4. The deliberately-unbuilt list — timer, inventory, method lookup table — stays unbuilt until asked.
+3. The deliberately-unbuilt list — timer, inventory, method lookup table — stays unbuilt until asked.

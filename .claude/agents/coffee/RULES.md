@@ -44,7 +44,7 @@ apps/coffee/
   lib/suggestion.ts            Claude's own recipe, and the columns it may write
   lib/suggestOnBag.ts          running that generation and landing it on the row
   lib/dates.ts                 a roast date as the label printed it, into a date column
-  lib/patch.ts                 what a form actually changed, and nothing when nothing did
+  lib/patch.ts                 what a bag cannot be saved without, and what actually changed
   lib/methods.ts               the brew method vocabulary
   lib/bags.ts                  previous-purchase and roaster-domain lookups
   lib/image.ts                 browser-side downscale
@@ -84,8 +84,8 @@ render beside the parsed values so a misparse is visible rather than invisible.
 
 **Joel asked for it on 2026-09-19**, having been asked twice what should happen when the roaster
 published nothing: *"failure to find a recipe should trigger sonnet five to generate a recommended
-recipe."* He owns this rule, so this is him deciding it, not an agent reading around it — **and this
-section is the amendment he approves at the gate, not a description of something already settled.**
+recipe."* He owns this rule, so this is him deciding it, not an agent reading around it. **He
+approved this section the same day** — *"Approved amendment"* — so it is settled rather than proposed.
 
 It does not breach §1 because §1 is a rule about `guide_*`, and `guide_*` is untouched.
 `validateGuide` still drops every parameter without a backing quote, a bag with no guide still reads
@@ -109,10 +109,11 @@ Four things keep the two apart, and none of them is a preference:
 to a retrieval; a heading that slowly starts reading like the block above it can. That is why the
 copy lives in the presentation module under test rather than inline in the card.
 
-**It does not prefill a brew.** `openingBrew` fills from `guide_dose`, `guide_water` and
-`guide_ratio` — the roaster's numbers — and letting a suggestion in there would quietly make the two
-interchangeable at the only point where you act on them. Whether it should is a real question and
-Joel's to answer; until he does, the suggestion is something you read and type.
+**It does not prefill a brew, and that is settled rather than pending.** Joel, 2026-09-19: *"Do not
+prefill."* `openingBrew` fills from `guide_dose`, `guide_water` and `guide_ratio` — the roaster's
+numbers — and letting a suggestion in there would make the two interchangeable at the only point
+where you act on them. **A suggestion is something you read and type in**, and typing it is the
+moment you decide to use it. Do not reopen this by making it a convenience.
 
 ### 2. Three tiers, and which one answered is stored
 
@@ -239,6 +240,14 @@ yield: one fact with two homes. It is derived in `lib/brews.ts`, shown in the fo
 before the POST. **`water_g` is water into the brew and `beverage_g` is what came out of it** — the
 bed keeps roughly two grams per gram of coffee, and filling either from the other overstates the
 yield by about a tenth, which is enough to relabel a brew that has not changed.
+
+**A bag is a purchase, so it needs a purchase date, and the error says so.** Joel, 2026-09-19:
+*"Error should say purchase date required."* The column stays nullable and the POST cannot demand
+one, because the row is written **before** the search, when there is no date to have — so the
+requirement is a rule about *finishing* a bag and lives at the save step, in `lib/patch.ts`, where
+both screens that edit a bag read it. **An error naming the field beats the two things it replaced**:
+"Couldn't save that bag", which said what failed and not what to do, and closing the panel quietly,
+which was true of the request and useless to the person holding the bag.
 
 **Each purchase is its own row.** Roasters re-release the same coffee each crop, so "have I had
 this before" is a lookup on `(lower(roaster), lower(coffee_name))`, not a uniqueness constraint.

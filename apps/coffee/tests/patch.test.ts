@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changedFields, hasChanges } from "../lib/patch";
+import { changedFields, hasChanges, missingRequired, REQUIRED } from "../lib/patch";
 
 describe("changedFields", () => {
   // The bug this file was written for: the review screen sent an empty PATCH
@@ -42,5 +42,33 @@ describe("changedFields", () => {
     expect(changedFields({ my_notes: "a", roast_date: "2026-08-14" } as Record<string, string>, { my_notes: "b" })).toEqual({
       my_notes: "b",
     });
+  });
+});
+
+describe("missingRequired", () => {
+  // Joel's call on 2026-09-19, after seeing the first fix close the panel
+  // quietly: the error should name the field. "Couldn't save that bag" said
+  // what failed; this says what to do about it.
+  it("names the field rather than the failure", () => {
+    expect(missingRequired({ purchased_date: "" })).toBe("Purchase date required.");
+    expect(missingRequired({ purchased_date: "   " })).toBe("Purchase date required.");
+    expect(missingRequired({ purchased_date: null })).toBe("Purchase date required.");
+  });
+
+  it("says nothing once the field is there", () => {
+    expect(missingRequired({ purchased_date: "2026-09-01", roast_date: "" })).toBeNull();
+  });
+
+  // A screen that never showed the field is not failing to fill it in, and an
+  // error about a control that is not on the page cannot be acted on.
+  it("does not demand a field the form never carried", () => {
+    expect(missingRequired({ my_notes: "" })).toBeNull();
+    expect(missingRequired({})).toBeNull();
+  });
+
+  it("holds the same rule on every screen that edits a bag", () => {
+    // Both save paths read this table. A requirement that applied on one
+    // screen and not the other is one you find out about by accident.
+    expect(Object.keys(REQUIRED)).toEqual(["purchased_date"]);
   });
 });

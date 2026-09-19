@@ -30,7 +30,7 @@ import type { Guide, GuideStatus } from "@/lib/guide";
 import { guidePresentation, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
 import type { Suggestion } from "@/lib/suggestion";
 import { parseLabelDate } from "@/lib/dates";
-import { changedFields, hasChanges } from "@/lib/patch";
+import { changedFields, hasChanges, missingRequired } from "@/lib/patch";
 import { MODEL_LABELS, DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT, effortsFor, isEffortFor, type SearchModel } from "@/lib/models";
 
 type Identity = {
@@ -329,14 +329,20 @@ function Scan({ onSaved }: { onSaved: () => void }) {
   async function save() {
     if (!bagId) return;
 
-    // The bag was written before the search started — this screen only records
-    // what you added to it afterwards. So when you added nothing, there is
-    // nothing to send and nothing has gone wrong.
-    //
-    // It used to send `{}` in that case, the route correctly refused an empty
-    // update, and the page reported **"Couldn't save that bag"** about a bag
-    // that had been in the library for minutes. Leaving the purchase date
-    // alone was all it took.
+    // A bag is a purchase, so it needs the date you bought it. This is the
+    // field that produced the original bug: leaving it alone sent an empty
+    // patch, the route correctly refused it, and the page reported
+    // **"Couldn't save that bag"** about a bag that had been in the library
+    // for minutes. Naming the field is Joel's call over closing quietly —
+    // an error you can act on beats both the old message and no message.
+    const missing = missingRequired(purchase);
+    if (missing) {
+      setError(missing);
+      return;
+    }
+
+    // Past that, nothing to change is still not a failure. The row exists and
+    // the request simply is not made.
     const patch = changedFields(
       { purchased_date: saved?.purchased_date ?? "", roast_date: saved?.roast_date ?? "" },
       purchase
@@ -688,6 +694,15 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
   }
 
   async function save() {
+    // The same requirement as the review screen, in the other place a bag is
+    // edited. A rule that holds on one screen and not the other is a rule you
+    // find out about by accident.
+    const missing = missingRequired(draft);
+    if (missing) {
+      setError(missing);
+      return;
+    }
+
     // Only what moved, and nothing at all when nothing did. This card posted
     // every field it rendered, which worked because it always rendered at
     // least one non-empty one — but it means a field another screen wrote
