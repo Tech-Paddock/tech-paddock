@@ -1,6 +1,6 @@
 # Coffee — handoff
 
-State as of 2026-09-18.
+State as of 2026-09-19.
 
 Read `RULES.md` first. This file is only what is true right now.
 
@@ -65,8 +65,8 @@ a folder is a route. The PNG has **no alpha** — iOS composites one onto black.
 
 ## In flight
 
-`claude/coffee-pour-over-icon` — pushed, CI green, no PR yet. The home screen icon only; no code,
-no schema, no route.
+Nothing. #117 merged the icon and #114 the ratio/water form, so everything described above is on
+`main` and live.
 
 ## Next
 
