@@ -69,8 +69,8 @@ are structural** — a near-black tile loses its edge on a dark wallpaper. It ha
 
 `claude/coffee-roast-date-and-suggested-recipe` — pushed, CI green. Roast date as a field, the
 empty-PATCH save bug, the suggested recipe. **#124 merged at 15:26 UTC while this was being written**,
-squashed, so this branch was rebuilt from `main` rather than left stacked on history that no longer
-exists there. Carries migration `20260919175624` — additive, so it rides with its code.
+squashed, so `main` was merged in rather than this branch left standing on commits that no longer
+exist there. Carries migration `20260919175624` — additive, so it rides with its code.
 
 ## Next
 
