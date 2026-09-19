@@ -67,10 +67,10 @@ are structural** — a near-black tile loses its edge on a dark wallpaper. It ha
 
 ## In flight
 
-`claude/coffee-roast-date-and-suggested-recipe` — pushed, CI green. Roast date as a field, the
-empty-PATCH save bug, the suggested recipe. **#124 merged at 15:26 UTC while this was being written**,
-squashed, so `main` was merged in rather than this branch left standing on commits that no longer
-exist there. Carries migration `20260919175624` — additive, so it rides with its code.
+`claude/coffee-roast-date-and-suggested-recipe` — **PR #138 open**, CI green on its head. Roast date
+as a field, the save that now names the missing field, the suggested recipe. **It carries migration
+`20260919175624`** — two nullable columns on `coffee.bags`, additive, applied by the TD at gate time
+**before** the merge. Skipping it breaks only the suggestion write, and applying it later fixes that.
 
 ## Next
 
