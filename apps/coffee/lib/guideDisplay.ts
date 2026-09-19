@@ -58,3 +58,23 @@ export function guidePresentation(status: GuideStatus): GuidePresentation {
   // answer and a negative answer must not look the same.
   return PRESENTATION[status] ?? PRESENTATION.not_searched;
 }
+
+/**
+ * The one thing on this screen that nobody published.
+ *
+ * It sits in the same card as the three tiers and must never read as a fourth
+ * one. So it carries no tier colour — the light stays on **No Recipe Found**,
+ * which is still the true answer to "what did the roaster say" — and the
+ * wording names Claude in the label itself rather than in small print
+ * underneath, because the label is the part that gets read.
+ *
+ * The test beside this file checks that. A suggestion that quietly starts
+ * reading like a found recipe is the single way this feature could damage the
+ * thing the app is for, and it would happen through wording, here.
+ */
+export const SUGGESTION_PRESENTATION = {
+  label: "Suggested by Claude",
+  note: "The roaster published nothing for this coffee. Claude suggested a starting point — it is not theirs, and nothing on a page says it.",
+  /** Deliberately not a tier colour. This is not a fourth light. */
+  dot: "bg-ink/40",
+} as const;

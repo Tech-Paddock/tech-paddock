@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { signedPhotoUrl, deletePhoto } from "@/lib/storage";
+import { isIsoDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,14 @@ export const dynamic = "force-dynamic";
 // them.
 // The dial-in moved to coffee.brews, so what remains editable on a bag is
 // what belongs to the purchase rather than to any one attempt at brewing it.
-const EDITABLE = ["my_notes", "purchased_date"] as const;
+//
+// roast_date joins them because it is the bag's, not the roaster's: it is read
+// off the label by a vision model that is told to report only what is legible,
+// so a smudged or oddly formatted one has to be typeable afterwards. It is not
+// a guide_* value and editing it makes no stored quote stop matching anything.
+const EDITABLE = ["my_notes", "purchased_date", "roast_date"] as const;
+
+const DATES: readonly string[] = ["purchased_date", "roast_date"];
 
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await getServiceClient().from("bags").select("*").eq("id", params.id).maybeSingle();
@@ -39,8 +47,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       continue;
     }
 
-    if (key === "purchased_date" && !/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
-      return NextResponse.json({ error: "Purchased date must be YYYY-MM-DD." }, { status: 400 });
+    if (DATES.includes(key) && !isIsoDate(String(value))) {
+      return NextResponse.json({ error: `${key.replace("_", " ")} must be YYYY-MM-DD.` }, { status: 400 });
     }
 
     update[key] = String(value);
