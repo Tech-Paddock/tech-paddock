@@ -223,12 +223,12 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.conf
 {
   /* Agents whose folder name does not match the app folder they own, and the
      reason this is a LIST rather than a string: on 2026-09-19 Joel retired the
-     Pipeline Tracker agent and gave `apps/tracker` to TechPad Gen, who already
-     owned `apps/home`. One agent now owns two apps. A one-to-one map could not
-     say that — it would have reported `apps/tracker` as an orphan while the
+     Pipeline Tracker and Message Editor agents and gave `apps/tracker` and
+     `apps/editor` to TechPad Gen, who already owned `apps/home`. One agent now
+     owns three apps. A one-to-one map could not say that — it would have reported `apps/tracker` as an orphan while the
      charter plainly named an owner, which is the documentation and the disk
      disagreeing in the direction this file exists to catch. */
-  const NAMED = { "techpad-gen": ["apps/home", "apps/tracker"], "message-editor": ["apps/editor"] };
+  const NAMED = { "techpad-gen": ["apps/home", "apps/tracker", "apps/editor"] };
   const agents = existsSync(R(".claude/agents"))
     ? readdirSync(R(".claude/agents")).filter((d) => statSync(R(".claude/agents", d)).isDirectory()).sort()
     : [];

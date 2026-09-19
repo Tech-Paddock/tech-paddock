@@ -40,9 +40,6 @@ Nothing.
    first, so the charter listed five projects against six on disk. Both corrected. **The fix is
    deleting the charter's copy and linking `CLAUDE.md`'s** — one fact, one home — but it is a
    charter, so it is your yes. *LoE: minutes.*
-17. **`tp-message-editor` refuses every deployment, so `editor.techpaddock.io` is frozen.** *Owner:
-   Joel.* Measured 2026-09-19: every deployment returns `BLOCKED`, production included, so every
-   merge since has silently never reached it. **Deliberate, or unblock it?** *LoE: minutes.*
 18. **`DECISIONS.md` is full — 260 of its 260 lines.** *Owner: Joel.* Append-only with no trimming
    rule, so the next settled call has nowhere to go. **Raise the ceiling, do not trim.** *LoE: minutes.*
 
@@ -59,9 +56,10 @@ Nothing.
    the rules forbid. *LoE: a session.*
 4. **Build `packages/shared`.** *Owner: TD.* One real copy of the five-way files, a stamping
    script, and `drift` failing a copy that disagrees. *LoE: a session.*
-5. **`shared.contacts` needs its write rules said out loud.** *Owner: Message Editor.* Shared on
-   purpose between `apps/editor` and `apps/tracker`. **The old premise — one of the two is going
-   away — is wrong**: the tracker changed hands on 2026-09-19 rather than closing. *LoE: minutes.*
+5. **`shared.contacts` needs its write rules said out loud.** *Owner: TechPad Gen.* Shared on
+   purpose between `apps/editor` and `apps/tracker`, **and both are one agent's as of 2026-09-19**.
+   The old premise — one of the two is going away — was wrong; neither did. **Say in the charter
+   which app writes what** rather than negotiating it with anybody. *LoE: minutes.*
 7. **Write the surface guide — site and app.** *Owner: TD.* Joel, 2026-09-18: most tools are
    websites; **Coffee is the only real app**, and Health will be. Site is a thin index grouped by
    verb around a long page; app is one screen, thumb-first, no index. Mockups exist. **It is settled

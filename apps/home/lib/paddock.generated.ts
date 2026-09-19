@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-19T22:19:36.614Z",
+  bakedAt: "2026-09-19T22:22:34.075Z",
   waiting: [
   {
     "title": "Pick how the login lockout gets fixed — the obvious fix is the wrong shape",
@@ -22,12 +22,6 @@ export const PADDOCK = {
   {
     "title": "The domain map is written down twice, and one copy went stale for a day",
     "detail": "*Owner: Joel.* CLAUDE.md and platform/RULES.md both carry a Vercel-project table; Health reached only the first, so the charter listed five projects against six on disk. Both corrected. The fix is deleting the charter's copy and linking CLA",
-    "ref": "—",
-    "state": "box"
-  },
-  {
-    "title": "`tp-message-editor` refuses every deployment, so `editor.techpaddock.io` is frozen",
-    "detail": "*Owner: Joel.* Measured 2026-09-19: every deployment returns BLOCKED, production included, so every merge since has silently never reached it. Deliberate, or unblock it? *LoE: minutes.*",
     "ref": "—",
     "state": "box"
   },
@@ -55,11 +49,6 @@ export const PADDOCK = {
   {
     "id": "health",
     "name": "Health",
-    "asOf": "2026-09-19"
-  },
-  {
-    "id": "message-editor",
-    "name": "Message Editor",
     "asOf": "2026-09-19"
   },
   {

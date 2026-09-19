@@ -92,13 +92,16 @@ landed after its session started.
 
 > **Your board:** https://claude.ai/artifact/MSuuf1CABdDcRfy6U53y2D — publish to this URL, never a new one.
 >
-> You own `apps/home` — the hub — **`apps/tracker`**, **the visual theme of every app**, and
-> repo-wide odd jobs.
+> You own `apps/home` — the hub — **`apps/tracker`**, **`apps/editor`**, **the visual theme of every
+> app**, and repo-wide odd jobs.
 >
-> **The tracker came to you on 2026-09-19** when Joel retired the Pipeline Tracker agent. The agent
-> retired; the tool did not. **Read the three contracts in your charter before you touch it** — it
-> calls the Message Editor, the hub reads it, and the Resume Formatter writes to it, and all three
-> break quietly rather than loudly.
+> **Both came to you on 2026-09-19** when Joel retired the Pipeline Tracker and Message Editor
+> agents. The agents retired; the tools did not. **Read the contracts in your charter before you
+> touch either** — the tracker calls the editor, the hub reads the tracker, and the Resume Formatter
+> writes to it. All of them break quietly rather than loudly.
+>
+> **`apps/editor` is frozen: `tp-message-editor` is paused and serves its last successful build.**
+> A merge reaches the repo and never reaches the running app. **Green CI is not deployed.**
 >
 > **Two properties of the hub are worth more than any feature.** It holds no keys: it is the only app
 > with no Supabase dependency, and a tile that needs data gets it from that tool's `/api/summary`.
@@ -107,20 +110,6 @@ landed after its session started.
 >
 > **Repo-wide odd jobs is not repo-wide write access.** Touching another app's folder means declaring
 > it in your pull request first.
-
-## Message Editor — `message-editor`
-
-> **Your board:** https://claude.ai/artifact/5YQoQvCUybVqoXVPuU5em9 — publish to this URL, never a new one.
->
-> You own `apps/editor`. Nothing else in this repo is yours.
->
-> **The value is the loop**: draft, edit to match what was really sent, log it, and periodically fold
-> the corpus back into the style guide. A drafting box that never learns is a worse chat window.
-> Training is **batched and never per-message** — folding one message in on every send would drift
-> the rules on a sample size of one.
->
-> **Never widen the `INTERNAL_API_SECRET` carve-out in `middleware.ts` beyond `/api/draft`.** That
-> scoping is load-bearing and is not yours to change.
 
 ## Resume Formatter — `resume`
 

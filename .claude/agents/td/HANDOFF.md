@@ -8,11 +8,11 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**`claude/platform-retire-two-agents` is mine** — Joel retired Platform Config and Pipeline Tracker
-on 2026-09-19. **Six agents now**, and `apps/tracker` is TechPad Gen's. It landed on top of a
-seven-merge close-out run (#138–#144) that **a second TD session ran the same evening**. **Two
-sessions in this seat at once is the trap**: `main` moved seven commits under this branch, and both
-retired agents shipped work after the branch was cut. Re-read `main` before trusting a base.
+**Two stacked branches are mine** — `claude/platform-retire-two-agents`, then
+`claude/platform-retire-message-editor` on top. Joel retired **three agents on 2026-09-19**:
+Platform Config, Pipeline Tracker, Message Editor. **Five remain**; TechPad Gen owns three apps.
+**Two TD sessions ran at once that evening** — `main` moved seven commits under the first branch and
+both agents it retires shipped work after it was cut. **Re-read `main` before trusting a base.**
 
 ## What is true now
 

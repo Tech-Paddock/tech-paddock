@@ -32,8 +32,16 @@ apps/home/
   scripts/collect-*.mjs build-time collectors — files above apps/home are unreadable at runtime
 ```
 
-**And `apps/tracker`, inherited on 2026-09-19** when Joel retired the Pipeline Tracker agent. The
-agent retired; **the tool did not.** It keeps its name, `tracker.techpaddock.io`, the `tracker`
+**And `apps/tracker` and `apps/editor`, inherited on 2026-09-19** when Joel retired the Pipeline
+Tracker and Message Editor agents. The agents retired; **the tools did not.**
+
+**`apps/editor` is frozen, not gone, and the difference matters.** `tp-message-editor` is paused —
+every deployment returns `BLOCKED`, production included — so it **still serves its last successful
+build** and `/api/draft` still answers. Merges reach the repo and never reach the running app, which
+means a change you make here is not a change anybody sees. Do not read a green CI run as deployed.
+
+**You now own both ends of the draft-follow-up contract**, which is what made it worth putting them
+together: the tracker calls it and the editor hosts it. It keeps its name, `tracker.techpaddock.io`, the `tracker`
 Postgres schema and its own `middleware.ts` variant. What changed is who answers for it.
 
 **Read `The three contracts` below before touching it.** The tracker is the most wired-in app here:
@@ -124,6 +132,16 @@ be set or the sweep does not run at all.**
 **Microsoft Graph is built and inert.** `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET` and
 `MS_GRAPH_REFRESH_TOKEN` are unset, so the calendar, To Do and the sweep all degrade quietly.
 **Nothing will tell you they are doing nothing.**
+
+**The editor hosts `/api/draft`, and its `middleware.ts` carve-out is load-bearing.** The exemption
+is scoped to `pathname === "/api/draft"` as an exact path, authenticated by `INTERNAL_API_SECRET`
+rather than a session cookie. **It is not yours to widen even though both ends are now yours** —
+that is exactly the argument the narrowness exists to refuse, and a second exempted route is the
+TD's to approve. Owning both sides removes the coordination, not the gate.
+
+**`shared.contacts` is written by both apps and both are yours now.** Ledger item 5 asked who the
+other owner was; the answer is that there is one owner, so the remaining work is to say in this
+charter which app writes what rather than to negotiate it with anybody.
 
 **The `tracker` Postgres schema and `tracker.pipeline_threads` are described by their migrations**
 in `supabase/`, which is where that detail is measured rather than restated.
