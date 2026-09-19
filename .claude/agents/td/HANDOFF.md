@@ -9,8 +9,8 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 ## In flight
 
 **Two branches are mine and stacked**: `claude/platform-charter-corrections` (item 6) and
-`claude/platform-deploy-scoping` (item 9) on top of it. Ten merged on 2026-09-19 (#124–#130,
-#132–#134); #131 is TechPad Gen's. **Check the open list live before assuming it is empty.**
+`claude/platform-deploy-scoping` (item 9) on top of it, both current with `main`. **Twelve merged on
+2026-09-19**, #124–#135. **No pull request is open** — check live before believing that.
 
 ## What is true now
 
@@ -72,8 +72,8 @@ a root install costs the per-app independence the CI matrix rests on.
 a canvas artifact, not in the repo, so the guide must carry the rules in words.
 
 **Every agent has a board, URLs in `KICKOFF.md`** — the only place they live, so an agent that loses
-its URL publishes a duplicate. **You are the rollup.** Joel, 2026-09-19: **a merge should refresh
-the merged agent's board too**, which is new and not yet in `CLAUDE.md`. **`On track` is item 3**,
-and the deploy trigger is still its unsolved half.
+its URL publishes a duplicate. **You are the rollup.** Joel, 2026-09-19: **a merge refreshes the
+merged agent's board too** — not in `CLAUDE.md` yet. **Their DevOps row and a dated TD banner only**;
+their Brief and Items stay theirs. **`On track` is item 3**, deploy trigger still unsolved.
 
 Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.
