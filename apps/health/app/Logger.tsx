@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Provenance from "./Provenance";
+import Correction from "./Correction";
 import { MACRO_KEYS, MACRO_LABELS, round, total, type Macros, type MacroSource } from "@/lib/macros";
 import { MEALS, MEAL_LABELS, localDate, type Meal } from "@/lib/meals";
 
@@ -41,6 +42,9 @@ export default function Logger() {
   const [busy, setBusy] = useState<null | "parsing" | "saving">(null);
   const [error, setError] = useState<string | null>(null);
   const [date, setDate] = useState<string>("");
+  // Which logged line is open for correction. One at a time: two open sheets on
+  // the same food could disagree about what the current numbers are.
+  const [fixing, setFixing] = useState<string | null>(null);
 
   // Resolved after mount: the server's day and the phone's day are different
   // things, and the one that matters is the one the person is standing in.
@@ -313,17 +317,40 @@ export default function Logger() {
                 </div>
                 <ul className="mt-2 flex flex-col gap-2">
                   {entry.items.map((item) => (
-                    <li key={item.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                      <span className="text-sm">
-                        {item.quantity !== 1 ? `${item.quantity} × ` : ""}
-                        {item.name}
-                      </span>
-                      <span className="text-sm text-ink-soft">
-                        {Math.round(item.macros.kcal * item.quantity)} kcal
-                      </span>
-                      <span className="ml-auto">
-                        <Provenance source={item.source} model={item.model} />
-                      </span>
+                    <li key={item.id} className="flex flex-col gap-1">
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                        <button
+                          type="button"
+                          onClick={() => setFixing(fixing === item.id ? null : item.id)}
+                          aria-expanded={fixing === item.id}
+                          className="text-left text-sm underline decoration-dotted underline-offset-2"
+                        >
+                          {item.quantity !== 1 ? `${item.quantity} × ` : ""}
+                          {item.name}
+                        </button>
+                        <span className="text-sm text-ink-soft">
+                          {Math.round(item.macros.kcal * item.quantity)} kcal
+                        </span>
+                        <span className="ml-auto">
+                          <Provenance source={item.source} model={item.model} />
+                        </span>
+                      </div>
+
+                      {/* The numbers shown are for one of the item; quantity is
+                          a property of this line, not of the food, so it is not
+                          part of what a correction changes. */}
+                      {fixing === item.id ? (
+                        <Correction
+                          itemId={item.item_id}
+                          name={item.name}
+                          current={item.macros}
+                          onClose={() => setFixing(null)}
+                          onSaved={() => {
+                            setFixing(null);
+                            void loadDay(day.date);
+                          }}
+                        />
+                      ) : null}
                     </li>
                   ))}
                 </ul>

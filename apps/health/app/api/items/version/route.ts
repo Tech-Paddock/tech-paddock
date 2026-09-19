@@ -20,6 +20,31 @@ export const dynamic = "force-dynamic";
  * Defaulting that would silently misdate the boundary, and the boundary is the
  * only thing a change means.
  */
+/**
+ * A food's whole history, newest era first.
+ *
+ * This exists so the append-only guarantee is **visible** rather than merely
+ * true. A correction that silently replaced the figure it beat would look
+ * identical on screen to one that kept it; showing the older rows is what makes
+ * "nothing was overwritten" something you can check instead of something you
+ * are told.
+ */
+export async function GET(request: NextRequest) {
+  const itemId = request.nextUrl.searchParams.get("item_id") ?? "";
+  if (!itemId) return NextResponse.json({ error: "Which food?" }, { status: 400 });
+
+  try {
+    const versions = await versionsOf(itemId);
+    return NextResponse.json({ versions });
+  } catch (e) {
+    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Couldn't read that history." },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
 
