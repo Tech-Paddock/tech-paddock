@@ -2,12 +2,11 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-19.** · **Next number: 21.**
+**Last reviewed: 2026-09-19.** · **Next number: 22.**
 
 **Numbers are permanent.** A closed item's row is deleted and its number is never used again, so the
 gaps below are correct rather than something to tidy. A new item takes `Next number` and increments
-it. Numbering restarts at 15 because 1–14 were each reused during four renumbers on 2026-09-19 and
-references to them are already ambiguous.
+it. **Why the run starts where it does is in `DECISIONS.md`**, not restated here.
 
 - Finished work is not here. Git log is the archive.
 - Settled calls, mistakes and traps are in `.claude/DECISIONS.md`. Live facts are computed, at `/admin`.
@@ -24,8 +23,13 @@ Nothing.
 
 ## Waiting on Joel
 
-18. **`DECISIONS.md` is full — 260 of its 260 lines.** *Owner: Joel.* Append-only with no trimming
-   rule, so the next settled call has nowhere to go. **Raise the ceiling, do not trim.** *LoE: minutes.*
+18. **`DECISIONS.md` is full — 260/260, and three copies of its ceiling disagree.** *Owner: Joel.*
+   **Its header's trimming rule exists and has never fired.** Raise the ceiling, or bound by relevance. *LoE: minutes.*
+
+21. **Recipes become their own app; #151 is held at the gate until they do.** *Owner: Joel.*
+   Health's recipe book is built and green on `claude/health-recipes`. **Do not merge it** —
+   `recipes.item_id` is a live FK into `health.items`, so merging makes the extraction destructive.
+   **Needs a name and a solutioning session**, `STANDUP.md` step 1. *LoE: minutes to decide.*
 
 ## Waiting on an agent
 
