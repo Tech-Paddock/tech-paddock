@@ -34,11 +34,39 @@ apps/home/
 
 **And `apps/tracker`, inherited on 2026-09-19** when Joel retired the Pipeline Tracker agent. The
 agent retired; **the tool did not.** It keeps its name, `tracker.techpaddock.io`, the `tracker`
-Postgres schema and its own `middleware.ts` variant. What changed is who answers for it.
+Postgres schema and its own `middleware.ts` variant.
 
-**Read `The three contracts` below before touching it.** The tracker is the most wired-in app here:
-it calls the Message Editor, the hub reads it, and the Resume Formatter writes to it. None of those
-three went away with the agent, and all three break quietly rather than loudly.
+**`apps/editor` is NOT yours.** It went to the technical director on 2026-09-19 because
+`tp-message-editor` is paused and the work there is caretaking rather than product. **You still call
+it**: the tracker's draft-follow-up hits the editor's `/api/draft`, so that contract is now
+cross-agent again and its scoping is the TD's to approve.
+
+**Read `The three contracts` below before touching the tracker.** It is the most wired-in app here:
+it calls the editor, the hub reads it, and the Resume Formatter writes to it. None of those went
+away with the agent, and all three break quietly rather than loudly.
+
+**And deliveries — Vercel, DNS and CI — as of 2026-09-19.** Joel: *"Tech gen owns deliveries and
+themes."* Platform Config was retired and this half of its domain came here rather than to the TD,
+who keeps the merge gate. **Merging and deploying are different events, and every serious incident
+here lives in the gap** — you own the second one.
+
+- **Environment variables bake in at build time.** Setting one changes nothing until that project
+  redeploys. This catches people out constantly; it reads as the change not having landed.
+- **`SESSION_SECRET` must be byte-identical across every project** or the others silently reject
+  valid sessions — which reads as a login bug, not a config one. **It cannot be read back out of
+  the dashboard**, so parity is only knowable by setting one fresh value everywhere and redeploying.
+- **DNS is uniform and the apex is deliberately different.** Every subdomain is a CNAME to
+  `d1317e1174061c29.vercel-dns-017.com`; the apex stays an A record at `76.76.21.21` because an apex
+  cannot be a CNAME. **Correct, not a leftover** — do not "fix" it.
+- **`HEAD^..HEAD` in each `ignoreCommand` is correct because this repo squash-merges** — one merge
+  is one commit, so that range is the whole change. That reverses an older argument for
+  `VERCEL_GIT_PREVIOUS_SHA`, which reasoned about a history this repo does not have.
+- **Read deployment state, never a project field.** `BLOCKED` is paused, `READY` at
+  `target: production` is live, `CANCELED` at `target: null` is a skipped preview. `live: false`
+  means something else and reading it wrong has already cost a day.
+
+**Still Joel's, with no undo:** creating or deleting a Vercel project, adding or removing a domain,
+changing a DNS record, and the Supabase exposed-schemas setting.
 
 Plus repo-wide odd jobs: shared UI conventions, cross-app consistency, anything that is nobody
 else's and is not infrastructure.

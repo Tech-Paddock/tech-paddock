@@ -6,7 +6,7 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-19T22:19:37.011Z",
+  "generatedAt": "2026-09-19T22:35:55.588Z",
   "complete": true,
   "reason": "",
   "checks": [
@@ -61,19 +61,14 @@ export const DRIFT: Drift = {
       "detail": "79 / 80"
     },
     {
-      "name": "budget: .claude/agents/message-editor/HANDOFF.md",
-      "state": "ok",
-      "detail": "69 / 80"
-    },
-    {
       "name": "budget: .claude/agents/resume/HANDOFF.md",
       "state": "warn",
       "detail": "80 / 80"
     },
     {
       "name": "budget: .claude/agents/td/HANDOFF.md",
-      "state": "warn",
-      "detail": "80 / 80"
+      "state": "fail",
+      "detail": "81 / 80"
     },
     {
       "name": "budget: .claude/agents/techpad-gen/HANDOFF.md",
@@ -83,7 +78,7 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/OPEN-ITEMS.md",
       "state": "warn",
-      "detail": "79 / 80"
+      "detail": "77 / 80"
     },
     {
       "name": "budget: .claude/DECISIONS.md",
@@ -101,11 +96,6 @@ export const DRIFT: Drift = {
       "detail": "2026-09-19, current with apps/health"
     },
     {
-      "name": "fresh: message-editor",
-      "state": "ok",
-      "detail": "2026-09-19, current with apps/editor"
-    },
-    {
       "name": "fresh: resume",
       "state": "ok",
       "detail": "2026-09-19, current with apps/resume"
@@ -113,7 +103,7 @@ export const DRIFT: Drift = {
     {
       "name": "fresh: td",
       "state": "ok",
-      "detail": "2026-09-19; owns no app folder, so freshness is not measurable here"
+      "detail": "2026-09-19, current with apps/editor"
     },
     {
       "name": "fresh: techpad-gen",
@@ -143,17 +133,17 @@ export const DRIFT: Drift = {
     {
       "name": "no computable facts written as prose",
       "state": "warn",
-      "detail": "CLAUDE.md:347 names a roster count"
+      "detail": "CLAUDE.md:346 names a roster count"
     },
     {
       "name": "ledger numbers are permanent",
       "state": "ok",
-      "detail": "11 items, ascending, all below Next number 19 — against origin/main"
+      "detail": "10 items, ascending, all below Next number 19 — against origin/main"
     }
   ],
   "counts": {
-    "ok": 20,
-    "warn": 8,
-    "fail": 0
+    "ok": 18,
+    "warn": 7,
+    "fail": 1
   }
 };
