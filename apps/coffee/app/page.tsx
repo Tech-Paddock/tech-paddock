@@ -549,24 +549,32 @@ function Scan({ onSaved }: { onSaved: () => void }) {
       {stage !== "confirm" && (
         <section className="bg-surface border border-line rounded-2xl p-4 flex flex-col gap-3">
           <h2 className="font-medium">The purchase</h2>
-          <label className="text-sm text-ink/70 flex flex-col gap-1">
-            Purchased
-            <input
-              type="date"
-              value={purchase.purchased_date}
-              onChange={(e) => setPurchase({ ...purchase, purchased_date: e.target.value })}
-              className="border border-line rounded-lg px-3 py-2 bg-surface"
-            />
-          </label>
-          <label className="text-sm text-ink/70 flex flex-col gap-1">
-            Roasted
-            <input
-              type="date"
-              value={purchase.roast_date}
-              onChange={(e) => setPurchase({ ...purchase, roast_date: e.target.value })}
-              className="border border-line rounded-lg px-3 py-2 bg-surface"
-            />
-          </label>
+          {/* Side by side, because they are one question asked twice — when it
+              was bought and when it was roasted — and the pair is what tells
+              you how old the coffee is. Stacked, they read as two unrelated
+              settings and the gap between the dates has to be done in your
+              head. Two columns still fit a phone: a date input is a fixed,
+              short piece of text. */}
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm text-ink/70 flex flex-col gap-1">
+              Purchased
+              <input
+                type="date"
+                value={purchase.purchased_date}
+                onChange={(e) => setPurchase({ ...purchase, purchased_date: e.target.value })}
+                className="border border-line rounded-lg px-3 py-2 bg-surface w-full min-w-0"
+              />
+            </label>
+            <label className="text-sm text-ink/70 flex flex-col gap-1">
+              Roasted
+              <input
+                type="date"
+                value={purchase.roast_date}
+                onChange={(e) => setPurchase({ ...purchase, roast_date: e.target.value })}
+                className="border border-line rounded-lg px-3 py-2 bg-surface w-full min-w-0"
+              />
+            </label>
+          </div>
           <p className="text-xs text-ink-soft">
             How you brew it is recorded per brew, on the bag in your shelf — a bag holds many brews.
           </p>
@@ -797,27 +805,34 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
               the block that never moves. */}
           <section className="flex flex-col gap-3">
             <SectionHead>This bag</SectionHead>
-            <label className="text-sm text-ink/70 flex flex-col gap-1">
-              Purchased
-              <input
-                type="date"
-                value={draft.purchased_date}
-                onChange={(e) => setDraft({ ...draft, purchased_date: e.target.value })}
-                className="border border-line rounded-lg px-3 py-2 bg-surface"
-              />
-            </label>
-            {/* Editable here because it is the bag's, not the roaster's: it is
-                read off a label by a model told to report only what is legible,
-                so a smudged or oddly printed one has to be typeable later. */}
-            <label className="text-sm text-ink/70 flex flex-col gap-1">
-              Roasted
-              <input
-                type="date"
-                value={draft.roast_date}
-                onChange={(e) => setDraft({ ...draft, roast_date: e.target.value })}
-                className="border border-line rounded-lg px-3 py-2 bg-surface"
-              />
-            </label>
+            {/* The two dates share a row. They are one question asked twice —
+                bought when, roasted when — and the distance between them is
+                the age of the coffee, which is the thing you are actually
+                reading. Stacked, that subtraction happens in your head.
+                Roasted is editable here because it is the bag's and not the
+                roaster's: a model told to report only what is legible will
+                leave a smudged or oddly printed date alone, so it has to be
+                typeable afterwards. */}
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-sm text-ink/70 flex flex-col gap-1">
+                Purchased
+                <input
+                  type="date"
+                  value={draft.purchased_date}
+                  onChange={(e) => setDraft({ ...draft, purchased_date: e.target.value })}
+                  className="border border-line rounded-lg px-3 py-2 bg-surface w-full min-w-0"
+                />
+              </label>
+              <label className="text-sm text-ink/70 flex flex-col gap-1">
+                Roasted
+                <input
+                  type="date"
+                  value={draft.roast_date}
+                  onChange={(e) => setDraft({ ...draft, roast_date: e.target.value })}
+                  className="border border-line rounded-lg px-3 py-2 bg-surface w-full min-w-0"
+                />
+              </label>
+            </div>
             <label className="text-sm text-ink/70 flex flex-col gap-1">
               Brew Notes
               <textarea
