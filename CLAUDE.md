@@ -75,14 +75,11 @@ message in one had a better home. `read-all.sh` went with them.
 
 | Agent | Owns | Charter |
 |---|---|---|
-| Technical Director | ops, gatekeeping, the ledger, merges, **app surface** | `.claude/agents/td/` |
-| TechPad Gen | `apps/home`, **the visual theme of every app**, shared components | `.claude/agents/techpad-gen/` |
-| Message Editor | `apps/editor` | `.claude/agents/message-editor/` |
-| Pipeline Tracker | `apps/tracker` | `.claude/agents/tracker/` |
+| Technical Director | ops, gatekeeping, the ledger, merges, **app surface**, **Postgres**, **`apps/editor`** (frozen) | `.claude/agents/td/` |
+| TechPad Gen | `apps/home`, `apps/tracker`, **the visual theme of every app**, **deliveries — Vercel, DNS, CI**, shared components | `.claude/agents/techpad-gen/` |
 | Resume Formatter | `apps/resume` | `.claude/agents/resume/` |
 | Coffee | `apps/coffee` | `.claude/agents/coffee/` |
 | Health | `apps/health` | `.claude/agents/health/` |
-| Platform Config | Postgres, Vercel, DNS, CI | `.claude/agents/platform/` |
 
 Each folder holds `RULES.md` and `HANDOFF.md`. The prompts that start a session are in
 `.claude/agents/KICKOFF.md`.
@@ -427,7 +424,9 @@ Per-tool detail lives in that tool's charter. Live facts about what is deployed 
   `ALTER DEFAULT PRIVILEGES` grants `anon` table access automatically, it is the only control between
   a leaked publishable key and the data.
 - **One deliberately shared table: `shared.contacts`** — written and read by the Message Editor and
-  the Pipeline Tracker, so a person exists once rather than as drifting duplicates.
+  the Pipeline Tracker app, so a person exists once rather than as drifting duplicates. **The editor
+  is the technical director's and the tracker is TechPad Gen's as of 2026-09-19**, so the write rules
+  are a cross-app contract rather than one agent's internal note.
 - **No secrets reach the browser.** Every Supabase read/write and every Anthropic call happens
   through the app's own server-side API routes.
 - **One login covers every subdomain.** The session cookie is scoped to `.techpaddock.io`;

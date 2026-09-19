@@ -221,7 +221,15 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.conf
    below, and an agent matching neither is reported as unmapped rather than
    skipped in silence. */
 {
-  const NAMED = { "techpad-gen": "apps/home", "message-editor": "apps/editor" };
+  /* Agents whose folder name does not match the app folder they own, and the
+     reason this is a LIST rather than a string: on 2026-09-19 Joel retired the
+     Pipeline Tracker and Message Editor agents; `apps/tracker` went to TechPad
+     Gen, who already owned `apps/home`, and the frozen `apps/editor` went to
+     the TD. One agent owns two apps and the TD owns one for the first time. A
+     one-to-one map could not say that — it would have reported `apps/tracker` as an orphan while the
+     charter plainly named an owner, which is the documentation and the disk
+     disagreeing in the direction this file exists to catch. */
+  const NAMED = { "techpad-gen": ["apps/home", "apps/tracker"], "td": ["apps/editor"] };
   const agents = existsSync(R(".claude/agents"))
     ? readdirSync(R(".claude/agents")).filter((d) => statSync(R(".claude/agents", d)).isDirectory()).sort()
     : [];
@@ -234,10 +242,10 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.conf
     const stated = body.match(/State as of (\d{4}-\d{2}-\d{2})/)?.[1];
     if (!stated) { add(`fresh: ${agent}`, "warn", "no 'State as of <date>' line — the Pit Wall reads that field"); continue; }
 
-    const path = NAMED[agent] ?? (APPS.includes(agent) ? `apps/${agent}` : null);
-    if (!path) {
-      // td and platform own no folder, so there is nothing to date them
-      // against. Say so rather than reporting ok for something unmeasured.
+    const paths = NAMED[agent] ?? (APPS.includes(agent) ? [`apps/${agent}`] : []);
+    if (!paths.length) {
+      // An agent owning no folder has nothing to date it against. Say so rather
+      // than reporting ok for something unmeasured.
       add(`fresh: ${agent}`, "ok", `${stated}; owns no app folder, so freshness is not measurable here`);
       continue;
     }
@@ -247,18 +255,28 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.conf
     // flagged three agents stale for one line each. Freshness is meant to ask
     // "has this handoff kept up with this app's code", so it measures the code.
     const SWEPT = ["vercel.json", ".env.example", "package-lock.json"];
-    const newest = git("log", "-1", "--format=%ad", "--date=short", "--", path,
-      ...SWEPT.map((f) => `:(exclude)${path}/${f}`));
-    if (!newest) add(`fresh: ${agent}`, "warn", `stated ${stated}; no commits found under ${path}`);
-    else add(`fresh: ${agent}`, stated >= newest ? "ok" : "warn",
-      stated >= newest ? `${stated}, current with ${path}` : `says ${stated}; ${path} last changed ${newest}`);
+    /* An agent owning several apps is as stale as its most recently changed
+       one, so this takes the newest date across all of them and names which. */
+    const dated = paths
+      .map((path) => [path, git("log", "-1", "--format=%ad", "--date=short", "--", path,
+        ...SWEPT.map((f) => `:(exclude)${path}/${f}`))])
+      .filter(([, d]) => d)
+      .sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0));
+    const label = paths.join(" + ");
+    if (!dated.length) add(`fresh: ${agent}`, "warn", `stated ${stated}; no commits found under ${label}`);
+    else {
+      const [newestPath, newest] = dated[dated.length - 1];
+      add(`fresh: ${agent}`, stated >= newest ? "ok" : "warn",
+        stated >= newest ? `${stated}, current with ${label}`
+          : `says ${stated}; ${newestPath} last changed ${newest}`);
+    }
   }
 
   /* An app with no agent is nobody's, and an agent's app that has been
      deprecated leaves a charter describing a folder that is gone. Both are the
      roster changing underneath the documentation, which is the thing this file
      exists to notice. */
-  const owned = new Set(Object.values(NAMED).map((p) => p.replace("apps/", "")).concat(agents));
+  const owned = new Set(Object.values(NAMED).flat().map((p) => p.replace("apps/", "")).concat(agents));
   const orphans = APPS.filter((a) => !owned.has(a));
   add("every app has an owning agent", orphans.length === 0 ? "ok" : "warn",
     orphans.length === 0 ? `${APPS.length} apps, all owned` : `no agent owns: ${orphans.join(", ")}`);

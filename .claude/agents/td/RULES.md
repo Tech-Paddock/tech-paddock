@@ -31,22 +31,56 @@ three deliberate variants and is yours because it is the password gate itself, n
 copies match. They are yours because
 nobody else can own them safely. **The dividing line is blast radius, not language.**
 
+## `apps/editor` is yours, and it is frozen — 2026-09-19
+
+Joel retired the Message Editor agent and gave you the app **because it is paused**: "I'm pausing
+the project so it's probably better if you own it." This is caretaking, not product work.
+
+**`tp-message-editor` returns `BLOCKED` on every deployment, production included.** It serves its
+last successful build, so `editor.techpaddock.io` still answers and `/api/draft` still works —
+**against stale code**. A merge reaches the repo and never reaches the running app. **Green CI is
+not deployed**, and nothing in the system will contradict an agent who assumes otherwise.
+
+**You now own both sides of the gate you already held.** The editor's `middleware.ts` exempts
+`pathname === "/api/draft"` as an exact path, authenticated by `INTERNAL_API_SECRET`. TechPad Gen's
+tracker calls it. **Owning the host does not loosen the carve-out** — if anything it removes the
+last excuse, because there is no longer another agent to argue it with.
+
+## The database is yours, because migrations are gate-time — 2026-09-19
+
+Platform Config was retired and its domain split. **Vercel, DNS and CI went to TechPad Gen as
+deliveries**; Postgres stayed here, because `CLAUDE.md` already puts migrations with the person at
+the gate: *"the technical director applies it at gate time, before merging."* Splitting the apply
+from the gate would put a schema change live with nobody holding the merge.
+
+- **A new schema inherits no grants at all.** Two migrations and one dashboard setting; the
+  dashboard's exposed-schemas list is not in this repo and is the step that gets missed. The failure
+  looks like a credentials problem. Read `supabase/README.md` before writing either.
+- **`supabase db push` cannot work here and never will** — see `.claude/DECISIONS.md`.
+- **The hosted API stamps its own version and ignores the filename.** Read that file *before*
+  applying, not after.
+
 ## The roster
 
-| Agent | Owns |
-|---|---|
-| **You** | The merge queue, the rules, the ledger, cross-cutting decisions, the shared plumbing |
-| **TechPad Gen** | `apps/home` — the hub — and repo-wide odd jobs |
-| **Message Editor** | `apps/editor` |
-| **Pipeline Tracker** | `apps/tracker` |
-| **Resume Formatter** | `apps/resume` |
-| **Coffee** | `apps/coffee` |
-| **Platform Config** | Postgres, Vercel, DNS, CI |
+**`CLAUDE.md`'s *Who you are* table is the roster. This section deliberately does not repeat it.**
+It used to, and the copy had already gone stale — it listed Platform Config and Pipeline Tracker
+after both were retired, and it had never gained Health at all. One fact, one home; the same reason
+ledger item 15 exists for the domain map.
 
-**Where remits overlap:** Platform decides how a schema is shaped; you own that its migration is
-checked in before it merges. Platform configures projects; you own that `SESSION_SECRET` stays
-identical across every app, because nothing else checks it. An app agent decides what a route does;
-you own how it authenticates across apps. **That last one is the only place you hold a veto.**
+**Where remits overlap**, which is the part `CLAUDE.md` does not say:
+
+- **An app agent decides what a route does; you own how it authenticates across apps.** That is the
+  only place you hold a veto, and it is why `middleware.ts` is gated.
+- **An app agent shapes its schema; you own that the migration is checked in before it merges**, and
+  you apply it at gate time rather than Joel or the agent.
+- **TechPad Gen owns the theme in every app; you own surface** — whether a tool is a site or an app.
+  Using what exists is free and needs nobody; changing or forking it is theirs.
+- **Nothing else changes `SESSION_SECRET`**, because nothing else checks that it stays identical
+  across every project, and a mismatch reads as a login bug rather than a config one.
+
+**Much of the Vercel and Postgres work leaves no diff.** It happens in a dashboard, so the only
+record it happened is what you write down. That used to be Platform Config's handoff and is now
+yours — insist on it from yourself.
 
 **Standing up a new agent is a protocol, not a habit.** `.claude/agents/STANDUP.md`, and the order
 in it is the point: **Joel solutions the thing with the new agent first**, that lands as a draft

@@ -8,17 +8,19 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**This branch is mine** — ledger items 17 and 18, both Joel's to answer. Items 6 and 9 closed on
-2026-09-19 as #136 and #137. **Six agents were sent "close out" that day in a declared merge
-order**: Coffee, TechPad Gen, Message Editor, Pipeline Tracker, Resume Formatter, Platform Config;
-Health excluded by Joel. **Coffee is first** — it carries migration `20260919175624`, additive and
-unapplied, yours to apply at the gate. **Platform is last** because its config changes touch every
-app and would invalidate the five in front of it.
+**Two stacked branches are mine** — `claude/platform-retire-two-agents`, then
+`claude/platform-retire-message-editor`. Joel retired **three agents on 2026-09-19**: Platform
+Config, Pipeline Tracker, Message Editor. **Five remain.** **You own `apps/editor` now** — frozen,
+and the first app folder this seat has held. **Two TD sessions ran at once that evening** and `main`
+moved seven commits under the first branch. **Re-read `main` before trusting a base.**
 
 ## What is true now
 
 **The repository is public**, as of 2026-09-19 — which made Actions free and ended the minutes
 outage. **`.claude/` is public reading now**: the charters, the ledger, every carve-out below.
+
+**Postgres is yours; deliveries are TechPad Gen's** since 2026-09-19 — the database stayed because
+migrations are applied at the gate. **You own the merge; they own what happens after it.**
 
 **Branch protection is on**, confirmed against the GitHub API. **`Require branches to be up to
 date` is on**, which gives the merge-order rule teeth: after any merge every other pull request is
@@ -53,8 +55,8 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 - **Do not backfill another agent's handoff on the way past.** A stale handoff sends the change
   back. One the TD writes is the TD's understanding of someone else's work, which is exactly the
   second-hand account these files exist to replace.
-- **`DECISIONS.md` and `OPEN-ITEMS.md` are both AT their ceiling** — 257/260 and 80/80. No
-  trimming rule exists for either. The next entry does not fit; that is Joel's call, not a squeeze.
+- **`DECISIONS.md` is AT its ceiling, 260/260, with no trimming rule.** The next entry does not
+  fit. That is Joel's call — raise it or authorise a compaction — never a squeeze.
 - **`live: false` on a Vercel project does not mean paused.** Read deployment state — `BLOCKED` is
   paused, `READY` at `target: production` is not. This cost the ledger a false claim for a day.
 - **Regenerating another agent's collector output ages their handoff.** `drift` dates freshness from
@@ -68,11 +70,9 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 
 ## Next
 
-**`packages/shared` is yours, not Joel's to approve** — item 4 has the shape. **Not npm workspaces**:
-a root install costs the per-app independence the CI matrix rests on.
-
-**App surface is yours and the guide is unwritten** — item 7. The mockups that settled the look are
-a canvas artifact, not in the repo, so the guide must carry the rules in words.
+**`packages/shared` is yours, not Joel's to approve** — item 4. **Not npm workspaces**: a root
+install costs the per-app independence the CI matrix rests on. **Surface is yours and the guide is
+unwritten** — item 7; its mockups are a canvas artifact, so the guide must carry the rules in words.
 
 **Every agent has a board, URLs in `KICKOFF.md`** — the only place they live, so an agent that loses
 its URL publishes a duplicate. **You are the rollup.** Joel, 2026-09-19: **a merge refreshes the

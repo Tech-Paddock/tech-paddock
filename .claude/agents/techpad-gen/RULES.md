@@ -32,6 +32,42 @@ apps/home/
   scripts/collect-*.mjs build-time collectors — files above apps/home are unreadable at runtime
 ```
 
+**And `apps/tracker`, inherited on 2026-09-19** when Joel retired the Pipeline Tracker agent. The
+agent retired; **the tool did not.** It keeps its name, `tracker.techpaddock.io`, the `tracker`
+Postgres schema and its own `middleware.ts` variant.
+
+**`apps/editor` is NOT yours.** It went to the technical director on 2026-09-19 because
+`tp-message-editor` is paused and the work there is caretaking rather than product. **You still call
+it**: the tracker's draft-follow-up hits the editor's `/api/draft`, so that contract is now
+cross-agent again and its scoping is the TD's to approve.
+
+**Read `The three contracts` below before touching the tracker.** It is the most wired-in app here:
+it calls the editor, the hub reads it, and the Resume Formatter writes to it. None of those went
+away with the agent, and all three break quietly rather than loudly.
+
+**And deliveries — Vercel, DNS and CI — as of 2026-09-19.** Joel: *"Tech gen owns deliveries and
+themes."* Platform Config was retired and this half of its domain came here rather than to the TD,
+who keeps the merge gate. **Merging and deploying are different events, and every serious incident
+here lives in the gap** — you own the second one.
+
+- **Environment variables bake in at build time.** Setting one changes nothing until that project
+  redeploys. This catches people out constantly; it reads as the change not having landed.
+- **`SESSION_SECRET` must be byte-identical across every project** or the others silently reject
+  valid sessions — which reads as a login bug, not a config one. **It cannot be read back out of
+  the dashboard**, so parity is only knowable by setting one fresh value everywhere and redeploying.
+- **DNS is uniform and the apex is deliberately different.** Every subdomain is a CNAME to
+  `d1317e1174061c29.vercel-dns-017.com`; the apex stays an A record at `76.76.21.21` because an apex
+  cannot be a CNAME. **Correct, not a leftover** — do not "fix" it.
+- **`HEAD^..HEAD` in each `ignoreCommand` is correct because this repo squash-merges** — one merge
+  is one commit, so that range is the whole change. That reverses an older argument for
+  `VERCEL_GIT_PREVIOUS_SHA`, which reasoned about a history this repo does not have.
+- **Read deployment state, never a project field.** `BLOCKED` is paused, `READY` at
+  `target: production` is live, `CANCELED` at `target: null` is a skipped preview. `live: false`
+  means something else and reading it wrong has already cost a day.
+
+**Still Joel's, with no undo:** creating or deleting a Vercel project, adding or removing a domain,
+changing a DNS record, and the Supabase exposed-schemas setting.
+
 Plus repo-wide odd jobs: shared UI conventions, cross-app consistency, anything that is nobody
 else's and is not infrastructure.
 
@@ -69,6 +105,56 @@ One login covers every subdomain because the session cookie is scoped to `.techp
 `/api/logout` here clears it everywhere at once — that is a hub responsibility, not a per-tool one.
 
 ---
+
+## The tracker's three contracts — inherited, and the reason it is wired in
+
+### Draft-follow-up — you call the Message Editor
+
+A button on each thread calls the editor's `/api/draft` directly, server to server, passing the
+linked contact and the thread's notes. It authenticates with a shared `INTERNAL_API_SECRET` header
+because a cross-app call carries no browser session.
+
+The editor's middleware lets it through **for `/api/draft` only**, matched as an exact path. That
+scoping is the blessed pattern here and **widening it is not yours to propose casually** — it is the
+editor's route, the TD's veto, and a blanket auth bypass is what the narrowness exists to prevent.
+
+### `/api/summary` — the hub reads you
+
+The hub renders its landing glance by fanning out to each tool's `/api/summary` server-side. Yours
+follows the same carve-out shape as above: `pathname === "/api/summary"` exactly, read-only, failing
+closed without the secret, four-second timeout.
+
+**Keep the shape narrow.** Counts and singles, never rows. Rich lists stay behind `loadDashboard`.
+That discipline is what made the route reviewable, and it is why an objection to it was withdrawn
+rather than sustained.
+
+### Resume write-through — the Resume Formatter writes to you
+
+The Resume Formatter is the submission layer. Naming a company when saving a render creates or
+updates a thread here. You keep your own ad-hoc thread creation for applications and networking
+threads that never involve a resume.
+
+**Job details live here, not there.** Company, role, posting URL and contact are on the thread and
+are never duplicated into `resume.renders`.
+
+**Two more things came with it.** `/api/cron/stale-tasks` is waved past the password gate by the
+tracker's `middleware.ts` and its guard fails **open** when `CRON_SECRET` is unset — ledger item 11,
+and the one-line fix is now yours rather than the retired agent's. And Microsoft Graph is
+unconfigured; the ordering rule in item 11 is not optional if it is ever turned on.
+
+**The daily sweep's guard fails closed as of #144**, which landed the same day the agent retired.
+`/api/cron/stale-tasks` read `if (secret && …)`, so an unset `CRON_SECRET` skipped the check
+entirely; it now reads `if (!secret || …)` and answers 401, byte-identically whether the secret is
+unset or merely wrong. **What that changed is the cost of un-parking item 11**: the ordering is no
+longer load-bearing for safety, and what replaced it is a plain requirement — **`CRON_SECRET` must
+be set or the sweep does not run at all.**
+
+**Microsoft Graph is built and inert.** `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET` and
+`MS_GRAPH_REFRESH_TOKEN` are unset, so the calendar, To Do and the sweep all degrade quietly.
+**Nothing will tell you they are doing nothing.**
+
+**The `tracker` Postgres schema and `tracker.pipeline_threads` are described by their migrations**
+in `supabase/`, which is where that detail is measured rather than restated.
 
 ## Guardrails
 
