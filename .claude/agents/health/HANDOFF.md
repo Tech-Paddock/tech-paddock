@@ -1,80 +1,79 @@
 # Health — handoff
 
-State as of 2026-09-19.
-
-Read `RULES.md` first, then `.claude/HEALTH-PLAN.md`. This file is only what is true right now.
+State as of 2026-09-19. Read `RULES.md` and `.claude/HEALTH-PLAN.md` first.
 
 ---
 
-## The macro log is built and is on a branch
+## The macro log is live
 
-`claude/health-macro-log` — pushed, CI green, **pull request open at Joel's request, 2026-09-19**.
-It replaces the placeholder page, adds the schema the app runs on, and lets a number that turned
-out wrong be fixed after the fact.
+Merged as #122 and deployed. Dictate what you ate, approve the draft, it is logged with the day's
+running total. `/debug` runs both models on one food and keeps every run.
 
-**The migration is applied**, at the gate on 2026-09-19, and verified: five tables, RLS on every one,
-zero policies. The hosted API stamped its own version and ignored the filename, so the file was
-renamed to `20260919135856_health_macro_tables.sql` to match — see `supabase/README.md`.
+**The database is empty.** Zero rows in every table, measured 2026-09-19. Nothing has been logged
+and the harness has never run, so there is no evidence yet about the thing it was built to measure.
+
+**In flight:** `claude/health-gate-followups` carries the column comments and the `models.ts`
+correction described below. True on that branch, not yet on `main`.
 
 ## How it works, in the order it matters
 
 **The lookup order is the product**, in `lib/log.ts:resolveItem`. Exact match on the normalised
-name; a miss goes outside to one model call that may search; approval writes it back, so the outside
-path runs at most once per distinct food.
+name; a miss goes outside to one model call that may search; approval writes it back, so the
+outside path runs at most once per distinct food.
 
 **Item numbers are append-only.** `health.items` is identity, `health.item_versions` is what it
-weighed over time. Nothing is updated in place, which makes guardrail 3 structural rather than
-remembered.
+weighed over time. Nothing is updated in place.
 
-**`kind` is the column that cannot be retrofitted.** A `correction` says the number was always wrong
-and reaches backwards through its era; a `change` says the food itself changed and does not. Settled
-in [#116](https://github.com/Tech-Paddock/tech-paddock/issues/116). `correction` is the default
-deliberately — guessing it wrong is visible, guessing `change` wrong silently strands old days.
+**`kind` is the column that cannot be retrofitted.** A `correction` says the number was always
+wrong and reaches backwards through its era; a `change` says the food itself changed and does not.
+Settled in [#116](https://github.com/Tech-Paddock/tech-paddock/issues/116). `correction` is the
+default deliberately — guessing it wrong is visible, guessing `change` wrong strands old days.
 
 **Read `lib/items.ts:resolveVersion` first.** Take the era with the greatest `effective_from` on or
-before the day, then within it the most recently written row. Thirteen tests pin it, including the
-fallback for a day before any era starts — a null there renders as a silently missing total.
+before the day, then within it the most recently written row. Thirteen tests pin it.
 
-**Entries reference an item's identity, never a copy of its numbers.** That is what lets a
-correction fix every past day while a change leaves them alone, and why `readDay` resolves per day.
+**Entries reference an item's identity, never a copy of its numbers**, which is why `readDay`
+resolves per day. Tapping a logged food opens `app/Correction.tsx`, which also lists earlier
+versions — that is what makes the append-only guarantee checkable rather than a promise.
 
-**Tapping a logged food opens the correction sheet**, `app/Correction.tsx`. It puts the choice as a
-question about the food — *the number was wrong* against *the food itself changed* — because that is
-the only form in which the answer is knowable. A change asks for the date the food changed and never
-defaults to today; the boundary is the only thing a change means. The sheet lists earlier versions,
-which makes the append-only guarantee checkable rather than a promise.
+## Agreed with Joel, not started
 
-## What is deliberately not there
+**Targets, a dashboard, and deleting a meal.** A preset page taking calorie and macro targets that
+rebalance against each other; a dashboard reading consumed against left; deleting an entry, which
+takes its lines with it. Mockups exist and Joel approved their four commitments on 2026-09-19:
 
-- **No effort dial and no `output_config` on either call.** Haiku 4.5 returns a 400 for an effort
-  where Sonnet 5 accepts one; JSON is asked for in the prompt and validated in code, which untrusted
-  model output needs anyway. Both argued at their call sites.
-- **No `/api/summary`, no line in the hub's glance.** Settled.
-- **No history screen.** Today only; `readDay` already takes any date, so that is a route rather
-  than a rewrite.
-- **No way to re-point a logged line at a different food** — and it is not a correction, so do not
-  build it as one. *"A #1 is 540, not 620"* fixes the food's numbers, which the sheet does. *"That
-  was a medium, not a large"* says the line references the wrong item: a different write, against
-  `entry_items`. **The plan does not say which it means by a dictated correction.** Joel's call.
+1. **A target needs an effective date**, for the reason `kind` exists — change your budget in March
+   and February must still be scored against February's.
+2. **Deleting an entry must not delete the food.** The cascade drops `entry_items`; `health.items`
+   and its versions stay, or a mis-logged lunch throws away approved macros.
+3. **None of it calls a model.** Joel: *"macro tracker should only be reading from database."*
+4. **The split clamps at zero** rather than showing a negative gram.
+
+**Recipes are parked on a charter change** Joel said he would make. A book is a library, therefore
+an index, and this app is settled as one screen with no index. He has also said Health *"will be
+surfaced as an app"*. **Do not start the recipe build before the charter lands.**
+
+**One question still open:** how wrong can a recipe's macros be before it matters? It decides
+whether a recipe needs correcting after you have cooked it a few times, or whether one estimate at
+creation is the end of it.
 
 ## Traps specific to this seat
 
 - **`lib/models.ts` is Coffee's registry copied verbatim, flagged rather than quiet.** Approved in
-  #116; the TD is carrying Health-as-second-copy into the argument for `packages/shared`. Do not let
-  a third copy happen quietly.
-- **The livery is still borrowed** — `senna`, which the paused tracker wears. TechPad Gen's.
+  #116. Do not let a third copy happen quietly, and do not cite a ledger number in a comment — that
+  is what this one already got wrong once.
+- **The livery is borrowed and has a collision.** `senna`, which the tracker also wears, maps
+  `--sev-warn` onto the accent — so "over target" and "on track" would be one colour. The mockups
+  use the reserved danger colour instead. **Both TechPad Gen's to settle**, not yours.
 - **A failed lookup must never look like "not found."** `LookupError` keeps them apart and every
-  route turns it into a 503. Degrading into internet-first changes nothing on screen, which is the
-  whole danger.
-- **`supabase migration list` always shows one remote-only version**, `20260908235234`. A *second*
-  discrepancy means something drifted.
+  route turns it into a 503. Degrading into internet-first changes nothing on screen.
+- **`eaten_at` is not the time you ate.** The app never sets it, so it duplicates `created_at`.
+  `eaten_on` is what a day's total reads. Both now carry column comments saying so.
+- **The hosted API stamps its own version and ignores your filename.** #122's migration was
+  renamed at the gate to match what ran. Check `migration list` rather than assuming.
 
 ## Next
 
-**Use it for a week before building anything else.** The harness at `/debug` answers one question —
-does Haiku reproduce a number you already approved — and cannot answer it without runs.
-`health.comparisons` keeps every run whether or not a pick is made.
-
-Two numbers Joel has not set, neither blocking: **the agreement rate that retires the harness**, and
-**the divergence tolerance**, currently 10%-or-25 kcal on calories and 20%-or-5 g on macros in
-`lib/macros.ts`.
+**Use it before building more** — the harness cannot answer whether Haiku reproduces a number you
+already approved without runs. Two numbers Joel has not set, neither blocking: **the agreement rate
+that retires the harness** and **the divergence tolerance** (10%-or-25 kcal, 20%-or-5 g).

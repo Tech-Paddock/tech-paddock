@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { uploadPhoto, signedPhotoUrl, StorageError, IMAGE_TYPES } from "@/lib/storage";
 import { findPreviousBag, guideColumns, searchPattern } from "@/lib/bags";
+import { isIsoDate } from "@/lib/dates";
 import type { Guide } from "@/lib/guide";
 
 export const dynamic = "force-dynamic";
@@ -86,9 +87,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const purchasedDate = field("purchased_date");
-  if (purchasedDate && !/^\d{4}-\d{2}-\d{2}$/.test(purchasedDate)) {
-    return NextResponse.json({ error: "Purchased date must be YYYY-MM-DD." }, { status: 400 });
+  // Both dates are checked here, not just the one the form used to send.
+  // roast_date is read off a label by a vision model and went straight into a
+  // Postgres `date` column unvalidated: "Roasted 08.14.26" then failed the
+  // insert, and what the page showed for it was "Couldn't save that bag" on a
+  // bag that had scanned perfectly. The page now sends a real date or nothing
+  // — lib/dates.ts is where a label's wording becomes one — so anything else
+  // arriving here is a caller's mistake and says which field it was.
+  const dates: Record<string, string | null> = {};
+  for (const key of ["purchased_date", "roast_date"]) {
+    const value = field(key);
+    if (value && !isIsoDate(value)) {
+      return NextResponse.json({ error: `${key.replace("_", " ")} must be YYYY-MM-DD.` }, { status: 400 });
+    }
+    dates[key] = value;
   }
 
   try {
@@ -114,10 +126,10 @@ export async function POST(request: NextRequest) {
         origin: field("origin"),
         process: field("process"),
         varietal: field("varietal"),
-        roast_date: field("roast_date"),
+        roast_date: dates.roast_date,
         photo_path: photoPath,
         ...guideColumns(guide, field("guide_model"), field("guide_effort")),
-        purchased_date: purchasedDate,
+        purchased_date: dates.purchased_date,
         my_notes: field("my_notes"),
       })
       .select()
