@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-19.** · **Next number: 17.**
+**Last reviewed: 2026-09-19.** · **Next number: 19.**
 
 **Numbers are permanent.** A closed item's row is deleted and its number is never used again, so the
 gaps below are correct rather than something to tidy. A new item takes `Next number` and increments
@@ -40,11 +40,16 @@ Nothing.
    first, so the charter listed five projects against six on disk. Both corrected. **The fix is
    deleting the charter's copy and linking `CLAUDE.md`'s** — one fact, one home — but it is a
    charter, so it is your yes. *LoE: minutes.*
+17. **`tp-message-editor` refuses every deployment, so `editor.techpaddock.io` is frozen.** *Owner:
+   Joel.* Measured 2026-09-19: every deployment returns `BLOCKED`, production included, so every
+   merge since has silently never reached it. **Deliberate, or unblock it?** *LoE: minutes.*
+18. **`DECISIONS.md` is full — 260 of its 260 lines.** *Owner: Joel.* Append-only with no trimming
+   rule, so the next settled call has nowhere to go. **Raise the ceiling, do not trim.** *LoE: minutes.*
 
 ## Waiting on an agent
 
 2. **The hub's glance has lost its only source — live now, not pending.** *Owner: TechPad Gen.*
-   `SOURCES` in `apps/home/lib/glance.ts` holds one entry, the paused tracker's `/api/summary`.
+   `SOURCES` in `apps/home/lib/glance.ts` holds one entry, the tracker's `/api/summary` (see 10).
    `fetchSummary` swallows the failure, so the panel empties quietly rather than erroring. **The hub
    gains database credentials for the first time.** *LoE: multi-session.*
 3. **Build the `On track` stage.** *Owner: TD.* Agreed 2026-09-17: a fourth phrase and a sixth

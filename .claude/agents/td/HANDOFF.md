@@ -8,9 +8,12 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**Nothing of mine is in flight** once this lands. Items 6 and 9 both closed on 2026-09-19, the
-second stacked on the first. **Check the open list live before assuming it is empty** — it went from
-one to seven in twenty minutes that day, and a pull request appeared mid-session twice.
+**This branch is mine** — ledger items 17 and 18, both Joel's to answer. Items 6 and 9 closed on
+2026-09-19 as #136 and #137. **Six agents were sent "close out" that day in a declared merge
+order**: Coffee, TechPad Gen, Message Editor, Pipeline Tracker, Resume Formatter, Platform Config;
+Health excluded by Joel. **Coffee is first** — it carries migration `20260919175624`, additive and
+unapplied, yours to apply at the gate. **Platform is last** because its config changes touch every
+app and would invalidate the five in front of it.
 
 ## What is true now
 
@@ -75,5 +78,3 @@ a canvas artifact, not in the repo, so the guide must carry the rules in words.
 its URL publishes a duplicate. **You are the rollup.** Joel, 2026-09-19: **a merge refreshes the
 merged agent's board too** — not in `CLAUDE.md` yet. **Their DevOps row and a dated TD banner only**;
 their Brief and Items stay theirs. **`On track` is item 3**, deploy trigger still unsolved.
-
-Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.
