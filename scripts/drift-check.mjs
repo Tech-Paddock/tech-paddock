@@ -146,6 +146,54 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.conf
   }
 }
 
+/* ── Each app's Vercel build is scoped to its own folder ──────────────────
+   Until 2026-09-19 every `ignoreCommand` read "skip previews, build
+   everything else", which cannot see which folder changed. One merge rebuilt
+   all six apps, and since Vercel aliases whichever build finishes LAST rather
+   than the newest commit, two merges close together could leave an app
+   serving the older one. It did: three merges four minutes apart on
+   2026-09-18 left techpaddock.io on the Coffee-icon build.
+
+   The command now diffs HEAD^..HEAD against this app's own folder. That makes
+   a typo catastrophic in a way the old one never was: an app whose command
+   names a DIFFERENT app's folder stops deploying entirely, silently, forever
+   — nothing errors, no check goes red, and the only symptom is "my change did
+   not go live", which is the most expensive failure this project has. So this
+   check fails rather than warns, and it verifies the folder each command
+   names is the folder it lives in.
+
+   `packages` rides in every pathspec deliberately, though it does not exist
+   yet. `packages/shared` is ledger item 4, and the day it lands every app
+   must rebuild when it changes. A pathspec naming a path git does not have is
+   not an error — it simply matches nothing — so this costs nothing today and
+   removes a step that would otherwise be discovered by an app going stale.
+
+   A missing vercel.json is only a warning: a freshly scaffolded app folder
+   has no Vercel project yet either, and CLAUDE.md promises that creating the
+   folder is enough to make CI build it. */
+{
+  const hard = [], soft = [];
+  for (const app of APPS) {
+    const rel = `apps/${app}/vercel.json`;
+    const raw = read(R(rel));
+    if (raw === null) { soft.push(`${app}: no vercel.json, so every merge rebuilds it`); continue; }
+    let cfg;
+    try { cfg = JSON.parse(raw); } catch { hard.push(`${app}: vercel.json is not valid JSON`); continue; }
+    const cmd = cfg.ignoreCommand;
+    if (typeof cmd !== "string") { hard.push(`${app}: no ignoreCommand, so every merge rebuilds it`); continue; }
+    if (!/VERCEL_ENV.*preview/.test(cmd)) hard.push(`${app}: ignoreCommand no longer skips previews`);
+    const named = [...cmd.matchAll(/apps\/([A-Za-z0-9._-]+)/g)].map((m) => m[1]);
+    if (!named.includes(app)) hard.push(`${app}: ignoreCommand watches no path under apps/${app}`);
+    const foreign = named.filter((n) => n !== app && APPS.includes(n));
+    if (foreign.length) hard.push(`${app}: ignoreCommand watches ${foreign.map((f) => "apps/" + f).join(", ")}, not its own folder — it would never deploy again`);
+  }
+  add("each app's build is scoped to its own folder",
+    hard.length ? "fail" : soft.length ? "warn" : "ok",
+    hard.length ? hard.join("; ")
+      : soft.length ? soft.join("; ")
+        : `${APPS.length} apps, each skipping a merge that does not touch it`);
+}
+
 /* 4 ── Budgets. CI fails the breach; this reports the approach, because a file
    that arrives at its ceiling has already stopped being rewritten. */
 {

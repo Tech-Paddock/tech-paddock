@@ -250,3 +250,10 @@ cross-owner additions, so a running session cannot repair itself.
   thing it exists to prevent. The roster check had the mirror flaw — it required a determiner, so
   "five apps means five agents" went unseen through three re-measures of the item that existed to
   find it. It now measures the cardinal against `apps/` instead of flagging any number.
+- **2026-09-19 — a Vercel project's `live: false` does NOT mean paused, and the ledger asserted for
+  a day that `tp-tracker` was.** `tp-home` reads `live: false` while serving `techpaddock.io`, so
+  the field cannot mean what it was read to mean. **Read deployment state instead:** a paused
+  project returns `BLOCKED` on every commit (`tp-message-editor`), a live one returns `READY` at
+  `target: production` (`tp-tracker`, on 4133904). A skipped preview also reads `CANCELED` with
+  `target: null` — that is `ignoreCommand` working, not a failure. The cost of the misread was
+  ledger item 11 resting on "unreachable while paused" when it was reachable throughout.
