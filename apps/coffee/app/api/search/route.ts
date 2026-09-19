@@ -3,6 +3,8 @@ import { searchBrewGuide } from "@/lib/anthropic";
 import { isSearchModel, isEffortFor, effortsFor, DEFAULT_SEARCH_MODEL } from "@/lib/models";
 import { findRoasterDomain, guideColumns } from "@/lib/bags";
 import { getServiceClient } from "@/lib/supabase";
+import { suggestOnBag } from "@/lib/suggestOnBag";
+import type { Suggestion } from "@/lib/suggestion";
 
 export const dynamic = "force-dynamic";
 // Three tiers of search and fetch runs well past the default. The page no
@@ -64,15 +66,32 @@ export async function POST(request: NextRequest) {
 
     // The result lands in the row, not in this response. That is the whole
     // point: by now the page that asked for it may be long gone.
+    let suggestion: Suggestion | null = null;
     if (bagId) {
-      const { error } = await supabase
+      const { data: bag, error } = await supabase
         .from("bags")
         .update({ ...guideColumns(guide, model, effort), guide_search_started_at: null })
-        .eq("id", bagId);
+        .eq("id", bagId)
+        .select("roaster, coffee_name, origin, process, varietal, roast_date")
+        .maybeSingle();
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+      // Nothing published anywhere on the roaster's own site is a correct and
+      // recorded answer, and since 2026-09-19 it is no longer the end of it:
+      // Claude suggests a starting point of its own, into its own column.
+      // `none` only — a tier-2 house guide is a recipe that was found, and
+      // suggesting over it would bury the thing this app exists to retrieve.
+      //
+      // It runs here rather than on the page for the same reason the search
+      // does: the answer belongs on the row, where closing the tab cannot
+      // lose it. It costs seconds against a search that took minutes, and it
+      // cannot fail the search — suggestOnBag records its own failure.
+      if (guide.status === "none" && bag) {
+        suggestion = (await suggestOnBag(bagId, bag)).suggestion;
+      }
     }
 
-    return NextResponse.json({ guide, model, effort });
+    return NextResponse.json({ guide, model, effort, suggestion });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The search failed.";
     // A failure is recorded too. Otherwise a bag sits on "searching" forever
