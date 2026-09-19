@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-18.
+State as of 2026-09-19.
 
 Read `RULES.md` first for the role and the gate. This file is only what is true right now.
 
@@ -8,13 +8,14 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**One branch of mine, `claude/ci-freshness-measures-what-an-agent-wrote`**, closing two items I
-owned: `drift` no longer ages an agent for a file a sweep touched, and the `\$` escaping warning now
-lives in all six `.env.example` files. The ledger renumbers 1–12.
-**TechPad Gen's `claude/home-paper-date-hydration` is pushed, green and has no pull request** — that
-is Joel's to ask for. **Check both live before assuming their state**; either may have moved.
+**One branch of mine, `claude/brief-security-after-going-public`** — ledger rows from auditing the
+repo the day it went public; #123 merged before it. **Five other agents' branches are pushed with no
+pull request**, Joel's to ask for. **Check every one live before assuming its state.**
 
 ## What is true now
+
+**The repository is public**, as of 2026-09-19 — which made Actions free and ended the minutes
+outage. **`.claude/` is public reading now**: the charters, the ledger, every carve-out below.
 
 **Branch protection is on**, confirmed against the GitHub API. **`Require branches to be up to
 date` is on**, which gives the merge-order rule teeth: after any merge every other pull request is
@@ -50,9 +51,8 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 - **Do not backfill another agent's handoff on the way past.** A stale handoff sends the change
   back. One the TD writes is the TD's understanding of someone else's work, which is exactly the
   second-hand account these files exist to replace.
-- **`DECISIONS.md` is append-only against a hard ceiling, and `drift` already warns on it.** There
-  is no trimming rule for that file, so the wall arrives with no plan behind it. Read the live
-  number from `drift` or The Garage, and raise it with Joel before the entry that will not fit.
+- **`DECISIONS.md` is append-only against a hard ceiling, and `drift` already warns on it.** No
+  trimming rule exists, so read the live number and raise it before the entry that will not fit.
 - **Regenerating another agent's collector output ages their handoff.** `drift` dates freshness from
   `git log -- apps/<app>`, so your commit touching `apps/home/lib/*.generated.ts` makes TechPad Gen
   read stale. Warn only, clears on their next session — say so rather than letting them hunt.
@@ -64,17 +64,17 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 
 ## Next
 
-**`packages/shared` is yours, not Joel's to approve** — item 8 has the shape. **Not npm workspaces**:
+**`packages/shared` is yours, not Joel's to approve** — item 6 has the shape. **Not npm workspaces**:
 a root install costs the per-app independence the CI matrix rests on.
 
-**Health is merged**, unreachable until Joel's four steps — item 2. **Step (a) is also the only
+**Health is merged**, unreachable until Joel's four steps. **Step (a) is also the only
 thing still paying for preview builds**: Vercel cannot see `apps/health/vercel.json` from the root.
 
-**App surface is yours and the guide is unwritten** — item 13. The mockups that settled the look are
+**App surface is yours and the guide is unwritten** — item 10. The mockups that settled the look are
 a canvas artifact, not in the repo, so the guide must carry the rules in words.
 
 **Every agent has a board, URLs in `KICKOFF.md`** — the only place they live, so an agent that loses
 its URL publishes a duplicate. **You are the rollup**; they report themselves. **`On track` is item
-6**, and the deploy trigger is still its unsolved half.
+5**, and the deploy trigger is still its unsolved half.
 
 Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.
