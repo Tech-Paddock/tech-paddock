@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { TOOLS, type ToolSlug } from "@/lib/platform";
 import { LIVERY } from "@/lib/livery";
-import ThemeControl from "./ThemeControl";
+import ThemeControl, { LiveryBadge } from "./ThemeControl";
 
 /**
  * The hub's chrome — topbar, sidebar, and the box everything else renders into.
@@ -82,11 +82,15 @@ function Bar({ children }: { children: React.ReactNode }) {
                   : `Working in ${APPS[selected].name}`}
             </span>
           </div>
-          {/* Pushed to the far end of the bar by .topbar-brand's auto margin.
-              The livery is fixed for this app; only the light/dark half of this
-              control does anything, and what it does is shared with the other
-              four subdomains. */}
-          <ThemeControl livery={LIVERY} />
+          {/* Switch with the brand, livery hard right — Joel's arrangement,
+              2026-09-19. The livery goes right because it is the one thing on
+              this bar that also appears on the bar of whatever tool is framed
+              below it, and the two want to line up; the switch comes left
+              because it is a control and belongs with the thing it controls.
+              The livery is fixed for this app, so only the switch does
+              anything, and what it does is shared with every subdomain. */}
+          <ThemeControl />
+          <LiveryBadge livery={LIVERY} />
         </div>
       </header>
       <div className="shell">
