@@ -22,7 +22,15 @@ export type Mode = "light" | "dark";
 export type Livery = "martini" | "clark" | "senna" | "mp44" | "jps";
 
 /**
- * Name and inspiration, shown in every app's header beside the switch.
+ * Two lines, shown beside the page title: **who and when**, then **what and who
+ * drove it**. Joel set that shape on 2026-09-19.
+ *
+ * **Line one names the livery, not always the constructor.** Martini and JPS
+ * were the identity of those cars more than Brabham and Lotus were, and the
+ * badge's job is to say which livery you are looking at — so the sponsor name
+ * wins where the sponsor is the thing you recognise. Clark goes the other way
+ * and reads "Lotus '63", because naming it "Clark '63" above a line that ends
+ * "Jim Clark" says his name twice and the season once.
  *
  * The inspiration line is deliberately not the palette's own `source` field.
  * That one is written to be read in a spec and runs long — Martini's names three
@@ -30,24 +38,27 @@ export type Livery = "martini" | "clark" | "senna" | "mp44" | "jps";
  */
 export const LIVERIES: Record<Livery, { name: string; source: string }> = {
   martini: {
-    name: "Martini",
-    source: "Brabham BT44B, 1975",
+    name: "Martini '75",
+    source: "Brabham BT44B, Reutemann",
   },
   clark: {
-    name: "Clark",
-    source: "Lotus 25, 1963",
+    name: "Lotus '63",
+    source: "Type 25, Jim Clark",
   },
   senna: {
+    // The one that does not fit, and deliberately not forced to. Every other
+    // livery is a car in a season; this one is a crash helmet across a career,
+    // so inventing a team and a chassis for it would be inventing a fact.
     name: "Senna",
-    source: "Ayrton Senna's helmet",
+    source: "Helmet, 1984–1994",
   },
   mp44: {
-    name: "MP4/4",
-    source: "McLaren MP4/4, 1988",
+    name: "McLaren '88",
+    source: "MP4/4, Ayrton Senna",
   },
   jps: {
-    name: "John Player Special",
-    source: "Lotus 79, 1978",
+    name: "JPS '78",
+    source: "Lotus 79, Mario Andretti",
   },
 };
 

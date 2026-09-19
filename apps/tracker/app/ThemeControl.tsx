@@ -32,13 +32,30 @@ import { LIVERIES, isPaddockOrigin, type Livery, type Mode, themeCookieString } 
  * because lib/theme.css chose them from the attribute and the media query
  * before any of this ran.
  */
-export default function ThemeControl({
-  livery,
-  onBar = false,
-}: {
-  livery: Livery;
-  onBar?: boolean;
-}) {
+/**
+ * The livery badge: two lines naming which car this app is wearing.
+ *
+ * **Split out of ThemeControl on 2026-09-19** so it can sit beside the page
+ * title while the switch stays where it was. It renders no state and reads no
+ * cookie — it is a label, and the only reason it lived in the control was that
+ * the two used to be one block.
+ *
+ * It keeps `.pd-theme-id` and its children, so the rule that hides the switch
+ * inside a frame still misses this on purpose: framed, a tool loses its switch
+ * and keeps its badge, because with two liveries on one screen the label is
+ * doing more work than usual, not less.
+ */
+export function LiveryBadge({ livery, onBar = false }: { livery: Livery; onBar?: boolean }) {
+  const { name, source } = LIVERIES[livery];
+  return (
+    <span className={onBar ? "pd-theme-id pd-on-bar" : "pd-theme-id"}>
+      <span className="pd-livery">{name}</span>
+      <span className="pd-source">{source}</span>
+    </span>
+  );
+}
+
+export default function ThemeControl({ onBar = false }: { onBar?: boolean }) {
   const [mode, setMode] = useState<Mode | null>(null);
 
   useEffect(() => {
@@ -102,14 +119,8 @@ export default function ThemeControl({
     setMode(next);
   }
 
-  const { name, source } = LIVERIES[livery];
-
   return (
     <div className={onBar ? "pd-theme pd-on-bar" : "pd-theme"}>
-      <span className="pd-theme-id">
-        <span className="pd-livery">{name}</span>
-        <span className="pd-source">{source}</span>
-      </span>
       <span className="pd-modes" role="group" aria-label="Colour mode">
         <button type="button" aria-pressed={mode === "light"} onClick={() => choose("light")}>
           Light

@@ -1,6 +1,6 @@
 # TechPad Gen — handoff
 
-State as of 2026-09-18.
+State as of 2026-09-19.
 
 Read `RULES.md` first. This file is only what is true right now.
 
@@ -46,8 +46,8 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 - **`TOOLS` in `lib/platform.ts` is the only list of tools, and its array order is Joel's** — it
   drives the sidebar, the `?app=` frame and The Garage at once. **The tracker is not in it**, so
   nothing here records that `tp-tracker` exists; un-parking means putting the entry back.
-  **Health is in it and does not serve yet** — a dead sidebar row until `tp-health` is wired up, and
-  that is the design: a tool missing from this file is invisible, a tool listed and down is a question.
+  **Health is in it and serves** — Root Directory, domain and env vars were all set on 2026-09-18,
+  between that change being written and it merging, so the row it added leads somewhere.
 - **The glance gets counts and singles, never rows** — a hub handed thread arrays slowly becomes a
   worse copy of the tracker. `SOURCES` holds one entry: a fact about the present, not a design limit.
 - **One Garage panel is not live, and it is the one that looks most authoritative.** Rules drift is
@@ -59,8 +59,10 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-`claude/home-drop-tracker-from-roster` — the tracker out of `TOOLS` and Health in, the sidebar in
-Joel's order, and The Garage's shared-secret probe derived from `hasSummaryRoute` rather than a slug.
+Six, all presentation, none blocking another, with an identical handoff on each so they cannot
+conflict. Ledger row in brackets where there is one; the rest came straight from Joel.
+`home-paper-date-hydration` (10) · `theme-hairline-contrast` (1) · `home-delete-feed-tab` (3)
+`theme-tab-titles` · `home-drop-editor-from-roster` · `theme-livery-badge`
 
 ## Next
 

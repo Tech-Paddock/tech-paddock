@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { LIVERY } from "@/lib/livery";
-import ThemeControl from "./ThemeControl";
+import ThemeControl, { LiveryBadge } from "./ThemeControl";
 
 type Contact = { id: string; name: string; org: string | null; preferred_channel: string | null };
 
@@ -168,9 +168,10 @@ function HomeShell() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold">Pipeline Tracker</h1>
-          <ThemeControl livery={LIVERY} />
+          <LiveryBadge livery={LIVERY} />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <ThemeControl />
           <Link
             href="/dashboard"
             className="px-3 py-2 rounded-lg border border-line bg-surface text-sm font-medium"

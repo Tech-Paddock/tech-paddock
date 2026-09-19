@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { TOOLS, type ToolSlug } from "@/lib/platform";
 import { LIVERY } from "@/lib/livery";
-import ThemeControl from "./ThemeControl";
+import ThemeControl, { LiveryBadge } from "./ThemeControl";
 
 /**
  * The hub's chrome — topbar, sidebar, and the box everything else renders into.
@@ -83,11 +83,14 @@ function Bar({ children }: { children: React.ReactNode }) {
                   : `Working in ${APPS[selected].name}`}
             </span>
           </div>
-          {/* Pushed to the far end of the bar by .topbar-brand's auto margin.
-              The livery is fixed for this app; only the light/dark half of this
-              control does anything, and what it does is shared with the other
-              four subdomains. */}
-          <ThemeControl livery={LIVERY} />
+          {/* The badge sits with the title it annotates; the switch keeps the
+              far end of the bar, pushed there by .topbar-brand's auto margin.
+              They were one block until 2026-09-19 and read as one control,
+              which is what Joel wanted apart. The livery is fixed for this app,
+              so only the switch does anything — and what it does is shared with
+              every other subdomain. */}
+          <LiveryBadge livery={LIVERY} />
+          <ThemeControl />
         </div>
       </header>
       <div className="shell">
