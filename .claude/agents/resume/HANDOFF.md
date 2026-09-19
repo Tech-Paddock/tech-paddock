@@ -8,8 +8,8 @@ Read `RULES.md` first. This file is only what is true right now.
 
 ## In flight
 
-**`claude/resume-diagnostics-tab`** — Check becomes Diagnostics, every readout moves onto it, and
-Reformat gains a pass/fail verdict. No migration, no API change. Nothing to do at deploy time.
+**Nothing.** #135 merged as `c3c40fd`, its branch is gone, and the tab work and verdict below are
+live rather than pending — verified at `main`, not assumed.
 
 ## What is true now
 
@@ -21,11 +21,10 @@ file, and any document dropped in. `?tab=check` still resolves. **Reformat's one
 pass/fail verdict** (`lib/verdict.ts`, ten tests): it fails on what happened to *this* reformat —
 lost lines, a blocking finding, input the template had no room for, an unfilled section — never on
 a template warning, which would pin it to FAIL until the template changed and is a note instead.
-Templates
-and History were one thing split by which table it lived in, which is the app's business and not the
-reader's; they are one tab with a Template / Input / Output filter over `/api/resumes`. **The view
-is merged; the tables are not.** A render contributes two rows sharing its id, so deleting either
-deletes the event and both files, and the confirm says so.
+Templates and History were one thing split by which table it lived in, which is the app's business
+and not the reader's; they are one tab with a Template / Input / Output filter over `/api/resumes`.
+**The view is merged; the tables are not.** A render contributes two rows sharing its id, so deleting
+either deletes the event and both files, and the confirm says so.
 
 **The layout is a workbench**: a rail of inputs, a column of results, one column below `lg` — the
 hub's iframe width, so narrow is the normal case. MP4/4 is pinned and no theme token has changed.
@@ -73,8 +72,9 @@ He is taking the plugin's surface and auth questions to the technical director.
 - **Not mine alone:** `renders.thread_id` points into the tracker's schema, and that tool is being
   deprecated — most of the argument for the `company`/`title` columns.
 
-**`RULES.md` is wrong in two places, neither fixed**: line 306 still forbids deleting a template a
-render points at, which #107 removed; line 87 names a migration version no file matches, renamed at
-that gate to `20260918041216` — `drift`'s standing warning, and ledger item 6.
+**`RULES.md` is wrong in one place now.** Line 306 still forbids deleting a template a render
+points at, which #107 removed on Joel's amendment, while the same file explains that removal sixty
+lines above — the charter contradicts itself. **A charter edit is Joel's approval**, so it is raised
+with the technical director, not made here. #136 fixed the migration half and `drift` is clean on it.
 
-**I am at a compaction point** once the branch above is pushed.
+**I am at a compaction point.**
