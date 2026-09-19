@@ -240,3 +240,13 @@ cross-owner additions, so a running session cannot repair itself.
   and #129 removed it from the hub's roster the same day. **Paused is reversible and deleted is
   not**, which is the same reasoning that keeps `tp-tracker` parked.
 
+- **2026-09-19 — a `drift` check is not finished until it has failed the case it exists to catch AND
+  passed the next legitimate edit.** Two checks shipped wrong in two days. The permanent-numbers
+  check passed a clean 1..N renumber, which is ascending and unique, until a title comparison against
+  `origin/main` was added. Then it read the ledger as one list and **failed the very first item added
+  under it**, because sections group by blocker while a new number is always the highest — so 15 in
+  `Waiting on Joel` sits above 2 in `Waiting on an agent`. Ascending is now per section. **A check
+  that fails a correct edit is worse than no check**: the way past it is to renumber, which is the
+  thing it exists to prevent. The roster check had the mirror flaw — it required a determiner, so
+  "five apps means five agents" went unseen through three re-measures of the item that existed to
+  find it. It now measures the cardinal against `apps/` instead of flagging any number.

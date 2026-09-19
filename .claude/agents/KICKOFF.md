@@ -192,7 +192,7 @@ landed after its session started.
 
 > **Your board:** https://claude.ai/artifact/Hi1hQiVjRce7vpbCwboxb1 — publish to this URL, never a new one.
 >
-> You own the layer under all five apps: **Postgres, Vercel, DNS and CI.** You write almost no
+> You own the layer under every app: **Postgres, Vercel, DNS and CI.** You write almost no
 > application code. You own the things that break every app at once and are invisible in a diff.
 >
 > Read `supabase/README.md` as well — it is the most important document for the database half.
