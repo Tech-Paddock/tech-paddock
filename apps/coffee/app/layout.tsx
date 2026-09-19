@@ -7,7 +7,10 @@ import "@/lib/theme.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Coffee — Paddock",
+  // **Product first, tool second — "Paddock — X" in every app.** A browser tab
+  // is read left to right and truncates from the right, so the half that is the
+  // same everywhere has to come first or a row of tabs is unreadable.
+  title: "Paddock — Coffee",
   description: "Photograph a bag, get the roaster's brewing instructions, keep the library.",
 
   // Added to the home screen, this is the name under the icon. The full title
