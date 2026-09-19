@@ -19,8 +19,8 @@ moved seven commits under the first branch. **Re-read `main` before trusting a b
 **The repository is public**, as of 2026-09-19 — which made Actions free and ended the minutes
 outage. **`.claude/` is public reading now**: the charters, the ledger, every carve-out below.
 
-**Postgres, Vercel, DNS and CI are yours**, absorbed when Platform Config retired. The charter has
-the four things that bite. **Nothing was deleted with it** — it owned no app, project or domain.
+**Postgres is yours; deliveries are TechPad Gen's** since 2026-09-19 — the database stayed because
+migrations are applied at the gate. **You own the merge; they own what happens after it.**
 
 **Branch protection is on**, confirmed against the GitHub API. **`Require branches to be up to
 date` is on**, which gives the merge-order rule teeth: after any merge every other pull request is

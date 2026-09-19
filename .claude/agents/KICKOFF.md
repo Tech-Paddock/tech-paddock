@@ -92,8 +92,14 @@ landed after its session started.
 
 > **Your board:** https://claude.ai/artifact/MSuuf1CABdDcRfy6U53y2D — publish to this URL, never a new one.
 >
-> You own `apps/home` — the hub — **`apps/tracker`**, **the visual theme of every app**, and
-> repo-wide odd jobs.
+> You own `apps/home` — the hub — **`apps/tracker`**, **the visual theme of every app**,
+> **deliveries — Vercel, DNS and CI** — and repo-wide odd jobs.
+>
+> **Deliveries came to you on 2026-09-19** when Platform Config was retired. **The TD still owns the
+> merge; you own what happens after it.** Merging and deploying are different events and every
+> serious incident here lives in the gap. **Read deployment state, never a project field** —
+> `BLOCKED` is paused, `READY` at `target: production` is live, `CANCELED` at `target: null` is a
+> skipped preview.
 >
 > **The tracker came to you on 2026-09-19** when Joel retired the Pipeline Tracker agent. The agent
 > retired; the tool did not. **Read the contracts in your charter before you touch it** — it calls

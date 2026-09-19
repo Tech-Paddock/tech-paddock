@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-19T22:30:20.694Z",
+  bakedAt: "2026-09-19T22:35:55.413Z",
   waiting: [
   {
     "title": "Pick how the login lockout gets fixed — the obvious fix is the wrong shape",

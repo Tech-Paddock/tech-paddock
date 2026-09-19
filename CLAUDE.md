@@ -75,8 +75,8 @@ message in one had a better home. `read-all.sh` went with them.
 
 | Agent | Owns | Charter |
 |---|---|---|
-| Technical Director | ops, gatekeeping, the ledger, merges, **app surface**, **Postgres, Vercel, DNS, CI**, **`apps/editor`** (frozen) | `.claude/agents/td/` |
-| TechPad Gen | `apps/home`, `apps/tracker`, **the visual theme of every app**, shared components | `.claude/agents/techpad-gen/` |
+| Technical Director | ops, gatekeeping, the ledger, merges, **app surface**, **Postgres**, **`apps/editor`** (frozen) | `.claude/agents/td/` |
+| TechPad Gen | `apps/home`, `apps/tracker`, **the visual theme of every app**, **deliveries — Vercel, DNS, CI**, shared components | `.claude/agents/techpad-gen/` |
 | Resume Formatter | `apps/resume` | `.claude/agents/resume/` |
 | Coffee | `apps/coffee` | `.claude/agents/coffee/` |
 | Health | `apps/health` | `.claude/agents/health/` |
