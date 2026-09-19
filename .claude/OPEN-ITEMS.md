@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-19.** · **Next number: 19.**
+**Last reviewed: 2026-09-19.** · **Next number: 20.**
 
 **Numbers are permanent.** A closed item's row is deleted and its number is never used again, so the
 gaps below are correct rather than something to tidy. A new item takes `Next number` and increments
