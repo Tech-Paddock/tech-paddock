@@ -33,6 +33,38 @@ import { LIVERIES, isPaddockOrigin, type Livery, type Mode, themeCookieString } 
  * before any of this ran.
  */
 /**
+ * The two marks in the switch.
+ *
+ * **Drawn rather than typed.** The obvious alternative is the ☀/☾ characters,
+ * and they are the wrong tool here: on most platforms they resolve to an emoji
+ * font, which paints its own colours and ignores `currentColor` — so the pressed
+ * state, which works by inverting the button's colour, would stop showing on the
+ * one button that is pressed. These take their colour from the text colour they
+ * replace, so every rule already written for the switch still applies, on the
+ * inverted bar too.
+ *
+ * `aria-hidden` because the button carries the name. The label moved from the
+ * visible text to `aria-label`, so the control still announces "Light, pressed"
+ * with nothing to read on screen.
+ */
+function Sun() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M12 2.4v2.2M12 19.4v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.4 12h2.2M19.4 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6" />
+    </svg>
+  );
+}
+
+function Moon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.8 13.4A8.6 8.6 0 1 1 10.6 3.2a6.7 6.7 0 0 0 10.2 10.2z" />
+    </svg>
+  );
+}
+
+/**
  * The livery badge: two lines naming which car this app is wearing.
  *
  * **Split out of ThemeControl on 2026-09-19** so it can sit beside the page
@@ -122,11 +154,23 @@ export default function ThemeControl({ onBar = false }: { onBar?: boolean }) {
   return (
     <div className={onBar ? "pd-theme pd-on-bar" : "pd-theme"}>
       <span className="pd-modes" role="group" aria-label="Colour mode">
-        <button type="button" aria-pressed={mode === "light"} onClick={() => choose("light")}>
-          Light
+        <button
+          type="button"
+          aria-pressed={mode === "light"}
+          aria-label="Light"
+          title="Light"
+          onClick={() => choose("light")}
+        >
+          <Sun />
         </button>
-        <button type="button" aria-pressed={mode === "dark"} onClick={() => choose("dark")}>
-          Dark
+        <button
+          type="button"
+          aria-pressed={mode === "dark"}
+          aria-label="Dark"
+          title="Dark"
+          onClick={() => choose("dark")}
+        >
+          <Moon />
         </button>
       </span>
     </div>

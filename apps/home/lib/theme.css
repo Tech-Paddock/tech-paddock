@@ -930,17 +930,29 @@
    most of the page. */
 [data-embedded] .pd-modes { display: none; }
 
+/* The buttons hold a drawn mark rather than a word since 2026-09-19. The
+   padding went square with it: "Light" and "Dark" needed width and a 14px
+   square does not, and a pill whose two halves are the width of their old
+   labels reads as a mis-set control once the labels are gone. */
 .pd-modes button {
   appearance: none;
   background: transparent;
   border: 0;
   cursor: pointer;
-  padding: 4px 11px;
+  padding: 5px 9px;
   font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
   color: var(--ink-soft);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Sized here rather than on the SVG so the two marks cannot drift apart, and
+   `block` because an inline SVG otherwise sits on the text baseline and leaves
+   a few pixels of descender space under it inside the pill. */
+.pd-modes button svg {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 .pd-on-bar .pd-modes button { color: rgb(var(--bar-ink-rgb) / 0.75); }
