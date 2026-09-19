@@ -31,22 +31,60 @@ three deliberate variants and is yours because it is the password gate itself, n
 copies match. They are yours because
 nobody else can own them safely. **The dividing line is blast radius, not language.**
 
+## Postgres, Vercel, DNS and CI — absorbed 2026-09-19
+
+**Platform Config was retired and its domain came here**, because in practice it had already
+arrived: you apply migrations at gate time, you read CI and Vercel to measure a branch, and creating
+a project or changing a DNS record was always Joel's to execute rather than any agent's.
+
+**It owned no app folder, so nothing was deleted with it** — no Vercel project, no domain, no
+schema. What it owned was knowledge, and these are the parts that bite:
+
+- **Environment variables bake in at build time.** Setting one changes nothing until that project
+  redeploys. This catches people out constantly, and it reads as the change not having landed.
+- **`SESSION_SECRET` must be byte-identical across every project** or the others silently reject
+  valid sessions — which reads as a login bug, not a config one.
+- **A new Postgres schema inherits no grants at all.** Two migrations and one dashboard setting; the
+  dashboard's exposed-schemas list is not in this repo and is the step that gets missed. The failure
+  looks like a credentials problem. Read `supabase/README.md` before writing either migration.
+- **`supabase db push` cannot work here and never will** — see `.claude/DECISIONS.md`.
+
+**Measured 2026-09-19, and recorded here because the handoff that held it is gone:**
+
+- **DNS is uniform and the apex is deliberately different.** Every subdomain is a CNAME to
+  `d1317e1174061c29.vercel-dns-017.com`; the apex stays an A record at `76.76.21.21` because an apex
+  cannot be a CNAME. **That is correct, not a leftover** — do not "fix" it.
+- **`SESSION_SECRET` cannot be read back out of the Vercel dashboard**, so parity across projects
+  cannot be confirmed by inspection. Setting one fresh known value on every project and **then
+  redeploying** is the only way to know they match.
+- **`HEAD^..HEAD` in each `ignoreCommand` is correct because this repo squash-merges** — one merge
+  is one commit, so that range is the whole change. This reverses an older argument for
+  `VERCEL_GIT_PREVIOUS_SHA`, which was reasoning about a history this repo does not have.
+
+**What still needs Joel and has no undo:** creating or deleting a Vercel project, adding or removing
+a domain, changing a DNS record, and the exposed-schemas setting.
+
 ## The roster
 
-| Agent | Owns |
-|---|---|
-| **You** | The merge queue, the rules, the ledger, cross-cutting decisions, the shared plumbing |
-| **TechPad Gen** | `apps/home` — the hub — and repo-wide odd jobs |
-| **Message Editor** | `apps/editor` |
-| **Pipeline Tracker** | `apps/tracker` |
-| **Resume Formatter** | `apps/resume` |
-| **Coffee** | `apps/coffee` |
-| **Platform Config** | Postgres, Vercel, DNS, CI |
+**`CLAUDE.md`'s *Who you are* table is the roster. This section deliberately does not repeat it.**
+It used to, and the copy had already gone stale — it listed Platform Config and Pipeline Tracker
+after both were retired, and it had never gained Health at all. One fact, one home; the same reason
+ledger item 15 exists for the domain map.
 
-**Where remits overlap:** Platform decides how a schema is shaped; you own that its migration is
-checked in before it merges. Platform configures projects; you own that `SESSION_SECRET` stays
-identical across every app, because nothing else checks it. An app agent decides what a route does;
-you own how it authenticates across apps. **That last one is the only place you hold a veto.**
+**Where remits overlap**, which is the part `CLAUDE.md` does not say:
+
+- **An app agent decides what a route does; you own how it authenticates across apps.** That is the
+  only place you hold a veto, and it is why `middleware.ts` is gated.
+- **An app agent shapes its schema; you own that the migration is checked in before it merges**, and
+  you apply it at gate time rather than Joel or the agent.
+- **TechPad Gen owns the theme in every app; you own surface** — whether a tool is a site or an app.
+  Using what exists is free and needs nobody; changing or forking it is theirs.
+- **Nothing else changes `SESSION_SECRET`**, because nothing else checks that it stays identical
+  across every project, and a mismatch reads as a login bug rather than a config one.
+
+**Much of the Vercel and Postgres work leaves no diff.** It happens in a dashboard, so the only
+record it happened is what you write down. That used to be Platform Config's handoff and is now
+yours — insist on it from yourself.
 
 **Standing up a new agent is a protocol, not a habit.** `.claude/agents/STANDUP.md`, and the order
 in it is the point: **Joel solutions the thing with the new agent first**, that lands as a draft
