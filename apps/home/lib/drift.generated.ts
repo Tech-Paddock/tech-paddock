@@ -6,7 +6,7 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-19T15:46:11.415Z",
+  "generatedAt": "2026-09-19T16:04:20.016Z",
   "complete": true,
   "reason": "",
   "checks": [
@@ -23,7 +23,12 @@ export const DRIFT: Drift = {
     {
       "name": "identical: lib/theme.css",
       "state": "ok",
-      "detail": "6 copies, all 5a83804a"
+      "detail": "6 copies, all fb1c02ec"
+    },
+    {
+      "name": "identical: next.config.mjs",
+      "state": "ok",
+      "detail": "6 copies, all 29e69287"
     },
     {
       "name": "middleware.ts: a base copy plus the two scoped bypasses",
@@ -83,7 +88,7 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/OPEN-ITEMS.md",
       "state": "warn",
-      "detail": "77 / 80"
+      "detail": "74 / 80"
     },
     {
       "name": "budget: .claude/DECISIONS.md",
@@ -158,11 +163,11 @@ export const DRIFT: Drift = {
     {
       "name": "ledger numbers are permanent",
       "state": "ok",
-      "detail": "11 items, ascending, all below Next number 15 — against origin/main"
+      "detail": "10 items, ascending, all below Next number 15 — against origin/main"
     }
   ],
   "counts": {
-    "ok": 18,
+    "ok": 19,
     "warn": 12,
     "fail": 0
   }
