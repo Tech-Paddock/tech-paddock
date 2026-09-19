@@ -218,3 +218,69 @@ export async function estimateMacros(params: {
     note: typeof parsed?.note === "string" && parsed.note.trim() ? parsed.note.trim() : null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// 3 · Tidying a grocery list
+// ---------------------------------------------------------------------------
+
+/**
+ * **Pinned to Haiku, and not under comparison.** Merging "2 cloves garlic" and
+ * "1 tbsp minced garlic" into one line is recognition, not judgement, and the
+ * result is checked in code afterwards either way — `validateTidy` refuses a
+ * proposal that drops a line or uses one twice, so a weaker model can fail to
+ * tidy but cannot lose your eggs.
+ *
+ * That guard is why this is the cheap model rather than the careful one: the
+ * risk of going cheap here is a list that stays messy, not one that is wrong.
+ */
+const TIDY_MODEL: ModelId = "claude-haiku-4-5";
+
+const TIDY_SYSTEM = `You consolidate a grocery list.
+
+- Merge lines that name the same thing, even when they are worded differently or measured
+  differently — "2 cloves garlic" and "1 tbsp minced garlic" are both garlic.
+- When you merge, the note should say what a shopper needs: a total where the amounts add up, and
+  both amounts where they do not.
+- Keep lines separate when they are genuinely different products. Whole milk and double cream are
+  not the same thing; neither are fresh and dried herbs.
+- **Never drop a line.** Every id you are given must appear in exactly one line's absorbed list.
+  A shorter list is not the goal; an accurate one is.
+- Write names the way someone would say them in a shop.`;
+
+export type TidyProposal = { name: string; note: string | null; absorbed: string[] };
+
+export async function tidyList(
+  items: { id: string; name: string; note: string | null }[]
+): Promise<TidyProposal[]> {
+  const response = (await getClient().messages.create({
+    model: TIDY_MODEL,
+    max_tokens: 2048,
+    system: TIDY_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content:
+          `The list:\n${items
+            .map((i) => `- id ${i.id}: ${i.name}${i.note ? ` (${i.note})` : ""}`)
+            .join("\n")}\n\n` +
+          `Return a JSON object: {"lines": [{"name": string, "note": string or null, ` +
+          `"absorbed": [id, ...]}]}. Every id above appears in exactly one absorbed list. ` +
+          `Put nothing after the JSON.`,
+      },
+    ],
+  } as never)) as { content: { type: string; text?: string }[] };
+
+  const raw = looseJson<{ lines?: unknown }>(textOf(response));
+  if (!Array.isArray(raw?.lines)) return [];
+
+  return raw.lines
+    .map((l) => {
+      const o = l as { name?: unknown; note?: unknown; absorbed?: unknown };
+      return {
+        name: typeof o.name === "string" ? o.name.trim() : "",
+        note: typeof o.note === "string" && o.note.trim() ? o.note.trim() : null,
+        absorbed: Array.isArray(o.absorbed) ? o.absorbed.filter((x): x is string => typeof x === "string") : [],
+      };
+    })
+    .filter((l) => l.name.length > 0);
+}
