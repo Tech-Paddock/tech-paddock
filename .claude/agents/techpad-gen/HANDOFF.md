@@ -9,23 +9,25 @@ Read `RULES.md` first. This file is only what is true right now.
 ## What is live
 
 **The Pit Wall** — answering "what needs me, right now, with several agents out". It renders the
-ledger's `Waiting on Joel` and `Parked` sections plus one row per agent, baked at build time by
-`scripts/collect-paddock.mjs` because files above `apps/home` are not readable at runtime.
+ledger's `Waiting on Joel` and `Parked` sections plus one row per agent, baked by
+`scripts/collect-paddock.mjs` because files above `apps/home` are unreadable at runtime — which is
+why this app's build watches `.claude`, the first trap below.
 
 **The Garage** — `/admin`. Three panels: *Declared*, generated at `prebuild` from `.env.example`
 names, the CI matrix and `supabase/migrations`; *Reported*, probed live; *Rules drift*, the TD's
 `scripts/drift-check.mjs --json`, passing checks named rather than dropped. **None of it guesses** —
-anything unreachable reads "unknown" with the reason. **Nothing is ever typed into it**: a page
-agents write config into is a second source of truth, which has injured this project twice.
+unreachable reads "unknown", with the reason. **Nothing is typed into it**; that cost us twice.
 
-**The theme system** — ten palettes, five liveries, both polarities, the light/dark control in every
-header that is not framed (below). `lib/theme.css` holds every token and is byte-identical in every
-app; `lib/livery.ts` is the one file that differs per app. No `tailwind.config.ts` contains a colour
-any more — every entry reads `rgb(var(--token-rgb) / <alpha-value>)`, and the triplet form is
-required rather than preferred: it is the only shape Tailwind's alpha modifier can interpolate.
+**The theme system** — ten palettes, five liveries, both polarities, and **two controls per header,
+not one**: `LiveryBadge` hard right on every bar including a framed tool's, and `ThemeControl` — a
+sun and a moon, beside the brand — which is the half a frame hides (below). `lib/theme.css` holds
+every token, byte-identical everywhere; `lib/livery.ts` is the one file that differs per app. No
+`tailwind.config.ts` holds a colour: entries read `rgb(var(--token-rgb) / <alpha-value>)`, the only
+shape Tailwind's alpha modifier can interpolate.
 
-**The Morning Paper** — `/` lands on Paper, Board and Feed alongside, held 24px clear of the sidebar
-by `.tabbed`. No privacy fold: Joel lifted it. The Feed is undefined and renders a labelled slot.
+**The Morning Paper** — `/` lands on Paper, with **Pit Wall the only other tab**, held 24px clear of
+the sidebar by `.tabbed`. No privacy fold: Joel lifted it. The Feed was deleted, not parked. **That
+tab's id is still `board`** — the label changed, the query string did not, so `/?tab=board` lives.
 
 **The chrome is a layout, not a component.** `app/(shell)/` is a route group holding `/` and
 `/admin`; its `layout.tsx` renders `Chrome.tsx` with each page as `children`. `/login` is
@@ -33,35 +35,34 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## Traps specific to this app
 
-- **Before adding a route to the shell:** it was built around an iframe at `height: 100%`, so
-  nothing had ever needed to scroll and there was no `overflow-y` anywhere. A document-length page
-  escapes into *document* scroll, dragging the topbar off the top. `.content` now has
-  `min-height: 0` and `overflow-y: auto`. Measured, not eyeballed.
+- **The hub is the only app reading files outside its own folder**, and since #137 an `ignoreCommand`
+  skips a merge that missed that folder. Four merges on 2026-09-19 moved `.claude/` alone, which
+  would have stranded the Pit Wall on an hours-old ledger with nothing red — hence `.claude` in this
+  app's pathspec. **Removing it stops a build rather than breaking one.**
+- **Before adding a route to the shell:** it was built around an iframe at `height: 100%`, so nothing
+  had ever needed to scroll and there was no `overflow-y`. A document-length page escapes into
+  *document* scroll, dragging the topbar off the top. `.content` now sets `min-height: 0` too.
 - **`children` rather than props is what makes the shell possible.** `/admin` is an async server
   component running live probes, so it can never be rendered *by* a client component — only through one.
 - **One switch per page is two halves that must stay together.** Framed, a tool hides its own
   Light/Dark (`[data-embedded] .pd-modes`) and keeps its badge — safe only because the hub posts
-  `{type:"paddock-mode", mode}` into every frame and `ThemeControl` listens behind
-  `isPaddockOrigin()`. **A tool that drops `ThemeControl.tsx` silently ignores the hub's switch.**
+  `{type:"paddock-mode", mode}` into every frame and `ThemeControl` listens behind `isPaddockOrigin()`.
+  **A tool that drops `ThemeControl.tsx` silently ignores the hub's switch.**
 - **`TOOLS` in `lib/platform.ts` is the only list of tools, and its array order is Joel's** — it
-  drives the sidebar, the `?app=` frame and The Garage at once. **The tracker is not in it**, so
-  nothing here records that `tp-tracker` exists; un-parking means putting the entry back.
-  **Health is in it and serves** — Root Directory, domain and env vars were all set on 2026-09-18,
-  between that change being written and it merging, so the row it added leads somewhere.
+  drives the sidebar, the `?app=` frame and The Garage at once. It holds **three**: resume, coffee,
+  health. **Tracker and editor are both out of it on Joel's word**, so nothing here records that
+  `tp-tracker` or `tp-message-editor` exists; putting either back is one entry. **Never key anything
+  off a slug literal** — dropping one broke `diagnostics.ts`, now derived from a route flag.
 - **The glance gets counts and singles, never rows** — a hub handed thread arrays slowly becomes a
   worse copy of the tracker. `SOURCES` holds one entry: a fact about the present, not a design limit.
-- **One Garage panel is not live, and it is the one that looks most authoritative.** Rules drift is
-  the repo as it stood when *this deployment* was built, so it goes stale after any merge until
-  `tp-home` redeploys. The panel says so on its face; keep that if it is ever rewritten.
-- **The drift JSON shape is the TD's, not this app's** — `{checks:[{name,state,detail}], counts}`.
-  `collect-drift.mjs` will not render a partial read: anything it cannot parse becomes
-  `complete: false` with the reason printed, never a panel quietly missing a row.
+- **One Garage panel is not live, and it looks the most authoritative.** Rules drift is the repo as
+  of *this deployment*, so a merge that misses this app stales it — the panel says so; keep that.
+- **The drift JSON shape is the TD's** — `{checks:[{name,state,detail}], counts}`. `collect-drift.mjs`
+  renders no partial read: what it cannot parse becomes `complete: false`, with the reason printed.
 
 ## In flight
 
-`theme-livery-badge`, open as a pull request. The livery split from the switch and set beside the
-page title, the switch moved to the brand, and the marks in it drawn rather than written.
-Five sibling branches merged ahead of it; this is what is left.
+Nothing. `theme-livery-badge` merged as #131, last of six.
 
 ## Next
 
@@ -74,5 +75,5 @@ Five sibling branches merged ahead of it; this is what is left.
 4. **`/api/version` is designed and undecided** — public, or behind the internal secret. Recommend
    public: it exposes a commit hash and nothing else, which is what lets a monitor see an outage.
 
-Both decisions Joel settled on 2026-09-16 are recorded in `DECISIONS.md` by #89 — the lifted fold
-and polarity against the Paper. Read them there; a second copy here could only drift.
+Joel's two calls of 2026-09-16 — the lifted fold, polarity against the Paper — are in `DECISIONS.md`
+by #89. Read them there; a second copy here could only drift.
