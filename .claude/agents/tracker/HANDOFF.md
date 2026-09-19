@@ -1,6 +1,6 @@
 # Pipeline Tracker — handoff
 
-State as of 2026-09-16.
+State as of 2026-09-19.
 
 Read `RULES.md` first. This file is only what is true right now.
 
@@ -8,61 +8,62 @@ Read `RULES.md` first. This file is only what is true right now.
 
 ## What is true now
 
-**`tracker.techpaddock.io` is live and serving current `main`.** Everything this agent has built is
-merged; nothing is in flight and no branch of yours exists. `npm test` is green — the second-largest
-suite in the repo, and the reason changes here are reviewable.
+**The daily sweep's guard fails closed.** `/api/cron/stale-tasks` read `if (secret && …)`, so an
+unset `CRON_SECRET` skipped the check and the endpoint was public. It now reads
+`if (!secret || …)` and answers 401. The response is byte-identical whether the secret is unset or
+merely wrong, so an unauthenticated caller cannot learn which.
 
-**The Microsoft Graph integration is built and inert.** `MS_GRAPH_CLIENT_ID`,
-`MS_GRAPH_CLIENT_SECRET`, `MS_GRAPH_REFRESH_TOKEN` and `CRON_SECRET` are all unset on `tp-tracker`,
-so `graphConfigured()` is false and the calendar, To Do and daily sweep all degrade quietly by
-design. **That is correct at runtime and it means nothing will tell you the cron is doing nothing.**
+**That changes what un-parking ledger item 11 costs.** The order is no longer load-bearing for
+safety — setting `MS_GRAPH_*` first no longer publishes an unauthenticated endpoint that writes into
+Outlook. What replaced it is a plain requirement: **`CRON_SECRET` must be set or the sweep does not
+run at all.** It is no longer optional, and `.env.example` says so.
 
-**It is parked, not forgotten, and un-parking is the dangerous moment.** Your `middleware.ts` waves
-`/api/cron/*` past the password gate and the route's own guard reads `if (secret && …)` — an unset
-`CRON_SECRET` skips the check entirely and the endpoint is public. It is harmless *only* because the
-next line returns early while Graph is unconfigured. **So `CRON_SECRET` is set first, then a
-redeploy, and only then `MS_GRAPH_*`.** Setting the Graph credentials first publishes an
-unauthenticated endpoint that writes into Joel's Outlook on demand. This is in the ledger under
-Parked and moves only when Joel says so.
+**Nothing observable changed in production.** `graphConfigured()` is still false, so the route
+returned `{skipped}` before and returns 401 now — both do no work. The sweep has still never run for
+real.
 
-**Your `/api/summary` carve-out stands.** It was once flagged as widening `INTERNAL_API_SECRET`
-across several apps — read from design notes rather than from the route — and the objection was
-withdrawn. It is `pathname === "/api/summary"` exactly, read-only, fails closed without the secret,
-four-second timeout. **Your narrow-shape discipline is what made it reviewable.**
+**`tp-tracker` is not paused.** It builds to production and serves, and its daily cron fires. The
+`live: false` field means something else (ledger item 10, Joel's). Do not write anything that
+assumes this app is dark.
 
-## The three contracts you sit inside
+**The Microsoft Graph integration remains built and inert.** `MS_GRAPH_CLIENT_ID`,
+`MS_GRAPH_CLIENT_SECRET` and `MS_GRAPH_REFRESH_TOKEN` are unset, so the calendar, To Do and sweep
+all degrade quietly. **Nothing will tell you they are doing nothing.**
 
-None of them is unilaterally yours. You call the Message Editor's `/api/draft`; the hub reads your
-`/api/summary`; the Resume Formatter writes threads into your table when a render names a company.
+**`/api/summary` is untouched** and its carve-out stands: `pathname === "/api/summary"` exactly,
+read-only, fails closed, four-second timeout. Counts and singles, never rows.
 
-**Job details live here, not there** — company, role, posting URL and contact are on the thread and
-are never duplicated into `resume.renders`. One record, one home.
+## Your charter disagrees with your code in three places
 
-**Keep `/api/summary` to counts and singles, never rows.** Rich lists stay behind `loadDashboard`.
+Measured on this branch, 2026-09-19. **None is mine to edit** — a charter is Joel's yes — and all
+three describe the app as it was before #22:
 
-## Traps specific to this app
+- **The file map** lists `app/api/draft/`; the route is `app/api/threads/[id]/draft/`. It omits the
+  whole dashboard surface — `app/dashboard/`, `app/api/contacts/`, `app/api/threads/[id]/task/`,
+  and `lib/{signals,dashboard,summary,matchMeetings,followUpTask,links}.ts`.
+- **"Primary view: sorted by days since `last_touch_date`, descending."** It is not. `lib/signals.ts`
+  derives an `effective_touch` from messages, renders and meetings that can run *ahead* of the
+  hand-recorded date, and `/dashboard` ranks by severity across decay, loose ends, rhythm and
+  commitments. The sort is still the product; it is no longer that sort.
+- **"The stale threshold is a setting, not a constant."** It is a constant: `DECAY_THRESHOLDS` in
+  `lib/signals.ts` hardcodes five per-stage values with no environment override and no UI. The
+  code's reasoning is written down and sound. **One of the two is wrong and a session that believes
+  the charter will go build a settings page nobody asked for.**
 
-- **Never widen an `INTERNAL_API_SECRET` carve-out**, here or in another app. A blanket auth bypass
-  is what the narrowness exists to prevent.
-- **Degrade quietly at runtime, loudly in setup.** The Microsoft integration is the model: a missing
-  credential makes the feature absent, not broken — and that is exactly why nothing will tell you it
-  is absent.
-- **`open_task_id` clears when a thread is updated**, so a fresh task can fire next time it goes
-  stale. The manual button deliberately overrides the open-task guard — that guard exists to stop
-  the daily sweep repeating itself, not to stop you asking.
-- **The stale threshold is a setting, not a constant.** Resist hardcoding anything a user would
-  reasonably want to tune.
-- **This app's data is almost entirely real people.** Fixtures are synthetic and stay that way.
+Requested as a ledger row, owner Joel: decide which side is right and correct the loser.
 
 ## In flight
 
-Nothing.
+`claude/tracker-agent-kickoff-ex4lb6` — the guard fix above, pushed, tests and build green.
+**The branch name is the harness's kickoff name, not `claude/tracker-…`.** Standing instructions
+for this session forbid pushing to any other branch, so the deviation is deliberate and named here
+rather than hidden.
 
 ## Next
 
 1. **Verify the daily sweep once the Microsoft credentials exist.** It has never run for real, so
-   every claim about it is a claim about code that has not executed. That is the single largest
-   untested surface you own — and it is blocked on Joel un-parking the item above, in that order.
+   every claim about it is a claim about code that has not executed — the single largest untested
+   surface here. Blocked on Joel un-parking item 11.
 2. **The deferred piece:** syncing a completed task back to auto-reset `last_touch_date`. The base
-   loop needs to be proven working first, which means step 1 comes before this.
+   loop has to be proven working first, so step 1 comes before it.
 3. Nothing else is queued. Ask before starting anything larger than a fix.
