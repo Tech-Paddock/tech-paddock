@@ -39,9 +39,10 @@ Nothing.
    script, and `drift` failing a copy that disagrees. *LoE: a session.*
 6. **`shared.contacts` needs its other owner named.** *Owner: Message Editor.* Deliberately shared
    between the editor and the tracker; one of the two is going away. *LoE: minutes.*
-7. **Three corrections in charters I may not edit.** *Owner: TD.* Carry each to its agent next
-   session. `platform/RULES.md` and `techpad-gen/RULES.md` still say five apps; `resume/RULES.md`
-   names the migration version I renamed at #107's gate, which `drift` warns on. *LoE: minutes.*
+7. **Two corrections in charters I may not edit** — re-measured 2026-09-19, and it was three.
+   *Owner: TD.* `platform/RULES.md` no longer says five apps. **`techpad-gen/RULES.md` still does**,
+   at lines 96 and 98. **`resume/RULES.md:87` names migration `20260918014500`, which no file
+   matches** — that is the one `drift` warns on every run. Each goes to its agent. *LoE: minutes.*
 8. **`Paper.tsx` throws a hydration error on every load.** *Owner: TechPad Gen.* `today()` renders
    the date with a comma on the server and without it in the browser. *LoE: minutes.*
 9. **Write the surface guide — site and app.** *Owner: TD.* Joel, 2026-09-18: most tools are
