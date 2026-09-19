@@ -8,9 +8,9 @@ Read `RULES.md` first, then `.claude/HEALTH-PLAN.md`. This file is only what is 
 
 ## The macro log is built and is on a branch
 
-`claude/health-macro-log` — pushed, CI green, **no pull request** (Joel has not asked). It replaces
-the placeholder page, adds the schema the app runs on, and lets a number that turned out wrong be
-fixed after the fact.
+`claude/health-macro-log` — pushed, CI green, **pull request open at Joel's request, 2026-09-19**.
+It replaces the placeholder page, adds the schema the app runs on, and lets a number that turned
+out wrong be fixed after the fact.
 
 **The migration is not applied.** `20260919091628_health_macro_tables.sql` is additive — five tables
 in a schema read live and confirmed empty before it was written — so it is safe to apply before the
