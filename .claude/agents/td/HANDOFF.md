@@ -8,9 +8,9 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**Nothing of mine is in flight.** Seven pull requests merged 09:25–09:34 on 2026-09-19 — #124 #125
-#126 #127 #128 #129 #130 — and TechPad Gen opened #131 during it. **Check the open list live before
-assuming it is empty**; it went from one to seven inside twenty minutes today.
+**`claude/brief-ledger-numbers-are-permanent` is mine.** Eight merged on 2026-09-19 (#124–#130,
+#132); #131 is TechPad Gen's. **Check the open list live before assuming it is empty** — it went
+from one to seven in twenty minutes today.
 
 ## What is true now
 
