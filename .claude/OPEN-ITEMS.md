@@ -2,7 +2,12 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-19.**
+**Last reviewed: 2026-09-19.** · **Next number: 15.**
+
+**Numbers are permanent.** A closed item's row is deleted and its number is never used again, so the
+gaps below are correct rather than something to tidy. A new item takes `Next number` and increments
+it. Numbering restarts at 15 because 1–14 were each reused during four renumbers on 2026-09-19 and
+references to them are already ambiguous.
 
 - Finished work is not here. Git log is the archive.
 - Settled calls, mistakes and traps are in `.claude/DECISIONS.md`. Live facts are computed, at `/admin`.
