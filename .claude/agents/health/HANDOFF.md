@@ -12,9 +12,9 @@ Read `RULES.md` first, then `.claude/HEALTH-PLAN.md`. This file is only what is 
 It replaces the placeholder page, adds the schema the app runs on, and lets a number that turned
 out wrong be fixed after the fact.
 
-**The migration is not applied.** `20260919091628_health_macro_tables.sql` is additive — five tables
-in a schema read live and confirmed empty before it was written — so it is safe to apply before the
-code that needs it. The technical director applies it at gate time.
+**The migration is applied**, at the gate on 2026-09-19, and verified: five tables, RLS on every one,
+zero policies. The hosted API stamped its own version and ignored the filename, so the file was
+renamed to `20260919135856_health_macro_tables.sql` to match — see `supabase/README.md`.
 
 ## How it works, in the order it matters
 
