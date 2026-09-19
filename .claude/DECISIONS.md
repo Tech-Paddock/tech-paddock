@@ -250,10 +250,11 @@ cross-owner additions, so a running session cannot repair itself.
   thing it exists to prevent. The roster check had the mirror flaw — it required a determiner, so
   "five apps means five agents" went unseen through three re-measures of the item that existed to
   find it. It now measures the cardinal against `apps/` instead of flagging any number.
-- **2026-09-19 — a Vercel project's `live: false` does NOT mean paused, and the ledger asserted for
-  a day that `tp-tracker` was.** `tp-home` reads `live: false` while serving `techpaddock.io`, so
-  the field cannot mean what it was read to mean. **Read deployment state instead:** a paused
-  project returns `BLOCKED` on every commit (`tp-message-editor`), a live one returns `READY` at
-  `target: production` (`tp-tracker`, on 4133904). A skipped preview also reads `CANCELED` with
-  `target: null` — that is `ignoreCommand` working, not a failure. The cost of the misread was
-  ledger item 11 resting on "unreachable while paused" when it was reachable throughout.
+- **2026-09-19 — Vercel project state was read wrong twice and both readings reached the repo as
+  fact. Read DEPLOYMENT STATE, never a project field.** `BLOCKED` on every commit is paused
+  (`tp-message-editor`); `READY` at `target: production` is not (`tp-tracker`, on 4133904);
+  `CANCELED` at `target: null` is `ignoreCommand` skipping a preview. `live: false` does not mean
+  paused — `tp-home` reads it while serving `techpaddock.io` — yet ledger item 11 rested on
+  "unreachable while paused". `framework: null` does not mean a broken Root Directory — `tp-health`
+  reads null, skips previews from its own `vercel.json`, builds `READY`, and serves a `verified`
+  `health.techpaddock.io`. **Health is live**, and was called unreachable for a day on that field.

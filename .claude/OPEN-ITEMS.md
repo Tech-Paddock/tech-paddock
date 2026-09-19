@@ -59,11 +59,6 @@ Nothing.
    websites; **Coffee is the only real app**, and Health will be. Site is a thin index grouped by
    verb around a long page; app is one screen, thumb-first, no index. Mockups exist. **It is settled
    at standup**, so `STANDUP.md` gains surface beside the name and the schema. *LoE: a session.*
-16. **`tp-health` has no Root Directory, so Vercel never reads `apps/health/vercel.json`.**
-   *Owner: Joel.* Measured 2026-09-19: `tp-health` reports `framework: null` where every other
-   project reports `nextjs` — it is building from the repo root, where there is no `package.json`.
-   **That is why it is the only project still paying for preview builds**, and after the build
-   scoping lands it is the one app that still rebuilds on every merge. *LoE: minutes.*
 
 ## Parked
 
