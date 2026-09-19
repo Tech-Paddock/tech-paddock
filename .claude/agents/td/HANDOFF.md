@@ -8,9 +8,9 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**#130 is mine** — ledger rows from auditing the repo the day it went public; #123 merged before it.
-**Six more opened within twenty minutes**, five of them TechPad Gen's: the queue is seven, not one.
-**Check every one live before assuming its state** — the trap below caught this file today.
+**Nothing of mine is in flight.** Seven pull requests merged 09:25–09:34 on 2026-09-19 — #124 #125
+#126 #127 #128 #129 #130 — and TechPad Gen opened #131 during it. **Check the open list live before
+assuming it is empty**; it went from one to seven inside twenty minutes today.
 
 ## What is true now
 
@@ -64,17 +64,17 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 
 ## Next
 
-**`packages/shared` is yours, not Joel's to approve** — item 6 has the shape. **Not npm workspaces**:
+**`packages/shared` is yours, not Joel's to approve** — item 4 has the shape. **Not npm workspaces**:
 a root install costs the per-app independence the CI matrix rests on.
 
 **Health is merged**, unreachable until Joel's four steps. **Step (a) is also the only
 thing still paying for preview builds**: Vercel cannot see `apps/health/vercel.json` from the root.
 
-**App surface is yours and the guide is unwritten** — item 10. The mockups that settled the look are
+**App surface is yours and the guide is unwritten** — item 7. The mockups that settled the look are
 a canvas artifact, not in the repo, so the guide must carry the rules in words.
 
 **Every agent has a board, URLs in `KICKOFF.md`** — the only place they live, so an agent that loses
 its URL publishes a duplicate. **You are the rollup**; they report themselves. **`On track` is item
-5**, and the deploy trigger is still its unsolved half.
+3**, and the deploy trigger is still its unsolved half.
 
 Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.
