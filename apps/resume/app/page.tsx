@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { LIVERY } from "@/lib/livery";
 import { KIND_LABEL, type ResumeFile, type ResumeKind } from "@/lib/resumes";
+import { verdictFor } from "@/lib/verdict";
 import ThemeControl from "./ThemeControl";
 
 /**
@@ -214,11 +215,18 @@ function Stat({ value, label, tone = "plain" }: { value: string; label: string; 
 
 /** Left rail, right work. One column below `lg`, which is also how it renders
  *  inside the hub's iframe — that width is the narrow case, not an edge case. */
+/**
+ * Two boxed sections: what you put in, and what came back.
+ *
+ * The frames are Joel's, 2026-09-19 — before them the rail and the results ran
+ * together as one field of cards on the same ground, and which side a thing
+ * belonged to was carried only by position. A border says it instead.
+ */
 function Workbench({ rail, children }: { rail: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="grid gap-5 lg:grid-cols-[20rem_minmax(0,1fr)] items-start">
-      <div className="flex flex-col gap-3 lg:sticky lg:top-4">{rail}</div>
-      <div className="flex flex-col gap-4 min-w-0">{children}</div>
+      <div className="border border-line rounded-xl p-3 flex flex-col gap-3 lg:sticky lg:top-4">{rail}</div>
+      <div className="border border-line rounded-xl p-3 flex flex-col gap-4 min-w-0">{children}</div>
     </div>
   );
 }
@@ -576,10 +584,19 @@ function ReformatShell() {
                 >
                   {busy ?? "Reformat"}
                 </button>
-                <p className="text-xs opacity-60">
-                  Every render is saved — the source, the output and which template built it — so what you sent stays
-                  reproducible. Both files are on the Resume tab.
-                </p>
+
+                {/* The download sits under the button that produced it, and its label
+                    does not change. Joel, 2026-09-19: "don't make this dynamic". A
+                    button whose text is the filename moves and re-wraps on every
+                    render, so the thing you reach for is never in the same place. */}
+                {result && (
+                  <button
+                    onClick={download}
+                    className="w-full border border-accent text-accent rounded-xl px-5 py-3 font-medium"
+                  >
+                    Download Resume
+                  </button>
+                )}
               </>
             }
           >
@@ -593,30 +610,66 @@ function ReformatShell() {
               </Panel>
             ) : (
               <>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <button
-                    onClick={download}
-                    className="flex-1 bg-accent text-accent-ink rounded-xl px-5 py-3 font-medium"
-                  >
-                    Download {result.filename}
-                  </button>
-                  <p className="text-xs opacity-60 sm:max-w-[16rem]">
-                    Rendered with {result.templateLabel}. {result.renderId ? "Saved to the Resume tab." : "Not saved."}
-                  </p>
-                </div>
+                {/* The verdict. Joel, 2026-09-19: "I need a pass fail indicator on the
+                    front page. if there were any irregularites with the reformat it
+                    should fail and give reason." The reasoning about what may vote on
+                    it — and what may not — is in lib/verdict.ts, with its tests. */}
+                {(() => {
+                  const v = verdictFor(result);
+                  return (
+                    <div
+                      className={`rounded-xl border-2 overflow-hidden ${v.pass ? "border-bar" : "border-urgent"}`}
+                    >
+                      {/* Black for pass, red for fail. The livery is red and black, so
+                          two reds would have been two shades of the same alarm — the
+                          word carries the verdict and the colour only has to separate
+                          the two states. */}
+                      <div
+                        className={`px-4 py-3 flex items-baseline gap-3 flex-wrap ${
+                          v.pass ? "bg-bar text-bar-ink" : "bg-urgent text-accent-ink"
+                        }`}
+                      >
+                        <span className="text-lg font-semibold tracking-wide">{v.pass ? "PASS" : "FAIL"}</span>
+                        <span className="text-sm opacity-90">
+                          {v.pass
+                            ? "Everything in the source reached the document."
+                            : `${v.reasons.length} irregularit${v.reasons.length === 1 ? "y" : "ies"} in this reformat.`}
+                        </span>
+                      </div>
 
-                {/* The one pointer, not a readout. Joel asked for no telemetry here on
-                    2026-09-19; a link to where it went is navigation, not a measurement. */}
-                <Panel title="Measured on Diagnostics">
-                  <p className="text-sm opacity-70">
-                    How much of the source reached the document, the ATS check on the output and what the renderer
-                    changed are on{" "}
-                    <button onClick={() => setTab("diagnostics")} className="underline font-medium">
-                      Diagnostics
-                    </button>
-                    , already loaded for this render — you do not have to drop the file in again.
-                  </p>
-                </Panel>
+                      {v.reasons.length > 0 && (
+                        <ul className="divide-y divide-line">
+                          {v.reasons.map((reason, i) => (
+                            <li key={i} className="px-4 py-2.5 text-sm">
+                              {reason}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {v.notes.length > 0 && (
+                        <div className="border-t border-line px-4 py-2.5 flex flex-col gap-1">
+                          <p className="text-[0.7rem] uppercase tracking-wide opacity-60">
+                            About the template, not this render
+                          </p>
+                          {v.notes.map((note, i) => (
+                            <p key={i} className="text-sm opacity-80">
+                              {note}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="border-t border-line px-4 py-2 text-xs opacity-60">
+                        {v.pass && v.notes.length === 0 ? "Nothing to look at. " : "Line by line on "}
+                        <button onClick={() => setTab("diagnostics")} className="underline font-medium">
+                          Diagnostics
+                        </button>
+                        .
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {result.renderId && (
                   <Panel title="Where did this go?">
