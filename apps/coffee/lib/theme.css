@@ -37,7 +37,7 @@
   --ink-invert-rgb: 255 255 255;
   --ink-invert: rgb(var(--ink-invert-rgb));
 
-  --line-rgb: 143 163 184;
+  --line-rgb: 131 149 169;
   --line: rgb(var(--line-rgb));
   --accent-rgb: 29 63 143;
   --accent: rgb(var(--accent-rgb));
@@ -92,7 +92,7 @@
     --ink-invert-rgb: 7 12 24;
     --ink-invert: rgb(var(--ink-invert-rgb));
 
-    --line-rgb: 56 72 99;
+    --line-rgb: 90 104 126;
     --line: rgb(var(--line-rgb));
     --accent-rgb: 127 178 224;
     --accent: rgb(var(--accent-rgb));
@@ -147,7 +147,7 @@
   --ink-invert-rgb: 7 12 24;
   --ink-invert: rgb(var(--ink-invert-rgb));
 
-  --line-rgb: 56 72 99;
+  --line-rgb: 90 104 126;
   --line: rgb(var(--line-rgb));
   --accent-rgb: 127 178 224;
   --accent: rgb(var(--accent-rgb));
@@ -205,7 +205,7 @@
   --ink-invert-rgb: 255 255 255;
   --ink-invert: rgb(var(--ink-invert-rgb));
 
-  --line-rgb: 139 176 154;
+  --line-rgb: 122 155 136;
   --line: rgb(var(--line-rgb));
   --accent-rgb: 15 92 51;
   --accent: rgb(var(--accent-rgb));
@@ -260,7 +260,7 @@
     --ink-invert-rgb: 5 17 12;
     --ink-invert: rgb(var(--ink-invert-rgb));
 
-    --line-rgb: 53 81 63;
+    --line-rgb: 83 107 91;
     --line: rgb(var(--line-rgb));
     --accent-rgb: 255 216 77;
     --accent: rgb(var(--accent-rgb));
@@ -315,7 +315,7 @@
   --ink-invert-rgb: 5 17 12;
   --ink-invert: rgb(var(--ink-invert-rgb));
 
-  --line-rgb: 53 81 63;
+  --line-rgb: 83 107 91;
   --line: rgb(var(--line-rgb));
   --accent-rgb: 255 216 77;
   --accent: rgb(var(--accent-rgb));
@@ -373,7 +373,7 @@
   --ink-invert-rgb: 255 255 255;
   --ink-invert: rgb(var(--ink-invert-rgb));
 
-  --line-rgb: 179 174 142;
+  --line-rgb: 153 148 121;
   --line: rgb(var(--line-rgb));
   --accent-rgb: 0 105 62;
   --accent: rgb(var(--accent-rgb));
@@ -428,7 +428,7 @@
     --ink-invert-rgb: 10 12 16;
     --ink-invert: rgb(var(--ink-invert-rgb));
 
-    --line-rgb: 62 73 86;
+    --line-rgb: 93 102 113;
     --line: rgb(var(--line-rgb));
     --accent-rgb: 255 217 0;
     --accent: rgb(var(--accent-rgb));
@@ -483,7 +483,7 @@
   --ink-invert-rgb: 10 12 16;
   --ink-invert: rgb(var(--ink-invert-rgb));
 
-  --line-rgb: 62 73 86;
+  --line-rgb: 93 102 113;
   --line: rgb(var(--line-rgb));
   --accent-rgb: 255 217 0;
   --accent: rgb(var(--accent-rgb));
@@ -541,7 +541,7 @@
   --ink-invert-rgb: 255 255 255;
   --ink-invert: rgb(var(--ink-invert-rgb));
 
-  --line-rgb: 168 156 143;
+  --line-rgb: 157 146 133;
   --line: rgb(var(--line-rgb));
   --accent-rgb: 200 16 46;
   --accent: rgb(var(--accent-rgb));
@@ -596,7 +596,7 @@
     --ink-invert-rgb: 13 11 11;
     --ink-invert: rgb(var(--ink-invert-rgb));
 
-    --line-rgb: 78 64 64;
+    --line-rgb: 107 96 96;
     --line: rgb(var(--line-rgb));
     --accent-rgb: 242 99 94;
     --accent: rgb(var(--accent-rgb));
@@ -651,7 +651,7 @@
   --ink-invert-rgb: 13 11 11;
   --ink-invert: rgb(var(--ink-invert-rgb));
 
-  --line-rgb: 78 64 64;
+  --line-rgb: 107 96 96;
   --line: rgb(var(--line-rgb));
   --accent-rgb: 242 99 94;
   --accent: rgb(var(--accent-rgb));
@@ -709,7 +709,7 @@
   --ink-invert-rgb: 255 253 246;
   --ink-invert: rgb(var(--ink-invert-rgb));
 
-  --line-rgb: 179 168 135;
+  --line-rgb: 155 146 117;
   --line: rgb(var(--line-rgb));
   --accent-rgb: 111 85 18;
   --accent: rgb(var(--accent-rgb));
@@ -764,7 +764,7 @@
     --ink-invert-rgb: 20 18 12;
     --ink-invert: rgb(var(--ink-invert-rgb));
 
-    --line-rgb: 71 64 50;
+    --line-rgb: 103 98 86;
     --line: rgb(var(--line-rgb));
     --accent-rgb: 201 162 39;
     --accent: rgb(var(--accent-rgb));
@@ -819,7 +819,7 @@
   --ink-invert-rgb: 20 18 12;
   --ink-invert: rgb(var(--ink-invert-rgb));
 
-  --line-rgb: 71 64 50;
+  --line-rgb: 103 98 86;
   --line: rgb(var(--line-rgb));
   --accent-rgb: 201 162 39;
   --accent: rgb(var(--accent-rgb));

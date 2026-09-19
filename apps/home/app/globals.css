@@ -757,7 +757,6 @@ a.slot:hover {
 
 .tab-density.active { color: var(--paper); background: var(--ink); border-color: var(--ink); }
 
-.tab-empty { max-width: 60ch; }
 
 .paper { display: flex; flex-direction: column; gap: 18px; max-width: 80ch; }
 

@@ -222,4 +222,21 @@ cross-owner additions, so a running session cannot repair itself.
   **Vercel aliases whichever build finishes last, not whichever commit is newest** — `techpaddock.io`
   ended up on the Coffee-icon build rather than the hub change that merged after it. The fix was to
   promote the correct deployment. **The trap generalises: any two merges close together can leave an
-  app serving the older one**, silently, with CI green and the branch deleted. Now ledger item 12.
+  app serving the older one**, silently, with CI green and the branch deleted. Now ledger item 9.
+- **2026-09-19 — Ledger numbers are permanent, and closing an item leaves a gap.** They used to be
+  positional: close one and everything below shifted up on the next write. **That happened four times
+  on 2026-09-19** and broke a parked row's cross-reference, three numbers in the TD's handoff, the
+  entry directly above this one, and live references in two agents' branches — each pointing
+  confidently at the wrong item rather than at nothing, which is the failure the `#` column exists to
+  prevent. The ledger now carries `Next number:` and a new item takes it. **Numbering restarted at 15
+  because 1–14 had each meant several things that day.** `drift` fails a reuse, a duplicate, or a
+  renumber — the last by comparing titles against `origin/main`, since a tidy 1..N renumber is
+  otherwise indistinguishable from a correct file.
+- **2026-09-19 — `tp-message-editor` is paused on purpose; its `BLOCKED` deployments are not a bug.**
+  Joel paused it because he is not using the Message Editor and does not want to spend attention on
+  it. Every production deployment since reads `BLOCKED`, on every commit, so `editor.techpaddock.io`
+  serves whatever was live before the pause. **Do not investigate it and do not unpause it to make a
+  check go green.** `apps/editor` still builds in CI — the matrix comes from the folders on disk —
+  and #129 removed it from the hub's roster the same day. **Paused is reversible and deleted is
+  not**, which is the same reasoning that keeps `tp-tracker` parked.
+

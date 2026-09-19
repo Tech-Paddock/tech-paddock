@@ -27,6 +27,7 @@ import {
   type MyBrewer,
 } from "@/lib/brewers";
 import type { Guide, GuideStatus } from "@/lib/guide";
+import { guidePresentation } from "@/lib/guideDisplay";
 import { MODEL_LABELS, DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT, effortsFor, isEffortFor, type SearchModel } from "@/lib/models";
 
 type Identity = {
@@ -95,40 +96,6 @@ const EMPTY: Identity = {
   varietal: "",
   roast_date: "",
 };
-
-/**
- * Short labels, because the heading is read at a glance in a kitchen and the
- * caveat underneath is where the nuance belongs.
- *
- * Tier 1 names the *place* rather than the audience. "Bag specific" was the
- * first wording asked for and it asserts the one thing the tier does not
- * check — whether the roaster wrote the recipe for this lot or prints the
- * same one everywhere. `PRODUCT_PAGE_CAVEAT` sits directly beneath it saying
- * so, and a heading its own caption has to walk back is worse than a longer
- * heading. Where it was read is the part a search can actually establish.
- */
-const GUIDE_LABELS: Record<GuideStatus, string> = {
-  coffee_specific: "From this bag's own page",
-  roaster_generic: "Roaster's generic recipe",
-  none: "No recipe provided by roaster.",
-  not_searched: "Not searched",
-};
-
-/**
- * The tier is decided by **where** the instructions were read, because that is
- * the only part a search can verify. It is not a claim that the roaster wrote
- * them for this lot, and the first real bag is exactly the case that shows the
- * difference: Sweet Bloom print one house recipe — Origami Air, 1:17, 900µm,
- * 2:40 — on every product page, so it validated as `coffee_specific` while
- * being the same recipe they give for everything.
- *
- * The label used to read "The roaster's recipe for this coffee", which asserted
- * the part that was never checked. It now says where it came from, and this
- * says out loud what that does and does not prove. Surfacing the uncertainty
- * beats resolving it in code: nothing in one page can tell the two apart.
- */
-const PRODUCT_PAGE_CAVEAT =
-  "Published on this coffee's page, which is not the same as written for it — plenty of roasters print one default recipe on all of them. The quote below is the check.";
 
 export default function CoffeePage() {
   // Scanning is an action you take occasionally; the library is the thing you
@@ -551,19 +518,7 @@ function GuideCard({ guide }: { guide: Guide }) {
 
   return (
     <section className="bg-surface border border-line rounded-2xl p-4 flex flex-col gap-3">
-      <div>
-        <h2 className="font-semibold">{GUIDE_LABELS[guide.status]}</h2>
-        {guide.status === "coffee_specific" && (
-          <p className="text-xs text-ink-soft mt-1">{PRODUCT_PAGE_CAVEAT}</p>
-        )}
-        {guide.guide_url && (
-          <a href={guide.guide_url} target="_blank" rel="noreferrer" className="text-xs text-accent underline break-all">
-            {guide.guide_url}
-          </a>
-        )}
-      </div>
-
-      <Quotes quotes={guide.quotes} />
+      <GuideStatusHeader status={guide.status} quotes={guide.quotes} guideUrl={guide.guide_url} />
 
       {guide.status === "none" ? (
         <p className="text-sm text-ink/70">
@@ -720,44 +675,14 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
       </div>
 
       {open && (
-        <div className="border-t border-line p-4 flex flex-col gap-4">
-          {/* The beans link lives on the pill above, so it is reachable without
-              opening the card. Only a brew guide on a *different* page needs
-              one here — at tier 1 the two URLs are the same, and a second link
-              to the same place is how that distinction gets lost. */}
-          {bag.guide_url && bag.guide_url !== bag.product_url && (
-            <a href={bag.guide_url} target="_blank" rel="noreferrer" className="text-sm text-accent underline">
-              The brew guide ↗
-            </a>
-          )}
+        <div className="border-t border-line p-4 flex flex-col gap-5">
 
-          <div>
-            <p className="text-sm font-semibold mb-1">{GUIDE_LABELS[bag.guide_status]}</p>
-            {bag.guide_status === "coffee_specific" && (
-              <p className="text-xs text-ink-soft mb-2">{PRODUCT_PAGE_CAVEAT}</p>
-            )}
-            {/* The quote first, the parse second. The parsed row is a reading
-                of the quote, so the quote is the thing with authority — and a
-                misparse is only visible if you meet the source before the
-                summary of it. */}
-            <div className="mb-3">
-              <Quotes quotes={bag.guide_quotes ?? []} />
-            </div>
-            {guideRows.length ? (
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                {guideRows.map(([k, v]) => (
-                  <div key={k} className="contents">
-                    <dt className="text-ink/60">{k}</dt>
-                    <dd>{v}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : (
-              <p className="text-sm text-ink/60">Nothing recorded from the roaster.</p>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-3 border-t border-line pt-4">
+          {/* Your side of the bag first. The roaster's recipe is fixed the
+              moment you buy it; the purchase date and what the coffee tastes
+              like are the parts you come back and change, so they sit above
+              the block that never moves. */}
+          <section className="flex flex-col gap-3">
+            <SectionHead>This bag</SectionHead>
             <label className="text-sm text-ink/70 flex flex-col gap-1">
               Purchased
               <input
@@ -768,80 +693,108 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
               />
             </label>
             <label className="text-sm text-ink/70 flex flex-col gap-1">
-              Notes on the coffee
+              Brew Notes
               <textarea
                 rows={3}
                 value={draft.my_notes}
                 onChange={(e) => setDraft({ ...draft, my_notes: e.target.value })}
                 className="border border-line rounded-lg px-3 py-2 bg-surface"
               />
+              {/* The helper stays, and carries more weight than it used to:
+                  this field and the per-brew notes field now have names that
+                  sound alike, and only this sentence says which is which. */}
               <span className="text-xs text-ink-soft">
                 What the coffee tastes like, which outlives any one brew. Per-brew observations go on the brew.
               </span>
             </label>
-            {error && (
-              <p className="text-sm text-urgent bg-surface border border-urgent rounded-lg px-3 py-2">{error}</p>
-            )}
+          </section>
 
-            <button
-              onClick={() => void save()}
-              disabled={saving || deleting}
-              className="bg-accent text-accent-ink rounded-lg px-3 py-2 font-medium disabled:opacity-60"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
+          <section className="flex flex-col gap-3 border-t border-line pt-4">
+            <SectionHead>Recipe</SectionHead>
 
-            {/* The brew log is its own section under the bag, not a block
-                inside the bag's own details. What the roaster said and what
-                you bought are fixed the moment you buy it; the brews are the
-                part that keeps growing, and they read as a log rather than as
-                one more field once they sit below the button that saves the
-                bag. */}
-            <Brews
-              bagId={bag.id}
-              onCount={setBrewCount}
-              guide={{ dose: bag.guide_dose, water: bag.guide_water, ratio: bag.guide_ratio }}
+            <GuideStatusHeader
+              status={bag.guide_status}
+              quotes={bag.guide_quotes ?? []}
+              guideUrl={bag.guide_url !== bag.product_url ? bag.guide_url : null}
             />
 
-            {/* Deleting a bag also deletes its photo and cannot be undone, so
-                it asks once. The confirm replaces the button rather than
-                appearing beside it — there is then no adjacent control to hit
-                by accident on a phone. */}
-            <div className="border-t border-line pt-3">
-              {confirmingDelete ? (
-                <div className="flex flex-col gap-2">
-                  <p className="text-sm text-ink/70">
-                    Delete <strong>{bag.coffee_name}</strong>, its photo
-                    {brewCount ? ` and ${brewCount} brew${brewCount === 1 ? "" : "s"}` : ""}? This cannot be
-                    undone.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => void remove()}
-                      disabled={deleting}
-                      className="flex-1 bg-urgent text-ink-invert rounded-lg px-3 py-2 font-medium disabled:opacity-60"
-                    >
-                      {deleting ? "Deleting…" : "Yes, delete"}
-                    </button>
-                    <button
-                      onClick={() => setConfirmingDelete(false)}
-                      disabled={deleting}
-                      className="flex-1 border border-line rounded-lg px-3 py-2"
-                    >
-                      Keep it
-                    </button>
-                  </div>
-                </div>
+            <div>
+              {/* The parsed values get a name of their own. Without it the rows
+                  read as though the status header were describing them, and
+                  the difference between what was quoted and what was parsed
+                  out of the quote is the difference this app exists to show. */}
+              <h4 className="text-sm font-semibold mb-1">Instructions</h4>
+              {guideRows.length ? (
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                  {guideRows.map(([k, v]) => (
+                    <div key={k} className="contents">
+                      <dt className="text-ink/60">{k}</dt>
+                      <dd>{v}</dd>
+                    </div>
+                  ))}
+                </dl>
               ) : (
-                <button
-                  onClick={() => setConfirmingDelete(true)}
-                  className="text-sm text-urgent underline"
-                >
-                  Delete this bag
-                </button>
+                <p className="text-sm text-ink/60">Nothing recorded from the roaster.</p>
               )}
             </div>
-          </div>
+          </section>
+
+          {error && (
+            <p className="text-sm text-urgent bg-surface border border-urgent rounded-lg px-3 py-2">{error}</p>
+          )}
+
+          {/* Save and Delete share a row, pushed to opposite ends. Deleting a
+              bag takes its photo and every brew with it and cannot be undone,
+              so the confirm *replaces* this row rather than opening beside it
+              — on a phone there is then nothing adjacent to hit by accident,
+              which is why the two buttons being inline is safe at all. */}
+          {confirmingDelete ? (
+            <div className="flex flex-col gap-2 border border-urgent rounded-lg p-3">
+              <p className="text-sm text-ink/70">
+                Delete <strong>{bag.coffee_name}</strong>, its photo
+                {brewCount ? ` and ${brewCount} brew${brewCount === 1 ? "" : "s"}` : ""}? This cannot be
+                undone.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => void remove()}
+                  disabled={deleting}
+                  className="flex-1 bg-urgent text-ink-invert rounded-lg px-3 py-2 font-medium disabled:opacity-60"
+                >
+                  {deleting ? "Deleting…" : "Yes, delete"}
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={deleting}
+                  className="flex-1 border border-line rounded-lg px-3 py-2"
+                >
+                  Keep it
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <button
+                onClick={() => void save()}
+                disabled={saving || deleting}
+                className="bg-accent text-accent-ink rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                className="border border-urgent text-urgent rounded-lg px-4 py-2 text-sm font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          )}
+
+          <Brews
+            bagId={bag.id}
+            onCount={setBrewCount}
+            guide={{ dose: bag.guide_dose, water: bag.guide_water, ratio: bag.guide_ratio }}
+          />
         </div>
       )}
     </article>
@@ -953,7 +906,7 @@ function Brews({
 
   return (
     <section className="flex flex-col gap-3 border-t border-line pt-4">
-      <h3 className="font-medium">Brews{brews?.length ? ` (${brews.length})` : ""}</h3>
+      <SectionHead>Brews{brews?.length ? ` (${brews.length})` : ""}</SectionHead>
 
       {error && (
         <p className="text-sm text-urgent bg-surface border border-urgent rounded-lg px-3 py-2">{error}</p>
@@ -1198,6 +1151,76 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
 //     </details>
 //   );
 // }
+
+/** One section's name, in the same voice everywhere the card uses one. */
+function SectionHead({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-soft">{children}</h3>
+  );
+}
+
+/**
+ * Which of the three answers the search came back with, and the evidence one
+ * tap underneath it.
+ *
+ * **The indicator is never the only signal.** Colour carries the same thing the
+ * label says in words, so the row still reads correctly to anyone who cannot
+ * separate the three hues — and the words are the ones that get quoted back,
+ * not the colour.
+ *
+ * It is a real `<details>` rather than a div with a click handler: the summary
+ * is focusable, operable from the keyboard and announced as a disclosure
+ * without any of that being written here.
+ *
+ * The quote lives inside because it is the check on everything below it, and
+ * putting the check behind one tap is the compromise between showing the
+ * evidence and not making a shelf of bags unreadable.
+ */
+function GuideStatusHeader({
+  status,
+  quotes,
+  guideUrl,
+}: {
+  status: GuideStatus;
+  quotes: { text: string }[];
+  guideUrl: string | null;
+}) {
+  const { label, dot } = guidePresentation(status);
+  const hasQuotes = quotes?.length > 0;
+
+  return (
+    <details className="border border-line rounded-lg bg-surface group">
+      <summary className="flex items-center gap-2.5 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} aria-hidden />
+        <span className="text-sm font-semibold min-w-0 flex-1">{label}</span>
+        <span className="text-ink-soft text-xs shrink-0 transition-transform group-open:rotate-90" aria-hidden>
+          ›
+        </span>
+      </summary>
+      <div className="border-t border-line p-3 flex flex-col gap-3">
+        {hasQuotes ? (
+          <Quotes quotes={quotes} />
+        ) : (
+          <p className="text-sm text-ink/60">
+            {status === "not_searched"
+              ? "The search has not run for this bag yet."
+              : "Nothing was quoted from the roaster's site."}
+          </p>
+        )}
+        {guideUrl && (
+          <a
+            href={guideUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm text-accent underline break-all"
+          >
+            The brew guide ↗
+          </a>
+        )}
+      </div>
+    </details>
+  );
+}
 
 /**
  * What the page actually said, above the parsed values rather than folded

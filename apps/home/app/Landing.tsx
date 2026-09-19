@@ -20,7 +20,9 @@ import Paper, { DENSITIES, type Density } from "./Paper";
  * them owning the others.
  *
  * **Paper is the landing**, per the settled decision, so an absent `?tab=` means
- * Paper rather than Board. The board did not move: it is the same PitWall and
+ * Paper rather than the Pit Wall. **There are two tabs, not three** — the Feed
+ * was deleted rather than parked on 2026-09-18, because it was named in the tab
+ * order and nowhere else and nothing said what it carried. The board did not move: it is the same PitWall and
  * glance that were here before, one tab along.
  *
  * **No tool tiles anywhere in here.** A grid of them sat under the glance on the
@@ -35,10 +37,14 @@ import Paper, { DENSITIES, type Density } from "./Paper";
  * If it should be remembered per person, that is a cookie like polarity's.
  */
 
+// **`id` and `name` are deliberately not the same word.** `board` stays the id
+// because it is in the query string — `/?tab=board` is a link Joel may have
+// bookmarked, and renaming an id breaks a URL to rename a label. The label is
+// what was wrong: "Board" named this tab *and* the thing the hub is, so the tab
+// takes the real name and the id keeps the old one.
 const TABS = [
   { id: "paper", name: "Paper" },
-  { id: "board", name: "Board" },
-  { id: "feed", name: "Feed" },
+  { id: "board", name: "Pit Wall" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -118,17 +124,6 @@ function Body({ glance, pit }: { glance: Glance; pit: PitWallData }) {
 
       {tab === "paper" && <Paper glance={glance} density={density} />}
       {tab === "board" && <Board glance={glance} pit={pit} />}
-      {tab === "feed" && (
-        <div className="paper-slot tab-empty">
-          <p className="paper-slot-label">Feed</p>
-          <p className="paper-slot-body">
-            Named in the settled tab order and nowhere else. Nothing in the repo says what it
-            carries, so this prototype does not guess — an invented Feed would be the most
-            expensive thing here to unpick later.
-          </p>
-          <p className="paper-slot-ask">Needs the brief: what the Feed is for.</p>
-        </div>
-      )}
     </div>
   );
 }
