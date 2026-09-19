@@ -9,9 +9,11 @@ State as of 2026-09-19. Read `RULES.md` and `.claude/HEALTH-PLAN.md` first.
 Merged as #122 and deployed. Dictate what you ate, approve the draft, it is logged with the day's
 running total. `/debug` runs both models on one food and keeps every run.
 
-**The database is empty.** Zero rows in every table, measured 2026-09-19. Nothing has been
-logged and the harness has never run, so there is no evidence yet about the thing it was built to
-measure.
+**The database is empty.** Zero rows in every table, measured 2026-09-19. Nothing has been logged
+and the harness has never run, so there is no evidence yet about the thing it was built to measure.
+
+**In flight:** `claude/health-gate-followups` carries the column comments and the `models.ts`
+correction described below. True on that branch, not yet on `main`.
 
 ## How it works, in the order it matters
 
@@ -72,8 +74,6 @@ creation is the end of it.
 
 ## Next
 
-**Use it before building more.** The harness answers one question — does Haiku reproduce a number
-you already approved — and cannot answer it without runs.
-
-Two numbers Joel has not set, neither blocking: **the agreement rate that retires the harness** and
-**the divergence tolerance** (now 10%-or-25 kcal on calories, 20%-or-5 g on macros).
+**Use it before building more** — the harness cannot answer whether Haiku reproduces a number you
+already approved without runs. Two numbers Joel has not set, neither blocking: **the agreement rate
+that retires the harness** and **the divergence tolerance** (10%-or-25 kcal, 20%-or-5 g).
