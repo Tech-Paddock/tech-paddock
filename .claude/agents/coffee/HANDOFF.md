@@ -62,10 +62,10 @@ in `apps/coffee/design/`, kept out of `app/` where a folder is a route. The PNG 
 
 ## In flight
 
-`claude/coffee-bag-card-layout` — pushed, no PR. The bag card rebuilt to Joel's sketch. **CI could
-not run**: Actions refuses to start any job account-wide, on billing. Verified locally instead —
-suite green, clean build, `drift-check` exit 0.
-**#121 is open** and touches this same handoff; whichever merges second resolves one conflict.
+`claude/coffee-bag-card-layout` — PR open, CI green on its head. The bag card rebuilt to Joel's
+sketch: the tier is a three-state light, the card is three sections, Save and Delete share a row.
+**Actions refused to start any job account-wide, on billing, for an hour of 2026-09-19.** Making the
+repo public cleared it, and run 484 is this branch's first genuine green rather than a stale re-read.
 
 **One item of that sketch is deliberately unbuilt**: generating a recipe when the roaster published
 none. It contradicts `RULES.md` §1 and needs a schema decision, so it went to Joel.
