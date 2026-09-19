@@ -14,21 +14,34 @@ import ThemeControl from "./ThemeControl";
  * business and not the reader's. They are one tab with a type filter now;
  * `/api/resumes` merges the view without merging the tables.
  *
- * **Reformat leads and is the landing tab.** Check led for a while on the
+ * **Reformat leads and is the landing tab.** Diagnostics led for a while on the
  * reasoning that formatting happens in Word and the last step before sending is
  * the one this app is for. That was wrong about how the app is actually opened:
- * it is opened to run a Jobright export through the house style, and Check is
- * where you go afterwards.
+ * it is opened to run a Jobright export through the house style, and Diagnostics
+ * is where you go afterwards.
+ *
+ * **Reformat carries no readouts, and that is deliberate.** Joel, 2026-09-19:
+ * *"Realistically I don't want any telemetry on the main tab. put it on the
+ * Check tab, rename it to diagnostics"*. So the tab you land on is the act —
+ * pick, drop, reformat, download — and every measurement of the result lives one
+ * tab over. **Diagnostics reads from two sources**: the render you just made,
+ * shown without asking for a file, and any document you drop in. Both answer the
+ * same question about different documents, which is why they share a tab rather
+ * than each having one.
  */
-type Tab = "reformat" | "resume" | "check";
+type Tab = "reformat" | "resume" | "diagnostics";
 const TABS: { id: Tab; label: string }[] = [
   { id: "reformat", label: "Reformat" },
   { id: "resume", label: "Resume" },
-  { id: "check", label: "Check" },
+  { id: "diagnostics", label: "Diagnostics" },
 ];
 
-/** The two retired tab names still resolve, so an old link lands somewhere sensible. */
-const TAB_ALIASES: Record<string, Tab> = { templates: "resume", history: "resume" };
+/** Retired tab names still resolve, so an old link lands somewhere sensible. */
+const TAB_ALIASES: Record<string, Tab> = {
+  templates: "resume",
+  history: "resume",
+  check: "diagnostics",
+};
 
 type Finding = { code: string; severity: "blocking" | "warning"; message: string };
 /** How much of what the renderer took from the source reached the document. The
@@ -573,28 +586,13 @@ function ReformatShell() {
             {!result ? (
               <Panel title="What comes back">
                 <p className="text-sm opacity-70">
-                  Your template with this resume&apos;s text in it, plus how much of the source reached the document, an
-                  ATS check on the output, and what the renderer changed. Nothing is generated: every line is moved
-                  across word for word.
+                  Your template with this resume&apos;s text in it. Nothing is generated: every line is moved across word
+                  for word. The measurements — how much of the source reached the document, an ATS check on the output,
+                  and what the renderer changed — are on Diagnostics.
                 </p>
               </Panel>
             ) : (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <Stat
-                    value={`${result.coverage.percent}%`}
-                    label="Lines carried"
-                    tone={result.coverage.percent === 100 ? "good" : "warn"}
-                  />
-                  <Stat
-                    value={`${result.findings.length}`}
-                    label="ATS findings"
-                    tone={result.findings.length === 0 ? "good" : "warn"}
-                  />
-                  <Stat value={`${result.summary.experience.length}`} label="Roles" />
-                  <Stat value={`${result.summary.highlights}`} label="Highlights" />
-                </div>
-
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <button
                     onClick={download}
@@ -607,64 +605,18 @@ function ReformatShell() {
                   </p>
                 </div>
 
-                {result.coverage.missing.length > 0 && (
-                  <Panel title="Not carried across" aside={<span className="text-xs text-warn">check before sending</span>}>
-                    <ul className="list-disc pl-5 text-sm flex flex-col gap-1">
-                      {result.coverage.missing.map((d, i) => (
-                        <li key={i} className="break-words">
-                          {d}
-                        </li>
-                      ))}
-                    </ul>
-                  </Panel>
-                )}
-
-                <Panel title="ATS check on the output">
-                  <div className="flex flex-col gap-2">
-                    <Findings findings={result.findings} />
-                    <p className="text-xs opacity-60">
-                      The output is your template with the text swapped, so a finding here is almost always about the
-                      template. Fix it there and every future render inherits the fix.
-                    </p>
-                  </div>
+                {/* The one pointer, not a readout. Joel asked for no telemetry here on
+                    2026-09-19; a link to where it went is navigation, not a measurement. */}
+                <Panel title="Measured on Diagnostics">
+                  <p className="text-sm opacity-70">
+                    How much of the source reached the document, the ATS check on the output and what the renderer
+                    changed are on{" "}
+                    <button onClick={() => setTab("diagnostics")} className="underline font-medium">
+                      Diagnostics
+                    </button>
+                    , already loaded for this render — you do not have to drop the file in again.
+                  </p>
                 </Panel>
-
-                <details className="bg-surface border border-line rounded-xl overflow-hidden">
-                  <summary className="px-4 py-2.5 text-sm font-semibold cursor-pointer">
-                    What went in · {result.summary.hasSummary ? "summary" : "no summary"}, {result.summary.competencies}{" "}
-                    competenc{result.summary.competencies === 1 ? "y" : "ies"}
-                  </summary>
-                  <ul className="border-t border-line divide-y divide-line">
-                    {result.summary.experience.map((e, i) => (
-                      <li key={`${e.company}-${i}`} className="px-4 py-2 flex items-baseline justify-between gap-3">
-                        <span className="min-w-0">
-                          <span className="font-medium">{e.company}</span>
-                          {e.title && <span className="opacity-70"> — {e.title}</span>}
-                        </span>
-                        <span className="text-xs opacity-60 whitespace-nowrap">
-                          {e.date || "no date"} · {e.bullets} bullet{e.bullets === 1 ? "" : "s"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-
-                <details className="bg-surface border border-line rounded-xl overflow-hidden">
-                  <summary className="px-4 py-2.5 text-sm font-semibold cursor-pointer">
-                    What it did to the template · {result.changeLog.length} change
-                    {result.changeLog.length === 1 ? "" : "s"}
-                  </summary>
-                  <ul className="border-t border-line divide-y divide-line">
-                    {result.changeLog.map((c, i) => (
-                      <li key={i} className="px-4 py-2 flex items-baseline justify-between gap-3">
-                        <span className="text-sm min-w-0">
-                          <span className="font-medium">{c.section}</span> <span className="opacity-70">{c.detail}</span>
-                        </span>
-                        <span className="text-xs opacity-60 whitespace-nowrap">{c.action}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
 
                 {result.renderId && (
                   <Panel title="Where did this go?">
@@ -838,7 +790,7 @@ function ReformatShell() {
           </>
         )}
 
-        {tab === "check" && (
+        {tab === "diagnostics" && (
           <Workbench
             rail={
               <>
@@ -864,6 +816,101 @@ function ReformatShell() {
               </>
             }
           >
+            {/* Source one: the render just made. It needs no file dropped in — the
+                result is already in hand, and asking for it again would be asking
+                for a file the app itself produced. */}
+            {result && (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-baseline justify-between gap-3 flex-wrap">
+                  <h2 className="text-sm font-semibold">This render</h2>
+                  <span className="text-xs opacity-60 truncate max-w-[18rem]" title={result.filename}>
+                    {result.filename} · {result.templateLabel}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <Stat
+                    value={`${result.coverage.percent}%`}
+                    label="Lines carried"
+                    tone={result.coverage.percent === 100 ? "good" : "warn"}
+                  />
+                  <Stat
+                    value={`${result.findings.length}`}
+                    label="ATS findings"
+                    tone={result.findings.length === 0 ? "good" : "warn"}
+                  />
+                  <Stat value={`${result.summary.experience.length}`} label="Roles" />
+                  <Stat value={`${result.summary.highlights}`} label="Highlights" />
+                </div>
+
+                {result.coverage.missing.length > 0 && (
+                  <Panel title="Not carried across" aside={<span className="text-xs text-warn">check before sending</span>}>
+                    <ul className="list-disc pl-5 text-sm flex flex-col gap-1">
+                      {result.coverage.missing.map((d, i) => (
+                        <li key={i} className="break-words">
+                          {d}
+                        </li>
+                      ))}
+                    </ul>
+                  </Panel>
+                )}
+
+                <Panel title="ATS check on the output">
+                  <div className="flex flex-col gap-2">
+                    <Findings findings={result.findings} />
+                    <p className="text-xs opacity-60">
+                      The output is your template with the text swapped, so a finding here is almost always about the
+                      template. Fix it there and every future render inherits the fix.
+                    </p>
+                  </div>
+                </Panel>
+
+                <details className="bg-surface border border-line rounded-xl overflow-hidden">
+                  <summary className="px-4 py-2.5 text-sm font-semibold cursor-pointer">
+                    What went in · {result.summary.hasSummary ? "summary" : "no summary"}, {result.summary.competencies}{" "}
+                    competenc{result.summary.competencies === 1 ? "y" : "ies"}
+                  </summary>
+                  <ul className="border-t border-line divide-y divide-line">
+                    {result.summary.experience.map((e, i) => (
+                      <li key={`${e.company}-${i}`} className="px-4 py-2 flex items-baseline justify-between gap-3">
+                        <span className="min-w-0">
+                          <span className="font-medium">{e.company}</span>
+                          {e.title && <span className="opacity-70"> — {e.title}</span>}
+                        </span>
+                        <span className="text-xs opacity-60 whitespace-nowrap">
+                          {e.date || "no date"} · {e.bullets} bullet{e.bullets === 1 ? "" : "s"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+
+                <details className="bg-surface border border-line rounded-xl overflow-hidden">
+                  <summary className="px-4 py-2.5 text-sm font-semibold cursor-pointer">
+                    What it did to the template · {result.changeLog.length} change
+                    {result.changeLog.length === 1 ? "" : "s"}
+                  </summary>
+                  <ul className="border-t border-line divide-y divide-line">
+                    {result.changeLog.map((c, i) => (
+                      <li key={i} className="px-4 py-2 flex items-baseline justify-between gap-3">
+                        <span className="text-sm min-w-0">
+                          <span className="font-medium">{c.section}</span> <span className="opacity-70">{c.detail}</span>
+                        </span>
+                        <span className="text-xs opacity-60 whitespace-nowrap">{c.action}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+
+                <div className="border-t border-line pt-3">
+                  <h2 className="text-sm font-semibold">Any other document</h2>
+                  <p className="text-xs opacity-60 mt-1">
+                    Drop one on the left. It is read the same way, and it does not disturb the report above.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {!inspection ? (
               <Panel title="What this reads">
                 <p className="text-sm opacity-70">
