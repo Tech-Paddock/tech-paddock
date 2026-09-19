@@ -27,7 +27,7 @@ wrong strands old days.
 day, then the most recent row in it. Entries reference identity and never a copy of the numbers, so
 `readDay` resolves per day; `app/Correction.tsx` lists earlier versions, which makes it checkable.
 
-## The grocery list is ahead of its charter
+## The grocery list
 
 `/list` adds lines, ticks them off, copies the lot, or taps one into a King Soopers search. **It
 leaves as text or a link — no stored credential, no OAuth, no `middleware.ts` edit**, the cheap
@@ -36,9 +36,9 @@ Haiku proposes a merge, `validateTidy` refuses one that drops or double-counts a
 it, you approve what survives. A prompt can only ask, and this is the one screen where a model's
 output would delete something you typed.
 
-**The charter amendment it needs is proposed, not approved.** `RULES.md` said "one screen rather than
-two"; the new section argues a screen earns its place by being a different moment, not a different
-noun. **Until Joel approves that wording, do not read it as permission for a third.**
+**The charter caught up on 2026-09-19.** `RULES.md` said "one screen rather than two"; Joel approved
+the amendment saying a screen earns its place by a different moment, not a different noun. **It is
+not permission for a third** — a second noun still goes to him first, so recipes stay parked.
 
 ## Agreed with Joel, not started
 
