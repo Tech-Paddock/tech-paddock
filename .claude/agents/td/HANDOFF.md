@@ -8,9 +8,9 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**This branch closes item 6**, and `claude/platform-deploy-scoping` is stacked behind it closing
-item 9. **Twelve merged on 2026-09-19**, #124–#135. **Check the open list live before assuming it
-is empty** — it went from one to seven in twenty minutes today.
+**Nothing of mine is in flight** once this lands. Items 6 and 9 both closed on 2026-09-19, the
+second stacked on the first. **Check the open list live before assuming it is empty** — it went from
+one to seven in twenty minutes that day, and a pull request appeared mid-session twice.
 
 ## What is true now
 
@@ -22,18 +22,17 @@ date` is on**, which gives the merge-order rule teeth: after any merge every oth
 behind and must take `main` again. `Block force pushes` and `Restrict deletions` are also on.
 
 **Standing up a new agent has a written protocol**, `.claude/agents/STANDUP.md`. **Solutioning is
-not yours, and do not scaffold before it exists** — a folder name reaches DNS and a schema name
-reaches the database, both settled by being typed. `drift`'s middleware check is roster-independent.
+not yours, and do not scaffold before it exists** — a folder name reaches DNS and a schema name the
+database, both settled by being typed. `drift`'s middleware check is roster-independent.
 
 **The required checks are `gate`, `drift` and `requested-by-joel`** — switched 2026-09-16, each
 bound to the GitHub Actions app rather than to any source. **No agent can read rulesets**, so that
 is Joel's screenshot rather than a measurement; treat it as the best available and say so.
 
-**Preview deployments are off**, as of 2026-09-18, through `ignoreCommand` in each app's
-`vercel.json` rather than a dashboard setting — so it is in the repo and reviewable. **Read the test
-before changing it.** It skips only an explicit `preview`, so production, development *and an unset*
-`VERCEL_ENV` all build. Written the obvious way round it would skip production too whenever that
-variable went missing, which is a change that merges and silently never goes live.
+**Previews are off, and each app now builds only when its own folder changes** — both through
+`ignoreCommand` in its `vercel.json`, in the repo rather than a dashboard. **Every failure mode
+builds rather than skips**: unset `VERCEL_ENV`, a git error, a missing repo. A wrong skip merges and
+silently never goes live, so `drift` fails a command naming another app's folder.
 
 **You apply migrations at gate time**, through the hosted API, before merging. `supabase db push`
 cannot work here and never will — see the traps in `.claude/DECISIONS.md`.
@@ -51,8 +50,10 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 - **Do not backfill another agent's handoff on the way past.** A stale handoff sends the change
   back. One the TD writes is the TD's understanding of someone else's work, which is exactly the
   second-hand account these files exist to replace.
-- **`DECISIONS.md` is append-only against a hard ceiling, and `drift` already warns on it.** No
-  trimming rule exists, so read the live number and raise it before the entry that will not fit.
+- **`DECISIONS.md` and `OPEN-ITEMS.md` are both AT their ceiling** — 257/260 and 80/80. No
+  trimming rule exists for either. The next entry does not fit; that is Joel's call, not a squeeze.
+- **`live: false` on a Vercel project does not mean paused.** Read deployment state — `BLOCKED` is
+  paused, `READY` at `target: production` is not. This cost the ledger a false claim for a day.
 - **Regenerating another agent's collector output ages their handoff.** `drift` dates freshness from
   `git log -- apps/<app>`, so your commit touching `apps/home/lib/*.generated.ts` makes TechPad Gen
   read stale. Warn only, clears on their next session — say so rather than letting them hunt.
@@ -67,14 +68,12 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 **`packages/shared` is yours, not Joel's to approve** — item 4 has the shape. **Not npm workspaces**:
 a root install costs the per-app independence the CI matrix rests on.
 
-**Health is merged**, unreachable until Joel's four steps. **Step (a) is also the only
-thing still paying for preview builds**: Vercel cannot see `apps/health/vercel.json` from the root.
-
 **App surface is yours and the guide is unwritten** — item 7. The mockups that settled the look are
 a canvas artifact, not in the repo, so the guide must carry the rules in words.
 
 **Every agent has a board, URLs in `KICKOFF.md`** — the only place they live, so an agent that loses
-its URL publishes a duplicate. **You are the rollup**; they report themselves. **`On track` is item
-3**, and the deploy trigger is still its unsolved half.
+its URL publishes a duplicate. **You are the rollup.** Joel, 2026-09-19: **a merge refreshes the
+merged agent's board too** — not in `CLAUDE.md` yet. **Their DevOps row and a dated TD banner only**;
+their Brief and Items stay theirs. **`On track` is item 3**, deploy trigger still unsolved.
 
 Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.

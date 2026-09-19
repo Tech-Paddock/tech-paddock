@@ -250,3 +250,11 @@ cross-owner additions, so a running session cannot repair itself.
   thing it exists to prevent. The roster check had the mirror flaw — it required a determiner, so
   "five apps means five agents" went unseen through three re-measures of the item that existed to
   find it. It now measures the cardinal against `apps/` instead of flagging any number.
+- **2026-09-19 — Vercel project state was read wrong twice and both readings reached the repo as
+  fact. Read DEPLOYMENT STATE, never a project field.** `BLOCKED` on every commit is paused
+  (`tp-message-editor`); `READY` at `target: production` is not (`tp-tracker`, on 4133904);
+  `CANCELED` at `target: null` is `ignoreCommand` skipping a preview. `live: false` does not mean
+  paused — `tp-home` reads it while serving `techpaddock.io` — yet ledger item 11 rested on
+  "unreachable while paused". `framework: null` does not mean a broken Root Directory — `tp-health`
+  reads null, skips previews from its own `vercel.json`, builds `READY`, and serves a `verified`
+  `health.techpaddock.io`. **Health is live**, and was called unreachable for a day on that field.

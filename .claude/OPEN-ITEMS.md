@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-19.** · **Next number: 16.**
+**Last reviewed: 2026-09-19.** · **Next number: 17.**
 
 **Numbers are permanent.** A closed item's row is deleted and its number is never used again, so the
 gaps below are correct rather than something to tidy. A new item takes `Next number` and increments
@@ -29,12 +29,17 @@ Nothing.
    worth nothing**, since one password opens all six. A firewall rate limit on `/api/login` needs no
    code; a shared table **gives the hub database credentials**. *LoE: minutes.*
 
+10. **`tp-tracker` was never paused — the field that said so means something else.** *Owner: Joel.*
+   Measured 2026-09-19: it built `4133904` to **production, `READY`**. `live: false` says nothing
+   about pausing; `tp-home` reads it too and serves `techpaddock.io`. **The signal is deployment
+   state** — a paused project returns `BLOCKED`, as `tp-message-editor` does. So the tracker is up
+   and its daily cron runs. Nothing leaks (see 11). **Pause it for real, or stop calling it paused.**
+   *LoE: minutes.*
 15. **The domain map is written down twice, and one copy went stale for a day.** *Owner: Joel.*
-   `CLAUDE.md` and `platform/RULES.md` both carry a Vercel-project table. Health landed in
-   `CLAUDE.md`'s and not in the charter's, so the charter listed five projects while the repo had
-   six — **the count in the prose above it was drift pointing at drift.** Both are corrected now.
-   **The fix is deleting the charter's copy and linking `CLAUDE.md`'s**, which is one fact, one
-   home — but it is a charter, so it is your yes. *LoE: minutes.*
+   `CLAUDE.md` and `platform/RULES.md` both carry a Vercel-project table; Health reached only the
+   first, so the charter listed five projects against six on disk. Both corrected. **The fix is
+   deleting the charter's copy and linking `CLAUDE.md`'s** — one fact, one home — but it is a
+   charter, so it is your yes. *LoE: minutes.*
 
 ## Waiting on an agent
 
@@ -55,23 +60,16 @@ Nothing.
    verb around a long page; app is one screen, thumb-first, no index. Mockups exist. **It is settled
    at standup**, so `STANDUP.md` gains surface beside the name and the schema. *LoE: a session.*
 
-9. **Every merge rebuilds every app, and the last build to finish wins the domain.**
-   *Owner: TD.* `ignoreCommand` in each `vercel.json` reads *skip previews, build everything else* —
-   it cannot see which folder changed. On 2026-09-18 three merges four minutes apart left
-   `techpaddock.io` aliased to the Coffee-icon build rather than the hub change. **Two merges close
-   together can leave an app serving the older one.** *LoE: a session.*
-
 ## Parked
 
 Deliberately deferred. **Not background work** — something here moves only when Joel says so.
 
-10. **`tp-tracker` stays paused.** Tabled 2026-09-18, paused the same day — verified, `live: false`.
-   **Paused is reversible and deleted is not**, so this is a safe place to leave it indefinitely.
-   Un-parking means deleting it and its DNS record — no undo, and needs item 2 first. *LoE: minutes.*
 11. **`CRON_SECRET` and the Microsoft Graph integration.** Parked 2026-09-15.
    **Why parking is safe:** `tracker`'s `middleware.ts` waves `/api/cron/*` past the password gate
    and the route's guard reads `if (secret && …)`, so an unset `CRON_SECRET` skips the check and the
-   endpoint is public — harmless *only* while Graph is unconfigured, and unreachable while paused.
+   endpoint is public **and reachable right now** — item 10; "unreachable while paused" was wrong.
+   **What makes it harmless is the `graphConfigured()` check above the work**, which returns
+   `{skipped}` before any query runs. Verified 2026-09-19: no `CRON_SECRET`, no `MS_GRAPH_*` set.
    **Un-parking is the dangerous moment and the order is not optional.** Set `CRON_SECRET`, redeploy,
    then `MS_GRAPH_*`. Graph first publishes an unauthenticated endpoint writing to Outlook.
    **Fail the guard closed and the ordering stops mattering** — one line, Pipeline Tracker's. *LoE: minutes.*
