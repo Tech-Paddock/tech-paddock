@@ -9,9 +9,8 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 ## In flight
 
 **#130 is mine** — ledger rows from auditing the repo the day it went public; #123 merged before it.
-**Six more opened within twenty minutes of it**, five of them TechPad Gen's, so the queue went from
-one pull request to seven. **Check every one live before assuming its state**; that is the trap
-below, and it caught this file once already today.
+**Six more opened within twenty minutes**, five of them TechPad Gen's: the queue is seven, not one.
+**Check every one live before assuming its state** — the trap below caught this file today.
 
 ## What is true now
 
