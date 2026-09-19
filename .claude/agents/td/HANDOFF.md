@@ -8,15 +8,9 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-<<<<<<< HEAD
-**Nothing of mine is in flight** once this lands. Items 6 and 9 both close on 2026-09-19, the second
-stacked on the first. **Check the open list live before assuming it is empty** — it went from one to
-seven in twenty minutes that day, and a pull request appeared mid-session twice.
-=======
-**This branch closes item 6**, and `claude/platform-deploy-scoping` is stacked behind it closing
-item 9. **Twelve merged on 2026-09-19**, #124–#135. **Check the open list live before assuming it
-is empty** — it went from one to seven in twenty minutes today.
->>>>>>> claude/platform-charter-corrections
+**Nothing of mine is in flight** once this lands. Items 6 and 9 both closed on 2026-09-19, the
+second stacked on the first. **Check the open list live before assuming it is empty** — it went from
+one to seven in twenty minutes that day, and a pull request appeared mid-session twice.
 
 ## What is true now
 
