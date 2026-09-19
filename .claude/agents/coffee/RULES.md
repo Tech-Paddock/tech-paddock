@@ -90,8 +90,15 @@ lot. **Do not flatten the distinction.**
 only part a search can check, and the first real bag is the case that separates the two: Sweet Bloom
 print one house recipe — Origami Air, 1:17, 900µm, 2:40 — on every product page, so it validated as
 `coffee_specific` while being their default for everything. The classification is right; the old
-label, "The roaster's recipe for this coffee", asserted the part that was never checked. It now says
-where it came from, with a line beneath tier 1 saying what that does and does not prove.
+label, "The roaster's recipe for this coffee", asserted the part that was never checked.
+
+**The three tiers are now a three-state indicator, and every label names the place.** "Found Brew
+Guide on Page", "Non-Specific Roaster Brew Guide", "No Recipe Found" — green, amber, red, with the
+word carrying the same thing as the colour so the colour is never the only signal. The wording lives
+in `lib/guideDisplay.ts`, deliberately apart from `lib/guide.ts`: presentation must not be able to
+reach validation. A test there refuses any label that claims a recipe was *written for* this coffee.
+The prose caveat that used to sit beneath tier 1 is gone, at Joel's instruction — **the quote itself
+replaces it**, one tap under the indicator, which is the check rather than a sentence about it.
 
 So **a `coffee_specific` guide is not evidence of a per-lot recipe**, and anything later that treats
 it as one is reading more into the column than it holds. The one honest signal available is
