@@ -56,8 +56,14 @@ const git = (...args) => {
    A mismatch in the auth pair does not throw; it silently rejects valid
    sessions on the other four, which looks like a login bug rather than a
    config one. theme.css drifts loudly by comparison, but it is still one more
-   file that has to be edited five times. */
-for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css"]) {
+   file that has to be edited five times.
+
+   next.config.mjs joined the list on 2026-09-19. It carries the security
+   headers, and it is the one file here where drift is silent by construction:
+   a missing header changes nothing anybody can see. apps/home had shipped with
+   an empty config and no frame-ancestors for as long as the file existed, and
+   nothing said so until somebody read all six. */
+for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.config.mjs"]) {
   const present = APPS.map((a) => [a, md5(R("apps", a, rel))]).filter(([, h]) => h);
   if (present.length === 0) { add(`identical: ${rel}`, "warn", "not present in any app — cannot measure"); continue; }
   const distinct = new Set(present.map(([, h]) => h));
@@ -288,6 +294,70 @@ add("worklogs stay retired", existsSync(R(".claude/worklogs")) ? "fail" : "ok",
   }
   add("no computable facts written as prose", hits.length === 0 ? "ok" : "warn",
     hits.length === 0 ? "no test counts or commit SHAs in prose" : hits.join("; "));
+}
+
+/* ── Ledger numbers are permanent ─────────────────────────────────────────
+   Numbers used to be positional: close an item and everything below shifted
+   up on the next write. On 2026-09-19 that happened four times in one day and
+   broke a parked row's cross-reference, three numbers in the TD's handoff, a
+   DECISIONS.md entry, and live references in two agents' branches — every one
+   of them pointing confidently at the wrong item rather than at nothing.
+
+   So a number now belongs to its item for good. Closing one leaves a gap, and
+   `Next number` in the ledger header is the high-water mark a new item takes.
+   This fails rather than warns: a silently reused number is the exact failure
+   the # column exists to prevent, and it is invisible in a diff. */
+{
+  const rel = ".claude/OPEN-ITEMS.md";
+  const text = read(R(rel));
+  if (text === null) {
+    add("ledger numbers are permanent", "fail", `${rel} is missing`);
+  } else {
+    const declared = text.match(/\*\*Next number:\s*(\d+)\.?\*\*/);
+    const nums = [...text.matchAll(/^(\d+)\. \*\*/gm)].map((m) => Number(m[1]));
+    const problems = [];
+
+    if (!declared) problems.push("header declares no `Next number:`");
+    const next = declared ? Number(declared[1]) : null;
+
+    const seen = new Set();
+    for (const n of nums) {
+      if (seen.has(n)) problems.push(`item ${n} appears twice`);
+      seen.add(n);
+    }
+    for (let i = 1; i < nums.length; i++) {
+      if (nums[i] <= nums[i - 1]) problems.push(`item ${nums[i]} follows ${nums[i - 1]}, so the file is not in ascending order`);
+    }
+    if (next !== null) {
+      const over = nums.filter((n) => n >= next);
+      if (over.length) problems.push(`${over.join(", ")} at or above Next number ${next} — bump the header when you add an item`);
+    }
+
+    /* The three rules above catch a duplicate, a missing header and a number
+       reaching into reserved space. They do NOT catch the failure this check
+       exists for: renumbering 1..N after a close produces a sequence that is
+       ascending, unique and inside the header — and every reference to the
+       items below the closed one is now wrong. The only way to see it is to
+       compare against what the numbers were, so that is what this does. */
+    const baseline = git("show", "origin/main:" + rel);
+    const titles = (t) =>
+      new Map([...t.matchAll(/^(\d+)\. \*\*(.+?)\*\*/gm)].map((m) => [m[2], Number(m[1])]));
+    if (baseline) {
+      const before = titles(baseline);
+      const moved = [];
+      for (const [title, n] of titles(text)) {
+        const was = before.get(title);
+        if (was !== undefined && was !== n) moved.push(`"${title.slice(0, 44)}" was ${was}, now ${n}`);
+      }
+      if (moved.length) problems.push(`items renumbered against origin/main: ${moved.join("; ")}`);
+    }
+
+    const checked = baseline ? "against origin/main" : "no origin/main to compare, numbering shape only";
+    add("ledger numbers are permanent", problems.length === 0 ? "ok" : "fail",
+      problems.length === 0
+        ? `${nums.length} items, ascending, all below Next number ${next} — ${checked}`
+        : problems.join("; "));
+  }
 }
 
 /* ── Output ──────────────────────────────────────────────────────────────── */

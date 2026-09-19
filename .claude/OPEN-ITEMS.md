@@ -2,7 +2,12 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-19.**
+**Last reviewed: 2026-09-19.** · **Next number: 15.**
+
+**Numbers are permanent.** A closed item's row is deleted and its number is never used again, so the
+gaps below are correct rather than something to tidy. A new item takes `Next number` and increments
+it. Numbering restarts at 15 because 1–14 were each reused during four renumbers on 2026-09-19 and
+references to them are already ambiguous.
 
 - Finished work is not here. Git log is the archive.
 - Settled calls, mistakes and traps are in `.claude/DECISIONS.md`. Live facts are computed, at `/admin`.
@@ -46,9 +51,6 @@ Nothing.
    websites; **Coffee is the only real app**, and Health will be. Site is a thin index grouped by
    verb around a long page; app is one screen, thumb-first, no index. Mockups exist. **It is settled
    at standup**, so `STANDUP.md` gains surface beside the name and the schema. *LoE: a session.*
-
-8. **No app sets `nosniff` or `Referrer-Policy`, and the hub sends no `frame-ancestors`.**
-   *Owner: TD.* `apps/home/next.config.mjs` is empty, so `techpaddock.io` can be framed. *LoE: minutes.*
 
 9. **Every merge rebuilds every app, and the last build to finish wins the domain.**
    *Owner: TD.* `ignoreCommand` in each `vercel.json` reads *skip previews, build everything else* —

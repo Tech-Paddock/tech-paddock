@@ -338,8 +338,16 @@ wrong or the rule is, and that is a conversation before any code exists.
   and every agent**, so one number names one item everywhere it is printed. **An agent printing only
   its own rows keeps the ledger's numbers and does not renumber them from one** — renumbering a
   subset is how "item 3" comes to mean two different things in two different sessions, which is the
-  whole failure the column exists to prevent. A number is stable until the item closes; when it
-  does, the ledger is renumbered on the next write and the sign-off follows the file.
+  whole failure the column exists to prevent.
+  **A number belongs to its item permanently, and closing an item leaves a gap rather than
+  renumbering what follows.** The ledger carries `Next number:` in its header; a new item takes that
+  value and increments it. **A number is never reused, even once the item holding it is gone** — a
+  reused number is worse than a gap, because a stale reference then points confidently at the wrong
+  item instead of at nothing.
+  This replaced renumbering on 2026-09-19, after four renumbers in one day broke a parked row's
+  cross-reference, three numbers in the technical director's handoff, a `DECISIONS.md` entry, and
+  live references in two agents' branches. **The gaps are the point, not untidiness to clean up**,
+  and `drift` fails a ledger that reuses a number or renumbers out of order.
   **The DevOps table is deliberately not numbered** — its rows are named by branch, which is already
   a stable handle and a more useful one, and a second numbering scheme in the same message would
   make "item 3" ambiguous again.
