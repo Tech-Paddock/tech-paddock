@@ -113,8 +113,9 @@ those two you are relying on when you claim something works.
 
 # Part 2 — Vercel, DNS and CI
 
-Five Vercel projects, all deploying from this one repo, separated by Root Directory. Four
-subdomains on Cloudflare, DNS-only, no proxy in front of Vercel. That is correct and stays.
+One Vercel project per app, all deploying from this one repo, separated by Root Directory. Every
+subdomain is on Cloudflare, DNS-only, no proxy in front of Vercel. That is correct and stays. The
+table below is the roster — counting it in prose as well is how this paragraph came to say five.
 
 | Vercel project | Root Directory | Domain |
 |---|---|---|
@@ -123,6 +124,7 @@ subdomains on Cloudflare, DNS-only, no proxy in front of Vercel. That is correct
 | `tp-tracker` | `apps/tracker` | `tracker.techpaddock.io` |
 | `tp-resume` | `apps/resume` | `resume.techpaddock.io` |
 | `tp-coffee-app` | `apps/coffee` | `coffee.techpaddock.io` |
+| `tp-health` | `apps/health` | `health.techpaddock.io` |
 
 Project names carry a `tp-` prefix and deliberately do not match their folders or subdomains. This
 is verified against the live account. **Do not rename live projects to tidy a document** — a
@@ -156,15 +158,15 @@ password produces a different hash in each project and the hash cannot double as
 
 Note the asymmetry: `APP_PASSWORD_HASH` **may** differ per project and still work, because each
 hash carries its own salt and verifies the same password. `SESSION_SECRET` may not. One password
-can be rolled out five different ways; one signing key cannot.
+can be rolled out a different way in every project; one signing key cannot.
 
 ## Environment variables
 
 | Variable | Where |
 |---|---|
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | every app that talks to Postgres |
-| `APP_PASSWORD_HASH` | all five |
-| `SESSION_SECRET` | all five, **byte-identical** |
+| `APP_PASSWORD_HASH` | every app |
+| `SESSION_SECRET` | every app, **byte-identical** |
 | `ANTHROPIC_API_KEY` | editor + coffee |
 | `INTERNAL_API_SECRET` | editor + tracker (+ home, for the glance fan-out) |
 | `EDITOR_BASE_URL`, `RESUME_BASE_URL`, `TRACKER_BASE_URL` | the app doing the calling |

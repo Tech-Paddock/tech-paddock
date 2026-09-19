@@ -8,9 +8,9 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**`claude/platform-security-headers` is mine**, closing item 8. Nine merged on 2026-09-19
-(#124–#130, #132, #133); #131 is TechPad Gen's. **Check the open list live before assuming it is
-empty** — it went from one to seven in twenty minutes today.
+**This branch closes item 6**, and `claude/platform-deploy-scoping` is stacked behind it closing
+item 9. **Twelve merged on 2026-09-19**, #124–#135. **Check the open list live before assuming it
+is empty** — it went from one to seven in twenty minutes today.
 
 ## What is true now
 

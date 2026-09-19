@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-19.** · **Next number: 15.**
+**Last reviewed: 2026-09-19.** · **Next number: 16.**
 
 **Numbers are permanent.** A closed item's row is deleted and its number is never used again, so the
 gaps below are correct rather than something to tidy. A new item takes `Next number` and increments
@@ -29,6 +29,13 @@ Nothing.
    worth nothing**, since one password opens all six. A firewall rate limit on `/api/login` needs no
    code; a shared table **gives the hub database credentials**. *LoE: minutes.*
 
+15. **The domain map is written down twice, and one copy went stale for a day.** *Owner: Joel.*
+   `CLAUDE.md` and `platform/RULES.md` both carry a Vercel-project table. Health landed in
+   `CLAUDE.md`'s and not in the charter's, so the charter listed five projects while the repo had
+   six — **the count in the prose above it was drift pointing at drift.** Both are corrected now.
+   **The fix is deleting the charter's copy and linking `CLAUDE.md`'s**, which is one fact, one
+   home — but it is a charter, so it is your yes. *LoE: minutes.*
+
 ## Waiting on an agent
 
 2. **The hub's glance has lost its only source — live now, not pending.** *Owner: TechPad Gen.*
@@ -43,10 +50,6 @@ Nothing.
    script, and `drift` failing a copy that disagrees. *LoE: a session.*
 5. **`shared.contacts` needs its other owner named.** *Owner: Message Editor.* Deliberately shared
    between the editor and the tracker; one of the two is going away. *LoE: minutes.*
-6. **Two corrections in charters I may not edit** — re-measured 2026-09-19, and it was three.
-   *Owner: TD.* `platform/RULES.md` no longer says five apps. **`techpad-gen/RULES.md` still does**,
-   at lines 96 and 98. **`resume/RULES.md:87` names migration `20260918014500`, which no file
-   matches** — that is the one `drift` warns on every run. Each goes to its agent. *LoE: minutes.*
 7. **Write the surface guide — site and app.** *Owner: TD.* Joel, 2026-09-18: most tools are
    websites; **Coffee is the only real app**, and Health will be. Site is a thin index grouped by
    verb around a long page; app is one screen, thumb-first, no index. Mockups exist. **It is settled
