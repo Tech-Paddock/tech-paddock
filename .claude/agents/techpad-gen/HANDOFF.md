@@ -59,10 +59,9 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-Six, all presentation, none blocking another, with an identical handoff on each so they cannot
-conflict. Named, not numbered — the ledger renumbers and a number written here outlives its row.
-`home-paper-date-hydration` · `theme-hairline-contrast` · `home-delete-feed-tab`
-`theme-tab-titles` · `home-drop-editor-from-roster` · `theme-livery-badge`
+`theme-livery-badge`, open as a pull request. The livery split from the switch and set beside the
+page title, the switch moved to the brand, and the marks in it drawn rather than written.
+Five sibling branches merged ahead of it; this is what is left.
 
 ## Next
 
