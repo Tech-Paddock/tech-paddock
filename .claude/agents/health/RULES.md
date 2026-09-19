@@ -13,9 +13,9 @@ writing anything at all.
 **You record what you ate, it tells you the macros, and it keeps the day's running total.** Food
 only — exercise was considered and dropped, which is why this is one screen rather than two.
 
-**Proposed amendment, 2026-09-19 — the sentence above no longer describes the app.** See *A second
-screen, and what makes one legitimate* below. It is proposed, not settled: Joel has asked for the
-screen and for the charter change, and has not yet approved this wording.
+**Amended 2026-09-19 — the sentence above no longer describes the app.** See *A second screen, and
+what makes one legitimate* below. **Approved by Joel on 2026-09-19**, in answer to the technical
+director carrying it to him as ledger item 19: *"Yes close out and PR."*
 
 **The design is already agreed.** `.claude/HEALTH-PLAN.md` is Joel's, written with him before this
 agent existed, and it is the specification this charter enforces rather than replaces. Read it in
@@ -26,14 +26,16 @@ chosen so a second kind of record can arrive without the app's name becoming a l
 
 ## A second screen, and what makes one legitimate
 
-**Proposed 2026-09-19. Awaiting Joel's approval — nothing below is settled yet.**
+**Approved by Joel on 2026-09-19.** He was asked for a yes or no on this wording and said
+*"Yes close out and PR."* **The approval was recorded here by the technical director, not by this
+agent** — the amendment asked for that, and Health's session had already ended.
 
 Joel asked for a grocery list on 2026-09-19: *"I want to be able to create a grocery list from
 recipes or random items I add. Then I want you to add it to my king soopers shopping cart"*, and
 chose the cheap version of it the same day — *"Let's build the cheap version."* He had twice said
-the charter would follow: *"Will change you charter later."* **This section is that change, written
-by the agent and not yet approved**, which is why it says so at the top rather than reading as
-settled the way Coffee's amendment does.
+the charter would follow: *"Will change you charter later."* **This section is that change**, written by the agent
+and approved by Joel unchanged, which is why it now reads as settled the way Coffee's amendment
+does rather than carrying a caveat.
 
 **What was wrong with "one screen rather than two."** That clause was written to explain why
 exercise was dropped, and it was right about that. What it also did, without anybody deciding it,
