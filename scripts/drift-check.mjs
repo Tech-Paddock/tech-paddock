@@ -56,8 +56,14 @@ const git = (...args) => {
    A mismatch in the auth pair does not throw; it silently rejects valid
    sessions on the other four, which looks like a login bug rather than a
    config one. theme.css drifts loudly by comparison, but it is still one more
-   file that has to be edited five times. */
-for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css"]) {
+   file that has to be edited five times.
+
+   next.config.mjs joined the list on 2026-09-19. It carries the security
+   headers, and it is the one file here where drift is silent by construction:
+   a missing header changes nothing anybody can see. apps/home had shipped with
+   an empty config and no frame-ancestors for as long as the file existed, and
+   nothing said so until somebody read all six. */
+for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.config.mjs"]) {
   const present = APPS.map((a) => [a, md5(R("apps", a, rel))]).filter(([, h]) => h);
   if (present.length === 0) { add(`identical: ${rel}`, "warn", "not present in any app — cannot measure"); continue; }
   const distinct = new Set(present.map(([, h]) => h));
