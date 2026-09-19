@@ -9,10 +9,10 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 ## In flight
 
 **Two stacked branches are mine** — `claude/platform-retire-two-agents`, then
-`claude/platform-retire-message-editor` on top. Joel retired **three agents on 2026-09-19**:
-Platform Config, Pipeline Tracker, Message Editor. **Five remain**; TechPad Gen owns three apps.
-**Two TD sessions ran at once that evening** — `main` moved seven commits under the first branch and
-both agents it retires shipped work after it was cut. **Re-read `main` before trusting a base.**
+`claude/platform-retire-message-editor`. Joel retired **three agents on 2026-09-19**: Platform
+Config, Pipeline Tracker, Message Editor. **Five remain.** **You own `apps/editor` now** — frozen,
+and the first app folder this seat has held. **Two TD sessions ran at once that evening** and `main`
+moved seven commits under the first branch. **Re-read `main` before trusting a base.**
 
 ## What is true now
 

@@ -223,12 +223,13 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.conf
 {
   /* Agents whose folder name does not match the app folder they own, and the
      reason this is a LIST rather than a string: on 2026-09-19 Joel retired the
-     Pipeline Tracker and Message Editor agents and gave `apps/tracker` and
-     `apps/editor` to TechPad Gen, who already owned `apps/home`. One agent now
-     owns three apps. A one-to-one map could not say that — it would have reported `apps/tracker` as an orphan while the
+     Pipeline Tracker and Message Editor agents; `apps/tracker` went to TechPad
+     Gen, who already owned `apps/home`, and the frozen `apps/editor` went to
+     the TD. One agent owns two apps and the TD owns one for the first time. A
+     one-to-one map could not say that — it would have reported `apps/tracker` as an orphan while the
      charter plainly named an owner, which is the documentation and the disk
      disagreeing in the direction this file exists to catch. */
-  const NAMED = { "techpad-gen": ["apps/home", "apps/tracker", "apps/editor"] };
+  const NAMED = { "techpad-gen": ["apps/home", "apps/tracker"], "td": ["apps/editor"] };
   const agents = existsSync(R(".claude/agents"))
     ? readdirSync(R(".claude/agents")).filter((d) => statSync(R(".claude/agents", d)).isDirectory()).sort()
     : [];
@@ -243,8 +244,8 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.conf
 
     const paths = NAMED[agent] ?? (APPS.includes(agent) ? [`apps/${agent}`] : []);
     if (!paths.length) {
-      // The TD owns no folder, so there is nothing to date it against. Say so
-      // rather than reporting ok for something unmeasured.
+      // An agent owning no folder has nothing to date it against. Say so rather
+      // than reporting ok for something unmeasured.
       add(`fresh: ${agent}`, "ok", `${stated}; owns no app folder, so freshness is not measurable here`);
       continue;
     }

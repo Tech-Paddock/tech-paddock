@@ -6,7 +6,7 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-19T22:22:34.216Z",
+  "generatedAt": "2026-09-19T22:30:20.962Z",
   "complete": true,
   "reason": "",
   "checks": [
@@ -103,12 +103,12 @@ export const DRIFT: Drift = {
     {
       "name": "fresh: td",
       "state": "ok",
-      "detail": "2026-09-19; owns no app folder, so freshness is not measurable here"
+      "detail": "2026-09-19, current with apps/editor"
     },
     {
       "name": "fresh: techpad-gen",
       "state": "ok",
-      "detail": "2026-09-19, current with apps/home + apps/tracker + apps/editor"
+      "detail": "2026-09-19, current with apps/home + apps/tracker"
     },
     {
       "name": "every app has an owning agent",
@@ -133,7 +133,7 @@ export const DRIFT: Drift = {
     {
       "name": "no computable facts written as prose",
       "state": "warn",
-      "detail": "CLAUDE.md:346 names a roster count; .claude/agents/td/HANDOFF.md:13 says \"three apps\"; apps/ holds 6"
+      "detail": "CLAUDE.md:346 names a roster count"
     },
     {
       "name": "ledger numbers are permanent",

@@ -31,6 +31,21 @@ three deliberate variants and is yours because it is the password gate itself, n
 copies match. They are yours because
 nobody else can own them safely. **The dividing line is blast radius, not language.**
 
+## `apps/editor` is yours, and it is frozen — 2026-09-19
+
+Joel retired the Message Editor agent and gave you the app **because it is paused**: "I'm pausing
+the project so it's probably better if you own it." This is caretaking, not product work.
+
+**`tp-message-editor` returns `BLOCKED` on every deployment, production included.** It serves its
+last successful build, so `editor.techpaddock.io` still answers and `/api/draft` still works —
+**against stale code**. A merge reaches the repo and never reaches the running app. **Green CI is
+not deployed**, and nothing in the system will contradict an agent who assumes otherwise.
+
+**You now own both sides of the gate you already held.** The editor's `middleware.ts` exempts
+`pathname === "/api/draft"` as an exact path, authenticated by `INTERNAL_API_SECRET`. TechPad Gen's
+tracker calls it. **Owning the host does not loosen the carve-out** — if anything it removes the
+last excuse, because there is no longer another agent to argue it with.
+
 ## Postgres, Vercel, DNS and CI — absorbed 2026-09-19
 
 **Platform Config was retired and its domain came here**, because in practice it had already
