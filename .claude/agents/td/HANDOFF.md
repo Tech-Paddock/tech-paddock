@@ -8,11 +8,11 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**One branch, `claude/brief-close-items-1-and-2`.** It closes the two wiring items — `tp-health` is
-live and Joel has logged in — renumbers the ledger 1–14, and opens item 12 for the deploy race that
-left `techpaddock.io` on the wrong build. **The merge queue behind it is empty**: #117, #118 and
-#119 all landed, every branch deleted, `origin/main` the only remote ref.
-**Check it live before assuming its state**; it may have merged since this was written.
+**One branch of mine, `claude/ci-freshness-measures-what-an-agent-wrote`**, closing two items I
+owned: `drift` no longer ages an agent for a file a sweep touched, and the `\$` escaping warning now
+lives in all six `.env.example` files. The ledger renumbers 1–12.
+**TechPad Gen's `claude/home-paper-date-hydration` is pushed, green and has no pull request** — that
+is Joel's to ask for. **Check both live before assuming their state**; either may have moved.
 
 ## What is true now
 
