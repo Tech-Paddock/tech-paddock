@@ -5,25 +5,31 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-19T16:04:19.866Z",
+  bakedAt: "2026-09-19T22:13:41.008Z",
   waiting: [
   {
     "title": "Pick how the login lockout gets fixed — the obvious fix is the wrong shape",
     "detail": "The counter is a signed cookie the client can drop, so nothing but a browser is limited; and a per-app fix is worth nothing, since one password opens all six. A firewall rate limit on /api/login needs no code; a shared table gives the hub d",
     "ref": "—",
     "state": "box"
+  },
+  {
+    "title": "`tp-tracker` was never paused — the field that said so means something else",
+    "detail": "*Owner: Joel.* Measured 2026-09-19: it built 4133904 to production, READY. live: false says nothing about pausing; tp-home reads it too and serves techpaddock.io. The signal is deployment state — a paused project returns BLOCKED, as tp-mess",
+    "ref": "—",
+    "state": "box"
+  },
+  {
+    "title": "The domain map is written down twice, and one copy went stale for a day",
+    "detail": "*Owner: Joel.* CLAUDE.md and platform/RULES.md both carry a Vercel-project table; Health reached only the first, so the charter listed five projects against six on disk. Both corrected. The fix is deleting the charter's copy and linking CLA",
+    "ref": "—",
+    "state": "box"
   }
 ] as BakedItem[],
   parked: [
   {
-    "title": "`tp-tracker` stays paused",
-    "detail": "Tabled 2026-09-18, paused the same day — verified, live: false. Paused is reversible and deleted is not, so this is a safe place to leave it indefinitely. Un-parking means deleting it and its DNS record — no undo, and needs item 2 first. *L",
-    "ref": "—",
-    "state": "clear"
-  },
-  {
     "title": "`CRON_SECRET` and the Microsoft Graph integration",
-    "detail": "Parked 2026-09-15. Why parking is safe: tracker's middleware.ts waves /api/cron/* past the password gate and the route's guard reads if (secret && …), so an unset CRON_SECRET skips the check and the endpoint is public — harmless *only* whil",
+    "detail": "Parked 2026-09-15. Why parking is safe: tracker's middleware.ts waves /api/cron/* past the password gate and the route's guard reads if (secret && …), so an unset CRON_SECRET skips the check and the endpoint is public and reachable right no",
     "ref": "—",
     "state": "clear"
   }
@@ -45,14 +51,9 @@ export const PADDOCK = {
     "asOf": "2026-09-16"
   },
   {
-    "id": "platform",
-    "name": "Platform Config",
-    "asOf": "2026-09-16"
-  },
-  {
     "id": "resume",
     "name": "Resume Formatter",
-    "asOf": "2026-09-18"
+    "asOf": "2026-09-19"
   },
   {
     "id": "td",
@@ -63,11 +64,6 @@ export const PADDOCK = {
     "id": "techpad-gen",
     "name": "TechPad Gen",
     "asOf": "2026-09-19"
-  },
-  {
-    "id": "tracker",
-    "name": "Pipeline Tracker",
-    "asOf": "2026-09-16"
   }
 ] as BakedAgent[],
 };

@@ -33,7 +33,8 @@ Nothing.
    Measured 2026-09-19: it built `4133904` to **production, `READY`**. `live: false` says nothing
    about pausing; `tp-home` reads it too and serves `techpaddock.io`. **The signal is deployment
    state** — a paused project returns `BLOCKED`, as `tp-message-editor` does. So the tracker is up
-   and its daily cron runs. Nothing leaks (see 11). **Pause it for real, or stop calling it paused.**
+   and its daily cron runs. Nothing leaks (see 11). `apps/tracker` is TechPad Gen's as of 2026-09-19.
+   **Pause it for real, or stop calling it paused.**
    *LoE: minutes.*
 15. **The domain map is written down twice, and one copy went stale for a day.** *Owner: Joel.*
    `CLAUDE.md` and `platform/RULES.md` both carry a Vercel-project table; Health reached only the
@@ -43,18 +44,20 @@ Nothing.
 
 ## Waiting on an agent
 
-2. **The hub's glance has lost its only source — live now, not pending.** *Owner: TechPad Gen.*
-   `SOURCES` in `apps/home/lib/glance.ts` holds one entry, the paused tracker's `/api/summary`.
-   `fetchSummary` swallows the failure, so the panel empties quietly rather than erroring. **The hub
-   gains database credentials for the first time.** *LoE: multi-session.*
+2. **The hub's glance has one source and nobody has checked whether it answers.** *Owner: TechPad
+   Gen.* `SOURCES` in `apps/home/lib/glance.ts` holds one entry, the tracker's `/api/summary` — and
+   item 10 found the tracker was never paused, so it may simply be working. `fetchSummary` swallows
+   the failure either way, so the panel empties quietly rather than erroring. **Both ends are one
+   owner's now**, and the hub keeps its no-keys property. *LoE: a session.*
 3. **Build the `On track` stage.** *Owner: TD.* Agreed 2026-09-17: a fourth phrase and a sixth
    DevOps colour for a branch deployed and waiting on Joel to drive it. **It needs a deliberate
    deploy trigger of its own** now that automatic previews are off — and not an empty commit, which
    the rules forbid. *LoE: a session.*
 4. **Build `packages/shared`.** *Owner: TD.* One real copy of the five-way files, a stamping
    script, and `drift` failing a copy that disagrees. *LoE: a session.*
-5. **`shared.contacts` needs its other owner named.** *Owner: Message Editor.* Deliberately shared
-   between the editor and the tracker; one of the two is going away. *LoE: minutes.*
+5. **`shared.contacts` needs its write rules said out loud.** *Owner: Message Editor.* Shared on
+   purpose between `apps/editor` and `apps/tracker`. **The old premise — one of the two is going
+   away — is wrong**: the tracker changed hands on 2026-09-19 rather than closing. *LoE: minutes.*
 7. **Write the surface guide — site and app.** *Owner: TD.* Joel, 2026-09-18: most tools are
    websites; **Coffee is the only real app**, and Health will be. Site is a thin index grouped by
    verb around a long page; app is one screen, thumb-first, no index. Mockups exist. **It is settled
@@ -72,4 +75,4 @@ Deliberately deferred. **Not background work** — something here moves only whe
    `{skipped}` before any query runs. Verified 2026-09-19: no `CRON_SECRET`, no `MS_GRAPH_*` set.
    **Un-parking is the dangerous moment and the order is not optional.** Set `CRON_SECRET`, redeploy,
    then `MS_GRAPH_*`. Graph first publishes an unauthenticated endpoint writing to Outlook.
-   **Fail the guard closed and the ordering stops mattering** — one line, Pipeline Tracker's. *LoE: minutes.*
+   **Fail the guard closed and the ordering stops mattering** — one line, TechPad Gen's now. *LoE: minutes.*

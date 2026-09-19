@@ -6,7 +6,7 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-19T16:04:20.016Z",
+  "generatedAt": "2026-09-19T22:13:41.223Z",
   "complete": true,
   "reason": "",
   "checks": [
@@ -46,6 +46,11 @@ export const DRIFT: Drift = {
       "detail": "gate job present — branch protection needs only that name"
     },
     {
+      "name": "each app's build is scoped to its own folder",
+      "state": "ok",
+      "detail": "6 apps, each skipping a merge that does not touch it"
+    },
+    {
       "name": "budget: .claude/agents/coffee/HANDOFF.md",
       "state": "warn",
       "detail": "80 / 80"
@@ -61,39 +66,29 @@ export const DRIFT: Drift = {
       "detail": "61 / 80"
     },
     {
-      "name": "budget: .claude/agents/platform/HANDOFF.md",
-      "state": "warn",
-      "detail": "78 / 80"
-    },
-    {
       "name": "budget: .claude/agents/resume/HANDOFF.md",
-      "state": "warn",
-      "detail": "78 / 80"
-    },
-    {
-      "name": "budget: .claude/agents/td/HANDOFF.md",
       "state": "warn",
       "detail": "80 / 80"
     },
     {
-      "name": "budget: .claude/agents/techpad-gen/HANDOFF.md",
+      "name": "budget: .claude/agents/td/HANDOFF.md",
       "state": "warn",
       "detail": "79 / 80"
     },
     {
-      "name": "budget: .claude/agents/tracker/HANDOFF.md",
-      "state": "ok",
-      "detail": "68 / 80"
+      "name": "budget: .claude/agents/techpad-gen/HANDOFF.md",
+      "state": "warn",
+      "detail": "78 / 80"
     },
     {
       "name": "budget: .claude/OPEN-ITEMS.md",
       "state": "warn",
-      "detail": "74 / 80"
+      "detail": "78 / 80"
     },
     {
       "name": "budget: .claude/DECISIONS.md",
-      "state": "ok",
-      "detail": "242 / 260"
+      "state": "warn",
+      "detail": "260 / 260"
     },
     {
       "name": "fresh: coffee",
@@ -111,14 +106,9 @@ export const DRIFT: Drift = {
       "detail": "says 2026-09-16; apps/editor last changed 2026-09-19"
     },
     {
-      "name": "fresh: platform",
-      "state": "ok",
-      "detail": "2026-09-16; owns no app folder, so freshness is not measurable here"
-    },
-    {
       "name": "fresh: resume",
-      "state": "warn",
-      "detail": "says 2026-09-18; apps/resume last changed 2026-09-19"
+      "state": "ok",
+      "detail": "2026-09-19, current with apps/resume"
     },
     {
       "name": "fresh: td",
@@ -128,12 +118,7 @@ export const DRIFT: Drift = {
     {
       "name": "fresh: techpad-gen",
       "state": "ok",
-      "detail": "2026-09-19, current with apps/home"
-    },
-    {
-      "name": "fresh: tracker",
-      "state": "warn",
-      "detail": "says 2026-09-16; apps/tracker last changed 2026-09-19"
+      "detail": "2026-09-19, current with apps/home + apps/tracker"
     },
     {
       "name": "every app has an owning agent",
@@ -142,8 +127,8 @@ export const DRIFT: Drift = {
     },
     {
       "name": "migration versions named in prose exist",
-      "state": "warn",
-      "detail": "names no file in supabase/migrations: .claude/OPEN-ITEMS.md → 20260918014500; .claude/agents/resume/RULES.md → 20260918014500"
+      "state": "ok",
+      "detail": "16 migrations, every reference resolves"
     },
     {
       "name": "worklogs stay retired",
@@ -158,17 +143,17 @@ export const DRIFT: Drift = {
     {
       "name": "no computable facts written as prose",
       "state": "warn",
-      "detail": "CLAUDE.md:349 names a roster count"
+      "detail": "CLAUDE.md:347 names a roster count"
     },
     {
       "name": "ledger numbers are permanent",
       "state": "ok",
-      "detail": "10 items, ascending, all below Next number 15 — against origin/main"
+      "detail": "9 items, ascending, all below Next number 17 — against origin/main"
     }
   ],
   "counts": {
     "ok": 19,
-    "warn": 12,
+    "warn": 9,
     "fail": 0
   }
 };

@@ -92,7 +92,13 @@ landed after its session started.
 
 > **Your board:** https://claude.ai/artifact/MSuuf1CABdDcRfy6U53y2D — publish to this URL, never a new one.
 >
-> You own `apps/home` — the hub — **the visual theme of every app**, and repo-wide odd jobs.
+> You own `apps/home` — the hub — **`apps/tracker`**, **the visual theme of every app**, and
+> repo-wide odd jobs.
+>
+> **The tracker came to you on 2026-09-19** when Joel retired the Pipeline Tracker agent. The agent
+> retired; the tool did not. **Read the three contracts in your charter before you touch it** — it
+> calls the Message Editor, the hub reads it, and the Resume Formatter writes to it, and all three
+> break quietly rather than loudly.
 >
 > **Two properties of the hub are worth more than any feature.** It holds no keys: it is the only app
 > with no Supabase dependency, and a tile that needs data gets it from that tool's `/api/summary`.
@@ -115,20 +121,6 @@ landed after its session started.
 >
 > **Never widen the `INTERNAL_API_SECRET` carve-out in `middleware.ts` beyond `/api/draft`.** That
 > scoping is load-bearing and is not yours to change.
-
-## Pipeline Tracker — `tracker`
-
-> **Your board:** https://claude.ai/artifact/AiNzMj9vLprkiTvjFUWtZ8 — publish to this URL, never a new one.
->
-> You own `apps/tracker`. Nothing else in this repo is yours.
->
-> **The sort is the product.** A list of applications is a spreadsheet; this exists to answer "what
-> have I let go quiet" without being asked.
->
-> **You sit inside three cross-app contracts and none is unilaterally yours:** you call the editor's
-> `/api/draft`, the hub reads your `/api/summary`, the Resume Formatter writes threads into your
-> table. Keep `/api/summary` to counts and singles. **Never widen an `INTERNAL_API_SECRET`
-> carve-out, in any app.**
 
 ## Resume Formatter — `resume`
 
@@ -188,25 +180,3 @@ landed after its session started.
 > **Two things are settled and not yours to reopen**: this tool does not appear on the hub's glance,
 > and the livery is borrowed from the paused tracker and belongs to TechPad Gen to settle.
 
-## Platform Config — `platform`
-
-> **Your board:** https://claude.ai/artifact/Hi1hQiVjRce7vpbCwboxb1 — publish to this URL, never a new one.
->
-> You own the layer under every app: **Postgres, Vercel, DNS and CI.** You write almost no
-> application code. You own the things that break every app at once and are invisible in a diff.
->
-> Read `supabase/README.md` as well — it is the most important document for the database half.
->
-> **Write down every dashboard change.** Most of your work leaves no diff, so your handoff is the
-> only record it happened at all.
->
-> **You may, without asking:** change build settings on a project that already exists — Node version,
-> environment variables, ignored build step. Reversible and visible.
-> **You may not, without me:** create or delete a project, add or remove a domain, or change any DNS
-> record. No undo, and no test catches them.
->
-> **Three that are never negotiable:** a schema change never lands without its migration file in the
-> same pull request at `supabase/migrations/`; RLS is enabled in the same migration that creates a
-> table, because every new table is granted to `anon` automatically; and the withheld contacts seed
-> stays withheld, so `migration list` will always show one remote-only version. That is correct, not
-> broken — and a hook blocks the command that would "fix" it.
