@@ -1,61 +1,69 @@
 # Message Editor — handoff
 
-State as of 2026-09-16.
+State as of 2026-09-19.
 
-Read `RULES.md` first. This file is only what is true right now.
+Read `RULES.md` first. It is the specification, and this file deliberately does not repeat it —
+the tool's shape, the three settled decisions, the `/api/draft` contract and the traps all live
+there, once. This is only what is true right now.
 
 ---
 
 ## What is true now
 
-**`editor.techpaddock.io` is live and serving current `main`.** Everything this agent has built is
-merged; nothing is in flight and no branch of yours exists.
+**Nothing this agent built has changed since 2026-09-16.** Commits have touched `apps/editor` since
+and none of them was this agent's: the livery beside the page title (#131), hairline contrast
+(#125), the three security headers (#134), `.env.example` (#123) and `vercel.json` twice
+(#108, #137). The app's *behaviour* is where 09-16 left it; its chrome and its deploy config are
+not. That gap is what a freshness warning cannot see, which is why it is written here.
 
-**Your tool's specification lives in your own `RULES.md`**, not in `CLAUDE.md`. That matters: you may
-**propose** a change to it in a pull request. Under the old layout the spec sat in a file you were
-forbidden to touch, so an agent finding its spec outdated had no move except to build the
-contradiction and flag it afterwards. That dead end is gone.
+**Do not assume a merge reaches the app — measure it.** `tp-message-editor` is paused: every
+deployment returns `BLOCKED`, the production target included, measured 2026-09-19 against the
+current head of `main`. `editor.techpaddock.io` serves whatever last succeeded, so the merges since
+have not reached it. **Whether the pause is deliberate is Joel's to say and the project is his** —
+it is not a bug to chase, and not something to route around. Read `/admin` and the project's
+deployment state rather than believing this paragraph's date.
 
-**Three decisions are settled and recorded in your charter** — tone is a picklist, there is no Effort
-toggle and there will not be one, and Context is a supported input. The original brief said otherwise
-on all three. Do not "correct" them back.
+**`editor.model_status` still has zero rows.** Recorded in `.claude/DECISIONS.md`, not on the
+ledger. `lib/modelCheck.ts` is unchanged since the day it landed. Its upsert is unconditional once
+reached, so zero rows means execution never gets there or the upsert itself errors — and every path
+out is silent: the function returns on a missing API key and on any `models.list()` failure, and
+`/api/login` calls it as `runModelDriftCheck().catch(() => {})`. **Table shape is ruled out** — the
+upsert's columns match `20260910215015_create_editor_model_status.sql` exactly.
 
-**The cross-app contract you host:** the Pipeline Tracker calls your `/api/draft` server to server
-with an `INTERNAL_API_SECRET` header, and your `middleware.ts` lets that through for `/api/draft`
-only, matched as an exact path. **That scoping is load-bearing and is not yours to widen.** If
-another agent needs a second route exempted, that is their pull request to argue and the TD's to
-approve.
+**There is still no `test` script**, so CI's `npm run test --if-present` does nothing here.
+`editor` and `home` are the apps without one.
 
-## Traps specific to this app
-
-- **Training is batched and never per-message.** Folding one message into the style guide via a model
-  call every time you hit send would drift the rules on a sample size of one. If you find yourself
-  reaching for "call the model to regenerate the whole artifact" on a write path, you have taken a
-  wrong turn.
-- **The draft renders as an editable textarea, not read-only.** It exists to be edited to match what
-  was actually sent before logging — the corpus this tool learns from is only as good as the edits it
-  captures. That principle generalises: anywhere you are tempted to make output read-only, don't.
-- **`style_guide` inserts a new version and never overwrites**, so past guides stay recoverable.
-- **Do not swap the pinned model on your own initiative.** A new model can carry API-shape changes
-  worth reading first — exactly what happened when `effort` moved under `output_config`.
-- **This is the tool most likely to have real contact data pass through it.** Every fixture is a
-  place a real name could hide. Keep them synthetic.
+**Train mode has never folded a real batch.** No writing samples have been loaded, so the style
+guide is still the seed rules.
 
 ## In flight
 
-Nothing.
+**`claude/message-editor-kickoff-2mmhm3`** — this handoff and nothing else. It is the harness-named
+opening branch rather than a `claude/editor-<description>` one, because the session is pinned to
+that name; the deviation is named in the pull request.
+
+**That ref was rebuilt from `origin/main` on 2026-09-19 before anything was written to it.** It had
+been carrying the pre-rebuild history, with **no merge base** against current `main` at all. Any
+branch cut from the old ref will be disjoint the same way — start from `origin/main`.
+
+## Open, and not this agent's to close
+
+**Ledger item 5 — `shared.contacts` needs its other owner named.** The recommendation went to the
+technical director on 2026-09-19: the Pipeline Tracker is a **reader, not a writer**. Its own
+`app/api/contacts/route.ts` says so in a comment and no tracker path writes the table, so the
+Message Editor is already the sole writer, nothing has to move, and no migration is owed by the
+deprecation. Naming it is a charter edit, so it is Joel's yes.
+
+**Popping the editor out into the Chrome window Joel works in.** He asked; the options were put to
+him and he has not answered, so nothing was built and no branch was cut. The technical director was
+asked to put it on the ledger. **That analysis was made against the pre-rebuild tree and its file
+references need re-checking before any of it is quoted** — `next.config.mjs` has gained two headers
+since.
 
 ## Next
 
-1. **Diagnose `editor.model_status`.** It has **zero rows** — the login-time model drift check has
-   never once successfully written, and it is the oldest unexplained thing in the project. A check
-   that has never fired is not a check, and it is the only safety net against the pinned model
-   quietly going stale. **This is your highest-value task.** Start by confirming whether
-   `/api/login` reaches `lib/modelCheck.ts` at all, then whether the write fails on permissions,
-   shape, or an unhandled rejection being swallowed. If it turns out to be grants or RLS, it becomes
-   Platform's.
-2. **Add a `test` script.** CI runs `npm run test --if-present`, so adding one opts this app in with
-   no CI change. `editor` and `home` are the apps without tests.
-3. **No writing samples have been loaded yet**, so Train mode has never folded a real batch and the
-   style guide is still the seed rules.
-4. Nothing else is queued. Ask before starting anything larger than a fix.
+1. **Diagnose `editor.model_status`.** Still the highest-value task and the oldest unexplained thing
+   in the project. Confirm whether `/api/login` reaches `lib/modelCheck.ts` at all before touching
+   anything else. If it lands on grants or RLS it becomes Platform's.
+2. **Add a `test` script.** It opts the app into CI's test step with no CI change.
+3. Nothing else is queued. Ask before starting anything larger than a fix.

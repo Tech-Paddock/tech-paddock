@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guidePresentation } from "@/lib/guideDisplay";
+import { guidePresentation, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
 import { GUIDE_FIELDS } from "@/lib/guide";
 import type { GuideStatus } from "@/lib/guide";
 
@@ -52,5 +52,32 @@ describe("guidePresentation", () => {
     for (const field of GUIDE_FIELDS) {
       expect(labels.some((l) => l.includes(field))).toBe(false);
     }
+  });
+});
+
+describe("SUGGESTION_PRESENTATION", () => {
+  it("names Claude in the label, not in the small print", () => {
+    // The label is the part that gets read on a phone. A suggestion whose
+    // attribution lives only in a caption is a suggestion that will be
+    // remembered as the roaster's.
+    expect(SUGGESTION_PRESENTATION.label).toMatch(/claude/i);
+  });
+
+  it("never claims anybody published it", () => {
+    // The whole risk of this feature is wording, and this is where wording
+    // lives. "Found", "on the page", "the roaster's" and a tier's own words
+    // would all quietly promote an invented recipe to a retrieved one.
+    const forbidden = /\bfound\b|\bon (the )?page\b|roaster'?s (recipe|guide|instructions)|\bpublished by\b|\bwritten for\b/i;
+    expect(SUGGESTION_PRESENTATION.label).not.toMatch(forbidden);
+    expect(SUGGESTION_PRESENTATION.note).not.toMatch(forbidden);
+  });
+
+  it("is not a fourth tier light", () => {
+    // The three lights answer "what did the roaster say". A suggestion is not
+    // an answer to that question, so it does not get one of their colours —
+    // and the status beside it stays No Recipe Found, which is still true.
+    const tiers = (["coffee_specific", "roaster_generic", "none"] as GuideStatus[]).map((s) => guidePresentation(s).dot);
+    expect(tiers).not.toContain(SUGGESTION_PRESENTATION.dot);
+    expect(SUGGESTION_PRESENTATION.label).not.toBe(guidePresentation("none").label);
   });
 });

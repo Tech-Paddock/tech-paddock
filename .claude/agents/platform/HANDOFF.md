@@ -1,6 +1,6 @@
 # Platform Config — handoff
 
-State as of 2026-09-16.
+State as of 2026-09-19.
 
 Read `RULES.md` first, then `supabase/README.md`. This file is only what is true right now.
 
@@ -8,71 +8,73 @@ Read `RULES.md` first, then `supabase/README.md`. This file is only what is true
 
 ## What is true now
 
-**Every project deploys and every domain serves.** `techpaddock.io`, `editor.`, `tracker.`,
-`resume.` and `coffee.` all return 200 behind the password gate. The six-and-a-half-hour outage of
-2026-09-11 is long closed; its cause is a trap in `.claude/DECISIONS.md` and the one line worth
-carrying is **if deployments stop again, read `link.org` on the Vercel project before touching
-anything on GitHub.**
+**Deploys are scoped per app.** Each `apps/*/vercel.json` carries an `ignoreCommand` that skips
+previews outright and otherwise builds only when that app's own folder or `packages` changed. It
+compares `HEAD^ HEAD`, correct *because this repo squash-merges* — one merge is one commit, so
+`HEAD^..HEAD` is the whole change. That reverses this file's older note arguing for
+`VERCEL_GIT_PREVIOUS_SHA`, which was reasoning about a non-squashed history. Every failure path
+exits 1 and builds, so a broken ignore step over-builds rather than silently skipping a deploy.
 
-**DNS is uniform.** Every subdomain is a CNAME to `d1317e1174061c29.vercel-dns-017.com`. The
-apex stays an A record at `76.76.21.21` because an apex cannot be a CNAME — correct, not a leftover.
-All four still send `frame-ancestors 'self' https://techpaddock.io https://*.techpaddock.io`.
+**`live: false` does not mean paused, and reading it that way has cost a day.** `tp-home` carries
+the same field while serving `techpaddock.io`. **The signal is deployment state.** A paused project
+returns `BLOCKED`; a skipped preview returns `CANCELED`; a real build returns `READY`.
+
+**`tp-message-editor` returns `BLOCKED` on every deployment, production included.** Measured
+2026-09-19 against the last four merges to `main` — `65514a8`, `34d6949`, `c3c40fd`, `f82ebd5` — all
+four `BLOCKED` at `target: production`. So `editor.techpaddock.io` serves whatever last succeeded
+and **every merge since has silently never reached it**. Joel's to act on. Ledger item 17.
+
+**`tp-tracker` is not paused.** Same four commits, all `READY` at `target: production`, previews
+`CANCELED` by the new ignore step. Its daily cron runs. Ledger item 10.
+
+**DNS is uniform.** Every subdomain is a CNAME to `d1317e1174061c29.vercel-dns-017.com`; the apex
+stays an A record at `76.76.21.21` because an apex cannot be a CNAME — correct, not a leftover.
 
 **`SESSION_SECRET` parity was confirmed by Joel on 2026-09-14.** The mechanism matters at the next
-rotation: the values cannot be read back out of the dashboard, so parity cannot be confirmed by
-inspection. Setting one fresh known value on all five and then **redeploying** is the only way to
-establish it.
+rotation: values cannot be read back out of the dashboard, so parity cannot be confirmed by
+inspection. Setting one fresh known value on all five and then **redeploying** is the only way.
 
-**The database is healthy with one deliberate gap.** Every migration in `supabase/migrations/` is
-applied, plus exactly one that is not in it: `20260908235234` is withheld because it seeds real
-names, so `migration list` will always show it as remote-only. **That is correct and permanent, and it should be the only difference** — a second one
-means real drift. Do not repair it; a hook blocks the command.
+**The database is healthy with one deliberate gap.** Measured 2026-09-19: 17 applied remotely, 16
+in `supabase/migrations/`, the single difference being `20260908235234`, withheld because it seeds
+real names. **That is correct and permanent, and it must stay the only difference** — a second one
+is real drift. Do not repair it; a hook blocks the command and the hook is right.
+
+**Branch protection's required checks are `gate`, `drift` and `requested-by-joel`**, switched
+2026-09-16. None change when an app is added or deprecated, so no per-app `build (…)` entry remains.
 
 **`supabase link` has never been run from an agent session** — it needs an access token no agent
-should hold. Local files were verified against remote history by normalized hash, not by the CLI.
+should hold. Local files are verified against remote history by normalized hash, not the CLI.
 
 ## Traps specific to this seat
 
-- **Environment variables are baked in at build time.** Changing one has no effect until that project
-  redeploys. This catches people out constantly.
-- **Adding a schema is three steps** — the recipe is in `RULES.md` and `supabase/README.md`; do not
-  add a fourth copy here. The one worth carrying: **`postgrest_logs` prints a relation count on
-  every reload**, so you can check the dashboard's Exposed schemas list without dashboard access.
-- **Supabase's value living in a Vercel field.** The project has both key systems enabled — legacy
-  `eyJ…` JWTs and modern `sb_secret_…` — and the code needs the legacy `service_role` JWT.
-  `Invalid Compact JWS` is the decisive tell, because a merely *wrong* JWT parses fine and fails
-  differently.
-- **Branch protection's required-checks list does not update itself**, and no agent can read a
-  ruleset to verify it. It should now name only `gate`, `drift` and `requested-by-joel` — none of
-  which change when an app is added or deprecated. A leftover per-app entry is invisible from here
-  and blocks every pull request until Joel removes it.
-- **If you switch a subdomain to a CNAME, take the target from that project's own Domains tab.** The
-  per-project hashed targets are not interchangeable.
+- **Environment variables are baked in at build time.** Changing one has no effect until that
+  project redeploys. This catches people out constantly.
+- **`.claude/DECISIONS.md` is at 260 of 260 lines**, append-only with no trimming rule, so the next
+  settled call has nowhere to go. Raising the ceiling is Joel's. **Do not trim it to make room.**
+- **Adding a schema is three steps** — the recipe is in `RULES.md` and `supabase/README.md`, not a
+  fourth copy here. The one worth carrying: **`postgrest_logs` prints a relation count on every
+  reload**, so the Exposed schemas list is checkable without dashboard access.
+- **Supabase's value living in a Vercel field.** Both key systems are enabled — legacy `eyJ…` JWTs
+  and modern `sb_secret_…` — and the code needs the legacy `service_role` JWT. `Invalid Compact JWS`
+  is the decisive tell: a merely *wrong* JWT parses fine and fails differently.
+- **No agent can read a branch-protection ruleset.** A leftover required check is invisible from
+  here and blocks every pull request until Joel removes it.
+- **A new subdomain's CNAME target comes from that project's own Domains tab** — never reused.
 - **Before claiming a deployment problem is fixed, check that a deployment actually happened.** A
   configuration that looks right and a build that never ran look identical from the dashboard.
+- **If deployments stop again, read `link.org` on the Vercel project before touching GitHub** — the
+  one line worth carrying out of the 2026-09-11 outage. The trap itself is in `DECISIONS.md`.
 
 ## In flight
 
-Nothing.
+`claude/platform-handoff-correction` — this correction. Nothing else.
 
 ## Next
 
-1. **Land the `ignoreCommand` change.** Every push still rebuilds all five Vercel projects — a
-   docs-only commit triggers five full Next.js builds. #57 fixed the GitHub Actions half only. One
-   line in each app's existing `vercel.json`:
-
-   ```json
-   "ignoreCommand": "git diff --quiet ${VERCEL_GIT_PREVIOUS_SHA:-HEAD^} HEAD ./"
-   ```
-
-   Exit 0 skips, exit 1 builds — inverted, because `git diff --quiet` exits 0 when nothing changed.
-   Use `VERCEL_GIT_PREVIOUS_SHA`, not Vercel's documented `HEAD^`: `HEAD^` examines only the latest
-   commit, so when two pushes land close together the older one's changes never deploy. Do not plan
-   around the dashboard's *Skip deployments* toggle — see `.claude/DECISIONS.md`.
-2. **Switch branch protection's required checks to `gate`, `drift` and `requested-by-joel`**, and
-   remove every per-app `build (…)` entry. This supersedes the old "add `build (coffee)`" item: the
-   ruleset was one short, and chasing it per app was the wrong fix. Joel's to set, and you cannot
-   read it back — until he does, a per-app entry for a deprecated app would block every pull request.
-3. **Run `supabase link` and `migration list` once, locally.** Expect one remote-only version.
-4. **`editor.model_status` has zero rows.** It is the Message Editor's table and task, but if it
-   turns out to be a grants or RLS problem it becomes yours.
+1. **`editor.techpaddock.io` is not taking merges** (item 17). Nothing on the platform side fixes
+   it; Joel must unblock the project. Then verify with a *new* deployment reaching `READY` at
+   `target: production` — not the dashboard's Redeploy, which rebuilds the stale commit.
+2. **Run `supabase link` and `migration list` once, locally.** Expect exactly one remote-only
+   version. Joel's; it needs an access token no agent should hold.
+3. **`editor.model_status` has zero rows.** The Message Editor's table and task, but if it turns
+   out to be a grants or RLS problem it becomes yours.
