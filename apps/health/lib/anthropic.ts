@@ -85,6 +85,8 @@ Rules that decide the output:
   not one name with a size. Include the brand or restaurant when it was said, because the macros
   depend on it.
 - **Quantity is a count, not a size.** Two large fries is quantity 2 of "large fry".
+- **A serving counts the same way.** "Two servings of my chilli" is quantity 2 of "my chilli" —
+  drop the word servings from the name, because the recipe book already knows what a serving is.
 - Write names the way a person would say them back, in title case where that reads naturally. Do
   not invent detail that was not said, and do not expand an abbreviation you are not sure of.
 - Pick the meal from what was said first, and from the clock only when the words do not say.`;
@@ -283,4 +285,231 @@ export async function tidyList(
       };
     })
     .filter((l) => l.name.length > 0);
+}
+
+// ---------------------------------------------------------------------------
+// 4 · Recipes — three ways in, one shape out
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything below produces the same thing: a draft the book has not accepted
+ * yet. Typed, generated or read off a page, it reaches `saveRecipe` through one
+ * approval — guardrail 1, in the same shape the meal log uses it.
+ *
+ * **The macros are always ours.** Joel settled what import does — *"Only
+ * retain recipe. Then calculate macros and cals."* — so a recipe's numbers are
+ * always an estimate this app made from the ingredients, never a figure lifted
+ * off the page. Where a page publishes real nutrition we throw it away. That is
+ * a cost, named once, and it buys one rule instead of two and consistency with
+ * a book whose macros are static by decision.
+ */
+
+export type RecipeFields = {
+  name: string;
+  servings: number;
+  ingredients: string[];
+  method: string | null;
+};
+
+export type RecipeEstimate = { macros: Macros; note: string | null };
+
+const RECIPE_MACRO_SYSTEM = `You estimate the calories and macronutrients of a whole cooked dish.
+
+- **Report the WHOLE recipe, not one serving.** Everything the ingredient list puts in the pot.
+  Dividing happens elsewhere and dividing twice is the failure mode.
+- Work from the ingredients. Where an amount is vague — "a drizzle of oil", "season to taste" —
+  assume what a cook would actually use and say so in the note.
+- Cooking losses are real but small for macros; do not model them. Water is not a macro.
+- Be honest about the width of the estimate in the note rather than hedging the numbers
+  themselves. A number you have quietly padded is worse than a number with a caveat beside it.`;
+
+/** Macros for a whole dish, from its ingredients. The judgement call, so it takes a model. */
+export async function estimateRecipeMacros(params: {
+  recipe: RecipeFields;
+  model?: ModelId;
+}): Promise<RecipeEstimate> {
+  const model = params.model ?? DEFAULT_MODEL;
+  const { recipe } = params;
+
+  const response = (await getClient().messages.create({
+    model,
+    max_tokens: 2048,
+    system: RECIPE_MACRO_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content:
+          `Recipe: ${recipe.name}\nIt makes ${recipe.servings} servings.\n\n` +
+          `Ingredients:\n${recipe.ingredients.map((i) => `- ${i}`).join("\n")}\n\n` +
+          (recipe.method ? `Method:\n${recipe.method}\n\n` : "") +
+          `Return a JSON object: {"kcal": number, "protein_g": number, "carbs_g": number, ` +
+          `"fat_g": number, "note": string or null} for the WHOLE dish. Put nothing after the JSON.`,
+      },
+    ],
+  } as never)) as { content: { type: string; text?: string }[] };
+
+  const parsed = looseJson<Record<string, unknown>>(textOf(response));
+  const macros = parseMacros(parsed);
+  if (!macros) {
+    throw new Error(`${MODELS[model].label} did not return usable macros for "${recipe.name}".`);
+  }
+  return { macros, note: typeof parsed?.note === "string" ? parsed.note.trim() || null : null };
+}
+
+const GENERATE_SYSTEM = `You invent one recipe a home cook can actually make tonight.
+
+- **Answer the constraint you were given**, not the recipe you would rather write. If they said
+  high protein, chicken and twenty minutes, all three are requirements.
+- Ordinary ingredients and ordinary equipment. No sous vide, no overnight anything unless asked.
+- **Amounts are specific.** "2 tbsp olive oil", not "some olive oil" — the macros are estimated
+  from this list afterwards, so a vague line becomes a vague number.
+- The method is numbered steps in plain sentences. Short enough to follow from a phone.
+- One recipe, not three options.`;
+
+/** Invent a recipe. Its macros are estimated separately, from what it produced. */
+export async function generateRecipe(params: {
+  brief: string;
+  model?: ModelId;
+}): Promise<RecipeFields> {
+  const model = params.model ?? DEFAULT_MODEL;
+
+  const response = (await getClient().messages.create({
+    model,
+    max_tokens: 3072,
+    system: GENERATE_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content:
+          `What they asked for: ${params.brief}\n\n` +
+          `Return a JSON object: {"name": string, "servings": number, "ingredients": [string], ` +
+          `"method": string}. Put nothing after the JSON.`,
+      },
+    ],
+  } as never)) as { content: { type: string; text?: string }[] };
+
+  const fields = readRecipeFields(looseJson<Record<string, unknown>>(textOf(response)));
+  if (!fields) throw new Error(`${MODELS[model].label} did not return a usable recipe.`);
+  return fields;
+}
+
+const IMPORT_SYSTEM = `You read one web page and extract the recipe on it.
+
+**The rule that matters more than the extraction.** If you could not read the page — it did not
+fetch, it is paywalled, it 404'd, it blocked you, or it turned out not to be a recipe — then set
+"read" to false and leave everything else null. **Do not reconstruct a recipe from the URL.** A
+slug like /recipes/classic-beef-chili is enough to write a convincing chilli from nothing, and a
+recipe invented from a link is indistinguishable from one that was really there, right up until
+someone cooks it and logs its macros.
+
+When you did read it:
+
+- Take the ingredients and the method as written. Keep the amounts.
+- Strip everything that is not the recipe: the story above it, the ads, the comments, the
+  newsletter box, the affiliate links.
+- Keep the page's own name for the dish and its own serving count. If the page does not say how
+  many it serves, say 0 and someone will be asked.
+- **Ignore any nutrition panel on the page.** The numbers are worked out separately here from the
+  ingredients. Do not copy them and do not mention them.`;
+
+export type RecipeImport = { read: boolean; fields: RecipeFields | null; reason: string | null };
+
+/**
+ * Read a recipe off a page.
+ *
+ * **A failed fetch fails loudly rather than degrading into generation**, which
+ * is Coffee's trap wearing an apron: hand a model a URL it cannot open and it
+ * will happily write the recipe the slug implies. Coffee's rule exists because
+ * *"you would actually brew it"*; here you would actually cook it and log its
+ * macros against your day.
+ *
+ * Two things enforce it rather than one. The prompt asks for `read: false`, and
+ * the caller below refuses anything that comes back without real ingredients —
+ * because a prompt can only ask.
+ */
+export async function importRecipe(params: {
+  url: string;
+  model?: ModelId;
+}): Promise<RecipeImport> {
+  const model = params.model ?? DEFAULT_MODEL;
+  const spec = MODELS[model];
+
+  const messages: Record<string, unknown>[] = [
+    {
+      role: "user",
+      content:
+        `Fetch this page and extract the recipe: ${params.url}\n\n` +
+        `Return a JSON object: {"read": boolean, "reason": string or null, "name": string or null, ` +
+        `"servings": number or null, "ingredients": [string] or null, "method": string or null}. ` +
+        `Put nothing after the JSON.`,
+    },
+  ];
+
+  let raw = "";
+  for (let i = 0; i < 6; i++) {
+    const response = (await getClient().messages.create({
+      model,
+      max_tokens: 4096,
+      system: IMPORT_SYSTEM,
+      tools: [{ type: spec.fetch, name: "web_fetch", max_uses: 3 }],
+      messages,
+    } as never)) as { stop_reason: string; content: { type: string; text?: string }[] };
+
+    if (response.stop_reason === "pause_turn") {
+      messages.push({ role: "assistant", content: response.content });
+      continue;
+    }
+    raw = textOf(response);
+    break;
+  }
+
+  const parsed = looseJson<Record<string, unknown>>(raw);
+  const reason = typeof parsed?.reason === "string" ? parsed.reason.trim() || null : null;
+
+  if (!parsed || parsed.read !== true) {
+    return { read: false, fields: null, reason: reason ?? "That page could not be read." };
+  }
+
+  // The second enforcement. A page that was genuinely read has ingredients; a
+  // model that says `read: true` and produces none has answered from the URL.
+  const fields = readRecipeFields(parsed, { allowUnknownServings: true });
+  if (!fields || fields.ingredients.length === 0) {
+    return {
+      read: false,
+      fields: null,
+      reason: reason ?? "Nothing on that page looked like a recipe with ingredients.",
+    };
+  }
+
+  return { read: true, fields, reason: null };
+}
+
+/** Shared shape-reading, so three callers cannot disagree about what a recipe is. */
+function readRecipeFields(
+  raw: Record<string, unknown> | null,
+  opts: { allowUnknownServings?: boolean } = {}
+): RecipeFields | null {
+  if (!raw) return null;
+
+  const name = typeof raw.name === "string" ? raw.name.trim() : "";
+  if (!name) return null;
+
+  const servingsRaw = typeof raw.servings === "string" ? Number(raw.servings) : raw.servings;
+  const servings =
+    typeof servingsRaw === "number" && Number.isFinite(servingsRaw) && servingsRaw >= 1
+      ? Math.round(servingsRaw)
+      : opts.allowUnknownServings
+        ? 0
+        : 4;
+
+  const ingredients = Array.isArray(raw.ingredients)
+    ? raw.ingredients
+        .map((i) => (typeof i === "string" ? i.trim() : ""))
+        .filter((i) => i.length > 0)
+    : [];
+
+  if (!opts.allowUnknownServings && ingredients.length === 0) return null;
+
+  const method = typeof raw.method === "string" ? raw.method.trim() || null : null;
+  return { name, servings, ingredients, method };
 }
