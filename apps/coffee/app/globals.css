@@ -19,3 +19,24 @@ body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
+
+/* One colour this app needs and the livery does not have.
+   `lib/theme.css` gives urgent, warn and info but no "good" — nothing in the
+   shared palette is green, because nothing else here has had a three-state
+   indicator. TechPad Gen owns the theme, so rather than fork the five-way
+   copy of theme.css or the five-way tailwind.config.ts, the value lives here,
+   in the one stylesheet that is Coffee's alone, and is flagged in the pull
+   request for them to adopt or refuse.
+   Both polarities are set by hand for the same reason the severity tokens are:
+   a stock green measures badly against one of the two grounds. */
+:root {
+  --found: rgb(61 110 58);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode="light"]) {
+    --found: rgb(126 178 108);
+  }
+}
+:root[data-mode="dark"] {
+  --found: rgb(126 178 108);
+}

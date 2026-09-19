@@ -188,7 +188,13 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css"]) {
       continue;
     }
 
-    const newest = git("log", "-1", "--format=%ad", "--date=short", "--", path);
+    // Deployment config and env templates are swept by cross-cutting changes
+    // that the owning agent did not write: #108 touched every vercel.json and
+    // flagged three agents stale for one line each. Freshness is meant to ask
+    // "has this handoff kept up with this app's code", so it measures the code.
+    const SWEPT = ["vercel.json", ".env.example", "package-lock.json"];
+    const newest = git("log", "-1", "--format=%ad", "--date=short", "--", path,
+      ...SWEPT.map((f) => `:(exclude)${path}/${f}`));
     if (!newest) add(`fresh: ${agent}`, "warn", `stated ${stated}; no commits found under ${path}`);
     else add(`fresh: ${agent}`, stated >= newest ? "ok" : "warn",
       stated >= newest ? `${stated}, current with ${path}` : `says ${stated}; ${path} last changed ${newest}`);
