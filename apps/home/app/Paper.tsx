@@ -36,14 +36,33 @@ export const DENSITIES: { id: Density; name: string; note: string }[] = [
   { id: "timing", name: "Timing", note: "Everything at once" },
 ];
 
-/** Long form, and deliberately not abbreviated — this is the masthead. */
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/**
+ * Long form, and deliberately not abbreviated — this is the masthead.
+ *
+ * **Written out rather than handed to `toLocaleDateString`, and that is the fix
+ * for a real bug.** The `en-GB` formatter does not agree with itself across
+ * runtimes: Node rendered "Friday, 18 September 2026" and the browser rendered
+ * the same string without the comma, so every load mismatched on hydration and
+ * React dropped this whole Suspense boundary to client rendering. One comma.
+ *
+ * An explicit table cannot disagree with itself, so the server and the browser
+ * now produce the same characters from the same date.
+ *
+ * **What is still allowed to differ is the date itself**, because the server
+ * reads UTC and the browser reads local time — within a few hours of midnight
+ * they are genuinely different days, and neither is wrong. That one element
+ * carries `suppressHydrationWarning` so the browser's answer wins quietly. It
+ * is scoped to the date and nothing else; it is not covering for the formatter.
+ */
 function today() {
-  return new Date().toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const d = new Date();
+  return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 function Owed({ item }: { item: SummaryItem }) {
@@ -99,7 +118,7 @@ export default function Paper({
   return (
     <article className={`paper paper-${density}`}>
       <header className="paper-masthead">
-        <p className="paper-date">{today()}</p>
+        <p className="paper-date" suppressHydrationWarning>{today()}</p>
         <h1>The Morning Paper</h1>
       </header>
 

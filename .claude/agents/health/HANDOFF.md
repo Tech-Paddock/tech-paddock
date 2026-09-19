@@ -1,65 +1,80 @@
 # Health — handoff
 
-State as of 2026-09-18.
+State as of 2026-09-19.
 
 Read `RULES.md` first, then `.claude/HEALTH-PLAN.md`. This file is only what is true right now.
 
 ---
 
-## The area exists and the product does not
+## The macro log is built and is on a branch
 
-**This is day one, and an almost-empty handoff is the correct shape for it.** The scaffold landed
-before you did, so that you inherit rails rather than a set of decisions somebody else made about
-your tool.
+`claude/health-macro-log` — pushed, CI green, **pull request open at Joel's request, 2026-09-19**.
+It replaces the placeholder page, adds the schema the app runs on, and lets a number that turned
+out wrong be fixed after the fact.
 
-## What is true now
+**The migration is applied**, at the gate on 2026-09-19, and verified: five tables, RLS on every one,
+zero policies. The hosted API stamped its own version and ignored the filename, so the file was
+renamed to `20260919135856_health_macro_tables.sql` to match — see `supabase/README.md`.
 
-**`apps/health` builds and is gated by password in code — it is not deployed yet.** It was copied from
-`apps/coffee`, the nearest existing app in kind. `lib/auth.ts`, `lib/password.ts` and `lib/theme.css`
-are **byte-identical** copies, verified by checksum rather than assumed, and `middleware.ts` is the
-**base** copy — a fourth variant fails `drift` deliberately, because that would be a fourth version
-of the password gate.
+## How it works, in the order it matters
 
-**`app/page.tsx` is a placeholder and says so on the page.** It is not a first guess at the real
-screen. Replacing it is your first substantive change.
+**The lookup order is the product**, in `lib/log.ts:resolveItem`. Exact match on the normalised
+name; a miss goes outside to one model call that may search; approval writes it back, so the outside
+path runs at most once per distinct food.
 
-**The `health` schema exists and is empty.** `20260918140357` creates it, `20260918140405` grants it,
-both applied before the scaffold merged. **Zero tables, on purpose** — the plan's macro tables are
-yours to design, and it says in its own words that everything in it is the first feature of `health`
-rather than the whole of it.
+**Item numbers are append-only.** `health.items` is identity, `health.item_versions` is what it
+weighed over time. Nothing is updated in place, which makes guardrail 3 structural rather than
+remembered.
 
-**`/api/health` probes three things** once the app is reachable: the schema is reachable, the Anthropic key is
-present and shaped right, and `SESSION_SECRET` is set. The database probe **names the exposed-schemas
-dashboard list in its failure message**, because that step is outside this repo and is the one the
-standup protocol says gets missed.
+**`kind` is the column that cannot be retrofitted.** A `correction` says the number was always wrong
+and reaches backwards through its era; a `change` says the food itself changed and does not. Settled
+in [#116](https://github.com/Tech-Paddock/tech-paddock/issues/116). `correction` is the default
+deliberately — guessing it wrong is visible, guessing `change` wrong silently strands old days.
 
-## Waiting on Joel, outside this repo
+**Read `lib/items.ts:resolveVersion` first.** Take the era with the greatest `effective_from` on or
+before the day, then within it the most recently written row. Thirteen tests pin it, including the
+fallback for a day before any era starts — a null there renders as a silently missing total.
 
-None of these has an undo and no agent may do them. Until they are done the app is built but not
-reachable, which does not block you from working.
+**Entries reference an item's identity, never a copy of its numbers.** That is what lets a
+correction fix every past day while a change leaves them alone, and why `readDay` resolves per day.
 
-1. **Root Directory → `apps/health`** on the `tp-health` Vercel project. Until then it builds the
-   repo root.
-2. **`health.techpaddock.io` attached** to that project. The Cloudflare record already exists and
-   points at a host Vercel does not yet claim.
-3. **Environment variables**, `SESSION_SECRET` **byte-identical** to the other five, then a redeploy —
-   Vercel bakes the environment in at build time.
-4. **`health` added to the exposed-schemas list** in the Supabase dashboard.
+**Tapping a logged food opens the correction sheet**, `app/Correction.tsx`. It puts the choice as a
+question about the food — *the number was wrong* against *the food itself changed* — because that is
+the only form in which the answer is knowable. A change asks for the date the food changed and never
+defaults to today; the boundary is the only thing a change means. The sheet lists earlier versions,
+which makes the append-only guarantee checkable rather than a promise.
+
+## What is deliberately not there
+
+- **No effort dial and no `output_config` on either call.** Haiku 4.5 returns a 400 for an effort
+  where Sonnet 5 accepts one; JSON is asked for in the prompt and validated in code, which untrusted
+  model output needs anyway. Both argued at their call sites.
+- **No `/api/summary`, no line in the hub's glance.** Settled.
+- **No history screen.** Today only; `readDay` already takes any date, so that is a route rather
+  than a rewrite.
+- **No way to re-point a logged line at a different food** — and it is not a correction, so do not
+  build it as one. *"A #1 is 540, not 620"* fixes the food's numbers, which the sheet does. *"That
+  was a medium, not a large"* says the line references the wrong item: a different write, against
+  `entry_items`. **The plan does not say which it means by a dictated correction.** Joel's call.
 
 ## Traps specific to this seat
 
-- **The livery is borrowed.** `lib/livery.ts` pins `senna`, which the paused tracker also wears, and
-  **two apps sharing a livery is the drift the one-owner theme rule exists to prevent.** It is
-  TechPad Gen's to settle. Do not fix it here.
-- **Read `supabase/README.md` before your first migration.** The hosted API stamps its own version
-  and ignores your filename, so name the file after the fact and check `migration list` rather than
-  assuming. Both migrations above were renamed to the versions that actually ran.
-- **`supabase migration list` will always show one remote-only version**, `20260908235234`. That is
-  deliberate and permanent. A *second* discrepancy means something drifted and is worth reading.
+- **`lib/models.ts` is Coffee's registry copied verbatim, flagged rather than quiet.** Approved in
+  #116; the TD is carrying Health-as-second-copy into the argument for `packages/shared`. Do not let
+  a third copy happen quietly.
+- **The livery is still borrowed** — `senna`, which the paused tracker wears. TechPad Gen's.
+- **A failed lookup must never look like "not found."** `LookupError` keeps them apart and every
+  route turns it into a 503. Degrading into internet-first changes nothing on screen, which is the
+  whole danger.
+- **`supabase migration list` always shows one remote-only version**, `20260908235234`. A *second*
+  discrepancy means something drifted.
 
 ## Next
 
-**Design the tables, then build the one screen.** In that order, and nothing before it: the plan is
-agreed, the schema is empty and waiting, and the lookup order in `RULES.md` is the product.
+**Use it for a week before building anything else.** The harness at `/debug` answers one question —
+does Haiku reproduce a number you already approved — and cannot answer it without runs.
+`health.comparisons` keeps every run whether or not a pick is made.
 
-**Everything else waiting is in the ledger**, which the `SessionStart` hook prints for you.
+Two numbers Joel has not set, neither blocking: **the agreement rate that retires the harness**, and
+**the divergence tolerance**, currently 10%-or-25 kcal on calories and 20%-or-5 g on macros in
+`lib/macros.ts`.
