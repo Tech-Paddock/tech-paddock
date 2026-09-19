@@ -59,10 +59,10 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-Three, none depending on another, all pushed and green:
-`claude/home-paper-date-hydration` — the masthead date made deterministic (ledger 10).
-`claude/theme-hairline-contrast` — all ten hairlines raised to clear 3:1 (ledger 1).
-`claude/home-delete-feed-tab` — the Feed tab deleted, `board` relabelled Pit Wall (ledger 3).
+Six, all presentation, none blocking another, with an identical handoff on each so they cannot
+conflict. Ledger row in brackets where there is one; the rest came straight from Joel.
+`home-paper-date-hydration` (10) · `theme-hairline-contrast` (1) · `home-delete-feed-tab` (3)
+`theme-tab-titles` · `home-drop-editor-from-roster` · `theme-livery-badge`
 
 ## Next
 
