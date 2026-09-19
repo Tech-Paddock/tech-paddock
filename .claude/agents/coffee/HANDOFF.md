@@ -27,9 +27,8 @@ the ratio and moves the water; typing water re-derives the ratio. **The ratio ha
 water over dose, derived in `lib/brews.ts` and dropped before the POST. `water_g` is *not*
 `beverage_g`: water in, not what came out of the bed.
 
-**A new brew opens as a repeat of the last one, then as the roaster's own numbers.** Settings carry —
-brewer, method, grinder, grind setting, dose, water, ratio — and your last brew wins field by field:
-their number is where your dial-in started, not an instruction. No reading carries. `openingBrew`.
+**A new brew opens as a repeat of the last one, then as the roaster's numbers.** Settings carry and
+your last brew wins field by field; no reading carries at all. `openingBrew`.
 
 **Beverage mass, TDS and the extraction read-out are commented out in the form**, not deleted;
 uncommenting two blocks puts them back, columns and tests untouched.
@@ -40,7 +39,7 @@ a `<button>` is invalid markup and browsers disagree about what a tap does. Keep
 **The guide tier is a three-state indicator** — green Found, amber Non-Specific, red No Recipe —
 expanding to the roaster's quote. Wording is in `lib/guideDisplay.ts`, apart from `lib/guide.ts` so
 presentation cannot reach validation. **The bag card is three sections**: This bag, Recipe, Brews,
-Save and Delete inline between the last two, the delete confirm replacing that whole row.
+with Save and Delete inline between the last two and the confirm replacing that row.
 
 **The icon is a pour-over in the JPS livery**, every colour a `theme.css` token. **Its two gold rules
 are structural:** a near-black tile loses its edge on a dark wallpaper. Source and re-render recipe
@@ -56,16 +55,16 @@ in `apps/coffee/design/`, kept out of `app/` where a folder is a route. The PNG 
 - **Two brewer vocabularies, and `myBrewerFor` crosses only on an exact match.** A bare "V60" does
   not map: two are on the shelf and the roaster did not say which. Rounding is the same invention.
 - **An installed app has its own cookie jar**, so signing in inside it is expected, not a session bug.
-- **The icon is a static import**, served from `/_next/static` — the one prefix the middleware
-  matcher excludes. Next's `app/apple-icon.png` convention is gated; iOS would take the login page.
+- **The icon is a static import**, from `/_next/static` — the one prefix the middleware excludes.
+  Next's `app/apple-icon.png` convention is gated; iOS would take a shot of the login page.
 - **`guide_status` records where instructions were read, not who they were written for.** Sweet
   Bloom print the same recipe on every product page. Nothing should rank or filter on tier 1.
 
 ## In flight
 
 `claude/coffee-bag-card-layout` — pushed, no PR. The bag card rebuilt to Joel's sketch. **CI could
-not run**: GitHub Actions is refusing to start jobs account-wide on billing, so the branch is
-verified locally only — 92 tests, a clean build, `drift-check` 0 fail with exit 0.
+not run**: Actions refuses to start any job account-wide, on billing. Verified locally instead —
+suite green, clean build, `drift-check` exit 0.
 **#121 is open** and touches this same handoff; whichever merges second resolves one conflict.
 
 **One item of that sketch is deliberately unbuilt**: generating a recipe when the roaster published
@@ -75,8 +74,7 @@ none. It contradicts `RULES.md` §1 and needs a schema decision, so it went to J
 
 1. **Run the same coffee twice — Haiku, then Sonnet 5 at `high`** — and compare which tier each
    reports. The open question the harness was built to answer, and nothing in the repo can answer it.
-2. **Expect `normalizeMethod` to need alias tuning** once there are real guides. The vocabulary is
-   right; the regexes were written against how roasters *tend* to word things, not against a sample.
-3. **Seeding roaster domains is proposed, not started.** It needs its own table, and no agent in the
-   sandbox can verify a domain — which is the guess `findRoasterDomain` refuses.
+2. **Expect `normalizeMethod` to need alias tuning** once there are real guides: the regexes were
+   written against how roasters *tend* to word things, not against a sample.
+3. **Seeding roaster domains is proposed, not started.** No agent here can verify a domain.
 4. The deliberately-unbuilt list — timer, inventory, method lookup table — stays unbuilt until asked.
