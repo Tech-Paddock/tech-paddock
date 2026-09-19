@@ -63,7 +63,9 @@ in `apps/coffee/design/`, kept out of `app/` where a folder is a route. The PNG 
 
 ## In flight
 
-`claude/coffee-bag-card-layout` — pushed, CI green, no PR yet. The bag card rebuilt to Joel's sketch.
+`claude/coffee-bag-card-layout` — pushed, no PR. The bag card rebuilt to Joel's sketch. **CI could
+not run**: GitHub Actions is refusing to start jobs account-wide on billing, so the branch is
+verified locally only — 92 tests, a clean build, `drift-check` 0 fail with exit 0.
 **#121 is open** and touches this same handoff; whichever merges second resolves one conflict.
 
 **One item of that sketch is deliberately unbuilt**: generating a recipe when the roaster published
