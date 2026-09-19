@@ -84,7 +84,7 @@ merging #56, which carried this amendment.
 
 **Deleting a template no longer takes its renders with it, and is no longer refused because of
 them** — amended by Joel on 2026-09-17: *"Generally I want the renders to stay even if the templates
-go."* `renders.template_id` is nullable with `on delete set null` (migration `20260918014500`).
+go."* `renders.template_id` is nullable with `on delete set null` (migration `20260918041216`).
 
 **The amendment is sound rather than merely authorised, and that distinction is the point.** The
 old rule's premise was that deleting a template destroyed the account of what a render was built

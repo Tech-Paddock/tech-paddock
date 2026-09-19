@@ -5,35 +5,11 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-18T14:08:39.563Z",
+  bakedAt: "2026-09-19T16:04:19.866Z",
   waiting: [
   {
-    "title": "Two tokens on `tp-home`, then redeploy",
-    "detail": "GITHUB_TOKEN fine-grained, read-only Contents + Metadata + Pull requests — not Actions. VERCEL_TOKEN team-scoped, with an expiry. The redeploy is not optional — Vercel bakes the environment in at build time. *LoE: minutes.*",
-    "ref": "—",
-    "state": "box"
-  },
-  {
-    "title": "Wire up `tp-health` — four steps, in order, none with an undo",
-    "detail": "The app is built and gated; none of it is reachable until these are done. (a) Root Directory → apps/health, or it keeps building the repo root. (b) Attach health.techpaddock.io — your DNS record points at a host Vercel does not claim. (c) E",
-    "ref": "—",
-    "state": "box"
-  },
-  {
-    "title": "`DECISIONS.md` is seven lines from its ceiling",
-    "detail": "Append-only, 193 of 200, and no trimming rule exists — so the wall arrives with nothing behind it. The migration-version finding below fits once; the one after it will not. Raise the ceiling or agree what may be cut. *LoE: minutes.*",
-    "ref": "—",
-    "state": "box"
-  },
-  {
-    "title": "What is the Feed?",
-    "detail": "In the settled tab order and nowhere else, so it ships as a labelled empty slot. A feed is rows — the same hub rule the tracker's move already bends. *LoE: minutes.*",
-    "ref": "—",
-    "state": "box"
-  },
-  {
-    "title": "Raise the hairline contrast bar?",
-    "detail": "--line on --surface is 1.82:1, short of the 3:1 bar for a non-text component. Raising it changes the look of every app. *LoE: minutes.*",
+    "title": "Pick how the login lockout gets fixed — the obvious fix is the wrong shape",
+    "detail": "The counter is a signed cookie the client can drop, so nothing but a browser is limited; and a per-app fix is worth nothing, since one password opens all six. A firewall rate limit on /api/login needs no code; a shared table gives the hub d",
     "ref": "—",
     "state": "box"
   }
@@ -41,7 +17,7 @@ export const PADDOCK = {
   parked: [
   {
     "title": "`tp-tracker` stays paused",
-    "detail": "Tabled 2026-09-18, paused the same day — verified, live: false. Paused is reversible and deleted is not, so this is a safe place to leave it indefinitely. Un-parking means deleting it and its DNS record — no undo, and it needs item 6 first.",
+    "detail": "Tabled 2026-09-18, paused the same day — verified, live: false. Paused is reversible and deleted is not, so this is a safe place to leave it indefinitely. Un-parking means deleting it and its DNS record — no undo, and needs item 2 first. *L",
     "ref": "—",
     "state": "clear"
   },
@@ -56,12 +32,12 @@ export const PADDOCK = {
   {
     "id": "coffee",
     "name": "Coffee",
-    "asOf": "2026-09-16"
+    "asOf": "2026-09-19"
   },
   {
     "id": "health",
     "name": "Health",
-    "asOf": "2026-09-18"
+    "asOf": "2026-09-19"
   },
   {
     "id": "message-editor",
@@ -81,12 +57,12 @@ export const PADDOCK = {
   {
     "id": "td",
     "name": "Technical Director",
-    "asOf": "2026-09-18"
+    "asOf": "2026-09-19"
   },
   {
     "id": "techpad-gen",
     "name": "TechPad Gen",
-    "asOf": "2026-09-17"
+    "asOf": "2026-09-19"
   },
   {
     "id": "tracker",

@@ -56,8 +56,14 @@ const git = (...args) => {
    A mismatch in the auth pair does not throw; it silently rejects valid
    sessions on the other four, which looks like a login bug rather than a
    config one. theme.css drifts loudly by comparison, but it is still one more
-   file that has to be edited five times. */
-for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css"]) {
+   file that has to be edited five times.
+
+   next.config.mjs joined the list on 2026-09-19. It carries the security
+   headers, and it is the one file here where drift is silent by construction:
+   a missing header changes nothing anybody can see. apps/home had shipped with
+   an empty config and no frame-ancestors for as long as the file existed, and
+   nothing said so until somebody read all six. */
+for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.config.mjs"]) {
   const present = APPS.map((a) => [a, md5(R("apps", a, rel))]).filter(([, h]) => h);
   if (present.length === 0) { add(`identical: ${rel}`, "warn", "not present in any app — cannot measure"); continue; }
   const distinct = new Set(present.map(([, h]) => h));
@@ -140,6 +146,54 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css"]) {
   }
 }
 
+/* ── Each app's Vercel build is scoped to its own folder ──────────────────
+   Until 2026-09-19 every `ignoreCommand` read "skip previews, build
+   everything else", which cannot see which folder changed. One merge rebuilt
+   all six apps, and since Vercel aliases whichever build finishes LAST rather
+   than the newest commit, two merges close together could leave an app
+   serving the older one. It did: three merges four minutes apart on
+   2026-09-18 left techpaddock.io on the Coffee-icon build.
+
+   The command now diffs HEAD^..HEAD against this app's own folder. That makes
+   a typo catastrophic in a way the old one never was: an app whose command
+   names a DIFFERENT app's folder stops deploying entirely, silently, forever
+   — nothing errors, no check goes red, and the only symptom is "my change did
+   not go live", which is the most expensive failure this project has. So this
+   check fails rather than warns, and it verifies the folder each command
+   names is the folder it lives in.
+
+   `packages` rides in every pathspec deliberately, though it does not exist
+   yet. `packages/shared` is ledger item 4, and the day it lands every app
+   must rebuild when it changes. A pathspec naming a path git does not have is
+   not an error — it simply matches nothing — so this costs nothing today and
+   removes a step that would otherwise be discovered by an app going stale.
+
+   A missing vercel.json is only a warning: a freshly scaffolded app folder
+   has no Vercel project yet either, and CLAUDE.md promises that creating the
+   folder is enough to make CI build it. */
+{
+  const hard = [], soft = [];
+  for (const app of APPS) {
+    const rel = `apps/${app}/vercel.json`;
+    const raw = read(R(rel));
+    if (raw === null) { soft.push(`${app}: no vercel.json, so every merge rebuilds it`); continue; }
+    let cfg;
+    try { cfg = JSON.parse(raw); } catch { hard.push(`${app}: vercel.json is not valid JSON`); continue; }
+    const cmd = cfg.ignoreCommand;
+    if (typeof cmd !== "string") { hard.push(`${app}: no ignoreCommand, so every merge rebuilds it`); continue; }
+    if (!/VERCEL_ENV.*preview/.test(cmd)) hard.push(`${app}: ignoreCommand no longer skips previews`);
+    const named = [...cmd.matchAll(/apps\/([A-Za-z0-9._-]+)/g)].map((m) => m[1]);
+    if (!named.includes(app)) hard.push(`${app}: ignoreCommand watches no path under apps/${app}`);
+    const foreign = named.filter((n) => n !== app && APPS.includes(n));
+    if (foreign.length) hard.push(`${app}: ignoreCommand watches ${foreign.map((f) => "apps/" + f).join(", ")}, not its own folder — it would never deploy again`);
+  }
+  add("each app's build is scoped to its own folder",
+    hard.length ? "fail" : soft.length ? "warn" : "ok",
+    hard.length ? hard.join("; ")
+      : soft.length ? soft.join("; ")
+        : `${APPS.length} apps, each skipping a merge that does not touch it`);
+}
+
 /* 4 ── Budgets. CI fails the breach; this reports the approach, because a file
    that arrives at its ceiling has already stopped being rewritten. */
 {
@@ -188,7 +242,13 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css"]) {
       continue;
     }
 
-    const newest = git("log", "-1", "--format=%ad", "--date=short", "--", path);
+    // Deployment config and env templates are swept by cross-cutting changes
+    // that the owning agent did not write: #108 touched every vercel.json and
+    // flagged three agents stale for one line each. Freshness is meant to ask
+    // "has this handoff kept up with this app's code", so it measures the code.
+    const SWEPT = ["vercel.json", ".env.example", "package-lock.json"];
+    const newest = git("log", "-1", "--format=%ad", "--date=short", "--", path,
+      ...SWEPT.map((f) => `:(exclude)${path}/${f}`));
     if (!newest) add(`fresh: ${agent}`, "warn", `stated ${stated}; no commits found under ${path}`);
     else add(`fresh: ${agent}`, stated >= newest ? "ok" : "warn",
       stated >= newest ? `${stated}, current with ${path}` : `says ${stated}; ${path} last changed ${newest}`);
@@ -275,13 +335,138 @@ add("worklogs stay retired", existsSync(R(".claude/worklogs")) ? "fail" : "ok",
          does not drift.
 
          So the trigger is the shape of a present-tense claim about the whole
-         set — `all N`, `the N`, `in N`, `across N` — not any number near a noun. */
+         set — `all N`, `the N`, `in N`, `across N` — not any number near a noun.
+
+         That determiner was also the hole. `techpad-gen/RULES.md` read "five
+         apps means five agents who will see it" and `platform/RULES.md` read
+         "the five app agents": both are present-tense roster claims, both went
+         stale the day Health landed, and neither has a determiner in front of
+         the number, so this check reported `ok` through three separate
+         re-measures of the ledger item that existed to find them.
+
+         The second check below drops the determiner requirement, and pays for
+         it twice over. First it narrows the noun: `apps`, `app agents` and
+         `Vercel projects` name the app roster and nothing else, so a cardinal in
+         front of one of them is about the roster whatever the surrounding
+         grammar. The bare nouns from the first pattern — `agents`, `tools`,
+         `copies` — stay out of it, because those appear in history and in
+         structural counts that the determiner was excluding for free.
+
+         Second, and this is the real difference: it MEASURES rather than
+         flagging any written number. The first pattern has nothing to check
+         itself against — there is no folder on disk holding the tools or the
+         schemas — so it treats every written count as a shelf-life claim and
+         says where to look. The app roster does have a folder, so this one
+         compares against it and stays quiet while the document is right. A count
+         that matches `apps/` today starts failing the day it stops matching,
+         which is the whole point and is not something the first pattern can do.
+
+         The floor at three is the one judgement call here, and it buys back the
+         good writing the narrow noun would otherwise catch: "two apps' buttons
+         sit inches apart on one screen" and "two apps share a livery" are claims
+         about a PAIR, not about the whole set, and both are correct sentences
+         this check would otherwise have fired on. A roster of two would be a
+         deprecation event that gets read rather than quietly updated. */
       else if (/\b(all|the|in|across|on)\s+(all\s+)?(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(apps|projects|agents|tools|copies|schemas|subdomains|domains|tables)\b/i.test(line))
         hits.push(`${rel}:${i + 1} names a roster count`);
+      else {
+        const words = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+        const m = line.match(/\b(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(apps|app agents|Vercel projects)\b/i);
+        const n = m ? (words[m[1].toLowerCase()] ?? Number(m[1])) : null;
+        if (n !== null && n >= 3 && n !== APPS.length)
+          hits.push(`${rel}:${i + 1} says "${m[1]} ${m[2]}"; apps/ holds ${APPS.length}`);
+      }
     });
   }
   add("no computable facts written as prose", hits.length === 0 ? "ok" : "warn",
     hits.length === 0 ? "no test counts or commit SHAs in prose" : hits.join("; "));
+}
+
+/* ── Ledger numbers are permanent ─────────────────────────────────────────
+   Numbers used to be positional: close an item and everything below shifted
+   up on the next write. On 2026-09-19 that happened four times in one day and
+   broke a parked row's cross-reference, three numbers in the TD's handoff, a
+   DECISIONS.md entry, and live references in two agents' branches — every one
+   of them pointing confidently at the wrong item rather than at nothing.
+
+   So a number now belongs to its item for good. Closing one leaves a gap, and
+   `Next number` in the ledger header is the high-water mark a new item takes.
+   This fails rather than warns: a silently reused number is the exact failure
+   the # column exists to prevent, and it is invisible in a diff. */
+{
+  const rel = ".claude/OPEN-ITEMS.md";
+  const text = read(R(rel));
+  if (text === null) {
+    add("ledger numbers are permanent", "fail", `${rel} is missing`);
+  } else {
+    const declared = text.match(/\*\*Next number:\s*(\d+)\.?\*\*/);
+    const nums = [...text.matchAll(/^(\d+)\. \*\*/gm)].map((m) => Number(m[1]));
+    const problems = [];
+
+    if (!declared) problems.push("header declares no `Next number:`");
+    const next = declared ? Number(declared[1]) : null;
+
+    const seen = new Set();
+    for (const n of nums) {
+      if (seen.has(n)) problems.push(`item ${n} appears twice`);
+      seen.add(n);
+    }
+    /* Ascending is measured WITHIN a section, never across the file — and the
+       difference is not cosmetic. The ledger groups by who is blocked (Blocking
+       everything else, Waiting on Joel, Waiting on an agent, Parked), while a
+       new item always takes the highest number there has ever been. Those two
+       rules point opposite ways: item 15 arriving in `Waiting on Joel` sits
+       above item 2 in `Waiting on an agent`, and a whole-file ascending rule
+       calls that correct file a failure.
+
+       It did. This check shipped on 2026-09-19 reading the file as one list, and
+       the first item added under it — 15, the morning after — tripped it. A
+       check that fails the next legitimate edit is worse than no check, because
+       the way past it is to renumber, which is the exact thing it exists to
+       stop. Within a section the rule still catches a row dropped in the wrong
+       place, and the baseline comparison below is what actually catches a
+       renumber. */
+    let section = "(before any heading)";
+    let prev = null;
+    for (const line of text.split("\n")) {
+      const h = line.match(/^## +(.+?)\s*$/);
+      if (h) { section = h[1]; prev = null; continue; }
+      const it = line.match(/^(\d+)\. \*\*/);
+      if (!it) continue;
+      const n = Number(it[1]);
+      if (prev !== null && n <= prev) problems.push(`item ${n} follows ${prev} under "${section}"`);
+      prev = n;
+    }
+    if (next !== null) {
+      const over = nums.filter((n) => n >= next);
+      if (over.length) problems.push(`${over.join(", ")} at or above Next number ${next} — bump the header when you add an item`);
+    }
+
+    /* The three rules above catch a duplicate, a missing header and a number
+       reaching into reserved space. They do NOT catch the failure this check
+       exists for: renumbering 1..N after a close produces a sequence that is
+       ascending, unique and inside the header — and every reference to the
+       items below the closed one is now wrong. The only way to see it is to
+       compare against what the numbers were, so that is what this does. */
+    const baseline = git("show", "origin/main:" + rel);
+    const titles = (t) =>
+      new Map([...t.matchAll(/^(\d+)\. \*\*(.+?)\*\*/gm)].map((m) => [m[2], Number(m[1])]));
+    if (baseline) {
+      const before = titles(baseline);
+      const moved = [];
+      for (const [title, n] of titles(text)) {
+        const was = before.get(title);
+        if (was !== undefined && was !== n) moved.push(`"${title.slice(0, 44)}" was ${was}, now ${n}`);
+      }
+      if (moved.length) problems.push(`items renumbered against origin/main: ${moved.join("; ")}`);
+    }
+
+    const checked = baseline ? "against origin/main" : "no origin/main to compare, numbering shape only";
+    add("ledger numbers are permanent", problems.length === 0 ? "ok" : "fail",
+      problems.length === 0
+        ? `${nums.length} items, ascending, all below Next number ${next} — ${checked}`
+        : problems.join("; "));
+  }
 }
 
 /* ── Output ──────────────────────────────────────────────────────────────── */

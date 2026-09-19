@@ -665,7 +665,10 @@ a.slot:hover {
 /* The livery control sits at the far end of the topbar, opposite the brand.
    An auto margin rather than space-between, because the badge and the text
    beside it are a single group and must stay tight to each other. */
-.topbar-brand > .pd-theme {
+/* The livery is the element that has to reach the bar's right edge, because it
+   is the one that lines up with the same badge on a framed tool's bar. The
+   switch sits with the brand instead and takes no auto margin. */
+.topbar-brand > .pd-theme-id {
   margin-left: auto;
 }
 
@@ -754,7 +757,6 @@ a.slot:hover {
 
 .tab-density.active { color: var(--paper); background: var(--ink); border-color: var(--ink); }
 
-.tab-empty { max-width: 60ch; }
 
 .paper { display: flex; flex-direction: column; gap: 18px; max-width: 80ch; }
 

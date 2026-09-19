@@ -93,6 +93,6 @@ One login covers every subdomain because the session cookie is scoped to `.techp
 
 - Run `npm run build` and `npx tsc --noEmit` before you push.
 - When a change touches every app's look, it is yours — but say so in your pull request, because
-  five apps means five agents who will see it.
+  every other agent will find the result in their own app without having asked for it.
 - Prefer fixing the convention over fixing the instance. Cross-app consistency is the reason this
-  role exists separately from the five app agents.
+  role exists separately from the app agents.

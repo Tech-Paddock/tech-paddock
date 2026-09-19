@@ -222,4 +222,39 @@ cross-owner additions, so a running session cannot repair itself.
   **Vercel aliases whichever build finishes last, not whichever commit is newest** — `techpaddock.io`
   ended up on the Coffee-icon build rather than the hub change that merged after it. The fix was to
   promote the correct deployment. **The trap generalises: any two merges close together can leave an
-  app serving the older one**, silently, with CI green and the branch deleted. Now ledger item 12.
+  app serving the older one**, silently, with CI green and the branch deleted. Now ledger item 9.
+- **2026-09-19 — Ledger numbers are permanent, and closing an item leaves a gap.** They used to be
+  positional: close one and everything below shifted up on the next write. **That happened four times
+  on 2026-09-19** and broke a parked row's cross-reference, three numbers in the TD's handoff, the
+  entry directly above this one, and live references in two agents' branches — each pointing
+  confidently at the wrong item rather than at nothing, which is the failure the `#` column exists to
+  prevent. The ledger now carries `Next number:` and a new item takes it. **Numbering restarted at 15
+  because 1–14 had each meant several things that day.** `drift` fails a reuse, a duplicate, or a
+  renumber — the last by comparing titles against `origin/main`, since a tidy 1..N renumber is
+  otherwise indistinguishable from a correct file.
+- **2026-09-19 — `tp-message-editor` is paused on purpose; its `BLOCKED` deployments are not a bug.**
+  Joel paused it because he is not using the Message Editor and does not want to spend attention on
+  it. Every production deployment since reads `BLOCKED`, on every commit, so `editor.techpaddock.io`
+  serves whatever was live before the pause. **Do not investigate it and do not unpause it to make a
+  check go green.** `apps/editor` still builds in CI — the matrix comes from the folders on disk —
+  and #129 removed it from the hub's roster the same day. **Paused is reversible and deleted is
+  not**, which is the same reasoning that keeps `tp-tracker` parked.
+
+- **2026-09-19 — a `drift` check is not finished until it has failed the case it exists to catch AND
+  passed the next legitimate edit.** Two checks shipped wrong in two days. The permanent-numbers
+  check passed a clean 1..N renumber, which is ascending and unique, until a title comparison against
+  `origin/main` was added. Then it read the ledger as one list and **failed the very first item added
+  under it**, because sections group by blocker while a new number is always the highest — so 15 in
+  `Waiting on Joel` sits above 2 in `Waiting on an agent`. Ascending is now per section. **A check
+  that fails a correct edit is worse than no check**: the way past it is to renumber, which is the
+  thing it exists to prevent. The roster check had the mirror flaw — it required a determiner, so
+  "five apps means five agents" went unseen through three re-measures of the item that existed to
+  find it. It now measures the cardinal against `apps/` instead of flagging any number.
+- **2026-09-19 — Vercel project state was read wrong twice and both readings reached the repo as
+  fact. Read DEPLOYMENT STATE, never a project field.** `BLOCKED` on every commit is paused
+  (`tp-message-editor`); `READY` at `target: production` is not (`tp-tracker`, on 4133904);
+  `CANCELED` at `target: null` is `ignoreCommand` skipping a preview. `live: false` does not mean
+  paused — `tp-home` reads it while serving `techpaddock.io` — yet ledger item 11 rested on
+  "unreachable while paused". `framework: null` does not mean a broken Root Directory — `tp-health`
+  reads null, skips previews from its own `vercel.json`, builds `READY`, and serves a `verified`
+  `health.techpaddock.io`. **Health is live**, and was called unreachable for a day on that field.

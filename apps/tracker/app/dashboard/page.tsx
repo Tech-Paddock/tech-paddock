@@ -4,7 +4,7 @@ import StageSuggestions from "./StageSuggestions";
 import { links } from "@/lib/links";
 import type { Severity, TouchSource } from "@/lib/signals";
 import { LIVERY } from "@/lib/livery";
-import ThemeControl from "../ThemeControl";
+import ThemeControl, { LiveryBadge } from "../ThemeControl";
 
 export const dynamic = "force-dynamic";
 
@@ -70,14 +70,17 @@ export default async function DashboardPage() {
           <p className="text-sm text-ink-soft">
             {data.threads.length} thread{data.threads.length === 1 ? "" : "s"} tracked
           </p>
-          <ThemeControl livery={LIVERY} />
+          <ThemeControl />
         </div>
-        <Link
-          href="/"
-          className="px-3 py-2 rounded-lg border border-line bg-surface text-sm font-medium"
-        >
-          All threads →
-        </Link>
+        <div className="flex items-center gap-3">
+          <LiveryBadge livery={LIVERY} />
+          <Link
+            href="/"
+            className="px-3 py-2 rounded-lg border border-line bg-surface text-sm font-medium"
+          >
+            All threads →
+          </Link>
+        </div>
       </header>
 
       {data.degraded.length > 0 && (

@@ -67,10 +67,10 @@ are structural** — a near-black tile loses its edge on a dark wallpaper. It ha
 
 ## In flight
 
-`claude/coffee-bag-card-layout` — PR #124 open, CI green. The card rebuilt to Joel's sketch.
-`claude/coffee-roast-date-and-suggested-recipe` — **stacked on it**, so #124 merges first. Roast
-date as a field, the empty-PATCH save bug, the suggested recipe. Carries migration `20260919175624`,
-additive, riding with its code.
+`claude/coffee-roast-date-and-suggested-recipe` — pushed, CI green. Roast date as a field, the
+empty-PATCH save bug, the suggested recipe. **#124 merged at 15:26 UTC while this was being written**,
+squashed, so this branch was rebuilt from `main` rather than left stacked on history that no longer
+exists there. Carries migration `20260919175624` — additive, so it rides with its code.
 
 ## Next
 

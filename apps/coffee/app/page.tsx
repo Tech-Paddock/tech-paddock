@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { downscale } from "@/lib/image";
 import { LIVERY } from "@/lib/livery";
-import ThemeControl from "./ThemeControl";
+import ThemeControl, { LiveryBadge } from "./ThemeControl";
 import { METHOD_LABELS, type BrewMethod } from "@/lib/methods";
 import {
   percentToPpm,
@@ -139,8 +139,9 @@ export default function CoffeePage() {
       <header className="bg-bar text-bar-ink px-4 py-3 flex items-center gap-2 border-b-4 border-accent">
         <span aria-hidden>☕</span>
         <h1 className="font-semibold">Coffee</h1>
+        <ThemeControl onBar />
         <div className="ml-auto">
-          <ThemeControl livery={LIVERY} onBar />
+          <LiveryBadge livery={LIVERY} onBar />
         </div>
       </header>
 
