@@ -869,18 +869,25 @@
   flex-wrap: wrap;
 }
 
+/* Standalone since the badge was split out of ThemeControl — it is mounted
+   beside the page title now, not inside the control, so it sets its own display
+   rather than inheriting a flex context from a parent it no longer has. */
 .pd-theme-id {
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
   gap: 1px;
   line-height: 1.2;
 }
 
+/* **This has to read as an annotation to the title, not a second title.** It
+   sits inches from the app name now, so it is set smaller than the name above
+   it, and the second line is italic — one shift in size and one in style, which
+   separates it at a glance without another colour or another rule to look at. */
 .pd-livery {
   color: var(--accent);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -888,6 +895,8 @@
   color: var(--ink-soft);
   font-size: 10px;
   font-weight: 400;
+  font-style: italic;
+  letter-spacing: 0.01em;
 }
 
 /* On the inverted bar the two tokens above have nothing like enough contrast,
@@ -921,17 +930,29 @@
    most of the page. */
 [data-embedded] .pd-modes { display: none; }
 
+/* The buttons hold a drawn mark rather than a word since 2026-09-19. The
+   padding went square with it: "Light" and "Dark" needed width and a 14px
+   square does not, and a pill whose two halves are the width of their old
+   labels reads as a mis-set control once the labels are gone. */
 .pd-modes button {
   appearance: none;
   background: transparent;
   border: 0;
   cursor: pointer;
-  padding: 4px 11px;
+  padding: 5px 9px;
   font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
   color: var(--ink-soft);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Sized here rather than on the SVG so the two marks cannot drift apart, and
+   `block` because an inline SVG otherwise sits on the text baseline and leaves
+   a few pixels of descender space under it inside the pill. */
+.pd-modes button svg {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 .pd-on-bar .pd-modes button { color: rgb(var(--bar-ink-rgb) / 0.75); }

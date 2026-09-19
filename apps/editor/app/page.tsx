@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { LIVERY } from "@/lib/livery";
-import ThemeControl from "./ThemeControl";
+import ThemeControl, { LiveryBadge } from "./ThemeControl";
 
 type Contact = {
   id: string;
@@ -287,25 +287,28 @@ function DraftShell() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold">Message Editor</h1>
-          <ThemeControl livery={LIVERY} />
+          <ThemeControl />
         </div>
-        <div className="flex gap-1 bg-surface border border-line rounded-lg p-1">
-          <button
-            onClick={() => setMode("draft")}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-              mode === "draft" ? "bg-accent text-accent-ink" : "text-ink/70"
-            }`}
-          >
-            Draft
-          </button>
-          <button
-            onClick={() => setMode("train")}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-              mode === "train" ? "bg-accent text-accent-ink" : "text-ink/70"
-            }`}
-          >
-            Train
-          </button>
+        <div className="flex items-center gap-3">
+          <LiveryBadge livery={LIVERY} />
+          <div className="flex gap-1 bg-surface border border-line rounded-lg p-1">
+            <button
+              onClick={() => setMode("draft")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                mode === "draft" ? "bg-accent text-accent-ink" : "text-ink/70"
+              }`}
+            >
+              Draft
+            </button>
+            <button
+              onClick={() => setMode("train")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium ${
+                mode === "train" ? "bg-accent text-accent-ink" : "text-ink/70"
+              }`}
+            >
+              Train
+            </button>
+          </div>
         </div>
       </header>
 
