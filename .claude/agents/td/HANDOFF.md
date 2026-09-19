@@ -9,8 +9,10 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 ## In flight
 
 **`claude/platform-retire-two-agents` is mine** — Joel retired Platform Config and Pipeline Tracker
-on 2026-09-19. **Six agents now**, and `apps/tracker` is TechPad Gen's. **Check the open list live
-before assuming it is empty** — it went from one to seven in twenty minutes that day.
+on 2026-09-19. **Six agents now**, and `apps/tracker` is TechPad Gen's. It landed on top of a
+seven-merge close-out run (#138–#144) that **a second TD session ran the same evening**. **Two
+sessions in this seat at once is the trap**: `main` moved seven commits under this branch, and both
+retired agents shipped work after the branch was cut. Re-read `main` before trusting a base.
 
 ## What is true now
 
@@ -76,5 +78,3 @@ unwritten** — item 7; its mockups are a canvas artifact, so the guide must car
 its URL publishes a duplicate. **You are the rollup.** Joel, 2026-09-19: **a merge refreshes the
 merged agent's board too** — not in `CLAUDE.md` yet. **Their DevOps row and a dated TD banner only**;
 their Brief and Items stay theirs. **`On track` is item 3**, deploy trigger still unsolved.
-
-Everything else waiting is in the ledger, which the `SessionStart` hook prints for you.

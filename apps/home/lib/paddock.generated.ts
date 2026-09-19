@@ -5,7 +5,7 @@ export type BakedItem = { state: "box" | "clear"; title: string; detail: string;
 export type BakedAgent = { id: string; name: string; asOf: string | null };
 
 export const PADDOCK = {
-  bakedAt: "2026-09-19T22:13:41.008Z",
+  bakedAt: "2026-09-19T22:19:36.614Z",
   waiting: [
   {
     "title": "Pick how the login lockout gets fixed — the obvious fix is the wrong shape",
@@ -24,12 +24,24 @@ export const PADDOCK = {
     "detail": "*Owner: Joel.* CLAUDE.md and platform/RULES.md both carry a Vercel-project table; Health reached only the first, so the charter listed five projects against six on disk. Both corrected. The fix is deleting the charter's copy and linking CLA",
     "ref": "—",
     "state": "box"
+  },
+  {
+    "title": "`tp-message-editor` refuses every deployment, so `editor.techpaddock.io` is frozen",
+    "detail": "*Owner: Joel.* Measured 2026-09-19: every deployment returns BLOCKED, production included, so every merge since has silently never reached it. Deliberate, or unblock it? *LoE: minutes.*",
+    "ref": "—",
+    "state": "box"
+  },
+  {
+    "title": "`DECISIONS.md` is full — 260 of its 260 lines",
+    "detail": "*Owner: Joel.* Append-only with no trimming rule, so the next settled call has nowhere to go. Raise the ceiling, do not trim. *LoE: minutes.*",
+    "ref": "—",
+    "state": "box"
   }
 ] as BakedItem[],
   parked: [
   {
     "title": "`CRON_SECRET` and the Microsoft Graph integration",
-    "detail": "Parked 2026-09-15. Why parking is safe: tracker's middleware.ts waves /api/cron/* past the password gate and the route's guard reads if (secret && …), so an unset CRON_SECRET skips the check and the endpoint is public and reachable right no",
+    "detail": "Parked 2026-09-15. *Owner: TechPad Gen as of 2026-09-19*, with the tracker. #144 closed the guard, so /api/cron/* answers 401 on an unset secret instead of admitting everyone — the ordering this row was written around has stopped being load",
     "ref": "—",
     "state": "clear"
   }
@@ -48,7 +60,7 @@ export const PADDOCK = {
   {
     "id": "message-editor",
     "name": "Message Editor",
-    "asOf": "2026-09-16"
+    "asOf": "2026-09-19"
   },
   {
     "id": "resume",

@@ -6,7 +6,7 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-19T22:13:41.223Z",
+  "generatedAt": "2026-09-19T22:19:37.011Z",
   "complete": true,
   "reason": "",
   "checks": [
@@ -53,17 +53,17 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/agents/coffee/HANDOFF.md",
       "state": "warn",
-      "detail": "80 / 80"
+      "detail": "79 / 80"
     },
     {
       "name": "budget: .claude/agents/health/HANDOFF.md",
       "state": "warn",
-      "detail": "80 / 80"
+      "detail": "79 / 80"
     },
     {
       "name": "budget: .claude/agents/message-editor/HANDOFF.md",
       "state": "ok",
-      "detail": "61 / 80"
+      "detail": "69 / 80"
     },
     {
       "name": "budget: .claude/agents/resume/HANDOFF.md",
@@ -73,7 +73,7 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/agents/td/HANDOFF.md",
       "state": "warn",
-      "detail": "79 / 80"
+      "detail": "80 / 80"
     },
     {
       "name": "budget: .claude/agents/techpad-gen/HANDOFF.md",
@@ -83,7 +83,7 @@ export const DRIFT: Drift = {
     {
       "name": "budget: .claude/OPEN-ITEMS.md",
       "state": "warn",
-      "detail": "78 / 80"
+      "detail": "79 / 80"
     },
     {
       "name": "budget: .claude/DECISIONS.md",
@@ -102,8 +102,8 @@ export const DRIFT: Drift = {
     },
     {
       "name": "fresh: message-editor",
-      "state": "warn",
-      "detail": "says 2026-09-16; apps/editor last changed 2026-09-19"
+      "state": "ok",
+      "detail": "2026-09-19, current with apps/editor"
     },
     {
       "name": "fresh: resume",
@@ -128,7 +128,7 @@ export const DRIFT: Drift = {
     {
       "name": "migration versions named in prose exist",
       "state": "ok",
-      "detail": "16 migrations, every reference resolves"
+      "detail": "18 migrations, every reference resolves"
     },
     {
       "name": "worklogs stay retired",
@@ -148,12 +148,12 @@ export const DRIFT: Drift = {
     {
       "name": "ledger numbers are permanent",
       "state": "ok",
-      "detail": "9 items, ascending, all below Next number 17 — against origin/main"
+      "detail": "11 items, ascending, all below Next number 19 — against origin/main"
     }
   ],
   "counts": {
-    "ok": 19,
-    "warn": 9,
+    "ok": 20,
+    "warn": 8,
     "fail": 0
   }
 };

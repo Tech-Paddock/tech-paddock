@@ -49,6 +49,18 @@ schema. What it owned was knowledge, and these are the parts that bite:
   looks like a credentials problem. Read `supabase/README.md` before writing either migration.
 - **`supabase db push` cannot work here and never will** — see `.claude/DECISIONS.md`.
 
+**Measured 2026-09-19, and recorded here because the handoff that held it is gone:**
+
+- **DNS is uniform and the apex is deliberately different.** Every subdomain is a CNAME to
+  `d1317e1174061c29.vercel-dns-017.com`; the apex stays an A record at `76.76.21.21` because an apex
+  cannot be a CNAME. **That is correct, not a leftover** — do not "fix" it.
+- **`SESSION_SECRET` cannot be read back out of the Vercel dashboard**, so parity across projects
+  cannot be confirmed by inspection. Setting one fresh known value on every project and **then
+  redeploying** is the only way to know they match.
+- **`HEAD^..HEAD` in each `ignoreCommand` is correct because this repo squash-merges** — one merge
+  is one commit, so that range is the whole change. This reverses an older argument for
+  `VERCEL_GIT_PREVIOUS_SHA`, which was reasoning about a history this repo does not have.
+
 **What still needs Joel and has no undo:** creating or deleting a Vercel project, adding or removing
 a domain, changing a DNS record, and the exposed-schemas setting.
 

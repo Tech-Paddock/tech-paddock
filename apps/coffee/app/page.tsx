@@ -27,7 +27,10 @@ import {
   type MyBrewer,
 } from "@/lib/brewers";
 import type { Guide, GuideStatus } from "@/lib/guide";
-import { guidePresentation } from "@/lib/guideDisplay";
+import { guidePresentation, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
+import type { Suggestion } from "@/lib/suggestion";
+import { parseLabelDate } from "@/lib/dates";
+import { changedFields, hasChanges, missingRequired } from "@/lib/patch";
 import { MODEL_LABELS, DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT, effortsFor, isEffortFor, type SearchModel } from "@/lib/models";
 
 type Identity = {
@@ -57,6 +60,10 @@ type Bag = Identity & {
   guide_model: string | null;
   guide_effort: string | null;
   guide_search_error: string | null;
+  // Claude's own, for a bag whose roaster published none. Deliberately not a
+  // guide_* value and never rendered as one.
+  suggested_recipe: Suggestion | null;
+  suggested_error: string | null;
   my_notes: string | null;
   purchased_date: string | null;
   created_at: string;
@@ -180,7 +187,15 @@ function Scan({ onSaved }: { onSaved: () => void }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [guide, setGuide] = useState<Guide | null>(null);
-  const [purchased, setPurchased] = useState("");
+  // The row as it was last read back. The review screen edits against it
+  // rather than against blanks, so "save" can tell a field that was changed
+  // from one that was simply left alone.
+  const [saved, setSaved] = useState<Bag | null>(null);
+  const [purchase, setPurchase] = useState({ purchased_date: "", roast_date: "" });
+  // What the label said where it could not be read as a date. Shown beside the
+  // empty field, because a roast date nobody printed and one nobody could
+  // parse are the same empty box and only one of them is an answer.
+  const [labelRoastDate, setLabelRoastDate] = useState<string | null>(null);
   const [stage, setStage] = useState<"idle" | "reading" | "confirm" | "searching" | "review" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
   const [previous, setPrevious] = useState<PreviousBag | null>(null);
@@ -244,6 +259,11 @@ function Scan({ onSaved }: { onSaved: () => void }) {
 
       const id = data.bag.id as string;
       setBagId(id);
+      setSaved(data.bag as Bag);
+      setPurchase({
+        purchased_date: (data.bag.purchased_date as string) ?? "",
+        roast_date: (data.bag.roast_date as string) ?? "",
+      });
 
       // Fired, not awaited. This request routinely outlives the page's
       // patience, and its answer is read back off the row instead.
@@ -285,6 +305,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
       const res = await fetch(`/api/bags/${bagId}`);
       if (!res.ok) return;
       const bag = (await res.json()).bag as Bag;
+      setSaved(bag);
 
       if (bag.guide_search_error) {
         setError(bag.guide_search_error);
@@ -307,15 +328,40 @@ function Scan({ onSaved }: { onSaved: () => void }) {
   // until the brew form can take it directly.
   async function save() {
     if (!bagId) return;
+
+    // A bag is a purchase, so it needs the date you bought it. This is the
+    // field that produced the original bug: leaving it alone sent an empty
+    // patch, the route correctly refused it, and the page reported
+    // **"Couldn't save that bag"** about a bag that had been in the library
+    // for minutes. Naming the field is Joel's call over closing quietly —
+    // an error you can act on beats both the old message and no message.
+    const missing = missingRequired(purchase);
+    if (missing) {
+      setError(missing);
+      return;
+    }
+
+    // Past that, nothing to change is still not a failure. The row exists and
+    // the request simply is not made.
+    const patch = changedFields(
+      { purchased_date: saved?.purchased_date ?? "", roast_date: saved?.roast_date ?? "" },
+      purchase
+    );
+    if (!hasChanges(patch)) {
+      onSaved();
+      return;
+    }
+
     setStage("saving");
     setError(null);
     try {
-      // The row already exists — this only records the dial-in. The guide on
-      // it was written by the search and is not editable here by design.
+      // The guide on the row was written by the search and is not editable
+      // here by design. What is editable is the purchase: when you bought it,
+      // and the roast date if the label's version of one could not be read.
       const res = await fetch(`/api/bags/${bagId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...(purchased ? { purchased_date: purchased } : {}) }),
+        body: JSON.stringify(patch),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Couldn't save that bag.");
@@ -392,15 +438,41 @@ function Scan({ onSaved }: { onSaved: () => void }) {
           </p>
         )}
         {identity &&
-          (Object.keys(EMPTY) as (keyof Identity)[]).map((key) => (
-            <Field
-              key={key}
-              label={key.replace("_", " ")}
-              value={identity[key] ?? ""}
+          (Object.keys(EMPTY) as (keyof Identity)[])
+            // roast_date is rendered below as a date, not as text. It is the
+            // one identity field with a date column behind it.
+            .filter((key) => key !== "roast_date")
+            .map((key) => (
+              <Field
+                key={key}
+                label={key.replace("_", " ")}
+                value={identity[key] ?? ""}
+                disabled={stage !== "confirm"}
+                onChange={(v) => setIdentity({ ...identity, [key]: v })}
+              />
+            ))}
+
+        {identity && (
+          <label className="text-sm text-ink/70 flex flex-col gap-1">
+            roast date
+            <input
+              type="date"
+              value={identity.roast_date ?? ""}
               disabled={stage !== "confirm"}
-              onChange={(v) => setIdentity({ ...identity, [key]: v })}
+              onChange={(e) => setIdentity({ ...identity, roast_date: e.target.value })}
+              className="border border-line rounded-lg px-3 py-2 bg-surface disabled:opacity-60"
             />
-          ))}
+            {labelRoastDate && (
+              // Said, but not readable as one date. Naming it is the whole
+              // point: an empty box here otherwise reads as a bag that did not
+              // print a roast date at all.
+              <span className="text-xs text-ink-soft">
+                The label says <strong>{labelRoastDate}</strong>, which could be more than one date. Type the one
+                you read.
+              </span>
+            )}
+          </label>
+        )}
       </section>
 
       {stage === "confirm" && (
@@ -481,8 +553,17 @@ function Scan({ onSaved }: { onSaved: () => void }) {
             Purchased
             <input
               type="date"
-              value={purchased}
-              onChange={(e) => setPurchased(e.target.value)}
+              value={purchase.purchased_date}
+              onChange={(e) => setPurchase({ ...purchase, purchased_date: e.target.value })}
+              className="border border-line rounded-lg px-3 py-2 bg-surface"
+            />
+          </label>
+          <label className="text-sm text-ink/70 flex flex-col gap-1">
+            Roasted
+            <input
+              type="date"
+              value={purchase.roast_date}
+              onChange={(e) => setPurchase({ ...purchase, roast_date: e.target.value })}
               className="border border-line rounded-lg px-3 py-2 bg-surface"
             />
           </label>
@@ -591,6 +672,7 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
   const [brewCount, setBrewCount] = useState<number | null>(null);
   const [draft, setDraft] = useState({
     purchased_date: bag.purchased_date ?? "",
+    roast_date: bag.roast_date ?? "",
     my_notes: bag.my_notes ?? "",
   });
 
@@ -612,13 +694,45 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
   }
 
   async function save() {
+    // The same requirement as the review screen, in the other place a bag is
+    // edited. A rule that holds on one screen and not the other is a rule you
+    // find out about by accident.
+    const missing = missingRequired(draft);
+    if (missing) {
+      setError(missing);
+      return;
+    }
+
+    // Only what moved, and nothing at all when nothing did. This card posted
+    // every field it rendered, which worked because it always rendered at
+    // least one non-empty one — but it means a field another screen wrote
+    // while this card sat open would be posted back over.
+    const patch = changedFields(
+      { purchased_date: bag.purchased_date, roast_date: bag.roast_date, my_notes: bag.my_notes },
+      draft
+    );
+    if (!hasChanges(patch)) {
+      setOpen(false);
+      return;
+    }
+
     setSaving(true);
-    await fetch(`/api/bags/${bag.id}`, {
+    setError(null);
+    const res = await fetch(`/api/bags/${bag.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(draft),
+      body: JSON.stringify(patch),
     });
     setSaving(false);
+
+    // A save that failed used to close the card as though it had worked. The
+    // next render read the row back and quietly showed the old values.
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? "Couldn't save that bag.");
+      return;
+    }
+
     setOpen(false);
     onChanged();
   }
@@ -692,6 +806,18 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
                 className="border border-line rounded-lg px-3 py-2 bg-surface"
               />
             </label>
+            {/* Editable here because it is the bag's, not the roaster's: it is
+                read off a label by a model told to report only what is legible,
+                so a smudged or oddly printed one has to be typeable later. */}
+            <label className="text-sm text-ink/70 flex flex-col gap-1">
+              Roasted
+              <input
+                type="date"
+                value={draft.roast_date}
+                onChange={(e) => setDraft({ ...draft, roast_date: e.target.value })}
+                className="border border-line rounded-lg px-3 py-2 bg-surface"
+              />
+            </label>
             <label className="text-sm text-ink/70 flex flex-col gap-1">
               Brew Notes
               <textarea
@@ -737,6 +863,11 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
                 <p className="text-sm text-ink/60">Nothing recorded from the roaster.</p>
               )}
             </div>
+
+            {/* Only where the roaster published nothing. A tier-2 house guide
+                is a recipe that was found, and suggesting over it would bury
+                the thing this app exists to retrieve. */}
+            {bag.guide_status === "none" && <SuggestedRecipe bag={bag} onChanged={onChanged} />}
           </section>
 
           {error && (
@@ -1153,6 +1284,100 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
 // }
 
 /** One section's name, in the same voice everywhere the card uses one. */
+/**
+ * Claude's own recipe, for a bag whose roaster published none.
+ *
+ * Everything about how this renders is about keeping it distinguishable from
+ * the block above it. The tier light stays **No Recipe Found**, because that
+ * is still the true answer to what the roaster said. This card carries no tier
+ * colour, sits inside a dashed border rather than the solid one the roaster's
+ * values get, says Claude in its heading, and names the model and the day it
+ * was generated underneath.
+ *
+ * None of that is decoration. `RULES.md` §1 refuses an invented recipe in the
+ * `guide_*` columns and still does — this is a different column, and the only
+ * way it could damage the rule is by coming to look like the other block.
+ * The wording lives in `lib/guideDisplay.ts` with a test that holds it to it.
+ */
+function SuggestedRecipe({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const suggestion = bag.suggested_recipe;
+
+  async function ask() {
+    setAsking(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/bags/${bag.id}/suggest`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Couldn't get a suggestion.");
+      onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't get a suggestion.");
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  const rows = suggestion
+    ? ([
+        ["Method", suggestion.method ? METHOD_LABELS[suggestion.method] : null],
+        ["Ratio", suggestion.params.ratio],
+        ["Dose", suggestion.params.dose],
+        ["Water", suggestion.params.water],
+        ["Temp", suggestion.params.temp],
+        ["Grind", suggestion.params.grind],
+        ["Time", suggestion.params.time],
+      ].filter(([, v]) => v) as [string, string][])
+    : [];
+
+  return (
+    <div className="border border-dashed border-line rounded-xl p-3 flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span aria-hidden className={`w-2.5 h-2.5 rounded-full ${SUGGESTION_PRESENTATION.dot}`} />
+        <h4 className="text-sm font-semibold">{SUGGESTION_PRESENTATION.label}</h4>
+      </div>
+
+      {suggestion ? (
+        <>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+            {rows.map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt className="text-ink/60">{k}</dt>
+                <dd>{v}</dd>
+              </div>
+            ))}
+          </dl>
+          {suggestion.rationale && <p className="text-sm text-ink/70">{suggestion.rationale}</p>}
+          <p className="text-xs text-ink-soft">
+            {SUGGESTION_PRESENTATION.note}{" "}
+            {MODEL_LABELS[suggestion.model as SearchModel] ?? suggestion.model}, {" "}
+            {new Date(suggestion.generated_at).toLocaleDateString()}.
+          </p>
+        </>
+      ) : (
+        <p className="text-xs text-ink-soft">{SUGGESTION_PRESENTATION.note}</p>
+      )}
+
+      {/* The stored failure and this session's failure are different things
+          and both are worth seeing: one says the automatic attempt after the
+          search failed, the other that the button just did. */}
+      {bag.suggested_error && !suggestion && (
+        <p className="text-xs text-urgent">Last attempt failed: {bag.suggested_error}</p>
+      )}
+      {error && <p className="text-xs text-urgent">{error}</p>}
+
+      <button
+        onClick={() => void ask()}
+        disabled={asking}
+        className="self-start border border-line rounded-lg px-3 py-1.5 text-sm disabled:opacity-60"
+      >
+        {asking ? "Asking Claude…" : suggestion ? "Ask again" : "Ask Claude for a starting point"}
+      </button>
+    </div>
+  );
+}
+
 function SectionHead({ children }: { children: React.ReactNode }) {
   return (
     <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-soft">{children}</h3>

@@ -114,6 +114,17 @@ tracker's `middleware.ts` and its guard fails **open** when `CRON_SECRET` is uns
 and the one-line fix is now yours rather than the retired agent's. And Microsoft Graph is
 unconfigured; the ordering rule in item 11 is not optional if it is ever turned on.
 
+**The daily sweep's guard fails closed as of #144**, which landed the same day the agent retired.
+`/api/cron/stale-tasks` read `if (secret && …)`, so an unset `CRON_SECRET` skipped the check
+entirely; it now reads `if (!secret || …)` and answers 401, byte-identically whether the secret is
+unset or merely wrong. **What that changed is the cost of un-parking item 11**: the ordering is no
+longer load-bearing for safety, and what replaced it is a plain requirement — **`CRON_SECRET` must
+be set or the sweep does not run at all.**
+
+**Microsoft Graph is built and inert.** `MS_GRAPH_CLIENT_ID`, `MS_GRAPH_CLIENT_SECRET` and
+`MS_GRAPH_REFRESH_TOKEN` are unset, so the calendar, To Do and the sweep all degrade quietly.
+**Nothing will tell you they are doing nothing.**
+
 **The `tracker` Postgres schema and `tracker.pipeline_threads` are described by their migrations**
 in `supabase/`, which is where that detail is measured rather than restated.
 
