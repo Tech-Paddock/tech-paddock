@@ -52,9 +52,6 @@ Nothing.
    verb around a long page; app is one screen, thumb-first, no index. Mockups exist. **It is settled
    at standup**, so `STANDUP.md` gains surface beside the name and the schema. *LoE: a session.*
 
-8. **No app sets `nosniff` or `Referrer-Policy`, and the hub sends no `frame-ancestors`.**
-   *Owner: TD.* `apps/home/next.config.mjs` is empty, so `techpaddock.io` can be framed. *LoE: minutes.*
-
 9. **Every merge rebuilds every app, and the last build to finish wins the domain.**
    *Owner: TD.* `ignoreCommand` in each `vercel.json` reads *skip previews, build everything else* —
    it cannot see which folder changed. On 2026-09-18 three merges four minutes apart left
