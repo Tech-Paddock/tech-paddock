@@ -17,8 +17,18 @@ export const dynamic = "force-dynamic";
  * quiet again after being worked gets a fresh task next time round.
  */
 export async function GET(request: NextRequest) {
+  // This guard fails closed: an unset CRON_SECRET rejects every caller rather
+  // than admitting all of them. `middleware.ts` waves `/api/cron/*` past the
+  // password gate, so this is the only thing standing in front of the route,
+  // and it used to read `if (secret && ...)` — which made the endpoint public
+  // whenever the variable was missing. That was harmless only because
+  // `graphConfigured()` below returned early, so the safety of an auth check
+  // rested on an unrelated feature flag staying unset.
+  //
+  // The response is byte-identical whether the secret is unset or merely wrong,
+  // so an unauthenticated caller cannot learn which it is.
   const secret = process.env.CRON_SECRET;
-  if (secret && request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

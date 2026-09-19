@@ -7,8 +7,15 @@
  * shape for the theme — "duplicate the pattern locally, name it in your pull
  * request, and let them decide later whether it becomes shared" — and the
  * technical director confirmed in issue #116 that the principle is not
- * theme-specific. Ledger item 8, `packages/shared`, is where the real fix lives;
- * Health being the second copy is the strongest argument that item has.
+ * theme-specific. **The `packages/shared` work on the ledger is where the real
+ * fix lives**, and Health being the second copy is the strongest argument that
+ * item has.
+ *
+ * Deliberately named rather than numbered. This comment cited a ledger item
+ * number, which was right when written and wrong within the hour — the ledger
+ * renumbered four times on 2026-09-19. Writing today's number here would repeat
+ * the mistake in a comment complaining about it, so the work is named and the
+ * ledger is left to say where it sits.
  *
  * It is a registry rather than a list of names because the models do not take
  * the same request: the web tool versions differ between them, so a bare model
