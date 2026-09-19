@@ -11,17 +11,16 @@ Read `RULES.md` first. This file is only what is true right now.
 **It is live at `coffee.techpaddock.io`**, behind the password gate, installed to the iPhone home
 screen and confirmed on a phone. The whole flow has run end to end against a real bag.
 
-**Save comes before the search**, and the page polls the row rather than waiting on a response: the
-search takes minutes with nothing on the connection, so a phone concludes the request is dead. Two
-correct answers were lost that way on the first live run. Reasoning in `RULES.md`.
+**Save comes before the search**, and the page polls the row rather than waiting: the search takes
+minutes with nothing on the connection, so a phone calls it dead. Two answers were lost that way.
 
-**The search is a comparison harness.** Model and effort are selectable and recorded on the bag; a
-weaker model is safe because `validateGuide` enforces quote-backing in code, so it can only fail to
-find one, never invent one. `lib/models.ts` is a registry: each model/effort mismatch is a 400.
+**The search is a comparison harness.** Model and effort are selectable and recorded; a weaker model
+is safe because `validateGuide` enforces quote-backing in code. `lib/models.ts` is a registry: each
+model/effort mismatch is a 400, not a degraded result.
 
-**A bag is a purchase; a brew is one attempt at it.** One set of columns on the bag could only hold
-the last thing you tried. `extraction_yield` is generated and ppm is never stored, both to stop one
-measurement being written twice. **Adding a field? Measurement, or function of measurements?**
+**A bag is a purchase; a brew is one attempt at it.** `extraction_yield` is generated and ppm never
+stored, both to stop one measurement being written twice. **Adding a field? Measurement, or function
+of measurements?**
 
 **The brew form works in dose, ratio and water, and any two give the third.** Changing the dose holds
 the ratio and moves the water; typing water re-derives the ratio. **The ratio has no column** — it is
@@ -32,41 +31,43 @@ water over dose, derived in `lib/brews.ts` and dropped before the POST. `water_g
 brewer, method, grinder, grind setting, dose, water, ratio — and your last brew wins field by field:
 their number is where your dial-in started, not an instruction. No reading carries. `openingBrew`.
 
-**Beverage mass, TDS and the extraction read-out are commented out in the form**, not deleted. The
-columns, the generated yield and their tests are untouched; uncommenting two blocks puts it back.
+**Beverage mass, TDS and the extraction read-out are commented out in the form**, not deleted;
+uncommenting two blocks puts them back, columns and tests untouched.
 
 **The bag pill carries "Beans ↗"** as a *sibling* of the expand toggle, never nested: an `<a>` inside
 a `<button>` is invalid markup and browsers disagree about what a tap does. Keep them siblings.
 
-**The roaster's quote sits above the parsed recipe**, in both cards: the parse is a reading of it.
+**The guide tier is a three-state indicator** — green Found, amber Non-Specific, red No Recipe —
+expanding to the roaster's quote. Wording is in `lib/guideDisplay.ts`, apart from `lib/guide.ts` so
+presentation cannot reach validation. **The bag card is three sections**: This bag, Recipe, Brews,
+Save and Delete inline between the last two, the delete confirm replacing that whole row.
 
-**The icon is a pour-over in the JPS livery**, every colour a token from `theme.css`'s `jps` block.
-**Its two gold rules are structural:** a near-black tile loses its edge on a dark wallpaper and the
-phone runs dark. Source and re-render recipe are in `apps/coffee/design/`, kept out of `app/` where
-a folder is a route. The PNG has **no alpha** — iOS composites one onto black.
+**The icon is a pour-over in the JPS livery**, every colour a `theme.css` token. **Its two gold rules
+are structural:** a near-black tile loses its edge on a dark wallpaper. Source and re-render recipe
+in `apps/coffee/design/`, kept out of `app/` where a folder is a route. The PNG has **no alpha**.
 
 ## Traps specific to this app
 
-- **An empty result and an unread result must not render the same.** Three times in this one app —
-  `findPreviousBag`, `findRoasterDomain`, the library loader — a failure rendered as a plausible
-  empty answer. Both lookups now throw `LookupError`. **Adding a read path here? Check this first.**
+- **An empty result and an unread result must not render the same.** Three times in this one app a
+  failure rendered as a plausible empty answer. **Adding a read path here? Check this first.**
 - **The search step cannot be exercised from a Claude Code sandbox** — roaster domains are blocked by
   the egress proxy. Tests cover validation against recorded response shapes. **Do not conclude the
   feature works because the tests pass**; it has to be verified on a deploy preview with a real bag.
 - **Two brewer vocabularies, and `myBrewerFor` crosses only on an exact match.** A bare "V60" does
-  not map: two are on the shelf and the roaster did not say which. Rounding to the nearest one, on
-  the roaster's authority, is the invention this tool refuses about brewing parameters.
+  not map: two are on the shelf and the roaster did not say which. Rounding is the same invention.
 - **An installed app has its own cookie jar**, so signing in inside it is expected, not a session bug.
 - **The icon is a static import**, served from `/_next/static` — the one prefix the middleware
   matcher excludes. Next's `app/apple-icon.png` convention is gated; iOS would take the login page.
 - **`guide_status` records where instructions were read, not who they were written for.** Sweet
-  Bloom's bag is tier 1 because 1:17 was read on its product page — and that is the recipe they print
-  on every product page. Nothing should rank, filter or quote on the strength of tier 1.
+  Bloom print the same recipe on every product page. Nothing should rank or filter on tier 1.
 
 ## In flight
 
-Nothing. #117 merged the icon and #114 the ratio/water form, so everything described above is on
-`main` and live.
+`claude/coffee-bag-card-layout` — pushed, CI green, no PR yet. The bag card rebuilt to Joel's sketch.
+**#121 is open** and touches this same handoff; whichever merges second resolves one conflict.
+
+**One item of that sketch is deliberately unbuilt**: generating a recipe when the roaster published
+none. It contradicts `RULES.md` §1 and needs a schema decision, so it went to Joel.
 
 ## Next
 
@@ -74,7 +75,6 @@ Nothing. #117 merged the icon and #114 the ratio/water form, so everything descr
    reports. The open question the harness was built to answer, and nothing in the repo can answer it.
 2. **Expect `normalizeMethod` to need alias tuning** once there are real guides. The vocabulary is
    right; the regexes were written against how roasters *tend* to word things, not against a sample.
-3. **Seeding roaster domains is proposed, not started.** It needs its own table — `bags` rows are
-   purchases, and **no agent in the sandbox can verify a domain**, which is the guess it refuses.
+3. **Seeding roaster domains is proposed, not started.** It needs its own table, and no agent in the
+   sandbox can verify a domain — which is the guess `findRoasterDomain` refuses.
 4. The deliberately-unbuilt list — timer, inventory, method lookup table — stays unbuilt until asked.
-   The beans link's size is **settled**, not parked: Joel looked at it and asked for nothing further.
