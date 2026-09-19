@@ -129,9 +129,10 @@ depends on it.
   line in `SOURCES`, no request to TechPad Gen. Adding it later is one endpoint and one ledger row,
   so nothing forecloses it.
 - **The livery is borrowed and is TechPad Gen's to settle.** `lib/livery.ts` pins `senna` because all
-  five liveries were taken when this app was scaffolded and the tracker wearing that one is paused.
-  **Two apps share a livery until that is resolved** — do not fix it yourself; it is the theme, and
-  the theme has one owner.
+  five liveries were taken when this app was scaffolded. **That the tracker wearing it was paused
+  was never true** — Joel confirmed on 2026-09-19 that it is deliberately live — so the clash is
+  real rather than borrowed from a dormant app. **Two apps share a livery until that is resolved**
+  — do not fix it yourself; it is the theme, and the theme has one owner.
 - **The schema is `health` and it is empty by design.** `20260918140357` and `20260918140405` create
   it and grant it. **The tables are yours to design** — they were deliberately not pre-empted,
   because a scaffold built before the design is a set of decisions nobody made.

@@ -138,9 +138,8 @@ threads that never involve a resume.
 are never duplicated into `resume.renders`.
 
 **Two more things came with it.** `/api/cron/stale-tasks` is waved past the password gate by the
-tracker's `middleware.ts` and its guard fails **open** when `CRON_SECRET` is unset — ledger item 11,
-and the one-line fix is now yours rather than the retired agent's. And Microsoft Graph is
-unconfigured; the ordering rule in item 11 is not optional if it is ever turned on.
+tracker's `middleware.ts`, so its own guard is the only thing in front of it — see below, because
+that guard changed the same day. And Microsoft Graph is unconfigured; it stays built and inert.
 
 **The daily sweep's guard fails closed as of #144**, which landed the same day the agent retired.
 `/api/cron/stale-tasks` read `if (secret && …)`, so an unset `CRON_SECRET` skipped the check
