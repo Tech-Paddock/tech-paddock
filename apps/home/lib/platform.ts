@@ -83,6 +83,11 @@ export type Drift = {
  * **Array order is the sidebar's order**, and it is Joel's, not alphabetical
  * and not the order these were built in.
  *
+ * **The Message Editor is deliberately absent**, removed 2026-09-19 on the same
+ * terms as the tracker below: out of the roster entirely rather than out of the
+ * sidebar alone. `apps/editor` is untouched and `editor.techpaddock.io` still
+ * serves — it is simply not one of the tools the hub lists or embeds.
+ *
  * **The Pipeline Tracker is deliberately absent.** `tp-tracker` is paused, so
  * every entry it had here pointed somewhere that does not answer: a sidebar row,
  * an iframe target, and a row in The Garage's table. Joel removed it from all
@@ -99,7 +104,7 @@ export type Drift = {
  * putting this entry back. `apps/tracker` is untouched and still builds in CI —
  * the roster CI derives comes from the folders on disk, never from this file.
  */
-export type ToolSlug = "resume" | "coffee" | "editor" | "health";
+export type ToolSlug = "resume" | "coffee" | "health";
 
 export type Tool = Project & { slug: ToolSlug };
 
@@ -107,7 +112,6 @@ export type Tool = Project & { slug: ToolSlug };
 export const TOOLS: Tool[] = [
   { slug: "resume", name: "Resume Formatter", url: "https://resume.techpaddock.io", vercelProject: "tp-resume" },
   { slug: "coffee", name: "Coffee", url: "https://coffee.techpaddock.io", vercelProject: "tp-coffee-app" },
-  { slug: "editor", name: "Message Editor", url: "https://editor.techpaddock.io", vercelProject: "tp-message-editor" },
   { slug: "health", name: "Health", url: "https://health.techpaddock.io", vercelProject: "tp-health" },
 ];
 

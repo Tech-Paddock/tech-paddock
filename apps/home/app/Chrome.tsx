@@ -34,7 +34,6 @@ import ThemeControl from "./ThemeControl";
 const PRESENTATION: Record<ToolSlug, { icon: string }> = {
   resume: { icon: "📄" },
   coffee: { icon: "☕" },
-  editor: { icon: "✉️" },
   health: { icon: "🥗" },
 };
 
