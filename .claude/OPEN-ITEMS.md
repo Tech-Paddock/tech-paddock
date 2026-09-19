@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-19.** · **Next number: 19.**
+**Last reviewed: 2026-09-19.** · **Next number: 20.**
 
 **Numbers are permanent.** A closed item's row is deleted and its number is never used again, so the
 gaps below are correct rather than something to tidy. A new item takes `Next number` and increments
@@ -28,7 +28,6 @@ Nothing.
    signed cookie the client can drop, so nothing but a browser is limited; and **a per-app fix is
    worth nothing**, since one password opens all six. A firewall rate limit on `/api/login` needs no
    code; a shared table **gives the hub database credentials**. *LoE: minutes.*
-
 10. **`tp-tracker` was never paused — the field that said so means something else.** *Owner: Joel.*
    Measured 2026-09-19: it built `4133904` to **production, `READY`**. `live: false` says nothing
    about pausing; `tp-home` reads it too and serves `techpaddock.io`. **The signal is deployment
@@ -66,6 +65,7 @@ Nothing.
    websites; **Coffee is the only real app**, and Health will be. Site is a thin index grouped by
    verb around a long page; app is one screen, thumb-first, no index. Mockups exist. **It is settled
    at standup**, so `STANDUP.md` gains surface beside the name and the schema. *LoE: a session.*
+19. **Health's charter parks recipes; its amendment needs Joel's yes.** *Owner: TD. LoE: minutes.*
 
 ## Parked
 
