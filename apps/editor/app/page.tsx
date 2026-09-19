@@ -287,10 +287,10 @@ function DraftShell() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold">Message Editor</h1>
-          <LiveryBadge livery={LIVERY} />
+          <ThemeControl />
         </div>
         <div className="flex items-center gap-3">
-          <ThemeControl />
+          <LiveryBadge livery={LIVERY} />
           <div className="flex gap-1 bg-surface border border-line rounded-lg p-1">
             <button
               onClick={() => setMode("draft")}

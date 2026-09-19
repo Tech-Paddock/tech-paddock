@@ -83,14 +83,15 @@ function Bar({ children }: { children: React.ReactNode }) {
                   : `Working in ${APPS[selected].name}`}
             </span>
           </div>
-          {/* The badge sits with the title it annotates; the switch keeps the
-              far end of the bar, pushed there by .topbar-brand's auto margin.
-              They were one block until 2026-09-19 and read as one control,
-              which is what Joel wanted apart. The livery is fixed for this app,
-              so only the switch does anything — and what it does is shared with
-              every other subdomain. */}
-          <LiveryBadge livery={LIVERY} />
+          {/* Switch with the brand, livery hard right — Joel's arrangement,
+              2026-09-19. The livery goes right because it is the one thing on
+              this bar that also appears on the bar of whatever tool is framed
+              below it, and the two want to line up; the switch comes left
+              because it is a control and belongs with the thing it controls.
+              The livery is fixed for this app, so only the switch does
+              anything, and what it does is shared with every subdomain. */}
           <ThemeControl />
+          <LiveryBadge livery={LIVERY} />
         </div>
       </header>
       <div className="shell">

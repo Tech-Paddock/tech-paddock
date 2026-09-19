@@ -463,10 +463,19 @@ function ReformatShell() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-bar text-bar-ink border-b-4 border-accent">
+      {/* The badge is positioned against the header rather than placed in the
+          row, and that is the whole point: this bar centres its content in a
+          max-w-6xl column, so anything inside that column stops short of the
+          bar's right edge — where the hub's own livery sits when this app is
+          framed below it. Pinning it to the header puts the two in one line.
+          `top-2.5` matches the row's py-2.5, so it aligns to the first line
+          rather than to the centre of a bar that grows when the nav wraps. */}
+      <header className="relative bg-bar text-bar-ink border-b-4 border-accent">
+        <span className="absolute right-4 top-2.5">
+          <LiveryBadge livery={LIVERY} onBar />
+        </span>
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3 flex-wrap">
           <h1 className="font-semibold whitespace-nowrap">Resume Formatter</h1>
-          <LiveryBadge livery={LIVERY} onBar />
           <nav className="flex gap-0.5 order-last w-full sm:order-none sm:w-auto sm:ml-2">
             {TABS.map((t) => (
               <button
@@ -485,9 +494,7 @@ function ReformatShell() {
               </button>
             ))}
           </nav>
-          <div className="ml-auto">
-            <ThemeControl onBar />
-          </div>
+          <ThemeControl onBar />
         </div>
       </header>
 

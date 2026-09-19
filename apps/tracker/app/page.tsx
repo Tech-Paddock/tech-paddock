@@ -168,10 +168,10 @@ function HomeShell() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold">Pipeline Tracker</h1>
-          <LiveryBadge livery={LIVERY} />
+          <ThemeControl />
         </div>
         <div className="flex items-center gap-3">
-          <ThemeControl />
+          <LiveryBadge livery={LIVERY} />
           <Link
             href="/dashboard"
             className="px-3 py-2 rounded-lg border border-line bg-surface text-sm font-medium"

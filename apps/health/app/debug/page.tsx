@@ -23,9 +23,9 @@ export default function Page() {
           <span className="opacity-50"> / </span>
           Model comparison
         </h1>
-        <LiveryBadge livery={LIVERY} onBar />
+        <ThemeControl onBar />
         <div className="ml-auto flex items-center gap-2">
-          <ThemeControl onBar />
+          <LiveryBadge livery={LIVERY} onBar />
         </div>
       </header>
 

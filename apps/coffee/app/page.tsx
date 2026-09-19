@@ -165,9 +165,9 @@ export default function CoffeePage() {
       <header className="bg-bar text-bar-ink px-4 py-3 flex items-center gap-2 border-b-4 border-accent">
         <span aria-hidden>☕</span>
         <h1 className="font-semibold">Coffee</h1>
-        <LiveryBadge livery={LIVERY} onBar />
+        <ThemeControl onBar />
         <div className="ml-auto">
-          <ThemeControl onBar />
+          <LiveryBadge livery={LIVERY} onBar />
         </div>
       </header>
 

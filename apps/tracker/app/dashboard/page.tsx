@@ -70,10 +70,10 @@ export default async function DashboardPage() {
           <p className="text-sm text-ink-soft">
             {data.threads.length} thread{data.threads.length === 1 ? "" : "s"} tracked
           </p>
-          <LiveryBadge livery={LIVERY} />
+          <ThemeControl />
         </div>
         <div className="flex items-center gap-3">
-          <ThemeControl />
+          <LiveryBadge livery={LIVERY} />
           <Link
             href="/"
             className="px-3 py-2 rounded-lg border border-line bg-surface text-sm font-medium"
