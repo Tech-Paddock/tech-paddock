@@ -175,10 +175,12 @@ landed after its session started.
 
 ## Cookbook — `cookbook`
 
-> **Your board:** _not created yet — Joel pastes the URL here before this agent first runs._
-> **Until it is here, do not publish a board.** Publishing without it creates a second page, and a
-> fortnight of that is thirty pages with no way to tell which is current. Deliver the three-part
-> sign-off in chat instead, and say out loud that it is in chat because you have no URL.
+> **Your board:** https://claude.ai/artifact/KMA29Udq3aqEgHK9WWkwKa — publish to this URL, never a new one.
+> **It is seeded, not written.** The technical director created the page on 2026-09-20 so the URL
+> would exist; its Work Brief is `- None.` on purpose, because nobody else can write yours. The one
+> DevOps row and the one ledger row on it were measured at #159's gate. **Overwrite all three** —
+> none of it is state you produced, and re-dating a row you did not measure is the failure the
+> "update only what you measured" rule exists to stop.
 >
 > You own `apps/cookbook`. Nothing else in this repo is yours.
 >
