@@ -39,8 +39,12 @@ export type GroceryItem = {
  * function on purpose — if it is wrong it is a one-line fix, and this comment
  * says how much it was ever worth.
  */
-const SEARCH_BASE = "https://www.kingsoopers.com/q/";
+export const SEARCH_BASE = "https://www.kingsoopers.com/q/";
 
+/**
+ * The generic search for a line, and the fallback behind every remembered brand.
+ * `lib/preferences.ts` is what decides when a line gets something better.
+ */
 export function searchUrl(item: Pick<GroceryItem, "name">): string {
   // The note is left out deliberately: "2 lbs" and "the small tin" are
   // instructions to a shopper, not search terms, and they narrow a search to

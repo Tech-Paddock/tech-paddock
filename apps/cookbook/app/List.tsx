@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { asText, searchUrl, type GroceryItem, type TidyLine } from "@/lib/grocery";
+import { asText, type GroceryItem, type TidyLine } from "@/lib/grocery";
+import type { ResolvedLink } from "@/lib/preferences";
+import Brands, { RememberForm } from "./Brands";
+
+/**
+ * A line as the server hands it over: the row, plus where its link should go and
+ * what decided that. **The browser never matches a preference itself** — see
+ * `app/api/grocery/route.ts`.
+ */
+type ShoppingLine = GroceryItem & ResolvedLink;
 
 /**
  * The shopping list — the other half of the book.
@@ -15,7 +24,9 @@ import { asText, searchUrl, type GroceryItem, type TidyLine } from "@/lib/grocer
  * thing it buys is who does the tapping.
  */
 export default function List({ refreshKey }: { refreshKey: number }) {
-  const [items, setItems] = useState<GroceryItem[] | null>(null);
+  const [items, setItems] = useState<ShoppingLine[] | null>(null);
+  const [remembering, setRemembering] = useState<ShoppingLine | null>(null);
+  const [brandsVersion, setBrandsVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState<null | "adding" | "tidying" | "applying">(null);
@@ -27,7 +38,7 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       const response = await fetch("/api/grocery", { cache: "no-store" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't read the list.");
-      setItems(body.items as GroceryItem[]);
+      setItems(body.items as ShoppingLine[]);
       setError(null);
     } catch (e) {
       // Same discipline as the book: a failed read leaves `items` null rather
@@ -249,17 +260,41 @@ export default function List({ refreshKey }: { refreshKey: number }) {
                 ) : null}
               </span>
               <a
-                href={searchUrl(item)}
+                href={item.href}
                 target="_blank"
                 rel="noreferrer"
                 className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2"
               >
-                look it up
+                {item.via && item.via.kind !== "plain" ? item.via.brand ?? "your brand" : "look it up"}
               </a>
+              <button
+                type="button"
+                onClick={() => setRemembering(item)}
+                className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2"
+              >
+                remember
+              </button>
             </li>
           ))}
         </ul>
       )}
+
+      {/* The editor opens under the list rather than inside the row: on a phone a
+          form squeezed into a line is a form you cannot type in. */}
+      {remembering ? (
+        <RememberForm
+          phrase={remembering.name}
+          existing={null}
+          onCancel={() => setRemembering(null)}
+          onSaved={() => {
+            setRemembering(null);
+            setBrandsVersion((v) => v + 1);
+            void load();
+          }}
+        />
+      ) : null}
+
+      <Brands version={brandsVersion} onChanged={() => void load()} />
 
       <div className="flex flex-col gap-2">
         <textarea
