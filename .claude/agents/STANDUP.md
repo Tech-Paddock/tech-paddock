@@ -34,11 +34,11 @@ of them has an undo.
 2. **Does it need its own Postgres schema?** If yes, that is **two migrations and one dashboard
    setting** — read `supabase/README.md` before writing either. A new schema inherits no grants at
    all, and the failure looks like a credentials problem.
-3. **Which surface — site or app?** A site is a thin index grouped by verb wrapping one long page; an
-   app is one screen, thumb-first, with no index because there is nowhere else to go. It decides the
-   shell, the navigation and whether there is a home-screen install, so it is expensive to change
-   once a screen exists. **A tool that fits neither gets its surface designed here, with Joel**, and
-   the answer is written into the draft charter before anything is scaffolded.
+3. **Which surface — site or app?** **Read `.claude/SURFACE.md` and apply its three questions**;
+   the rules live there and are not restated here. It decides the shell, the navigation and whether
+   there is a home-screen install, so it is expensive to change once a screen exists. **A tool that
+   fits neither gets its surface designed here, with Joel**, and the answer is written into the
+   draft charter before anything is scaffolded.
 
 ## What is already automatic — do not build these
 

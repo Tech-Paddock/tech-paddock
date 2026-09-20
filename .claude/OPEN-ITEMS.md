@@ -27,7 +27,8 @@ Nothing.
    2026-09-20: named, themed as a cookbook, and **Health reads it to price a meal** rather than
    owning recipes. **The branch is the only written record of the design**, and #151's closing
    comment says what carries over and what dies with the `health.items` link. **Surface is still
-   open**, the TD's read being site over app. **Needs `STANDUP.md` step 1.** *LoE: a session.*
+   open**, the TD's read being site over app — the test is in `.claude/SURFACE.md`, which answers
+   the Cookbook as its worked example and leaves the call yours. **Needs `STANDUP.md` step 1.** *LoE: a session.*
 
 ## Waiting on an agent
 
@@ -50,10 +51,6 @@ Nothing.
    between `apps/editor` (TD, frozen) and `apps/tracker` (TechPad Gen). The old premise — one of the
    two is going away — was wrong; neither did, they changed hands. **It is a cross-app contract
    again**, which is the TD's to write down. *LoE: minutes.*
-7. **Write the surface guide — site and app.** *Owner: TD.* Joel, 2026-09-18: most tools are
-   websites; **Coffee is the only real app**, and Health will be. Site is a thin index grouped by
-   verb around a long page; app is one screen, thumb-first, no index. Mockups exist. **It is settled
-   at standup**, so `STANDUP.md` gains surface beside the name and the schema. *LoE: a session.*
 
 20. **An app that reads outside its own folder silently stops rebuilding, and nothing checks.**
    *Owner: TD.* #137 scoped each build to its own folder; the hub reads `.claude` at build time, so
