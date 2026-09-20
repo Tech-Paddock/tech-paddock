@@ -32,6 +32,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { expected as stampExpected, MANIFEST, SHARED_DIR } from "./stamp-shared.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const R = (...p) => join(repoRoot, ...p);
@@ -63,7 +64,7 @@ const git = (...args) => {
    a missing header changes nothing anybody can see. apps/home had shipped with
    an empty config and no frame-ancestors for as long as the file existed, and
    nothing said so until somebody read all six. */
-for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.config.mjs"]) {
+for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme.ts", "next.config.mjs"]) {
   const present = APPS.map((a) => [a, md5(R("apps", a, rel))]).filter(([, h]) => h);
   if (present.length === 0) { add(`identical: ${rel}`, "warn", "not present in any app — cannot measure"); continue; }
   const distinct = new Set(present.map(([, h]) => h));
@@ -75,6 +76,47 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.conf
       : `${distinct.size} distinct versions across ${present.length} copies: ` +
         present.map(([a, h]) => `${a}=${h.slice(0, 8)}`).join(", "),
   );
+}
+
+/* 1b ── The copies match packages/shared, which is the file they came from.
+   Check 1 asks whether the six agree with each other. That was the only
+   question worth asking while there was no original: six copies that agree are
+   correct no matter which one somebody edited. Since packages/shared exists
+   there IS an original, and "all six agree" stops being sufficient — six copies
+   can agree perfectly and all six disagree with the canonical file, which is
+   exactly what happens when an agent edits one copy and helpfully syncs the
+   other five.
+
+   So this is the stronger question and check 1 is deliberately kept rather than
+   replaced: it still answers on a branch where packages/shared has been deleted
+   or has not landed, and on the password gate two overlapping checks are worth
+   more than a tidy single one.
+
+   `expected()` is imported from the stamper rather than reimplemented, so the
+   check cannot drift from the writer it is checking. A reimplementation here
+   would be a sixth copy of the thing this whole change exists to stop. */
+{
+  const name = "stamped copies match packages/shared";
+  if (!existsSync(R(SHARED_DIR))) {
+    add(name, "warn", `${SHARED_DIR} is not present — nothing to stamp from`);
+  } else {
+    const missingCanonical = MANIFEST
+      .filter(({ from }) => !existsSync(R(SHARED_DIR, from)))
+      .map(({ from }) => `${SHARED_DIR}/${from}`);
+
+    if (missingCanonical.length) {
+      add(name, "fail", `canonical file missing: ${missingCanonical.join(", ")}`);
+    } else {
+      const rows = stampExpected(repoRoot);
+      const bad = rows.filter(({ rel, want }) => read(R(rel)) !== want);
+      add(name, bad.length === 0 ? "ok" : "fail",
+        bad.length === 0
+          ? `${rows.length} copies across ${APPS.length} apps match — one edit, not ${APPS.length}`
+          : `${bad.length} of ${rows.length} copies disagree: ` +
+            bad.map(({ rel }) => rel).join(", ") +
+            " — run: node scripts/stamp-shared.mjs");
+    }
+  }
 }
 
 /* 2 ── middleware.ts is deliberately NOT uniform, and the shape is the rule:

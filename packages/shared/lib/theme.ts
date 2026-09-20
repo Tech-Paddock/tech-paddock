@@ -1,6 +1,3 @@
-/* Stamped from packages/shared/lib/theme.ts — do not edit this copy.
- * Edit the canonical file, then run: node scripts/stamp-shared.mjs
- * drift fails a copy that disagrees, and CI runs drift. */
 /**
  * Paddock theme — the shared half.
  *
