@@ -194,6 +194,71 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.conf
         : `${APPS.length} apps, each skipping a merge that does not touch it`);
 }
 
+/* ── The On track marker, and the one place it must never be ──────────────
+   `.claude/ON-TRACK` is the deploy trigger for the On track stage: every
+   app's ignoreCommand greps it, and a name listed there turns that app's
+   preview build on for the branch carrying the file.
+
+   Three ways it goes wrong, and only the first is obvious.
+
+   A name that is not an app folder is the ignoreCommand typo again wearing a
+   different hat — `grep -qxF` simply never matches, so the agent is told the
+   branch is deployed and nothing was ever built. Silent, and the only symptom
+   is a URL that 404s. It FAILS.
+
+   A name still listed on `main` means a branch merged switched on, and from
+   then on every push to main builds a preview nobody asked for. It FAILS, and
+   the technical director empties the file at the gate so it never gets here.
+
+   A name listed on a branch is correct and expected — but it is also a live
+   deployment of unmerged code, so it WARNS rather than passing quietly. A
+   preview that nobody remembers is running is the thing this file makes cheap
+   to create, so it is the thing the check has to keep saying out loud.
+
+   The file missing entirely is a fail, not a warn: every grep then fails, every
+   preview skips, and On track stops working with nothing to say so. That is
+   the silent-skip failure #57 and the ignoreCommand check both exist to stop. */
+{
+  const name = "On track marker is off, and names real apps";
+  const rel = ".claude/ON-TRACK";
+  const text = read(R(rel));
+
+  if (text === null) {
+    add(name, "fail", `${rel} is missing — every preview silently skips and On track stops working`);
+  } else {
+    const listed = text.split("\n").map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("#"));
+    const unknown = listed.filter((a) => !APPS.includes(a));
+
+    /* Which ref this is, asked of the ref and never of the commit. Comparing
+       HEAD to origin/main looks equivalent and is not: a branch cut from main
+       that has no commit yet points at exactly main's commit, and an agent
+       doing entirely correct work would be told their branch had merged
+       switched on. Actions leaves HEAD detached but sets GITHUB_REF, and off
+       CI the branch name reads straight out of git. A pull_request event's
+       refs/pull/N/merge is not main, which is right — a pull request is still
+       a branch here. */
+    const ref = process.env.GITHUB_REF || git("rev-parse", "--abbrev-ref", "HEAD");
+    const onMain = ref === "refs/heads/main" || ref === "main";
+
+    if (unknown.length) {
+      add(name, "fail",
+        `${rel} lists ${unknown.join(", ")}, which ${unknown.length === 1 ? "is not an app" : "are not apps"} under apps/ — ` +
+        `the ignoreCommand grep never matches, so that preview is never built and nothing says so`);
+    } else if (listed.length === 0) {
+      add(name, "ok", `${rel} lists no app — previews skip, which is the default`);
+    } else if (onMain) {
+      add(name, "fail",
+        `${rel} still lists ${listed.join(", ")} on main — a branch merged switched on, and every ` +
+        `push to main now builds a preview. Empty the file; the gate is where that happens.`);
+    } else {
+      add(name, "warn",
+        `${listed.join(", ")} deployed as a preview from this branch — unmerged code, live behind ` +
+        `Vercel Authentication. Empty ${rel} before this merges; drift fails it on main.`);
+    }
+  }
+}
+
 /* 4 ── Budgets. CI fails the breach; this reports the approach, because a file
    that arrives at its ceiling has already stopped being rewritten. */
 {

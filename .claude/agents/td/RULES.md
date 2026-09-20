@@ -103,6 +103,12 @@ asks what the work makes true.
 
 CI green on the current head — the `gate` job, not a stale run from before a force-push.
 Blast radius declared. Handoffs current. No personal information. No check weakened to pass.
+**`.claude/ON-TRACK` empty.** A branch that went On track carries its app's name there, and that name
+is a live preview switch: merged, every push to `main` would build a preview nobody asked for. `drift`
+fails a `main` that still lists one, so this is a red check rather than a lost afternoon — but it goes
+red *after* the merge, which is the wrong end. **Empty it before you merge, in a commit on the branch**,
+and the same push proves the preview stops. It is the one line of a pull request that is there to be
+deleted rather than read.
 
 **Merge order, when more than one thing is mergeable.** Decide it before merging any of them, and
 record it. Order is a decision even when nobody makes it, and the default — whichever you happened to

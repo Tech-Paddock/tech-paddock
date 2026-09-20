@@ -1,0 +1,31 @@
+# Apps deployed as previews right now — one app folder name per line.
+#
+# This file IS the deploy trigger. Every app's ignoreCommand reads it: a name
+# listed here means Vercel builds a preview of that app on every push to the
+# branch carrying this file. A name absent means Vercel skips, which is the
+# default, and which is what `main` always looks like.
+#
+# It exists switched off rather than not existing, so the mechanism is visible
+# to an agent reading the repo rather than discoverable only from a rule.
+#
+# Writing a name here is deliberate, recorded and reversible — which is what
+# the On track stage needed and an empty commit could never be. The commit that
+# adds a name changes what the repo does; it is not activity for its own sake.
+#
+# Rules:
+#   - One folder name per line, exactly as it appears under apps/.
+#   - Lines starting with # are comments. `# home` does NOT switch home on.
+#   - An empty list is the normal state and the only state `main` may have.
+#   - `drift` FAILS on main if any app is listed, so this cannot merge switched
+#     on. The technical director empties it at the gate, before merging.
+#
+# The preview URL is derived from the branch, not invented:
+#   https://<project>-git-<branch-with-slashes-and-dots-as-dashes>-tech-paddock.vercel.app
+# Vercel truncates and hashes long ones, so the URL goes on the board only
+# after it has been read back from a live deployment.
+#
+# Every *.vercel.app host is behind Vercel Authentication — measured, not
+# assumed: ssoProtection is enabled for all_except_custom_domains. A preview is
+# reachable by the Vercel account and nobody else, and the app's own password
+# gate sits behind that.
+
