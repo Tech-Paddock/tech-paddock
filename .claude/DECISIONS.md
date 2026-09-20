@@ -150,6 +150,26 @@ plausibly reopen or repeat, delete it; git keeps it.
   3 first.** The honest version needs preview-scoped environment variables and a Supabase branch, so
   what is driven is not reading production data — infrastructure and money, and therefore Joel's.
   **Closing item 3 outright is a legitimate answer** and merge-then-look stays how this works.
+- **`lib/models.ts` stays a per-app copy and does not go into `packages/shared`.** Settled by the
+  technical director at #159's gate on 2026-09-20, when the Cookbook's copy became the third — after
+  Coffee's and Health's — and its pull request flagged it and asked, which is the path `CLAUDE.md`
+  sets out. **The three are not the same file, and the reason matters more than the count.** Coffee's
+  exports `SEARCH_MODELS` over three models with `search`, `fetch` and an `efforts` array plus
+  `effortsFor`, `isEffortFor` and `DEFAULT_EFFORT`, because Coffee has an effort dial. Health's
+  exports `MODELS` over two with `search` and `fetch` and a `COMPARISON_MODEL`. The Cookbook's has
+  **no `search` at all**, deliberately, because nothing in it searches — it fetches the one page you
+  pasted. Diffed at the gate rather than assumed: 76, 67 and 61 lines, no two alike.
+  **`packages/shared` is for files that must be byte-identical, and these must not be.**
+  `scripts/stamp-shared.mjs` writes copies outward and `drift` *fails* a copy that disagrees, so
+  putting this file there forces one of two bad outcomes: the stamp overwrites each app's deliberate
+  differences and every app carries capabilities it decided against, or `drift` goes permanently red
+  and the pressure lands on weakening the check — which the brief forbids outright. What actually
+  recurs here is a **pattern** (a registry keyed by model id carrying each model's request shape),
+  not a file, and duplicate-and-flag is where a pattern belongs.
+  **So there is no ledger row for it**, and that is the decision rather than an omission: a row would
+  carry a question that has been answered. **What is still open is the livery, item 24, not this.**
+  If a fourth app ever needs the *identical* registry, reopen it then — additive, and on evidence.
+
 ## Mistakes — do not repeat
 
 - **Merging a second change on a gate result taken before the first.** #69 and #70 were merged past

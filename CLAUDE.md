@@ -218,8 +218,13 @@ wrong or the rule is, and that is a conversation before any code exists.
   for this on 2026-09-18, extending what had been the technical director's alone. **Your board's URL
   is in your kickoff block** — publish to *that* URL. Publishing without it creates a second board,
   and a fortnight of that is thirty pages with no way to tell which is current.
-  **One publish per response, at the end, and the message ends with the link.** The three sections
-  still exist and are still measured the same way — the medium changed, not the discipline. **A
+  **One publish per session, at close-out — not one per response.** Measured on 2026-09-20: four
+  publishes in one session cost roughly four times the edit-and-verify tokens, for a page nobody
+  opened in between. **Re-measure whenever he asks for status — that rule is unchanged — but say the
+  numbers in chat and publish the page when the session ends.** A republish that only moves a
+  timestamp is the stale-board failure wearing a fresh stamp, which this section already forbids.
+  The three sections still exist and are still measured the same way — the medium changed, not the
+  discipline. **A
   board written from memory is worse than a table written from memory**, because a page looks
   permanent and a chat message visibly scrolls away, so the re-measure rule below binds harder here
   rather than less.
