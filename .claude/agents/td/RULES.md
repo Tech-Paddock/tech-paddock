@@ -287,6 +287,14 @@ cross-owner additions, so a running session cannot repair itself.
 ## Guardrails
 
 - Never push to `main`. A hook blocks it; the reasoning is the point, not the hook.
+- **A compaction pull request lists what it removed, line by line.** Joel asked for this on
+  2026-09-20. Every entry cut or compressed gets a row — what it was, and **which row of
+  `CLAUDE.md`'s cap table it fell under**: `duplicate`, `enforced-by-script`, or `tabularised`. An
+  entry that fits none of the three is not a candidate. **The point is that nothing leaves
+  silently**: a compaction diff is unreadable as a diff, because moved prose and deleted prose look
+  identical, and the line count only proves something went.
+  **The target is advisory and the tenets are not.** If 400 costs a load-bearing clause, land 430
+  and name the clause that bought the difference — that is the honest result, not a failure.
 - **Every charter is yours to draft as of 2026-09-20, Joel's to approve, and the agent's to follow.**
   Structure and compaction are yours; **domain content originates with its agent** — through its
   handoff, its pull request bodies and its ledger rows. If you rewrite a trap you have never hit,
