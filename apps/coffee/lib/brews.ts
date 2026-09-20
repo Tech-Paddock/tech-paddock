@@ -83,6 +83,9 @@ export function readBrew(input: { tdsPercent: number | null; yieldPercent: numbe
  * ppm is derived from the TDS reading and extraction yield is generated in
  * Postgres rather than accepted from a client. It lives in the draft because
  * a form has to hold what you typed, and it is dropped before the POST.
+ *
+ * `time` is the other field whose name is not its column: it holds `m:ss` as
+ * typed and becomes whole seconds — `brew_seconds` — on the way out.
  */
 export type BrewDraft = {
   brewer: string;
@@ -92,6 +95,7 @@ export type BrewDraft = {
   dose_g: string;
   ratio: string;
   water_g: string;
+  time: string;
   beverage_g: string;
   notes: string;
 };
@@ -122,6 +126,7 @@ export function blankBrew(): BrewDraft {
     dose_g: "",
     ratio: "",
     water_g: "",
+    time: "",
     beverage_g: "",
     notes: "",
   };
@@ -131,11 +136,18 @@ export function blankBrew(): BrewDraft {
  * Ratio and water are two views of one decision, and the dose turns each into
  * the other: water = dose x ratio.
  *
- * Water rounds to whole grams because that is what a kettle and a scale
- * resolve, and the ratio to one decimal because 1:16.7 is how a recipe is
- * written and 1:16.67 is not. Editing one field and then the other can
- * therefore move the water by up to a gram, which is below the accuracy of
- * the pour and well below anything the cup can tell you.
+ * **Both round to whole numbers**, on Joel's instruction of 2026-09-20:
+ * *"Whole numbers only for recipe."* Water because that is what a kettle and
+ * a scale resolve, and the ratio because 1:17 is what you brew to and
+ * 1:16.9 is a description of what the scale happened to say. Editing one
+ * field and then the other can therefore move the water by a few grams,
+ * which is below the accuracy of the pour and well below anything the cup
+ * can tell you.
+ *
+ * This rounds *your* numbers, derived from your own dose and water.
+ * `parseRatio` still reports the roaster's ratio as they published it —
+ * rounding that one would be inventing on their authority, which is the
+ * thing this app refuses everywhere else.
  */
 export function waterFor(doseG: number | null, ratio: number | null): number | null {
   if (!doseG || !ratio) return null;
@@ -146,7 +158,38 @@ export function waterFor(doseG: number | null, ratio: number | null): number | n
 export function ratioFor(doseG: number | null, waterG: number | null): number | null {
   if (!doseG || !waterG) return null;
   if (doseG <= 0 || waterG <= 0) return null;
-  return Math.round((waterG / doseG) * 10) / 10;
+  return Math.round(waterG / doseG);
+}
+
+/**
+ * A brew time as the timer reads it: `m:ss`.
+ *
+ * Stored as whole seconds, because a duration is one number and `3:00` is a
+ * way of writing it rather than a second fact about it. Two columns for one
+ * measurement is the mistake ppm and extraction yield are both already
+ * avoiding.
+ *
+ * **A bare number is refused rather than read.** "3" in a brew-time box is
+ * three minutes to one person and three seconds to another, and there is
+ * nothing in the string that settles it — the same shape of ambiguity
+ * `lib/dates.ts` refuses in `05/06/2026`. The form says what it wants
+ * instead of guessing and storing a brew nobody made.
+ */
+export function parseBrewTime(text: string | null | undefined): number | null {
+  if (!text) return null;
+  const match = /^\s*(\d{1,3}):([0-5]\d)\s*$/.exec(text);
+  if (!match) return null;
+  const total = Number(match[1]) * 60 + Number(match[2]);
+  return total > 0 ? total : null;
+}
+
+/** Whole seconds back into `m:ss`, for a brew that has already been logged. */
+export function formatBrewTime(seconds: string | number | null | undefined): string | null {
+  if (seconds == null || seconds === "") return null;
+  const n = Number(seconds);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const whole = Math.round(n);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
 /**
@@ -256,11 +299,16 @@ export function parseRatio(text: string | null | undefined): number | null {
  *
  * **Settings carry forward. Readings do not.** Brewer, brew method, grinder,
  * grind setting, dose and water are decisions — you make them again
- * deliberately, and repeating them is the point. Beverage mass, TDS, rating
- * and notes are observations of one cup. Carrying a reading forward would
- * record a measurement nobody took, and beverage mass and TDS both feed the
- * generated extraction yield, so a stale one produces a figure that is
- * arithmetically correct about a brew that never happened.
+ * deliberately, and repeating them is the point. Beverage mass, TDS, brew
+ * time, rating and notes are observations of one cup. Carrying a reading
+ * forward would record a measurement nobody took, and beverage mass and TDS
+ * both feed the generated extraction yield, so a stale one produces a figure
+ * that is arithmetically correct about a brew that never happened.
+ *
+ * **Brew time is a reading, and that is the whole reason it does not carry.**
+ * It is tempting to read it as a target you aim at, like a ratio — but the
+ * number that gets logged is what the timer said when the bed drained, and
+ * repeating it would write down a stopwatch nobody started.
  *
  * This is the same line `findPreviousBag` draws across bags — the dial-in
  * carries, what you thought of the cup does not.
@@ -294,7 +342,13 @@ export function repeatOf(previous: PreviousBrew | null | undefined): BrewDraft {
  * for: dose, water, ratio. Grind is deliberately absent — "900µm" is a
  * particle size and the field below it is a dial position on a Fellow Ode,
  * and translating one into the other is the rounding this app refuses
- * everywhere else. Temperature and time have no field to land in.
+ * everywhere else. Temperature has no field to land in.
+ *
+ * **Brew time has one now, and still does not fill from here.** The form
+ * asks what the timer said, and the roaster's "2:40" is what they aim at —
+ * prefilling it would put a number in the one box whose entire content is
+ * what actually happened, which is the same objection as carrying a TDS
+ * reading across from the last brew.
  *
  * Water is taken from their own water figure where they gave one and derived
  * from the ratio otherwise, so a roaster who publishes only "1:17" still

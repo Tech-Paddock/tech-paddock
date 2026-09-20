@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { downscale } from "@/lib/image";
 import { LIVERY } from "@/lib/livery";
 import ThemeControl, { LiveryBadge } from "./ThemeControl";
@@ -11,6 +11,8 @@ import {
   blankBrew,
   ratioFor,
   openingBrew,
+  parseBrewTime,
+  formatBrewTime,
   withDose,
   withRatio,
   withWater,
@@ -60,6 +62,10 @@ type Bag = Identity & {
   guide_model: string | null;
   guide_effort: string | null;
   guide_search_error: string | null;
+  // Set while a search is in flight and cleared when it lands. It is how a
+  // page that was not there when the search started can still tell "still
+  // working" from "never ran".
+  guide_search_started_at: string | null;
   // Claude's own, for a bag whose roaster published none. Deliberately not a
   // guide_* value and never rendered as one.
   suggested_recipe: Suggestion | null;
@@ -82,6 +88,7 @@ type Brew = {
   beverage_g: string | number | null;
   tds_percent: string | number | null;
   extraction_yield: string | number | null;
+  brew_seconds: number | null;
   rating: number | null;
   notes: string | null;
 };
@@ -460,7 +467,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
               value={identity.roast_date ?? ""}
               disabled={stage !== "confirm"}
               onChange={(e) => setIdentity({ ...identity, roast_date: e.target.value })}
-              className="border border-line rounded-lg px-3 py-2 bg-surface disabled:opacity-60"
+              className="border border-line rounded-lg px-3 py-2 bg-surface disabled:opacity-60 w-full min-w-0"
             />
             {labelRoastDate && (
               // Said, but not readable as one date. Naming it is the whole
@@ -556,7 +563,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
               head. Two columns still fit a phone: a date input is a fixed,
               short piece of text. */}
           <div className="grid grid-cols-2 gap-3">
-            <label className="text-sm text-ink/70 flex flex-col gap-1">
+            <label className="text-sm text-ink/70 flex flex-col gap-1 min-w-0">
               Purchased
               <input
                 type="date"
@@ -565,7 +572,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
                 className="border border-line rounded-lg px-3 py-2 bg-surface w-full min-w-0"
               />
             </label>
-            <label className="text-sm text-ink/70 flex flex-col gap-1">
+            <label className="text-sm text-ink/70 flex flex-col gap-1 min-w-0">
               Roasted
               <input
                 type="date"
@@ -814,7 +821,7 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
                 leave a smudged or oddly printed date alone, so it has to be
                 typeable afterwards. */}
             <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm text-ink/70 flex flex-col gap-1">
+              <label className="text-sm text-ink/70 flex flex-col gap-1 min-w-0">
                 Purchased
                 <input
                   type="date"
@@ -823,7 +830,7 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
                   className="border border-line rounded-lg px-3 py-2 bg-surface w-full min-w-0"
                 />
               </label>
-              <label className="text-sm text-ink/70 flex flex-col gap-1">
+              <label className="text-sm text-ink/70 flex flex-col gap-1 min-w-0">
                 Roasted
                 <input
                   type="date"
@@ -851,7 +858,10 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
           </section>
 
           <section className="flex flex-col gap-3 border-t border-line pt-4">
-            <SectionHead>Recipe</SectionHead>
+            <div className="flex items-start justify-between gap-3">
+              <SectionHead>Recipe</SectionHead>
+              <Research bag={bag} onChanged={onChanged} />
+            </div>
 
             <GuideStatusHeader
               status={bag.guide_status}
@@ -999,17 +1009,29 @@ function Brews({
   }, [load]);
 
   async function add() {
+    // Checked before anything is sent, because the only wrong answer here is
+    // a confident one: "3" in a time box is three minutes to one person and
+    // three seconds to another, and a brew logged at the wrong one of those
+    // is indistinguishable afterwards from a brew that really ran that long.
+    const seconds = parseBrewTime(draft.time);
+    if (draft.time.trim() && seconds == null) {
+      setError("Brew time reads as minutes and seconds — 3:00.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
       // The ratio is left behind deliberately: it is water over dose, the
       // server has no column for it, and sending a derived number is how a
-      // second copy of one fact gets born.
-      const { ratio: _ratio, ...row } = draft;
+      // second copy of one fact gets born. The time goes as the seconds it
+      // parsed to, because m:ss is a way of writing a duration rather than a
+      // second fact about it.
+      const { ratio: _ratio, time: _time, ...row } = draft;
       const res = await fetch(`/api/bags/${bagId}/brews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...row, rating }),
+        body: JSON.stringify({ ...row, brew_seconds: seconds, rating }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Couldn't log that brew.");
@@ -1129,8 +1151,23 @@ function Brews({
               lib/brews.ts so it can be tested without a browser. */}
           <div className="grid grid-cols-3 gap-3">
             <Field label="dose (g)" value={draft.dose_g} onChange={(v) => setDraft(withDose(draft, v))} />
-            <Field label="ratio 1:" value={draft.ratio} onChange={(v) => setDraft(withRatio(draft, v))} />
+            <Field label="ratio" value={draft.ratio} onChange={(v) => setDraft(withRatio(draft, v))} />
             <Field label="water (g)" value={draft.water_g} onChange={(v) => setDraft(withWater(draft, v))} />
+          </div>
+
+          {/* Time sits under the three it belongs with, in a track the same
+              width, rather than crowding them into four columns on a phone.
+              It is deliberately not prefilled from anywhere — not from the
+              last brew and not from the roaster's published time — because
+              this box holds what the timer said, and a number already in it
+              is a stopwatch nobody started. */}
+          <div className="grid grid-cols-3 gap-3">
+            <Field
+              label="time (m:ss)"
+              value={draft.time}
+              onChange={(v) => setDraft({ ...draft, time: v })}
+              placeholder="3:00"
+            />
           </div>
 
           {/* The refractometer half, commented out rather than removed. The
@@ -1188,7 +1225,29 @@ function Brews({
   );
 }
 
-/** One logged brew, with its reading in both units. */
+/**
+ * One logged brew.
+ *
+ * Joel reshaped this on 2026-09-20, and every one of the four changes is the
+ * same change: a pill on a shelf is read at a glance, so it carries what
+ * separates one attempt from the next and nothing else.
+ *
+ * **The rating leads**, because scanning a dial-in is looking for the good
+ * one — it was the last line, under everything you had to read to reach it.
+ * **The grinder is gone**: it is one machine on one counter and repeats on
+ * every row, so it said nothing while taking a line. **"water" is gone from
+ * the numbers**, because `18g · 305g · 1:17` is already unambiguous — the
+ * second mass in a brewing recipe is the water. **The time sits beside them**
+ * behind a rule rather than under them, since time and ratio are the two you
+ * actually compare between attempts.
+ *
+ * **The grind setting stays, and it is the one judgement call in the four.**
+ * It shared that line with the grinder, so "remove grinder information"
+ * could fairly be read as taking both — but the grinder is one machine on
+ * one counter and the setting is the number you moved since last time, which
+ * is the whole subject of a dial-in log. It is labelled now rather than left
+ * as a naked "4.5". Say the word and it goes.
+ */
 function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
   const pct = brew.tds_percent == null ? null : Number(brew.tds_percent);
   const ey = brew.extraction_yield == null ? null : Number(brew.extraction_yield);
@@ -1197,27 +1256,41 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
   // Derived here for the same reason it is derived in the form: water over
   // dose is one fact, and a stored copy is a second one that can disagree.
   const ratio = ratioFor(dose, water);
+  const time = formatBrewTime(brew.brew_seconds);
+  const recipe = [dose ? `${dose}g` : null, water ? `${water}g` : null, ratio ? `1:${ratio}` : null]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="bg-paper border border-line rounded-xl p-3 flex flex-col gap-1">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-sm font-medium">
-          {brew.brewer ? MY_BREWER_LABELS[brew.brewer as MyBrewer] : "Brew"}
-          {brew.brew_method ? ` · ${brew.brew_method}` : ""}
+        <span className="text-sm font-medium min-w-0 flex items-baseline gap-2">
+          {brew.rating ? (
+            <span className="text-accent shrink-0" aria-label={`${brew.rating} of 5`}>
+              {"★".repeat(brew.rating)}
+            </span>
+          ) : null}
+          <span className="min-w-0 truncate">
+            {brew.brewer ? MY_BREWER_LABELS[brew.brewer as MyBrewer] : "Brew"}
+            {brew.brew_method ? ` · ${brew.brew_method}` : ""}
+          </span>
         </span>
         <span className="text-xs text-ink-soft shrink-0">{new Date(brew.brewed_at).toLocaleDateString()}</span>
       </div>
 
-      {(brew.grinder || brew.grind_setting) && (
-        <span className="text-sm text-ink/60">{[brew.grinder, brew.grind_setting].filter(Boolean).join(" · ")}</span>
+      {brew.grind_setting && (
+        <span className="text-sm text-ink/60">Grind {brew.grind_setting}</span>
       )}
 
-      {(dose || water) && (
-        <span className="text-sm">
-          {[dose ? `${dose}g` : null, water ? `${water}g water` : null, ratio ? `1:${ratio}` : null]
-            .filter(Boolean)
-            .join(" · ")}
-        </span>
+      {(recipe || time) && (
+        <div className="flex items-center gap-2 text-sm">
+          {recipe && <span>{recipe}</span>}
+          {/* A real rule rather than a typed bar: it takes the row's height
+              and the line colour, so it separates the two readings without
+              reading as a third one. */}
+          {recipe && time && <span aria-hidden className="w-px self-stretch bg-line shrink-0" />}
+          {time && <span>{time}</span>}
+        </div>
       )}
 
       {pct != null && (
@@ -1232,7 +1305,6 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
         </span>
       )}
 
-      {brew.rating ? <span className="text-sm text-accent">{"★".repeat(brew.rating)}</span> : null}
       {brew.notes && <span className="text-sm text-ink/70">{brew.notes}</span>}
 
       <button onClick={onDelete} className="self-start text-xs text-urgent underline mt-1">
@@ -1314,6 +1386,113 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
  * way it could damage the rule is by coming to look like the other block.
  * The wording lives in `lib/guideDisplay.ts` with a test that holds it to it.
  */
+/**
+ * Run the search again on a bag that has already been searched.
+ *
+ * Joel, 2026-09-20: *"Add refresh button to research for recipe. This should
+ * also refresh link."* It does, and not as a second feature bolted beside the
+ * first: the search writes `product_url` and `guide_url` through the same
+ * `guideColumns` the original run used, so the **Beans ↗** link on the pill is
+ * re-derived from whatever this run found rather than patched separately. A
+ * roaster who has since published a guide, or moved the page out from under
+ * the old link, is the case this exists for.
+ *
+ * **It runs at the default model and effort and offers no dial.** The scan
+ * screen's model picker is a comparison harness you set up deliberately on
+ * the way in; this is a button pressed one-handed in a kitchen. What ran is
+ * still recorded on the row either way.
+ *
+ * **It polls rather than waits**, for the reason the scan screen does: the
+ * search runs for minutes with nothing on the connection, and the answer
+ * lands on the row. Closing the card — or the tab — cannot lose it.
+ */
+function Research({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Held in refs so a re-render of the library — which hands this component a
+  // new onChanged every time — restarts the interval without forgetting that
+  // the search was already seen running.
+  const seenRunning = useRef(false);
+  const changed = useRef(onChanged);
+  changed.current = onChanged;
+
+  function start() {
+    if (!bag.roaster || !bag.coffee_name) {
+      setError("A roaster and a coffee name are needed to search.");
+      return;
+    }
+    setError(null);
+    seenRunning.current = false;
+    setSearching(true);
+
+    // Fired, not awaited — the same call the scan screen makes, for the same
+    // reason. Its answer is read back off the row below.
+    void fetch("/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bag_id: bag.id,
+        roaster: bag.roaster,
+        coffee_name: bag.coffee_name,
+        model: DEFAULT_SEARCH_MODEL,
+        effort: isEffortFor(DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT) ? DEFAULT_EFFORT : null,
+      }),
+    }).catch(() => {});
+  }
+
+  useEffect(() => {
+    if (!searching) return;
+    const launched = Date.now();
+
+    const tick = async () => {
+      const res = await fetch(`/api/bags/${bag.id}`);
+      if (!res.ok) return;
+      const fresh = (await res.json()).bag as Bag;
+
+      if (fresh.guide_search_started_at) {
+        seenRunning.current = true;
+        return;
+      }
+
+      // Nothing in flight. That is either "it finished" or "it never got
+      // going", and the difference is whether this ever saw it running —
+      // which is the same distinction the row exists to make. Give the
+      // route a grace period to stamp the row before believing the second.
+      if (!seenRunning.current && Date.now() - launched < 20_000) return;
+
+      setSearching(false);
+      // A search that failed recorded why. Reporting nothing here would be
+      // the empty-and-unread confusion this app keeps paying for.
+      setError(
+        fresh.guide_search_error ??
+          (seenRunning.current ? null : "The search did not start. Nothing on this bag changed.")
+      );
+      changed.current();
+    };
+
+    const timer = setInterval(() => void tick(), 4000);
+    return () => clearInterval(timer);
+  }, [searching, bag.id]);
+
+  return (
+    <div className="flex flex-col items-end gap-1 shrink-0">
+      <button
+        onClick={start}
+        disabled={searching}
+        className="text-sm text-accent underline disabled:opacity-60 disabled:no-underline"
+      >
+        {searching ? "Searching…" : "Search again"}
+      </button>
+      {searching && (
+        <span className="text-xs text-ink-soft text-right">
+          Minutes, not seconds. You can close this.
+        </span>
+      )}
+      {error && <span className="text-xs text-urgent text-right">{error}</span>}
+    </div>
+  );
+}
+
 function SuggestedRecipe({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1415,6 +1594,15 @@ function SectionHead({ children }: { children: React.ReactNode }) {
  * The quote lives inside because it is the check on everything below it, and
  * putting the check behind one tap is the compromise between showing the
  * evidence and not making a shelf of bags unreadable.
+ *
+ * **It is a quiet line rather than a panel**, on Joel's instruction of
+ * 2026-09-20: *"Remove the section around found brew guide on page. And make
+ * font smaller and grey italic with the dropdown carrot."* A bordered box
+ * gave the provenance the same weight as the instructions underneath it,
+ * which is backwards — the recipe is what you came to read and this says
+ * where it came from. **Nothing about the two-signal rule changed**: the dot
+ * still carries the tier and the words still say it, so grey is the type
+ * colour and never the answer.
  */
 function GuideStatusHeader({
   status,
@@ -1429,15 +1617,15 @@ function GuideStatusHeader({
   const hasQuotes = quotes?.length > 0;
 
   return (
-    <details className="border border-line rounded-lg bg-surface group">
-      <summary className="flex items-center gap-2.5 p-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} aria-hidden />
-        <span className="text-sm font-semibold min-w-0 flex-1">{label}</span>
+    <details className="group">
+      <summary className="flex items-center gap-2 py-1.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} aria-hidden />
+        <span className="text-xs italic text-ink-soft min-w-0 truncate">{label}</span>
         <span className="text-ink-soft text-xs shrink-0 transition-transform group-open:rotate-90" aria-hidden>
           ›
         </span>
       </summary>
-      <div className="border-t border-line p-3 flex flex-col gap-3">
+      <div className="pt-1 pb-2 flex flex-col gap-3">
         {hasQuotes ? (
           <Quotes quotes={quotes} />
         ) : (
@@ -1492,11 +1680,13 @@ function Field({
   value,
   onChange,
   disabled,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
+  placeholder?: string;
 }) {
   return (
     <label className="text-sm text-ink/70 flex flex-col gap-1 capitalize">
@@ -1504,8 +1694,9 @@ function Field({
       <input
         value={value}
         disabled={disabled}
+        placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="border border-line rounded-lg px-3 py-2 bg-surface disabled:bg-paper disabled:text-ink/70 normal-case"
+        className="border border-line rounded-lg px-3 py-2 bg-surface disabled:bg-paper disabled:text-ink/70 normal-case w-full min-w-0"
       />
     </label>
   );
