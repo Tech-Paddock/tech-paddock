@@ -1,80 +1,80 @@
 # Coffee — handoff
 
-State as of 2026-09-19.
-
-Read `RULES.md` first. This file is only what is true right now.
+State as of 2026-09-20. Read `RULES.md` first; this file is only what is true right now.
 
 ---
 
 ## What is true now
 
 **It is live at `coffee.techpaddock.io`**, behind the password gate, installed to the iPhone home
-screen and confirmed on a phone. The whole flow has run end to end against a real bag.
+screen. The whole flow has run end to end against a real bag.
 
 **Save comes before the search**, and the page polls the row rather than waiting: the search takes
 minutes with nothing on the connection, so a phone calls it dead. Two answers were lost that way.
+**It can be run again from the shelf** — same call, same polling, and it refreshes the link too.
 
-**A `none` is no longer the end of the screen.** Joel asked on 2026-09-19 for Sonnet 5 to suggest a
-recipe when the roaster published nothing. It lands in `suggested_recipe`, **never `guide_*`**, with
-no quote and no URL because it read nothing — no web tools on that call. The light still says **No
-Recipe Found**, which is still true. `RULES.md` §1 carries the amendment; the risk it names is
-wording, so the copy lives in `guideDisplay.ts` under test.
+**A `none` is no longer the end of the screen.** Sonnet 5 suggests a recipe where the roaster
+published none. It lands in `suggested_recipe`, **never `guide_*`**, with no quote and no URL because
+it read nothing — no web tools on that call. The light still says **No Recipe Found**, which is still
+true. `RULES.md` §1 carries the amendment; the risk it names is wording, so the copy is under test.
 
-**The search is a comparison harness.** Model and effort are selectable and recorded; a weaker model
-is safe because `validateGuide` enforces quote-backing in code. `lib/models.ts` is a registry: each
-model/effort mismatch is a 400. The suggestion is **not** on that dial — nothing for it to retrieve.
+**The search is a comparison harness.** Model and effort are selectable, recorded, and validated by
+`lib/models.ts`; a weaker one is safe because `validateGuide` enforces quote-backing in code.
+**Neither the suggestion nor Search again is on that dial.**
 
 **A bag is a purchase; a brew is one attempt at it.** `extraction_yield` is generated and ppm never
-stored, both to stop one measurement being written twice. **Measurement, or function of them?**
+stored, to stop one measurement being written twice. **Measurement, or a function of them?** **The
+brew form works in dose, ratio and water, and any two give the third**, and **the ratio has no
+column** — water over dose, derived in `lib/brews.ts`, dropped before the POST, and rounded whole
+since 2026-09-20. `water_g` is *not* `beverage_g`: water in, not what came out. **Beverage mass, TDS
+and extraction are commented out of the form**, not deleted — uncomment to restore.
 
-**The brew form works in dose, ratio and water, and any two give the third.** **The ratio has no
-column** — water over dose, derived in `lib/brews.ts` and dropped before the POST. `water_g` is *not*
-`beverage_g`: water in, not what came out of the bed.
+**Brew time is a real field**, whole seconds in `brew_seconds`, typed and shown as `m:ss`. **It is a
+reading**: it neither repeats into the next brew nor prefills from `guide_time`, and a bare "3" is
+refused rather than guessed at.
 
 **A new brew opens as a repeat of the last one, then as the roaster's numbers** — `openingBrew`, your
-last brew winning field by field, no reading carried. **A suggestion does not feed it, settled** —
-Joel, 2026-09-19. You read it and type it, and typing it is where you decide to use it.
+last brew winning field by field, no reading carried. **A suggestion does not feed it, settled**:
+you read it and type it, and typing it is where you decide to use it.
 
-**Beverage mass, TDS and extraction are commented out in the form**, not deleted — uncomment to restore.
+**Roast date is a real date field** beside Purchased on one row — the gap is the age of the coffee.
+The label's date goes through `lib/dates.ts`; an ambiguous `05/06/2026` is refused and shown as text.
+**A date input on iOS sets its own minimum width**, so `globals.css` turns that off; without it the
+second of two on a row runs past the card.
 
-**Roast date is a real date field**, and it sits beside Purchased on one row — the gap between the
-two is the age of the coffee. What the label printed goes through `lib/dates.ts` first; an ambiguous
-`05/06/2026` is refused and shown as text rather than guessed.
-
-**The bag pill carries "Beans ↗"** as a *sibling* of the expand toggle, never nested: an `<a>` inside
-a `<button>` is invalid markup and browsers disagree about what a tap does. Keep them siblings.
-
-**The guide tier is a three-state indicator** — green Found, amber Non-Specific, red No Recipe,
-expanding to the quote. **The card is three sections**: This bag, Recipe, Brews, Save beside Delete.
-
-**The icon is a pour-over in the JPS livery**, every colour a `theme.css` token. **Its two gold rules
-are structural** — a near-black tile loses its edge on a dark wallpaper. It has **no alpha**.
+**The guide tier is a three-state indicator** — green Found, amber Non-Specific, red No Recipe — a
+quiet grey italic line since 2026-09-20, expanding to the quote. **The card is three sections**: This
+bag, Recipe, Brews. **A brew pill leads with its rating** and carries no grinder.
 
 ## Traps specific to this app
 
 - **An empty result and an unread result must not render the same.** Four times in this one app a
   failure rendered as a plausible empty answer. **Adding a read path here? Check this first.**
-- **A bag needs a purchase date, and the error names it.** That empty field sent `{}`, the route
-  correctly refused it, and the page said "Couldn't save that bag" about a bag saved minutes
-  earlier. `lib/patch.ts` holds both halves: the requirement, and sending only what moved.
-- **Neither model call can be exercised from a Claude Code sandbox.** Roaster domains are blocked by
-  the egress proxy and the suggestion needs a real key. Tests cover the validation and the coercion
-  against recorded shapes. **Do not conclude either feature works because the tests pass.**
+- **A bag needs a purchase date, and the error names it.** That empty field sent `{}` and the page
+  said "Couldn't save that bag" about a bag saved minutes earlier. `lib/patch.ts` holds both
+  halves: the requirement, and sending only what moved.
+- **Neither model call can be exercised from a Claude Code sandbox** — roaster domains are blocked
+  by the egress proxy and the suggestion needs a real key. Tests cover the validation and the
+  coercion against recorded shapes. **Do not conclude either works because the tests pass.**
 - **Two brewer vocabularies, and `myBrewerFor` crosses only on an exact match.** A bare "V60" does
   not map: two are on the shelf and the roaster did not say which. Rounding is the same invention.
-- **The icon is a static import**, from `/_next/static` — the one prefix the middleware excludes.
+- **The icon is a pour-over in the JPS livery**, every colour a token, **no alpha**, its two gold
+  rules structural. **A static import**, from `/_next/static` — the one prefix middleware excludes.
+- **"Beans ↗" is a *sibling* of the expand toggle, never nested.** An `<a>` inside a `<button>` is
+  invalid markup and browsers disagree about what a tap does.
 - **`guide_status` records where instructions were read, not who they were written for.** Sweet Bloom
   print the same recipe on every page, so nothing should rank or filter on tier 1.
 
 ## In flight
 
-**#138 merged at 19:20 UTC**, migration and all. `claude/coffee-dates-side-by-side` is my only open
-branch: the two date fields share a row. **`claude/coffee-roast-date-and-suggested-recipe` is back on
-the remote and should not be** — a push landed after the merge deleted it. Clutter, Joel's to remove.
+`claude/coffee-recipe-and-brew-pill` is my only open branch: Search again, brew time, whole numbers,
+the date-box fix, the quiet tier line, the reshaped pill, and migration `20260920135705` — additive,
+one nullable column. **`claude/coffee-roast-date-and-suggested-recipe` is still on the remote and
+should not be**: merged history, clutter, Joel's to remove.
 
 ## Next
 
-1. **Confirm `20260919175624` was applied and the suggestion works on a real bag.** Nothing in the
-   sandbox can, and a missing column fails only the suggestion write — quietly, on the live site.
+1. **Confirm `20260919175624` and `20260920135705` were applied.** Nothing in the sandbox can, and a
+   missing column fails only the suggestion or the brew time — quietly, on the live site.
 2. **Run one coffee twice, Haiku then Sonnet 5 at `high`**, and compare the tiers. The open question.
-3. The deliberately-unbuilt list — timer, inventory, method lookup table — stays unbuilt until asked.
+3. The deliberately-unbuilt list — timer, inventory, method table — stays unbuilt until asked.
