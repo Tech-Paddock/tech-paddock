@@ -45,6 +45,11 @@ second of two on a row runs past the card.
 quiet grey italic line since 2026-09-20, expanding to the quote. **The card is three sections**: This
 bag, Recipe, Brews. **A brew pill leads with its rating** and carries no grinder.
 
+**Grind setting rounds to one decimal place.** `formatGrindSetting` applies at save and at display,
+because the one grinder on the shelf has a stepped dial in tenths — "4" hides which tenth it sat on,
+"4.53" is not a setting it can be turned to. It also normalizes an unformatted value when a brew
+repeats. Non-numeric text passes through unchanged.
+
 ## Traps specific to this app
 
 - **An empty result and an unread result must not render the same.** Four times in this one app a
@@ -67,9 +72,10 @@ bag, Recipe, Brews. **A brew pill leads with its rating** and carries no grinder
 ## In flight
 
 `claude/coffee-recipe-and-brew-pill`, **open as #161**, is my only branch: Search again, brew time,
-whole numbers, the date-box fix, the quiet tier line, the reshaped pill, and the `coffee_brews_time`
-migration — additive, one nullable column, the gate's to apply before merging. **`claude/coffee-roast-date-and-suggested-recipe` is still on the
-remote and should not be**, measured today: merged history, clutter, Joel's to remove.
+whole numbers, the date-box fix, the quiet tier line, the reshaped pill, one-decimal grind settings,
+and the `coffee_brews_time` migration — additive, one nullable column, the gate's to apply before
+merging. **`claude/coffee-roast-date-and-suggested-recipe` is still on the remote and should not
+be**, measured today: merged history, clutter, Joel's to remove.
 
 ## Next
 
