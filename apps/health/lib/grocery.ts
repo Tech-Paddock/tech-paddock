@@ -8,8 +8,27 @@ import { LookupError } from "./items";
  * Soopers as text you copy or a search link you tap — no stored credential, no
  * OAuth, no carve-out in `middleware.ts`. Pushing straight into a Kroger cart
  * needs all three, and the only thing it buys is who does the tapping.
+ *
+ * **Half of the ask that created this file now lives in another tool.** Joel
+ * asked for a list built *"from recipes or random items I add"*; recipes became
+ * their own app with their own schema on 2026-09-20, and a list of their own
+ * came with them. What is left here is the *random items* half — the recipe
+ * half is not arriving, because it is already built over there.
+ *
+ * **Where this list itself ends up is not this file's to assume.** It stays
+ * Health's until the technical director sequences the move, which is
+ * destructive and therefore two pull requests. Nothing here should read as
+ * though that has a date.
  */
 
+/**
+ * Where a line came from.
+ *
+ * **Nothing here writes `recipe`, and the tool that would have is now a
+ * different app** — it pushes a recipe's ingredients onto its own list, in its
+ * own schema. The value stays because it is in the live enum, and narrowing an
+ * enum is a destructive migration rather than a type edit.
+ */
 export type GrocerySource = "manual" | "recipe";
 
 export type GroceryItem = {
@@ -155,9 +174,10 @@ export async function applyTidy(open: GroceryItem[], lines: TidyLine[]): Promise
 
   // Where every row a line absorbed came from the same place, the new line came
   // from there too. A merge of mixed sources is `manual`, because that is what
-  // it now is. Nothing produces `recipe` yet — recipes are parked — but the
-  // column exists, and flattening it silently is the kind of loss that is only
-  // noticed long after the feature that would have cared about it lands.
+  // it now is. Every row on this list reads `manual` and nothing here makes
+  // another today, so this preserves a value it may never meet — kept rather
+  // than flattened because the column is live, and what might fill it is a
+  // cross-app contract still being designed rather than a feature ruled out.
   const sourceOf = (l: TidyLine): GrocerySource => {
     const sources = new Set(
       l.absorbed.map((id) => open.find((i) => i.id === id)?.source).filter(Boolean)

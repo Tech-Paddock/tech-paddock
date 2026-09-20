@@ -8,11 +8,12 @@ export const dynamic = "force-dynamic";
 /**
  * The grocery list.
  *
- * A second product screen, which the charter did not allow when it was written
- * — the amendment proposed in this change is what makes it legitimate, rather
- * than the fact that it now exists. Like `/debug`, it needs no `middleware.ts`
- * edit: the matcher is a catch-all negative, so it is behind the password gate
- * already.
+ * A second product screen, which the charter did not allow when it was written.
+ * Joel approved the amendment that makes one legitimate on 2026-09-19 — a
+ * screen is earned by being a different *moment*, never a different noun — and
+ * that, rather than the fact this exists, is what licenses it. Like `/debug`,
+ * it needs no `middleware.ts` edit: the matcher is a catch-all negative, so it
+ * is behind the password gate already.
  */
 export default function Page() {
   return (
