@@ -182,6 +182,17 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.conf
     const cmd = cfg.ignoreCommand;
     if (typeof cmd !== "string") { hard.push(`${app}: no ignoreCommand, so every merge rebuilds it`); continue; }
     if (!/VERCEL_ENV.*preview/.test(cmd)) hard.push(`${app}: ignoreCommand no longer skips previews`);
+    /* Vercel's own schema caps this at 256 characters, and it does not fail the
+       way you would hope. The deployment does not fall back to building — it is
+       rejected outright, "vercel.json schema validation failed", so EVERY deploy
+       of that app stops including production. It cost one deployment here on
+       2026-09-20, caught only because the On track work was being tested live;
+       nothing in CI reads Vercel's schema. The warn band is the point: this
+       command grows by twice the length of an app's name, so an app with a
+       longer name is how it goes over next, so the warn band sits just above
+       today's longest rather than at a round number. */
+    if (cmd.length > 256) hard.push(`${app}: ignoreCommand is ${cmd.length} characters — Vercel's limit is 256, and over it EVERY deploy of this app is rejected, production included`);
+    else if (cmd.length > 245) soft.push(`${app}: ignoreCommand is ${cmd.length} of Vercel's 256 characters`);
     const named = [...cmd.matchAll(/apps\/([A-Za-z0-9._-]+)/g)].map((m) => m[1]);
     if (!named.includes(app)) hard.push(`${app}: ignoreCommand watches no path under apps/${app}`);
     const foreign = named.filter((n) => n !== app && APPS.includes(n));
