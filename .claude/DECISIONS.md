@@ -170,6 +170,21 @@ plausibly reopen or repeat, delete it; git keeps it.
   carry a question that has been answered. **What is still open is the livery, item 24, not this.**
   If a fourth app ever needs the *identical* registry, reopen it then — additive, and on evidence.
 
+- **2026-09-20 — one board, not seven. Every agent except the technical director signs off in
+  chat.** Joel: *"You continue to generate paddock debrief as laid out. Everyone else no more
+  paddock debriefs. I just want DevOps and open items from that agent within the body of the chat."*
+  This reverses the 2026-09-18 extension that gave every agent a page of its own. **The reason he
+  gave is agent turnover**, asked directly: *"With the quicker turnover of agents, it just makes
+  sense."* **A board is a persistent page and an agent is no longer a persistent thing.** The 09-18
+  design assumed an agent that ran for weeks and curated one page; agents are now archived and
+  restarted often, so each page outlives the agent that owned it and goes stale with nobody left who
+  would notice. **A table in the message he is already reading cannot outlive anything.** The
+  readership evidence is the same call from the other side — a publish per agent, and he opened one. **Work Brief did not move to chat; it was dropped** for those
+  agents, and what was finished goes in the prose of the answer instead. The two tables survived
+  because a table is the part prose cannot carry. **The measuring rules did not change with the
+  medium** — live branches, live check runs, the ledger re-read off disk, update only what you
+  measured. `.claude/agents/BOARD.html` stays; it now has one caller.
+
 ## Mistakes — do not repeat
 
 - **Merging a second change on a gate result taken before the first.** #69 and #70 were merged past
@@ -261,13 +276,39 @@ plausibly reopen or repeat, delete it; git keeps it.
   "unreachable while paused". `framework: null` does not mean a broken Root Directory — `tp-health`
   reads null, skips previews from its own `vercel.json`, builds `READY`, and serves a `verified`
   `health.techpaddock.io`. **Health is live**, and was called unreachable for a day on that field.
+- **2026-09-20 — Vercel's Redeploy button is a no-op in this repo, for every app.** The Ignored
+  Build Step is a pure function of `HEAD^..HEAD`, so re-running it on the same commit returns the
+  same answer every time, and an empty commit produces the same empty diff. **That makes an
+  environment variable impossible to pick up from the dashboard** — a deployment's env snapshot is
+  taken when it is *created*, so editing a variable changes nothing until a new build exists. It
+  cost the Cookbook its bring-up: `tp-cookbook` served the `5c7a399` build, correct and live, while
+  three redeploys carrying `ANTHROPIC_API_KEY` were cancelled in turn. **The proof that nothing was
+  broken is `tp-home` on `68ffc52`** — alone among the seven it watches `.claude`, and alone among
+  the seven it built. Six apps skipping a docs-only merge is the feature working.
+  **The fix, landed the same day: every `ignoreCommand` now reads `FORCE_BUILD`.** Set it to
+  anything on the Vercel project, redeploy, remove it. It sits **after the preview check and before
+  the diff**, so it forces production only and previews stay ruled out — a separate settled call it
+  must not quietly undo. **It cost 43 characters**, taking the longest command from 175 to 218, and
+  **moved `drift`'s warn band from 200 to 235** because seven permanent warns would have been worse
+  than none: a band nobody can clear is a band everybody learns to scroll past. The hard fail at 256
+  is the real guard and is unchanged. **From git the way out is still a commit touching that app's
+  folder or `packages`**, and `packages` rebuilds all seven at once, which is why it rides in every
+  pathspec.
+- **2026-09-20 — the measurement behind `CLAUDE.md`'s "the proxy refuses it", so nobody re-tests
+  it.** That file already says an agent cannot delete a remote branch here; what it does not say is
+  how the refusal arrives, which is why it gets tried anyway. **`git push origin --delete` hangs up
+  mid-sideband** — `send-pack: unexpected disconnect`, which reads like a network blip and invites
+  a retry. **`DELETE /git/refs/heads/...` returns 403, "Write access to this GitHub API path is not
+  permitted through this proxy."** Four attempts each, on 2026-09-20. **Pushes that create or update
+  a ref work fine**, which is what makes the deletion case surprising. Neither is transient: stop
+  after the first and ask Joel.
 ## Known, deliberately not fixed
 
-- **Every push still rebuilds every Vercel project.** #57 fixed the GitHub Actions half only. The
-  agreed fix is one `ignoreCommand` line per app's `vercel.json`, written up in the Platform handoff
-  and not landed. Note the *Skip deployments when there are no changes* toggle does **not** behave as
-  its label suggests here — `tp-coffee-app` had it enabled and rebuilt twice from a `.claude/`-only
-  commit. Do not plan around it.
+- **Vercel's *Skip deployments when there are no changes* toggle does not behave as its label
+  suggests here.** `tp-coffee-app` had it enabled and rebuilt twice from a `.claude/`-only commit.
+  Do not plan around it; the `ignoreCommand` in each app's `vercel.json` is what actually scopes a
+  build, and all seven carry one. *This bullet used to say that fix was agreed and not landed. It
+  has been landed since 2026-09-19, proved itself on 2026-09-20, and the claim outlived it.*
 - **`/api/health` sits behind the password gate**, so no external monitor can reach it.
 - **`editor.model_status` has zero rows.** The login-time drift check has never once successfully
   written. The oldest unexplained thing in the project.
