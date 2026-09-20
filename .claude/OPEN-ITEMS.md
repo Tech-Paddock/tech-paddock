@@ -22,11 +22,13 @@ Nothing.
 
 ## Waiting on Joel
 
-3. **Say what `On track` means now that previews are ruled out.** *Owner: Joel.* It was built on a
-   preview trigger and you said no to previews, so #156 stripped it back — no fourth phrase, no
-   sixth colour. **My recommendation needs no machinery at all: merged and live on the real domain,
-   waiting on your verdict**, because merging already deploys in about a minute. Say yes, or say
-   what you meant instead. *LoE: minutes.*
+3. **Do you still want to drive a branch before it merges? `On track` was only ever that.**
+   *Owner: Joel.* It existed as the one controlled exception to previews being off, so ruling
+   previews out removed it; #156 stripped it back to nothing. **The gap is real** — every other
+   stage is answered by reading a diff, which tells you nothing about a phone app. **Three answers,
+   all fine**: merged-and-live-waiting-on-your-verdict, which needs no machinery; a real preview,
+   which needs preview env vars and a Supabase branch so it is not reading production; or close it
+   and keep merge-then-look. The story is in `DECISIONS.md`. *LoE: minutes.*
 
 21. **The Cookbook is its own app and its own schema. #151 is closed and
    `claude/health-recipes` is kept on purpose — do not delete that branch.** *Owner: Joel.* Settled

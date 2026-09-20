@@ -127,6 +127,29 @@ plausibly reopen or repeat, delete it; git keeps it.
   thing it exists to prevent. The roster check had the mirror flaw — it required a determiner, so
   "five apps means five agents" went unseen through three re-measures of the item that existed to
   find it. It now measures the cardinal against `apps/` instead of flagging any number.
+- **2026-09-20 — An agent publishes only its own board. Joel walked back the merge-refresh rule.**
+  On 2026-09-19 the TD was told a merge should also refresh the merged agent's board — their DevOps
+  row and a dated TD banner. **Joel reversed it on 2026-09-20: "Don't push updates to other agents
+  artifacts."** It never reached `CLAUDE.md`, so it lived in exactly one place, the TD's handoff,
+  and it is gone from there. **The 2026-09-18 rule is untouched and still stands**: every agent
+  publishes its own board, to the URL in its own kickoff block. What changes is that a merge now
+  leaves the merged agent's board alone, stale or not — **their row is theirs to write, and an
+  agent's board is not a channel anyone else writes to.** The TD's board remains the rollup and is
+  still the only one that reports every agent; the rollup is read from the repo, never written back.
+- **2026-09-20 — Preview deployments stay off, and that is what removed the `On track` stage.**
+  #108 turned previews off on 2026-09-17: 65 of the last 100 deployments were previews of work still
+  being thought about, on URLs nobody opened, paying Vercel to rebuild what CI had just built free.
+  **`On track` was agreed the same day and existed only as the controlled exception to it** — a
+  fourth phrase and a sixth DevOps colour for a branch deployed to a URL Joel could actually drive
+  before deciding whether it merged. **The gap it filled is real and is still open**: all five
+  stages are answered by a *decision* taken from reading a diff, and for a phone app like Coffee a
+  diff says nothing about whether the thing is any good. #156 built it on `.claude/ON-TRACK`, a
+  marker file every `ignoreCommand` grepped, and **Joel then ruled previews out entirely, which left
+  the stage with no mechanism at all**, so it was stripped back out the same day — no marker, no
+  grep, no phrase, no colour, `CLAUDE.md` untouched. **Do not rebuild it without reading ledger item
+  3 first.** The honest version needs preview-scoped environment variables and a Supabase branch, so
+  what is driven is not reading production data — infrastructure and money, and therefore Joel's.
+  **Closing item 3 outright is a legitimate answer** and merge-then-look stays how this works.
 ## Mistakes — do not repeat
 
 - **Merging a second change on a gate result taken before the first.** #69 and #70 were merged past
