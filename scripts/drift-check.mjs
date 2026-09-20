@@ -186,13 +186,16 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.conf
        way you would hope. The deployment does not fall back to building — it is
        rejected outright, "vercel.json schema validation failed", so EVERY deploy
        of that app stops including production. It cost one deployment here on
-       2026-09-20, caught only because the On track work was being tested live;
-       nothing in CI reads Vercel's schema. The warn band is the point: this
-       command grows by twice the length of an app's name, so an app with a
-       longer name is how it goes over next, so the warn band sits just above
-       today's longest rather than at a round number. */
+       2026-09-20, on a draft of this command that ran 300 characters, and
+       nothing in CI reads Vercel's schema — the only reason it was caught is
+       that someone happened to be watching a deployment at the time.
+       The warn band exists because the failure is all-or-nothing and arrives
+       with no approach: at 256 everything of that app's stops deploying, at 255
+       everything is fine. Today's longest is 175, so 200 is the first length
+       that means somebody deliberately grew this rather than an app simply
+       having a longer name. */
     if (cmd.length > 256) hard.push(`${app}: ignoreCommand is ${cmd.length} characters — Vercel's limit is 256, and over it EVERY deploy of this app is rejected, production included`);
-    else if (cmd.length > 245) soft.push(`${app}: ignoreCommand is ${cmd.length} of Vercel's 256 characters`);
+    else if (cmd.length > 200) soft.push(`${app}: ignoreCommand is ${cmd.length} of Vercel's 256 characters`);
     const named = [...cmd.matchAll(/apps\/([A-Za-z0-9._-]+)/g)].map((m) => m[1]);
     if (!named.includes(app)) hard.push(`${app}: ignoreCommand watches no path under apps/${app}`);
     const foreign = named.filter((n) => n !== app && APPS.includes(n));
@@ -203,71 +206,6 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "next.conf
     hard.length ? hard.join("; ")
       : soft.length ? soft.join("; ")
         : `${APPS.length} apps, each skipping a merge that does not touch it`);
-}
-
-/* ── The On track marker, and the one place it must never be ──────────────
-   `.claude/ON-TRACK` is the deploy trigger for the On track stage: every
-   app's ignoreCommand greps it, and a name listed there turns that app's
-   preview build on for the branch carrying the file.
-
-   Three ways it goes wrong, and only the first is obvious.
-
-   A name that is not an app folder is the ignoreCommand typo again wearing a
-   different hat — `grep -qxF` simply never matches, so the agent is told the
-   branch is deployed and nothing was ever built. Silent, and the only symptom
-   is a URL that 404s. It FAILS.
-
-   A name still listed on `main` means a branch merged switched on, and from
-   then on every push to main builds a preview nobody asked for. It FAILS, and
-   the technical director empties the file at the gate so it never gets here.
-
-   A name listed on a branch is correct and expected — but it is also a live
-   deployment of unmerged code, so it WARNS rather than passing quietly. A
-   preview that nobody remembers is running is the thing this file makes cheap
-   to create, so it is the thing the check has to keep saying out loud.
-
-   The file missing entirely is a fail, not a warn: every grep then fails, every
-   preview skips, and On track stops working with nothing to say so. That is
-   the silent-skip failure #57 and the ignoreCommand check both exist to stop. */
-{
-  const name = "On track marker is off, and names real apps";
-  const rel = ".claude/ON-TRACK";
-  const text = read(R(rel));
-
-  if (text === null) {
-    add(name, "fail", `${rel} is missing — every preview silently skips and On track stops working`);
-  } else {
-    const listed = text.split("\n").map((l) => l.trim())
-      .filter((l) => l && !l.startsWith("#"));
-    const unknown = listed.filter((a) => !APPS.includes(a));
-
-    /* Which ref this is, asked of the ref and never of the commit. Comparing
-       HEAD to origin/main looks equivalent and is not: a branch cut from main
-       that has no commit yet points at exactly main's commit, and an agent
-       doing entirely correct work would be told their branch had merged
-       switched on. Actions leaves HEAD detached but sets GITHUB_REF, and off
-       CI the branch name reads straight out of git. A pull_request event's
-       refs/pull/N/merge is not main, which is right — a pull request is still
-       a branch here. */
-    const ref = process.env.GITHUB_REF || git("rev-parse", "--abbrev-ref", "HEAD");
-    const onMain = ref === "refs/heads/main" || ref === "main";
-
-    if (unknown.length) {
-      add(name, "fail",
-        `${rel} lists ${unknown.join(", ")}, which ${unknown.length === 1 ? "is not an app" : "are not apps"} under apps/ — ` +
-        `the ignoreCommand grep never matches, so that preview is never built and nothing says so`);
-    } else if (listed.length === 0) {
-      add(name, "ok", `${rel} lists no app — previews skip, which is the default`);
-    } else if (onMain) {
-      add(name, "fail",
-        `${rel} still lists ${listed.join(", ")} on main — a branch merged switched on, and every ` +
-        `push to main now builds a preview. Empty the file; the gate is where that happens.`);
-    } else {
-      add(name, "warn",
-        `${listed.join(", ")} deployed as a preview from this branch — unmerged code, live behind ` +
-        `Vercel Authentication. Empty ${rel} before this merges; drift fails it on main.`);
-    }
-  }
 }
 
 /* 4 ── Budgets. CI fails the breach; this reports the approach, because a file

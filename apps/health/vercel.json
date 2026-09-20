@@ -1,4 +1,4 @@
 {
   "framework": "nextjs",
-  "ignoreCommand": "R=$(git rev-parse --show-toplevel 2>/dev/null); if [ \"$VERCEL_ENV\" = preview ]; then grep -qxF health \"$R/.claude/ON-TRACK\" && exit 1; exit 0; fi; cd \"$R\" || exit 1; git diff --quiet HEAD^ HEAD -- apps/health packages || exit 1; exit 0"
+  "ignoreCommand": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then exit 0; fi; cd \"$(git rev-parse --show-toplevel)\" || exit 1; git diff --quiet HEAD^ HEAD -- apps/health packages || exit 1; exit 0"
 }

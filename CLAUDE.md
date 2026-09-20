@@ -146,7 +146,7 @@ wrong or the rule is, and that is a conversation before any code exists.
   **No other agent can see the conversation where he asked**, so the request lands in the repo or it
   did not happen. `requested-by-joel` fails a body without that line. What no check can see is
   whether the quote is real, so **this rule rests further on honesty than the ones around it.**
-- **Four phrases from Joel mean four specific things.** They exist so he can move work without
+- **Three phrases from Joel mean three specific things.** They exist so he can move work without
   spelling out the steps each time, and so the steps are the same for every agent.
 
   **"Close out."** Finish what you are on, commit and push, update your `HANDOFF.md`, and **open the
@@ -156,21 +156,6 @@ wrong or the rule is, and that is a conversation before any code exists.
 
   **"Park it."** The same, without the pull request. Stop at the pushed branch. He uses this when he
   wants the work safe but not in the queue.
-
-  **"On track."** Park it, and deploy it first. Finish, commit, push, update your `HANDOFF.md` —
-  then **add your app's folder name to `.claude/ON-TRACK` and push that too**, which is what turns
-  the preview build on. No pull request. He uses this when he wants to drive the thing before
-  deciding whether it merges at all.
-  **The marker file is the trigger and it is the whole trigger.** Every app's `ignoreCommand` greps
-  it, so a name listed there builds a preview of that app and of nothing else, on every push to that
-  branch. **This is why it is not an empty commit**, which the rules forbid: the commit adding your
-  name changes what the repo does. **Give him the URL** —
-  `https://<project>-git-<branch>-tech-paddock.vercel.app`, slashes and dots becoming dashes — and
-  **read it back from the deployment rather than deriving it**, because Vercel truncates and hashes
-  a long one. **Nothing you deploy this way is public**: Vercel Authentication covers every
-  `*.vercel.app` host, so it is reachable by his account and nobody else, with the app's own password
-  gate behind that. **The technical director empties `.claude/ON-TRACK` at the gate**, and `drift`
-  fails a `main` that still lists an app, so a branch cannot merge switched on.
 
   **"Pick up: <thing>."** New work. Come back with what you understand the job to be, what you would
   do first, and the second-order answers. **Do not cut a branch or write code until he answers** —
@@ -268,7 +253,7 @@ wrong or the rule is, and that is a conversation before any code exists.
 
   **2 · DevOps.** What exists and is not live yet, one line each, carrying **what it is, whose it
   is, and the stage it is parked at** — the owning agent is a column so he can see at a glance who a
-  branch belongs to, because a branch name does not always say. Six stages, in the order work moves
+  branch belongs to, because a branch name does not always say. Five stages, in the order work moves
   through them, and the words are the ones Joel reads — not git's:
 
   ```
@@ -278,7 +263,6 @@ wrong or the rule is, and that is a conversation before any code exists.
   | | Stage | Means |
   |---|---|---|
   | 🟡 | **In progress** | Still being worked on. Covers everything before it is finished, saved or not — that distinction is the agent's business, never his. |
-  | 🔵 | **On track** | Finished, pushed, and **deployed to a preview Joel can drive**. Give the URL. The agent has nothing left; he does. |
   | 🟡 | **Needs a PR** | Finished and pushed, CI green — but the pull request is still work, so it is yellow until Joel asks and the agent writes it. |
   | 🟢 | **Ready to merge** | Pull request open, CI green on its head. **The agent's work is finished here** — the only thing left is the technical director's merge. |
   | 🔴 | **Stuck** | CI failing, a merge conflict, or a step that errored. **Say what is broken, not just that it is.** |
@@ -291,15 +275,6 @@ wrong or the rule is, and that is a conversation before any code exists.
   **It cannot report another agent's in-progress work.** That lives in the other agent's session and
   never reaches the repo until it is pushed, so a line about it would be invented. This is the same
   rule as the ledger's: what you have not measured does not get a row.
-
-  **On track is blue because the next move is his hands on the thing, not his yes.** Every other
-  stage is answered by a decision — ask for the pull request, merge it, delete the branch. This one
-  is answered by using the app, which takes as long as it takes and is the only stage where nothing
-  at all is owed by anyone until he has. **The row carries a URL or it is not an On track row**: a
-  stage that says something is deployed without saying where is the same failure as a handoff that
-  says a thing is live without saying how you would know. **It ends in one of two places** — he asks
-  for the pull request and it turns yellow, or he wants it different and it turns yellow the other
-  way, back to *In progress*.
 
   **Needs deletion is nearly always Joel's action, which is why it gets its own colour.** No agent
   can delete a remote branch here — the proxy refuses it — so a dead branch stays listed until he

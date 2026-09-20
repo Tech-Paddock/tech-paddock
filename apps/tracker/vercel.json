@@ -1,6 +1,6 @@
 {
   "framework": "nextjs",
-  "ignoreCommand": "R=$(git rev-parse --show-toplevel 2>/dev/null); if [ \"$VERCEL_ENV\" = preview ]; then grep -qxF tracker \"$R/.claude/ON-TRACK\" && exit 1; exit 0; fi; cd \"$R\" || exit 1; git diff --quiet HEAD^ HEAD -- apps/tracker packages || exit 1; exit 0",
+  "ignoreCommand": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then exit 0; fi; cd \"$(git rev-parse --show-toplevel)\" || exit 1; git diff --quiet HEAD^ HEAD -- apps/tracker packages || exit 1; exit 0",
   "crons": [
     {
       "path": "/api/cron/stale-tasks",
