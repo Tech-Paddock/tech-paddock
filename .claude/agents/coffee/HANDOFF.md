@@ -66,9 +66,9 @@ bag, Recipe, Brews. **A brew pill leads with its rating** and carries no grinder
 
 ## In flight
 
-`claude/coffee-recipe-and-brew-pill` is my only open branch: Search again, brew time, whole numbers,
-the date-box fix, the quiet tier line, the reshaped pill, and the `coffee_brews_time` migration —
-additive, one nullable column. **`claude/coffee-roast-date-and-suggested-recipe` is still on the
+`claude/coffee-recipe-and-brew-pill`, **open as #161**, is my only branch: Search again, brew time,
+whole numbers, the date-box fix, the quiet tier line, the reshaped pill, and the `coffee_brews_time`
+migration — additive, one nullable column, the gate's to apply before merging. **`claude/coffee-roast-date-and-suggested-recipe` is still on the
 remote and should not be**, measured today: merged history, clutter, Joel's to remove.
 
 ## Next
