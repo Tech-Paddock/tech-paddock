@@ -207,6 +207,26 @@ function numText(value: string | number | null | undefined): string {
   return Number.isFinite(n) ? String(n) : String(value);
 }
 
+/**
+ * A dial setting, rounded to one decimal place.
+ *
+ * The one grinder on the shelf — the Fellow Ode 2 — has a stepped dial in
+ * tenths, so "4.5" is a real setting and "4.53" is not: the grinder cannot
+ * be turned to that, and "4" hides which tenth it actually sat on. Applied
+ * at save and at display, the same two points `formatBrewTime` and the
+ * ratio rounding already apply at. Non-numeric text passes through
+ * unchanged rather than being dropped, in case a grinder someday scores its
+ * dial by name rather than by number.
+ */
+export function formatGrindSetting(value: string | null | undefined): string {
+  if (value == null) return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return trimmed;
+  return n.toFixed(1);
+}
+
 /** A field as a number, or null when it is blank or not one. */
 function num(value: string): number | null {
   if (!value.trim()) return null;
@@ -328,7 +348,7 @@ export function repeatOf(previous: PreviousBrew | null | undefined): BrewDraft {
     // The grinder keeps its default rather than blanking, because a previous
     // brew that recorded none says nothing about which one is on the counter.
     grinder: previous.grinder ?? blank.grinder,
-    grind_setting: previous.grind_setting ?? "",
+    grind_setting: formatGrindSetting(previous.grind_setting),
     dose_g: dose,
     water_g: water,
     ratio: ratio == null ? "" : String(ratio),

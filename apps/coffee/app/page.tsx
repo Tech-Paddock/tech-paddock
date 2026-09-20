@@ -13,6 +13,7 @@ import {
   openingBrew,
   parseBrewTime,
   formatBrewTime,
+  formatGrindSetting,
   withDose,
   withRatio,
   withWater,
@@ -1031,7 +1032,12 @@ function Brews({
       const res = await fetch(`/api/bags/${bagId}/brews`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...row, brew_seconds: seconds, rating }),
+        body: JSON.stringify({
+          ...row,
+          grind_setting: formatGrindSetting(draft.grind_setting),
+          brew_seconds: seconds,
+          rating,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Couldn't log that brew.");
@@ -1279,7 +1285,7 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
       </div>
 
       {brew.grind_setting && (
-        <span className="text-sm text-ink/60">Grind {brew.grind_setting}</span>
+        <span className="text-sm text-ink/60">Grind {formatGrindSetting(brew.grind_setting)}</span>
       )}
 
       {(recipe || time) && (

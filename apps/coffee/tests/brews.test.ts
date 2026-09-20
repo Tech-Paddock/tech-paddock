@@ -17,6 +17,7 @@ import {
   openingBrew,
   parseBrewTime,
   formatBrewTime,
+  formatGrindSetting,
   TDS_TARGET,
   YIELD_TARGET,
 } from "@/lib/brews";
@@ -371,5 +372,28 @@ describe("brew time", () => {
     // started — the same line beverage mass, TDS and rating already sit on.
     expect(repeatOf({ brewer: "v60-02", dose_g: 18, water_g: 306 }).time).toBe("");
     expect(openingBrew(null, { dose: "18g", ratio: "1:17" }).draft.time).toBe("");
+  });
+});
+
+describe("grind setting", () => {
+  it("rounds to one decimal place, because the dial is stepped in tenths", () => {
+    expect(formatGrindSetting("4.5")).toBe("4.5");
+    expect(formatGrindSetting("4.53")).toBe("4.5");
+    expect(formatGrindSetting("4")).toBe("4.0");
+    expect(formatGrindSetting("4.96")).toBe("5.0");
+  });
+
+  it("is blank for nothing, and passes non-numeric text through", () => {
+    expect(formatGrindSetting(null)).toBe("");
+    expect(formatGrindSetting(undefined)).toBe("");
+    expect(formatGrindSetting("")).toBe("");
+    expect(formatGrindSetting("  ")).toBe("");
+    expect(formatGrindSetting("fine")).toBe("fine");
+  });
+
+  it("normalizes an unformatted setting on repeat", () => {
+    expect(repeatOf({ grind_setting: "4" }).grind_setting).toBe("4.0");
+    expect(repeatOf({ grind_setting: "4.5" }).grind_setting).toBe("4.5");
+    expect(repeatOf({ grind_setting: null }).grind_setting).toBe("");
   });
 });
