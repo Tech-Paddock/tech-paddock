@@ -22,9 +22,6 @@ Nothing.
 
 ## Waiting on Joel
 
-18. **`DECISIONS.md` is full — 260/260, and three copies of its ceiling disagree.** *Owner: Joel.*
-   **Its header's trimming rule exists and has never fired.** Raise the ceiling, or bound by relevance. *LoE: minutes.*
-
 21. **The Cookbook is its own app and its own schema. #151 is closed and
    `claude/health-recipes` is kept on purpose — do not delete that branch.** *Owner: Joel.* Settled
    2026-09-20: named, themed as a cookbook, and **Health reads it to price a meal** rather than

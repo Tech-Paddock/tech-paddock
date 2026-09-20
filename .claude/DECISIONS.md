@@ -1,12 +1,22 @@
 # Decisions, mistakes and traps
 
 **This is the only append-only file in the repo.** Everything else describes now and gets
-overwritten. This describes what was settled, so it accumulates — which makes it the file most
-likely to become the next 588-line ledger. It has a ceiling: **200 lines.** When an entry stops
-being something anyone would plausibly reopen or repeat, delete it. Git keeps it.
+overwritten. This describes what was settled, so it accumulates.
 
-**Not read at session start.** Read it when you are about to reopen a decision, or when you have
-just been bitten by something and want to know whether it is known.
+**Append inside the section that describes your entry — never at the end of the file.** On
+2026-09-20 sixty-six of this file's lines were found filed under a repo-transfer runbook, which was
+simply the last heading: why ledger numbers are permanent, why the editor is paused, how to read
+Vercel state. Nothing was wrong with any entry and nobody would ever have found them. **There is no
+default section and the last one is not it.** Pick the heading, then append under it.
+
+**Ceiling: 400 lines**, raised from 260 on 2026-09-20 with Joel's word. **The number is deliberately
+loose, because this file's budget is not the ledger's.** `.claude/OPEN-ITEMS.md` is printed into
+every session by a hook, so each of its lines is paid again in every session forever and 80 is
+strict on purpose. This one is **not read at session start** — read it when you are about to reopen
+a decision, or when you have just been bitten and want to know whether it is known. Rationing it
+only makes a settled call cheaper to relitigate than to look up, which is the failure it exists to
+prevent. **So do not trim to make room.** When an entry stops being something anyone would
+plausibly reopen or repeat, delete it; git keeps it.
 
 ---
 
@@ -82,7 +92,41 @@ just been bitten by something and want to know whether it is known.
   checks before the folder goes or nothing merges again; the Pit Wall serves what the tool served
   before the Vercel project and DNS record go, and those have no undo; `shared.contacts` needs its
   other owner named. The parked `CRON_SECRET` hazard retires with it — that window is this app's.
-
+- **2026-09-18 — Feed is deleted, not parked.** It lived in the settled tab order and nowhere else,
+  and shipped as a labelled empty slot that said so. Joel: *"drop the feed completely, not parked
+  deprecated."* **Board is renamed Pit Wall** in the same breath, because the hub's Board tab and
+  the technical director's published board were two things wearing one word, and that collision is
+  what made the hub hard to talk about.
+- **2026-09-18 — App surface belongs to the technical director, not TechPad Gen.** Surface is
+  site-or-app: shell, navigation, whether there is an index. That is architecture with visual
+  consequences, not palette — and `CLAUDE.md` enumerates the theme as *palette, tokens, type,
+  spacing, component language*, none of which it is. **It is settled at standup**, alongside the
+  name and the schema, because it fixes things that are expensive to change afterwards.
+- **2026-09-18 — Every agent publishes its own debrief board; the sign-off leaves chat.** The old
+  rule reserved a board for the technical director because *"a page published from one session
+  cannot be republished from another"* — **that was wrong**: another session updates a page by
+  passing its URL. So each agent gets a durable URL, carried in its kickoff block, and the real
+  risk was never the link count but sprawl from agents that do not know their own URL. **A row an
+  agent did not measure is left untouched**, which is what lets a board carry state across sessions.
+- **2026-09-19 — Ledger numbers are permanent, and closing an item leaves a gap.** They used to be
+  positional: close one and everything below shifted up on the next write. **That happened four times
+  on 2026-09-19** and broke a parked row's cross-reference, three numbers in the TD's handoff, the
+  entry directly above this one, and live references in two agents' branches — each pointing
+  confidently at the wrong item rather than at nothing, which is the failure the `#` column exists to
+  prevent. The ledger now carries `Next number:` and a new item takes it. **Numbering restarted at 15
+  because 1–14 had each meant several things that day.** `drift` fails a reuse, a duplicate, or a
+  renumber — the last by comparing titles against `origin/main`, since a tidy 1..N renumber is
+  otherwise indistinguishable from a correct file.
+- **2026-09-19 — a `drift` check is not finished until it has failed the case it exists to catch AND
+  passed the next legitimate edit.** Two checks shipped wrong in two days. The permanent-numbers
+  check passed a clean 1..N renumber, which is ascending and unique, until a title comparison against
+  `origin/main` was added. Then it read the ledger as one list and **failed the very first item added
+  under it**, because sections group by blocker while a new number is always the highest — so 15 in
+  `Waiting on Joel` sits above 2 in `Waiting on an agent`. Ascending is now per section. **A check
+  that fails a correct edit is worse than no check**: the way past it is to renumber, which is the
+  thing it exists to prevent. The roster check had the mirror flaw — it required a determiner, so
+  "five apps means five agents" went unseen through three re-measures of the item that existed to
+  find it. It now measures the cardinal against `apps/` instead of flagging any number.
 ## Mistakes — do not repeat
 
 - **Merging a second change on a gate result taken before the first.** #69 and #70 were merged past
@@ -107,7 +151,6 @@ just been bitten by something and want to know whether it is known.
   every one correct when written. Name where to look, not what it currently says.
 - **Leaving a to-do on a branch you are about to merge.** The agent came back to a branch that had
   vanished mid-edit. Either the note names a fresh branch, or the merge waits.
-
 ## Traps — things that will bite you
 
 - **A merged branch can come back, carrying everything.** A push to a deleted branch is a branch
@@ -160,7 +203,21 @@ just been bitten by something and want to know whether it is known.
   those remotes are deleted, so a push *recreates* the branch and republishes the names.
 - **`APP_PASSWORD_HASH` may differ per app and still work** — bcrypt salts per hash. `SESSION_SECRET`
   may not. One password rolls out five ways; one signing key cannot.
-
+- **2026-09-18 — Merging and deploying came apart, and `ignoreCommand` is why.** Each app's
+  `vercel.json` says *skip previews, build everything else*; it cannot see which folder changed, so
+  **every merge to `main` rebuilds every app**. Three merges four minutes apart raced, and
+  **Vercel aliases whichever build finishes last, not whichever commit is newest** — `techpaddock.io`
+  ended up on the Coffee-icon build rather than the hub change that merged after it. The fix was to
+  promote the correct deployment. **The trap generalises: any two merges close together can leave an
+  app serving the older one**, silently, with CI green and the branch deleted. Now ledger item 9.
+- **2026-09-19 — Vercel project state was read wrong twice and both readings reached the repo as
+  fact. Read DEPLOYMENT STATE, never a project field.** `BLOCKED` on every commit is paused
+  (`tp-message-editor`); `READY` at `target: production` is not (`tp-tracker`, on 4133904);
+  `CANCELED` at `target: null` is `ignoreCommand` skipping a preview. `live: false` does not mean
+  paused — `tp-home` reads it while serving `techpaddock.io` — yet ledger item 11 rested on
+  "unreachable while paused". `framework: null` does not mean a broken Root Directory — `tp-health`
+  reads null, skips previews from its own `vercel.json`, builds `READY`, and serves a `verified`
+  `health.techpaddock.io`. **Health is live**, and was called unreachable for a day on that field.
 ## Known, deliberately not fixed
 
 - **Every push still rebuilds every Vercel project.** #57 fixed the GitHub Actions half only. The
@@ -182,33 +239,6 @@ just been bitten by something and want to know whether it is known.
 - **`resume.templates.version` is max+1 across all rows including archived.** Delete the newest and
   the next upload reuses that number, so one version can name two files over time. Renders keep a
   `template_snapshot`, so it is harmless — but it reads as a bug later.
-
-## Before transferring the repo again
-
-**A transfer breaks every running agent session irreversibly**, and GitHub App installations do not
-travel with a repository. Both halves of that have already cost hours.
-
-Install Claude's **and** Vercel's GitHub Apps on the destination org first, with "only select
-repositories" — the org holds unrelated repos. Then stop every running session. Then move. In that
-order. A session's authorized repository set is fixed when it starts, and `add_repo` refuses
-cross-owner additions, so a running session cannot repair itself.
-
-- **2026-09-18 — Feed is deleted, not parked.** It lived in the settled tab order and nowhere else,
-  and shipped as a labelled empty slot that said so. Joel: *"drop the feed completely, not parked
-  deprecated."* **Board is renamed Pit Wall** in the same breath, because the hub's Board tab and
-  the technical director's published board were two things wearing one word, and that collision is
-  what made the hub hard to talk about.
-- **2026-09-18 — App surface belongs to the technical director, not TechPad Gen.** Surface is
-  site-or-app: shell, navigation, whether there is an index. That is architecture with visual
-  consequences, not palette — and `CLAUDE.md` enumerates the theme as *palette, tokens, type,
-  spacing, component language*, none of which it is. **It is settled at standup**, alongside the
-  name and the schema, because it fixes things that are expensive to change afterwards.
-- **2026-09-18 — Every agent publishes its own debrief board; the sign-off leaves chat.** The old
-  rule reserved a board for the technical director because *"a page published from one session
-  cannot be republished from another"* — **that was wrong**: another session updates a page by
-  passing its URL. So each agent gets a durable URL, carried in its kickoff block, and the real
-  risk was never the link count but sprawl from agents that do not know their own URL. **A row an
-  agent did not measure is left untouched**, which is what lets a board carry state across sessions.
 - **2026-09-18 — `tp-health` is wired and ledger items 1 and 2 are closed, with step (d) never
   proved.** Root Directory, the domain, all four environment variables and a successful login are
   each measured. **What is not**: whether `health` is on Supabase's exposed-schemas list. Nothing
@@ -216,22 +246,6 @@ cross-owner additions, so a running session cannot repair itself.
   `getServiceClient` and is therefore the test. **If a Health query ever returns a permissions error
   that reads like a bad key, this is the cause and no further diagnosis is needed.** Closed on Joel's
   word rather than on evidence, recorded here so the gap is findable rather than forgotten.
-- **2026-09-18 — Merging and deploying came apart, and `ignoreCommand` is why.** Each app's
-  `vercel.json` says *skip previews, build everything else*; it cannot see which folder changed, so
-  **every merge to `main` rebuilds every app**. Three merges four minutes apart raced, and
-  **Vercel aliases whichever build finishes last, not whichever commit is newest** — `techpaddock.io`
-  ended up on the Coffee-icon build rather than the hub change that merged after it. The fix was to
-  promote the correct deployment. **The trap generalises: any two merges close together can leave an
-  app serving the older one**, silently, with CI green and the branch deleted. Now ledger item 9.
-- **2026-09-19 — Ledger numbers are permanent, and closing an item leaves a gap.** They used to be
-  positional: close one and everything below shifted up on the next write. **That happened four times
-  on 2026-09-19** and broke a parked row's cross-reference, three numbers in the TD's handoff, the
-  entry directly above this one, and live references in two agents' branches — each pointing
-  confidently at the wrong item rather than at nothing, which is the failure the `#` column exists to
-  prevent. The ledger now carries `Next number:` and a new item takes it. **Numbering restarted at 15
-  because 1–14 had each meant several things that day.** `drift` fails a reuse, a duplicate, or a
-  renumber — the last by comparing titles against `origin/main`, since a tidy 1..N renumber is
-  otherwise indistinguishable from a correct file.
 - **2026-09-19 — `tp-message-editor` is paused on purpose; its `BLOCKED` deployments are not a bug.**
   Joel paused it because he is not using the Message Editor and does not want to spend attention on
   it. Every production deployment since reads `BLOCKED`, on every commit, so `editor.techpaddock.io`
@@ -239,22 +253,3 @@ cross-owner additions, so a running session cannot repair itself.
   check go green.** `apps/editor` still builds in CI — the matrix comes from the folders on disk —
   and #129 removed it from the hub's roster the same day. **Paused is reversible and deleted is
   not**, which is the same reasoning that keeps `tp-tracker` parked.
-
-- **2026-09-19 — a `drift` check is not finished until it has failed the case it exists to catch AND
-  passed the next legitimate edit.** Two checks shipped wrong in two days. The permanent-numbers
-  check passed a clean 1..N renumber, which is ascending and unique, until a title comparison against
-  `origin/main` was added. Then it read the ledger as one list and **failed the very first item added
-  under it**, because sections group by blocker while a new number is always the highest — so 15 in
-  `Waiting on Joel` sits above 2 in `Waiting on an agent`. Ascending is now per section. **A check
-  that fails a correct edit is worse than no check**: the way past it is to renumber, which is the
-  thing it exists to prevent. The roster check had the mirror flaw — it required a determiner, so
-  "five apps means five agents" went unseen through three re-measures of the item that existed to
-  find it. It now measures the cardinal against `apps/` instead of flagging any number.
-- **2026-09-19 — Vercel project state was read wrong twice and both readings reached the repo as
-  fact. Read DEPLOYMENT STATE, never a project field.** `BLOCKED` on every commit is paused
-  (`tp-message-editor`); `READY` at `target: production` is not (`tp-tracker`, on 4133904);
-  `CANCELED` at `target: null` is `ignoreCommand` skipping a preview. `live: false` does not mean
-  paused — `tp-home` reads it while serving `techpaddock.io` — yet ledger item 11 rested on
-  "unreachable while paused". `framework: null` does not mean a broken Root Directory — `tp-health`
-  reads null, skips previews from its own `vercel.json`, builds `READY`, and serves a `verified`
-  `health.techpaddock.io`. **Health is live**, and was called unreachable for a day on that field.

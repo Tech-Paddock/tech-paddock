@@ -55,8 +55,8 @@ its skip path has still never executed in CI. It fails loudly rather than passin
   prefix has been done twice; the guard rejected both.
 - **Do not backfill another agent's handoff on the way past.** A stale handoff sends the change
   back; one the TD writes is the second-hand account these files exist to replace.
-- **`DECISIONS.md` is AT its ceiling, 260/260, and three copies of that ceiling disagree.** Its
-  trimming rule exists and has never once fired. Joel's call — raise or archive, never a squeeze.
+- **`DECISIONS.md` has sections, and append does not mean at the end.** Being the last heading is
+  what put 66 lines of decisions under a transfer runbook. Ceiling 400, and do not trim to fit.
 - **`live: false` on a Vercel project does not mean paused.** Read deployment state — `BLOCKED` is
   paused, `READY` at `target: production` is not. This cost the ledger a false claim for a day.
 - **Regenerating another agent's collector output ages their handoff.** `drift` dates freshness from
