@@ -261,13 +261,34 @@ plausibly reopen or repeat, delete it; git keeps it.
   "unreachable while paused". `framework: null` does not mean a broken Root Directory — `tp-health`
   reads null, skips previews from its own `vercel.json`, builds `READY`, and serves a `verified`
   `health.techpaddock.io`. **Health is live**, and was called unreachable for a day on that field.
+- **2026-09-20 — Vercel's Redeploy button is a no-op in this repo, for every app.** The Ignored
+  Build Step is a pure function of `HEAD^..HEAD`, so re-running it on the same commit returns the
+  same answer every time, and an empty commit produces the same empty diff. **That makes an
+  environment variable impossible to pick up from the dashboard** — a deployment's env snapshot is
+  taken when it is *created*, so editing a variable changes nothing until a new build exists. It
+  cost the Cookbook its bring-up: `tp-cookbook` served the `5c7a399` build, correct and live, while
+  three redeploys carrying `ANTHROPIC_API_KEY` were cancelled in turn. **The proof that nothing was
+  broken is `tp-home` on `68ffc52`** — alone among the seven it watches `.claude`, and alone among
+  the seven it built. Six apps skipping a docs-only merge is the feature working.
+  **From git, the way out is a commit touching that app's folder or `packages`** — and `packages`
+  rebuilds all seven at once, which is exactly why it rides in every pathspec. **Joel found a route
+  through the Vercel dashboard on the same day; it is not written down here, and should be.**
+  **A `FORCE_BUILD` clause in each `ignoreCommand` was built, tested and dropped** once that route
+  existed — 43 characters, taking the longest command 175 → 218 and forcing the `drift` warn band
+  from 200 to 235. Do not re-derive it without deciding that cost is worth paying again.
+- **2026-09-20 — an agent cannot delete a remote branch here, and the reason is the proxy, not
+  the rule.** `git push origin --delete` hangs up mid-sideband and `DELETE /git/refs/heads/...`
+  returns **403, "Write access to this GitHub API path is not permitted through this proxy"** —
+  four attempts each. Pushes that create or update a ref work fine. **So "needs deletion" on a board
+  is a genuine request to Joel and never a task an agent can pick up**, which is what the board's
+  purple row has always meant without anyone knowing why.
 ## Known, deliberately not fixed
 
-- **Every push still rebuilds every Vercel project.** #57 fixed the GitHub Actions half only. The
-  agreed fix is one `ignoreCommand` line per app's `vercel.json`, written up in the Platform handoff
-  and not landed. Note the *Skip deployments when there are no changes* toggle does **not** behave as
-  its label suggests here — `tp-coffee-app` had it enabled and rebuilt twice from a `.claude/`-only
-  commit. Do not plan around it.
+- **Vercel's *Skip deployments when there are no changes* toggle does not behave as its label
+  suggests here.** `tp-coffee-app` had it enabled and rebuilt twice from a `.claude/`-only commit.
+  Do not plan around it; the `ignoreCommand` in each app's `vercel.json` is what actually scopes a
+  build, and all seven carry one. *This bullet used to say that fix was agreed and not landed. It
+  has been landed since 2026-09-19, proved itself on 2026-09-20, and the claim outlived it.*
 - **`/api/health` sits behind the password gate**, so no external monitor can reach it.
 - **`editor.model_status` has zero rows.** The login-time drift check has never once successfully
   written. The oldest unexplained thing in the project.

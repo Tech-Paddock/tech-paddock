@@ -28,10 +28,10 @@ Nothing.
    free; a real preview, costing preview env vars and a Supabase branch; or close it and keep
    merge-then-look. Why it has no mechanism left is in `DECISIONS.md`. *LoE: minutes.*
 
-27. **The Cookbook's bring-up: three env vars, the exposed-schemas list, then a redeploy.** *Owner:
-   Joel.* `tp-cookbook` and its CNAME exist already, read live 2026-09-20. Missing `SESSION_SECRET`
-   (**byte-identical to the other six** — a wrong one breaks *the other apps*), `ANTHROPIC_API_KEY`
-   and `APP_PASSWORD_HASH`; then `cookbook` on exposed schemas; then redeploy. *LoE: minutes.*
+27. **The Cookbook's bring-up: `cookbook` on Supabase's exposed-schemas list, then a build.**
+   *Owner: Joel.* `ANTHROPIC_API_KEY` landed 2026-09-20; `SESSION_SECRET` and `APP_PASSWORD_HASH`
+   are **shared variables, which a project env read cannot see** — confirm by eye, never from that
+   call. **A redeploy cannot be the build**; `DECISIONS.md` says why. *LoE: minutes.*
 
 ## Waiting on an agent
 
