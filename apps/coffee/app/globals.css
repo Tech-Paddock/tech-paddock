@@ -40,3 +40,21 @@ body {
 :root[data-mode="dark"] {
   --found: rgb(126 178 108);
 }
+
+/* A date input on iOS is a native control with its own idea of how wide it
+   should be: the width of the text it draws, "Aug 28, 2026" and all. That
+   width is a floor, so `width: 100%` cannot bring it under one — and the
+   moment two of them share a row, the second runs out past the edge of the
+   card it sits in, which is what Joel photographed on 2026-09-20.
+
+   `appearance: none` drops the native box so the declared width holds, and
+   `min-width: 0` removes the floor the intrinsic size would otherwise set.
+   Every browser on iOS is WebKit, Chrome included, so this is the primary
+   device rather than a Safari-only nicety — and on desktop it changes
+   nothing, because there the declared width already won. */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  width: 100%;
+}

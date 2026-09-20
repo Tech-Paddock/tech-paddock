@@ -53,6 +53,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     row[key] = n;
   }
 
+  // Whole seconds, parsed on the page from what was typed as m:ss. Refused
+  // rather than coerced for the same reason a dose is: a brew time that
+  // silently became 0 or 3 would describe a brew that did not happen.
+  if (body.brew_seconds !== undefined && body.brew_seconds !== null && body.brew_seconds !== "") {
+    const n = Number(body.brew_seconds);
+    if (!Number.isInteger(n) || n <= 0 || n >= 86400) {
+      return NextResponse.json({ error: "Brew time must be a whole number of seconds." }, { status: 400 });
+    }
+    row.brew_seconds = n;
+  }
+
   if (body.rating !== undefined && body.rating !== null && body.rating !== "") {
     const n = Number(body.rating);
     if (!Number.isInteger(n) || n < 1 || n > 5) {
