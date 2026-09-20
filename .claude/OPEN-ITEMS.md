@@ -23,18 +23,14 @@ Nothing.
 
 ## Waiting on Joel
 
-4. **`packages/shared` is built and parked on `claude/platform-packages-shared`.** *Owner: Joel.*
-   One real copy of five files — `next.config.mjs` and `lib/theme.ts` joined once all apps were
-   checksummed — stamped outward, `drift` failing a copy that disagrees. **Needs your ask for a PR
-   and your approval of a `CLAUDE.md` edit.** Still the gate for 1. *LoE: minutes.*
-
 18. **`DECISIONS.md` is full — 260/260, and three copies of its ceiling disagree.** *Owner: Joel.*
    **Its header's trimming rule exists and has never fired.** Raise the ceiling, or bound by relevance. *LoE: minutes.*
 
-21. **The meal cookbook is its own app and its own schema; #151 is superseded, not merely held.**
-   *Owner: Joel.* Settled 2026-09-20 — themed as a cookbook, and **Health reads it to price a meal**
-   rather than owning recipes. **Surface is open**; the TD's read is site over app. **Needs
-   `STANDUP.md` step 1**, your solutioning session, whose output is a draft charter. *LoE: a session.*
+21. **The cookbook is its own app and its own schema; #151 is superseded, not merely held.**
+   *Owner: Joel.* Settled 2026-09-20 — **named Cookbook**, themed as one, and **Health reads it to
+   price a meal** rather than owning recipes. **Surface is still open**; the TD's read is site over
+   app. **Needs `STANDUP.md` step 1**, your solutioning session, whose output is a draft charter.
+   *LoE: a session.*
 
 ## Waiting on an agent
 
@@ -52,6 +48,10 @@ Nothing.
    DevOps colour for a branch deployed and waiting on Joel to drive it. **It needs a deliberate
    deploy trigger of its own** now that automatic previews are off — and not an empty commit, which
    the rules forbid. **Joel asked for it on 2026-09-19.** *LoE: a session.*
+4. **`packages/shared` is built, and #152 is open and green.** *Owner: TD.* One real copy of five
+   files — `next.config.mjs` and `lib/theme.ts` joined once every app was checksummed — stamped
+   outward, `drift` failing a copy that disagrees. Joel asked for it and approved the `CLAUDE.md`
+   edit on 2026-09-20, so **only the merge is left**. Still the gate for 1. *LoE: minutes.*
 5. **`shared.contacts` needs its write rules said out loud.** *Owner: TD.* Shared on purpose
    between `apps/editor` (TD, frozen) and `apps/tracker` (TechPad Gen). The old premise — one of the
    two is going away — was wrong; neither did, they changed hands. **It is a cross-app contract
