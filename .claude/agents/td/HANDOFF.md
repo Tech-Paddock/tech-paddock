@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-19.
+State as of 2026-09-20.
 
 Read `RULES.md` first for the role and the gate. This file is only what is true right now.
 
@@ -8,12 +8,12 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**Two branches are mine, both parked, neither with a pull request.**
-`claude/platform-packages-shared` builds item 4: **`packages/shared` holds the one real copy** of
-`lib/auth.ts`, `lib/password.ts`, `lib/theme.css`, `lib/theme.ts` and `next.config.mjs`, stamped out
-by `scripts/stamp-shared.mjs`, and **`drift` fails a copy that disagrees**. **Do not edit a copy.**
-**It edits `CLAUDE.md`, so Joel approves it at merge**, and a change there rebuilds every app.
-`claude/brief-tracker-live-close-item-10` carries the ledger. **Re-read `main` before trusting either.**
+**Two branches are mine, both open as pull requests on 2026-09-20, both green.**
+**#152** builds item 4: **`packages/shared` holds the one real copy** of `lib/auth.ts`,
+`lib/password.ts`, `lib/theme.css`, `lib/theme.ts` and `next.config.mjs`, stamped out by
+`scripts/stamp-shared.mjs`, and **`drift` fails a copy that disagrees**. **Do not edit a copy.** It
+edits `CLAUDE.md`, **which Joel approved**, and a change there rebuilds every app. **#153** carries
+the ledger. **Take #152 first**, then #153 takes `main`. **Re-read `main` before trusting either.**
 
 ## What is true now
 
@@ -70,9 +70,9 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 
 ## Next
 
-**Item 4 is built and parked**, above; **item 1 is now one edit** — change
-`packages/shared/lib/auth.ts`, stamp, done. **Surface is yours and the guide is unwritten** — item 7;
-its mockups are a canvas artifact, so the guide carries the rules in words. **#151 is held, item 21.**
+**Item 4 is #152**; **item 1 is then one edit** — `packages/shared/lib/auth.ts`, stamp, done.
+**Surface is yours and unwritten** — item 7, mockups in a canvas artifact, so the guide carries the
+rules in words. **#151 is superseded: the Cookbook is its own app, and `STANDUP.md` step 1 is Joel's.**
 
 **Every agent has a board, URLs in `KICKOFF.md`** — the only place they live, so an agent that loses
 its URL publishes a duplicate. **You are the rollup.** Joel, 2026-09-19: **a merge refreshes the
