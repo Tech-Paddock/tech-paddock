@@ -31,7 +31,7 @@ Nothing.
 27. **The Cookbook's bring-up: `cookbook` on Supabase's exposed-schemas list, then a build.**
    *Owner: Joel.* `ANTHROPIC_API_KEY` landed 2026-09-20; `SESSION_SECRET` and `APP_PASSWORD_HASH`
    are **shared variables, which a project env read cannot see** — confirm by eye, never from that
-   call. **A redeploy cannot be the build**; `DECISIONS.md` says why. *LoE: minutes.*
+   call. **A bare redeploy is not a build**; set `FORCE_BUILD` on the project first. *LoE: minutes.*
 
 ## Waiting on an agent
 

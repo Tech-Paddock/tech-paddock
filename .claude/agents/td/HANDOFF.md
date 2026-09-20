@@ -16,10 +16,10 @@ summary-of-a-summary reasoning**, re-pointed at the gap between sessions rather 
 
 ## What is true now
 
-**Vercel's Redeploy is a no-op here, for every app** — the mechanism and the cost are in
-`DECISIONS.md`. From git the only way to a build is a commit touching that app's folder or
-`packages`. **Joel found a dashboard route on 2026-09-20 and it is not written down; ask him and
-record it.** A `FORCE_BUILD` clause was built, tested and dropped once that route existed.
+**A bare Redeploy cannot build here — the ignore step is a pure function of `HEAD^..HEAD`.**
+Since 2026-09-20 every `ignoreCommand` reads `FORCE_BUILD`: set it on the Vercel project, redeploy,
+remove it. It is read **after the preview check**, so previews stay ruled out. The warn band moved
+200 → 235 to pay for it; the hard fail at 256 is the real guard. `DECISIONS.md` has the cost.
 
 **Consumption was the session-before-last's real finding.** 30 sessions read ~$7.4K of list-price
 value — **not a bill**, but 8 hit the seven-day warning and **one immortal session was 58%** of it.

@@ -1,4 +1,4 @@
 {
   "framework": "nextjs",
-  "ignoreCommand": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then exit 0; fi; cd \"$(git rev-parse --show-toplevel)\" || exit 1; git diff --quiet HEAD^ HEAD -- apps/editor packages || exit 1; exit 0"
+  "ignoreCommand": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then exit 0; fi; if [ -n \"$FORCE_BUILD\" ]; then exit 1; fi; cd \"$(git rev-parse --show-toplevel)\" || exit 1; git diff --quiet HEAD^ HEAD -- apps/editor packages || exit 1; exit 0"
 }

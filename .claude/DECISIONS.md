@@ -270,12 +270,15 @@ plausibly reopen or repeat, delete it; git keeps it.
   three redeploys carrying `ANTHROPIC_API_KEY` were cancelled in turn. **The proof that nothing was
   broken is `tp-home` on `68ffc52`** — alone among the seven it watches `.claude`, and alone among
   the seven it built. Six apps skipping a docs-only merge is the feature working.
-  **From git, the way out is a commit touching that app's folder or `packages`** — and `packages`
-  rebuilds all seven at once, which is exactly why it rides in every pathspec. **Joel found a route
-  through the Vercel dashboard on the same day; it is not written down here, and should be.**
-  **A `FORCE_BUILD` clause in each `ignoreCommand` was built, tested and dropped** once that route
-  existed — 43 characters, taking the longest command 175 → 218 and forcing the `drift` warn band
-  from 200 to 235. Do not re-derive it without deciding that cost is worth paying again.
+  **The fix, landed the same day: every `ignoreCommand` now reads `FORCE_BUILD`.** Set it to
+  anything on the Vercel project, redeploy, remove it. It sits **after the preview check and before
+  the diff**, so it forces production only and previews stay ruled out — a separate settled call it
+  must not quietly undo. **It cost 43 characters**, taking the longest command from 175 to 218, and
+  **moved `drift`'s warn band from 200 to 235** because seven permanent warns would have been worse
+  than none: a band nobody can clear is a band everybody learns to scroll past. The hard fail at 256
+  is the real guard and is unchanged. **From git the way out is still a commit touching that app's
+  folder or `packages`**, and `packages` rebuilds all seven at once, which is why it rides in every
+  pathspec.
 - **2026-09-20 — an agent cannot delete a remote branch here, and the reason is the proxy, not
   the rule.** `git push origin --delete` hangs up mid-sideband and `DELETE /git/refs/heads/...`
   returns **403, "Write access to this GitHub API path is not permitted through this proxy"** —
