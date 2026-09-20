@@ -241,7 +241,9 @@ wrong or the rule is, and that is a conversation before any code exists.
   optional, including on a one-sentence answer.
 - **Only the technical director publishes a board. Every other agent signs off in chat.** Joel
   settled this on 2026-09-20, reversing the 2026-09-18 extension that had given every agent a page
-  of its own: a board per agent meant a publish per agent, and he opened one.
+  of its own. **A board is a persistent page and an agent is no longer a persistent thing** — they
+  are archived and restarted often now, so a page outlives its owner and goes stale with nobody left
+  who would notice. A table in the message he is already reading cannot outlive anything.
   **The technical director's board is unchanged** — all three sections, published to the URL in its
   kickoff block and never a new one. **One publish per session, at close-out, not one per response.**
   Measured on 2026-09-20: four publishes in one session cost roughly four times the edit-and-verify

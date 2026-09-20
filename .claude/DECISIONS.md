@@ -173,10 +173,13 @@ plausibly reopen or repeat, delete it; git keeps it.
 - **2026-09-20 — one board, not seven. Every agent except the technical director signs off in
   chat.** Joel: *"You continue to generate paddock debrief as laid out. Everyone else no more
   paddock debriefs. I just want DevOps and open items from that agent within the body of the chat."*
-  This reverses the 2026-09-18 extension that gave every agent a page of its own. **The reason is
-  readership, not cost** — a board per agent meant a publish per agent and he opened one, and a page
-  nobody opens is worse than a table in the message he is already reading, because it still looks
-  authoritative while going stale. **Work Brief did not move to chat; it was dropped** for those
+  This reverses the 2026-09-18 extension that gave every agent a page of its own. **The reason he
+  gave is agent turnover**, asked directly: *"With the quicker turnover of agents, it just makes
+  sense."* **A board is a persistent page and an agent is no longer a persistent thing.** The 09-18
+  design assumed an agent that ran for weeks and curated one page; agents are now archived and
+  restarted often, so each page outlives the agent that owned it and goes stale with nobody left who
+  would notice. **A table in the message he is already reading cannot outlive anything.** The
+  readership evidence is the same call from the other side — a publish per agent, and he opened one. **Work Brief did not move to chat; it was dropped** for those
   agents, and what was finished goes in the prose of the answer instead. The two tables survived
   because a table is the part prose cannot carry. **The measuring rules did not change with the
   medium** — live branches, live check runs, the ledger re-read off disk, update only what you
