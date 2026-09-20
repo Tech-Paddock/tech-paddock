@@ -22,6 +22,12 @@ Nothing.
 
 ## Waiting on Joel
 
+3. **Say what `On track` means now that previews are ruled out.** *Owner: Joel.* It was built on a
+   preview trigger and you said no to previews, so #156 stripped it back — no fourth phrase, no
+   sixth colour. **My recommendation needs no machinery at all: merged and live on the real domain,
+   waiting on your verdict**, because merging already deploys in about a minute. Say yes, or say
+   what you meant instead. *LoE: minutes.*
+
 21. **The Cookbook is its own app and its own schema. #151 is closed and
    `claude/health-recipes` is kept on purpose — do not delete that branch.** *Owner: Joel.* Settled
    2026-09-20: named, themed as a cookbook, and **Health reads it to price a meal** rather than
@@ -43,10 +49,6 @@ Nothing.
    **the tracker is deliberately live**, so it may simply be working. `fetchSummary` swallows the
    failure either way. **Both ends are one owner's now**, so the hub keeps its no-keys property.
    *LoE: a session.*
-3. **Build the `On track` stage.** *Owner: TD.* Agreed 2026-09-17: a fourth phrase and a sixth
-   DevOps colour for a branch deployed and waiting on Joel to drive it. **It needs a deliberate
-   deploy trigger of its own** now that automatic previews are off — and not an empty commit, which
-   the rules forbid. **Joel asked for it on 2026-09-19.** *LoE: a session.*
 5. **`shared.contacts` needs its write rules said out loud.** *Owner: TD.* Shared on purpose
    between `apps/editor` (TD, frozen) and `apps/tracker` (TechPad Gen). The old premise — one of the
    two is going away — was wrong; neither did, they changed hands. **It is a cross-app contract
