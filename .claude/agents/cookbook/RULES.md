@@ -1,9 +1,10 @@
-# Cookbook — draft charter
+# Cookbook — charter
 
-**This is a draft**, per `STANDUP.md` step 1 — the design conversation with Joel, in a session that
-is not yet an agent. It is the handoff into that protocol, not a charter anyone runs under yet.
-**Nothing is scaffolded from this file directly** — no folder, no branch, no migration — until the
-technical director takes it through the rest of `STANDUP.md`.
+**Written as a draft** on 2026-09-20 per `STANDUP.md` step 1 — the design conversation with Joel, in
+a session that was not yet an agent — and **carried through the rest of the protocol unchanged** by
+the technical director on the same day. Everything below the line is as that session wrote it. Only
+the heading above and the *Not yet true* section at the end were touched, because the standup is
+what made them false.
 
 **Read `CLAUDE.md` first.** Its universal rules bind this tool and this file never overrides them;
 it only adds.
@@ -128,8 +129,18 @@ change it under a live dependency, which `CLAUDE.md`'s migration rule exists to 
 - **The recipe table design in full** — this agent's, once scaffolded, the same way Health's
   `health.*` tables were left to Health rather than pre-empted at standup.
 
-## Not yet true
+## What the standup left, and what it did not
 
-No folder, no `cookbook` schema, no kickoff block, no rows in `CLAUDE.md`'s *Who you are* table or
-domain map, no Vercel project, no DNS record. `STANDUP.md`'s remaining steps — scaffolding, the
-manual checklist, standing the agent up for real — have not run.
+**In the repo, all done:** the folder at `apps/cookbook`, the `cookbook` schema and its grants, a
+kickoff block, both rows in `CLAUDE.md`, `.env.example`, `/api/health`, and the shared files stamped
+from `packages/shared`. `app/page.tsx` is a placeholder that says it is one — **the screen is this
+agent's to design, and the tables before it.**
+
+**Outside the repo, Joel's and without an undo:** the Vercel project `tp-cookbook` with its Root
+Directory, its environment variables (`SESSION_SECRET` **byte-identical** to the others), the
+`cookbook.techpaddock.io` DNS record, **the exposed-schemas list in the Supabase dashboard**, and a
+redeploy afterwards because Vercel bakes the environment in at build time. Until those run this app
+is scaffolded but not reachable, and `/api/health` is what says which step is missing.
+
+**Still not this agent's, and still the technical director's:** the Health↔Cookbook read contract
+and the grocery-list move, ledger items 22 and 23. **There is also no board URL yet** — item 25.

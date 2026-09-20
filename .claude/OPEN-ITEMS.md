@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-20.** · **Next number: 22.**
+**Last reviewed: 2026-09-20.** · **Next number: 26.**
 
 **Numbers are permanent and the gaps are correct** — the rule is in `CLAUDE.md`, which every session
 loads anyway, and why the run starts where it does is in `DECISIONS.md`.
@@ -28,22 +28,20 @@ Nothing.
    waiting on your verdict**, because merging already deploys in about a minute. Say yes, or say
    what you meant instead. *LoE: minutes.*
 
-21. **The Cookbook is its own app and its own schema. #151 is closed and
-   `claude/health-recipes` is kept on purpose — do not delete that branch.** *Owner: Joel.* Settled
-   2026-09-20: named, themed as a cookbook, and **Health reads it to price a meal** rather than
-   owning recipes. **The branch is the only written record of the design**, and #151's closing
-   comment says what carries over and what dies with the `health.items` link. **Surface is still
-   open**, the TD's read being site over app — the test is in `.claude/SURFACE.md`, which answers
-   the Cookbook as its worked example and leaves the call yours. **Needs `STANDUP.md` step 1.** *LoE: a session.*
+25. **Cookbook has no board URL, and its kickoff block is holding a blank for you.** *Owner: Joel.*
+   Every other agent's is in `KICKOFF.md`, which is the only place they live. Until you paste one in,
+   that agent has been told to put its sign-off in chat and say why — **publishing without a URL
+   creates a second board**, and a fortnight of that is thirty pages with no way to tell which is
+   current. **Paste it with the manual checklist**, not separately. *LoE: minutes.*
 
 ## Waiting on an agent
 
 1. **Fix the login lockout with a shared table — Joel chose it on 2026-09-19 over the firewall
    rate limit.** *Owner: TD.* The counter is a signed cookie the client can drop, and a per-app fix
-   is worth nothing since one password opens all six. **The cost he accepted is that the hub gains
+   is worth nothing since one password opens every app. **The cost he accepted is that the hub gains
    database credentials**, which it has never had. **Its gate is gone**: this is an edit to the
    shared auth files, and #152 landed `packages/shared`, so it is one edit plus a restamp rather
-   than six. *LoE: a session.*
+   than one per app. *LoE: a session.*
 2. **The hub's glance has one source and nobody has checked whether it answers.** *Owner: TechPad
    Gen.* `SOURCES` in `apps/home/lib/glance.ts` holds one entry, the tracker's `/api/summary`, and
    **the tracker is deliberately live**, so it may simply be working. `fetchSummary` swallows the
@@ -59,6 +57,24 @@ Nothing.
    four merges stranded the Pit Wall on an hours-old ledger with nothing red. #145 fixed **the hub**
    — not the class. A `drift` rule comparing what a build reads against what its `ignoreCommand`
    watches would catch the next one. *LoE: minutes.*
+
+22. **The Health↔Cookbook read contract — Health prices a meal by reading Cookbook.** *Owner: TD.*
+   Explicitly not the Cookbook charter's to invent, and not Health's either: it is cross-app, which
+   makes it this seat's like the tracker's `/api/summary`. **Design it before either side builds
+   against a guess** — a contract changed under a live dependency is what the migration rule exists
+   to avoid. Consider it alongside 23; they are one conversation. *LoE: a session.*
+23. **Move the grocery list from Health to Cookbook — destructive, so two pull requests.** *Owner:
+   TD.* Settled 2026-09-20 that it belongs beside the book: you shop from recipes, not from what you
+   ate. **The decision is made; the sequence is not.** Health's `/list` is live and
+   `health.grocery_items` may hold rows, so it is stop-using-then-drop, and it touches Health's
+   charter and code. **Cookbook may build its own list meanwhile** and has been told not to assume a
+   date. *LoE: a session.*
+24. **Five liveries, seven apps — two are now worn twice and nothing resolves it.** *Owner: TechPad
+   Gen.* Health borrowed `senna` in September on the reasoning that the tracker was being
+   deprecated; **item 10 killed that premise** — the tracker is deliberately live. Cookbook has now
+   borrowed `clark` from the frozen editor, flagged rather than quiet. **The theme is one owner's on
+   purpose**, so this is yours: two more liveries, or a deliberate rule that some apps share.
+   *LoE: a session.*
 
 ## Parked
 

@@ -15,7 +15,7 @@ handoff listed is on `main`, and the queue is empty.**
 
 **`packages/shared` is the one real copy** of `auth.ts`, `password.ts`, `theme.css`, `theme.ts` and
 `next.config.mjs`; `scripts/stamp-shared.mjs` writes it outward and `drift` fails a copy that
-disagrees. **Edit canonical and restamp — never a copy.** A lockout fix is one edit now, not six.
+disagrees. **Edit canonical and restamp — never a copy.** A lockout fix is one edit, not one per app.
 
 **Surface is written**: `.claude/SURFACE.md`. **Page count is not the test** — Coffee, the Resume
 Formatter and the Message Editor each have one route and only Coffee is an app. `CLAUDE.md` and
