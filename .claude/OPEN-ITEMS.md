@@ -31,10 +31,10 @@ Nothing.
 18. **`DECISIONS.md` is full — 260/260, and three copies of its ceiling disagree.** *Owner: Joel.*
    **Its header's trimming rule exists and has never fired.** Raise the ceiling, or bound by relevance. *LoE: minutes.*
 
-21. **Recipes become their own app; #151 is held at the gate until they do.** *Owner: Joel.*
-   Health's recipe book is built and green on `claude/health-recipes`. **Do not merge it** —
-   `recipes.item_id` is a live FK into `health.items`, so merging makes the extraction destructive.
-   **Needs a name and a solutioning session**, `STANDUP.md` step 1. *LoE: minutes to decide.*
+21. **The meal cookbook is its own app and its own schema; #151 is superseded, not merely held.**
+   *Owner: Joel.* Settled 2026-09-20 — themed as a cookbook, and **Health reads it to price a meal**
+   rather than owning recipes. **Surface is open**; the TD's read is site over app. **Needs
+   `STANDUP.md` step 1**, your solutioning session, whose output is a draft charter. *LoE: a session.*
 
 ## Waiting on an agent
 

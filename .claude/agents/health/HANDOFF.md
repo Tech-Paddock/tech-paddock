@@ -38,7 +38,7 @@ output would delete something you typed.
 
 **The charter caught up on 2026-09-19.** `RULES.md` said "one screen rather than two"; Joel approved
 the amendment saying a screen earns its place by a different moment, not a different noun. **It is
-not permission for a third** — a second noun still goes to him first, so recipes stay parked.
+not permission for a third** — a second noun still goes to him first.
 
 ## Agreed with Joel, not started
 
@@ -52,8 +52,8 @@ against left; deleting an entry takes its lines. Joel approved the mockups' comm
 3. **None of it calls a model.** Joel: *"macro tracker should only be reading from database."*
 4. **The split clamps at zero** rather than showing a negative gram.
 
-**Recipes are still parked** on a charter change Joel said he would make — each is a second noun and
-the amendment above deliberately does not cover them. **Do not start that build before it lands.**
+**Recipes left on 2026-09-20** — their own app, own schema, themed as a meal cookbook. **You read
+them to price a meal and do not own them**: no book, no generator, no import here. Contract is the TD's.
 
 ## Traps specific to this seat
 
@@ -75,5 +75,5 @@ the amendment above deliberately does not cover them. **Do not start that build 
 
 **Use it before building more** — without runs the harness cannot say whether Haiku reproduces a
 number you already approved. Unset by Joel, none blocking: **the agreement rate that retires the
-harness**, **the divergence tolerance** (10%-or-25 kcal, 20%-or-5 g), and how wrong a recipe's macros
-may be before it matters.
+harness**, **the divergence tolerance** (10%-or-25 kcal, 20%-or-5 g), and how wrong a
+dish's macros may be before it matters.

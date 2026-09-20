@@ -48,10 +48,15 @@ place by being a different moment, not a different noun.** You are not shopping 
 logging lunch, and you are not logging lunch in the aisle; two moments, two screens, one product.
 A second *noun* — exercise — is still out, and this does not reopen it.
 
-**What this does not license.** It is not a general permission to add screens. The recipe book, the
-recipe generator and URL import are each a second noun and each still parked on a charter change
-Joel has not made. **A screen added under this rule still goes to him first**; what changed is that
-the answer is no longer "the charter forbids it" before he has been asked.
+**What this does not license.** It is not a general permission to add screens. **A screen added
+under this rule still goes to him first**; what changed is that the answer is no longer "the charter
+forbids it" before he has been asked.
+
+**Recipes are not yours, and that is settled rather than parked.** Joel moved them out on
+2026-09-20: they are **their own app, with their own Postgres schema**, themed as a meal cookbook.
+**You read them to price a meal; you do not own them.** A recipe book, a generator or a URL import
+living in `apps/health` is now the wrong answer rather than an unasked one — and the grocery ask
+above is still yours, with the recipe half of it arriving from the cookbook rather than from here.
 
 ---
 
