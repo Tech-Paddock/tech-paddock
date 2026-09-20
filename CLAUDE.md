@@ -46,7 +46,7 @@ keeps things in one place. When you have something to say, find the reader first
 | `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | overwrite, Joel approves |
 | `agents/<you>/HANDOFF.md` | **your area's state right now** | every session | **overwrite · ≤80 lines** |
 | `.claude/OPEN-ITEMS.md` | **open requests, each with an owner** | every session, via hook | **overwrite · ≤80 lines** |
-| `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append; supersede in place · ≤260 lines** |
+| `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append in its section; supersede in place · ≤400 lines** |
 | your debrief board | **your sign-off, published** | Joel reads it instead of chat | **overwrite · URL in your kickoff** |
 | `/admin` — The Garage | facts about the running system | when you need a fact | **computed, never written** |
 | commits and pull request bodies | what landed, why, blast radius, who asked | at the gate, and afterwards | the event log |
@@ -410,13 +410,15 @@ Per-tool detail lives in that tool's charter. Live facts about what is deployed 
 
 - **One repo, monorepo layout.** One folder per tool under `apps/`, each with its own
   `package.json`, each pointed at by its own Vercel project via that project's Root Directory. There
-  is no root `package.json`; work inside the relevant app folder. `packages/shared` was never
-  created: `lib/auth.ts` and `lib/password.ts` are byte-identical copies in every app and
-  `lib/supabase.ts` is a per-app variant. **`lib/theme.css` and `lib/theme.ts` are byte-identical in
-  every app too, and only `theme.css` is checksummed** — so `theme.ts` is the one that can drift
-  without anything saying so. `theme.css`'s drift is at least loud, showing up as one app looking
-  wrong beside another in an iframe. **A session or lockout fix is the same edit once per app**, and
-  there is one more app than there was. Worth consolidating before the auth logic changes again.
+  is no root `package.json`; work inside the relevant app folder. **`packages/shared` holds the one
+  real copy of every file that must be identical in every app** — `lib/auth.ts`, `lib/password.ts`,
+  `lib/theme.css`, `lib/theme.ts` and `next.config.mjs`. `node scripts/stamp-shared.mjs` writes the
+  copies, `--check` verifies them, and **`drift` fails a copy that disagrees**, so a session or
+  lockout fix is now **one edit and a command** rather than one edit per app. **Do not edit a copy**
+  — each opens with a banner saying so. **They are still copies, and deliberately so**: a root
+  workspace install would buy one real `import` and cost the per-app independence that the Vercel
+  Root Directories and the derived CI matrix both rest on. **`lib/supabase.ts` stays a per-app
+  variant** and the hub has none at all, which is the hub holding no database credential.
 - **One Supabase project**, each tool in its own Postgres schema — `shared`, `editor`, `tracker`,
   `resume`, `coffee`, `health` — never the default `public`. One migration history, at `supabase/`
   in the repo root, never under an app. **Read `supabase/README.md` before writing one.** A new schema inherits
