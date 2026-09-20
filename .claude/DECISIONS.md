@@ -279,12 +279,14 @@ plausibly reopen or repeat, delete it; git keeps it.
   is the real guard and is unchanged. **From git the way out is still a commit touching that app's
   folder or `packages`**, and `packages` rebuilds all seven at once, which is why it rides in every
   pathspec.
-- **2026-09-20 — an agent cannot delete a remote branch here, and the reason is the proxy, not
-  the rule.** `git push origin --delete` hangs up mid-sideband and `DELETE /git/refs/heads/...`
-  returns **403, "Write access to this GitHub API path is not permitted through this proxy"** —
-  four attempts each. Pushes that create or update a ref work fine. **So "needs deletion" on a board
-  is a genuine request to Joel and never a task an agent can pick up**, which is what the board's
-  purple row has always meant without anyone knowing why.
+- **2026-09-20 — the measurement behind `CLAUDE.md`'s "the proxy refuses it", so nobody re-tests
+  it.** That file already says an agent cannot delete a remote branch here; what it does not say is
+  how the refusal arrives, which is why it gets tried anyway. **`git push origin --delete` hangs up
+  mid-sideband** — `send-pack: unexpected disconnect`, which reads like a network blip and invites
+  a retry. **`DELETE /git/refs/heads/...` returns 403, "Write access to this GitHub API path is not
+  permitted through this proxy."** Four attempts each, on 2026-09-20. **Pushes that create or update
+  a ref work fine**, which is what makes the deletion case surprising. Neither is transient: stop
+  after the first and ask Joel.
 ## Known, deliberately not fixed
 
 - **Vercel's *Skip deployments when there are no changes* toggle does not behave as its label

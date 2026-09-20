@@ -54,7 +54,7 @@ version** — name and query only, and it stamps the clock. Use `execute_sql` wi
 - **A project env read cannot see shared variables.** I reported `SESSION_SECRET` and
   `APP_PASSWORD_HASH` missing from `tp-cookbook`; `tp-coffee-app` returns the same three keys while
   live and gated. **The absence was the instrument, not the project.** Confirm shared vars with Joel.
-- **You cannot delete a remote branch** — the proxy refuses both routes. `DECISIONS.md` has it.
+- **You cannot delete a remote branch** — `CLAUDE.md` says so; `DECISIONS.md` has how it fails.
 - **`Vercel – tp-message-editor` is red on `main` itself** — `BLOCKED`, the frozen editor. It makes
   every PR `mergeable_state: unstable` and **is not a gate failure**. Check a red status against
   `main` before treating it as the branch's.
