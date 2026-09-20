@@ -71,8 +71,8 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 ## Next
 
 **Item 4 is done and item 1 is now one edit** — `packages/shared/lib/auth.ts`, stamp, done.
-**Surface is yours and unwritten** — item 7, mockups in a canvas artifact, so the guide carries the
-rules in words. **#151 is superseded: the Cookbook is its own app, and `STANDUP.md` step 1 is Joel's.**
+**Surface is yours and now written** — `.claude/SURFACE.md`. **Page count is not the test**: three
+apps have one route and only Coffee is an app. **The Cookbook's own surface is still Joel's call.**
 
 **Every agent has a board, URLs in `KICKOFF.md`** — the only place they live, so an agent that loses
 its URL publishes a duplicate. **You are the rollup.** Joel, 2026-09-19: **a merge refreshes the
