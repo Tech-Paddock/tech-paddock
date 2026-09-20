@@ -1,8 +1,11 @@
+/* Stamped from packages/shared/lib/theme.ts — do not edit this copy.
+ * Edit the canonical file, then run: node scripts/stamp-shared.mjs
+ * drift fails a copy that disagrees, and CI runs drift. */
 /**
  * Paddock theme — the shared half.
  *
- * Byte-identical in all five apps, the arrangement lib/auth.ts and
- * lib/password.ts already use. It holds no secret and touches no session.
+ * Stamped into every app from packages/shared, the arrangement lib/auth.ts and
+ * lib/password.ts now use too. It holds no secret and touches no session.
  *
  * Two axes, and they are deliberately different kinds of thing.
  *

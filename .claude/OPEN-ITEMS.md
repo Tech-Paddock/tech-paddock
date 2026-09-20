@@ -2,12 +2,10 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-19.** · **Next number: 20.**
+**Last reviewed: 2026-09-20.** · **Next number: 22.**
 
-**Numbers are permanent.** A closed item's row is deleted and its number is never used again, so the
-gaps below are correct rather than something to tidy. A new item takes `Next number` and increments
-it. Numbering restarts at 15 because 1–14 were each reused during four renumbers on 2026-09-19 and
-references to them are already ambiguous.
+**Numbers are permanent and the gaps are correct** — the rule is in `CLAUDE.md`, which every session
+loads anyway, and why the run starts where it does is in `DECISIONS.md`.
 
 - Finished work is not here. Git log is the archive.
 - Settled calls, mistakes and traps are in `.claude/DECISIONS.md`. Live facts are computed, at `/admin`.
@@ -24,46 +22,41 @@ Nothing.
 
 ## Waiting on Joel
 
-1. **Pick how the login lockout gets fixed — the obvious fix is the wrong shape.** The counter is a
-   signed cookie the client can drop, so nothing but a browser is limited; and **a per-app fix is
-   worth nothing**, since one password opens all six. A firewall rate limit on `/api/login` needs no
-   code; a shared table **gives the hub database credentials**. *LoE: minutes.*
-
-10. **`tp-tracker` was never paused — the field that said so means something else.** *Owner: Joel.*
-   Measured 2026-09-19: it built `4133904` to **production, `READY`**. `live: false` says nothing
-   about pausing; `tp-home` reads it too and serves `techpaddock.io`. **The signal is deployment
-   state** — a paused project returns `BLOCKED`, as `tp-message-editor` does. So the tracker is up
-   and its daily cron runs. `apps/tracker` is TechPad Gen's as of 2026-09-19. **Pause it for real, or stop calling it paused.**
-   *LoE: minutes.*
-15. **The domain map is written down twice, and one copy went stale for a day.** *Owner: Joel.*
-   `CLAUDE.md` and `platform/RULES.md` both carry a Vercel-project table; Health reached only the
-   first, so the charter listed five projects against six on disk. Both corrected. **The fix is
-   deleting the charter's copy and linking `CLAUDE.md`'s** — one fact, one home — but it is a
-   charter, so it is your yes. *LoE: minutes.*
-18. **`DECISIONS.md` is full — 260 of its 260 lines.** *Owner: Joel.* Append-only with no trimming
-   rule, so the next settled call has nowhere to go. **Raise the ceiling, do not trim.** *LoE: minutes.*
+21. **The Cookbook is its own app and its own schema. #151 is closed and
+   `claude/health-recipes` is kept on purpose — do not delete that branch.** *Owner: Joel.* Settled
+   2026-09-20: named, themed as a cookbook, and **Health reads it to price a meal** rather than
+   owning recipes. **The branch is the only written record of the design**, and #151's closing
+   comment says what carries over and what dies with the `health.items` link. **Surface is still
+   open**, the TD's read being site over app — the test is in `.claude/SURFACE.md`, which answers
+   the Cookbook as its worked example and leaves the call yours. **Needs `STANDUP.md` step 1.** *LoE: a session.*
 
 ## Waiting on an agent
 
+1. **Fix the login lockout with a shared table — Joel chose it on 2026-09-19 over the firewall
+   rate limit.** *Owner: TD.* The counter is a signed cookie the client can drop, and a per-app fix
+   is worth nothing since one password opens all six. **The cost he accepted is that the hub gains
+   database credentials**, which it has never had. **Its gate is gone**: this is an edit to the
+   shared auth files, and #152 landed `packages/shared`, so it is one edit plus a restamp rather
+   than six. *LoE: a session.*
 2. **The hub's glance has one source and nobody has checked whether it answers.** *Owner: TechPad
-   Gen.* `SOURCES` in `apps/home/lib/glance.ts` holds one entry, the tracker's `/api/summary` — and
-   item 10 found the tracker was never paused, so it may simply be working. `fetchSummary` swallows
-   the failure either way. **Both ends are one owner's now**, so the hub keeps its no-keys
-   property. *LoE: a session.*
+   Gen.* `SOURCES` in `apps/home/lib/glance.ts` holds one entry, the tracker's `/api/summary`, and
+   **the tracker is deliberately live**, so it may simply be working. `fetchSummary` swallows the
+   failure either way. **Both ends are one owner's now**, so the hub keeps its no-keys property.
+   *LoE: a session.*
 3. **Build the `On track` stage.** *Owner: TD.* Agreed 2026-09-17: a fourth phrase and a sixth
    DevOps colour for a branch deployed and waiting on Joel to drive it. **It needs a deliberate
    deploy trigger of its own** now that automatic previews are off — and not an empty commit, which
-   the rules forbid. *LoE: a session.*
-4. **Build `packages/shared`.** *Owner: TD.* One real copy of the five-way files, a stamping
-   script, and `drift` failing a copy that disagrees. *LoE: a session.*
+   the rules forbid. **Joel asked for it on 2026-09-19.** *LoE: a session.*
 5. **`shared.contacts` needs its write rules said out loud.** *Owner: TD.* Shared on purpose
    between `apps/editor` (TD, frozen) and `apps/tracker` (TechPad Gen). The old premise — one of the
    two is going away — was wrong; neither did, they changed hands. **It is a cross-app contract
    again**, which is the TD's to write down. *LoE: minutes.*
-7. **Write the surface guide — site and app.** *Owner: TD.* Joel, 2026-09-18: most tools are
-   websites; **Coffee is the only real app**, and Health will be. Site is a thin index grouped by
-   verb around a long page; app is one screen, thumb-first, no index. Mockups exist. **It is settled
-   at standup**, so `STANDUP.md` gains surface beside the name and the schema. *LoE: a session.*
+
+20. **An app that reads outside its own folder silently stops rebuilding, and nothing checks.**
+   *Owner: TD.* #137 scoped each build to its own folder; the hub reads `.claude` at build time, so
+   four merges stranded the Pit Wall on an hours-old ledger with nothing red. #145 fixed **the hub**
+   — not the class. A `drift` rule comparing what a build reads against what its `ignoreCommand`
+   watches would catch the next one. *LoE: minutes.*
 
 ## Parked
 

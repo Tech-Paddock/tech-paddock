@@ -64,8 +64,8 @@ from the gate would put a schema change live with nobody holding the merge.
 
 **`CLAUDE.md`'s *Who you are* table is the roster. This section deliberately does not repeat it.**
 It used to, and the copy had already gone stale — it listed Platform Config and Pipeline Tracker
-after both were retired, and it had never gained Health at all. One fact, one home; the same reason
-ledger item 15 exists for the domain map.
+after both were retired, and it had never gained Health at all. One fact, one home — the rule that
+also removed the domain map's second copy when `platform/RULES.md` was deleted.
 
 **Where remits overlap**, which is the part `CLAUDE.md` does not say:
 
@@ -268,6 +268,21 @@ another route.
 push as the `drift` job. It only ever measures — checksums, the matrix, handoff dates against git,
 budgets — and reports `ok`, `warn` or `fail`, never `ok` for something it could not look at. The
 half that needs judgement is the Monday Routine, which reports and is forbidden from acting.
+
+## Before transferring the repo again
+
+Moved here from `.claude/DECISIONS.md` on 2026-09-20. **It is a runbook, not a decision** — it tells
+you what to do and in what order, where every other entry in that file tells you what was settled.
+Being the last heading in an append-only file is what made sixty-six lines of real decisions land
+under it, so it lives with the ops it belongs to.
+
+**A transfer breaks every running agent session irreversibly**, and GitHub App installations do not
+travel with a repository. Both halves of that have already cost hours.
+
+Install Claude's **and** Vercel's GitHub Apps on the destination org first, with "only select
+repositories" — the org holds unrelated repos. Then stop every running session. Then move. In that
+order. A session's authorized repository set is fixed when it starts, and `add_repo` refuses
+cross-owner additions, so a running session cannot repair itself.
 
 ## Guardrails
 

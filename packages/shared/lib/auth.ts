@@ -1,6 +1,3 @@
-/* Stamped from packages/shared/lib/auth.ts — do not edit this copy.
- * Edit the canonical file, then run: node scripts/stamp-shared.mjs
- * drift fails a copy that disagrees, and CI runs drift. */
 const SESSION_COOKIE = "paddock_session";
 const ATTEMPTS_COOKIE = "paddock_attempts";
 const MAX_ATTEMPTS = 5;
