@@ -255,10 +255,28 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
 {
   const budgets = [
     ...APPS.length ? [] : [],
+    // ENUMERATED, not hardcoded — same reasoning as the staleness check below: a new
+    // agent must arrive already budgeted rather than silently unmeasured.
     ...readdirSync(R(".claude/agents")).filter((d) => existsSync(R(".claude/agents", d, "HANDOFF.md")))
       .map((d) => [`.claude/agents/${d}/HANDOFF.md`, 80]),
+    ...readdirSync(R(".claude/agents")).filter((d) => existsSync(R(".claude/agents", d, "RULES.md")))
+      .map((d) => [`.claude/agents/${d}/RULES.md`, 370]),
     [".claude/OPEN-ITEMS.md", 80],
     [".claude/DECISIONS.md", 400],
+    // Tier 1 — auto-loaded into every session of every agent, so every line is paid
+    // again forever. 510 is a RATCHET at today's size, not a target: it stops growth
+    // without failing `main` on the day it lands. The target is 400 and it arrives
+    // with the compaction, because a cap set below the file is a red `main`.
+    ["CLAUDE.md", 530],
+    // Read on demand rather than auto-loaded. Budgeted against growth, deliberately
+    // loose: this tier is where reasoning goes when it leaves CLAUDE.md, so squeezing
+    // it would defeat the compaction it exists to receive.
+    [".claude/agents/KICKOFF.md", 220],
+    [".claude/agents/STANDUP.md", 110],
+    [".claude/agents/BOARD.html", 340],
+    [".claude/SURFACE.md", 120],
+    [".claude/HEALTH-PLAN.md", 250],
+    ["supabase/README.md", 200],
   ];
   for (const [rel, ceiling] of budgets) {
     const n = lines(R(rel));

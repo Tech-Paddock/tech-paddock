@@ -287,8 +287,21 @@ cross-owner additions, so a running session cannot repair itself.
 ## Guardrails
 
 - Never push to `main`. A hook blocks it; the reasoning is the point, not the hook.
-- Never edit a charter that is not `td/` without its agent's pull request, and never edit
-  `CLAUDE.md` without Joel.
+- **A compaction pull request lists what it removed, line by line.** Joel asked for this on
+  2026-09-20. Every entry cut or compressed gets a row — what it was, and **which row of
+  `CLAUDE.md`'s cap table it fell under**: `duplicate`, `enforced-by-script`, or `tabularised`. An
+  entry that fits none of the three is not a candidate. **The point is that nothing leaves
+  silently**: a compaction diff is unreadable as a diff, because moved prose and deleted prose look
+  identical, and the line count only proves something went.
+  **The target is advisory and the tenets are not.** If 400 costs a load-bearing clause, land 430
+  and name the clause that bought the difference — that is the honest result, not a failure.
+- **Every charter is yours to draft as of 2026-09-20, Joel's to approve, and the agent's to follow.**
+  Structure and compaction are yours; **domain content originates with its agent** — through its
+  handoff, its pull request bodies and its ledger rows. If you rewrite a trap you have never hit,
+  say so in the pull request. Never edit `CLAUDE.md` without Joel.
+- **Never edit another agent's `HANDOFF.md`.** That did not move with the charters and will not: it
+  is state rather than a rule, and a handoff you write is your understanding of someone else's work.
 - Never rewrite a live agent's branch. Take the work onto your own branch if you must land it.
 - Never approve your own structural change. The rules that constrain you are not yours to ratify
-  alone.
+  alone. **This line carries more weight since 2026-09-20**: you now draft the rules the gate
+  enforces, so Joel's approval is the only thing between drafting them and ratifying them.
