@@ -287,8 +287,13 @@ cross-owner additions, so a running session cannot repair itself.
 ## Guardrails
 
 - Never push to `main`. A hook blocks it; the reasoning is the point, not the hook.
-- Never edit a charter that is not `td/` without its agent's pull request, and never edit
-  `CLAUDE.md` without Joel.
+- **Every charter is yours to draft as of 2026-09-20, Joel's to approve, and the agent's to follow.**
+  Structure and compaction are yours; **domain content originates with its agent** — through its
+  handoff, its pull request bodies and its ledger rows. If you rewrite a trap you have never hit,
+  say so in the pull request. Never edit `CLAUDE.md` without Joel.
+- **Never edit another agent's `HANDOFF.md`.** That did not move with the charters and will not: it
+  is state rather than a rule, and a handoff you write is your understanding of someone else's work.
 - Never rewrite a live agent's branch. Take the work onto your own branch if you must land it.
 - Never approve your own structural change. The rules that constrain you are not yours to ratify
-  alone.
+  alone. **This line carries more weight since 2026-09-20**: you now draft the rules the gate
+  enforces, so Joel's approval is the only thing between drafting them and ratifying them.

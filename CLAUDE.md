@@ -43,7 +43,7 @@ keeps things in one place. When you have something to say, find the reader first
 | Channel | Carries | Read when | Shape |
 |---|---|---|---|
 | `CLAUDE.md` | rules binding every agent | every session, automatic | overwrite |
-| `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | overwrite, Joel approves |
+| `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | **overwrite · ≤350 lines · TD drafts, Joel approves** |
 | `agents/<you>/HANDOFF.md` | **your area's state right now** | every session | **overwrite · ≤80 lines** |
 | `.claude/OPEN-ITEMS.md` | **open requests, each with an owner** | every session, via hook | **overwrite · ≤80 lines** |
 | `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append in its section; supersede in place · ≤400 lines** |
@@ -64,6 +64,24 @@ nothing tells you.
 
 **A request is a ledger row with an owner.** That is how you ask another agent for something. Not a
 note in your handoff that nobody else reads — say it to the technical director, who owns the ledger.
+
+### When a document reaches its cap
+
+Caps are in the table above and enforced by `scripts/drift-check.mjs`, which **warns ten lines out
+and fails past the ceiling**. The warning is a prompt to compact, not a wall to route around. Take
+the file entry by entry:
+
+| The entry is | Do this | Because |
+|---|---|---|
+| **enforced by a script** | compact it to a pointer naming the check | the check stops the violation; the prose only describes it |
+| **convention-only** | **keep its reasoning**, cut a duplicate instead | the reasoning is the only thing stopping the violation |
+| **enumerable** — every entry answers the same questions | make it a table | prose *about* a table is the commonest waste here |
+| **conditional** — entries need different amounts of *why* | leave it prose | a table forces every row to one width, so the caveat that needed three sentences is squeezed out by column geometry rather than deleted, and the diff looks tidy |
+
+**Never raise a cap to fit new content, and never trim load-bearing reasoning to make room.** If
+nothing can honestly be cut, the cap is wrong — raise it in its own pull request, with the reason
+written down. **A budget that fires on good work is re-set deliberately; one that is quietly widened
+is a file winning.**
 
 **What is deliberately not a channel.** Worklogs were retired on 2026-09-16. They existed so a live
 agent could see what another live agent had claimed *right now*, which cannot happen, and every real
@@ -111,10 +129,17 @@ wrong or the rule is, and that is a conversation before any code exists.
 - **Joel: create or delete a Vercel project, add or remove a domain, or change a DNS record.** No
   undo, and no test catches them. Changing settings on a project that already exists is fine — the
   line is between configuring something that exists and creating, destroying or re-pointing it.
-- **Joel: edit this file, or any charter but your own.** Both are approved before they change. **If
-  what you are about to build contradicts either, stop and ask before you build it.** Raising it in
-  the pull request is the backstop for something discovered late, not the normal path — code already
-  written applies pressure to approve it, which is what this rule exists to prevent.
+- **Joel: edit this file.** It is approved before it changes. **If what you are about to build
+  contradicts it, stop and ask before you build it.** Raising it in the pull request is the backstop
+  for something discovered late, not the normal path — code already written applies pressure to
+  approve it, which is what this rule exists to prevent.
+- **A charter is not the agent's to edit — settled 2026-09-20.** `agents/<you>/RULES.md` is a rule,
+  and rules are decided and followed rather than owned: **the technical director drafts, Joel
+  approves, you follow.** It was already the shape in practice, since Joel approved every charter
+  change anyway, and it makes a cross-agent edit one pull request instead of six.
+  **Your `HANDOFF.md` stays yours and always will.** That is state, not a rule, and a handoff written
+  by anyone but the agent who did the work is the second-hand account these files exist to replace.
+  **Propose a charter change** — in your handoff, a pull request body, or a ledger row. Do not make it.
 - **The technical director: the shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`,
   `middleware.ts`, or anything touching `SESSION_SECRET` and the shared cookie. **These are gated for two different reasons, and
   merging them is how the rule gets talked past.** `lib/auth.ts` and `lib/password.ts` genuinely are
