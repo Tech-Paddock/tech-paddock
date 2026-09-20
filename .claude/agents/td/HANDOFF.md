@@ -7,74 +7,74 @@ role and the gate; this is only what is true right now.
 
 ## In flight
 
-**Nothing.** #152 to #156 all merged on 2026-09-20, GitHub deleted every branch, and no pull
-request is open. `main` is `990a5eb`, `drift` on it **21 ok · 7 warn · 0 fail**, `tp-home` `READY`
-at `target: production`. **A clean queue is unusual here — check it live anyway.**
+**#159 (Cookbook) passed the gate and is NOT merged.** Head `bf37647`, CI green on it (runs 661
+*and* 662), blast radius `apps/cookbook` + one migration, no shared file touched. **The merge was
+refused by the harness permission classifier — `[Merge Without Review]` — not by the gate.** Nothing
+is wrong with the change. Joel grants the permission or merges it himself. **Re-read the head SHA
+and the open list before merging; do not re-run the whole gate on a whim.**
+
+**Its migration is already applied** — correct: additive, before the merge, per `CLAUDE.md`. The
+database is ahead of the code, which is the safe direction. If #159 is abandoned, two empty tables
+in `cookbook` are the only residue.
+
+**`claude/brief-cookbook-gate-followup` is pushed and finished** — Cookbook's board URL into
+`KICKOFF.md`, item 25 closed, 27 opened, the `models.ts` call into `DECISIONS.md`. **No pull
+request: Joel has not asked for one.**
 
 ## What is true now
 
+**The read-back rule now has its proof, and it is the preferred one.** `supabase/README.md` calls
+recording the file's own version at apply time **preferred, "to be proven on the next migration
+applied"** — done, and the Cookbook's migration is recorded under exactly the version its filename
+declares. **MCP `apply_migration` cannot do it**: name and query only, and it stamps the clock. Use
+`execute_sql` with the DDL and the `supabase_migrations.schema_migrations` insert **in one statement
+batch**, so they are one transaction. That is recording what you apply, not repairing history, which
+is why it is allowed where editing a version afterwards is not.
+
+**Item 26's three are unchanged and now measured** — the ledger names them, so this does not.
+Local and remote differ by those three plus the deliberate remote-only seed. **Nothing new drifted.**
+
+**`lib/models.ts` stays a per-app copy — settled at #159's gate**, in `DECISIONS.md`: three copies,
+76/67/61 lines, none alike, where `packages/shared` means byte-identical. **No row; that is the answer.**
+
 **`packages/shared` is the one real copy** of `auth.ts`, `password.ts`, `theme.css`, `theme.ts` and
-`next.config.mjs`; `scripts/stamp-shared.mjs` writes it outward and `drift` fails a copy that
-disagrees. **Edit canonical and restamp — never a copy.** A lockout fix is one edit, not one per app.
+`next.config.mjs`; `drift` fails a copy that disagrees. **Edit canonical and restamp, never a copy.**
 
-**Surface is written**: `.claude/SURFACE.md`. **Page count is not the test** — Coffee, the Resume
-Formatter and the Message Editor each have one route and only Coffee is an app. `CLAUDE.md` and
-`STANDUP.md` point at it; `drift` scans it.
+**Previews are off and `On track` does not exist** — three phrases, five stages. Joel's call on 2026-09-20; read its `DECISIONS.md` entry before rebuilding it.
 
-**`DECISIONS.md` has sections and a 400-line ceiling**, 278 used. **Append inside the section that
-describes your entry**, never at the end. Do not trim to make room; it is not read at session start.
+**Publish only your own board**; a merge leaves the merged agent's alone, stale or not. Board URLs
+live in `KICKOFF.md` and nowhere else, and **Cookbook's is no longer blank** — seeded by this seat,
+its Work Brief deliberately `- None.`, because nobody else can write another agent's.
 
-**Previews are off and staying off — Joel ruled on it 2026-09-20**, so **`On track` does not exist**
-and there are three phrases and five stages. **Read its `DECISIONS.md` entry before rebuilding it.**
-
-**Publish only your own board.** Joel reversed the merge-refresh rule on 2026-09-20: a merge leaves
-the merged agent's board alone, stale or not. **Yours is the rollup, read from the repo and never
-written back.** Board URLs live in `KICKOFF.md` and nowhere else.
-
-**The repository is public** since 2026-09-19, so **`.claude/` is public reading**. Same day,
-**Postgres stayed yours and deliveries went to TechPad Gen**: you own the merge, they own after it.
-
-**Branch protection is on**, confirmed against the GitHub API, and **`Require branches to be up to
-date` is on** — after any merge every other pull request is behind and must take `main` again.
-**Required checks are `gate`, `drift`, `requested-by-joel`.** No agent can read rulesets, so that
-last part is Joel's screenshot rather than a measurement — say so when you repeat it.
-
-**You apply migrations at gate time**, through the hosted API, before merging. `supabase db push`
-cannot work here and never will — see the traps in `.claude/DECISIONS.md`.
+**Branch protection is on**, **`Require branches to be up to date` is on**, and the required checks
+are **`gate`, `drift`, `requested-by-joel`** — Joel's screenshot, not a measurement, as no agent can
+read rulesets. Say which it is when you repeat it.
 
 ## Traps specific to this seat
 
-- **Check the open list with a live call as the first step of every merge**, never from memory —
-  others open pull requests while you work and you cannot see it happen.
-- **Read the real head SHA before passing `expectedHeadSha`.** Inventing or abbreviating one has now
-  been done three times; the guard rejected all three, which is the only reason it costs a retry.
-- **A merge refused straight after you edited the body is usually not real** — editing re-queues
-  `requested-by-joel`. **`gate` runs after the whole build matrix**, so a green `drift` proves
-  nothing; `build (home)` is usually last, being the only app that really builds.
-- **Vercel's `ignoreCommand` is capped at 256 characters and the failure is total.** Over it the
-  deployment is rejected outright, not built — every deploy of that app stops, production included,
-  with CI green throughout. `drift` fails it now at 256 and warns at 200; nothing else would.
-- **A dry-run merge on a dirty tree proves nothing.** Stashing first merges an empty branch and
-  reports clean. Commit, then dry-run. A green result you did not earn is worse than a red one.
-- **`live: false` on a Vercel project does not mean paused.** Read deployment state — `BLOCKED` is
-  paused, `READY` at `target: production` is not. This cost the ledger a false claim for a day.
+- **Check the open list with a live call as the first step of every merge**, never from memory.
+- **Read the real head SHA before passing `expectedHeadSha`.** Three inventions, three rejections.
+- **`Vercel – tp-message-editor` is red on `main` itself** — `BLOCKED`, the frozen editor. It makes
+  every PR `mergeable_state: unstable` and **is not a gate failure**. Check a red status against
+  `main` before treating it as the branch's.
+- **`gate` runs after the whole build matrix**, so a green `drift` proves nothing.
+- **A pull request body is a claim, not evidence.** #159's was accurate on the diff and **stale on
+  the dashboard** — it said the Vercel project and the domain did not exist; both did. Read Vercel
+  and Supabase live before repeating a body's deployment steps to Joel.
+- **This session could not read `postgrest_logs`** (classifier refused) and **cannot read the
+  exposed-schemas list at all** — PostgREST config, not a `pg_settings` row. Grants and RLS *are*
+  checkable in SQL. Say which of the two you have.
+- **Vercel's `ignoreCommand` is capped at 256 characters and the failure is total.**
+- **A dry-run merge on a dirty tree proves nothing.** Commit, then dry-run.
+- **`live: false` on a Vercel project does not mean paused.** Read deployment state.
 - **You are a session, not a service** — you do not persist and do not monitor. Say so.
-- **The `supabase migration repair` hook matches that string in any Bash command**, including one
-  merely writing documentation about it. Use Write instead. **Obfuscating it is routing around a hook.**
+- **The `supabase migration repair` hook matches that string in any Bash command.** Use Write.
 
 ## Next
 
-**Item 1 is the biggest thing here and it is one edit now** — the lockout counter moves from a
-signed cookie to a shared table: `packages/shared/lib/auth.ts`, stamp, migration in the same PR.
-**Item 5 is minutes** — `shared.contacts` write rules, a contract between the editor (yours, frozen)
-and the tracker (TechPad Gen's). **Item 20** wants `drift` comparing what a build reads with what
-its `ignoreCommand` watches — on 2026-09-20 `build (home)` skipped on four `.claude`-only branches
-and Vercel was the only thing that built the hub.
+**Item 27 is Joel's and it is minutes** — three env vars, exposed schemas, redeploy. **Item 1** is
+the lockout counter, one edit plus a restamp now `packages/shared` exists. **Items 22 and 23** are
+the Cookbook pair and are one conversation. **Item 20** is a `drift` rule.
 
-**Waiting on Joel: item 3** (whether drive-before-merge is wanted at all) and **item 21** (the
-Cookbook's surface, and `STANDUP.md` step 1). **`claude/health-recipes` must not be deleted** — the
-only record of its design. Coffee's branch is 🟣; its work landed as #150.
-
-**Do not inherit this as measured:** anything behind `techpaddock.io` or a `*.vercel.app` host.
-This session's proxy refused both, so every claim about a live page here is a Vercel API reading
-rather than an HTTP response. Say which one you have.
+**Do not inherit as measured:** anything behind `techpaddock.io` or a `*.vercel.app` host — every
+claim about a live page here is a Vercel API reading, never an HTTP response.

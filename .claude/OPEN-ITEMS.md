@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-20.** · **Next number: 27.**
+**Last reviewed: 2026-09-20.** · **Next number: 28.**
 
 **Numbers are permanent and the gaps are correct** — the rule is in `CLAUDE.md`, which every session
 loads anyway, and why the run starts where it does is in `DECISIONS.md`.
@@ -28,10 +28,10 @@ Nothing.
    free; a real preview, costing preview env vars and a Supabase branch; or close it and keep
    merge-then-look. Why it has no mechanism left is in `DECISIONS.md`. *LoE: minutes.*
 
-25. **Cookbook has no board URL, and its kickoff block is holding a blank for you.** *Owner: Joel.*
-   Every other agent's is in `KICKOFF.md`, the only place they live. Until you paste one in, that
-   agent has been told to sign off in chat and say why — **publishing without a URL creates a second
-   board.** **Paste it with the manual checklist**, not separately. *LoE: minutes.*
+27. **The Cookbook's bring-up: three env vars, the exposed-schemas list, then a redeploy.** *Owner:
+   Joel.* `tp-cookbook` and its CNAME exist already, read live 2026-09-20. Missing `SESSION_SECRET`
+   (**byte-identical to the other six** — a wrong one breaks *the other apps*), `ANTHROPIC_API_KEY`
+   and `APP_PASSWORD_HASH`; then `cookbook` on exposed schemas; then redeploy. *LoE: minutes.*
 
 ## Waiting on an agent
 
