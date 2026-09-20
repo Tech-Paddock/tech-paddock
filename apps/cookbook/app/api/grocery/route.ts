@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addItems, readList, removeItems, setChecked } from "@/lib/grocery";
 import { LookupError } from "@/lib/errors";
+import { readPreferences, resolveLink } from "@/lib/preferences";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +15,20 @@ export const dynamic = "force-dynamic";
  * technical director's (ledger item 23).
  */
 
-/** A failed read is a 503, never an empty list — an empty list means "buy nothing". */
+/**
+ * A failed read is a 503, never an empty list — an empty list means "buy nothing".
+ *
+ * **Each line comes back carrying the link it should have.** The match against
+ * remembered brands is resolved here rather than in the browser: the preferences
+ * are the whole table on every render, and a phone in a shop should be handed an
+ * answer rather than the data to work one out.
+ */
 export async function GET() {
   try {
-    return NextResponse.json({ items: await readList() });
+    const [items, preferences] = await Promise.all([readList(), readPreferences()]);
+    return NextResponse.json({
+      items: items.map((item) => ({ ...item, ...resolveLink(item, preferences) })),
+    });
   } catch (e) {
     if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
     return NextResponse.json({ error: "Couldn't read the list." }, { status: 500 });

@@ -1,15 +1,14 @@
 # Health — handoff
 
-State as of 2026-09-19. Read `RULES.md` and `.claude/HEALTH-PLAN.md` first.
+State as of 2026-09-20. Read `RULES.md` and `.claude/HEALTH-PLAN.md` first.
 
 ---
 
 ## The macro log is live
 
 Merged as #122 and deployed. Dictate what you ate, approve the draft, it is logged with the day's
-running total; `/debug` runs both models on one food and keeps every run. **The database is empty** —
-zero rows in every table, measured 2026-09-19 — so nothing has been logged, the harness has never
-run, and there is no evidence yet about the thing it was built to measure.
+running total; `/debug` runs both models on one food and keeps every run. **Every table is still
+empty, measured 2026-09-20** — nothing logged, the harness never run, nothing to measure yet.
 
 ## How it works, in the order it matters
 
@@ -36,9 +35,14 @@ Haiku proposes a merge, `validateTidy` refuses one that drops or double-counts a
 it, you approve what survives. A prompt can only ask, and this is the one screen where a model's
 output would delete something you typed.
 
-**The charter caught up on 2026-09-19.** `RULES.md` said "one screen rather than two"; Joel approved
-the amendment saying a screen earns its place by a different moment, not a different noun. **It is
-not permission for a third** — a second noun still goes to him first.
+**The charter caught up on 2026-09-19** — a screen earns its place by a different moment, not a
+different noun. **It is not permission for a third**; a second noun still goes to Joel first.
+
+**Recipes left on 2026-09-20** — their own app, own schema, own list. **You read them to price a
+meal and do not own them**: no book, no generator, no import here, and the contract is the TD's.
+**This list's own home is not settled**: the decision is that it follows them, it stays here until
+the TD sequences it (destructive, so two pull requests), and `RULES.md` still reads as though it is
+permanently yours. Ledger item 23.
 
 ## Agreed with Joel, not started
 
@@ -51,9 +55,6 @@ against left; deleting an entry takes its lines. Joel approved the mockups' comm
    mis-logged lunch throws away approved macros.
 3. **None of it calls a model.** Joel: *"macro tracker should only be reading from database."*
 4. **The split clamps at zero** rather than showing a negative gram.
-
-**Recipes left on 2026-09-20** — their own app, own schema, themed as a meal cookbook. **You read
-them to price a meal and do not own them**: no book, no generator, no import here. Contract is the TD's.
 
 ## Traps specific to this seat
 
@@ -74,6 +75,5 @@ them to price a meal and do not own them**: no book, no generator, no import her
 ## Next
 
 **Use it before building more** — without runs the harness cannot say whether Haiku reproduces a
-number you already approved. Unset by Joel, none blocking: **the agreement rate that retires the
-harness**, **the divergence tolerance** (10%-or-25 kcal, 20%-or-5 g), and how wrong a
-dish's macros may be before it matters.
+number you already approved. Unset by Joel, neither blocking: **the agreement rate that retires the
+harness** and **the divergence tolerance** (10%-or-25 kcal, 20%-or-5 g).
