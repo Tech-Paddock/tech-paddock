@@ -4,9 +4,8 @@
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
 **Last reviewed: 2026-09-19.** · **Next number: 22.**
 
-**Numbers are permanent.** A closed item's row is deleted and its number is never used again, so the
-gaps below are correct rather than something to tidy. A new item takes `Next number` and increments
-it. **Why the run starts where it does is in `DECISIONS.md`**, not restated here.
+**Numbers are permanent and the gaps are correct** — the rule is in `CLAUDE.md`, which every session
+loads anyway, and why the run starts where it does is in `DECISIONS.md`.
 
 - Finished work is not here. Git log is the archive.
 - Settled calls, mistakes and traps are in `.claude/DECISIONS.md`. Live facts are computed, at `/admin`.
@@ -26,11 +25,12 @@ Nothing.
 18. **`DECISIONS.md` is full — 260/260, and three copies of its ceiling disagree.** *Owner: Joel.*
    **Its header's trimming rule exists and has never fired.** Raise the ceiling, or bound by relevance. *LoE: minutes.*
 
-21. **The cookbook is its own app and its own schema; #151 is superseded, not merely held.**
-   *Owner: Joel.* Settled 2026-09-20 — **named Cookbook**, themed as one, and **Health reads it to
-   price a meal** rather than owning recipes. **Surface is still open**; the TD's read is site over
-   app. **Needs `STANDUP.md` step 1**, your solutioning session, whose output is a draft charter.
-   *LoE: a session.*
+21. **The Cookbook is its own app and its own schema. #151 is closed and
+   `claude/health-recipes` is kept on purpose — do not delete that branch.** *Owner: Joel.* Settled
+   2026-09-20: named, themed as a cookbook, and **Health reads it to price a meal** rather than
+   owning recipes. **The branch is the only written record of the design**, and #151's closing
+   comment says what carries over and what dies with the `health.items` link. **Surface is still
+   open**, the TD's read being site over app. **Needs `STANDUP.md` step 1.** *LoE: a session.*
 
 ## Waiting on an agent
 
