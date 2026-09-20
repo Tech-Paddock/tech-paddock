@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-20.** · **Next number: 22.**
+**Last reviewed: 2026-09-20.** · **Next number: 27.**
 
 **Numbers are permanent and the gaps are correct** — the rule is in `CLAUDE.md`, which every session
 loads anyway, and why the run starts where it does is in `DECISIONS.md`.
@@ -23,52 +23,58 @@ Nothing.
 ## Waiting on Joel
 
 3. **Do you still want to drive a branch before it merges? `On track` was only ever that.**
-   *Owner: Joel.* It existed as the one controlled exception to previews being off, so ruling
-   previews out removed it; #156 stripped it back to nothing. **The gap is real** — every other
-   stage is answered by reading a diff, which tells you nothing about a phone app. **Three answers,
-   all fine**: merged-and-live-waiting-on-your-verdict, which needs no machinery; a real preview,
-   which needs preview env vars and a Supabase branch so it is not reading production; or close it
-   and keep merge-then-look. The story is in `DECISIONS.md`. *LoE: minutes.*
+   *Owner: Joel.* **The gap is real** — every other stage is answered by reading a diff, which says
+   nothing about a phone app. **Three answers, all fine**: merged-and-live-waiting-on-your-verdict,
+   free; a real preview, costing preview env vars and a Supabase branch; or close it and keep
+   merge-then-look. Why it has no mechanism left is in `DECISIONS.md`. *LoE: minutes.*
 
-21. **The Cookbook is its own app and its own schema. #151 is closed and
-   `claude/health-recipes` is kept on purpose — do not delete that branch.** *Owner: Joel.* Settled
-   2026-09-20: named, themed as a cookbook, and **Health reads it to price a meal** rather than
-   owning recipes. **The branch is the only written record of the design**, and #151's closing
-   comment says what carries over and what dies with the `health.items` link. **Surface is still
-   open**, the TD's read being site over app — the test is in `.claude/SURFACE.md`, which answers
-   the Cookbook as its worked example and leaves the call yours. **Needs `STANDUP.md` step 1.** *LoE: a session.*
+25. **Cookbook has no board URL, and its kickoff block is holding a blank for you.** *Owner: Joel.*
+   Every other agent's is in `KICKOFF.md`, the only place they live. Until you paste one in, that
+   agent has been told to sign off in chat and say why — **publishing without a URL creates a second
+   board.** **Paste it with the manual checklist**, not separately. *LoE: minutes.*
 
 ## Waiting on an agent
 
 1. **Fix the login lockout with a shared table — Joel chose it on 2026-09-19 over the firewall
    rate limit.** *Owner: TD.* The counter is a signed cookie the client can drop, and a per-app fix
-   is worth nothing since one password opens all six. **The cost he accepted is that the hub gains
-   database credentials**, which it has never had. **Its gate is gone**: this is an edit to the
-   shared auth files, and #152 landed `packages/shared`, so it is one edit plus a restamp rather
-   than six. *LoE: a session.*
+   is worth nothing since one password opens every app. **The cost he accepted is the hub gaining
+   database credentials**, which it has never had. **Its gate is gone** — `packages/shared` landed
+   in #152, so this is one edit plus a restamp. *LoE: a session.*
 2. **The hub's glance has one source and nobody has checked whether it answers.** *Owner: TechPad
    Gen.* `SOURCES` in `apps/home/lib/glance.ts` holds one entry, the tracker's `/api/summary`, and
-   **the tracker is deliberately live**, so it may simply be working. `fetchSummary` swallows the
-   failure either way. **Both ends are one owner's now**, so the hub keeps its no-keys property.
-   *LoE: a session.*
+   **the tracker is deliberately live** — so it may simply be working. *LoE: a session.*
 5. **`shared.contacts` needs its write rules said out loud.** *Owner: TD.* Shared on purpose
    between `apps/editor` (TD, frozen) and `apps/tracker` (TechPad Gen). The old premise — one of the
    two is going away — was wrong; neither did, they changed hands. **It is a cross-app contract
    again**, which is the TD's to write down. *LoE: minutes.*
 
 20. **An app that reads outside its own folder silently stops rebuilding, and nothing checks.**
-   *Owner: TD.* #137 scoped each build to its own folder; the hub reads `.claude` at build time, so
-   four merges stranded the Pit Wall on an hours-old ledger with nothing red. #145 fixed **the hub**
-   — not the class. A `drift` rule comparing what a build reads against what its `ignoreCommand`
-   watches would catch the next one. *LoE: minutes.*
+   *Owner: TD.* #145 fixed **the hub**, not the class. A `drift` rule comparing what a build reads
+   against what its `ignoreCommand` watches would catch the next one. *LoE: minutes.*
+
+22. **The Health↔Cookbook read contract — Health prices a meal by reading Cookbook.** *Owner: TD.*
+   Explicitly not the Cookbook charter's to invent, and not Health's either: it is cross-app, which
+   makes it this seat's like the tracker's `/api/summary`. **Design it before either side builds
+   against a guess** — a contract changed under a live dependency is what the migration rule exists
+   to avoid. Consider it alongside 23; they are one conversation. *LoE: a session.*
+23. **Move the grocery list from Health to Cookbook — destructive, so two pull requests.** *Owner:
+   TD.* Settled 2026-09-20 that it belongs beside the book: you shop from recipes, not from what you
+   ate. **The decision is made; the sequence is not** — `/list` is live, so it is stop-using-then-drop,
+   and it touches Health's charter. **Cookbook builds its own meanwhile.** *LoE: a session.*
+24. **Five liveries, seven apps — two are now worn twice and nothing resolves it.** *Owner: TechPad
+   Gen.* Health borrowed `senna` on a premise item 10 killed; Cookbook has now borrowed `clark` from
+   the frozen editor, flagged rather than quiet. Two more, or a rule that some share. *LoE: a session.*
+26. **Three migration filenames disagree with the versions actually recorded.** *Owner: TD.*
+   `20260919175624`, `20260919185800`, `20260919220112`. The hosted API stamps its own version and
+   ignores the filename — known, documented, and the read-back check that catches it was not run.
+   **Renaming is the honest direction**, the database being the record of what ran, but the first is
+   named in Coffee's handoff so that one needs Coffee. *LoE: minutes.*
 
 ## Parked
 
 Deliberately deferred. **Not background work** — something here moves only when Joel says so.
 
 11. **`CRON_SECRET` and the Microsoft Graph integration.** Parked 2026-09-15. *Owner: TechPad Gen
-   as of 2026-09-19*, with the tracker. **#144 closed the guard**, so `/api/cron/*` answers 401 on an
-   unset secret instead of admitting everyone — **the ordering this row was written around has
-   stopped being load-bearing.** What replaced it is plainer: **`CRON_SECRET` must be set or the
-   sweep does not run at all.** Graph stays built and inert, and nothing says so out loud.
-   *LoE: minutes.*
+   as of 2026-09-19*, with the tracker. #144 closed the guard, so the ordering this row was written
+   around stopped being load-bearing. What replaced it is plainer: **`CRON_SECRET` must be set or
+   the sweep does not run at all.** Graph stays built and inert. *LoE: minutes.*

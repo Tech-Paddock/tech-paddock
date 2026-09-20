@@ -1,0 +1,23 @@
+-- The `cookbook` schema: an empty room with the lights on.
+--
+-- Deliberately no tables. The standup protocol asks only whether a new tool
+-- needs its own schema, and the answer for Cookbook is yes — its draft charter
+-- names `cookbook` alongside the folder, the subdomain and the Vercel project
+-- as the four things the name fixes at once.
+--
+-- **The tables are the Cookbook agent's to design, not the scaffold's.** The
+-- charter is explicit about this: "the tables are this agent's to design in
+-- full, the same way Health's were, not pre-empted here." Two are implied by
+-- decisions already settled with Joel — recipes storing the whole pot with
+-- static macros, and a grocery list with a `source` column — but implied is not
+-- designed, and shaping them before the agent exists is exactly the "set of
+-- decisions nobody made" the protocol warns about.
+--
+-- What ships here is the schema and its grants, because those are what make the
+-- agent's first migration a normal one rather than a three-step special case.
+--
+-- **Shape: additive.** It creates a schema. No existing object is touched,
+-- nothing can violate it, and no code depends on it yet — `apps/cookbook`
+-- pins this schema in lib/supabase.ts but reads nothing from it.
+
+create schema if not exists cookbook;

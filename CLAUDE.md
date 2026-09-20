@@ -80,6 +80,7 @@ message in one had a better home. `read-all.sh` went with them.
 | Resume Formatter | `apps/resume` | `.claude/agents/resume/` |
 | Coffee | `apps/coffee` | `.claude/agents/coffee/` |
 | Health | `apps/health` | `.claude/agents/health/` |
+| Cookbook | `apps/cookbook` | `.claude/agents/cookbook/` |
 
 Each folder holds `RULES.md` and `HANDOFF.md`. The prompts that start a session are in
 `.claude/agents/KICKOFF.md`.
@@ -420,7 +421,7 @@ Per-tool detail lives in that tool's charter. Live facts about what is deployed 
   Root Directories and the derived CI matrix both rest on. **`lib/supabase.ts` stays a per-app
   variant** and the hub has none at all, which is the hub holding no database credential.
 - **One Supabase project**, each tool in its own Postgres schema — `shared`, `editor`, `tracker`,
-  `resume`, `coffee`, `health` — never the default `public`. One migration history, at `supabase/`
+  `resume`, `coffee`, `health`, `cookbook` — never the default `public`. One migration history, at `supabase/`
   in the repo root, never under an app. **Read `supabase/README.md` before writing one.** A new schema inherits
   no grants at all, so adding one means two migrations and a dashboard setting — three steps.
 - **Row Level Security on every table, deny-by-default, zero policies.** The server uses the service
@@ -469,6 +470,7 @@ subdomain. Verified against the live account; the table gets corrected, not the 
 | `resume.techpaddock.io` | Resume Formatter | `tp-resume` |
 | `coffee.techpaddock.io` | Coffee | `tp-coffee-app` |
 | `health.techpaddock.io` | Health | `tp-health` |
+| `cookbook.techpaddock.io` | Cookbook | `tp-cookbook` |
 
 ---
 

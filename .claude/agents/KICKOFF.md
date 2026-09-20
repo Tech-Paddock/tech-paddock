@@ -49,7 +49,7 @@ landed after its session started.
 > per response. **Do not also print the three sections underneath it**; the chat message carries the
 > answer, the publish time and the link, and nothing more. The shape is in `CLAUDE.md` and the page
 > itself is `.claude/agents/BOARD.html` — fill its placeholders rather than inventing a layout, so
-> seven boards stay one board. Show only your own branches and your own ledger rows,
+> every board stays one board. Show only your own branches and your own ledger rows,
 > and never a status colour you did not look up in this session. **A row you did not measure this
 > session is left exactly as it is** — not rewritten, not re-dated. A branch of yours that is
 > merged, superseded or dead still gets a line, purple, until I delete it — you cannot.
@@ -172,3 +172,38 @@ landed after its session started.
 > **Two things are settled and not yours to reopen**: this tool does not appear on the hub's glance,
 > and the livery is borrowed from the paused tracker and belongs to TechPad Gen to settle.
 
+
+## Cookbook — `cookbook`
+
+> **Your board:** _not created yet — Joel pastes the URL here before this agent first runs._
+> **Until it is here, do not publish a board.** Publishing without it creates a second page, and a
+> fortnight of that is thirty pages with no way to tell which is current. Deliver the three-part
+> sign-off in chat instead, and say out loud that it is in chat because you have no URL.
+>
+> You own `apps/cookbook`. Nothing else in this repo is yours.
+>
+> **The design is already agreed and it is not yours to redo.** Your charter was written with Joel
+> on 2026-09-20, before this agent existed, and it carries forward two days of design argued out on
+> `claude/health-recipes` — **1,624 lines that exist nowhere else.** Read #151's *Why* section and
+> its closing comment in full before changing anything. Re-deriving those decisions from scratch
+> will produce worse answers slowly.
+>
+> **Surface is settled: site.** A cookbook is a collection, so the index *is* the product. Thin
+> index grouped by verb, one long page, not thumb-first, no home-screen install. The reasoning is in
+> `.claude/SURFACE.md`, which answers this tool as its worked example. **Not yours to reopen.**
+>
+> **You are on day one.** `app/page.tsx` is a placeholder that says so, the `cookbook` schema exists
+> and is deliberately empty, and **the tables are yours to design.** Design them before you build
+> the screen — that order is the one Health was given and it is the one that worked.
+>
+> **Three things are settled and not yours to reopen**: macros are static and ingredients are text
+> rather than a join; an import never keeps a page's published numbers, it re-estimates them; and a
+> page that could not be read is refused rather than guessed, enforced twice.
+>
+> **Two things are explicitly NOT yours, and building them is the mistake to avoid.** The
+> Health↔Cookbook read contract and the grocery-list move out of `apps/health` are both cross-app
+> and both the technical director's to sequence — ledger items 22 and 23. **Build your own grocery
+> list against your own schema from day one if you want one; never write to `health.grocery_items`,
+> and never assume Health's `/list` disappears on any particular date.**
+>
+> **Your livery is borrowed and belongs to TechPad Gen** — item 24. Do not change it yourself.
