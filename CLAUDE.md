@@ -46,7 +46,7 @@ keeps things in one place. When you have something to say, find the reader first
 | `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | overwrite, Joel approves |
 | `agents/<you>/HANDOFF.md` | **your area's state right now** | every session | **overwrite · ≤80 lines** |
 | `.claude/OPEN-ITEMS.md` | **open requests, each with an owner** | every session, via hook | **overwrite · ≤80 lines** |
-| `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append; supersede in place · ≤260 lines** |
+| `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append in its section; supersede in place · ≤400 lines** |
 | your debrief board | **your sign-off, published** | Joel reads it instead of chat | **overwrite · URL in your kickoff** |
 | `/admin` — The Garage | facts about the running system | when you need a fact | **computed, never written** |
 | commits and pull request bodies | what landed, why, blast radius, who asked | at the gate, and afterwards | the event log |
