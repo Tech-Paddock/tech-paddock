@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-19.** · **Next number: 22.**
+**Last reviewed: 2026-09-20.** · **Next number: 22.**
 
 **Numbers are permanent and the gaps are correct** — the rule is in `CLAUDE.md`, which every session
 loads anyway, and why the run starts where it does is in `DECISIONS.md`.
@@ -37,8 +37,9 @@ Nothing.
 1. **Fix the login lockout with a shared table — Joel chose it on 2026-09-19 over the firewall
    rate limit.** *Owner: TD.* The counter is a signed cookie the client can drop, and a per-app fix
    is worth nothing since one password opens all six. **The cost he accepted is that the hub gains
-   database credentials**, which it has never had. **Do 4 first** — this is an edit to the shared
-   auth files, and after `packages/shared` it is one edit rather than six. *LoE: a session.*
+   database credentials**, which it has never had. **Its gate is gone**: this is an edit to the
+   shared auth files, and #152 landed `packages/shared`, so it is one edit plus a restamp rather
+   than six. *LoE: a session.*
 2. **The hub's glance has one source and nobody has checked whether it answers.** *Owner: TechPad
    Gen.* `SOURCES` in `apps/home/lib/glance.ts` holds one entry, the tracker's `/api/summary`, and
    **the tracker is deliberately live**, so it may simply be working. `fetchSummary` swallows the
@@ -48,10 +49,6 @@ Nothing.
    DevOps colour for a branch deployed and waiting on Joel to drive it. **It needs a deliberate
    deploy trigger of its own** now that automatic previews are off — and not an empty commit, which
    the rules forbid. **Joel asked for it on 2026-09-19.** *LoE: a session.*
-4. **`packages/shared` is built, and #152 is open and green.** *Owner: TD.* One real copy of five
-   files — `next.config.mjs` and `lib/theme.ts` joined once every app was checksummed — stamped
-   outward, `drift` failing a copy that disagrees. Joel asked for it and approved the `CLAUDE.md`
-   edit on 2026-09-20, so **only the merge is left**. Still the gate for 1. *LoE: minutes.*
 5. **`shared.contacts` needs its write rules said out loud.** *Owner: TD.* Shared on purpose
    between `apps/editor` (TD, frozen) and `apps/tracker` (TechPad Gen). The old premise — one of the
    two is going away — was wrong; neither did, they changed hands. **It is a cross-app contract
