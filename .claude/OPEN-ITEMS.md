@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-20.** · **Next number: 26.**
+**Last reviewed: 2026-09-20.** · **Next number: 27.**
 
 **Numbers are permanent and the gaps are correct** — the rule is in `CLAUDE.md`, which every session
 loads anyway, and why the run starts where it does is in `DECISIONS.md`.
@@ -29,10 +29,9 @@ Nothing.
    merge-then-look. Why it has no mechanism left is in `DECISIONS.md`. *LoE: minutes.*
 
 25. **Cookbook has no board URL, and its kickoff block is holding a blank for you.** *Owner: Joel.*
-   Every other agent's is in `KICKOFF.md`, which is the only place they live. Until you paste one in,
-   that agent has been told to put its sign-off in chat and say why — **publishing without a URL
-   creates a second board**, and a fortnight of that is thirty pages with no way to tell which is
-   current. **Paste it with the manual checklist**, not separately. *LoE: minutes.*
+   Every other agent's is in `KICKOFF.md`, the only place they live. Until you paste one in, that
+   agent has been told to sign off in chat and say why — **publishing without a URL creates a second
+   board.** **Paste it with the manual checklist**, not separately. *LoE: minutes.*
 
 ## Waiting on an agent
 
@@ -43,18 +42,15 @@ Nothing.
    in #152, so this is one edit plus a restamp. *LoE: a session.*
 2. **The hub's glance has one source and nobody has checked whether it answers.** *Owner: TechPad
    Gen.* `SOURCES` in `apps/home/lib/glance.ts` holds one entry, the tracker's `/api/summary`, and
-   **the tracker is deliberately live**, so it may simply be working. `fetchSummary` swallows the
-   failure either way, and **both ends are one owner's now**. *LoE: a session.*
+   **the tracker is deliberately live** — so it may simply be working. *LoE: a session.*
 5. **`shared.contacts` needs its write rules said out loud.** *Owner: TD.* Shared on purpose
    between `apps/editor` (TD, frozen) and `apps/tracker` (TechPad Gen). The old premise — one of the
    two is going away — was wrong; neither did, they changed hands. **It is a cross-app contract
    again**, which is the TD's to write down. *LoE: minutes.*
 
 20. **An app that reads outside its own folder silently stops rebuilding, and nothing checks.**
-   *Owner: TD.* #137 scoped each build to its own folder; the hub reads `.claude` at build time, so
-   four merges stranded the Pit Wall on an hours-old ledger with nothing red. #145 fixed **the hub**
-   — not the class. A `drift` rule comparing what a build reads against what its `ignoreCommand`
-   watches would catch the next one. *LoE: minutes.*
+   *Owner: TD.* #145 fixed **the hub**, not the class. A `drift` rule comparing what a build reads
+   against what its `ignoreCommand` watches would catch the next one. *LoE: minutes.*
 
 22. **The Health↔Cookbook read contract — Health prices a meal by reading Cookbook.** *Owner: TD.*
    Explicitly not the Cookbook charter's to invent, and not Health's either: it is cross-app, which
@@ -66,9 +62,13 @@ Nothing.
    ate. **The decision is made; the sequence is not** — `/list` is live, so it is stop-using-then-drop,
    and it touches Health's charter. **Cookbook builds its own meanwhile.** *LoE: a session.*
 24. **Five liveries, seven apps — two are now worn twice and nothing resolves it.** *Owner: TechPad
-   Gen.* Health borrowed `senna` because the tracker was being deprecated; **item 10 killed that
-   premise.** Cookbook has now borrowed `clark` from the frozen editor, flagged rather than quiet.
-   Two more liveries, or a deliberate rule that some apps share. *LoE: a session.*
+   Gen.* Health borrowed `senna` on a premise item 10 killed; Cookbook has now borrowed `clark` from
+   the frozen editor, flagged rather than quiet. Two more, or a rule that some share. *LoE: a session.*
+26. **Three migration filenames disagree with the versions actually recorded.** *Owner: TD.*
+   `20260919175624`, `20260919185800`, `20260919220112`. The hosted API stamps its own version and
+   ignores the filename — known, documented, and the read-back check that catches it was not run.
+   **Renaming is the honest direction**, the database being the record of what ran, but the first is
+   named in Coffee's handoff so that one needs Coffee. *LoE: minutes.*
 
 ## Parked
 
