@@ -1,6 +1,3 @@
-/* Stamped from packages/shared/lib/password.ts — do not edit this copy.
- * Edit the canonical file, then run: node scripts/stamp-shared.mjs
- * drift fails a copy that disagrees, and CI runs drift. */
 import bcrypt from "bcryptjs";
 
 // Node-only (bcryptjs isn't Edge-compatible) — import this from API routes,

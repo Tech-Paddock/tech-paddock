@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-19.
+State as of 2026-09-20.
 
 Read `RULES.md` first for the role and the gate. This file is only what is true right now.
 
@@ -8,11 +8,12 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**Two stacked branches are mine** — `claude/platform-retire-two-agents`, then
-`claude/platform-retire-message-editor`. Joel retired **three agents on 2026-09-19**: Platform
-Config, Pipeline Tracker, Message Editor. **Five remain.** **You own `apps/editor` now** — frozen,
-and the first app folder this seat has held. **Two TD sessions ran at once that evening** and `main`
-moved seven commits under the first branch. **Re-read `main` before trusting a base.**
+**Two branches are mine, both open as pull requests on 2026-09-20, both green.**
+**#152** builds item 4: **`packages/shared` holds the one real copy** of `lib/auth.ts`,
+`lib/password.ts`, `lib/theme.css`, `lib/theme.ts` and `next.config.mjs`, stamped out by
+`scripts/stamp-shared.mjs`, and **`drift` fails a copy that disagrees**. **Do not edit a copy.** It
+edits `CLAUDE.md`, **which Joel approved**, and a change there rebuilds every app. **#153** carries
+the ledger. **Take #152 first**, then #153 takes `main`. **Re-read `main` before trusting either.**
 
 ## What is true now
 
@@ -53,10 +54,9 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 - **Read the real head SHA before passing `expectedHeadSha`.** Inventing a full SHA from a short
   prefix has been done twice; the guard rejected both.
 - **Do not backfill another agent's handoff on the way past.** A stale handoff sends the change
-  back. One the TD writes is the TD's understanding of someone else's work, which is exactly the
-  second-hand account these files exist to replace.
-- **`DECISIONS.md` is AT its ceiling, 260/260, with no trimming rule.** The next entry does not
-  fit. That is Joel's call — raise it or authorise a compaction — never a squeeze.
+  back; one the TD writes is the second-hand account these files exist to replace.
+- **`DECISIONS.md` is AT its ceiling, 260/260, and three copies of that ceiling disagree.** Its
+  trimming rule exists and has never once fired. Joel's call — raise or archive, never a squeeze.
 - **`live: false` on a Vercel project does not mean paused.** Read deployment state — `BLOCKED` is
   paused, `READY` at `target: production` is not. This cost the ledger a false claim for a day.
 - **Regenerating another agent's collector output ages their handoff.** `drift` dates freshness from
@@ -70,9 +70,9 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 
 ## Next
 
-**`packages/shared` is yours, not Joel's to approve** — item 4. **Not npm workspaces**: a root
-install costs the per-app independence the CI matrix rests on. **Surface is yours and the guide is
-unwritten** — item 7; its mockups are a canvas artifact, so the guide must carry the rules in words.
+**Item 4 is #152**; **item 1 is then one edit** — `packages/shared/lib/auth.ts`, stamp, done.
+**Surface is yours and unwritten** — item 7, mockups in a canvas artifact, so the guide carries the
+rules in words. **#151 is superseded: the Cookbook is its own app, and `STANDUP.md` step 1 is Joel's.**
 
 **Every agent has a board, URLs in `KICKOFF.md`** — the only place they live, so an agent that loses
 its URL publishes a duplicate. **You are the rollup.** Joel, 2026-09-19: **a merge refreshes the

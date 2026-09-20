@@ -30,9 +30,10 @@ in `SOURCES` rather than new knowledge in the hub.
 install`). Each app's `.env.example` documents its own environment variables, with the commands to
 generate the ones that need generating.
 
-`packages/shared` was never created: `lib/auth.ts`, `lib/password.ts` and `lib/theme.css` are
-byte-identical copies in every app, so a session or lockout fix is the same edit five times.
-Worth consolidating before the auth logic changes again.
+[`packages/shared`](./packages/shared/README.md) holds the one real copy of every file that has to
+be identical in every app. Edit it there and run `node scripts/stamp-shared.mjs`; `--check` verifies
+without writing, and `drift` fails a copy that disagrees. **Do not edit the copies** — each one opens
+with a banner saying where it came from.
 
 ## Database
 

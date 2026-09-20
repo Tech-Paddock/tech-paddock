@@ -1,11 +1,14 @@
+/* Stamped from packages/shared/lib/theme.css — do not edit this copy.
+ * Edit the canonical file, then run: node scripts/stamp-shared.mjs
+ * drift fails a copy that disagrees, and CI runs drift. */
 /* Paddock theme tokens.
  *
  * GENERATED — do not hand-edit. Source of truth is the palette set the contrast
  * gate checks; every value here has passed 4.5:1 for text and 3:1 for non-text
  * against the ground it is actually painted on.
  *
- * This file is byte-identical in all five apps, the same arrangement lib/auth.ts
- * and lib/password.ts already use. Unlike those, drift here is loud rather than
+ * Stamped into every app from packages/shared, the same arrangement lib/auth.ts
+ * and lib/password.ts now use too. Unlike those, drift here is loud rather than
  * silent: it shows up as one app looking wrong next to another in an iframe.
  *
  * How a theme is chosen
