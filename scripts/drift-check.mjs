@@ -233,11 +233,16 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
        that someone happened to be watching a deployment at the time.
        The warn band exists because the failure is all-or-nothing and arrives
        with no approach: at 256 everything of that app's stops deploying, at 255
-       everything is fine. Today's longest is 175, so 200 is the first length
-       that means somebody deliberately grew this rather than an app simply
-       having a longer name. */
+       everything is fine.
+       It moved from 200 to 235 on 2026-09-20, when every command grew a
+       FORCE_BUILD clause and the longest went 175 -> 218. Seven permanent warns
+       would have been worse than no warn at all: a band nobody can clear is a
+       band everybody learns to scroll past. The hard fail below is the real
+       guard — it runs on every push and stops an over-long command reaching
+       Vercel at all — so 235 is a nudge, which is why it can sit 17 above the
+       new baseline and 21 below the cliff. */
     if (cmd.length > 256) hard.push(`${app}: ignoreCommand is ${cmd.length} characters — Vercel's limit is 256, and over it EVERY deploy of this app is rejected, production included`);
-    else if (cmd.length > 200) soft.push(`${app}: ignoreCommand is ${cmd.length} of Vercel's 256 characters`);
+    else if (cmd.length > 235) soft.push(`${app}: ignoreCommand is ${cmd.length} of Vercel's 256 characters`);
     const named = [...cmd.matchAll(/apps\/([A-Za-z0-9._-]+)/g)].map((m) => m[1]);
     if (!named.includes(app)) hard.push(`${app}: ignoreCommand watches no path under apps/${app}`);
     const foreign = named.filter((n) => n !== app && APPS.includes(n));
