@@ -8,12 +8,12 @@ Read `RULES.md` first for the role and the gate. This file is only what is true 
 
 ## In flight
 
-**Two branches are mine, both open as pull requests on 2026-09-20, both green.**
-**#152** builds item 4: **`packages/shared` holds the one real copy** of `lib/auth.ts`,
-`lib/password.ts`, `lib/theme.css`, `lib/theme.ts` and `next.config.mjs`, stamped out by
-`scripts/stamp-shared.mjs`, and **`drift` fails a copy that disagrees**. **Do not edit a copy.** It
-edits `CLAUDE.md`, **which Joel approved**, and a change there rebuilds every app. **#153** carries
-the ledger. **Take #152 first**, then #153 takes `main`. **Re-read `main` before trusting either.**
+**#152 is merged.** `packages/shared` is the one real copy of `auth.ts`, `password.ts`, `theme.css`,
+`theme.ts` and `next.config.mjs`; `drift` fails a copy that disagrees. **Edit canonical, restamp.**
+
+**This branch is #153**, the ledger. **Three more are mine and behind it**, each taking `main` in
+turn because up-to-date is required: `brief-decisions-refile`, `platform-surface-guide`,
+`platform-on-track-stage`. **Re-read `main` before trusting any of them.**
 
 ## What is true now
 
@@ -70,7 +70,7 @@ its skip path has still never executed in CI. It fails loudly rather than passin
 
 ## Next
 
-**Item 4 is #152**; **item 1 is then one edit** — `packages/shared/lib/auth.ts`, stamp, done.
+**Item 4 is done and item 1 is now one edit** — `packages/shared/lib/auth.ts`, stamp, done.
 **Surface is yours and unwritten** — item 7, mockups in a canvas artifact, so the guide carries the
 rules in words. **#151 is superseded: the Cookbook is its own app, and `STANDUP.md` step 1 is Joel's.**
 

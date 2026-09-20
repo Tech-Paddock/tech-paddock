@@ -64,8 +64,8 @@ from the gate would put a schema change live with nobody holding the merge.
 
 **`CLAUDE.md`'s *Who you are* table is the roster. This section deliberately does not repeat it.**
 It used to, and the copy had already gone stale — it listed Platform Config and Pipeline Tracker
-after both were retired, and it had never gained Health at all. One fact, one home; the same reason
-ledger item 15 exists for the domain map.
+after both were retired, and it had never gained Health at all. One fact, one home — the rule that
+also removed the domain map's second copy when `platform/RULES.md` was deleted.
 
 **Where remits overlap**, which is the part `CLAUDE.md` does not say:
 
