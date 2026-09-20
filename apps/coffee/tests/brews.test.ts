@@ -15,6 +15,9 @@ import {
   parseRatio,
   fromGuide,
   openingBrew,
+  parseBrewTime,
+  formatBrewTime,
+  formatGrindSetting,
   TDS_TARGET,
   YIELD_TARGET,
 } from "@/lib/brews";
@@ -157,7 +160,13 @@ describe("ratio and water", () => {
 
   it("turns water into a ratio at a dose", () => {
     expect(ratioFor(18, 306)).toBe(17);
-    expect(ratioFor(18, 300)).toBe(16.7);
+  });
+
+  it("rounds the ratio to a whole number", () => {
+    // Joel, 2026-09-20: "Whole numbers only for recipe." 1:17 is what you
+    // brew to; 1:16.7 is a description of what the scale happened to say.
+    expect(ratioFor(18, 300)).toBe(17);
+    expect(ratioFor(20, 290)).toBe(15);
   });
 
   it("is null wherever a number is missing or not a number", () => {
@@ -277,7 +286,7 @@ describe("openingBrew", () => {
     // What you did on this bag is the dial-in; their number is where it
     // started. Overwriting yours would undo the last attempt every time.
     const { draft, source } = openingBrew(previous, guide);
-    expect(draft).toMatchObject({ dose_g: "18", water_g: "300", ratio: "16.7" });
+    expect(draft).toMatchObject({ dose_g: "18", water_g: "300", ratio: "17" });
     expect(source).toBe("repeat");
   });
 
@@ -306,5 +315,85 @@ describe("openingBrew", () => {
     const { draft } = openingBrew({ ...previous, brewer: "v60-02" }, guide);
     expect(draft.beverage_g).toBe("");
     expect(draft.notes).toBe("");
+  });
+});
+
+describe("brew time", () => {
+  it("reads m:ss as whole seconds", () => {
+    expect(parseBrewTime("3:00")).toBe(180);
+    expect(parseBrewTime("2:45")).toBe(165);
+    expect(parseBrewTime(" 0:30 ")).toBe(30);
+    expect(parseBrewTime("12:05")).toBe(725);
+  });
+
+  it("refuses a bare number rather than guessing which unit it is", () => {
+    // "3" is three minutes to one person and three seconds to another, and
+    // nothing in the string settles it. This is the same refusal
+    // lib/dates.ts makes about 05/06/2026.
+    expect(parseBrewTime("3")).toBeNull();
+    expect(parseBrewTime("180")).toBeNull();
+  });
+
+  it("refuses a seconds field that is not a seconds field", () => {
+    expect(parseBrewTime("2:75")).toBeNull();
+    expect(parseBrewTime("2:5")).toBeNull();
+    expect(parseBrewTime("about 3:00")).toBeNull();
+    expect(parseBrewTime("0:00")).toBeNull();
+    expect(parseBrewTime("")).toBeNull();
+    expect(parseBrewTime(null)).toBeNull();
+  });
+
+  it("writes whole seconds back as m:ss", () => {
+    expect(formatBrewTime(180)).toBe("3:00");
+    expect(formatBrewTime(165)).toBe("2:45");
+    expect(formatBrewTime(30)).toBe("0:30");
+    // Postgres hands an integer column back as a number, but a client that
+    // stringifies it must not render "NaN:NaN".
+    expect(formatBrewTime("725")).toBe("12:05");
+  });
+
+  it("has nothing to say about a brew that was not timed", () => {
+    expect(formatBrewTime(null)).toBeNull();
+    expect(formatBrewTime(undefined)).toBeNull();
+    expect(formatBrewTime("")).toBeNull();
+    expect(formatBrewTime(0)).toBeNull();
+    expect(formatBrewTime("not a number")).toBeNull();
+  });
+
+  it("round-trips what was typed", () => {
+    for (const text of ["3:00", "2:45", "0:15", "10:00"]) {
+      expect(formatBrewTime(parseBrewTime(text))).toBe(text);
+    }
+  });
+
+  it("does not carry into the next brew, because it is a reading", () => {
+    // Settings repeat; readings do not. What gets logged here is what the
+    // timer said, and repeating it would write down a stopwatch nobody
+    // started — the same line beverage mass, TDS and rating already sit on.
+    expect(repeatOf({ brewer: "v60-02", dose_g: 18, water_g: 306 }).time).toBe("");
+    expect(openingBrew(null, { dose: "18g", ratio: "1:17" }).draft.time).toBe("");
+  });
+});
+
+describe("grind setting", () => {
+  it("rounds to one decimal place, because the dial is stepped in tenths", () => {
+    expect(formatGrindSetting("4.5")).toBe("4.5");
+    expect(formatGrindSetting("4.53")).toBe("4.5");
+    expect(formatGrindSetting("4")).toBe("4.0");
+    expect(formatGrindSetting("4.96")).toBe("5.0");
+  });
+
+  it("is blank for nothing, and passes non-numeric text through", () => {
+    expect(formatGrindSetting(null)).toBe("");
+    expect(formatGrindSetting(undefined)).toBe("");
+    expect(formatGrindSetting("")).toBe("");
+    expect(formatGrindSetting("  ")).toBe("");
+    expect(formatGrindSetting("fine")).toBe("fine");
+  });
+
+  it("normalizes an unformatted setting on repeat", () => {
+    expect(repeatOf({ grind_setting: "4" }).grind_setting).toBe("4.0");
+    expect(repeatOf({ grind_setting: "4.5" }).grind_setting).toBe("4.5");
+    expect(repeatOf({ grind_setting: null }).grind_setting).toBe("");
   });
 });

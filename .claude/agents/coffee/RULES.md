@@ -188,8 +188,8 @@ pages at tier 2. One column would lose which you are looking at.
 **A bag is a purchase; a brew is one thing you did with it.** One bag, many brews. The bag holds
 what is fixed the moment you buy it — identity, purchased date, photo, and the whole `guide_*`
 block — and `my_notes`, which describes the coffee and outlives any one attempt at it. Everything
-variable is a brew: brewer, brew method, grinder, grind setting, dose, beverage mass, TDS, rating,
-and notes about that cup.
+variable is a brew: brewer, brew method, grinder, grind setting, dose, water, brew time, beverage
+mass, TDS, rating, and notes about that cup.
 
 The dial-in used to live on the bag, as a single set of columns. One dial-in per bag can only
 record the last thing you tried, which is the opposite of what dialling in is — a sequence of
@@ -240,6 +240,30 @@ yield: one fact with two homes. It is derived in `lib/brews.ts`, shown in the fo
 before the POST. **`water_g` is water into the brew and `beverage_g` is what came out of it** — the
 bed keeps roughly two grams per gram of coffee, and filling either from the other overstates the
 yield by about a tenth, which is enough to relabel a brew that has not changed.
+
+**Both round to whole numbers.** Joel, 2026-09-20: *"Whole numbers only for recipe."* Water already
+did, because that is what a kettle and a scale resolve; the ratio does now, because 1:17 is what
+you brew to and 1:16.9 is a description of what the scale happened to say. **It rounds your numbers
+only** — `parseRatio` still reports the roaster's published ratio unrounded, since rounding that
+one would be inventing on their authority, which is the thing `myBrewerFor` already refuses about
+brewers.
+
+**Brew time is stored as whole seconds and typed as `m:ss`.** A duration is one number, so minutes
+and seconds are not two columns, for the same reason ppm is derived from `tds_percent` rather than
+kept beside it. **A bare number is refused rather than read**: "3" is three minutes to one person
+and three seconds to another, and nothing in the string settles it — the same refusal `lib/dates.ts`
+makes about `05/06/2026`. **It is a reading, not a setting**, so it does not carry into the next
+brew and does not prefill from `guide_time`: the box holds what the timer said, and a number
+already in it is a stopwatch nobody started. `guide_time` keeps the roaster's own wording, free
+text, exactly as quoted — the two are rule 3 again.
+
+**The search can be run again from the shelf, and that refreshes the link.** Joel, 2026-09-20:
+*"Add refresh button to research for recipe. This should also refresh link."* Both halves are one
+call: the search writes `product_url` and `guide_url` through the same `guideColumns` the first run
+used, so the link is re-derived rather than patched. It runs at the default model and offers no
+dial — the model picker is a comparison harness you set up on the way in, and this is a button
+pressed in a kitchen. It polls the row rather than waiting, so closing the card cannot lose an
+answer that takes minutes.
 
 **A bag is a purchase, so it needs a purchase date, and the error says so.** Joel, 2026-09-19:
 *"Error should say purchase date required."* The column stays nullable and the POST cannot demand
