@@ -284,7 +284,10 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       {remembering ? (
         <RememberForm
           phrase={remembering.name}
-          existing={null}
+          /* The rule already deciding this line, when there is one. Opening the
+             line's own words instead is how you write `2 cups whole milk` into
+             the table and shadow the rule you meant to edit. */
+          existing={remembering.via}
           onCancel={() => setRemembering(null)}
           onSaved={() => {
             setRemembering(null);

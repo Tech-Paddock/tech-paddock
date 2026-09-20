@@ -141,6 +141,7 @@ export default function Brands({ version, onChanged }: { version: number; onChan
   const [preferences, setPreferences] = useState<Preference[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Preference | null>(null);
   const [paste, setPaste] = useState("");
   const [outcome, setOutcome] = useState<string | null>(null);
 
@@ -163,11 +164,17 @@ export default function Brands({ version, onChanged }: { version: number; onChan
   }, [open, load, version]);
 
   async function forget(id: string) {
-    await fetch("/api/preferences", {
+    const response = await fetch("/api/preferences", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
     });
+    // A delete that quietly failed, followed by a reload, looks exactly like a
+    // delete that worked until the row reappears.
+    if (!response.ok) {
+      setError((await response.json()).error ?? "Couldn't forget that one.");
+      return;
+    }
     await load();
     onChanged();
   }
@@ -247,6 +254,13 @@ export default function Brands({ version, onChanged }: { version: number; onChan
                   </span>
                   <button
                     type="button"
+                    onClick={() => setEditing(p)}
+                    className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2"
+                  >
+                    edit
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => forget(p.id)}
                     className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2"
                   >
@@ -255,6 +269,19 @@ export default function Brands({ version, onChanged }: { version: number; onChan
                 </li>
               ))}
             </ul>
+          ) : null}
+
+          {editing ? (
+            <RememberForm
+              phrase={editing.phrase}
+              existing={editing}
+              onCancel={() => setEditing(null)}
+              onSaved={() => {
+                setEditing(null);
+                void load();
+                onChanged();
+              }}
+            />
           ) : null}
 
           {/* The receipts path. The aggregation happens in a session that has the

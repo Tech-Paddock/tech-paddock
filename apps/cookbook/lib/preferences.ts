@@ -1,6 +1,6 @@
 import { getServiceClient } from "./supabase";
 import { LookupError } from "./errors";
-import { SEARCH_BASE, type GroceryItem } from "./grocery";
+import { searchFor, type GroceryItem } from "./grocery";
 
 /**
  * Remembered brands for the shopping list.
@@ -104,15 +104,18 @@ export function matchPreference(name: string, preferences: Preference[]): Prefer
   return best;
 }
 
-/** A search for whatever words were given. One builder, so one URL shape. */
-export function searchFor(terms: string): string {
-  return SEARCH_BASE + encodeURIComponent(terms.trim().replace(/\s+/g, " "));
-}
-
 export type ResolvedLink = {
   href: string;
-  /** What decided it, for the badge beside the line. Null means nothing did. */
-  via: { phrase: string; kind: PreferenceKind; brand: string | null } | null;
+  /**
+   * The preference that decided it, or null when nothing did.
+   *
+   * **The whole row, not a summary of it**, so *remember* on a line that already
+   * has a brand opens the rule that is already deciding it. A summary meant the
+   * editor prefilled the line's own words — and saving that wrote a second,
+   * narrower row (`2 cups whole milk`) that shadowed the rule it was meant to
+   * edit. Everything here is already in the page: the link is the payload.
+   */
+  via: Preference | null;
 };
 
 /**
@@ -130,7 +133,7 @@ export function resolveLink(
   const fallback = searchFor(item.name);
   if (!preference) return { href: fallback, via: null };
 
-  const via = { phrase: preference.phrase, kind: preference.kind, brand: preference.brand };
+  const via = preference;
 
   if (preference.kind === "product" && preference.url) return { href: preference.url, via };
   if (preference.kind === "terms" && preference.terms) return { href: searchFor(preference.terms), via };
@@ -218,8 +221,14 @@ export function readDraft(raw: unknown): { row: PreferenceDraft } | { error: str
  * **Upsert on the normalised phrase, not insert-then-catch**, because unlike a
  * recipe name a second opinion about milk is a correction rather than a mistake.
  */
-export async function savePreference(draft: PreferenceDraft): Promise<Preference> {
-  const existing = await findByPhrase(draft.phrase);
+export async function savePreference(
+  draft: PreferenceDraft,
+  /** The current rows, when the caller already has them — see `importPreferences`. */
+  known?: Preference[]
+): Promise<Preference> {
+  const wanted = normalizePhrase(draft.phrase);
+  const all = known ?? (await readPreferences());
+  const existing = all.find((p) => normalizePhrase(p.phrase) === wanted) ?? null;
 
   const payload = { ...draft, updated_at: new Date().toISOString() };
   const query = existing
@@ -229,13 +238,6 @@ export async function savePreference(draft: PreferenceDraft): Promise<Preference
   const { data, error } = await query.select(COLUMNS).single();
   if (error) throw new LookupError(`Couldn't save that preference: ${error.message}`);
   return data as Preference;
-}
-
-/** The row whose phrase normalises the same way, if there is one. */
-async function findByPhrase(phrase: string): Promise<Preference | null> {
-  const wanted = normalizePhrase(phrase);
-  const all = await readPreferences();
-  return all.find((p) => normalizePhrase(p.phrase) === wanted) ?? null;
 }
 
 export async function removePreference(id: string): Promise<void> {
@@ -251,21 +253,39 @@ export type ImportOutcome = { saved: number; rejected: { row: number; reason: st
  * **Every row is validated before any row is written, and a bad row is reported
  * rather than dropped.** A silent skip in a seed of forty is how you find out in
  * the shop that the one you cared about never landed.
+ *
+ * **A row that fails at the database is reported the same way, and the rest of
+ * the batch still lands.** Throwing halfway would leave an unknown number of
+ * rows written behind an error that names none of them, which is worse than a
+ * partial import you can read.
+ *
+ * The table is read once, not once per row. Later rows see earlier ones through
+ * `known`, so a batch containing the same phrase twice updates rather than
+ * colliding with itself.
  */
 export async function importPreferences(rows: unknown[]): Promise<ImportOutcome> {
-  const drafts: PreferenceDraft[] = [];
+  const drafts: { row: number; draft: PreferenceDraft }[] = [];
   const rejected: { row: number; reason: string }[] = [];
 
   rows.forEach((raw, i) => {
     const read = readDraft(raw);
     if ("error" in read) rejected.push({ row: i + 1, reason: read.error });
-    else drafts.push(read.row);
+    else drafts.push({ row: i + 1, draft: read.row });
   });
 
+  const known = drafts.length > 0 ? await readPreferences() : [];
   let saved = 0;
-  for (const draft of drafts) {
-    await savePreference(draft);
-    saved++;
+
+  for (const { row, draft } of drafts) {
+    try {
+      const written = await savePreference(draft, known);
+      const at = known.findIndex((p) => p.id === written.id);
+      if (at === -1) known.push(written);
+      else known[at] = written;
+      saved++;
+    } catch (e) {
+      rejected.push({ row, reason: e instanceof Error ? e.message : "The database refused it." });
+    }
   }
 
   return { saved, rejected };

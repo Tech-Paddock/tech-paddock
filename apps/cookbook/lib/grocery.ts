@@ -42,14 +42,19 @@ export type GroceryItem = {
 export const SEARCH_BASE = "https://www.kingsoopers.com/q/";
 
 /**
- * The generic search for a line, and the fallback behind every remembered brand.
- * `lib/preferences.ts` is what decides when a line gets something better.
+ * A search for whatever words it is given. **The one builder** — `resolveLink`
+ * in `lib/preferences.ts` calls this for a remembered phrase and for the
+ * fallback alike, so a fix to the URL shape is still a one-line fix.
  */
+export function searchFor(terms: string): string {
+  return SEARCH_BASE + encodeURIComponent(terms.trim().replace(/\s+/g, " "));
+}
+
+/** The generic search for a line: its name, and deliberately not its note. */
 export function searchUrl(item: Pick<GroceryItem, "name">): string {
-  // The note is left out deliberately: "2 lbs" and "the small tin" are
-  // instructions to a shopper, not search terms, and they narrow a search to
-  // nothing.
-  return SEARCH_BASE + encodeURIComponent(item.name.trim().replace(/\s+/g, " "));
+  // "2 lbs" and "the small tin" are instructions to a shopper, not search
+  // terms, and they narrow a search to nothing.
+  return searchFor(item.name);
 }
 
 /** The open lines as a block you can paste anywhere. Ticked-off lines are not shopping. */

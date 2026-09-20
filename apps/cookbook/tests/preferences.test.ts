@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { searchFor, searchUrl } from "../lib/grocery";
 import {
   matchPreference,
   normalizePhrase,
   readDraft,
   resolveLink,
-  searchFor,
   type Preference,
 } from "../lib/preferences";
 
@@ -80,6 +80,20 @@ describe("resolveLink", () => {
     // different facts about the same link.
     expect(resolved.href).toBe(searchFor("whole milk"));
     expect(resolved.via?.kind).toBe("plain");
+  });
+
+  it("hands back the matched row itself, so the editor opens the rule that is deciding", () => {
+    // Regression: `via` used to be a summary, so *remember* on this line
+    // prefilled "2 cups whole milk" and saving wrote a second, narrower row
+    // that shadowed the rule it was meant to edit.
+    const p = pref("whole milk", { id: "the-rule", terms: "whole milk" });
+    expect(resolveLink({ name: "2 cups whole milk" }, [p]).via?.id).toBe("the-rule");
+  });
+
+  it("the fallback is the same builder the plain list link uses", () => {
+    // One URL shape, in one place. Two builders is how the /q/ path gets fixed
+    // in one of them.
+    expect(resolveLink({ name: "saffron" }, []).href).toBe(searchUrl({ name: "saffron" }));
   });
 
   it("falls back to the line's own name when nothing matches", () => {
