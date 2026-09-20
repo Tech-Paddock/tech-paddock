@@ -14,24 +14,23 @@ minutes with nothing on the connection, so a phone calls it dead. Two answers we
 **It can be run again from the shelf** — same call, same polling, and it refreshes the link too.
 
 **A `none` is no longer the end of the screen.** Sonnet 5 suggests a recipe where the roaster
-published none. It lands in `suggested_recipe`, **never `guide_*`**, with no quote and no URL because
-it read nothing — no web tools on that call. The light still says **No Recipe Found**, which is still
-true. `RULES.md` §1 carries the amendment; the risk it names is wording, so the copy is under test.
+published none, into `suggested_recipe`, **never `guide_*`**, with no quote and no URL because it
+read nothing. The light still says **No Recipe Found**. `RULES.md` §1 has the amendment; the risk it
+names is wording, so the copy is under test.
 
-**The search is a comparison harness.** Model and effort are selectable, recorded, and validated by
-`lib/models.ts`; a weaker one is safe because `validateGuide` enforces quote-backing in code.
-**Neither the suggestion nor Search again is on that dial.**
+**The search is a comparison harness.** Model and effort are selectable, recorded and validated by
+`lib/models.ts`; a weaker one is safe because `validateGuide` enforces quote-backing in code. **Neither
+the suggestion nor Search again is on that dial.**
 
 **A bag is a purchase; a brew is one attempt at it.** `extraction_yield` is generated and ppm never
 stored, to stop one measurement being written twice. **Measurement, or a function of them?** **The
 brew form works in dose, ratio and water, and any two give the third**, and **the ratio has no
 column** — water over dose, derived in `lib/brews.ts`, dropped before the POST, and rounded whole
-since 2026-09-20. `water_g` is *not* `beverage_g`: water in, not what came out. **Beverage mass, TDS
-and extraction are commented out of the form**, not deleted — uncomment to restore.
+since 2026-09-20. `water_g` is *not* `beverage_g`: water in, not what came out. **The refractometer
+half of the form is commented out**, not deleted.
 
-**Brew time is a real field**, whole seconds in `brew_seconds`, typed and shown as `m:ss`. **It is a
-reading**: it neither repeats into the next brew nor prefills from `guide_time`, and a bare "3" is
-refused rather than guessed at.
+**Brew time is a real field**, whole seconds in `brew_seconds`, typed as `m:ss`. **It is a reading**:
+it neither repeats nor prefills from `guide_time`, and a bare "3" is refused rather than guessed at.
 
 **A new brew opens as a repeat of the last one, then as the roaster's numbers** — `openingBrew`, your
 last brew winning field by field, no reading carried. **A suggestion does not feed it, settled**:
@@ -68,13 +67,14 @@ bag, Recipe, Brews. **A brew pill leads with its rating** and carries no grinder
 ## In flight
 
 `claude/coffee-recipe-and-brew-pill` is my only open branch: Search again, brew time, whole numbers,
-the date-box fix, the quiet tier line, the reshaped pill, and migration `20260920135705` — additive,
-one nullable column. **`claude/coffee-roast-date-and-suggested-recipe` is still on the remote and
-should not be**: merged history, clutter, Joel's to remove.
+the date-box fix, the quiet tier line, the reshaped pill, and the `coffee_brews_time` migration —
+additive, one nullable column. **`claude/coffee-roast-date-and-suggested-recipe` is still on the
+remote and should not be**, measured today: merged history, clutter, Joel's to remove.
 
 ## Next
 
-1. **Confirm `20260919175624` and `20260920135705` were applied.** Nothing in the sandbox can, and a
-   missing column fails only the suggestion or the brew time — quietly, on the live site.
+1. **Only `coffee_brews_time` is waiting.** Read off the database 2026-09-20: `suggested_recipe` is
+   live, `brew_seconds` is not. **The hosted API stamps its own version, so a filename is not what
+   ran** — ledger 26 holds the numbers. **The suggestion has still never run against a real bag.**
 2. **Run one coffee twice, Haiku then Sonnet 5 at `high`**, and compare the tiers. The open question.
 3. The deliberately-unbuilt list — timer, inventory, method table — stays unbuilt until asked.
