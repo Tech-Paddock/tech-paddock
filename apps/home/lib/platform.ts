@@ -93,6 +93,12 @@ export type Drift = {
  * an iframe target, and a row in The Garage's table. Joel removed it from all
  * three on 2026-09-18 rather than from the sidebar alone.
  *
+ * **The Cookbook was added 2026-09-20, on Joel's word that it is live.** Not on
+ * the Health terms below: `tp-cookbook` serves `cookbook.techpaddock.io`, its
+ * latest production deployment is `READY`, and the domain is verified — all
+ * three read off the deployment state rather than a project field, which is the
+ * rule this app has been caught by before.
+ *
  * **Health is deliberately present before it serves.** `tp-health` has no Root
  * Directory and no domain attached yet, so until those are set its sidebar row
  * and frame lead nowhere. That is the intended state rather than an oversight:
@@ -104,7 +110,7 @@ export type Drift = {
  * putting this entry back. `apps/tracker` is untouched and still builds in CI —
  * the roster CI derives comes from the folders on disk, never from this file.
  */
-export type ToolSlug = "resume" | "coffee" | "health";
+export type ToolSlug = "resume" | "coffee" | "health" | "cookbook";
 
 export type Tool = Project & { slug: ToolSlug };
 
@@ -113,6 +119,7 @@ export const TOOLS: Tool[] = [
   { slug: "resume", name: "Resume Formatter", url: "https://resume.techpaddock.io", vercelProject: "tp-resume" },
   { slug: "coffee", name: "Coffee", url: "https://coffee.techpaddock.io", vercelProject: "tp-coffee-app" },
   { slug: "health", name: "Health", url: "https://health.techpaddock.io", vercelProject: "tp-health" },
+  { slug: "cookbook", name: "Cookbook", url: "https://cookbook.techpaddock.io", vercelProject: "tp-cookbook" },
 ];
 
 export const HUB: Project = {
