@@ -78,8 +78,10 @@ Adding the folder is enough to be built, measured and reported. That is the whol
 10. **The DNS record**, a CNAME like the rest.
 11. **The exposed-schemas list in the Supabase dashboard**, if step 2 said yes. It is not in this
     repo and it is the step that gets missed.
-12. **Redeploy.** Vercel bakes the environment in at build time, so a variable set after a build is
-    not in the running deployment.
+12. **Build it again — a bare redeploy will not do.** Vercel bakes the environment in at build
+    time, so a variable set after a build is not in the running deployment, and the Ignored Build
+    Step cancels a redeploy of the same commit. **Set `FORCE_BUILD` on the project, redeploy,
+    then remove it.**
 
 ## The manual output — what the technical director hands over
 
