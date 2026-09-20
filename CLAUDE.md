@@ -174,7 +174,9 @@ wrong or the rule is, and that is a conversation before any code exists.
 - **TechPad Gen owns the theme, in every app.** Palette, tokens, type, spacing, and the shared
   component language. **Surface is not the theme and is the technical director's** — whether a tool
   is a site or an app decides its shell and its navigation, which is architecture, and it is settled
-  at standup rather than in a feature. **Using what exists is free and needs nobody** — build with the tokens already
+  at standup rather than in a feature. **The rules are in `.claude/SURFACE.md`; read it before you
+  design a screen.** Page count is not the test — Coffee and the Resume Formatter have the same
+  number of routes and are not the same shape. **Using what exists is free and needs nobody** — build with the tokens already
   there. **What needs TechPad Gen is changing or forking it.** One owner rather than five because the
   hub embeds the tools in iframes, so two apps' buttons sit inches apart on one screen; drift there
   is visible and makes one product look like several.

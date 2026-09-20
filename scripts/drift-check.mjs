@@ -323,7 +323,7 @@ add("worklogs stay retired", existsSync(R(".claude/worklogs")) ? "fail" : "ok",
    not wrong the day it is written. It is wrong later, which is why it is a
    warning naming where to look rather than an error. */
 {
-  const docs = [R("CLAUDE.md"), R("README.md"), R("supabase/README.md"),
+  const docs = [R("CLAUDE.md"), R("README.md"), R("supabase/README.md"), R(".claude/SURFACE.md"),
     ...readdirSync(R(".claude/agents")).flatMap((d) => ["RULES.md", "HANDOFF.md"]
       .map((f) => R(".claude/agents", d, f))).filter(existsSync)];
   const hits = [];
