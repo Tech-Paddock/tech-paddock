@@ -23,6 +23,11 @@ Nothing.
 
 ## Waiting on Joel
 
+4. **`packages/shared` is built and parked on `claude/platform-packages-shared`.** *Owner: Joel.*
+   One real copy of five files — `next.config.mjs` and `lib/theme.ts` joined once all apps were
+   checksummed — stamped outward, `drift` failing a copy that disagrees. **Needs your ask for a PR
+   and your approval of a `CLAUDE.md` edit.** Still the gate for 1. *LoE: minutes.*
+
 18. **`DECISIONS.md` is full — 260/260, and three copies of its ceiling disagree.** *Owner: Joel.*
    **Its header's trimming rule exists and has never fired.** Raise the ceiling, or bound by relevance. *LoE: minutes.*
 
@@ -47,11 +52,6 @@ Nothing.
    DevOps colour for a branch deployed and waiting on Joel to drive it. **It needs a deliberate
    deploy trigger of its own** now that automatic previews are off — and not an empty commit, which
    the rules forbid. **Joel asked for it on 2026-09-19.** *LoE: a session.*
-4. **Build `packages/shared`.** *Owner: TD.* One real copy of the five-way files, a stamping
-   script, and `drift` failing a copy that disagrees. **Joel asked for it on 2026-09-19**, and it
-   is the gate for 1. **It brings back the all-six deploy on purpose**: every app's `ignoreCommand`
-   already watches `packages`, so the first real file there rebuilds all six at once — which is
-   correct, because a shared auth file does affect all six. *LoE: a session.*
 5. **`shared.contacts` needs its write rules said out loud.** *Owner: TD.* Shared on purpose
    between `apps/editor` (TD, frozen) and `apps/tracker` (TechPad Gen). The old premise — one of the
    two is going away — was wrong; neither did, they changed hands. **It is a cross-app contract
