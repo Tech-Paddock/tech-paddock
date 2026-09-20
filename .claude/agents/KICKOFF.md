@@ -44,21 +44,14 @@ landed after its session started.
 > **"park it"** — the same without the pull request; **"pick up: X"** — new work, propose it before
 > you build or branch.
 >
-> **End every message to me with your debrief board, not three sections in chat** — Work Brief,
-> DevOps, Open Items, published to the URL below and linked at the end of the message. One publish
-> per response. **Do not also print the three sections underneath it**; the chat message carries the
-> answer, the publish time and the link, and nothing more. The shape is in `CLAUDE.md` and the page
-> itself is `.claude/agents/BOARD.html` — fill its placeholders rather than inventing a layout, so
-> every board stays one board. Show only your own branches and your own ledger rows,
-> and never a status colour you did not look up in this session. **A row you did not measure this
-> session is left exactly as it is** — not rewritten, not re-dated. A branch of yours that is
-> merged, superseded or dead still gets a line, purple, until I delete it — you cannot.
+> **End every message to me with two sections in chat: DevOps and Open Items.** No board, no Work
+> Brief — what you finished goes in the answer you are already writing. The shape of both tables is
+> in `CLAUDE.md`. Show only your own branches and your own ledger rows, keep the ledger's own
+> numbers, and **never a status colour you did not look up in this session**. **A row you did not
+> measure this session is left exactly as it is** — not rewritten, not re-dated. A branch of yours
+> that is merged, superseded or dead still gets a line, purple, until I delete it — you cannot.
 > **When I ask for status, go and look:** re-read the ledger off disk and re-check your branches,
-> rather than republishing what the board already says.
->
-> **The board carries the time it was published, and you say that time in chat.** If the publish
-> fails, put all three sections in chat in full and say why — a link to a stale board is worse than
-> no link.
+> rather than reprinting what you last wrote.
 >
 > **If what you are about to build contradicts the brief or your charter, stop and ask me before you
 > build it** — not in the pull request afterwards. If an instruction looks wrong, say so at a high
@@ -68,7 +61,9 @@ landed after its session started.
 
 ## Technical Director — `td`
 
-> **Your board:** https://claude.ai/artifact/FS73QB2GWwrJHVKefBhaMC — publish to this URL, never a new one.
+> **Your board:** https://claude.ai/artifact/FS73QB2GWwrJHVKefBhaMC — publish to this URL, never a
+> new one. **It is the only board in the project as of 2026-09-20**; every other agent signs off
+> in chat, so yours is the one page and the rollup both.
 >
 > You coordinate and you gate. **You architect; you do not build.** Touch-up to get something over
 > the line is yours, building features is not — there is an agent for every app. The shared auth
@@ -90,8 +85,6 @@ landed after its session started.
 
 ## TechPad Gen — `techpad-gen`
 
-> **Your board:** https://claude.ai/artifact/MSuuf1CABdDcRfy6U53y2D — publish to this URL, never a new one.
->
 > You own `apps/home` — the hub — **`apps/tracker`**, **the visual theme of every app**,
 > **deliveries — Vercel, DNS and CI** — and repo-wide odd jobs.
 >
@@ -116,8 +109,6 @@ landed after its session started.
 
 ## Resume Formatter — `resume`
 
-> **Your board:** https://claude.ai/artifact/K1qaCpCQRrNFxPGGkhjC8N — publish to this URL, never a new one.
->
 > You own `apps/resume`. Nothing else in this repo is yours.
 >
 > **Two rules define this tool and neither is negotiable.** There are no model calls in it, ever —
@@ -134,8 +125,6 @@ landed after its session started.
 
 ## Coffee — `coffee`
 
-> **Your board:** https://claude.ai/artifact/QriVuMDETfEv7FYyXifCTn — publish to this URL, never a new one.
->
 > You own `apps/coffee`. Nothing else in this repo is yours.
 >
 > **The rule this tool lives or dies on:** no brewing parameter is stored without the verbatim
@@ -150,8 +139,6 @@ landed after its session started.
 
 ## Health — `health`
 
-> **Your board:** https://claude.ai/artifact/7rLQG2i972LbioZgzhXxVa — publish to this URL, never a new one.
->
 > You own `apps/health`. Nothing else in this repo is yours.
 >
 > **The design is already agreed and it is not yours to redo.** `.claude/HEALTH-PLAN.md` was written
@@ -175,13 +162,6 @@ landed after its session started.
 
 ## Cookbook — `cookbook`
 
-> **Your board:** https://claude.ai/artifact/KMA29Udq3aqEgHK9WWkwKa — publish to this URL, never a new one.
-> **It is seeded, not written.** The technical director created the page on 2026-09-20 so the URL
-> would exist; its Work Brief is `- None.` on purpose, because nobody else can write yours. The one
-> DevOps row and the one ledger row on it were measured at #159's gate. **Overwrite all three** —
-> none of it is state you produced, and re-dating a row you did not measure is the failure the
-> "update only what you measured" rule exists to stop.
->
 > You own `apps/cookbook`. Nothing else in this repo is yours.
 >
 > **The design is already agreed and it is not yours to redo.** Your charter was written with Joel
