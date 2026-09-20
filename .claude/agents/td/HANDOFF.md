@@ -36,13 +36,11 @@ at today's size** — `CLAUDE.md`'s 400 arrives with the compaction, since a cap
 red `main`. **That compaction is deliberately not this session's**: an agent holding the whole file's
 reasoning cannot judge whether a compacted line still carries it. A cold session is the test.
 
-**The board is regenerated, never adopted.** Reading one back to edit it cost ~38K tokens resident
-for the rest of the session; building from `BOARD.html` cost ~9K. **Publish once per session at
-close-out.** Both in `claude/brief-board-regenerate`.
+**The board is regenerated, never adopted** — reading one back to edit it cost ~38K tokens resident
+for the rest of the session against ~9K to build it. **Publish once per session, at close-out.**
 
 **The doc floor is the checkout, not overhead**, and **regressive** — 5% of a 600K session, 46% of a
-75K one, so shorter sessions make cutting it matter *more*. **`### Always` is 55% of `CLAUDE.md`**
-and the sign-off spec 34% of it; that is where the compaction lives.
+75K one. **`### Always` is 55% of `CLAUDE.md`**, the sign-off spec 34%; the compaction lives there.
 
 **The ledger is 80/80 and cannot record the work that would give it room** — item 28, the
 `CLAUDE.md` compaction, has no line to sit on. That is the demonstration, not untidiness.
@@ -50,9 +48,6 @@ and the sign-off spec 34% of it; that is where the compaction lives.
 **The read-back rule has its proof, twice.** **MCP `apply_migration` cannot record a file's own
 version** — name and query only, and it stamps the clock. Use `execute_sql` with the DDL and the
 `supabase_migrations.schema_migrations` insert **in one batch**. **Item 26's three are unchanged.**
-
-**`lib/models.ts` stays a per-app copy — settled at #159's gate**, reasoned in `DECISIONS.md`.
-**No ledger row; that is the answer rather than a gap.**
 
 **Branch protection and `Require branches to be up to date` are on; required checks are `gate`,
 `drift`, `requested-by-joel`** — Joel's screenshot, not a measurement. Say which it is.
@@ -78,7 +73,7 @@ version** — name and query only, and it stamps the clock. Use `execute_sql` wi
 
 ## Next
 
-**Joel's, minutes each**: merge #159, then **item 27** — three env vars, exposed schemas, redeploy.
+**Joel's, minutes each**: **item 27** — three env vars, exposed schemas, redeploy.
 **Item 1** is the lockout counter, one edit plus a restamp. **22 and 23** are one conversation.
 
 **Do not inherit as measured:** anything behind `techpaddock.io` or a `*.vercel.app` host — every
