@@ -170,6 +170,18 @@ plausibly reopen or repeat, delete it; git keeps it.
   carry a question that has been answered. **What is still open is the livery, item 24, not this.**
   If a fourth app ever needs the *identical* registry, reopen it then — additive, and on evidence.
 
+- **2026-09-20 — one board, not seven. Every agent except the technical director signs off in
+  chat.** Joel: *"You continue to generate paddock debrief as laid out. Everyone else no more
+  paddock debriefs. I just want DevOps and open items from that agent within the body of the chat."*
+  This reverses the 2026-09-18 extension that gave every agent a page of its own. **The reason is
+  readership, not cost** — a board per agent meant a publish per agent and he opened one, and a page
+  nobody opens is worse than a table in the message he is already reading, because it still looks
+  authoritative while going stale. **Work Brief did not move to chat; it was dropped** for those
+  agents, and what was finished goes in the prose of the answer instead. The two tables survived
+  because a table is the part prose cannot carry. **The measuring rules did not change with the
+  medium** — live branches, live check runs, the ledger re-read off disk, update only what you
+  measured. `.claude/agents/BOARD.html` stays; it now has one caller.
+
 ## Mistakes — do not repeat
 
 - **Merging a second change on a gate result taken before the first.** #69 and #70 were merged past

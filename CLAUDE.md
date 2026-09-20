@@ -47,7 +47,7 @@ keeps things in one place. When you have something to say, find the reader first
 | `agents/<you>/HANDOFF.md` | **your area's state right now** | every session | **overwrite · ≤80 lines** |
 | `.claude/OPEN-ITEMS.md` | **open requests, each with an owner** | every session, via hook | **overwrite · ≤80 lines** |
 | `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append in its section; supersede in place · ≤400 lines** |
-| your debrief board | **your sign-off, published** | Joel reads it instead of chat | **overwrite · URL in your kickoff** |
+| the debrief board | **the sign-off, published** | **technical director only** — everyone else signs off in chat | **overwrite · URL in that kickoff** |
 | `/admin` — The Garage | facts about the running system | when you need a fact | **computed, never written** |
 | commits and pull request bodies | what landed, why, blast radius, who asked | at the gate, and afterwards | the event log |
 
@@ -239,50 +239,36 @@ wrong or the rule is, and that is a conversation before any code exists.
   tool output, file dumps and command results scrolling past above it — he reads this terminal all
   day and should never have to hunt for where your answer starts. It costs one line and it is not
   optional, including on a one-sentence answer.
-- **Every agent delivers the sign-off as its own board, not as three sections in chat.** Joel asked
-  for this on 2026-09-18, extending what had been the technical director's alone. **Your board's URL
-  is in your kickoff block** — publish to *that* URL. Publishing without it creates a second board,
-  and a fortnight of that is thirty pages with no way to tell which is current.
-  **One publish per session, at close-out — not one per response.** Measured on 2026-09-20: four
-  publishes in one session cost roughly four times the edit-and-verify tokens, for a page nobody
-  opened in between. **Re-measure whenever he asks for status — that rule is unchanged — but say the
-  numbers in chat and publish the page when the session ends.** A republish that only moves a
-  timestamp is the stale-board failure wearing a fresh stamp, which this section already forbids.
-  The three sections still exist and are still measured the same way — the medium changed, not the
-  discipline. **A
-  board written from memory is worse than a table written from memory**, because a page looks
-  permanent and a chat message visibly scrolls away, so the re-measure rule below binds harder here
-  rather than less.
+- **Only the technical director publishes a board. Every other agent signs off in chat.** Joel
+  settled this on 2026-09-20, reversing the 2026-09-18 extension that had given every agent a page
+  of its own: a board per agent meant a publish per agent, and he opened one.
+  **The technical director's board is unchanged** — all three sections, published to the URL in its
+  kickoff block and never a new one. **One publish per session, at close-out, not one per response.**
+  Measured on 2026-09-20: four publishes in one session cost roughly four times the edit-and-verify
+  tokens, for a page nobody opened in between. **It carries the time it was published**, said again
+  in chat, which is the only thing making a stale board visible rather than silently authoritative.
+  **When it cannot be published the sign-off goes into chat in full, with the reason said out loud**
+  — the artifact service refused twelve publishes in a row on the day that rule was written, leaving
+  the page two merges stale, and **a link to a stale board is worse than no link**.
+- **Every other agent ends its message with two sections — DevOps and Open Items. No Work Brief.**
+  What you finished goes in the answer you are already writing, in prose, where he is already
+  reading. **A table is the part prose cannot carry**, which is why they are the two that
+  survived. `- None.` is still written rather than dropped: a missing section and a quiet one are
+  indistinguishable.
+  **The medium changed; the measuring did not.** Both are re-measured every time they are written —
+  a live branch list, live check runs, and the ledger re-read off disk. **A table written from memory
+  is the failure this section exists to prevent**, and chat makes that easier rather than harder,
+  because a message visibly scrolls away and nobody goes back to check it against anything.
   **Update only what you measured.** A row you did not touch this session is left exactly as it is —
-  not rewritten, not re-dated, not re-worded. This is the same rule as "never fill in a row you
-  cannot see", and it is what makes a board safe to carry state a later session did not produce.
-  **Every board carries the time it was published**, and the agent states that same time in chat.
-  That is the only thing that makes a stale board visible rather than silently authoritative.
-  **The technical director's board is the rollup** and is the only one that reports every agent.
-  **When the board cannot be republished, the sign-off goes back into chat, in full, with the reason
-  said out loud.** That is not hypothetical: the artifact service refused twelve publishes in a row
-  on the day this rule was written, leaving the page two merges stale. **A link to a stale board is
-  worse than no link** — it reports the wrong state while looking authoritative, which is the exact
-  failure the whole sign-off exists to prevent.
-- **The board carries the three-part sign-off. Do not repeat it in chat.** Joel cut the chat copy
-  on 2026-09-18, having found agents publishing the board *and* printing the same three sections
-  underneath it. **Two copies of one report is how the two come to disagree**, and the page is the
-  copy that survives the scrollback.
-  **What your message to him carries instead**: the answer to what he actually asked, the time you
-  published, and the link. Nothing else is owed — no Work Brief, no DevOps table, no Open Items
-  table. **`- None.` has no place in chat any more**; it lives on the board, where a quiet section
-  still has to say it is quiet.
-  **The three sections below are the board's specification.** They are still measured the same way,
-  to the same standard, in the same order — the medium changed, not the discipline. Three headings,
-  always all three, and a section with nothing in it says so rather than being dropped, because a
-  missing section and a quiet one are indistinguishable.
-  **The one time they go back into chat is when the board cannot be published**, which the rule
-  above already requires, in full and with the reason said out loud.
+  not rewritten, not re-dated, not re-worded. Same rule as "never fill in a row you cannot see".
+  **The three sections are specified below.** Work Brief is the technical director's board alone; the
+  other two are written the same way in either medium.
 
-  **1 · Work Brief.** What you finished in this message, as **dashed bullets, one per thing** — the
-  dashes are the point, because a paragraph of three accomplishments reads as one. Not the session,
-  not the plan; what is now done. **`- None.` is the correct answer when the message only answered a
-  question**, and it is written rather than dropped.
+  **1 · Work Brief — the technical director's board only.** What was finished in this message, as
+  **dashed bullets, one per thing**; the dashes are the point, because a paragraph of three
+  accomplishments reads as one. Not the session, not the plan; what is now done. **`- None.` is the
+  correct answer when the message only answered a question**, and it is written rather than dropped.
+  **Every other agent says this in prose instead**, in the answer it is already writing.
 
   **2 · DevOps.** What exists and is not live yet, one line each, carrying **what it is, whose it
   is, and the stage it is parked at** — the owning agent is a column so he can see at a glance who a
@@ -337,10 +323,10 @@ wrong or the rule is, and that is a conversation before any code exists.
   **A stage comes from `git status` and a live check run in this session — never from memory.** If
   you could not check, the line reads `unchecked` rather than guessing.
 
-  **When Joel asks for status, all three are re-measured and the board is republished — never
-  reprinted.** A status check is a request to go and look, and the last sign-off is the one thing
-  that cannot answer it. **A board republished without re-measuring is the same failure wearing a
-  fresh timestamp**, and worse than the stale one, because the stamp now vouches for it.
+  **When Joel asks for status, every section is re-measured — never reprinted.** A status check is
+  a request to go and look, and the last sign-off is the one thing that cannot answer it. **Writing
+  it out again without re-measuring is the same failure wearing a fresh timestamp**, and worse than
+  the stale one, because the new stamp vouches for it.
 
   - **Work Brief** becomes what has landed since his last message, not what was in the previous
     footer. `- None.` when nothing has.
