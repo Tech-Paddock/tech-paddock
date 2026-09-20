@@ -1,6 +1,6 @@
 # TechPad Gen — handoff
 
-State as of 2026-09-19.
+State as of 2026-09-20.
 
 Read `RULES.md` first. This file is only what is true right now.
 
@@ -49,10 +49,10 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
   `{type:"paddock-mode", mode}` into every frame and `ThemeControl` listens behind `isPaddockOrigin()`.
   **A tool that drops `ThemeControl.tsx` silently ignores the hub's switch.**
 - **`TOOLS` in `lib/platform.ts` is the only list of tools, and its array order is Joel's** — it
-  drives the sidebar, the `?app=` frame and The Garage at once. It holds **three**: resume, coffee,
-  health. **Tracker and editor are both out of it on Joel's word**, so nothing here records that
-  `tp-tracker` or `tp-message-editor` exists; putting either back is one entry. **Never key anything
-  off a slug literal** — dropping one broke `diagnostics.ts`, now derived from a route flag.
+  drives the sidebar, the `?app=` frame and The Garage at once. It holds **four**: resume, coffee,
+  health, cookbook. **Tracker and editor are both out of it on Joel's word**, so nothing here records
+  that `tp-tracker` or `tp-message-editor` exists; putting either back is one entry. **Never key
+  anything off a slug literal** — dropping one broke `diagnostics.ts`, derived from a route flag now.
 - **The glance gets counts and singles, never rows** — a hub handed thread arrays slowly becomes a
   worse copy of the tracker. `SOURCES` holds one entry: a fact about the present, not a design limit.
 - **One Garage panel is not live, and it looks the most authoritative.** Rules drift is the repo as
@@ -62,7 +62,8 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-Nothing. `theme-livery-badge` merged as #131, last of six.
+`claude/home-cookbook-roster` — the Cookbook joins the roster with the 📖 icon, appended last: array
+order is Joel's. **Not listed-before-it-serves like Health** — `tp-cookbook` is `READY` at production.
 
 ## Next
 

@@ -35,6 +35,7 @@ const PRESENTATION: Record<ToolSlug, { icon: string }> = {
   resume: { icon: "📄" },
   coffee: { icon: "☕" },
   health: { icon: "🥗" },
+  cookbook: { icon: "📖" },
 };
 
 export const APPS = TOOLS.map((tool) => ({
