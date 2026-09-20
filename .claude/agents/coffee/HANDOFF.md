@@ -27,28 +27,22 @@ stored, to stop one measurement being written twice. **Measurement, or a functio
 brew form works in dose, ratio and water, and any two give the third**, and **the ratio has no
 column** — water over dose, derived in `lib/brews.ts`, dropped before the POST, and rounded whole
 since 2026-09-20. `water_g` is *not* `beverage_g`: water in, not what came out. **The refractometer
-half of the form is commented out**, not deleted.
-
-**Brew time is a real field**, whole seconds in `brew_seconds`, typed as `m:ss`. **It is a reading**:
-it neither repeats nor prefills from `guide_time`, and a bare "3" is refused rather than guessed at.
+half of the form is commented out**, not deleted. **Brew time is a real field**, whole seconds in
+`brew_seconds`, typed as `m:ss` — **a reading**: it neither repeats nor prefills from `guide_time`,
+and a bare "3" is refused rather than guessed at.
 
 **A new brew opens as a repeat of the last one, then as the roaster's numbers** — `openingBrew`, your
-last brew winning field by field, no reading carried. **A suggestion does not feed it, settled**:
-you read it and type it, and typing it is where you decide to use it.
+last brew winning field by field, no reading carried. **A suggestion does not feed it, settled**: you
+read it and type it, and typing it is where you decide to use it.
 
 **Roast date is a real date field** beside Purchased on one row — the gap is the age of the coffee.
 The label's date goes through `lib/dates.ts`; an ambiguous `05/06/2026` is refused and shown as text.
-**A date input on iOS sets its own minimum width**, so `globals.css` turns that off; without it the
-second of two on a row runs past the card.
-
-**The guide tier is a three-state indicator** — green Found, amber Non-Specific, red No Recipe — a
-quiet grey italic line since 2026-09-20, expanding to the quote. **The card is three sections**: This
-bag, Recipe, Brews. **A brew pill leads with its rating** and carries no grinder.
-
-**Grind setting rounds to one decimal place.** `formatGrindSetting` applies at save and at display,
-because the one grinder on the shelf has a stepped dial in tenths — "4" hides which tenth it sat on,
-"4.53" is not a setting it can be turned to. It also normalizes an unformatted value when a brew
-repeats. Non-numeric text passes through unchanged.
+**A date input on iOS sets its own minimum width**, so `globals.css` turns that off — without it the
+second of two on a row runs past the card. **The guide tier is a three-state indicator** — green
+Found, amber Non-Specific, red No Recipe — a quiet grey italic line since 2026-09-20, expanding to
+the quote. **The card is three sections**: This bag, Recipe, Brews. **A brew pill leads with its
+rating** and carries no grinder. **Grind setting rounds to one decimal**, at save and display —
+`formatGrindSetting`, the shelf's grinder has a stepped dial in tenths.
 
 ## Traps specific to this app
 
@@ -64,23 +58,22 @@ repeats. Non-numeric text passes through unchanged.
   not map: two are on the shelf and the roaster did not say which. Rounding is the same invention.
 - **The icon is a pour-over in the JPS livery**, every colour a token, **no alpha**, its two gold
   rules structural. **A static import**, from `/_next/static` — the one prefix middleware excludes.
-- **"Beans ↗" is a *sibling* of the expand toggle, never nested.** An `<a>` inside a `<button>` is
-  invalid markup and browsers disagree about what a tap does.
-- **`guide_status` records where instructions were read, not who they were written for.** Sweet Bloom
-  print the same recipe on every page, so nothing should rank or filter on tier 1.
+- **"Beans ↗" is a *sibling* of the expand toggle, never nested** — an `<a>` in a `<button>` is invalid
+  markup and browsers disagree about what a tap does.
+- **`guide_status` records where instructions were read, not who they were written for** — Sweet
+  Bloom print the same recipe on every page, so nothing should rank or filter on tier 1.
 
 ## In flight
 
-`claude/coffee-recipe-and-brew-pill`, **open as #161**, is my only branch: Search again, brew time,
-whole numbers, the date-box fix, the quiet tier line, the reshaped pill, one-decimal grind settings,
-and the `coffee_brews_time` migration — additive, one nullable column, the gate's to apply before
-merging. **`claude/coffee-roast-date-and-suggested-recipe` is still on the remote and should not
-be**, measured today: merged history, clutter, Joel's to remove.
+`claude/coffee-recipe-and-brew-pill`, **open as #161**, is my only branch — everything above from
+"It can be run again from the shelf" down, plus the `coffee_brews_time` migration: additive, one
+nullable column, the gate's to apply before merging. **`claude/coffee-roast-date-and-suggested-recipe`
+is still on the remote and should not be**, measured today: merged history, clutter, Joel's to remove.
 
 ## Next
 
-1. **Only `coffee_brews_time` is waiting.** Read off the database 2026-09-20: `suggested_recipe` is
-   live, `brew_seconds` is not. **The hosted API stamps its own version, so a filename is not what
+1. **Only `coffee_brews_time` is waiting.** `suggested_recipe` is live, `brew_seconds` is not, read
+   off the database 2026-09-20. **The hosted API stamps its own version, so a filename is not what
    ran** — ledger 26 holds the numbers. **The suggestion has still never run against a real bag.**
-2. **Run one coffee twice, Haiku then Sonnet 5 at `high`**, and compare the tiers. The open question.
-3. The deliberately-unbuilt list — timer, inventory, method table — stays unbuilt until asked.
+2. **Run one coffee twice, Haiku then Sonnet 5 at `high`**, compare the tiers — the open question.
+   The deliberately-unbuilt list — timer, inventory, method table — stays unbuilt until asked.
