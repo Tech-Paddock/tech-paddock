@@ -7,48 +7,50 @@ role and the gate; this is only what is true right now.
 
 ## In flight
 
-**#159 (Cookbook) passed the gate and is NOT merged.** Head `bf37647`, CI green on it (runs 661
-*and* 662), blast radius `apps/cookbook` + one migration, no shared file touched. **The merge was
-refused by the harness permission classifier — `[Merge Without Review]` — not by the gate.** Nothing
-is wrong with the change. Joel grants the permission or merges it himself. **Re-read the head SHA
-and the open list before merging; do not re-run the whole gate on a whim.**
+**#159 (Cookbook) passed the gate and is NOT merged.** Head `bf37647`, CI green (runs 661 and 662),
+blast radius `apps/cookbook` + one migration, no shared file touched. **The merge was refused by the
+harness classifier — `[Merge Without Review]` — not by the gate.** Joel grants it or merges himself.
+**Its migration is already applied**, correctly: additive, before the merge.
 
-**Its migration is already applied** — correct: additive, before the merge, per `CLAUDE.md`. The
-database is ahead of the code, which is the safe direction. If #159 is abandoned, two empty tables
-in `cookbook` are the only residue.
-
-**`claude/brief-cookbook-gate-followup` is pushed and finished** — Cookbook's board URL into
-`KICKOFF.md`, item 25 closed, 27 opened, the `models.ts` call into `DECISIONS.md`. **No pull
-request: Joel has not asked for one.**
+**Two pull requests of mine are open**, both green, both `brief`.
+`claude/brief-cookbook-gate-followup`: Cookbook's board URL into `KICKOFF.md`, item 25 closed, 27
+opened, the `models.ts` call into `DECISIONS.md`. `claude/brief-board-regenerate`: how the board is
+produced. **Merge the followup first** — the other is cut from `main` and shares none of its files.
 
 ## What is true now
 
-**The read-back rule now has its proof, and it is the preferred one.** `supabase/README.md` calls
-recording the file's own version at apply time **preferred, "to be proven on the next migration
-applied"** — done, and the Cookbook's migration is recorded under exactly the version its filename
-declares. **MCP `apply_migration` cannot do it**: name and query only, and it stamps the clock. Use
-`execute_sql` with the DDL and the `supabase_migrations.schema_migrations` insert **in one statement
-batch**, so they are one transaction. That is recording what you apply, not repairing history, which
-is why it is allowed where editing a version afterwards is not.
+**Consumption was this session's real finding.** 30 sessions read ~$7.4K of list-price value —
+**not a bill** (`isUsingOverage` false everywhere) but 8 hit the seven-day warning, and **one
+immortal session was 58%** of it. Joel archived it. **Cost ≈ context × tool calls**: 10.3B of 10.5B
+tokens are re-reads. **Batch calls, group PR gates, end a session at its branch.**
 
-**Item 26's three are unchanged and now measured** — the ledger names them, so this does not.
-Local and remote differ by those three plus the deliberate remote-only seed. **Nothing new drifted.**
+**Joel's model, and it is right: a session is a branch off `main`; the agent is the owner.** Cut it
+from the docs, do one change, merge via handoff and ledger, **close it**. It predicts the duplicate-27
+collision here. **Wants a `DECISIONS.md` row once he confirms** — his call, so not written yet.
 
-**`lib/models.ts` stays a per-app copy — settled at #159's gate**, in `DECISIONS.md`: three copies,
-76/67/61 lines, none alike, where `packages/shared` means byte-identical. **No row; that is the answer.**
+**The board is regenerated, never adopted.** Reading one back to edit it cost ~38K tokens resident
+for the rest of the session; building from `BOARD.html` cost ~9K. **Publish once per session at
+close-out.** Both in `claude/brief-board-regenerate`.
 
-**`packages/shared` is the one real copy** of `auth.ts`, `password.ts`, `theme.css`, `theme.ts` and
-`next.config.mjs`; `drift` fails a copy that disagrees. **Edit canonical and restamp, never a copy.**
+**The doc floor is the checkout, not overhead** — ~17K a session, ~8% of the meter, and
+**regressive**: 5% of a 600K session, 46% of a 75K one, so shortening sessions makes cutting it
+matter *more*. **`### Always` is 55% of `CLAUDE.md`** and the sign-off spec is 34% of it; a 15–25%
+cut lives there. **Joel has not said go, and `CLAUDE.md` is his.**
 
-**Previews are off and `On track` does not exist** — three phrases, five stages. Joel's call on 2026-09-20; read its `DECISIONS.md` entry before rebuilding it.
+**The ledger is 80/80 and cannot record the work that would give it room** — item 28, the
+`CLAUDE.md` compaction, has no line to sit on. That is the demonstration, not untidiness.
 
-**Publish only your own board**; a merge leaves the merged agent's alone, stale or not. Board URLs
-live in `KICKOFF.md` and nowhere else, and **Cookbook's is no longer blank** — seeded by this seat,
-its Work Brief deliberately `- None.`, because nobody else can write another agent's.
+**The read-back rule has its proof**, the one `supabase/README.md` asked for: the Cookbook's
+migration is recorded under exactly the version its filename declares. **MCP `apply_migration`
+cannot do it** — name and query only, and it stamps the clock. Use `execute_sql` with the DDL and
+the `supabase_migrations.schema_migrations` insert **in one batch**, which records what you apply
+rather than repairing history. **Item 26's three are unchanged; nothing new drifted.**
 
-**Branch protection is on**, **`Require branches to be up to date` is on**, and the required checks
-are **`gate`, `drift`, `requested-by-joel`** — Joel's screenshot, not a measurement, as no agent can
-read rulesets. Say which it is when you repeat it.
+**`lib/models.ts` stays a per-app copy — settled at #159's gate**, reasoned in `DECISIONS.md`.
+**No ledger row; that is the answer rather than a gap.**
+
+**Branch protection and `Require branches to be up to date` are on; required checks are `gate`,
+`drift`, `requested-by-joel`** — Joel's screenshot, not a measurement. Say which it is.
 
 ## Traps specific to this seat
 
@@ -59,22 +61,20 @@ read rulesets. Say which it is when you repeat it.
   `main` before treating it as the branch's.
 - **`gate` runs after the whole build matrix**, so a green `drift` proves nothing.
 - **A pull request body is a claim, not evidence.** #159's was accurate on the diff and **stale on
-  the dashboard** — it said the Vercel project and the domain did not exist; both did. Read Vercel
-  and Supabase live before repeating a body's deployment steps to Joel.
-- **This session could not read `postgrest_logs`** (classifier refused) and **cannot read the
-  exposed-schemas list at all** — PostgREST config, not a `pg_settings` row. Grants and RLS *are*
-  checkable in SQL. Say which of the two you have.
+  the dashboard** — it said the Vercel project and domain did not exist; both did. Read Vercel and
+  Supabase live before repeating a body's deployment steps to Joel.
+- **Share-of-context is the wrong denominator for cost.** Content is paid on every call *after* it
+  arrives. I got this wrong three times in one session, each time too high.
+- **This session could not read the exposed-schemas list** — PostgREST config, not a `pg_settings`
+  row. Grants and RLS *are* checkable in SQL. Say which of the two you have.
 - **Vercel's `ignoreCommand` is capped at 256 characters and the failure is total.**
-- **A dry-run merge on a dirty tree proves nothing.** Commit, then dry-run.
-- **`live: false` on a Vercel project does not mean paused.** Read deployment state.
 - **You are a session, not a service** — you do not persist and do not monitor. Say so.
 - **The `supabase migration repair` hook matches that string in any Bash command.** Use Write.
 
 ## Next
 
-**Item 27 is Joel's and it is minutes** — three env vars, exposed schemas, redeploy. **Item 1** is
-the lockout counter, one edit plus a restamp now `packages/shared` exists. **Items 22 and 23** are
-the Cookbook pair and are one conversation. **Item 20** is a `drift` rule.
+**Joel's, minutes each**: merge #159, then **item 27** — three env vars, exposed schemas, redeploy.
+**Item 1** is the lockout counter, one edit plus a restamp. **22 and 23** are one conversation.
 
 **Do not inherit as measured:** anything behind `techpaddock.io` or a `*.vercel.app` host — every
 claim about a live page here is a Vercel API reading, never an HTTP response.
