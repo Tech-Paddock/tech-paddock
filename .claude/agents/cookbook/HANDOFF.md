@@ -71,9 +71,8 @@ is in `KICKOFF.md` on `main`.** **The livery is borrowed** — `clark` is the ed
 picks; after those, editing a kept recipe's servings without re-estimating it, which is what storing
 the pot was for and nothing exposes yet.
 
-**Waiting on Joel:** the receipt-derived seed, and a decision on those four. **Item 27's
-exposed-schemas step looks already done** — every read this app makes goes through PostgREST on the
-`cookbook` schema and they are working — but that is inferred from a working read, not from seeing
-the setting, which no session here can reach. **Confirm by eye before closing the row.**
+**Waiting on Joel:** the receipt-derived seed, and a decision on those four. **Item 27 is closed** —
+he said so on 2026-09-21, which matches what this seat measured from the outside. **The row is still
+in the ledger on `main`; removing it is the technical director's**, who owns that file.
 
 **Still the TD's:** the read contract (22) and the grocery-list move out of Health (23).
