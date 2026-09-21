@@ -1,6 +1,6 @@
 # Cookbook — handoff
 
-State as of 2026-09-20.
+State as of 2026-09-21.
 
 `RULES.md` has the charter. This file is only what is true right now.
 
@@ -8,29 +8,27 @@ State as of 2026-09-20.
 
 ## In flight
 
-**The app is live and reading its database.** #159 and #160 are on `main`; item 27's last step was a
-**wrong `SUPABASE_SERVICE_ROLE_KEY` value**, not a missing variable, fixed by Joel 2026-09-20.
+**Nothing of mine is unmerged, and everything of mine is live.** #165 merged as `f60e493` and
+`tp-cookbook`'s production deployment is `READY` on it, read 2026-09-21. The app is in use — the
+book and the list both hold rows.
 
-**#165 — remembered brands for the shopping list — is open, and its gate belongs on `b5f7383`.**
-Agreed with Joel 2026-09-20 over four messages; the reasoning is in the migration header. **Its
-migration is written and not applied** — additive, so the TD applies it at gate time. Tap *milk* and
-land on the milk you buy; the generic King Soopers search stays the fallback.
+**Remembered brands are deployed and empty.** `cookbook.brand_preferences` exists, RLS on, zero
+policies, **zero rows**: the feature is live and nobody has saved a preference yet. Its migration
+was applied at the gate and **recorded under exactly the version its filename declares**, which is
+the read-back item 26 exists about.
 
-**The rule to keep hold of: longest matching phrase wins, and `plain` is a real answer** — `milk` →
-Fairlife, `whole milk` → plain. Why that third kind is load-bearing is in the migration header.
+**The seed has not arrived.** It comes from a session that reads Joel's receipts and hands back JSON
+for the shop section's **Paste a batch** box — validated row by row, refusals named, **no receipt
+reaching this app**. The format and the rules for that session are in #165's body.
 
-**The rows are Joel's shopping and do not go in git.** The migration seeds nothing. A seed arrives
-from a session that reads his receipts and hands back JSON, pasted into the shop section's
-**Paste a batch** box — validated row by row, refusals named. **No receipt reaches this app.**
-
-**Four gaps were named at Joel's intent review on 2026-09-20 and deliberately not built** — he said
-close out instead, so they are his call, not a to-do left half-done. In his priority order: **the
-table is the only copy** and nothing exports it, which is the unpaid cost of keeping the rows out of
-git; **the import writes on trust** where his own workflow has a gate step (shape is checked,
-judgement cannot be — `brand: Fairlife` with `terms: horizon organic` is well-formed and wrong); the
-panel **hides `note`**, which the migration header calls the only thing making a row legible later;
-and a brand can only be created **from a line already on the list**. The first two are worth doing
-before a forty-row seed lands and matter less afterwards.
+**Four gaps were named at Joel's intent review on 2026-09-20 and deliberately not built** — he chose
+close-out over building them, so they are his call, not work abandoned halfway. In his order: **the
+table is the only copy** and nothing exports it, the unpaid cost of keeping the rows out of git;
+**the import writes on trust** where his own workflow has a review step (shape is checked, judgement
+cannot be — `brand: Fairlife` with `terms: horizon organic` is well-formed and wrong); the panel
+**hides `note`**, which the migration header calls the only thing making a row legible later; and a
+brand can only be created **from a line already on the list**. The first two are worth doing before
+a forty-row seed lands and matter less afterwards.
 
 ## What is true now
 
@@ -69,10 +67,12 @@ is in `KICKOFF.md` on `main`.** **The livery is borrowed** — `clark` is the ed
 
 ## Next
 
-**Finish the brands branch**, then: editing a kept recipe's servings without re-estimating it, which
-is what storing the pot was for and nothing exposes yet.
+**Nothing is in flight.** The next thing worth building is whichever of the four gaps above Joel
+picks; after those, editing a kept recipe's servings without re-estimating it, which is what storing
+the pot was for and nothing exposes yet.
 
-**Waiting on Joel:** the receipt-derived seed, and whether the ledger's item 27 can close — the app
-reads its own schema now, which is the exposed-schemas step proving itself.
+**Waiting on Joel:** the receipt-derived seed, and a decision on those four. **Item 27 is closed** —
+he said so on 2026-09-21, matching what this seat measured from the outside, and the technical
+director took the row out of the ledger in #170. **Nothing in the ledger is this area's.**
 
 **Still the TD's:** the read contract (22) and the grocery-list move out of Health (23).
