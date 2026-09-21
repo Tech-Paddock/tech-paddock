@@ -177,8 +177,8 @@ wrong or the rule is, and that is a conversation before any code exists.
 
   **"Close out."** Finish what you are on, commit and push, update your `HANDOFF.md`, and **open the
   pull request** — body carrying `Requested by Joel on YYYY-MM-DD — "close out"`, blast radius, and
-  the Deployment section. Then say you are at a compaction point and stop. **This is the ask the
-  rule above requires**; there is no separate permission to wait for.
+  the Deployment section. Then say the branch is pushed and stop. **This is the ask the rule above
+  requires**; there is no separate permission to wait for.
 
   **"Park it."** The same, without the pull request. Stop at the pushed branch. He uses this when he
   wants the work safe but not in the queue.
@@ -226,14 +226,14 @@ wrong or the rule is, and that is a conversation before any code exists.
   and must be written down**; a blank section is indistinguishable from a forgotten one.
   Merging and deploying are different events, and every serious incident here lives in the gap.
 - **Update your `HANDOFF.md` before you hand work over** — in the message that hands the branch over,
-  or in the pull request when Joel asks for one. A finished branch is a checkpoint: the session may
-  be compacted right after it, and that is the normal case here rather than the unlucky one.
+  or in the pull request when Joel asks for one. A finished branch is where the session ends, and
+  **sessions are ended deliberately now rather than run on**, so this is the normal case.
   **Say what is now true, not what you did** — the commit already records the what. If the change
   makes your handoff's description wrong, correcting it is part of the change.
-  **Then say, in as many words, that you are at a compaction point.** That sentence is the only
-  signal anyone gets that the work is on disk rather than still in your head. A handoff written after
-  a compaction is composed from a summary of a summary: fluent, second-hand, and confidently wrong,
-  which is the single failure this project has paid for most.
+  **The next session in your area starts from this file and nothing else.** A handoff composed from
+  a summary rather than from the work is fluent, second-hand and confidently wrong — the single
+  failure this project has paid for most. **Short sessions moved that risk rather than removing it**,
+  from mid-session to the gap between sessions, which this file is the only thing spanning.
 - **Open every message to Joel with a horizontal rule.** A markdown `---` on its own line, as the
   very first line, before any prose. It is the one mark that separates your reply to him from the
   tool output, file dumps and command results scrolling past above it — he reads this terminal all
