@@ -1,6 +1,6 @@
 # Coffee — handoff
 
-State as of 2026-09-20. Read `RULES.md` first; this file is only what is true right now.
+State as of 2026-09-21. Read `RULES.md` first; this file is only what is true right now.
 
 ---
 
@@ -40,9 +40,10 @@ The label's date goes through `lib/dates.ts`; an ambiguous `05/06/2026` is refus
 **A date input on iOS sets its own minimum width**, so `globals.css` turns that off — without it the
 second of two on a row runs past the card. **The guide tier is a three-state indicator** — green
 Found, amber Non-Specific, red No Recipe — a quiet grey italic line since 2026-09-20, expanding to
-the quote. **The card is three sections**: This bag, Recipe, Brews. **A brew pill leads with its
-rating** and carries no grinder. **Grind setting rounds to one decimal**, at save and display —
-`formatGrindSetting`, the shelf's grinder has a stepped dial in tenths.
+the quote. **The card is three sections**: This bag, Recipe, Brews. **A brew pill shows nothing
+about the grinder**, name or dial setting — Joel closed that judgement call on 2026-09-21. Rating
+leads, water is unlabeled in the recipe, brew time sits inline behind a vertical rule.
+`formatGrindSetting` still runs at save; the setting is logged, just not shown on the pill.
 
 ## Traps specific to this app
 
@@ -65,15 +66,13 @@ rating** and carries no grinder. **Grind setting rounds to one decimal**, at sav
 
 ## In flight
 
-`claude/coffee-recipe-and-brew-pill`, **open as #161**, is my only branch — everything above from
-"It can be run again from the shelf" down, plus the `coffee_brews_time` migration: additive, one
-nullable column, the gate's to apply before merging. **`claude/coffee-roast-date-and-suggested-recipe`
-is still on the remote and should not be**, measured today: merged history, clutter, Joel's to remove.
+**#161 merged 2026-09-20 15:06 UTC** — `coffee_brews_time` confirmed live on the database, read
+directly rather than trusted from the PR body. `claude/coffee-pill-no-grind` is my only open branch,
+carrying only the grind-setting removal above; no migration. **`claude/coffee-roast-date-and-suggested-recipe`
+is still on the remote and should not be**, measured 2026-09-21: merged history, clutter, Joel's to remove.
 
 ## Next
 
-1. **Only `coffee_brews_time` is waiting.** `suggested_recipe` is live, `brew_seconds` is not, read
-   off the database 2026-09-20. **The hosted API stamps its own version, so a filename is not what
-   ran** — ledger 26 holds the numbers. **The suggestion has still never run against a real bag.**
-2. **Run one coffee twice, Haiku then Sonnet 5 at `high`**, compare the tiers — the open question.
-   The deliberately-unbuilt list — timer, inventory, method table — stays unbuilt until asked.
+1. **Run one coffee twice, Haiku then Sonnet 5 at `high`**, compare the tiers — the open question.
+   The suggestion has still never run against a real bag.
+2. The deliberately-unbuilt list — timer, inventory, method table — stays unbuilt until asked.
