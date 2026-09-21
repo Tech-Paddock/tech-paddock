@@ -29,7 +29,8 @@ column** — water over dose, derived in `lib/brews.ts`, dropped before the POST
 since 2026-09-20. `water_g` is *not* `beverage_g`: water in, not what came out. **The refractometer
 half of the form is commented out**, not deleted. **Brew time is a real field**, whole seconds in
 `brew_seconds`, typed as `m:ss` — **a reading**: it neither repeats nor prefills from `guide_time`,
-and a bare "3" is refused rather than guessed at.
+and a bare "3" is refused rather than guessed at. **No timer, confirmed** — Joel, 2026-09-21: "just
+a text field for brew time." Not a gap to close; the text field is the design.
 
 **A new brew opens as a repeat of the last one, then as the roaster's numbers** — `openingBrew`, your
 last brew winning field by field, no reading carried. **A suggestion does not feed it, settled**: you
@@ -75,4 +76,5 @@ is still on the remote and should not be**, measured 2026-09-21: merged history,
 
 1. **Run one coffee twice, Haiku then Sonnet 5 at `high`**, compare the tiers — the open question.
    The suggestion has still never run against a real bag.
-2. The deliberately-unbuilt list — timer, inventory, method table — stays unbuilt until asked.
+2. **A timer is declined, not just unbuilt** — see above. Inventory and a method table stay
+   unbuilt until asked.
