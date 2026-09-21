@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-20.** · **Next number: 28.**
+**Last reviewed: 2026-09-21.** · **Next number: 28.**
 
 **Numbers are permanent and the gaps are correct** — the rule is in `CLAUDE.md`, which every session
 loads anyway, and why the run starts where it does is in `DECISIONS.md`.
@@ -27,11 +27,6 @@ Nothing.
    nothing about a phone app. **Three answers, all fine**: merged-and-live-waiting-on-your-verdict,
    free; a real preview, costing preview env vars and a Supabase branch; or close it and keep
    merge-then-look. Why it has no mechanism left is in `DECISIONS.md`. *LoE: minutes.*
-
-27. **The Cookbook's bring-up: `cookbook` on Supabase's exposed-schemas list, then a build.**
-   *Owner: Joel.* `ANTHROPIC_API_KEY` landed 2026-09-20; `SESSION_SECRET` and `APP_PASSWORD_HASH`
-   are **shared variables, which a project env read cannot see** — confirm by eye, never from that
-   call. **A bare redeploy is not a build**; set `FORCE_BUILD` on the project first. *LoE: minutes.*
 
 ## Waiting on an agent
 
