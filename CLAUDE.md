@@ -483,12 +483,18 @@ subdomain. Verified against the live account; the table gets corrected, not the 
 | Subdomain | Tool | Vercel project |
 |---|---|---|
 | `techpaddock.io` | hub (`apps/home`) | `tp-home` |
-| `editor.techpaddock.io` | Message Editor | `tp-message-editor` |
+| `editor.techpaddock.io` | Message Editor — **paused** | `tp-message-editor` |
 | `tracker.techpaddock.io` | Pipeline Tracker | `tp-tracker` |
 | `resume.techpaddock.io` | Resume Formatter | `tp-resume` |
 | `coffee.techpaddock.io` | Coffee | `tp-coffee-app` |
 | `health.techpaddock.io` | Health | `tp-health` |
 | `cookbook.techpaddock.io` | Cookbook | `tp-cookbook` |
+
+**The Message Editor is paused and its red check is expected — ignore it.** `tp-message-editor`
+deploys `BLOCKED` on every commit, so `Vercel – tp-message-editor` is red **on `main` itself** and
+every pull request here reads `mergeable_state: unstable`. **Not a gate failure, not a reason to
+hold a merge.** The general rule: **check a red status against `main` before treating it as yours** —
+red on both is the repo's weather, not your change.
 
 ---
 
