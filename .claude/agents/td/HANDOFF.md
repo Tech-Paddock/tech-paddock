@@ -72,8 +72,8 @@ version** — name and query only, and it stamps the clock. Use `execute_sql` wi
 
 ## Next
 
-**Joel's, minutes**: **item 27** is `cookbook` on the exposed-schemas list, plus a build. **Item 1**
-is the lockout counter, one edit plus a restamp. **22 and 23** are one conversation.
+**Item 27 closed 2026-09-21** on Joel's word, *"Schema exposed."* **Item 1** is the lockout
+counter, one edit plus a restamp. **22 and 23** are one conversation.
 
 **Do not inherit as measured:** anything behind `techpaddock.io` or a `*.vercel.app` host. Every
 claim about a live page here is a Vercel API reading, never an HTTP response — both domains
