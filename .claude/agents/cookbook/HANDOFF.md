@@ -42,13 +42,15 @@ one approval** — type it, ask Claude, paste a link — and **nothing is writte
 `web`, so a lifted number is not storable rather than merely not written. **A duplicate name or
 phrase is refused by an index**, not a lookup, with a test holding each one's normaliser in step.
 
-**The list is the cheap version and that is a decision, not a gap.** Copied text or a King Soopers
-link — no credential, no OAuth, no `middleware.ts` change; a remembered brand changes the link, not
-that rule. Tidy is one Haiku call and `validateTidy` refuses a proposal that drops or doubles a line.
-**Logging what you ate is absent** — item 22, the TD's.
+**The list is the cheap version and that is a decision, not a gap** — put to Joel again on 2026-09-21
+and reconfirmed. Copied text or a King Soopers link; no credential, no OAuth, no `middleware.ts`
+change, and a remembered brand changes the link, not that rule. **So a substitution policy and
+delivery-vs-pickup are Kroger account settings, not this app's** — a search link carries neither, so
+building them here re-opens the cart push. Tidy is one Haiku call and `validateTidy` refuses a
+proposal that drops or doubles a line. **Logging what you ate is absent** — item 22, the TD's.
 
-**`lib/models.ts` stays a per-app copy — settled in `DECISIONS.md`, no ledger row.** **Your board URL
-is in `KICKOFF.md` on `main`.** **The livery is borrowed** — `clark` is the editor's, item 24.
+**`lib/models.ts` stays a per-app copy — settled in `DECISIONS.md`, no ledger row.** **The livery is
+borrowed** — `clark` is the editor's, item 24. **This seat has no board; it signs off in chat.**
 
 ## Traps specific to this area
 
@@ -60,9 +62,8 @@ is in `KICKOFF.md` on `main`.** **The livery is borrowed** — `clark` is the ed
   at all. It cost a wrong turn once.
 - **A page that could not be read is refused twice**, the second check being the one that matters: a
   page claimed as read with no ingredients is rejected. A slug alone invents a convincing chilli.
-- **Read Vercel and Supabase live before writing a deployment step.** #159's body said the project and
-  the domain did not exist; **both already did**, and item 27's wording went stale the same way in a
-  day. The dashboard is the record, never the checklist.
+- **Read Vercel and Supabase live before writing a deployment step.** #159's body said the project
+  and the domain did not exist; **both already did**. The dashboard is the record, never a checklist.
 - **`npm run lint` has no config here** — not in CI, and no app has one. Boilerplate, not a break.
 
 ## Next
@@ -71,8 +72,9 @@ is in `KICKOFF.md` on `main`.** **The livery is borrowed** — `clark` is the ed
 picks; after those, editing a kept recipe's servings without re-estimating it, which is what storing
 the pot was for and nothing exposes yet.
 
-**Waiting on Joel:** the receipt-derived seed, and a decision on those four. **Item 27 is closed** —
-he said so on 2026-09-21, matching what this seat measured from the outside, and the technical
-director took the row out of the ledger in #170. **Nothing in the ledger is this area's.**
+**Waiting on Joel:** the receipt-derived seed, a decision on those four, and **the whole produce
+section of his 2026-09-21 rules** — auto-adding produce, and the count thresholds that pick a bag
+over singles. He parked it himself; it needs his thinking, so it is not a question to re-ask.
+**Nothing in the ledger is this area's.**
 
 **Still the TD's:** the read contract (22) and the grocery-list move out of Health (23).
