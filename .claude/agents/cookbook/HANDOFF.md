@@ -72,7 +72,7 @@ picks; after those, editing a kept recipe's servings without re-estimating it, w
 the pot was for and nothing exposes yet.
 
 **Waiting on Joel:** the receipt-derived seed, and a decision on those four. **Item 27 is closed** —
-he said so on 2026-09-21, which matches what this seat measured from the outside. **The row is still
-in the ledger on `main`; removing it is the technical director's**, who owns that file.
+he said so on 2026-09-21, matching what this seat measured from the outside, and the technical
+director took the row out of the ledger in #170. **Nothing in the ledger is this area's.**
 
 **Still the TD's:** the read contract (22) and the grocery-list move out of Health (23).
