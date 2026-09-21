@@ -1234,25 +1234,18 @@ function Brews({
 /**
  * One logged brew.
  *
- * Joel reshaped this on 2026-09-20, and every one of the four changes is the
- * same change: a pill on a shelf is read at a glance, so it carries what
- * separates one attempt from the next and nothing else.
+ * A pill on a shelf is read at a glance, so it carries what separates one
+ * attempt from the next and nothing else.
  *
  * **The rating leads**, because scanning a dial-in is looking for the good
- * one — it was the last line, under everything you had to read to reach it.
- * **The grinder is gone**: it is one machine on one counter and repeats on
- * every row, so it said nothing while taking a line. **"water" is gone from
- * the numbers**, because `18g · 305g · 1:17` is already unambiguous — the
- * second mass in a brewing recipe is the water. **The time sits beside them**
- * behind a rule rather than under them, since time and ratio are the two you
- * actually compare between attempts.
- *
- * **The grind setting stays, and it is the one judgement call in the four.**
- * It shared that line with the grinder, so "remove grinder information"
- * could fairly be read as taking both — but the grinder is one machine on
- * one counter and the setting is the number you moved since last time, which
- * is the whole subject of a dial-in log. It is labelled now rather than left
- * as a naked "4.5". Say the word and it goes.
+ * one. **Nothing about the grinder shows** — it is one machine on one
+ * counter and repeats on every row, so neither its name nor the dial
+ * setting says anything while taking a line. Joel called this one on
+ * 2026-09-21, closing the judgement call the setting had been left as.
+ * **"water" is gone from the numbers**, because `18g · 305g · 1:17` is
+ * already unambiguous — the second mass in a brewing recipe is the water.
+ * **The time sits beside them** behind a rule rather than under them, since
+ * time and ratio are the two you actually compare between attempts.
  */
 function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
   const pct = brew.tds_percent == null ? null : Number(brew.tds_percent);
@@ -1283,10 +1276,6 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
         </span>
         <span className="text-xs text-ink-soft shrink-0">{new Date(brew.brewed_at).toLocaleDateString()}</span>
       </div>
-
-      {brew.grind_setting && (
-        <span className="text-sm text-ink/60">Grind {formatGrindSetting(brew.grind_setting)}</span>
-      )}
 
       {(recipe || time) && (
         <div className="flex items-center gap-2 text-sm">
