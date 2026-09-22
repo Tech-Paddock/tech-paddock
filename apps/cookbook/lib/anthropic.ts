@@ -164,7 +164,9 @@ const GENERATE_SYSTEM = `You invent one recipe a home cook can actually make ton
 - Ordinary ingredients and ordinary equipment. No sous vide, no overnight anything unless asked.
 - **Amounts are specific.** "2 tbsp olive oil", not "some olive oil" — the macros are estimated from
   this list afterwards, so a vague line becomes a vague number.
-- The method is numbered steps in plain sentences. Short enough to follow from a phone on a worktop.
+- **The method is numbered steps, one per line, separated by real newlines** — "1. …\n2. …".
+  Steps run together in one paragraph are unreadable on a phone at a worktop, which is where this
+  gets read. Plain sentences, short enough to follow without scrolling back.
 - One recipe, not three options.`;
 
 /** Invent a recipe. Its macros are estimated separately, from what it produced. */
