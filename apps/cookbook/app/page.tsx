@@ -12,20 +12,21 @@ export const dynamic = "force-dynamic";
  * collection, and for a collection the index *is* the product. You arrive to see
  * what you could cook, which answers the second question *site* plainly.
  *
- * So this is **a thin index grouped by verb wrapping one long page**, not a screen
- * and not a tab bar. The three links below are the index; everything they point at
- * is on this route. Scrolling past a section beats finding a route, and nothing
- * here is designed around a thumb at a worktop the way Coffee and Health are.
+ * **That is no longer what this renders, and the gap is deliberate.** Joel asked
+ * for tabs on 2026-09-22 and the index that used to sit here — three pills by verb
+ * — went with them, because an index above a tab bar is two navigations for one
+ * page. The tabs are in `Cookbook.tsx` and are state, not routes: this is still
+ * one route, still not thumb-first, still no home-screen install.
+ *
+ * **`SURFACE.md` has not caught up and says so here rather than quietly.** It
+ * defines *site* as one long page and uses this app as the example. Bringing it
+ * and `CLAUDE.md` in line is the technical director's; the note is in this seat's
+ * `HANDOFF.md`.
  *
  * **No home-screen install**, which is why `layout.tsx` carries no `appleWebApp`
  * metadata. A site you open when you are deciding what to cook does not earn an
  * icon.
  */
-const INDEX = [
-  { href: "#book", verb: "See what I could cook" },
-  { href: "#add", verb: "Add a recipe" },
-  { href: "#shop", verb: "Shop for it" },
-];
 
 export default function Page() {
   return (
@@ -39,20 +40,6 @@ export default function Page() {
       </header>
 
       <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6">
-        {/* The index. Grouped by verb rather than by entity, because it answers
-            *what am I here to do* — "Recipes / Ingredients / List" would answer
-            *what objects exist*, which is a question nobody arrives with. */}
-        <nav aria-label="What you are here to do" className="flex flex-wrap gap-2">
-          {INDEX.map((entry) => (
-            <a
-              key={entry.href}
-              href={entry.href}
-              className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm text-ink-soft"
-            >
-              {entry.verb}
-            </a>
-          ))}
-        </nav>
 
         <Cookbook />
       </div>

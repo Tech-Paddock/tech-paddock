@@ -18,8 +18,14 @@ type ShoppingLine = GroceryItem & ResolvedLink;
  * **You shop from recipes, not from what you ate.** That is why this sits beside
  * the book rather than beside a food log, settled with Joel on 2026-09-20.
  *
- * **The cheap version, on purpose.** The list leaves as a block of text you copy
- * or a King Soopers search you tap. No stored retailer credential, no OAuth, no
+ * **Named for where it goes, since 2026-09-22.** Every link on it is a King
+ * Soopers search, so "What to buy" was a word vaguer than the thing deserves.
+ *
+ * **The cheap version, on purpose** — reconfirmed by Joel on 2026-09-21 when a
+ * do-not-substitute rule and a delivery/pickup toggle were put to this app. Both
+ * are Kroger account settings that a search link cannot carry; building them here
+ * would be re-opening the cart push rather than adding a feature. The list leaves
+ * as a block of text you copy or a King Soopers search you tap. No stored retailer credential, no OAuth, no
  * `middleware.ts` carve-out — the expensive version needs all three and the only
  * thing it buys is who does the tapping.
  */
@@ -28,6 +34,7 @@ export default function List({ refreshKey }: { refreshKey: number }) {
   const [remembering, setRemembering] = useState<ShoppingLine | null>(null);
   const [brandsVersion, setBrandsVersion] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState<null | "adding" | "tidying" | "applying">(null);
   const [proposal, setProposal] = useState<TidyLine[] | null>(null);
@@ -89,6 +96,33 @@ export default function List({ refreshKey }: { refreshKey: number }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't tick that off.");
       await load();
+    }
+  }
+
+  /**
+   * Empty the list — every line, ticked or not.
+   *
+   * **Two taps, because there is no undo.** `clearBought` removes what you have
+   * already put in the trolley and is close to harmless; this one throws away
+   * the shopping you have not done yet, including anything a recipe pushed on.
+   * A bare button next to "Copy the list" is one mis-tap from losing the week's
+   * shop, so the confirm is the feature, not decoration.
+   */
+  async function clearEverything() {
+    const all = (items ?? []).map((i) => i.id);
+    if (all.length === 0) return;
+    setError(null);
+    try {
+      const response = await fetch("/api/grocery", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: all }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't clear the list.");
+      setItems([]);
+      setConfirmingClear(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't clear the list.");
     }
   }
 
@@ -165,7 +199,7 @@ export default function List({ refreshKey }: { refreshKey: number }) {
   return (
     <section id="shop" className="flex scroll-mt-4 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-base font-semibold">What to buy</h2>
+        <h2 className="text-base font-semibold">King Soopers list</h2>
         {items !== null ? (
           <span className="text-xs text-ink-soft">
             {open.length} to get{bought.length > 0 ? `, ${bought.length} in the trolley` : ""}
@@ -188,6 +222,33 @@ export default function List({ refreshKey }: { refreshKey: number }) {
           >
             {busy === "tidying" ? "Thinking…" : "Tidy"}
           </button>
+          {confirmingClear ? (
+            <>
+              <button
+                type="button"
+                onClick={clearEverything}
+                className="rounded border border-danger/60 px-3 py-1.5 text-sm text-danger"
+              >
+                Clear {(items ?? []).length} — sure?
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingClear(false)}
+                className="rounded border border-line px-3 py-1.5 text-sm text-ink-soft"
+              >
+                Keep it
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingClear(true)}
+              disabled={(items ?? []).length === 0}
+              className="rounded border border-line px-3 py-1.5 text-sm text-ink-soft disabled:opacity-50"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
