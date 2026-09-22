@@ -20,8 +20,9 @@ row, **no receipt reaching this app**; format in #165's body.
 belong in the ledger, which only the TD writes, and went to Joel in that day's sign-off.
 
 **Four brand-panel gaps, named by Joel 2026-09-20, not built** — his call, his order: nothing
-**exports** the table; **import writes on trust** (shape is checkable, judgement is not); the panel
-**hides `note`**; a brand needs **a line already on the list**.
+**exports** the table; **import writes on trust** (shape is checkable, judgement is not — `brand:
+Fairlife` with `terms: horizon organic` is well-formed and wrong); the panel **hides `note`**; a
+brand needs **a line already on the list**. The first two matter most before a forty-row seed lands.
 
 ## What is true now
 
@@ -45,21 +46,19 @@ proposal that drops or doubles a line. **Clear empties everything and asks first
 
 **`methodSteps` splits a method; the prompt asking for line breaks is the smaller half** — the
 renderer always honoured newlines, so a prompt-only fix would have left the existing book as one
-block. Markers only, never sentences; its tests are mostly what it refuses to split.
+block. Numbered markers only, never sentences; its tests are mostly what it refuses to split.
 
 ## Traps specific to this area
 
+**The durable ones moved to `DECISIONS.md`'s Traps section on 2026-09-22** — empty-vs-unread, the
+Supabase key, and `lint` having no config anywhere. That file is append-only, is not rationed the
+way this one is, and is where traps were always meant to live. What is left is tied to live state.
+
 - **Never write to `health.*`.** `lib/supabase.ts` pins `cookbook`, no per-query override. Health's
   `/list` is live and **stays Health's** until item 23 is sequenced; do not assume a date.
-- **A failed read must never render as an empty book or list.** Both read as "nothing here", the
-  opposite of what happened. `LookupError` → 503, and the client leaves its state `null`.
-- **"Invalid API key" here is Supabase, not Anthropic** — reading the book or the list calls no model
-  at all. It cost a wrong turn once.
-- **A page that could not be read is refused twice**, the second check being the one that matters: a
-  page claimed as read with no ingredients is rejected. A slug alone invents a convincing chilli.
+- **A page that could not be read is refused twice** — `RULES.md` has it in full, including why.
 - **Read Vercel and Supabase live before writing a deployment step.** #159's body said the project
   and the domain did not exist; **both already did**. The dashboard is the record, never a checklist.
-- **`npm run lint` has no config here** — not in CI, and no app has one. Boilerplate, not a break.
 
 ## Next
 
