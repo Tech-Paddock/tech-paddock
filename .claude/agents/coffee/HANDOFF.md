@@ -17,9 +17,8 @@ minutes with nothing on the connection, so a phone calls it dead. Two answers we
 
 **Research is a trigger, not a second kind of search.** It posts the bag and nothing else; the route
 sources the product URL **off the row, never off the request**, and falls back to its own default
-model and effort. One message shape whether or not a product page is known, so the search cannot
-tell which button started it. A link the roaster has moved costs one fetch and then searches as
-normal, so a stale link never becomes a dead end the bag cannot recover from.
+model and effort. One message shape either way, so the search cannot tell which button started it.
+A link the roaster has moved costs one fetch and then searches as normal, never a dead end.
 
 **Nothing is pinned up front.** `findRoasterDomain` is gone and no search sets `allowed_domains`.
 Pinning narrowed the only channel by which a page can enter the conversation — `web_fetch` reaches
@@ -53,21 +52,20 @@ are in `RULES.md` and are deliberately not restated here. **None of them changed
   quote-backed, never host-checked, and `Beans ↗` links it straight out. Maria Gutierrez holds
   `/products/maria-gutierrez` where Sweet Bloom's verified shape is `/product/…-3/`. **Open, and
   Joel's**: he accepted a link failing because a roaster moved it, which is not one we invented.
-- **Two brewer vocabularies, and `myBrewerFor` crosses only on an exact match.** A bare "V60" does
-  not map: two are on the shelf and the roaster did not say which. Rounding is the same invention.
+- **Two brewer vocabularies; `myBrewerFor` crosses only on an exact match.** A bare "V60" does not
+  map — two are on the shelf and the roaster did not say which. Rounding is the same invention.
 - **A date input on iOS sets its own minimum width**, turned off in `globals.css`.
 - **The icon is a pour-over in the JPS livery**, every colour a token, **no alpha**. **A static
   import**, from `/_next/static` — the one prefix middleware excludes.
-- **"Beans ↗" is a *sibling* of the expand toggle, never nested** — an `<a>` in a `<button>` is
-  invalid markup and browsers disagree about what a tap does.
+- **"Beans ↗" is a *sibling* of the expand toggle** — an `<a>` in a `<button>` is invalid markup.
 - **`guide_status` records where instructions were read, not who they were written for**, so nothing
   ranks or filters on tier 1. **The Sweet Bloom example `RULES.md` gives for it is wrong** — Next 1.
 
 ## In flight
 
-**`claude/coffee-search-reads-the-product-page`** — the 2026-09-22 change above. Suite and build
-pass, drift clean, no migration, nothing shared touched. **No pull request until Joel asks.** Nothing
-else of mine is open; the branches this file used to list are merged and off the remote.
+**`claude/coffee-search-reads-the-product-page`** — the 2026-09-22 change above. Suite, build and
+drift clean; no migration, nothing shared touched. **No pull request until Joel asks.** Nothing else
+of mine is open; the branches this file used to list are merged and off the remote.
 
 ## Next
 
@@ -78,5 +76,5 @@ else of mine is open; the branches this file used to list are merged and off the
    agent's to edit** — the TD drafts and Joel approves. Proposed, not made.
 2. **The unpinned search has never run against a real bag.** Maria Gutierrez is the test: it went
    `none` while pinned, and the roaster publishes a recipe for it.
-3. **Still open**: one coffee twice, Haiku then Sonnet 5 at `high`, compare the tiers. The
-   suggestion has still never run against a real bag.
+3. **Still open**: one coffee twice, Haiku then Sonnet 5 at `high`, compare the tiers; and the
+   suggestion has still never run against a real bag either.
