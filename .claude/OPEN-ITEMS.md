@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-21.** · **Next number: 28.**
+**Last reviewed: 2026-09-22.** · **Next number: 29.**
 
 **Numbers are permanent and the gaps are correct** — the rule is in `CLAUDE.md`, which every session
 loads anyway, and why the run starts where it does is in `DECISIONS.md`.
@@ -18,7 +18,10 @@ loads anyway, and why the run starts where it does is in `DECISIONS.md`.
 
 ## Blocking everything else
 
-Nothing.
+28. **`CLAUDE.md` is 521 of 530 lines — the next rule anyone adds fails `drift`, and the file
+   forbids raising a cap to fit content.** *Owner: TD.* The target is settled: the sign-off spec,
+   27.9% of the file, replaced by `scripts/sign-off.mjs`. **The script needs the ledger restructured
+   first** — it currently parses 9 items of 10, silently. `DECISIONS.md` has both. *LoE: a session.*
 
 ## Waiting on Joel
 
