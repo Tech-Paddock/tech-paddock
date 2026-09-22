@@ -46,12 +46,40 @@ not deployed**, and nothing in the system will contradict an agent who assumes o
 tracker calls it. **Owning the host does not loosen the carve-out** — if anything it removes the
 last excuse, because there is no longer another agent to argue it with.
 
+## DevOps is yours — Vercel, DNS, CI and deploys — 2026-09-22
+
+When Platform Config was retired on 2026-09-19 its domain was split: Vercel, DNS and CI went to
+TechPad Gen as deliveries, Postgres stayed here. **The reason for that split was never written
+down**, and it left four answers to one question across the repo. **This collapses them into one;
+it is not new policy.** Why separation of duties was weighed and rejected is in `DECISIONS.md`.
+
+**Merging and deploying are different events, and every serious incident here lives in the gap.**
+You now own both sides of it, so nobody downstream of the merge catches what you did not check.
+
+- **Environment variables bake in at build time.** Setting one changes nothing until that project
+  redeploys. This catches people out constantly; it reads as the change not having landed.
+- **`SESSION_SECRET` must be byte-identical across every project** or the others silently reject
+  valid sessions — which reads as a login bug, not a config one. **It cannot be read back out of
+  the dashboard**, so parity is only knowable by setting one fresh value everywhere and redeploying.
+- **DNS is uniform and the apex is deliberately different.** Every subdomain is a CNAME to
+  `d1317e1174061c29.vercel-dns-017.com`; the apex stays an A record at `76.76.21.21` because an apex
+  cannot be a CNAME. **Correct, not a leftover** — do not "fix" it.
+- **`HEAD^..HEAD` in each `ignoreCommand` is correct because this repo squash-merges** — one merge
+  is one commit, so that range is the whole change. That reverses an older argument for
+  `VERCEL_GIT_PREVIOUS_SHA`, which reasoned about a history this repo does not have.
+- **Read deployment state, never a project field.** `BLOCKED` is paused, `READY` at
+  `target: production` is live, `CANCELED` at `target: null` is a skipped preview. `live: false`
+  means something else and reading it wrong has already cost a day.
+
+**Still Joel's, with no undo:** creating or deleting a Vercel project, adding or removing a domain,
+changing a DNS record, and the Supabase exposed-schemas setting.
+
 ## The database is yours, because migrations are gate-time — 2026-09-19
 
-Platform Config was retired and its domain split. **Vercel, DNS and CI went to TechPad Gen as
-deliveries**; Postgres stayed here, because `CLAUDE.md` already puts migrations with the person at
-the gate: *"the technical director applies it at gate time, before merging."* Splitting the apply
-from the gate would put a schema change live with nobody holding the merge.
+Postgres stayed here when the rest of Platform Config's domain moved, because `CLAUDE.md` already
+puts migrations with the person at the gate: *"the technical director applies it at gate time,
+before merging."* Splitting the apply from the gate would put a schema change live with nobody
+holding the merge.
 
 - **A new schema inherits no grants at all.** Two migrations and one dashboard setting; the
   dashboard's exposed-schemas list is not in this repo and is the step that gets missed. The failure
@@ -88,9 +116,6 @@ in it is the point: **Joel solutions the thing with the new agent first**, that 
 built ahead of the design is a set of decisions nobody made. You do every repo step on one branch
 and hand him a manual checklist of the steps outside it, in order, each with what breaks if it is
 skipped. It happens rarely enough that nobody remembers those, which is why it is written down.
-
-**Watch Platform for work that leaves no diff.** Much of it happens in a dashboard, so its handoff
-is the only record that it happened at all. Insist on it.
 
 ---
 

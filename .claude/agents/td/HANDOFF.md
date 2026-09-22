@@ -8,13 +8,11 @@ only what is true right now.
 **Branch state is not written here — it went stale inside one session.** Read it live:
 `git ls-remote --heads origin`, the open pull request list, check runs on the head SHA.
 
-## Owned, and the change that has not landed
+## DevOps is written into the charters
 
-**DevOps is yours as of 2026-09-22** — Vercel, DNS, CI, deploys, alongside the merge.
-**The charter change is not written**: `CLAUDE.md`'s roster, `td/RULES.md`, `techpad-gen/RULES.md`
-and `KICKOFF.md` all still describe the old split, and `td/RULES.md:92` still says watch
-**Platform**, retired 2026-09-19. **The Vercel trap list moves with the seat, verbatim**, out of
-TechPad Gen's kickoff block, or the move relocates the error it prevents.
+**Vercel, DNS, CI and deploys are this seat's**, and after `claude/brief-devops-to-td` every file
+says so once: `CLAUDE.md`'s roster, `td/RULES.md`, `techpad-gen/RULES.md` and `KICKOFF.md`. **The
+trap list moved verbatim**; TechPad Gen keeps a pointer because the Pit Wall reads Vercel.
 
 ## Cost, measured 2026-09-22
 
@@ -24,11 +22,14 @@ request is ~$5 at that size and free when Joel opens it in a browser. Full figur
 
 ## Linear, part-built — one step blocks the rest
 
-**The connector authenticates as `claude@techpaddock.io` as of 2026-09-22** — verified, not assumed;
-a session asking Linear who it is gets the bot, not Joel. **Phase 0 is done and Phase 1 is next**:
-seeding touches no repo file and is reversible. The plan is in #178's body — Phase 2 is one atomic
-branch or it leaves a window where the hook prints a file that is gone. **The same mechanism is what
-makes the GitHub bot worth doing**, and that one makes `requested-by-joel` mechanically enforceable.
+**The connector authenticates as `claude@techpaddock.io`**, and **Phase 1 is done**: the eleven
+ledger items are TEC-5 to TEC-15, titled with their ledger number, labelled `owner:`/`agent:`,
+priority from the ledger section. **Linear is now write-only and `OPEN-ITEMS.md` read-only** until
+Phase 2 deletes it. TEC-1 to 4 are Linear's onboarding issues, left alone. The plan is in #178's
+body — Phase 2 is one atomic branch or it leaves a window where the hook prints a file that is gone.
+**The GitHub bot is measured**: `claudetechpaddock`, role `write`, `admin: false`. What
+`requested-by-joel` checks now that the bot and Joel are different accounts is **Joel's call, and
+undesigned**.
 
 **Phase 2 needs a charter PII line first.** Linear user objects carry a real name and email, nothing
 enforces `CLAUDE.md`'s rule against committing either, and whatever reads Linear must map users to
@@ -47,8 +48,7 @@ question he asks.
 rebase and a full CI run, so **merges here are serial** and a batch costs a cycle each. One PR
 merged as it finishes never meets the rule.
 
-**Four Cookbook branches are dead and need deleting — Joel's alone.** The three stack ancestors
-under #175, plus `claude/cookbook-handoff-after-merge`, superseded twice.
+**Every dead branch is gone** — `main` is the only remote head, measured 2026-09-22.
 
 **#177's two extras are in its commits**: a handoff conflict resolved by taking TechPad Gen's own
 newer copy whole — lossless by inspection, never a judgement, because a handoff is not this seat's
