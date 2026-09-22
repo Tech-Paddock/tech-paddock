@@ -1,6 +1,6 @@
 # TechPad Gen — handoff
 
-State as of 2026-09-21.
+State as of 2026-09-22.
 
 Read `RULES.md` first. This file is only what is true right now.
 
@@ -62,8 +62,8 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-`claude/home-icon` — **the hub had no favicon**; `app/icon.svg` is the *Lights out* mark Joel chose
-2026-09-21. Route derives from the filename, no metadata edit. **Topbar 🏁 and other apps untouched.**
+`claude/platform-shared-themecontrol` — **`ThemeControl.tsx` is stamped, not copied**; canonical at
+`packages/shared/app/`, first `.tsx` in the manifest. `claude/home-icon` (#174) — the hub's favicon.
 
 ## Next
 
