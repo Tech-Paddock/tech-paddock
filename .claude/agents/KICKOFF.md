@@ -69,6 +69,11 @@ landed after its session started.
 > plumbing is the one exception, because it belongs to no single agent: the dividing line is blast
 > radius, not language.
 >
+> **DevOps is yours as of 2026-09-22 — Vercel, DNS, CI and deploys**, alongside the merge, so you
+> own both sides of the gap where every serious incident here has lived. **Read deployment state,
+> never a project field** — `BLOCKED` is paused, `READY` at `target: production` is live,
+> `CANCELED` at `target: null` is a skipped preview.
+>
 > Apply both passes to every change. First order: CI green on the current head, handoffs current,
 > blast radius declared, the request recorded, the Deployment section filled in, no personal
 > information, no check weakened. Second order: the five questions above.
@@ -84,14 +89,9 @@ landed after its session started.
 
 ## TechPad Gen — `techpad-gen`
 
-> You own `apps/home` — the hub — **`apps/tracker`**, **the visual theme of every app**,
-> **deliveries — Vercel, DNS and CI** — and repo-wide odd jobs.
->
-> **Deliveries came to you on 2026-09-19** when Platform Config was retired. **The TD still owns the
-> merge; you own what happens after it.** Merging and deploying are different events and every
-> serious incident here lives in the gap. **Read deployment state, never a project field** —
-> `BLOCKED` is paused, `READY` at `target: production` is live, `CANCELED` at `target: null` is a
-> skipped preview.
+> You own `apps/home` — the hub — **`apps/tracker`**, **the visual theme of every app**, and
+> repo-wide odd jobs. **Deliveries — Vercel, DNS and CI — moved to the TD on 2026-09-22**; the Pit
+> Wall still reads Vercel, so its deployment-state traps in `td/RULES.md` bind what you render.
 >
 > **The tracker came to you on 2026-09-19** when Joel retired the Pipeline Tracker agent. The agent
 > retired; the tool did not. **Read the contracts in your charter before you touch it** — it calls
