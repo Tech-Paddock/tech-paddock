@@ -24,11 +24,11 @@ request is ~$5 at that size and free when Joel opens it in a browser. Full figur
 
 ## Linear, part-built — one step blocks the rest
 
-**The connector is still authorised as Joel's personal account** — checked five times. **Nothing
-else in the cutover starts until that flips.** Workspace, team key and members read live; the bot is
-admin because role restriction is paywalled and not worth buying. The plan is in #178's body: Phase
-1 seeds and touches no repo file, Phase 2 is one atomic branch or it leaves a window where the hook
-prints a file that is gone.
+**The connector authenticates as `claude@techpaddock.io` as of 2026-09-22** — verified, not assumed;
+a session asking Linear who it is gets the bot, not Joel. **Phase 0 is done and Phase 1 is next**:
+seeding touches no repo file and is reversible. The plan is in #178's body — Phase 2 is one atomic
+branch or it leaves a window where the hook prints a file that is gone. **The same mechanism is what
+makes the GitHub bot worth doing**, and that one makes `requested-by-joel` mechanically enforceable.
 
 **Phase 2 needs a charter PII line first.** Linear user objects carry a real name and email, nothing
 enforces `CLAUDE.md`'s rule against committing either, and whatever reads Linear must map users to
