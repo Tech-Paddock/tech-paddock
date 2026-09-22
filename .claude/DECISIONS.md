@@ -231,6 +231,18 @@ plausibly reopen or repeat, delete it; git keeps it.
 - **`supabase db push` cannot work here, permanently.** It refuses whenever the remote holds a
   version the local directory lacks, and `20260908235234` is remote-only for ever on purpose. The TD
   applies migrations through the hosted API at gate time.
+- **`npm run lint` has no config in any app here, and none is in CI.** Every app carries the Next.js
+  boilerplate script and not one has an ESLint config behind it, so a local `lint` fails looking
+  exactly like a broken setup. It is boilerplate, not a break — and because CI never runs it, a
+  green pipeline says nothing about it either way.
+- **"Invalid API key" in the Cookbook is Supabase, not Anthropic.** Reading the book or the shopping
+  list calls no model at all — the only model calls are drafting a recipe and Tidy. Reaching for the
+  Anthropic key when the book will not load cost a wrong turn once.
+- **A failed read must never render as an empty collection.** "Nothing here" and "we could not look"
+  are opposite facts that draw the identical screen, and the empty one is the confident lie. The
+  Cookbook's pattern: `LookupError` becomes a 503 and the client leaves its state `null` rather than
+  `[]`, so an unread book cannot be mistaken for an empty one. Anything that lists rows wants this.
+
 - **A new Postgres schema inherits no grants, and exposing it is a dashboard setting.** Three steps,
   not two: the schema, its grants, and the hosted project's Exposed schemas list. Step three lives
   nowhere in this repo and fails looking exactly like a credentials problem — it cost an hour once.

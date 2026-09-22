@@ -248,3 +248,57 @@ export async function toGroceryList(recipe: Recipe): Promise<number> {
   const added = await addItems(lines.map((name) => ({ name, source: "recipe" as const })));
   return added.length;
 }
+
+/**
+ * A method as the lines you actually follow at the worktop.
+ *
+ * **The renderer already honoured newlines; the model was the one running the
+ * steps together.** Fixing the prompt alone would have looked like a fix and
+ * left every recipe already in the book as one wall of text, so the split
+ * happens here, on the way to the screen, where it repairs the old rows too.
+ *
+ * **Split on step markers, never on sentences.** "Add the stock. Simmer." is one
+ * instruction in two sentences as often as it is two steps, and there is no way
+ * to tell from the text. A numbered marker is the author saying where the breaks
+ * are, so it is the only thing trusted.
+ *
+ * **A number is a marker only when nothing but a marker could be there**: at a
+ * line start or after a space, followed by `.` or `)`, then a space, then a
+ * letter. That is what keeps `1.5 tbsp oil` and `Bake at 180. 20 minutes.` out —
+ * both look like markers until the character after the dot is read.
+ */
+export function methodSteps(method: string | null): string[] {
+  if (!method) return [];
+
+  const marker = /(?:^|\s)\d{1,2}[.)]\s+(?=[A-Za-z])/g;
+  const text = method.trim();
+  if (!text) return [];
+
+  // Existing newlines are the author's own breaks and are always kept. Splitting
+  // a line that is already one step is how a tidy list becomes a ragged one.
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  const out: string[] = [];
+  for (const line of lines) {
+    const cuts: number[] = [];
+    for (const m of line.matchAll(marker)) {
+      // The marker may have consumed a leading space; the step starts at the digit.
+      const at = m.index + (m[0].length - m[0].trimStart().length);
+      if (at > 0) cuts.push(at);
+    }
+    if (cuts.length === 0) {
+      out.push(line);
+      continue;
+    }
+    let from = 0;
+    for (const at of cuts) {
+      const piece = line.slice(from, at).trim();
+      if (piece) out.push(piece);
+      from = at;
+    }
+    const tail = line.slice(from).trim();
+    if (tail) out.push(tail);
+  }
+
+  return out;
+}

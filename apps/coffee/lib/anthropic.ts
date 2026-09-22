@@ -3,6 +3,7 @@ import { BREW_METHODS } from "./methods";
 import { validateGuide, type Guide, type RawGuide } from "./guide";
 import { coerceSuggestion, type Suggestion } from "./suggestion";
 import { SEARCH_MODELS, DEFAULT_SEARCH_MODEL, isEffortFor, type SearchModel } from "./models";
+import { toolErrorsIn, unearnedNone } from "./searchRun";
 
 /**
  * Reading a label is transcription and it is already fast, so it stays on the
@@ -106,15 +107,37 @@ Also report the coffee's own product page URL if you find it, even when the brew
 instructions came from a different page on the same site.`;
 
 /**
- * Tier 1 and 2 in one call. `allowed_domains` pins the search to the roaster's
- * own site when we know it — the prompt can ask for that, but only this
- * enforces it. The result is then re-checked in validateGuide, because search
- * is not the only way a URL reaches the conversation.
+ * Tier 1 and 2 in one call.
+ *
+ * **Nothing is pinned up front.** Until 2026-09-22 a roaster whose domain a
+ * previous search had verified had `allowed_domains` set on the search from
+ * the start. Joel ended it — *"we should not be prepining any roaster info"* —
+ * and the measurement behind that is in the row history: the first Sweet Bloom
+ * bag searched unpinned and came back tier 1 with four quotes, the second
+ * searched pinned and came back `none`, with no code change in between.
+ *
+ * The mechanism is that `web_fetch` only fetches URLs already present in the
+ * conversation, so search is the sole channel by which any page can enter it.
+ * Narrowing that channel to one host does not make the search more careful; it
+ * removes the model's only way of reaching the site at all when the pinned
+ * query surfaces nothing. **The host check in `validateGuide` is unchanged and
+ * is now the whole of the constraint**, which is what it was for every first
+ * search this app has ever run — including the one that worked.
+ *
+ * **A product URL the bag already holds is handed over instead.** Joel,
+ * 2026-09-22: *"Refresh should refer product url."* Naming it in the message is
+ * what makes it fetchable, for the same reason above. It is read off the row by
+ * the route rather than supplied by the caller, and there is one message either
+ * way — *"Research is a trigger"*, not a second kind of search. If the page is
+ * gone the model searches as it otherwise would — *"I'm fine if the url fails
+ * because they've moved or removed their beans"* — so a stale link costs one
+ * fetch and never becomes a dead end the bag cannot recover from.
  */
 export async function searchBrewGuide(params: {
   roaster: string;
   coffeeName: string;
-  roasterDomain?: string | null;
+  /** A product page a previous search found, read first when we have one. */
+  productUrl?: string | null;
   model?: SearchModel;
   effort?: string | null;
 }): Promise<Guide> {
@@ -125,35 +148,46 @@ export async function searchBrewGuide(params: {
   const effort = isEffortFor(model, params.effort) ? params.effort : null;
 
   const tools: Record<string, unknown>[] = [
-    {
-      type: spec.search,
-      name: "web_search",
-      max_uses: 6,
-      ...(params.roasterDomain ? { allowed_domains: [params.roasterDomain] } : {}),
-    },
+    { type: spec.search, name: "web_search", max_uses: 6 },
     { type: spec.fetch, name: "web_fetch", max_uses: 6 },
   ];
 
+  const known = params.productUrl?.trim() || null;
+
+  // One message, whether or not a product page is known. The URL is a fact
+  // about the bag that is present or absent, not a second mode of searching:
+  // a prompt that branched would make a re-search a different process from the
+  // first search, which is the thing Joel ruled out on 2026-09-22.
   const messages: Record<string, unknown>[] = [
     {
       role: "user",
       content:
-        `Roaster: ${params.roaster}\nCoffee: ${params.coffeeName}\n\n` +
-        `Find this roaster's brewing instructions for this coffee, working the three tiers in order. ` +
+        `Roaster: ${params.roaster}\nCoffee: ${params.coffeeName}\n` +
+        (known ? `Known product page for this coffee: ${known}\n` : "") +
+        `\nFind this roaster's brewing instructions for this coffee, working the three tiers in order. ` +
+        `Establish the roaster's official site and read brewing instructions only from it. ` +
+        (known
+          ? `A known product page is given above: fetch it directly and start there. If it no longer ` +
+            `loads or no longer describes this coffee, the roaster has moved or removed it — search ` +
+            `for the current page as you otherwise would, and report nothing from the old URL. `
+          : "") +
         `When you are done, give your answer as a JSON object with these keys: status (one of ` +
         `"coffee_specific", "roaster_generic", "none"), product_url, guide_url, params (an object ` +
         `with any of: method, ratio, dose, water, temp, grind, time — all strings, omit what the ` +
         `page does not state), and quotes (an array of {field, text, url}, one per reported ` +
-        `parameter, each quoting the page verbatim). Put nothing after the JSON.` +
-        (params.roasterDomain ? "" : `\n\nYou do not have a confirmed domain for this roaster. Establish their official site first, and read brewing instructions only from it.`),
+        `parameter, each quoting the page verbatim). Put nothing after the JSON.`,
     },
   ];
 
   let raw = "";
+  let answered = false;
+  const toolErrors: string[] = [];
   // Server tools can end a turn with stop_reason "pause_turn" rather than a
-  // result. Resume by handing the paused turn back; without this the answer
-  // is silently truncated instead of erroring.
-  for (let i = 0; i < 6; i++) {
+  // result. Resume by handing the paused turn back; without this the answer is
+  // silently truncated instead of erroring. Ten, because ten is where the
+  // server's own sampling loop pauses — a lower cap here just cuts off a search
+  // that was still working.
+  for (let i = 0; i < 10; i++) {
     const response = (await getClient().messages.create({
       model,
       max_tokens: 8192,
@@ -163,7 +197,9 @@ export async function searchBrewGuide(params: {
       system: SEARCH_SYSTEM,
       tools,
       messages,
-    } as never)) as { stop_reason: string; content: { type: string; text?: string }[] };
+    } as never)) as { stop_reason: string; content: { type: string; text?: string; content?: unknown }[] };
+
+    toolErrors.push(...toolErrorsIn(response.content));
 
     if (response.stop_reason === "pause_turn") {
       messages.push({ role: "assistant", content: response.content });
@@ -173,10 +209,27 @@ export async function searchBrewGuide(params: {
       .filter((b) => b.type === "text")
       .map((b) => b.text ?? "")
       .join("\n");
+    answered = true;
     break;
   }
 
-  return validateGuide(parseGuideJson(raw), params.roasterDomain);
+  // Running out of resumes is not an answer. Left as it was, the empty string
+  // parsed to {} and came out as a confident tier-3 `none` — a search that was
+  // cut off mid-flight, recorded as "this roaster publishes nothing".
+  if (!answered) {
+    throw new Error("The search was still working after 10 turns and was stopped before it answered.");
+  }
+
+  const guide = validateGuide(parseGuideJson(raw), null);
+
+  // A `none` reached past a tool that failed is not an answer about the
+  // roaster. Thrown rather than returned, so the route records why on the row
+  // and leaves the bag's guide untouched — the rule itself is in
+  // `lib/searchRun.ts`, where it can be tested without an API call.
+  const unearned = unearnedNone(guide.status, toolErrors);
+  if (unearned) throw new Error(unearned);
+
+  return guide;
 }
 
 /** The model is asked for bare JSON but answers after a search narrative often enough to matter. */

@@ -45,32 +45,6 @@ export async function findPreviousBag(roaster: string, coffeeName: string) {
   return { id: bag.id, created_at: bag.created_at, ...brew };
 }
 
-/**
- * The roaster's own hostname, learned from a product URL a previous search
- * verified. This is what lets the second and later searches for a roaster pin
- * `allowed_domains` up front instead of leaning on the post-hoc host check in
- * validateGuide. The first search for a roaster we have never seen stays
- * unpinned — there is nothing to pin it to yet, and guessing a domain from the
- * roaster's name is exactly the kind of invention this tool refuses.
- */
-export async function findRoasterDomain(roaster: string): Promise<string | null> {
-  const { data, error } = await getServiceClient()
-    .from("bags")
-    .select("product_url, guide_url")
-    .ilike("roaster", roaster)
-    .not("product_url", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  // A failed lookup is not the same as a roaster we have never seen. Both
-  // leave the search unpinned, but the second is the documented first-search
-  // behaviour and the first is a broken database worth stopping for.
-  if (error) throw new LookupError(`Couldn't look up a verified domain for ${roaster}: ${error.message}`);
-
-  return hostOf(data?.product_url) ?? hostOf(data?.guide_url);
-}
-
 /** A library lookup that could not be answered, as against one that answered "no". */
 export class LookupError extends Error {
   constructor(message: string) {
@@ -79,6 +53,11 @@ export class LookupError extends Error {
   }
 }
 
+/**
+ * A URL's hostname, `www.` stripped and lowercased, or null if it is not a
+ * URL at all. Used to tell a stored product link that can be handed to the
+ * model from a string that only looks like one.
+ */
 export function hostOf(url: string | null | undefined): string | null {
   if (!url) return null;
   try {
