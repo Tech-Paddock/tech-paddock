@@ -62,6 +62,11 @@ function sameSite(a: string | null, b: string | null): boolean {
  * Reduce a model response to only what it can back, and decide which tier
  * actually answered. Never throws: a malformed response is a guide with
  * status "none", which is a legitimate outcome rather than an error.
+ *
+ * **"Legitimate" is about the payload, not about the run.** A `none` here
+ * means this response backed nothing; whether the run was in a position to
+ * find anything is a separate question, and `lib/searchRun.ts` answers it
+ * before the answer is allowed anywhere near the row.
  */
 export function validateGuide(raw: RawGuide, roasterDomain?: string | null): Guide {
   const productUrl = typeof raw.product_url === "string" && raw.product_url ? raw.product_url : null;
@@ -112,9 +117,11 @@ export function validateGuide(raw: RawGuide, roasterDomain?: string | null): Gui
     return { status: "none", product_url: productUrl, guide_url: null, method: null, params: {}, quotes: [], dropped };
   }
 
-  // Tier 2 is "the roaster's own site only". allowed_domains pins the search,
-  // but the search is not the only way a URL can enter the conversation, so
-  // the constraint is re-checked here against what was actually read.
+  // Tier 2 is "the roaster's own site only", and since 2026-09-22 this is the
+  // whole of that constraint rather than a re-check behind one: the search is
+  // no longer pinned to a domain up front. `roasterDomain` stays as the way a
+  // caller can name the anchor; with none, the anchor is the product page the
+  // model itself reported, which is what every first search has always used.
   const domain = roasterDomain ? host(`https://${roasterDomain.replace(/^https?:\/\//, "")}`) : null;
   const guideHost = host(guideUrl);
   const anchor = domain ?? host(productUrl);

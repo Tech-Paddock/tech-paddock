@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { findPreviousBag, findRoasterDomain, guideColumns, hostOf, searchPattern, LookupError } from "@/lib/bags";
+import { findPreviousBag, guideColumns, hostOf, searchPattern, LookupError } from "@/lib/bags";
 import type { Guide } from "@/lib/guide";
 
 // The Supabase query builder is chainable and only resolves at the end, so the
@@ -88,25 +88,6 @@ describe("findPreviousBag", () => {
     await expect(findPreviousBag("Sweet Bloom", "Maria Gutierrez")).rejects.toThrow(
       /permission denied for schema coffee/
     );
-  });
-});
-
-describe("findRoasterDomain", () => {
-  it("pins the search to a host a previous product URL verified", async () => {
-    answers({ product_url: "https://sweetbloomcoffee.com/products/x", guide_url: null });
-    await expect(findRoasterDomain("Sweet Bloom")).resolves.toBe("sweetbloomcoffee.com");
-  });
-
-  it("leaves the first search for an unknown roaster unpinned", async () => {
-    answers(null);
-    await expect(findRoasterDomain("Sweet Bloom")).resolves.toBeNull();
-  });
-
-  it("throws rather than leave a search unpinned because the database was down", async () => {
-    // Unpinned is the documented behaviour for a roaster we have never seen.
-    // Reaching it via a broken database is a different thing wearing its face.
-    fails("permission denied for schema coffee");
-    await expect(findRoasterDomain("Sweet Bloom")).rejects.toBeInstanceOf(LookupError);
   });
 });
 

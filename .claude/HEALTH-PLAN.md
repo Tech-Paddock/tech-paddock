@@ -89,6 +89,12 @@ earlier draft is unnecessary and dropped.
 Correcting the draft before approving is the easy case. Correcting something already logged resolves
 to the most recent matching row.
 
+**A correction does not reach backwards — settled 2026-09-22, answering #116.** An entry snapshots
+the item's numbers when it is logged, so a past day's total never moves and a read is a plain sum.
+**The entry also stores the item id and the version it snapshotted.** Nothing recomputes, but a
+backfill stays possible; without the reference, every day logged before a correction is wrong
+permanently, which is the one irreversible choice in this design.
+
 ### It does not appear on the hub's glance
 
 Joel, asked whether it belongs there: **"leave it off for now."** So no `/api/summary`, no line in
@@ -198,9 +204,11 @@ say "Haiku matched 46 of 50," and that number ends the validation period.
 
 ### A pick is allowed to win
 
-Table says 620, Haiku says 625, Sonnet says 890 — you can take one and have it stick. A pick can
-overwrite the canonical row, deliberately, and the row records that a debug run changed it and which
-model produced the new number.
+Table says 620, Haiku says 625, Sonnet says 890 — you can take one and have it stick. **A pick wins
+by appending a new version, never by overwriting the row in place**, and that version records the
+debug run and the model behind the number. Reads resolve to the newest, so the pick has the effect
+you want and the correction it replaced is still there. **Corrected 2026-09-22 answering #116** —
+the earlier wording let a pick overwrite in place, contradicting `health/RULES.md` guardrail 3.
 
 ### Two mechanics
 

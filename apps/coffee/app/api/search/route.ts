@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchBrewGuide } from "@/lib/anthropic";
 import { isSearchModel, isEffortFor, effortsFor, DEFAULT_SEARCH_MODEL } from "@/lib/models";
-import { findRoasterDomain, guideColumns } from "@/lib/bags";
+import { guideColumns, hostOf } from "@/lib/bags";
 import { getServiceClient } from "@/lib/supabase";
 import { suggestOnBag } from "@/lib/suggestOnBag";
 import type { Suggestion } from "@/lib/suggestion";
@@ -47,22 +47,32 @@ export async function POST(request: NextRequest) {
   const supabase = getServiceClient();
 
   // Mark it in flight before the long call, so a page that reconnects can tell
-  // "still working" from "never started".
+  // "still working" from "never started" — and read the product page off the
+  // row in the same round trip.
+  //
+  // **Off the row, never off the request.** Joel, 2026-09-22: *"Research
+  // should just kick off the original search not be a unique process.
+  // Research is a trigger."* A caller that could hand in a product URL is a
+  // caller that can make its search different from the scan screen's, which is
+  // exactly the divergence that wording rules out. What the search does now
+  // depends on what the bag knows, not on which button started it — a fresh
+  // bag has no product URL because nothing has found one yet, and a bag that
+  // has been searched before does.
+  let productUrl: string | null = null;
   if (bagId) {
-    await supabase
+    const { data: row } = await supabase
       .from("bags")
       .update({ guide_search_started_at: new Date().toISOString(), guide_search_error: null })
-      .eq("id", bagId);
+      .eq("id", bagId)
+      .select("product_url")
+      .maybeSingle();
+    // `hostOf` is a sanity check, not a constraint: a stored value that is not
+    // a URL at all is dropped rather than handed over as though it were a page.
+    productUrl = hostOf(row?.product_url) ? (row?.product_url as string).trim() : null;
   }
 
   try {
-    // Prefer a domain a previous search already verified for this roaster over
-    // one the caller supplied, and fall back to neither rather than a guess.
-    const roasterDomain =
-      (await findRoasterDomain(roaster)) ??
-      (typeof body.roaster_domain === "string" && body.roaster_domain.trim() ? body.roaster_domain.trim() : null);
-
-    const guide = await searchBrewGuide({ roaster, coffeeName, roasterDomain, model, effort });
+    const guide = await searchBrewGuide({ roaster, coffeeName, productUrl, model, effort });
 
     // The result lands in the row, not in this response. That is the whole
     // point: by now the page that asked for it may be long gone.
