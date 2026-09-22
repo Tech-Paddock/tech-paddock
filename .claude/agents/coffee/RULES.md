@@ -127,10 +127,12 @@ A house pour-over ratio is useful, but it is not what the roaster decided about 
 lot. **Do not flatten the distinction.**
 
 **The tier records where the instructions were read, not who they were written for.** That is the
-only part a search can check, and the first real bag is the case that separates the two: Sweet Bloom
-print one house recipe — Origami Air, 1:17, 900µm, 2:40 — on every product page, so it validated as
-`coffee_specific` while being their default for everything. The classification is right; the old
-label, "The roaster's recipe for this coffee", asserted the part that was never checked.
+only part a search can check, and the distinction is real: a house ratio published on every product
+page validates as `coffee_specific` while being a default. **The first real bag was thought to be
+that case and is not** — Sweet Bloom's stored guide reads 18g/305g/850µm/23-25s against the house
+Origami Air 1:17/900µm/2:40, and Joel confirms they dial per bean. The rule is untouched and nothing
+ranks or filters on tier 1, but **this bag no longer illustrates it and a real example is owed.**
+The old label, "The roaster's recipe for this coffee", asserted the part never checked.
 
 **The three tiers are now a three-state indicator, and every label names the place.** "Found Brew
 Guide on Page", "Non-Specific Roaster Brew Guide", "No Recipe Found" — green, amber, red, with the
@@ -278,10 +280,13 @@ this before" is a lookup on `(lower(roaster), lower(coffee_name))`, not a unique
 `findPreviousBag` carries forward **only the dial-in** — method, grinder, grind setting. A rating
 or tasting note describes a lot you actually drank, and this bag is not that lot.
 
-**`findRoasterDomain` pins the search.** Once one verified product URL exists for a roaster, later
-searches pin `allowed_domains` up front rather than leaning on the post-hoc host check. The first
-search for an unknown roaster stays unpinned — guessing a domain from the roaster's name is exactly
-the invention this tool refuses.
+**Nothing is pinned up front.** `findRoasterDomain` was removed in #176 on Joel's instruction —
+*"we should not be prepining any roaster info."* No search sets `allowed_domains`, and
+`validateGuide`'s post-hoc host check is now the whole of the constraint. **Pinning was not
+neutral**: `web_fetch` only fetches URLs already in the conversation, so search is the sole channel
+by which a page enters it, and narrowing that channel left the fetch nothing to work with. The rows
+are the measurement — the same roaster returned four quotes unpinned and `none` pinned, 27 hours
+apart with no code change between.
 
 **It installs to the iPhone home screen, and is iOS-only on purpose.** The primary device is a
 phone in a kitchen, so the tool is installed rather than opened in a tab: `apple-touch-icon` plus
