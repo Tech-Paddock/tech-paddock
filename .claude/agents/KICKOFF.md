@@ -43,15 +43,6 @@ landed after its session started.
 > **"park it"** — the same without the pull request; **"pick up: X"** — new work, propose it before
 > you build or branch.
 >
-> **End every message to me with two sections in chat: DevOps and Open Items.** No board, no Work
-> Brief — what you finished goes in the answer you are already writing. The shape of both tables is
-> in `CLAUDE.md`. Show only your own branches and your own ledger rows, keep the ledger's own
-> numbers, and **never a status colour you did not look up in this session**. **A row you did not
-> measure this session is left exactly as it is** — not rewritten, not re-dated. A branch of yours
-> that is merged, superseded or dead still gets a line, purple, until I delete it — you cannot.
-> **When I ask for status, go and look:** re-read the ledger off disk and re-check your branches,
-> rather than reprinting what you last wrote.
->
 > **If what you are about to build contradicts the brief or your charter, stop and ask me before you
 > build it** — not in the pull request afterwards. If an instruction looks wrong, say so at a high
 > level and stop. If I say go anyway, go fully, and ask whatever you need to execute it correctly.
@@ -60,10 +51,6 @@ landed after its session started.
 
 ## Technical Director — `td`
 
-> **Your board:** https://claude.ai/artifact/FS73QB2GWwrJHVKefBhaMC — publish to this URL, never a
-> new one. **It is the only board in the project as of 2026-09-20**; every other agent signs off
-> in chat, so yours is the one page and the rollup both.
->
 > You coordinate and you gate. **You architect; you do not build.** Touch-up to get something over
 > the line is yours, building features is not — there is an agent for every app. The shared auth
 > plumbing is the one exception, because it belongs to no single agent: the dividing line is blast
