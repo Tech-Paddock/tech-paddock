@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Provenance from "./Provenance";
+import { useToast } from "./Toast";
 import { MACRO_KEYS, MACRO_LABELS, round, scale, type Macros } from "@/lib/macros";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
 import { methodSteps, perServing, type Recipe, type RecipeDraft, type RecipeOrigin } from "@/lib/recipes";
@@ -55,8 +56,10 @@ function MacroRow({ macros, per }: { macros: Macros; per: string }) {
 
 export default function Book({ onAddedToList }: { onAddedToList?: () => void }) {
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  // Only for the read itself. Everything else reports through a toast; a book
+  // that could not be read is a state, and it stays on screen while it is true.
+  const [readError, setReadError] = useState<string | null>(null);
+  const toast = useToast();
   const [busy, setBusy] = useState<null | "drafting" | "keeping">(null);
   const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
 
@@ -79,10 +82,11 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't read the book.");
       setRecipes(body.recipes as Recipe[]);
+      setReadError(null);
     } catch (e) {
       // Deliberately leaves `recipes` null rather than setting it to []. An
       // unread book and an empty book must not render the same.
-      setError(e instanceof Error ? e.message : "Couldn't read the book.");
+      setReadError(e instanceof Error ? e.message : "Couldn't read the book.");
     }
   }, []);
 
@@ -93,8 +97,6 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   async function makeDraft() {
     if (busy) return;
     setBusy("drafting");
-    setError(null);
-    setNotice(null);
     try {
       const payload =
         mode === "manual"
@@ -125,7 +127,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       if (mode === "manual") await save(drafted);
       else setDraft(drafted);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't draft that.");
+      toast.error(e instanceof Error ? e.message : "Couldn't draft that.");
     } finally {
       setBusy(null);
     }
@@ -152,26 +154,23 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     setMethod("");
     setBrief("");
     setUrl("");
-    setNotice(`"${(body.recipe as Recipe).name}" is in the book.`);
+    toast.notice(`"${(body.recipe as Recipe).name}" is in the book.`);
     await load();
   }
 
   async function keepIt() {
     if (!draft || busy) return;
     setBusy("keeping");
-    setError(null);
     try {
       await save(draft);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't save that.");
+      toast.error(e instanceof Error ? e.message : "Couldn't save that.");
     } finally {
       setBusy(null);
     }
   }
 
   async function toList(recipe: Recipe) {
-    setError(null);
-    setNotice(null);
     try {
       const response = await fetch("/api/recipes/grocery", {
         method: "POST",
@@ -180,16 +179,14 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't add those.");
-      setNotice(`${body.added} ingredient${body.added === 1 ? "" : "s"} added to your list.`);
+      toast.notice(`${body.added} ingredient${body.added === 1 ? "" : "s"} added to your list.`);
       onAddedToList?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't add those.");
+      toast.error(e instanceof Error ? e.message : "Couldn't add those.");
     }
   }
 
   async function remove(recipe: Recipe) {
-    setError(null);
-    setNotice(null);
     try {
       const response = await fetch("/api/recipes", {
         method: "DELETE",
@@ -197,10 +194,10 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
         body: JSON.stringify({ id: recipe.id }),
       });
       if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't remove that.");
-      setNotice(`"${recipe.name}" is out of the book. Your list keeps anything you already added.`);
+      toast.notice(`"${recipe.name}" is out of the book. Your list keeps anything you already added.`);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't remove that.");
+      toast.error(e instanceof Error ? e.message : "Couldn't remove that.");
     }
   }
 
@@ -230,15 +227,6 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
 
   return (
     <div className="flex flex-col gap-8">
-      {error ? (
-        <p role="alert" className="rounded-lg border border-danger/60 bg-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
-      {notice ? (
-        <p className="rounded-lg border border-line bg-surface p-3 text-sm text-ink-soft">{notice}</p>
-      ) : null}
-
       {/* ------------------------------------------------------------------ */}
       {/* Adding one. First on the page, collapsed until you want it.        */}
       {/* ------------------------------------------------------------------ */}
@@ -255,8 +243,12 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
         </button>
 
         {/* Hidden rather than unmounted: collapsing the panel must not throw away
-            a half-typed recipe or a draft you have not decided on yet. */}
-        <div id="add-panel" hidden={!adding} className="flex flex-col gap-3">
+            a half-typed recipe or a draft you have not decided on yet.
+            **The display class has to follow `adding` too.** `hidden` alone lost
+            to Tailwind's `flex`, which comes later in the cascade at the same
+            specificity, so the panel never closed and the sign flipped for
+            nothing — the bug Joel found on 2026-09-22. */}
+        <div id="add-panel" hidden={!adding} className={adding ? "flex flex-col gap-3" : "hidden"}>
         <div className="flex flex-wrap items-center gap-2">
           {/* The model picker sits here and nowhere else, because pricing a dish
               is the only judgement in the app. Reading the book calls nothing,
@@ -442,9 +434,12 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       {/* ------------------------------------------------------------------ */}
       {/* The book, under the form now. It is still the reason you came.     */}
       {/* ------------------------------------------------------------------ */}
-      <section id="book" className="flex scroll-mt-4 flex-col gap-3">
+      {/* Boxed and named "Recipes", Joel on 2026-09-22 — the same frame as the
+          panel above, so the page reads as two things rather than one form
+          trailing into a list. */}
+      <section id="book" className="flex scroll-mt-4 flex-col gap-3 rounded-lg border border-line p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold">What you could cook</h2>
+          <h2 className="text-base font-semibold">Recipes</h2>
           {recipes !== null && recipes.length > 0 ? (
             <input
               value={query}
@@ -458,10 +453,16 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
         </div>
 
         {recipes === null ? (
-          <p className="text-sm text-ink-soft">Reading the book…</p>
+          readError ? (
+            <p role="alert" className="text-sm text-danger">
+              {readError}
+            </p>
+          ) : (
+            <p className="text-sm text-ink-soft">Reading the book…</p>
+          )
         ) : recipes.length === 0 ? (
           <p className="rounded-lg border border-dashed border-line p-4 text-sm text-ink-soft">
-            Nothing in it yet. Write one below, describe one, or paste a link.
+            Nothing in it yet. Add one above: type it, describe it, or paste a link.
           </p>
         ) : shown.length === 0 ? (
           // Deliberately not the same sentence as an empty book. "Nothing here"
