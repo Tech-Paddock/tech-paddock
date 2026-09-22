@@ -210,11 +210,12 @@ plausibly reopen or repeat, delete it; git keeps it.
   that was deliberately rejected, in the other direction. The second: the gate's value is the
   second-order pass, and **a narrow charter is by construction the agent least able to run it**;
   widen it and the cheap checkout that motivated the seat is gone.
-- **2026-09-22 — The sign-off is computed, not specified.** The spec is 10,363 B, **27.9% of
-  `CLAUDE.md`**, and 18% of its lines exist only to police writing the tables from memory. **Moving
-  it to an on-demand file would have saved nothing** — the sign-off is per-message, so an agent
-  reads it on turn one and it stays resident exactly as today. Replacing it with a script is the
-  only version that recovers anything, because then nobody reads it at all.
+- **2026-09-22 — The sign-off is deleted, not computed.** *Supersedes "computed, not specified",
+  the same day.* The spec was **27.9% of `CLAUDE.md`**, and a script was the only replacement that
+  recovered the cost. **Joel stopped the debrief outright instead**, so there is nothing left to
+  compute: no board, no footer, and status is a question he asks. What survived is the reasoning
+  that was never about the tables — go and look rather than reprint, never fill in a row you cannot
+  see, and permanent ledger numbers. `BOARD.html` went with it, ahead of Linear's Phase 2.
 
 ## Mistakes — do not repeat
 

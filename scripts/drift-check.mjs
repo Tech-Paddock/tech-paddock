@@ -278,7 +278,6 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
     // it would defeat the compaction it exists to receive.
     [".claude/agents/KICKOFF.md", 220],
     [".claude/agents/STANDUP.md", 110],
-    [".claude/agents/BOARD.html", 340],
     [".claude/SURFACE.md", 120],
     [".claude/HEALTH-PLAN.md", 250],
     ["supabase/README.md", 200],
