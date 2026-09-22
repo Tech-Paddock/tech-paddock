@@ -185,6 +185,37 @@ plausibly reopen or repeat, delete it; git keeps it.
   medium** — live branches, live check runs, the ledger re-read off disk, update only what you
   measured. `.claude/agents/BOARD.html` stays; it now has one caller.
 
+- **2026-09-22 — DevOps is the technical director's, and now says so once.** It was split on
+  2026-09-19 when Platform Config was retired: Postgres stayed at the gate because migrations are
+  applied there, and Vercel, DNS and CI went to TechPad Gen as *deliveries* — **a reason never
+  written down anywhere**. The repo then carried four answers: `CLAUDE.md`'s roster gave the TD
+  "ops" *and* TechPad Gen "deliveries"; `td/RULES.md:81` said Vercel was the TD's; `:92` said to
+  watch **Platform**, a seat that no longer exists. **This is not new policy — it collapses four
+  statements into one.** The one argument that survived steelmanning was separation of duties, that
+  a gate confirming its own merge marks its own homework; it fails here because the independent
+  re-read is a fresh session reading the same repo, which a fresh **TD** session does equally well
+  without a second charter to keep current. **The Vercel trap list moves with the seat, verbatim**,
+  or the move relocates the error it exists to prevent.
+- **2026-09-22 — Linear holds open items. GitHub stays the repo. The board is deleted.** Linear
+  becomes canonical and a Routine generates `.claude/OPEN-ITEMS.md` from it, so the `SessionStart`
+  hook still prints it and **agents read for free — no credential, no network call at session
+  start.** Writing an item calls Linear; reading never does. **`BOARD.html` goes with it**, which is
+  the 2026-09-20 reasoning finished: a board is a persistent page and agents are not persistent
+  things, so once Linear holds the queue and GitHub holds the pull requests the last board is a
+  third copy of state two systems already render live. **Migration cost, measured: 17 references to
+  ledger numbers across 8 files, four of them — items 7, 9, 19, 27 — pointing at items already
+  closed**, which Linear will not hold. Decide deliberately whether those carry or are rewritten.
+- **2026-09-22 — No deployment agent.** Proposed and declined. The decisive objection: `CLAUDE.md`
+  puts migrations at the gate, so an agent that merges must also apply them — rebuilding the split
+  that was deliberately rejected, in the other direction. The second: the gate's value is the
+  second-order pass, and **a narrow charter is by construction the agent least able to run it**;
+  widen it and the cheap checkout that motivated the seat is gone.
+- **2026-09-22 — The sign-off is computed, not specified.** The spec is 10,363 B, **27.9% of
+  `CLAUDE.md`**, and 18% of its lines exist only to police writing the tables from memory. **Moving
+  it to an on-demand file would have saved nothing** — the sign-off is per-message, so an agent
+  reads it on turn one and it stays resident exactly as today. Replacing it with a script is the
+  only version that recovers anything, because then nobody reads it at all.
+
 ## Mistakes — do not repeat
 
 - **Merging a second change on a gate result taken before the first.** #69 and #70 were merged past
@@ -314,6 +345,18 @@ plausibly reopen or repeat, delete it; git keeps it.
   permitted through this proxy."** Four attempts each, on 2026-09-20. **Pushes that create or update
   a ref work fine**, which is what makes the deletion case surprising. Neither is transient: stop
   after the first and ask Joel.
+- **The TD's handoff-freshness check is structurally dead.** `drift-check.mjs:311` maps `td` to
+  `["apps/editor"]` — the **frozen** app — so it reports `ok` forever. Measured 2026-09-22: it said
+  `ok fresh: td 2026-09-20, current with apps/editor` while the handoff was two merges stale. The
+  guard above it covers an agent owning *no* folder; the TD owns an *inert* one and falls past it.
+- **The ledger is not reliably machine-parseable and fails silently.** A parse written 2026-09-22
+  returned **9 items where there are 10** — item 1's title wraps, so the `**…**` never closes on the
+  numbered line and it was dropped with no error. Any script reading this file must **exit non-zero
+  on an unparseable item** and cross-check its count against `Next number`.
+- **CI's build scope check does not watch `packages/`.** `ci.yml:94-97` names `apps/<app>`,
+  `.github/workflows` and `supabase`; every app's Vercel `ignoreCommand` does include `packages`.
+  Latent only because stamping writes into `apps/` too, so `drift` is what actually catches it.
+  **Concrete evidence for ledger item 20.**
 ## Known, deliberately not fixed
 
 - **Vercel's *Skip deployments when there are no changes* toggle does not behave as its label

@@ -1,80 +1,80 @@
 # Technical Director — handoff
 
-State as of 2026-09-20, written as a handover to a new session of this seat. `RULES.md` has the
-role and the gate; this is only what is true right now.
+State as of 2026-09-22. `RULES.md` has the role and the gate, `DECISIONS.md` the reasoning; this is
+only what is true right now.
 
 ---
 
-## In flight
+**Branch state is not written here — it went stale inside one session.** Read it live:
+`git ls-remote --heads origin`, the open pull request list, check runs on the head SHA.
 
-**#159 through #163 are merged and `main` is at `68ffc52`.** **#164 is open and green** — the
-`FORCE_BUILD` hatch. **A second branch is stacked on it**, `claude/brief-one-board`, so #164 merges
-first; rebase the stack onto the new `main` before retargeting it. **Joel is adding more pull
-requests and asked for the batch to be gated together**, not one at a time.
+## Owned, and the change that has not landed
 
-**`claude/brief-drop-compaction` is pushed and green at `371af90`, with no pull request** — Joel has
-not asked. It takes the compaction ritual out of `CLAUDE.md` and every kickoff block and **keeps the
-summary-of-a-summary reasoning**, re-pointed at the gap between sessions rather than deleted.
+**DevOps is yours as of 2026-09-22** — Vercel, DNS, CI, deploys, alongside the merge.
+**The charter change is not written**: `CLAUDE.md`'s roster, `td/RULES.md`, `techpad-gen/RULES.md`
+and `KICKOFF.md` all still describe the old split, and `td/RULES.md:92` still says watch
+**Platform**, retired 2026-09-19. **The Vercel trap list moves with the seat, verbatim**, out of
+TechPad Gen's kickoff block, or the move relocates the error it prevents.
 
-## What is true now
+## Cost, measured 2026-09-22
 
-**A bare Redeploy cannot build here.** Since 2026-09-20 every `ignoreCommand` reads `FORCE_BUILD`:
-set it on the project, redeploy, **remove it**. `DECISIONS.md` has the mechanism and what it cost.
+**Cost = context × turns.** A fresh session of this seat checks out at ~16.5K tokens; a ~10-turn
+gate is **$0.24 fresh against $5.80 at 387K**, so **one session, one branch, end it.** A pull
+request is ~$5 at that size and free when Joel opens it in a browser. Full figures in #178.
 
-**Consumption.** 30 sessions read ~$7.4K of list-price value — **not a bill**, but 8 hit the
-seven-day warning and **one immortal session was 58%** of it. **Cost ≈ context × tool calls**: 10.3B
-of 10.5B tokens are re-reads. **Batch calls, group gates, and end a session at its branch** — Joel's
-model and it is right: a session is a branch off `main`.
+## Linear, part-built — one step blocks the rest
 
-**Charters are yours to draft as of 2026-09-20, Joel's to approve**; `HANDOFF.md` did not move.
-**Every document is capped** — `CLAUDE.md` has the table for what to do at one, and caps are
-ratchets at today's size. **`CLAUDE.md`'s 400 arrives with its compaction, which is deliberately
-not this seat's while it holds the file's reasoning**: a cold session is the test.
+**The connector is still authorised as Joel's personal account** — checked five times. **Nothing
+else in the cutover starts until that flips.** Workspace, team key and members read live; the bot is
+admin because role restriction is paywalled and not worth buying. The plan is in #178's body: Phase
+1 seeds and touches no repo file, Phase 2 is one atomic branch or it leaves a window where the hook
+prints a file that is gone.
 
-**Yours is the only board as of 2026-09-20** — every other agent signs off with DevOps and Open
-Items in chat and publishes nothing. **Regenerate from `BOARD.html`, never adopt the published
-page**: reading one back to edit it cost ~38K tokens resident for the rest of the session against
-~9K to build it. **Publish once per session, at close-out.**
+**Phase 2 needs a charter PII line first.** Linear user objects carry a real name and email, nothing
+enforces `CLAUDE.md`'s rule against committing either, and whatever reads Linear must map users to
+the repo's short names.
 
-**The doc floor is the checkout, not overhead**, and **regressive** — 5% of a 600K session, 46% of
-a 75K one; `### Always` is 55% of `CLAUDE.md` and the sign-off spec 34%, so the compaction lives
-there. **The ledger is 80/80 and cannot record the work that would give it room** — the
-demonstration, not untidiness.
+## The debrief is dead
 
-**The read-back rule has its proof, twice.** **MCP `apply_migration` cannot record a file's own
-version** — name and query only, and it stamps the clock. Use `execute_sql` with the DDL and the
-`supabase_migrations.schema_migrations` insert **in one batch**. **Item 26's three are unchanged.**
+Joel stopped it 2026-09-22. **The sign-off spec is deleted, not replaced** — no script, no new file.
+~145 lines off `CLAUDE.md`, 521 → ~376, **resolving item 28 as a side effect.** Status is now a
+question he asks.
 
-**Branch protection and `Require branches to be up to date` are on; required checks are `gate`,
-`drift`, `requested-by-joel`** — Joel's screenshot, not a measurement. Say which it is.
+## The queue cleared 2026-09-22, and what it left
 
-## Traps specific to this seat
+**Six merged** — #174, #179, #176, #175, #177 and this — in an order decided before any landed.
+**Branch protection requires branches be up to date; measured now, not a screenshot.** Each needed a
+rebase and a full CI run, so **merges here are serial** and a batch costs a cycle each. One PR
+merged as it finishes never meets the rule.
 
-- **Check the open list with a live call as the first step of every merge**, never from memory.
+**Four Cookbook branches are dead and need deleting — Joel's alone.** The three stack ancestors
+under #175, plus `claude/cookbook-handoff-after-merge`, superseded twice.
+
+**#177's two extras are in its commits**: a handoff conflict resolved by taking TechPad Gen's own
+newer copy whole — lossless by inspection, never a judgement, because a handoff is not this seat's
+to author — and `drift`'s `SWEPT` list now **derived from `MANIFEST`**, after stamping seven apps
+falsely flagged three agents stale for a banner none of them wrote.
+
+## Health is unblocked and has not started
+
+#116's answers landed in `HEALTH-PLAN.md` via #179 after blocking Health four days. **The schema is
+unwritten and is Health's** — migrations are applied here at gate time, so one designed here would
+be gated alone. Its prompt is written.
+
+**#116 is the ledger cap's cost, stated by the agent it blocked** — three rows would have breached
+an 80-line budget in a file Health does not own, so a real request went where nobody reads. **It
+happened twice more tonight**: item 28 barely fit, and item 29 needed two entries compacted.
+
+## Traps only here
+
+The freshness check, ledger parse, `packages/` gap, Vercel state reading and the `migration repair`
+hook are all in `DECISIONS.md` now.
+
+- **Check the open list live as the first step of every merge**, never from memory.
 - **Read the real head SHA before passing `expectedHeadSha`.** Three inventions, three rejections.
-- **A project env read cannot see shared variables.** I reported `SESSION_SECRET` and
-  `APP_PASSWORD_HASH` missing from `tp-cookbook`; `tp-coffee-app` returns the same three keys while
-  live and gated. **The absence was the instrument, not the project.** Confirm shared vars with Joel.
-- **You cannot delete a remote branch** — `CLAUDE.md` says so; `DECISIONS.md` has how it fails.
-- **`Vercel – tp-message-editor` is red on `main` itself** — `BLOCKED`, the frozen editor. It makes
-  every PR `mergeable_state: unstable` and **is not a gate failure**. Check a red status against
-  `main` before treating it as the branch's.
+- **`Vercel – tp-message-editor` is red on `main` itself** — frozen editor, **not a gate failure.**
 - **`gate` runs after the whole build matrix**, so a green `drift` proves nothing.
-- **A pull request body is a claim, not evidence.** #159's was accurate on the diff and **stale on
-  the dashboard** — it said the Vercel project and domain did not exist; both did. Read Vercel and
-  Supabase live before repeating a body's deployment steps to Joel.
-- **Share-of-context is the wrong denominator for cost.** Content is paid on every call *after* it
-  arrives. I got this wrong three times in one session, each time too high.
-- **The exposed-schemas list is unreadable from here** — PostgREST config, not `pg_settings`.
-  Grants and RLS *are* checkable in SQL. Say which of the two you have.
-- **You are a session, not a service** — you do not persist and do not monitor. Say so.
-- **The `supabase migration repair` hook matches that string in any Bash command.** Use Write.
-
-## Next
-
-**Item 27 closed 2026-09-21** on Joel's word, *"Schema exposed."* **Item 1** is the lockout
-counter, one edit plus a restamp. **22 and 23** are one conversation.
-
-**Do not inherit as measured:** anything behind `techpaddock.io` or a `*.vercel.app` host. Every
-claim about a live page here is a Vercel API reading, never an HTTP response — both domains
-returned `HTTP 000` from this container on 2026-09-20, which is the proxy and not the apps.
+- **A pull request body is a claim, not evidence** — read Vercel and Supabase live before repeating
+  its deployment steps to Joel.
+- **A project env read cannot see shared variables.** Confirm those with Joel.
+- **You cannot delete a remote branch**, and **you are a session, not a service.** Say which.
