@@ -1429,6 +1429,11 @@ function Research({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
         bag_id: bag.id,
         roaster: bag.roaster,
         coffee_name: bag.coffee_name,
+        // Joel, 2026-09-22: "Refresh should refer product url." The page has
+        // the link already, so the re-search reads that page rather than
+        // hunting for it again. A link the roaster has since moved or removed
+        // costs one failed fetch and then searches as normal.
+        product_url: bag.product_url,
         model: DEFAULT_SEARCH_MODEL,
         effort: isEffortFor(DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT) ? DEFAULT_EFFORT : null,
       }),

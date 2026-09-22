@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchBrewGuide } from "@/lib/anthropic";
 import { isSearchModel, isEffortFor, effortsFor, DEFAULT_SEARCH_MODEL } from "@/lib/models";
-import { findRoasterDomain, guideColumns } from "@/lib/bags";
+import { guideColumns, hostOf } from "@/lib/bags";
 import { getServiceClient } from "@/lib/supabase";
 import { suggestOnBag } from "@/lib/suggestOnBag";
 import type { Suggestion } from "@/lib/suggestion";
@@ -56,13 +56,19 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Prefer a domain a previous search already verified for this roaster over
-    // one the caller supplied, and fall back to neither rather than a guess.
-    const roasterDomain =
-      (await findRoasterDomain(roaster)) ??
-      (typeof body.roaster_domain === "string" && body.roaster_domain.trim() ? body.roaster_domain.trim() : null);
+    // The page may send the product page it already has on the row, so a
+    // re-search reads that page instead of trying to rediscover it. Nothing is
+    // pinned: a domain a previous search verified used to constrain this one
+    // up front, and Joel ended that on 2026-09-22 — the reasoning, and the two
+    // Sweet Bloom rows that measured it, are on `searchBrewGuide`.
+    //
+    // `hostOf` is the sanity check rather than a constraint: a stored value
+    // that is not a URL at all is dropped here rather than handed to the model
+    // as though it were a page.
+    const productUrl =
+      typeof body.product_url === "string" && hostOf(body.product_url) ? body.product_url.trim() : null;
 
-    const guide = await searchBrewGuide({ roaster, coffeeName, roasterDomain, model, effort });
+    const guide = await searchBrewGuide({ roaster, coffeeName, productUrl, model, effort });
 
     // The result lands in the row, not in this response. That is the whole
     // point: by now the page that asked for it may be long gone.
