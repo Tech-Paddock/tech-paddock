@@ -1,6 +1,6 @@
 # TechPad Gen — handoff
 
-State as of 2026-09-20.
+State as of 2026-09-21.
 
 Read `RULES.md` first. This file is only what is true right now.
 
@@ -62,8 +62,8 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-`claude/home-cookbook-roster` — the Cookbook joins the roster with the 📖 icon, appended last: array
-order is Joel's. **Not listed-before-it-serves like Health** — `tp-cookbook` is `READY` at production.
+`claude/home-icon` — **the hub had no favicon**; `app/icon.svg` is the *Lights out* mark Joel chose
+2026-09-21. Route derives from the filename, no metadata edit. **Topbar 🏁 and other apps untouched.**
 
 ## Next
 
