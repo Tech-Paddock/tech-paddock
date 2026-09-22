@@ -1,6 +1,3 @@
-/* Stamped from packages/shared/app/ThemeControl.tsx — do not edit this copy.
- * Edit the canonical file, then run: node scripts/stamp-shared.mjs
- * drift fails a copy that disagrees, and CI runs drift. */
 "use client";
 
 import { useEffect, useState } from "react";
