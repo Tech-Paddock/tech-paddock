@@ -15,9 +15,11 @@ minutes with nothing on the connection, so a phone calls it dead. Two answers we
 
 ### What changed on 2026-09-22
 
-**Re-search reads the product URL already on the row**, named in the message because that is what
-makes it fetchable. A link the roaster has since moved costs one fetch and then searches as normal,
-so a stale link never becomes a dead end the bag cannot recover from.
+**Research is a trigger, not a second kind of search.** It posts the bag and nothing else; the route
+sources the product URL **off the row, never off the request**, and falls back to its own default
+model and effort. One message shape whether or not a product page is known, so the search cannot
+tell which button started it. A link the roaster has moved costs one fetch and then searches as
+normal, so a stale link never becomes a dead end the bag cannot recover from.
 
 **Nothing is pinned up front.** `findRoasterDomain` is gone and no search sets `allowed_domains`.
 Pinning narrowed the only channel by which a page can enter the conversation — `web_fetch` reaches

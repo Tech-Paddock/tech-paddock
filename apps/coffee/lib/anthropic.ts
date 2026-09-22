@@ -124,10 +124,11 @@ instructions came from a different page on the same site.`;
  * is now the whole of the constraint**, which is what it was for every first
  * search this app has ever run — including the one that worked.
  *
- * **A product URL we already hold is handed over instead.** Joel, 2026-09-22:
- * *"Refresh should refer product url."* Naming it in the message is what makes
- * it fetchable, for the same reason above, so a re-search reads the page it
- * already knows about rather than trying to rediscover it. If that page is
+ * **A product URL the bag already holds is handed over instead.** Joel,
+ * 2026-09-22: *"Refresh should refer product url."* Naming it in the message is
+ * what makes it fetchable, for the same reason above. It is read off the row by
+ * the route rather than supplied by the caller, and there is one message either
+ * way — *"Research is a trigger"*, not a second kind of search. If the page is
  * gone the model searches as it otherwise would — *"I'm fine if the url fails
  * because they've moved or removed their beans"* — so a stale link costs one
  * fetch and never becomes a dead end the bag cannot recover from.
@@ -153,18 +154,23 @@ export async function searchBrewGuide(params: {
 
   const known = params.productUrl?.trim() || null;
 
+  // One message, whether or not a product page is known. The URL is a fact
+  // about the bag that is present or absent, not a second mode of searching:
+  // a prompt that branched would make a re-search a different process from the
+  // first search, which is the thing Joel ruled out on 2026-09-22.
   const messages: Record<string, unknown>[] = [
     {
       role: "user",
       content:
         `Roaster: ${params.roaster}\nCoffee: ${params.coffeeName}\n` +
-        (known ? `Known product page: ${known}\n` : "") +
+        (known ? `Known product page for this coffee: ${known}\n` : "") +
         `\nFind this roaster's brewing instructions for this coffee, working the three tiers in order. ` +
+        `Establish the roaster's official site and read brewing instructions only from it. ` +
         (known
-          ? `Read the known product page above first — fetch it directly. If it no longer loads or no ` +
-            `longer describes this coffee, the roaster has moved or removed it: search for the current ` +
-            `page as you otherwise would, and do not report anything from the old URL. `
-          : `Establish the roaster's official site first, and read brewing instructions only from it. `) +
+          ? `A known product page is given above: fetch it directly and start there. If it no longer ` +
+            `loads or no longer describes this coffee, the roaster has moved or removed it — search ` +
+            `for the current page as you otherwise would, and report nothing from the old URL. `
+          : "") +
         `When you are done, give your answer as a JSON object with these keys: status (one of ` +
         `"coffee_specific", "roaster_generic", "none"), product_url, guide_url, params (an object ` +
         `with any of: method, ratio, dose, water, temp, grind, time — all strings, omit what the ` +

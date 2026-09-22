@@ -47,27 +47,31 @@ export async function POST(request: NextRequest) {
   const supabase = getServiceClient();
 
   // Mark it in flight before the long call, so a page that reconnects can tell
-  // "still working" from "never started".
+  // "still working" from "never started" — and read the product page off the
+  // row in the same round trip.
+  //
+  // **Off the row, never off the request.** Joel, 2026-09-22: *"Research
+  // should just kick off the original search not be a unique process.
+  // Research is a trigger."* A caller that could hand in a product URL is a
+  // caller that can make its search different from the scan screen's, which is
+  // exactly the divergence that wording rules out. What the search does now
+  // depends on what the bag knows, not on which button started it — a fresh
+  // bag has no product URL because nothing has found one yet, and a bag that
+  // has been searched before does.
+  let productUrl: string | null = null;
   if (bagId) {
-    await supabase
+    const { data: row } = await supabase
       .from("bags")
       .update({ guide_search_started_at: new Date().toISOString(), guide_search_error: null })
-      .eq("id", bagId);
+      .eq("id", bagId)
+      .select("product_url")
+      .maybeSingle();
+    // `hostOf` is a sanity check, not a constraint: a stored value that is not
+    // a URL at all is dropped rather than handed over as though it were a page.
+    productUrl = hostOf(row?.product_url) ? (row?.product_url as string).trim() : null;
   }
 
   try {
-    // The page may send the product page it already has on the row, so a
-    // re-search reads that page instead of trying to rediscover it. Nothing is
-    // pinned: a domain a previous search verified used to constrain this one
-    // up front, and Joel ended that on 2026-09-22 — the reasoning, and the two
-    // Sweet Bloom rows that measured it, are on `searchBrewGuide`.
-    //
-    // `hostOf` is the sanity check rather than a constraint: a stored value
-    // that is not a URL at all is dropped here rather than handed to the model
-    // as though it were a page.
-    const productUrl =
-      typeof body.product_url === "string" && hostOf(body.product_url) ? body.product_url.trim() : null;
-
     const guide = await searchBrewGuide({ roaster, coffeeName, productUrl, model, effort });
 
     // The result lands in the row, not in this response. That is the whole
