@@ -65,10 +65,6 @@ loads anyway, and why the run starts where it does is in `DECISIONS.md`.
    `20260919175624`, `20260919185800`, `20260919220112`. **Renaming is the honest direction** — the
    database is the record of what ran. The first is named in Coffee's handoff, so that one needs
    Coffee. Why it happens is in `DECISIONS.md`. *LoE: minutes.*
-29. **Coffee's charter describes code #176 removed, and its worked example is contradicted by a
-   stored row.** *Owner: TD.* `findRoasterDomain` pinning is documented there as deliberate and is
-   gone; §2's Sweet Bloom recipe disagrees with the guide actually retrieved. Coffee proposed both
-   rather than editing its own charter. **`drift` does not check charter against code.** *LoE: minutes.*
 
 ## Parked
 
