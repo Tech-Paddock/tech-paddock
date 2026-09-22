@@ -36,8 +36,7 @@ landed after its session started.
 > do not know what the change is.
 >
 > Commit and push as you go. **Do not open a pull request until I ask for one** — a finished branch
-> is the deliverable. Update your `HANDOFF.md` before you hand it over, and say in as many words
-> that you are at a compaction point.
+> is the deliverable. Update your `HANDOFF.md` before you hand it over, and say the branch is pushed.
 >
 > **Three phrases from me mean three specific things**, and they are spelled out in `CLAUDE.md`:
 > **"close out"** — finish, push, update your handoff, open the pull request quoting me;
