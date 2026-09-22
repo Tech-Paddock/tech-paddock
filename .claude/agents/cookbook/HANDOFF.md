@@ -8,18 +8,18 @@ State as of 2026-09-21.
 
 ## In flight
 
-**Nothing of mine is unmerged, and everything of mine is live.** #165 merged as `f60e493` and
-`tp-cookbook`'s production deployment is `READY` on it, read 2026-09-21. The app is in use — the
-book and the list both hold rows.
+**Nothing of mine is unmerged and everything of mine is live** — #165, `f60e493`. `/admin` holds the
+deployment state, which is why it is not written here. The book and the list both hold rows.
 
-**Remembered brands are deployed and empty.** `cookbook.brand_preferences` exists, RLS on, zero
-policies, **zero rows**: the feature is live and nobody has saved a preference yet. Its migration
-was applied at the gate and **recorded under exactly the version its filename declares**, which is
-the read-back item 26 exists about.
+**Remembered brands are live and empty** — `brand_preferences`, RLS on, zero policies, **zero
+rows**. Its migration was **recorded under exactly the version its filename declares**, unlike the
+three in item 26.
 
-**The seed has not arrived.** It comes from a session that reads Joel's receipts and hands back JSON
-for the shop section's **Paste a batch** box — validated row by row, refusals named, **no receipt
-reaching this app**. The format and the rules for that session are in #165's body.
+**The seed has not arrived** — receipts read elsewhere, JSON into **Paste a batch**, validated row
+by row, **no receipt reaching this app**. Format and rules in #165's body.
+
+**Six things are pending on the TD** and reshape this area — Joel agreed tabs on 2026-09-22. They
+belong in the ledger, which only the TD writes, and went to Joel in that day's sign-off.
 
 **Four gaps were named at Joel's intent review on 2026-09-20 and deliberately not built** — he chose
 close-out over building them, so they are his call, not work abandoned halfway. In his order: **the
