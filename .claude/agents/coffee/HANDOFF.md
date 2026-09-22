@@ -64,8 +64,8 @@ are in `RULES.md` and are deliberately not restated here. **None of them changed
 ## In flight
 
 **`claude/coffee-search-reads-the-product-page`** — the 2026-09-22 change above. Suite, build and
-drift clean; no migration, nothing shared touched. **No pull request until Joel asks.** Nothing else
-of mine is open; the branches this file used to list are merged and off the remote.
+drift clean; no migration, nothing shared touched. **Pull request opened at Joel's close-out**, so
+only the TD's merge is left. Nothing else of mine is open; the rest are merged and off the remote.
 
 ## Next
 
