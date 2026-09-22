@@ -1392,10 +1392,15 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
  * roaster who has since published a guide, or moved the page out from under
  * the old link, is the case this exists for.
  *
- * **It runs at the default model and effort and offers no dial.** The scan
- * screen's model picker is a comparison harness you set up deliberately on
- * the way in; this is a button pressed one-handed in a kitchen. What ran is
- * still recorded on the row either way.
+ * **It is a trigger, not a second kind of search.** Joel, 2026-09-22:
+ * *"Research should just kick off the original search not be a unique
+ * process."* So it posts the bag and nothing else: the route sources the
+ * product page from the row and falls back to its own default model and
+ * effort, which is the dial this button never offered anyway — the scan
+ * screen's picker is a comparison harness you set up deliberately on the way
+ * in, and this is a button pressed one-handed in a kitchen. What ran is
+ * recorded on the row either way, and the search itself cannot tell which of
+ * the two started it.
  *
  * **It polls rather than waits**, for the reason the scan screen does: the
  * search runs for minutes with nothing on the connection, and the answer
@@ -1425,13 +1430,11 @@ function Research({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
     void fetch("/api/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bag_id: bag.id,
-        roaster: bag.roaster,
-        coffee_name: bag.coffee_name,
-        model: DEFAULT_SEARCH_MODEL,
-        effort: isEffortFor(DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT) ? DEFAULT_EFFORT : null,
-      }),
+      // The bag and nothing else. No product URL — the route reads that off
+      // the row — and no model or effort, so the defaults this button always
+      // used are the route's own rather than a second copy of them here.
+      // Joel, 2026-09-22: "Research is a trigger."
+      body: JSON.stringify({ bag_id: bag.id, roaster: bag.roaster, coffee_name: bag.coffee_name }),
     }).catch(() => {});
   }
 

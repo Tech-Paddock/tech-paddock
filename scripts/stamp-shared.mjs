@@ -56,6 +56,7 @@ export const MANIFEST = [
   { from: "lib/theme.css", to: "lib/theme.css" },
   { from: "lib/theme.ts", to: "lib/theme.ts" },
   { from: "next.config.mjs", to: "next.config.mjs" },
+  { from: "app/ThemeControl.tsx", to: "app/ThemeControl.tsx" },
 ];
 
 export const SHARED_DIR = "packages/shared";
@@ -71,9 +72,17 @@ export const appsOnDisk = (root = repoRoot) => {
     .sort();
 };
 
-/* Every file in the manifest is .ts, .css or .mjs, and all three take the same
-   block-comment syntax. A file type that does not would need a case added here
-   rather than silently stamping a syntax error into six apps at once. */
+/* Every file in the manifest is .ts, .tsx, .css or .mjs, and all four take the
+   same block-comment syntax. A file type that does not would need a case added
+   here rather than silently stamping a syntax error into every app at once.
+
+   .tsx brought one wrinkle the others did not: ThemeControl.tsx opens with a
+   "use client" directive, and this banner lands above it. A block comment
+   before a directive is legal and Next.js honours it — verified by building
+   apps/home with the banner in place before the manifest entry was added. If
+   it were ever NOT honoured the component would silently become a server
+   component, so it is checked rather than assumed. It fails at build, loudly,
+   because the component calls useState. */
 export const banner = (from) =>
   `/* Stamped from ${SHARED_DIR}/${from} — do not edit this copy.\n` +
   ` * Edit the canonical file, then run: node scripts/stamp-shared.mjs\n` +

@@ -18,24 +18,21 @@ TechPad Gen's kickoff block, or the move relocates the error it prevents.
 
 ## Cost, measured 2026-09-22
 
-**Cost = context × turns.** Every token admitted is re-paid on every turn after it.
-
-- This seat checks out at **16,563 tokens**; a ~10-turn gate is **$0.24 fresh against $5.80 at
-  387K**. **One session, one branch, end it.**
-- A pull request is ~**$5** at 387K and **free when Joel opens it in a browser** — which is why PR
-  creation and merging are moving to him.
+**Cost = context × turns.** A fresh session of this seat checks out at ~16.5K tokens; a ~10-turn
+gate is **$0.24 fresh against $5.80 at 387K**, so **one session, one branch, end it.** A pull
+request is ~$5 at that size and free when Joel opens it in a browser. Full figures in #178.
 
 ## Linear, part-built — one step blocks the rest
 
-Workspace `tech-paddock`, team **TEC**, bot mailbox `claude@techpaddock.io` live via Cloudflare,
-bot account created and left **admin** (role restriction is paywalled, not worth buying).
+**The connector is still authorised as Joel's personal account** — checked five times. **Nothing
+else in the cutover starts until that flips.** Workspace, team key and members read live; the bot is
+admin because role restriction is paywalled and not worth buying. The plan is in #178's body: Phase
+1 seeds and touches no repo file, Phase 2 is one atomic branch or it leaves a window where the hook
+prints a file that is gone.
 
-**The connector is still authorised as Joel's personal account** — checked four times. **Nothing
-else in the cutover starts until that flips.** The plan is in this branch's pull request body.
-
-**Phase 2 needs a charter PII line first.** Linear user objects carry Joel's real name and email,
-nothing enforces `CLAUDE.md`'s rule against committing either, and whatever reads Linear must map
-users to the repo's short names.
+**Phase 2 needs a charter PII line first.** Linear user objects carry a real name and email, nothing
+enforces `CLAUDE.md`'s rule against committing either, and whatever reads Linear must map users to
+the repo's short names.
 
 ## The debrief is dead
 
@@ -43,27 +40,30 @@ Joel stopped it 2026-09-22. **The sign-off spec is deleted, not replaced** — n
 ~145 lines off `CLAUDE.md`, 521 → ~376, **resolving item 28 as a side effect.** Status is now a
 question he asks.
 
-## The queue, and the one thing at risk
+## The queue cleared 2026-09-22, and what it left
 
-**Merge order, decided before any of it merged**: #174 → #175 → Coffee → this branch last, because
-this seat is the only one still live and takes the `DECISIONS.md` conflict with #175.
+**Six merged** — #174, #179, #176, #175, #177 and this — in an order decided before any landed.
+**Branch protection requires branches be up to date; measured now, not a screenshot.** Each needed a
+rebase and a full CI run, so **merges here are serial** and a batch costs a cycle each. One PR
+merged as it finishes never meets the rule.
 
-**The four Cookbook branches were a stack; #175 is the tip carrying all four.** Merging them
-individually reproduces the #51/#52/#53 cascade. Three ancestors plus
-`claude/cookbook-handoff-after-merge` are superseded and **need deleting — Joel's alone**.
+**Four Cookbook branches are dead and need deleting — Joel's alone.** The three stack ancestors
+under #175, plus `claude/cookbook-handoff-after-merge`, superseded twice.
 
-**TechPad Gen's `ThemeControl.tsx` work never reached the remote.** If that session ended it is gone;
-the rebuild spec is in its close-out prompt.
+**#177's two extras are in its commits**: a handoff conflict resolved by taking TechPad Gen's own
+newer copy whole — lossless by inspection, never a judgement, because a handoff is not this seat's
+to author — and `drift`'s `SWEPT` list now **derived from `MANIFEST`**, after stamping seven apps
+falsely flagged three agents stale for a banner none of them wrote.
 
-## Health's #116 — answered, not landed
+## Health is unblocked and has not started
 
-Blocked four days on three questions to this seat. Joel answered 2026-09-22: append-only wins;
-snapshot the macros **but store the item id and version so a backfill stays possible**; copy
-`lib/models.ts` with a flag. **`HEALTH-PLAN.md` still carries the sentence the charter contradicts**
-— Joel's file, one sentence, the only loose end.
+#116's answers landed in `HEALTH-PLAN.md` via #179 after blocking Health four days. **The schema is
+unwritten and is Health's** — migrations are applied here at gate time, so one designed here would
+be gated alone. Its prompt is written.
 
-**#116 is the ledger cap's cost, stated by the agent it blocked** — three rows would have breached a
-budget in a file Health does not own, so a real request went where nobody reads.
+**#116 is the ledger cap's cost, stated by the agent it blocked** — three rows would have breached
+an 80-line budget in a file Health does not own, so a real request went where nobody reads. **It
+happened twice more tonight**: item 28 barely fit, and item 29 needed two entries compacted.
 
 ## Traps only here
 

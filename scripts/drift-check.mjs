@@ -333,7 +333,15 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
     // that the owning agent did not write: #108 touched every vercel.json and
     // flagged three agents stale for one line each. Freshness is meant to ask
     // "has this handoff kept up with this app's code", so it measures the code.
-    const SWEPT = ["vercel.json", ".env.example", "package-lock.json"];
+    //
+    // Every stamped copy is swept for the same reason, and the list is DERIVED
+    // from the manifest rather than restated: a stamped file is by definition
+    // one no app agent writes. Restating it as a literal is how this recurred
+    // — folding ThemeControl.tsx into packages/shared flagged health, resume
+    // and editor stale for a banner none of them wrote. Deriving it means the
+    // next manifest entry is swept by existing, with nobody having to remember.
+    const SWEPT = ["vercel.json", ".env.example", "package-lock.json",
+                   ...MANIFEST.map((m) => m.to)];
     /* An agent owning several apps is as stale as its most recently changed
        one, so this takes the newest date across all of them and names which. */
     const dated = paths

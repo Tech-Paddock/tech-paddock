@@ -2,7 +2,7 @@
 
 **What is open, and who owns the next action. Nothing else.** Shape and budget are in `CLAUDE.md`'s
 channel table. It grew to 588 lines once, 401 of them finished work every agent read every session.
-**Last reviewed: 2026-09-22.** · **Next number: 29.**
+**Last reviewed: 2026-09-22.** · **Next number: 30.**
 
 **Numbers are permanent and the gaps are correct** — the rule is in `CLAUDE.md`, which every session
 loads anyway, and why the run starts where it does is in `DECISIONS.md`.
@@ -51,10 +51,9 @@ loads anyway, and why the run starts where it does is in `DECISIONS.md`.
    against what its `ignoreCommand` watches would catch the next one. *LoE: minutes.*
 
 22. **The Health↔Cookbook read contract — Health prices a meal by reading Cookbook.** *Owner: TD.*
-   Explicitly not the Cookbook charter's to invent, and not Health's either: it is cross-app, which
-   makes it this seat's like the tracker's `/api/summary`. **Design it before either side builds
-   against a guess** — a contract changed under a live dependency is what the migration rule exists
-   to avoid. Consider it alongside 23; they are one conversation. *LoE: a session.*
+   Not Cookbook's to invent and not Health's: it is cross-app, which makes it this seat's like the
+   tracker's `/api/summary`. **Design it before either side builds against a guess.** Consider it
+   alongside 23; they are one conversation. *LoE: a session.*
 23. **Move the grocery list from Health to Cookbook — destructive, so two pull requests.** *Owner:
    TD.* Settled 2026-09-20 that it belongs beside the book: you shop from recipes, not from what you
    ate. **The decision is made; the sequence is not** — `/list` is live, so it is stop-using-then-drop,
@@ -63,10 +62,13 @@ loads anyway, and why the run starts where it does is in `DECISIONS.md`.
    Gen.* Health borrowed `senna` on a premise item 10 killed; Cookbook has now borrowed `clark` from
    the frozen editor, flagged rather than quiet. Two more, or a rule that some share. *LoE: a session.*
 26. **Three migration filenames disagree with the versions actually recorded.** *Owner: TD.*
-   `20260919175624`, `20260919185800`, `20260919220112`. The hosted API stamps its own version and
-   ignores the filename — known, documented, and the read-back check that catches it was not run.
-   **Renaming is the honest direction**, the database being the record of what ran, but the first is
-   named in Coffee's handoff so that one needs Coffee. *LoE: minutes.*
+   `20260919175624`, `20260919185800`, `20260919220112`. **Renaming is the honest direction** — the
+   database is the record of what ran. The first is named in Coffee's handoff, so that one needs
+   Coffee. Why it happens is in `DECISIONS.md`. *LoE: minutes.*
+29. **Coffee's charter describes code #176 removed, and its worked example is contradicted by a
+   stored row.** *Owner: TD.* `findRoasterDomain` pinning is documented there as deliberate and is
+   gone; §2's Sweet Bloom recipe disagrees with the guide actually retrieved. Coffee proposed both
+   rather than editing its own charter. **`drift` does not check charter against code.** *LoE: minutes.*
 
 ## Parked
 

@@ -1,3 +1,6 @@
+/* Stamped from packages/shared/app/ThemeControl.tsx — do not edit this copy.
+ * Edit the canonical file, then run: node scripts/stamp-shared.mjs
+ * drift fails a copy that disagrees, and CI runs drift. */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,9 +10,10 @@ import { LIVERIES, isPaddockOrigin, type Livery, type Mode, themeCookieString } 
  * The header control: which livery this app wears, what it is drawn from, and
  * the light/dark switch.
  *
- * Byte-identical in all five apps. It styles itself from plain classes in
+ * Byte-identical in all seven apps — stamped from packages/shared, not copied
+ * by hand. It styles itself from plain classes in
  * lib/theme.css rather than utility classes, which is what lets the same file
- * drop into the hub (hand-written CSS) and the four tools (Tailwind) without
+ * drop into the hub (hand-written CSS) and the six tools (Tailwind) without
  * either one growing a second copy.
  *
  * **One switch per page, which takes both halves below.** The hub embeds the
@@ -22,7 +26,7 @@ import { LIVERIES, isPaddockOrigin, type Livery, type Mode, themeCookieString } 
  * **A tool added later that drops this file will ignore the hub's switch.**
  *
  * The pressed state resolves after mount rather than during render, and that is
- * not laziness. Four of the five headers sit inside client components, so the
+ * not laziness. The headers that host it are mostly client components, so the
  * server-read cookie cannot be threaded in as a prop without making each of
  * them a server component first. Worse, when no cookie is set the answer is
  * whatever the operating system says, which the server cannot know at all —
@@ -104,7 +108,7 @@ export default function ThemeControl({ onBar = false }: { onBar?: boolean }) {
   // once and will not read it again — so the parent says so directly.
   //
   // The hub listens too, and nothing ever posts to the hub. That is the cost of
-  // this file being one file rather than five, and it is a dormant listener.
+  // this file being one file rather than seven, and it is a dormant listener.
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (!isPaddockOrigin(event.origin)) return;
@@ -125,13 +129,13 @@ export default function ThemeControl({ onBar = false }: { onBar?: boolean }) {
     document.documentElement.setAttribute("data-mode", next);
     document.cookie = themeCookieString(location.hostname, location.protocol, next);
 
-    // Everything above changed *this* document. The hub embeds the four tools
+    // Everything above changed *this* document. The hub embeds its tools
     // cross-origin, and none of it crosses that boundary: the frames are
     // already loaded, so they will not re-read the cookie until something
     // reloads them. Tell each one instead.
     //
     // Written as "every frame on this page" rather than "the tools", so the
-    // same file works in all five apps — the four tools contain no iframe and
+    // same file works in all seven apps — the six tools contain no iframe and
     // this loop does nothing there.
     document.querySelectorAll("iframe").forEach((frame) => {
       try {

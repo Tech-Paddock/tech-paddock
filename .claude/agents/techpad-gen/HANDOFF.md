@@ -1,6 +1,6 @@
 # TechPad Gen — handoff
 
-State as of 2026-09-20.
+State as of 2026-09-22.
 
 Read `RULES.md` first. This file is only what is true right now.
 
@@ -62,8 +62,8 @@ deliberately outside it — a sidebar there offers links the visitor cannot foll
 
 ## In flight
 
-`claude/home-cookbook-roster` — the Cookbook joins the roster with the 📖 icon, appended last: array
-order is Joel's. **Not listed-before-it-serves like Health** — `tp-cookbook` is `READY` at production.
+`claude/platform-shared-themecontrol` — **`ThemeControl.tsx` is stamped, not copied**; canonical at
+`packages/shared/app/`, first `.tsx` in the manifest. `claude/home-icon` (#174) — the hub's favicon.
 
 ## Next
 

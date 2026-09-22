@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Paddock">
+  <!-- Lights out. Chosen by Joel on 2026-09-21 from six candidates.
+       Colours are the Martini livery's own, copied from lib/theme.css:
+       ink #0A1020, pinstripe #C8102E. The unlit row is surface-raised
+       darkened, so the gantry reads as a gantry rather than six dots. -->
+  <rect width="64" height="64" rx="14" fill="#0A1020"/>
+  <rect x="8" y="15" width="48" height="34" rx="8" fill="#16233D"/>
+  <circle cx="19" cy="26" r="6" fill="#C8102E"/>
+  <circle cx="32" cy="26" r="6" fill="#C8102E"/>
+  <circle cx="45" cy="26" r="6" fill="#C8102E"/>
+  <circle cx="19" cy="39" r="6" fill="#26364F"/>
+  <circle cx="32" cy="39" r="6" fill="#26364F"/>
+  <circle cx="45" cy="39" r="6" fill="#26364F"/>
+</svg>

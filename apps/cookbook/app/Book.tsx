@@ -4,19 +4,27 @@ import { useCallback, useEffect, useState } from "react";
 import Provenance from "./Provenance";
 import { MACRO_KEYS, MACRO_LABELS, round, scale, type Macros } from "@/lib/macros";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
-import { perServing, type Recipe, type RecipeDraft, type RecipeOrigin } from "@/lib/recipes";
+import { methodSteps, perServing, type Recipe, type RecipeDraft, type RecipeOrigin } from "@/lib/recipes";
 
 /**
  * The book, and the three ways into it.
  *
- * **Nothing here writes until you press Keep it.** Typed, generated or read off a
- * page, a recipe is a draft on this screen and a row in the book only after that.
- * One approval covers all three, which is what keeps "the model wrote something
- * plausible" and "this is how I cook it" from being the same event.
+ * **Nothing a model wrote is saved until you press Keep it** — generated or read
+ * off a page, it is a draft on this screen and a row in the book only after that.
+ * That is what keeps "the model wrote something plausible" and "this is how I
+ * cook it" from being the same event.
  *
- * **One component for both halves, because this is a site and they are one page.**
- * The book reads first and adding is underneath it: you arrive to see what you
- * could cook, which is the whole reason the surface call went to *site*.
+ * **Typing one saves straight away, and that is the exception, added 2026-09-22.**
+ * The draft step exists to show you what a model produced before it lands. On the
+ * typed path you wrote the recipe, so the only thing the draft adds is the macros
+ * — an approval of your own words back. Joel called it ceremony and he is right.
+ * **The charter still says all three land as a draft**; correcting it is the
+ * technical director's, and the note is in this seat's `HANDOFF.md`.
+ *
+ * **Adding comes first now, the book underneath.** Joel asked for that on
+ * 2026-09-22 along with the tabs: this panel is where you arrive to *do*
+ * something, and the book is long enough that a form under it is a form you
+ * scroll to find. Collapsed by default, so the book is still what you see.
  */
 
 type Mode = "manual" | "generate" | "import";
@@ -62,6 +70,8 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
 
   const [draft, setDraft] = useState<RecipeDraft | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -107,7 +117,13 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't draft that.");
-      setDraft(body.draft as RecipeDraft);
+
+      const drafted = body.draft as RecipeDraft;
+
+      // The typed path has nothing to approve: you wrote it, so it goes in.
+      // Every other path stops here and waits for Keep it.
+      if (mode === "manual") await save(drafted);
+      else setDraft(drafted);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't draft that.");
     } finally {
@@ -115,27 +131,37 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     }
   }
 
+  /**
+   * Write one draft to the book and reset the form.
+   *
+   * Takes the draft rather than reading it off state, because the typed path
+   * saves one it has just been handed and never puts it on screen.
+   */
+  async function save(toKeep: RecipeDraft) {
+    const response = await fetch("/api/recipes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ draft: toKeep }),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error ?? "Couldn't save that.");
+    setDraft(null);
+    setName("");
+    setServings("4");
+    setIngredients("");
+    setMethod("");
+    setBrief("");
+    setUrl("");
+    setNotice(`"${(body.recipe as Recipe).name}" is in the book.`);
+    await load();
+  }
+
   async function keepIt() {
     if (!draft || busy) return;
     setBusy("keeping");
     setError(null);
     try {
-      const response = await fetch("/api/recipes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draft }),
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Couldn't save that.");
-      setDraft(null);
-      setName("");
-      setServings("4");
-      setIngredients("");
-      setMethod("");
-      setBrief("");
-      setUrl("");
-      setNotice(`"${(body.recipe as Recipe).name}" is in the book.`);
-      await load();
+      await save(draft);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save that.");
     } finally {
@@ -178,6 +204,23 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     }
   }
 
+  /**
+   * **Name and ingredients, and deliberately not the method.** "Fry the onion"
+   * is in half the book, so matching on it returns half the book. What you search
+   * for here is a dish or a thing in the fridge.
+   *
+   * Filtered in the browser because the whole book is already here. When it stops
+   * being, this moves to the query — the shape of the answer does not change.
+   */
+  const shown = (recipes ?? []).filter((recipe) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      recipe.name.toLowerCase().includes(q) ||
+      recipe.ingredients.some((i) => i.toLowerCase().includes(q))
+    );
+  });
+
   const ready =
     mode === "manual"
       ? name.trim() !== "" && ingredients.trim() !== "" && Number(servings) >= 1
@@ -197,39 +240,24 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       ) : null}
 
       {/* ------------------------------------------------------------------ */}
-      {/* The book comes first. On a site, the index is the product.         */}
+      {/* Adding one. First on the page, collapsed until you want it.        */}
       {/* ------------------------------------------------------------------ */}
-      <section id="book" className="flex scroll-mt-4 flex-col gap-3">
-        <h2 className="text-base font-semibold">What you could cook</h2>
-
-        {recipes === null ? (
-          <p className="text-sm text-ink-soft">Reading the book…</p>
-        ) : recipes.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-line p-4 text-sm text-ink-soft">
-            Nothing in it yet. Write one below, describe one, or paste a link.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {recipes.map((recipe) => (
-              <RecipeCard
-                key={recipe.id}
-                recipe={recipe}
-                open={openId === recipe.id}
-                onToggle={() => setOpenId(openId === recipe.id ? null : recipe.id)}
-                onList={() => toList(recipe)}
-                onRemove={() => remove(recipe)}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Adding one.                                                        */}
-      {/* ------------------------------------------------------------------ */}
-      <section id="add" className="flex scroll-mt-4 flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+      <section id="add" className="flex scroll-mt-4 flex-col gap-3 rounded-lg border border-line p-3">
+        <button
+          type="button"
+          onClick={() => setAdding((v) => !v)}
+          aria-expanded={adding}
+          aria-controls="add-panel"
+          className="flex w-full items-center gap-2 text-left"
+        >
           <h2 className="text-base font-semibold">Add a recipe</h2>
+          <span aria-hidden className="ml-auto text-ink-soft">{adding ? "\u2212" : "+"}</span>
+        </button>
+
+        {/* Hidden rather than unmounted: collapsing the panel must not throw away
+            a half-typed recipe or a draft you have not decided on yet. */}
+        <div id="add-panel" hidden={!adding} className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {/* The model picker sits here and nowhere else, because pricing a dish
               is the only judgement in the app. Reading the book calls nothing,
               and neither does keeping a draft. */}
@@ -289,7 +317,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               value={ingredients}
               onChange={(e) => setIngredients(e.target.value)}
               rows={5}
-              placeholder={"500g beef mince\n1 tin kidney beans\n2 tbsp olive oil"}
+              placeholder={"500g beef mince\n1 tin kidney beans\n2 tbsp olive oil\n\nAmounts matter — the macros are estimated from them"}
               aria-label="Ingredients, one per line"
               className="rounded-lg border border-line bg-surface p-3 text-base"
             />
@@ -301,9 +329,6 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               aria-label="Method"
               className="rounded-lg border border-line bg-surface p-3 text-base"
             />
-            <p className="text-xs text-ink-soft">
-              The macros come from the ingredients, so the amounts are worth writing.
-            </p>
           </div>
         ) : mode === "generate" ? (
           <div className="flex flex-col gap-2">
@@ -315,7 +340,6 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               aria-label="What you feel like"
               className="rounded-lg border border-line bg-surface p-3 text-base"
             />
-            <p className="text-xs text-ink-soft">One recipe, then its macros. Nothing is saved yet.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-2">
@@ -341,7 +365,16 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
           disabled={!ready || busy !== null}
           className="rounded-lg bg-accent px-4 py-3 text-base font-semibold text-accent-ink disabled:opacity-50"
         >
-          {busy === "drafting" ? "Working it out…" : "Work out the macros"}
+          {/* **The label says what the press actually does, and that now differs
+              by mode.** On the typed path it prices and saves in one go, so
+              promising only macros would understate a write. On the other two it
+              invents or reads a recipe and then prices it, and nothing is saved
+              until Keep it — so it must not say "save". */}
+          {busy === "drafting"
+            ? "Working it out…"
+            : mode === "manual"
+              ? "Work out the macros and save"
+              : "Work it out"}
         </button>
 
         {draft ? (
@@ -375,8 +408,12 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
                     <li key={n}>{i}</li>
                   ))}
                 </ul>
-                {draft.method ? (
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-ink-soft">{draft.method}</p>
+                {methodSteps(draft.method).length > 0 ? (
+                  <ol className="mt-2 flex list-inside list-decimal flex-col gap-1.5 text-sm text-ink-soft">
+                    {methodSteps(draft.method).map((step, n) => (
+                      <li key={n}>{step.replace(/^\d{1,2}[.)]\s*/, "")}</li>
+                    ))}
+                  </ol>
                 ) : null}
               </details>
             </div>
@@ -399,7 +436,55 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
             </footer>
           </section>
         ) : null}
+        </div>
       </section>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* The book, under the form now. It is still the reason you came.     */}
+      {/* ------------------------------------------------------------------ */}
+      <section id="book" className="flex scroll-mt-4 flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-base font-semibold">What you could cook</h2>
+          {recipes !== null && recipes.length > 0 ? (
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              type="search"
+              placeholder="Search"
+              aria-label="Search your recipes"
+              className="ml-auto min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm sm:max-w-56"
+            />
+          ) : null}
+        </div>
+
+        {recipes === null ? (
+          <p className="text-sm text-ink-soft">Reading the book…</p>
+        ) : recipes.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-line p-4 text-sm text-ink-soft">
+            Nothing in it yet. Write one below, describe one, or paste a link.
+          </p>
+        ) : shown.length === 0 ? (
+          // Deliberately not the same sentence as an empty book. "Nothing here"
+          // and "nothing matched" send you to different next actions.
+          <p className="rounded-lg border border-dashed border-line p-4 text-sm text-ink-soft">
+            Nothing matches “{query.trim()}”.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {shown.map((recipe) => (
+              <RecipeCard
+                key={recipe.id}
+                recipe={recipe}
+                open={openId === recipe.id}
+                onToggle={() => setOpenId(openId === recipe.id ? null : recipe.id)}
+                onList={() => toList(recipe)}
+                onRemove={() => remove(recipe)}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
     </div>
   );
 }
@@ -424,12 +509,19 @@ function RecipeCard({
 
   return (
     <li className="rounded-lg border border-line bg-surface">
-      <button type="button" onClick={onToggle} className="flex w-full flex-wrap items-baseline gap-2 p-3 text-left">
-        <span className="text-sm font-medium">{recipe.name}</span>
-        <span className="text-[11px] text-ink-soft">
+      {/* **A lean pill: the name gives way, the facts do not.** `truncate` rather
+          than a character count — a count that fits a laptop overflows a phone,
+          and this is mostly a phone object. `min-w-0` is what lets the name
+          shrink at all inside a flex row, and `shrink-0` on the rest is what
+          stops the kcal being the thing that disappears.
+          Rating, time, meal, main and cuisine belong in this row too and are not
+          here yet: they are columns that do not exist until the metadata change. */}
+      <button type="button" onClick={onToggle} className="flex w-full items-baseline gap-2 p-3 text-left">
+        <span className="min-w-0 truncate text-sm font-medium">{recipe.name}</span>
+        <span className="hidden shrink-0 text-[11px] text-ink-soft sm:inline">
           {ORIGIN_LABELS[recipe.origin]} · makes {recipe.servings}
         </span>
-        <span className="ml-auto text-xs tabular-nums text-ink-soft">
+        <span className="ml-auto shrink-0 text-xs tabular-nums text-ink-soft">
           {round(serving).kcal} kcal a serving
         </span>
       </button>
@@ -439,7 +531,11 @@ function RecipeCard({
           <MacroRow macros={serving} per="one serving" />
           <Provenance source={recipe.source} model={recipe.model} url={recipe.source_url} />
 
-          {recipe.note ? <p className="text-xs text-ink-soft">{recipe.note}</p> : null}
+          {/* **`recipe.note` is stored and deliberately not shown here.** It is the
+              estimate's own caveat — "assumed a tablespoon of oil" — which is what
+              you want when deciding whether to keep a number and noise when you
+              are cooking. It still renders on the draft, where the deciding
+              happens, and it is still on the row for anything that wants it. */}
 
           {recipe.ingredients.length > 0 ? (
             <ul className="flex flex-col gap-1 text-sm">
@@ -448,8 +544,14 @@ function RecipeCard({
               ))}
             </ul>
           ) : null}
-          {recipe.method ? (
-            <p className="whitespace-pre-wrap text-sm text-ink-soft">{recipe.method}</p>
+          {methodSteps(recipe.method).length > 0 ? (
+            <ol className="flex list-inside list-decimal flex-col gap-1.5 text-sm text-ink-soft">
+              {methodSteps(recipe.method).map((step, n) => (
+                // The marker the author wrote is stripped so the list's own
+                // numbering does not print "1. 1. Chop the onion".
+                <li key={n}>{step.replace(/^\d{1,2}[.)]\s*/, "")}</li>
+              ))}
+            </ol>
           ) : null}
 
           {/* **Pricing helpings, and deliberately not logging them.**
