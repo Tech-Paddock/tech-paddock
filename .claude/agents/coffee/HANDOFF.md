@@ -1,6 +1,6 @@
 # Coffee — handoff
 
-State as of 2026-09-21. Read `RULES.md` first; this file is only what is true right now.
+State as of 2026-09-22. Read `RULES.md` first; this file is only what is true right now.
 
 ---
 
@@ -11,70 +11,70 @@ screen. The whole flow has run end to end against a real bag.
 
 **Save comes before the search**, and the page polls the row rather than waiting: the search takes
 minutes with nothing on the connection, so a phone calls it dead. Two answers were lost that way.
-**It can be run again from the shelf** — same call, same polling, and it refreshes the link too.
+**It can be run again from the shelf**, and that refreshes the link too.
 
-**A `none` is no longer the end of the screen.** Sonnet 5 suggests a recipe where the roaster
-published none, into `suggested_recipe`, **never `guide_*`**, with no quote and no URL because it
-read nothing. The light still says **No Recipe Found**. `RULES.md` §1 has the amendment; the risk it
-names is wording, so the copy is under test.
+### What changed on 2026-09-22
 
-**The search is a comparison harness.** Model and effort are selectable, recorded and validated by
-`lib/models.ts`; a weaker one is safe because `validateGuide` enforces quote-backing in code. **Neither
-the suggestion nor Search again is on that dial.**
+**Re-search reads the product URL already on the row**, named in the message because that is what
+makes it fetchable. A link the roaster has since moved costs one fetch and then searches as normal,
+so a stale link never becomes a dead end the bag cannot recover from.
 
-**A bag is a purchase; a brew is one attempt at it.** `extraction_yield` is generated and ppm never
-stored, to stop one measurement being written twice. **Measurement, or a function of them?** **The
-brew form works in dose, ratio and water, and any two give the third**, and **the ratio has no
-column** — water over dose, derived in `lib/brews.ts`, dropped before the POST, and rounded whole
-since 2026-09-20. `water_g` is *not* `beverage_g`: water in, not what came out. **The refractometer
-half of the form is commented out**, not deleted. **Brew time is a real field**, whole seconds in
-`brew_seconds`, typed as `m:ss` — **a reading**: it neither repeats nor prefills from `guide_time`,
-and a bare "3" is refused rather than guessed at. **No timer, confirmed** — Joel, 2026-09-21: "just
-a text field for brew time." Not a gap to close; the text field is the design.
+**Nothing is pinned up front.** `findRoasterDomain` is gone and no search sets `allowed_domains`.
+Pinning narrowed the only channel by which a page can enter the conversation — `web_fetch` reaches
+nothing search surfaced — and the rows measure it: Sweet Bloom unpinned came back tier 1 with four
+quotes, Sweet Bloom pinned came back `none`, no code change between them. **`validateGuide`'s host
+check is untouched and is now the whole constraint**, which is what it was for every first search
+this app has ever run.
 
-**A new brew opens as a repeat of the last one, then as the roaster's numbers** — `openingBrew`, your
-last brew winning field by field, no reading carried. **A suggestion does not feed it, settled**: you
-read it and type it, and typing it is where you decide to use it.
+**A search that failed is no longer stored as one that found nothing.** Web search and web fetch do
+not raise — a failure is a result block carrying an `error_code` inside an HTTP 200, and reading only
+the text blocks turned that into a confident `none` about the roaster. Running out of resume turns
+did the same, an empty string parsing to `{}`. **`lib/searchRun.ts` holds the rule**, pure and apart
+from the SDK so it has tests: a `none` reached past a failed tool is refused and written to
+`guide_search_error`, which the page already shows; a run that found something stands regardless.
 
-**Roast date is a real date field** beside Purchased on one row — the gap is the age of the coffee.
-The label's date goes through `lib/dates.ts`; an ambiguous `05/06/2026` is refused and shown as text.
-**A date input on iOS sets its own minimum width**, so `globals.css` turns that off — without it the
-second of two on a row runs past the card. **The guide tier is a three-state indicator** — green
-Found, amber Non-Specific, red No Recipe — a quiet grey italic line since 2026-09-20, expanding to
-the quote. **The card is three sections**: This bag, Recipe, Brews. **A brew pill shows nothing
-about the grinder**, name or dial setting — Joel closed that judgement call on 2026-09-21. Rating
-leads, water is unlabeled in the recipe, brew time sits inline behind a vertical rule.
-`formatGrindSetting` still runs at save; the setting is logged, just not shown on the pill.
+### Settled elsewhere
+
+The suggestion, the comparison harness, the bag/brew split, the measurement rules and `openingBrew`
+are in `RULES.md` and are deliberately not restated here. **None of them changed this session.**
 
 ## Traps specific to this app
 
-- **An empty result and an unread result must not render the same.** Four times in this one app a
-  failure rendered as a plausible empty answer. **Adding a read path here? Check this first.**
+- **An empty result and an unread result must not render the same.** **Five times now** — the fifth
+  was the search itself, fixed above. **Adding a read path here? Check this first.**
 - **A bag needs a purchase date, and the error names it.** That empty field sent `{}` and the page
-  said "Couldn't save that bag" about a bag saved minutes earlier. `lib/patch.ts` holds both
-  halves: the requirement, and sending only what moved.
-- **Neither model call can be exercised from a Claude Code sandbox** — roaster domains are blocked
-  by the egress proxy and the suggestion needs a real key. Tests cover the validation and the
-  coercion against recorded shapes. **Do not conclude either works because the tests pass.**
+  said "Couldn't save that bag" about a bag saved minutes earlier. `lib/patch.ts` holds both halves.
+- **Neither model call can be exercised from a Claude Code sandbox** — roaster domains are blocked by
+  the egress proxy and the suggestion needs a real key. **Do not conclude either works because the
+  tests pass.**
+- **`product_url` is stored having never been read**, on a `none` as much as on a hit — never
+  quote-backed, never host-checked, and `Beans ↗` links it straight out. Maria Gutierrez holds
+  `/products/maria-gutierrez` where Sweet Bloom's verified shape is `/product/…-3/`. **Open, and
+  Joel's**: he accepted a link failing because a roaster moved it, which is not one we invented.
 - **Two brewer vocabularies, and `myBrewerFor` crosses only on an exact match.** A bare "V60" does
   not map: two are on the shelf and the roaster did not say which. Rounding is the same invention.
-- **The icon is a pour-over in the JPS livery**, every colour a token, **no alpha**, its two gold
-  rules structural. **A static import**, from `/_next/static` — the one prefix middleware excludes.
-- **"Beans ↗" is a *sibling* of the expand toggle, never nested** — an `<a>` in a `<button>` is invalid
-  markup and browsers disagree about what a tap does.
-- **`guide_status` records where instructions were read, not who they were written for** — Sweet
-  Bloom print the same recipe on every page, so nothing should rank or filter on tier 1.
+- **A date input on iOS sets its own minimum width**, turned off in `globals.css`.
+- **The icon is a pour-over in the JPS livery**, every colour a token, **no alpha**. **A static
+  import**, from `/_next/static` — the one prefix middleware excludes.
+- **"Beans ↗" is a *sibling* of the expand toggle, never nested** — an `<a>` in a `<button>` is
+  invalid markup and browsers disagree about what a tap does.
+- **`guide_status` records where instructions were read, not who they were written for**, so nothing
+  ranks or filters on tier 1. **The Sweet Bloom example `RULES.md` gives for it is wrong** — Next 1.
 
 ## In flight
 
-**#161 merged 2026-09-20 15:06 UTC** — `coffee_brews_time` confirmed live on the database, read
-directly rather than trusted from the PR body. `claude/coffee-pill-no-grind` is my only open branch,
-carrying only the grind-setting removal above; no migration. **`claude/coffee-roast-date-and-suggested-recipe`
-is still on the remote and should not be**, measured 2026-09-21: merged history, clutter, Joel's to remove.
+**`claude/coffee-search-reads-the-product-page`** — the 2026-09-22 change above. Suite and build
+pass, drift clean, no migration, nothing shared touched. **No pull request until Joel asks.** Nothing
+else of mine is open; the branches this file used to list are merged and off the remote.
 
 ## Next
 
-1. **Run one coffee twice, Haiku then Sonnet 5 at `high`**, compare the tiers — the open question.
-   The suggestion has still never run against a real bag.
-2. **A timer is declined, not just unbuilt** — see above. Inventory and a method table stay
-   unbuilt until asked.
+1. **`RULES.md` §2 is wrong about Sweet Bloom, and our own data says so.** It has them printing one
+   house recipe — "1:17, 900µm, 2:40" — on every product page, and builds the tier-1 caveat on that.
+   The Jhonny Alvarado row we actually retrieved reads 18g / 305g / **850µm / 23-25s**. Joel,
+   2026-09-22: *"Sweetbloom dials their recipes for all their beans."* **A charter is not this
+   agent's to edit** — the TD drafts and Joel approves. Proposed, not made.
+2. **The unpinned search has never run against a real bag.** Maria Gutierrez is the test: it went
+   `none` while pinned, and the roaster publishes a recipe for it.
+3. **Still open**: one coffee twice, Haiku then Sonnet 5 at `high`, compare the tiers. The
+   suggestion has still never run against a real bag.
