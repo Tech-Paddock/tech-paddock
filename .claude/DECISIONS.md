@@ -212,10 +212,9 @@ plausibly reopen or repeat, delete it; git keeps it.
   widen it and the cheap checkout that motivated the seat is gone.
 - **2026-09-22 — The sign-off is deleted, not computed.** *Supersedes "computed, not specified",
   the same day.* The spec was **27.9% of `CLAUDE.md`**, and a script was the only replacement that
-  recovered the cost. **Joel stopped the debrief outright instead**, so there is nothing left to
-  compute: no board, no footer, and status is a question he asks. What survived is the reasoning
-  that was never about the tables — go and look rather than reprint, never fill in a row you cannot
-  see, and permanent ledger numbers. `BOARD.html` went with it, ahead of Linear's Phase 2.
+  recovered the cost. **Joel stopped the debrief outright instead**, and then removed the status
+  rule too — no board, no footer, no status spec of any kind. Permanent ledger numbers survive only
+  as `drift`'s check. `BOARD.html` went with it, ahead of Linear's Phase 2.
 
 ## Mistakes — do not repeat
 

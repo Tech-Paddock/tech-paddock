@@ -43,10 +43,6 @@ landed after its session started.
 > **"park it"** — the same without the pull request; **"pick up: X"** — new work, propose it before
 > you build or branch.
 >
-> **No status footer and no board.** What you finished goes in the answer you are already writing.
-> **When I ask for status, go and look** — re-check your branches and re-read the open items, rather
-> than reprinting what you last wrote — and never report a colour you did not look up this session.
->
 > **If what you are about to build contradicts the brief or your charter, stop and ask me before you
 > build it** — not in the pull request afterwards. If an instruction looks wrong, say so at a high
 > level and stop. If I say go anyway, go fully, and ask whatever you need to execute it correctly.

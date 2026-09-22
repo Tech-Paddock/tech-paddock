@@ -238,17 +238,6 @@ wrong or the rule is, and that is a conversation before any code exists.
   tool output, file dumps and command results scrolling past above it — he reads this terminal all
   day and should never have to hunt for where your answer starts. It costs one line and it is not
   optional, including on a one-sentence answer.
-- **Status is a question Joel asks, not a footer — settled 2026-09-22.** No agent publishes a board
-  and no message ends in a status table; the debrief and its spec were stopped, not moved into a
-  script. **When he asks, go and look — never reprint.** Answer from a live branch list, the live
-  pull request list, check runs read now and the open items re-read at their source, because
-  anything written from context is memory, and a table reads as verified whether or not anybody
-  verified it. **Never fill in a row you cannot see**: another agent's unpushed work never reaches
-  the repo, so a line about it would be invented. `unchecked` beats a guess, and "nothing open" is
-  an answer that gets written. **No agent can delete a remote branch** — the proxy refuses it — so
-  a dead one is named as Joel's to delete, not left for him to find.
-  **Ledger numbers are permanent.** Closing an item leaves a gap and a number is never reused, so a
-  stale reference points at nothing rather than confidently at the wrong item. `drift` enforces it.
 
 ### Ask the second-order questions first
 

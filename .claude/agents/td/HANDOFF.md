@@ -37,8 +37,8 @@ the repo's short names.
 ## The debrief is dead
 
 Joel stopped it 2026-09-22, and `claude/brief-drop-sign-off` deletes it: the spec, the board rule,
-`BOARD.html` and its kickoff URL. `CLAUDE.md` goes 521 → 381, **which resolves item 28 (TEC-5)** —
-close it in Linear once that merges. **Status is a question he asks**; the survivors are one bullet.
+`BOARD.html` and its kickoff URL. `CLAUDE.md` goes 521 → 370, **which resolves item 28 (TEC-5)** —
+close it in Linear once that merges. **No status rule survives**; ledger numbers stay `drift`'s.
 
 ## The queue cleared 2026-09-22, and what it left
 
