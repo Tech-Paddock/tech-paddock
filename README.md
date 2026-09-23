@@ -55,8 +55,8 @@ document is wrong next week and nothing tells you.
 ## Working here as an agent
 
 Read the rules in [CLAUDE.md](./CLAUDE.md) — loaded into every session automatically — then your own
-charter and handoff at `.claude/agents/<you>/`. The open-items ledger is printed into your session by
-a hook.
+charter and handoff at `.claude/agents/<you>/`. Open items live in Linear, team TEC;
+a hook reminds you to list them.
 
 Agents here never run at the same time and cannot see each other, so the repo is the only channel
 between them. How that works is the communication layer section of CLAUDE.md.

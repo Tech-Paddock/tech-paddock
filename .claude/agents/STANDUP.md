@@ -63,7 +63,7 @@ Adding the folder is enough to be built, measured and reported. That is the whol
    fourth version of the password gate.
 5. **`.env.example`** — variable names and how to generate them, never a value.
 6. **`/api/health`.** Add `/api/summary` only if the tool belongs on the hub's glance; then it needs
-   a line in `SOURCES` in `apps/home/lib/glance.ts`, which is **TechPad Gen's file** — a ledger row,
+   a line in `SOURCES` in `apps/home/lib/glance.ts`, which is **TechPad Gen's file** — a Linear issue,
    not an edit you make.
 7. **Fix the roster counts in prose.** `grep -rni '\b(five|six|seven)\b' CLAUDE.md README.md .claude/`
    — every one of them is true right up until this day, and this is the day. Prefer removing the
@@ -99,5 +99,5 @@ rather than two.
 - `/admin` — the app shows in Declared, and Reported once it is deployed.
 - Open the subdomain in a private window and confirm it asks for the password.
 
-Finish by putting the new agent on the ledger with whatever it is waiting for, and give Joel the
+Finish by filing a Linear issue for the new agent with whatever it is waiting for, and give Joel the
 kickoff block to paste.
