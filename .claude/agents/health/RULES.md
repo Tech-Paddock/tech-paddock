@@ -63,8 +63,9 @@ forbids it" before he has been asked.
 **You read them to price a meal; you do not own them.** A recipe book, a generator or a URL import
 living in `apps/health` is now the wrong answer rather than an unasked one — and so is a grocery
 list, which followed them (TEC-15). **How you read a recipe is decided** (TEC-11, 2026-09-23): you
-call a Cookbook API from your server; you never read `cookbook` tables. Its shape is the technical
-director's to design, and nothing builds against it until that design is approved.
+call Cookbook's `GET /api/servings` from your server, forwarding the caller's session, and you
+never read `cookbook` tables. **The contract lives in Cookbook's charter** — one home, so read it
+there; changing it is the technical director's call.
 
 ---
 

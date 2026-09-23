@@ -116,21 +116,34 @@ so Health's `/list` can redirect straight onto it. Then Health redirects and sto
 Until Health's redirect is live, do not assume `/list` has gone, and never write to
 `health.grocery_items`.
 
-## The Health↔Cookbook contract — explicitly not this charter's to invent
+## The Health↔Cookbook contract — the technical director's, and this is its one home
 
-Health prices a meal — works out its calories and macros — by reading Cookbook. **Decided
-2026-09-23 (TEC-11): Health calls a Cookbook API from its server; it never reads `cookbook` tables.**
-The route, its shape and how it authenticates are the technical director's to design,
-the same way the hub's glance and the tracker's contracts are. **This charter does not propose a
-shape for it.** Building ahead of that design risks shipping the wrong contract and having to
-change it under a live dependency, which `CLAUDE.md`'s migration rule exists to avoid.
+Health prices a meal — works out its calories and macros — by reading Cookbook. **Health calls a
+Cookbook API from its server; it never reads `cookbook` tables** (option A, Joel, 2026-09-23,
+TEC-11). Health's charter points here rather than copying it. **Changing it is the TD's call.**
+
+- **One route: `GET /api/servings`.** Every recipe in the book, per serving:
+  `{ recipes: [{ id, name, servings, per_serving: { kcal, protein_g, carbs_g, fat_g } }] }`.
+  **Cookbook does the division** — the table stores the whole pot — so Health never learns that
+  convention. Nothing else under `/api` is contract; it stays yours to change freely.
+- **Additive only.** A new field is free. Renaming or removing one is a contract change.
+- **Authentication is the session you already have.** Health's server forwards the caller's
+  `paddock_session` cookie — that one cookie, not the whole header — to a fixed origin,
+  `COOKBOOK_BASE_URL`, defaulting to `https://cookbook.techpaddock.io`, **never a URL taken from the
+  request**. Your `middleware.ts` already accepts any request bearing a valid session, so **there is
+  no carve-out** and the password gate stays three variants. It rests on `SESSION_SECRET` parity,
+  which `CLAUDE.md` already requires; a mismatch reads as the Cookbook being down.
+- **It works only inside a request you made.** A background job has no session to forward, and
+  that is deliberate: this read happens when you log a meal, not on a timer.
+- **Down is never "not found".** A timeout, a 401 or a 5xx surfaces in Health as "couldn't reach the
+  Cookbook", never as "no such recipe" — Health's second guardrail, unchanged.
+- **Health snapshots the numbers at log time** (TEC-21 when approved), so this is read once per
+  entry and a later edit to a recipe never rewrites a past day.
 
 ---
 
 ## Open questions, and whose they are
 
-- **The grocery list migration's shape and order** — technical director.
-- **The Health↔Cookbook read contract** — technical director.
 - **The recipe table design in full** — this agent's, once scaffolded, the same way Health's
   `health.*` tables were left to Health rather than pre-empted at standup.
 
