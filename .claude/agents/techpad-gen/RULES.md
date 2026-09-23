@@ -89,7 +89,7 @@ One login covers every subdomain because the session cookie is scoped to `.techp
 
 ---
 
-## The tracker's three contracts — inherited, and the reason it is wired in
+## The tracker's four contracts — inherited, and the reason it is wired in
 
 ### Draft-follow-up — you call the Message Editor
 
@@ -100,6 +100,12 @@ because a cross-app call carries no browser session.
 The editor's middleware lets it through **for `/api/draft` only**, matched as an exact path. That
 scoping is the blessed pattern here and **widening it is not yours to propose casually** — it is the
 editor's route, the TD's veto, and a blanket auth bypass is what the narrowness exists to prevent.
+
+### `shared.contacts` — you read it, the editor writes it
+
+The tracker reads contacts and stores a `contact_id` on its threads; it never writes the table.
+**The rules are in `supabase/README.md`**, not here. Writing to it from the tracker changes that
+contract, and it goes to Joel through the TD first.
 
 ### `/api/summary` — the hub reads you
 

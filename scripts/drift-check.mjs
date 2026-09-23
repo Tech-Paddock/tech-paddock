@@ -278,7 +278,11 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
     [".claude/agents/STANDUP.md", 110],
     [".claude/SURFACE.md", 120],
     [".claude/HEALTH-PLAN.md", 250],
-    ["supabase/README.md", 200],
+    // Raised from 200 on 2026-09-23 (TEC-9), at Joel's call: the shared.contacts write
+    // contract is ~35 lines of rules that each carry a caveat, the file sat at 191, and
+    // squeezing the contract into 9 lines would have cut the caveats. Raised in its own
+    // change, not the one that fills it.
+    ["supabase/README.md", 240],
   ];
   for (const [rel, ceiling] of budgets) {
     const n = lines(R(rel));

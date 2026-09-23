@@ -1,6 +1,6 @@
 # Health — handoff
 
-State as of 2026-09-20. Read `RULES.md` and `.claude/HEALTH-PLAN.md` first.
+State as of 2026-09-23. Read `RULES.md` and `.claude/HEALTH-PLAN.md` first. Open items: Linear, TEC.
 
 ---
 
@@ -35,14 +35,10 @@ Haiku proposes a merge, `validateTidy` refuses one that drops or double-counts a
 it, you approve what survives. A prompt can only ask, and this is the one screen where a model's
 output would delete something you typed.
 
-**The charter caught up on 2026-09-19** — a screen earns its place by a different moment, not a
-different noun. **It is not permission for a third**; a second noun still goes to Joel first.
-
-**Recipes left on 2026-09-20** — their own app, own schema, own list. **You read them to price a
-meal and do not own them**: no book, no generator, no import here, and the contract is the TD's.
-**This list's own home is not settled**: the decision is that it follows them, it stays here until
-the TD sequences it (destructive, so two pull requests), and `RULES.md` still reads as though it is
-permanently yours. Ledger item 23.
+**Recipes left on 2026-09-20** for their own app and schema; you read them to price a meal and own
+none of them. **The list follows them to Cookbook** (TEC-15, sequence approved 2026-09-23) and is
+still here until TEC-23 lands. `RULES.md` on `main` still reads as though it is permanently yours;
+the charter drafts are on the TD's `claude/brief-grocery-move`.
 
 ## Agreed with Joel, not started
 
@@ -59,7 +55,7 @@ against left; deleting an entry takes its lines. Joel approved the mockups' comm
 ## Traps specific to this seat
 
 - **`lib/models.ts` is Coffee's registry copied verbatim, flagged rather than quiet.** Approved in
-  #116. Do not let a third copy happen quietly, and do not cite a ledger number in a comment.
+  #116. Do not let a third copy happen quietly, and do not cite an issue number in a comment.
 - **The livery is borrowed and has a collision.** `senna`, which the tracker also wears, maps
   `--sev-warn` onto the accent, so "over target" and "on track" are one colour. The mockups use the
   danger colour instead. **Both TechPad Gen's to settle**, not yours.
@@ -77,3 +73,8 @@ against left; deleting an entry takes its lines. Joel approved the mockups' comm
 **Use it before building more** — without runs the harness cannot say whether Haiku reproduces a
 number you already approved. Unset by Joel, neither blocking: **the agreement rate that retires the
 harness** and **the divergence tolerance** (10%-or-25 kcal, 20%-or-5 g).
+
+**Filed and waiting — start none of them until its blocker clears:**
+- **TEC-21** — snapshot macros onto entries at log time, your 2026-09-22 proposal. Joel's go.
+- **TEC-23** — `/list` redirects to Cookbook, grocery code goes, no migration. Cookbook's list URL.
+- **TEC-25** — read recipe macros from Cookbook's `/api/servings`. That endpoint live; after TEC-21.
