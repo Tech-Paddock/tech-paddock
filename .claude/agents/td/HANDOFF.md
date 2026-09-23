@@ -33,6 +33,8 @@ Cookbook were created 2026-09-23; Coffee and Resume Formatter still have none.
 (#189): the #186 hook is the gate, the quoted line is the record. **Left:** confirm a fresh session
 on `main` lists its Linear items, once this merges.
 
+**TEC-9 parked:** contract on `claude/db-contacts-contract`, stacked on `claude/db-readme-cap` — merge the cap first.
+
 ## Cost, measured 2026-09-22
 
 **Cost = context × turns.** A fresh session of this seat checks out at ~16.5K tokens; a ~10-turn
