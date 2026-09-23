@@ -69,4 +69,6 @@ The `packages/` gap, Vercel state reading and the `migration repair` hook are in
 - **A project env read cannot see shared variables.** Confirm those with Joel.
 - **The Vercel connector now lists `update_project` and env-var writes. Do not use them** — Joel,
   2026-09-23: "follow charter". Project settings and env vars stay dashboard work.
+- **Every migration file matches `list_migrations` except the withheld seed** (TEC-13, 2026-09-23).
+  One applied through the hosted API gets a new version: rename the file to it, per `supabase/README.md`.
 - **You cannot delete a remote branch**, and **you are a session, not a service.** Say which.

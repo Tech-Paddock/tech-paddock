@@ -7,7 +7,7 @@
 -- This is the design argued out with Joel across 2026-09-18 and 19 on
 -- `claude/health-recipes`, which is kept on purpose rather than deleted. That
 -- branch's `20260919232121_health_recipes.sql` was **never applied** — history
--- ends at `20260919220112` — so extracting recipes into their own app cost
+-- ends at `20260919225229` — so extracting recipes into their own app cost
 -- nothing, and this file is that design landing where it belongs rather than a
 -- new one. What changed, and why, is below.
 --
@@ -159,12 +159,12 @@ comment on column cookbook.recipes.origin is
 -- sequences the move (ledger item 23, destructive, so two pull requests). This
 -- app never writes that table and never assumes it disappears on any date.
 --
--- The shape is Health's `20260919220112` carried over, including the **cheap
+-- The shape is Health's `20260919225229` carried over, including the **cheap
 -- version** Joel chose on 2026-09-19: the list leaves as copied text or a search
 -- link per line, with no retailer credential, no OAuth and no `middleware.ts`
 -- carve-out. That constraint moved with the list rather than being reopened.
 --
--- `source` finally has a writer. It has existed in Health since `20260919220112`
+-- `source` finally has a writer. It has existed in Health since `20260919225229`
 -- with nothing producing `recipe`, because the book that would have was parked.
 
 create type cookbook.grocery_source as enum ('manual', 'recipe');
