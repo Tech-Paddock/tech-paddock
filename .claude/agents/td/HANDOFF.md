@@ -26,8 +26,9 @@ name and email. Nothing mechanical enforces it.
 a missing file reads as empty — green build, nothing waiting on Joel. It is TechPad Gen's and was in
 progress on 2026-09-23. **Do not merge Phase 2 ahead of it.**
 
-**Three handoffs still say "ledger"** — TechPad Gen's, Health's and Cookbook's. They are not this
-seat's to edit; each agent corrects its own next session.
+**Three handoffs still say "ledger"** — filed as TEC-17 (TechPad Gen), TEC-18 (Health) and TEC-19
+(Cookbook). Their charters are already corrected here. `agent:`/`owner:` labels for Health and
+Cookbook were created 2026-09-23; Coffee and Resume Formatter still have none.
 
 **Still undesigned and Joel's:** what `requested-by-joel` checks now that the bot
 (`claudetechpaddock`, `write`, not admin) and Joel are different accounts. Then Phase 3: confirm a
@@ -67,6 +68,6 @@ The `packages/` gap, Vercel state reading and the `migration repair` hook are in
 - **A pull request body is a claim, not evidence** — read Vercel and Supabase live before repeating
   its deployment steps to Joel.
 - **A project env read cannot see shared variables.** Confirm those with Joel.
-- **The Vercel connector now lists `update_project` and env-var writes**; `RULES.md` still says this
-  seat cannot change project settings. Unused; Joel's ruling pending.
+- **The Vercel connector now lists `update_project` and env-var writes. Do not use them** — Joel,
+  2026-09-23: "follow charter". Project settings and env vars stay dashboard work.
 - **You cannot delete a remote branch**, and **you are a session, not a service.** Say which.
