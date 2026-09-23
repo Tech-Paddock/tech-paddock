@@ -22,23 +22,18 @@ titles. TEC-1 to 4 are Linear's onboarding issues, left alone.
 **`CLAUDE.md` names Linear's user records under the personal-information rule** — they carry a real
 name and email. Nothing mechanical enforces it.
 
-**Three handoffs still say "ledger"** — filed as TEC-17 (TechPad Gen), TEC-18 (Health) and TEC-19
-(Cookbook). Their charters are already corrected here. `agent:`/`owner:` labels for Health and
-Cookbook were created 2026-09-23; Coffee and Resume Formatter still have none.
+**Coffee and the Resume Formatter have no `agent:`/`owner:` labels yet**; every other agent does.
 
 **Phase 3 is done.** #98 and #116 are closed; #116's live proposal is TEC-21. **`requested-by-joel`
 stays** (#189): the #186 hook is the gate, the quoted line is the record. A fresh session on `main`
 (2026-09-23) was pointed at Linear by the hook and listed TEC live — the last open step.
 
-## Build scope — TEC-10, on `claude/ci-build-scope-packages`
+## Build scope — TEC-10 (#191)
 
-**`scripts/build-scope.mjs` is the one reader of each `vercel.json` `ignoreCommand`.** CI calls it
-for its per-app scope (plus `.github/workflows` and `supabase`), and **fails open** — an unreadable
-scope builds. `drift`'s *every build watches what it reads* derives what each build reads outside
-its folder and fails a read the pathspec misses; how it finds reads, and what it cannot see, is in
-the file's header. **The hub has no diff now: it builds every production merge**, because its
-prebuild reads nearly the whole repo and The Garage's build-time panels must stay current. **It
-still skips previews** — drift hard-fails an `ignoreCommand` that stops doing that.
+**`scripts/build-scope.mjs` is the one reader of each `ignoreCommand`**: CI scopes each app with it
+and **fails open**; drift fails a build that reads a path it does not watch (how, and its blind
+spots: the file's header). **The hub diffs nothing and builds every production merge** — its
+prebuild reads nearly the whole repo — **and still skips previews**, which drift enforces.
 
 ## Cost, measured 2026-09-22
 
