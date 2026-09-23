@@ -22,9 +22,8 @@ titles. TEC-1 to 4 are Linear's onboarding issues, left alone.
 **`CLAUDE.md` names Linear's user records under the personal-information rule** — they carry a real
 name and email. Nothing mechanical enforces it.
 
-**TEC-16 must merge before or with Phase 2.** The Pit Wall reads the deleted file at build time and
-a missing file reads as empty — green build, nothing waiting on Joel. It is TechPad Gen's and was in
-progress on 2026-09-23. **Do not merge Phase 2 ahead of it.**
+**TEC-16 rode with Phase 2 (#187)** at Joel's direction: the Pit Wall no longer reads the ledger,
+so it has no Waiting on Joel or Parked rows. `apps/home` stays TechPad Gen's.
 
 **Three handoffs still say "ledger"** — filed as TEC-17 (TechPad Gen), TEC-18 (Health) and TEC-19
 (Cookbook). Their charters are already corrected here. `agent:`/`owner:` labels for Health and
