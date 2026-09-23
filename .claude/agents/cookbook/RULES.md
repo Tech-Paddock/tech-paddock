@@ -108,14 +108,19 @@ question, not just a feature to add:
 - **This is the technical director's to sequence**, alongside the read contract below — both are
   cross-app, and both belong in the same conversation rather than two uncoordinated ones.
 
-Until that happens, Cookbook may build its own grocery list against its own schema from day one;
-what it must not do is assume Health's `/list` disappears on any particular date, or write to
+**Sequenced 2026-09-23, Joel approving — TEC-15.** Both tables held zero rows, so nothing is copied.
+Your part comes first: **the list needs a URL of its own** — today it is tab state with no address —
+so Health's `/list` can redirect straight onto it. Then Health redirects and stops touching
+`health.grocery_items`; then that table is dropped. From then on the list is only yours.
+
+Until Health's redirect is live, do not assume `/list` has gone, and never write to
 `health.grocery_items`.
 
 ## The Health↔Cookbook contract — explicitly not this charter's to invent
 
-Health prices a meal by reading Cookbook. What that read looks like — an endpoint shaped like the
-tracker's `/api/summary`, a shared schema grant, something else — is the technical director's call,
+Health prices a meal — works out its calories and macros — by reading Cookbook. **Decided
+2026-09-23 (TEC-11): Health calls a Cookbook API from its server; it never reads `cookbook` tables.**
+The route, its shape and how it authenticates are the technical director's to design,
 the same way the hub's glance and the tracker's contracts are. **This charter does not propose a
 shape for it.** Building ahead of that design risks shipping the wrong contract and having to
 change it under a live dependency, which `CLAUDE.md`'s migration rule exists to avoid.

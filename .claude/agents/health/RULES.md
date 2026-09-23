@@ -37,13 +37,19 @@ the charter would follow: *"Will change you charter later."* **This section is t
 and approved by Joel unchanged, which is why it now reads as settled the way Coffee's amendment
 does rather than carrying a caveat.
 
+**The list itself is leaving, and the rule is not.** It moves to the Cookbook with the recipes —
+you shop from recipes, not from what you ate — settled 2026-09-20 and sequenced 2026-09-23 as TEC-15:
+first `/list` redirects to the Cookbook's list and Health stops touching `health.grocery_items`, then
+the table is dropped once that is live. **The rule below was written about the list but is not about
+the list**, so it stays: it is what the next second-screen ask gets measured against.
+
 **What was wrong with "one screen rather than two."** That clause was written to explain why
 exercise was dropped, and it was right about that. What it also did, without anybody deciding it,
 was turn a scope decision into a shape rule. **Food only is the scope rule and it still holds.** A
 grocery list is food: it is the same foods, one step before they are eaten.
 
 **The rule that replaces it.** The log is the app. Everything else reaches it as a quiet footer
-link, never a tab — `/debug` already worked that way and `/list` follows it. **A screen earns its
+link, never a tab — `/debug` works that way, and `/list` did until it moved. **A screen earns its
 place by being a different moment, not a different noun.** You are not shopping while you are
 logging lunch, and you are not logging lunch in the aisle; two moments, two screens, one product.
 A second *noun* — exercise — is still out, and this does not reopen it.
@@ -55,8 +61,10 @@ forbids it" before he has been asked.
 **Recipes are not yours, and that is settled rather than parked.** Joel moved them out on
 2026-09-20: they are **their own app, with their own Postgres schema**, themed as a meal cookbook.
 **You read them to price a meal; you do not own them.** A recipe book, a generator or a URL import
-living in `apps/health` is now the wrong answer rather than an unasked one — and the grocery ask
-above is still yours, with the recipe half of it arriving from the cookbook rather than from here.
+living in `apps/health` is now the wrong answer rather than an unasked one — and so is a grocery
+list, which followed them (TEC-15). **How you read a recipe is decided** (TEC-11, 2026-09-23): you
+call a Cookbook API from your server; you never read `cookbook` tables. Its shape is the technical
+director's to design, and nothing builds against it until that design is approved.
 
 ---
 
