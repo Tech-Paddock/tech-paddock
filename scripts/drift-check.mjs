@@ -33,6 +33,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expected as stampExpected, MANIFEST, SHARED_DIR } from "./stamp-shared.mjs";
+import { watchedBy, buildReads, covers } from "./build-scope.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const R = (...p) => join(repoRoot, ...p);
@@ -204,11 +205,13 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
    check fails rather than warns, and it verifies the folder each command
    names is the folder it lives in.
 
-   `packages` rides in every pathspec deliberately, though it does not exist
-   yet. `packages/shared` is ledger item 4, and the day it lands every app
-   must rebuild when it changes. A pathspec naming a path git does not have is
-   not an error — it simply matches nothing — so this costs nothing today and
-   removes a step that would otherwise be discovered by an app going stale.
+   `packages` rides in every pathspec because `packages/shared` is stamped
+   into every app, so a change there must rebuild all of them.
+
+   A command with no `git diff` at all is the other legal shape: it builds
+   every production merge, so it cannot name the wrong folder. The hub has
+   used it since TEC-10, because its build reads nearly the whole repo — see
+   the next check.
 
    A missing vercel.json is only a warning: a freshly scaffolded app folder
    has no Vercel project yet either, and CLAUDE.md promises that creating the
@@ -243,6 +246,7 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
        new baseline and 21 below the cliff. */
     if (cmd.length > 256) hard.push(`${app}: ignoreCommand is ${cmd.length} characters — Vercel's limit is 256, and over it EVERY deploy of this app is rejected, production included`);
     else if (cmd.length > 235) soft.push(`${app}: ignoreCommand is ${cmd.length} of Vercel's 256 characters`);
+    if (watchedBy(app).kind === "always") continue; // no diff: builds every production merge
     const named = [...cmd.matchAll(/apps\/([A-Za-z0-9._-]+)/g)].map((m) => m[1]);
     if (!named.includes(app)) hard.push(`${app}: ignoreCommand watches no path under apps/${app}`);
     const foreign = named.filter((n) => n !== app && APPS.includes(n));
@@ -252,7 +256,44 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
     hard.length ? "fail" : soft.length ? "warn" : "ok",
     hard.length ? hard.join("; ")
       : soft.length ? soft.join("; ")
-        : `${APPS.length} apps, each skipping a merge that does not touch it`);
+        : (() => {
+            const always = APPS.filter((a) => watchedBy(a).kind === "always");
+            return `${APPS.length - always.length} apps skip a merge that does not touch them` +
+              (always.length ? `; ${always.join(", ")} builds every production merge` : "");
+          })());
+}
+
+/* ── A build that reads a path it does not watch stops rebuilding ─────────
+   The #145 class. An app whose build reads a file outside its own folder, but
+   whose ignoreCommand does not diff that file, skips every merge that changes
+   only the file — and keeps serving what it read last, with nothing red.
+   The hub did exactly this with `.claude` (#145), and after that fix still did
+   it with every other app's folder, ci.yml, supabase and drift-check.mjs,
+   which is why it now has no diff at all (TEC-10).
+
+   What a build reads is derived by scripts/build-scope.mjs, statically and
+   cut short wherever an argument is not a literal — so it over-reads rather
+   than under-reads. What it cannot see is written there. The same file is
+   what CI calls to decide its own build scope, so the second half of this
+   check is that CI still calls it, and that every vercel.json still parses:
+   CI fails OPEN on one that does not, which is safe but no longer scoped. */
+{
+  const hard = [], notes = [];
+  for (const app of APPS) {
+    const w = watchedBy(app);
+    if (w.kind === "unparseable") { hard.push(`${app}: CI cannot read its scope — ${w.why}`); continue; }
+    const reads = buildReads(app);
+    if (w.kind === "always") { if (reads.length) notes.push(`${app} builds every merge (reads ${reads.length} paths outside its folder)`); continue; }
+    const missed = reads.filter((r) => !covers(w, r));
+    if (missed.length) hard.push(`${app}: build reads ${missed.map((r) => r || "the repo root").join(", ")} but its ignoreCommand watches only ${w.paths.join(" ")} — it will silently stop rebuilding`);
+  }
+  const ci = read(R(".github/workflows/ci.yml"));
+  if (ci === null) hard.push("ci.yml not readable");
+  else if (!ci.includes("scripts/build-scope.mjs")) hard.push("CI no longer reads its build scope from vercel.json via scripts/build-scope.mjs — it can miss what an ignoreCommand watches");
+  add("every build watches what it reads",
+    hard.length ? "fail" : "ok",
+    hard.length ? hard.join("; ")
+      : `${APPS.length} apps; CI scopes from vercel.json` + (notes.length ? `; ${notes.join("; ")}` : ""));
 }
 
 /* 4 ── Budgets. CI fails the breach; this reports the approach, because a file

@@ -89,13 +89,28 @@ jobs:
             exit 0
           fi
 
-          # This app's own folder, plus the shared things that can break any app:
-          # the workflow itself, and the migration history every app reads.
-          if git diff --quiet "$base" HEAD -- \
-               "apps/${{ matrix.app }}" \
-               ".github/workflows" \
-               "supabase"; then
-            echo "reason=nothing under apps/${{ matrix.app }}, .github/workflows or supabase changed" >> "$GITHUB_OUTPUT"
+          # This app's scope is whatever its Vercel ignoreCommand watches, read by
+          # the same script drift uses, so CI and Vercel cannot disagree about it.
+          # A hardcoded list here missed packages/ for weeks (TEC-10). Plus the
+          # shared things that can break any app: the workflow itself, and the
+          # migration history every app reads.
+          #
+          # Fail OPEN: a scope nobody can read builds. A skipped build is the
+          # silent failure; an extra one costs a minute.
+          if ! scope="$(node scripts/build-scope.mjs "${{ matrix.app }}")"; then
+            echo "reason=could not read apps/${{ matrix.app }}/vercel.json's scope — building to be safe" >> "$GITHUB_OUTPUT"
+            echo "build=yes" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$scope" = "ALWAYS" ]; then
+            echo "reason=apps/${{ matrix.app }} diffs nothing in its ignoreCommand, so it always builds" >> "$GITHUB_OUTPUT"
+            echo "build=yes" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          read -r -a paths <<< "$scope"
+
+          if git diff --quiet "$base" HEAD -- "${paths[@]}" ".github/workflows" "supabase"; then
+            echo "reason=nothing under ${scope}, .github/workflows or supabase changed" >> "$GITHUB_OUTPUT"
             echo "build=no" >> "$GITHUB_OUTPUT"
           else
             echo "reason=changed since ${base}" >> "$GITHUB_OUTPUT"
