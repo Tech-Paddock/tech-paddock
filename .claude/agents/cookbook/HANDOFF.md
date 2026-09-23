@@ -34,7 +34,9 @@ not routes. **Adding sits on top of both tabs**, collapsed on Recipes. **Four wa
 `source_url`, refused twice when illegible like a link. **Nothing a model wrote is saved until
 Keep it; the typed path saves straight away**, so the charter's "all three land as a draft" is
 false twice over now — the TD's. **Results are toasts** (`app/Toast.tsx`); a failed read stays inline.
-**Tab icon only, no home-screen icon** — the standup settled no install; Joel asking changes that.
+**Tab icon only, no home-screen icon** — the standup settled no install. **The icon is Joel's pick
+between Nos. 11 and 12** (artifact `8dHFRUnnZW4AJo9vem63HA`); the branch holds No. 7 until he says.
+**Its colours are exact and fixed, dark mode included** — his words: "it's perfect". No dark variant.
 
 **Three tables, all in `cookbook`**, reasoning in the migration headers. `recipes` stores **the whole
 pot** and derives the serving; `grocery_items` is this app's list; `brand_preferences` the third.
@@ -48,9 +50,7 @@ Kroger account settings, not this app's.** Tidy is one Haiku call and `validateT
 proposal that drops or doubles a line. **Clear empties everything and asks first** — no undo.
 **Logging what you ate is absent** — item 22, the TD's.
 
-**`methodSteps` splits a method; the prompt asking for line breaks is the smaller half** — the
-renderer always honoured newlines, so a prompt-only fix would have left the existing book as one
-block. Numbered markers only, never sentences; its tests are mostly what it refuses to split.
+**`methodSteps` splits a method on numbered markers only** — why, and what it refuses, is in its tests.
 
 ## Traps specific to this area
 
