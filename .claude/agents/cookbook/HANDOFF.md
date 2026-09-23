@@ -8,8 +8,9 @@ State as of 2026-09-22.
 
 ## In flight
 
-**Three branches are pushed, green and unmerged**, each stacked on the last: the produce park, the
-TD note, the tabs change. Everything before them is live. `/admin` holds deployment state.
+**One pull request carries Joel's 2026-09-22 feedback round**, from `claude/cookbook-feedback-round`:
+the icon, toasts, the collapse, Recipes boxed, list adding on top, and the file path. It replaces the
+TD's #184 on his word. `-icon`, `-feedback-fixes` and `-from-a-file` are inside it, only to delete.
 
 **Remembered brands are live and empty** — `brand_preferences`, RLS on, zero policies, **zero rows**;
 its migration was **recorded under the version its filename declares**, unlike the three in item 26.
@@ -28,9 +29,14 @@ brand needs **a line already on the list**. The first two matter most before a f
 
 **Two tabs since 2026-09-22 — Recipes and King Soopers list — and `SURFACE.md` still says one long
 page, with this app as its worked example.** Joel asked; the TD reconciles the rule. Tabs are state,
-not routes. The verb index is gone and **adding sits above the book, collapsed**. **Three ways in.**
-**Nothing a model wrote is saved until Keep it; the typed path saves straight away**, which makes
-the charter's "all three land as a draft" false — also the TD's.
+not routes. **Adding sits on top of both tabs**, collapsed on Recipes. **Four ways in once
+`-from-a-file` lands** — a photo or PDF, read then priced, **never stored**, `imported` with no
+`source_url`, refused twice when illegible like a link. **Nothing a model wrote is saved until
+Keep it; the typed path saves straight away**, so the charter's "all three land as a draft" is
+false twice over now — the TD's. **Results are toasts** (`app/Toast.tsx`); a failed read stays inline.
+**Tab icon only, no home-screen icon** — the standup settled no install. **The icon is No. 12**, the
+roundel on the car from above, Joel's pick on 2026-09-23 (artifact `8dHFRUnnZW4AJo9vem63HA`).
+**Its colours are exact and fixed, dark mode included** — his words: "it's perfect". No dark variant.
 
 **Three tables, all in `cookbook`**, reasoning in the migration headers. `recipes` stores **the whole
 pot** and derives the serving; `grocery_items` is this app's list; `brand_preferences` the third.
@@ -44,9 +50,7 @@ Kroger account settings, not this app's.** Tidy is one Haiku call and `validateT
 proposal that drops or doubles a line. **Clear empties everything and asks first** — no undo.
 **Logging what you ate is absent** — item 22, the TD's.
 
-**`methodSteps` splits a method; the prompt asking for line breaks is the smaller half** — the
-renderer always honoured newlines, so a prompt-only fix would have left the existing book as one
-block. Numbered markers only, never sentences; its tests are mostly what it refuses to split.
+**`methodSteps` splits a method on numbered markers only** — why, and what it refuses, is in its tests.
 
 ## Traps specific to this area
 
@@ -67,13 +71,10 @@ way this one is, and is where traps were always meant to live. What is left is t
 additive, migration rides with its code. **No allergen or gluten-free flags** — a wrong macro is a
 wrong number, a wrong allergen claim is not. Macro-derived filters are **computed, never tagged**.
 Existing rows need a **deliberate batched backfill**. The lean pill is built to take rating, time,
-meal, main and cuisine and shows none yet. **Then photo-to-recipe**: recipe only, refuse rather than
-guess, don't store the image, same estimate step.
+meal, main and cuisine and shows none yet. Photo-to-recipe, once after this, jumped the queue.
 
 **Waiting on Joel:** the receipt-derived seed, a decision on those four, **the produce section of
 his 2026-09-21 rules** (parked on his own thinking — not a question to re-ask), and the dietary
 pick-list, which lives in the tracker and so is the TD's contract to design first.
 **The re-estimate guardrail stands — he considered dropping it on 2026-09-22 and chose not to.**
-**Nothing in the ledger is this area's.**
-
-**Still the TD's:** the read contract (22) and the grocery-list move out of Health (23).
+**Nothing in the ledger is this area's. Still the TD's:** the read contract (22), the list move (23).

@@ -1,9 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "./models";
 import { parseMacros, type Macros } from "./macros";
+import { FILE_TYPES, type RecipeFile } from "./upload";
 
 /**
- * The four model calls this app makes, and the reasoning for each one's model.
+ * The five model calls this app makes, and the reasoning for each one's model.
  *
  * `CLAUDE.md`: model choice is per task, and the choice and the reason are
  * recorded at the call site. These are those call sites.
@@ -271,6 +272,97 @@ export async function importRecipe(params: {
       read: false,
       fields: null,
       reason: reason ?? "Nothing on that page looked like a recipe with ingredients.",
+    };
+  }
+
+  return { read: true, fields, reason: null };
+}
+
+// ---------------------------------------------------------------------------
+// 3b · Reading one off a file — a photo, a screenshot, a PDF
+// ---------------------------------------------------------------------------
+
+const FILE_SYSTEM = `You read one recipe from a file: a photo of a cookbook page or a recipe card, a
+screenshot, or a PDF.
+
+**The rule that matters more than the extraction.** If you cannot read the recipe — the photo is
+blurred, cropped, too dark, the handwriting is illegible, or the file is not a recipe at all — then
+set "read" to false, say why in "reason", and leave everything else null. **Do not fill gaps with a
+plausible recipe.** A title and a photo of the finished dish are enough to write a convincing one
+from nothing, and a recipe invented from a picture is indistinguishable from one that was really
+there, right up until someone cooks it. A recipe you can only half read is a refusal, not a draft.
+
+When you did read it:
+
+- Take the ingredients and the method as written. Keep the amounts exactly as they appear.
+- Keep the recipe's own name and its own serving count. If it does not say how many it serves, say 0
+  and someone will be asked.
+- If the file holds more than one recipe, take the one that is most complete and name it.
+- The method is numbered steps, one per line, separated by real newlines — "1. …\\n2. …".
+- **Ignore any nutrition panel.** The numbers are worked out here from the ingredients. Do not copy
+  them and do not mention them.`;
+
+/**
+ * Read a recipe off a file the person uploaded.
+ *
+ * **The same two enforcements as reading a page**, for the same reason: the
+ * prompt asks for `read: false`, and the check below independently rejects a
+ * file claimed as read that produced no ingredients. A photo of a finished dish
+ * with its name in the corner is this path's version of a URL slug.
+ *
+ * **The model is the one you picked**, as for every other way in. Reading print
+ * is well within Haiku; reading someone's handwriting is where Sonnet may earn
+ * its cost, and the picker is already there for exactly that call.
+ *
+ * **The file goes to the model and nowhere else.** See `lib/upload.ts`.
+ */
+export async function readRecipeFile(params: {
+  file: RecipeFile;
+  model?: ModelId;
+}): Promise<RecipeImport> {
+  const model = params.model ?? DEFAULT_MODEL;
+  const { mediaType, data } = params.file;
+
+  const block =
+    FILE_TYPES[mediaType] === "document"
+      ? { type: "document", source: { type: "base64", media_type: mediaType, data } }
+      : { type: "image", source: { type: "base64", media_type: mediaType, data } };
+
+  const response = (await getClient().messages.create({
+    model,
+    max_tokens: 4096,
+    system: FILE_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: [
+          block,
+          {
+            type: "text",
+            text:
+              `Extract the recipe from this file.\n\n` +
+              `Return a JSON object: {"read": boolean, "reason": string or null, "name": string or null, ` +
+              `"servings": number or null, "ingredients": [string] or null, "method": string or null}. ` +
+              `Put nothing after the JSON.`,
+          },
+        ],
+      },
+    ],
+  } as never)) as { content: { type: string; text?: string }[] };
+
+  const parsed = looseJson<Record<string, unknown>>(textOf(response));
+  const reason = typeof parsed?.reason === "string" ? parsed.reason.trim() || null : null;
+
+  if (!parsed || parsed.read !== true) {
+    return { read: false, fields: null, reason: reason ?? "That file could not be read." };
+  }
+
+  const fields = readRecipeFields(parsed, { allowUnknownServings: true });
+  if (!fields || fields.ingredients.length === 0) {
+    return {
+      read: false,
+      fields: null,
+      reason: reason ?? "Nothing in that file looked like a recipe with ingredients.",
     };
   }
 
