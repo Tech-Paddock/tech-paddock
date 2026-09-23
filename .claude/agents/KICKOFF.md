@@ -170,8 +170,8 @@ landed after its session started.
 >
 > **Two things are explicitly NOT yours, and building them is the mistake to avoid.** The
 > Health↔Cookbook read contract and the grocery-list move out of `apps/health` are both cross-app
-> and both the technical director's to sequence — ledger items 22 and 23. **Build your own grocery
+> and both the technical director's to sequence — TEC-11 and TEC-15. **Build your own grocery
 > list against your own schema from day one if you want one; never write to `health.grocery_items`,
 > and never assume Health's `/list` disappears on any particular date.**
 >
-> **Your livery is borrowed and belongs to TechPad Gen** — item 24. Do not change it yourself.
+> **Your livery is borrowed and belongs to TechPad Gen** — TEC-12. Do not change it yourself.

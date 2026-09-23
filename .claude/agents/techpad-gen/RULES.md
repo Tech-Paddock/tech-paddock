@@ -127,7 +127,7 @@ that guard changed the same day. And Microsoft Graph is unconfigured; it stays b
 **The daily sweep's guard fails closed as of #144**, which landed the same day the agent retired.
 `/api/cron/stale-tasks` read `if (secret && …)`, so an unset `CRON_SECRET` skipped the check
 entirely; it now reads `if (!secret || …)` and answers 401, byte-identically whether the secret is
-unset or merely wrong. **What that changed is the cost of un-parking item 11**: the ordering is no
+unset or merely wrong. **What that changed is the cost of un-parking TEC-14**: the ordering is no
 longer load-bearing for safety, and what replaced it is a plain requirement — **`CRON_SECRET` must
 be set or the sweep does not run at all.**
 

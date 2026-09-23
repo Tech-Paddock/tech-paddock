@@ -196,15 +196,13 @@ plausibly reopen or repeat, delete it; git keeps it.
   re-read is a fresh session reading the same repo, which a fresh **TD** session does equally well
   without a second charter to keep current. **The Vercel trap list moves with the seat, verbatim**,
   or the move relocates the error it exists to prevent.
-- **2026-09-22 — Linear holds open items. GitHub stays the repo. The board is deleted.** Linear
-  becomes canonical and a Routine generates `.claude/OPEN-ITEMS.md` from it, so the `SessionStart`
-  hook still prints it and **agents read for free — no credential, no network call at session
-  start.** Writing an item calls Linear; reading never does. **`BOARD.html` goes with it**, which is
-  the 2026-09-20 reasoning finished: a board is a persistent page and agents are not persistent
-  things, so once Linear holds the queue and GitHub holds the pull requests the last board is a
-  third copy of state two systems already render live. **Migration cost, measured: 17 references to
-  ledger numbers across 8 files, four of them — items 7, 9, 19, 27 — pointing at items already
-  closed**, which Linear will not hold. Decide deliberately whether those carry or are rewritten.
+- **2026-09-22 — Linear holds open items. GitHub stays the repo. The board is deleted.** *Superseded
+  2026-09-23 on the ledger's half:* the plan was a Routine regenerating `.claude/OPEN-ITEMS.md` from
+  Linear so the hook kept printing it; **Joel dropped the file instead** ("Let's drop the open
+  items"), so the hook now only points at Linear and **every session calls Linear to read its items**.
+  That is a convention, not a guarantee — the cost accepted for one copy instead of two. Ledger
+  numbers became TEC ids; references to items already closed were left as history. `BOARD.html` went
+  first: once Linear holds the queue and GitHub the pull requests, a board is a third copy.
 - **2026-09-22 — No deployment agent.** Proposed and declined. The decisive objection: `CLAUDE.md`
   puts migrations at the gate, so an agent that merges must also apply them — rebuilding the split
   that was deliberately rejected, in the other direction. The second: the gate's value is the
@@ -345,14 +343,12 @@ plausibly reopen or repeat, delete it; git keeps it.
   permitted through this proxy."** Four attempts each, on 2026-09-20. **Pushes that create or update
   a ref work fine**, which is what makes the deletion case surprising. Neither is transient: stop
   after the first and ask Joel.
-- **The TD's handoff-freshness check is structurally dead.** `drift-check.mjs:311` maps `td` to
-  `["apps/editor"]` — the **frozen** app — so it reports `ok` forever. Measured 2026-09-22: it said
-  `ok fresh: td 2026-09-20, current with apps/editor` while the handoff was two merges stale. The
-  guard above it covers an agent owning *no* folder; the TD owns an *inert* one and falls past it.
-- **The ledger is not reliably machine-parseable and fails silently.** A parse written 2026-09-22
-  returned **9 items where there are 10** — item 1's title wraps, so the `**…**` never closes on the
-  numbered line and it was dropped with no error. Any script reading this file must **exit non-zero
-  on an unparseable item** and cross-check its count against `Next number`.
+- **The TD's handoff-freshness check was structurally dead** — dated against the **frozen**
+  `apps/editor`, it read `ok` forever while the handoff was two merges stale. *Fixed 2026-09-23*: it
+  now also dates against `scripts` and `.github`. **An inert folder is not an owned one.**
+- **The ledger was not reliably machine-parseable and failed silently** — a wrapped title dropped
+  an item with no error. Moot since the file's deletion on 2026-09-23; **any parser of prose must
+  exit non-zero on an unparseable entry**, which still holds for whatever reads a document next.
 - **CI's build scope check does not watch `packages/`.** `ci.yml:94-97` names `apps/<app>`,
   `.github/workflows` and `supabase`; every app's Vercel `ignoreCommand` does include `packages`.
   Latent only because stamping writes into `apps/` too, so `drift` is what actually catches it.

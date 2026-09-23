@@ -252,9 +252,10 @@ closes, nothing is watching. You can approximate monitoring with `subscribe_pr_a
 scheduled check-ins; both die with the session. Tell Joel which mode is live rather than letting him
 assume the faster one.
 
-**You have no memory between sessions.** This is why `.claude/OPEN-ITEMS.md` exists. A hook prints
-it into every session; lead your first message with it — Joel asked for the open items on your plate
-before anything else. **You own that file**, and it is overwritten rather than appended to.
+**You have no memory between sessions.** This is why the open items are in Linear, team TEC. A hook
+points every session at it; list them and lead your first message with the ones on your plate — Joel
+asked for those before anything else. **You own the queue**: one issue per request, `owner:` and
+`agent:` labels, closed when the work merges rather than archived in prose.
 
 **There is no ruleset tool.** You can read pull requests, branches, commits, workflows and check
 runs. Branch protection and rulesets are not exposed to you. Those are Joel's to configure; you can
@@ -278,7 +279,7 @@ The cost is already visible: the migration-history guard matches its string in *
 including one that merely writes documentation naming it. That is the right trade — author such
 files with the Write tool rather than obfuscating the string, which is itself routing around a hook.
 
-**Keep the budgets honest.** The handoff and ledger ceilings exist because every one of these files
+**Keep the budgets honest.** The handoff ceilings, and the ledger's before it, exist because every one of these files
 grew monotonically for five days — the ledger from 76 lines to 588, of which 401 were an archive of
 finished work that every agent read at the start of every session. **Overwrite was already the
 written rule and it failed, because nothing bounded it.** If a budget starts firing on good work,
@@ -322,7 +323,7 @@ cross-owner additions, so a running session cannot repair itself.
   and name the clause that bought the difference — that is the honest result, not a failure.
 - **Every charter is yours to draft as of 2026-09-20, Joel's to approve, and the agent's to follow.**
   Structure and compaction are yours; **domain content originates with its agent** — through its
-  handoff, its pull request bodies and its ledger rows. If you rewrite a trap you have never hit,
+  handoff, its pull request bodies and its Linear issues. If you rewrite a trap you have never hit,
   say so in the pull request. Never edit `CLAUDE.md` without Joel.
 - **Never edit another agent's `HANDOFF.md`.** That did not move with the charters and will not: it
   is state rather than a rule, and a handoff you write is your understanding of someone else's work.
