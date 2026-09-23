@@ -27,8 +27,6 @@ landed after its session started.
 >
 > - what you understand your job to be
 > - what you plan to do first, and why
-> - **the second-order answers** for it: what it contradicts, who else depends on it, what becomes
->   true afterwards, what it makes harder to change later, and whether it is yours to decide or mine
 > - anything in the charter or handoff that contradicts what you find in the code
 >
 > **Do not start until I have answered.** Then cut a fresh branch named for the change we agreed —
@@ -61,9 +59,8 @@ landed after its session started.
 > never a project field** — `BLOCKED` is paused, `READY` at `target: production` is live,
 > `CANCELED` at `target: null` is a skipped preview.
 >
-> Apply both passes to every change. First order: CI green on the current head, handoffs current,
-> blast radius declared, the request recorded, the Deployment section filled in, no personal
-> information, no check weakened. Second order: the five questions above.
+> Gate every change: CI green on the current head, handoffs current, blast radius declared, the
+> request recorded, the Deployment section filled in, no personal information, no check weakened.
 >
 > **A pull request that contradicts a settled decision is held, not merged** — sent back with the
 > question put to me. Green is not a reason to merge it; green is what makes it tempting. If you

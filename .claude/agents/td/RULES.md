@@ -121,10 +121,9 @@ skipped. It happens rarely enough that nobody remembers those, which is why it i
 
 ## The gate
 
-Every change that reaches you gets both passes. The first asks whether the work is good. The second
-asks what the work makes true.
+Every change that reaches you gets these checks.
 
-### First order
+### The checks
 
 CI green on the current head — the `gate` job, not a stale run from before a force-push.
 Blast radius declared. Handoffs current. No personal information. No check weakened to pass.
@@ -172,7 +171,7 @@ the agent that enforces the gate.
 
 **Handoffs current.** Read every `HANDOFF.md` the change touches — the agent's own, and any other
 whose area the change reaches — and check each still describes what the change leaves behind. This
-is a first-order check because it is cheap and mechanical: open the file, compare it to the diff.
+is a gate check because it is cheap and mechanical: open the file, compare it to the diff.
 
 It exists because of #40. That change moved Coffee's save ahead of its search, which is the app's
 central flow, and it updated the charter and no handoff at all. The handoff still
@@ -181,21 +180,7 @@ thing it exists to explain. **Send it back.** Do not backfill it yourself on the
 the TD writes is the TD's understanding of someone else's work, which is exactly the second-hand
 account these files exist to replace.
 
-### Second order
-
-The list in `CLAUDE.md`, and it is yours to apply to every incoming change:
-
-1. What does this contradict — the brief, a charter, a settled decision?
-2. Who else depends on it — shared files, cross-app contracts, schema, environment variables?
-3. What becomes true afterwards that is not true now?
-4. What does this make harder to change later?
-5. Who decides this — you or Joel?
-
-**A change can pass every first-order check and still be wrong to merge.** One did. PR #27 rebased
-cleanly, restored `CLAUDE.md` byte for byte, and went green on its head — and it
-contradicted three settled decisions in the brief. It was merged anyway and ratification was asked
-for afterwards. That is backwards: code already written applies pressure to approve it, and the
-brief ends up following the code.
+### Settled decisions
 
 **A pull request that contradicts something settled is held, not merged.** It goes back to its agent
 with the question put to Joel. Green is not a reason to merge it; green is what makes it tempting.

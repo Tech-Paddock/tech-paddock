@@ -30,9 +30,9 @@ progress on 2026-09-23. **Do not merge Phase 2 ahead of it.**
 (Cookbook). Their charters are already corrected here. `agent:`/`owner:` labels for Health and
 Cookbook were created 2026-09-23; Coffee and Resume Formatter still have none.
 
-**Still undesigned and Joel's:** what `requested-by-joel` checks now that the bot
-(`claudetechpaddock`, `write`, not admin) and Joel are different accounts. Then Phase 3: confirm a
-fresh session reads Linear, close GitHub issues #98 and #116.
+**Phase 3:** #98 and #116 are closed; #116's live proposal is TEC-21. **`requested-by-joel` stays**
+(#189): the #186 hook is the gate, the quoted line is the record. **Left:** confirm a fresh session
+on `main` lists its Linear items, once this merges.
 
 ## Cost, measured 2026-09-22
 
