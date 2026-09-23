@@ -66,9 +66,9 @@ docx fixtures.
 Consequences to expect:
 
 - `supabase migration list` will always show `20260908235234` as present remotely and missing
-  locally. That is correct and permanent. **It should be the only difference** — as of 2026-09-14 it
-  is again, and a second discrepancy appearing means something drifted and is worth reading rather
-  than dismissing.
+  locally. That is correct and permanent. **It should be the only difference** — as of 2026-09-23 it
+  is again, after three files were renamed to their recorded versions (TEC-13). A second
+  discrepancy appearing means something drifted and is worth reading rather than dismissing.
 - **Do not run `supabase migration repair` on it.** Repairing would edit the remote history to
   match the repo, falsifying the record of what was actually applied in order to silence a gap we
   chose on purpose.

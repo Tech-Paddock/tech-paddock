@@ -213,6 +213,10 @@ plausibly reopen or repeat, delete it; git keeps it.
   recovered the cost. **Joel stopped the debrief outright instead**, and then removed the status
   rule too — no board, no footer, no status spec of any kind. Permanent ledger numbers survive only
   as `drift`'s check. `BOARD.html` went with it, ahead of Linear's Phase 2.
+- **2026-09-23 — Health reads recipes through a Cookbook API, authenticated by forwarding the
+  session** (TEC-11). Reading `cookbook` tables directly was rejected: a second shared table, and
+  Health tied to Cookbook's layout. A secret-based carve-out was unnecessary — the middleware already
+  accepts any valid session — and would have been a fourth password gate. Contract: Cookbook's charter.
 
 ## Mistakes — do not repeat
 
