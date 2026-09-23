@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-22. `RULES.md` has the role and the gate, `DECISIONS.md` the reasoning; this is
+State as of 2026-09-23. `RULES.md` has the role and the gate, `DECISIONS.md` the reasoning; this is
 only what is true right now.
 
 ---
@@ -27,9 +27,8 @@ ledger items are TEC-5 to TEC-15, titled with their ledger number, labelled `own
 priority from the ledger section. **Linear is now write-only and `OPEN-ITEMS.md` read-only** until
 Phase 2 deletes it. TEC-1 to 4 are Linear's onboarding issues, left alone. The plan is in #178's
 body — Phase 2 is one atomic branch or it leaves a window where the hook prints a file that is gone.
-**The GitHub bot is measured**: `claudetechpaddock`, role `write`, `admin: false`. What
-`requested-by-joel` checks now that the bot and Joel are different accounts is **Joel's call, and
-undesigned**.
+**The GitHub bot is measured**: `claudetechpaddock`, role `write`, `admin: false`. **`requested-by-joel`
+stays** (Joel, 2026-09-23): the #186 hook is the gate, the quoted line is the record.
 
 **Phase 2 needs a charter PII line first.** Linear user objects carry a real name and email, nothing
 enforces `CLAUDE.md`'s rule against committing either, and whatever reads Linear must map users to
