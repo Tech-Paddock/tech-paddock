@@ -46,7 +46,7 @@ keeps things in one place. When you have something to say, find the reader first
 | `CLAUDE.md` | rules binding every agent | every session, automatic | overwrite |
 | `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | **overwrite · ≤350 lines · TD drafts, Joel approves** |
 | `agents/<you>/HANDOFF.md` | **your area's state right now** | every session | **overwrite · ≤80 lines** |
-| Linear, team TEC | **open requests, each with an owner** | every session, first | **one issue per request · `owner:` and `agent:` labels** |
+| Linear, team TEC | **open requests, each with an owner** | every session, first | **one issue per request · `owner:` and `agent:` labels · body ends with Next steps** |
 | `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append in its section; supersede in place · ≤400 lines** |
 | `/admin` — The Garage | facts about the running system | when you need a fact | **computed, never written** |
 | commits and pull request bodies | what landed, why, blast radius, who asked | at the gate, and afterwards | the event log |
@@ -64,6 +64,9 @@ nothing tells you.
 
 **A request is a Linear issue with an owner.** That is how you ask another agent for something. Not a
 note in your handoff that nobody else reads — say it to the technical director, who owns the queue.
+**Its body ends with a Next steps section** — numbered, each step naming who acts, kept current by
+whoever changes the issue. The next session acts on it without reading the history; an issue that
+needs the history to act on is a note, not a request.
 
 ### When a document reaches its cap
 

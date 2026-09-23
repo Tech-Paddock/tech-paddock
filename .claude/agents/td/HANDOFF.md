@@ -35,6 +35,8 @@ and **fails open**; drift fails a build that reads a path it does not watch (how
 spots: the file's header). **The hub diffs nothing and builds every production merge** — its
 prebuild reads nearly the whole repo — **and still skips previews**, which drift enforces.
 
+**TEC-9 parked:** contract on `claude/db-contacts-contract`, stacked on `claude/db-readme-cap` — merge the cap first.
+
 ## Cost, measured 2026-09-22
 
 **Cost = context × turns.** A fresh session of this seat checks out at ~16.5K tokens; a ~10-turn
@@ -63,6 +65,7 @@ this seat cannot.
 The `packages/` gap, Vercel state reading and the `migration repair` hook are in `DECISIONS.md`.
 
 - **Check the open list live as the first step of every merge**, never from memory.
+- **Add Next steps to any TEC issue missing them** when you list the queue — the rule is `CLAUDE.md`'s.
 - **Read the real head SHA before passing `expectedHeadSha`.** Three inventions, three rejections.
 - **`Vercel – tp-message-editor` is red on `main` itself** — frozen editor, **not a gate failure.**
 - **`gate` runs after the whole build matrix**, so a green `drift` proves nothing.

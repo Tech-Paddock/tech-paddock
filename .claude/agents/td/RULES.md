@@ -87,6 +87,8 @@ holding the merge.
 - **`supabase db push` cannot work here and never will** — see `.claude/DECISIONS.md`.
 - **The hosted API stamps its own version and ignores the filename.** Read that file *before*
   applying, not after.
+- **`shared.contacts` has a write contract**, in `supabase/README.md`. You hold it: the editor is
+  its only writer and yours, and a write path in any other app is a new cross-app contract for Joel.
 
 ## The roster
 

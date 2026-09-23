@@ -66,9 +66,9 @@ docx fixtures.
 Consequences to expect:
 
 - `supabase migration list` will always show `20260908235234` as present remotely and missing
-  locally. That is correct and permanent. **It should be the only difference** — as of 2026-09-14 it
-  is again, and a second discrepancy appearing means something drifted and is worth reading rather
-  than dismissing.
+  locally. That is correct and permanent. **It should be the only difference** — as of 2026-09-23 it
+  is again, after three files were renamed to their recorded versions (TEC-13). A second
+  discrepancy appearing means something drifted and is worth reading rather than dismissing.
 - **Do not run `supabase migration repair` on it.** Repairing would edit the remote history to
   match the repo, falsifying the record of what was actually applied in order to silence a gap we
   chose on purpose.
@@ -170,6 +170,42 @@ count on every reload. Count the tables across the schemas you expect to be expo
 number is short, one of them is not on the list.
 
 
+
+## `shared.contacts` — the write contract
+
+The one table two apps share on purpose, so the rules are a contract rather than one agent's note.
+Read from the code and the live catalog on 2026-09-23 (TEC-9), not from any description of them.
+
+| | Who | What the code does |
+|---|---|---|
+| **Insert** | Message Editor only — `POST /api/contacts` | `name` required; `org`, `position`, `relationship_type`, `preferred_channel`, `notes` optional, null when absent |
+| **Update** | Message Editor only — `PATCH /api/contacts/[id]` | Writes the request body as sent, plus `updated_at`. No column allowlist. No UI calls it |
+| **Delete** | Message Editor only — `DELETE /api/contacts/[id]` | Hard delete. No UI calls it |
+| **Read** | Editor (`/api/contacts`, `/api/draft`); Tracker (`/api/contacts`, thread draft, `lib/followUpTask.ts`, `lib/dashboard.ts`) | Read-only |
+| **Reference** | `editor.message_history.contact_id`, `tracker.pipeline_threads.contact_id` | Foreign keys, `ON DELETE NO ACTION` |
+
+**Nothing prevents a duplicate.** The table has its primary key and no other constraint — no unique
+index, no trigger. The editor inserts without looking first; its typeahead showing existing names is
+the only guard, and it is a person reading a list. Adding a unique key is a schema change with real
+rows behind it, so it is a decision, not a fix.
+
+**A referenced contact cannot be deleted.** Both foreign keys are `NO ACTION`, so the delete fails and
+the route returns 500. That is the safe direction — history is never orphaned — but it means delete
+works only on a contact nothing points at.
+
+**`updated_at` moves only through the editor's PATCH.** There is no trigger, so any other write path
+would leave it stale unless it set it itself.
+
+**The tracker never writes this table** — `apps/tracker/app/api/contacts/route.ts` says so and the code
+agrees. It stores a `contact_id` in its own threads and nothing more. The Resume Formatter writes
+`tracker.pipeline_threads.contact_id` the same way; its `getSharedClient` is exported and never called
+(TEC-26).
+
+**The only create path is in the paused editor.** `tp-message-editor` deploys `BLOCKED`, so what
+creates contacts in production is its last good build, not necessarily this code.
+
+**Adding a write path anywhere else changes this contract.** It goes to Joel through the technical
+director as a new cross-app contract, and this section changes in the same pull request.
 
 ## Why the grants look alarming
 
