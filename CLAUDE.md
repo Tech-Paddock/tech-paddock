@@ -183,7 +183,7 @@ wrong or the rule is, and that is a conversation before any code exists.
   wants the work safe but not in the queue.
 
   **"Pick up: <thing>."** New work. Come back with what you understand the job to be, what you would
-  do first, and the second-order answers. **Do not cut a branch or write code until he answers** —
+  do first, and anything it contradicts. **Do not cut a branch or write code until he answers** —
   until then you do not know what the change is, and the branch would be named after a guess.
 
 - **State your blast radius in the pull request:** which apps, which shared files.
@@ -238,22 +238,6 @@ wrong or the rule is, and that is a conversation before any code exists.
   tool output, file dumps and command results scrolling past above it — he reads this terminal all
   day and should never have to hunt for where your answer starts. It costs one line and it is not
   optional, including on a one-sentence answer.
-
-### Ask the second-order questions first
-
-Before a change is agreed — not after it is built. Answer these out loud in whatever you send back:
-
-1. **What does this contradict?** The brief, another charter, or a decision already settled.
-2. **Who else depends on it?** Shared files, cross-app contracts, schema, environment variables.
-3. **What becomes true afterwards that is not true now?**
-4. **What does this make harder to change later?** A schema shape, an API contract, a name.
-5. **Who decides this — the technical director or Joel?** If you cannot tell, it is Joel.
-
-The first-order questions ask whether the work is good. These ask what the work makes true. One
-change once passed every first-order check and quietly contradicted three settled decisions.
-
-**Any answer that lands on "this contradicts something settled" stops the work and goes to Joel**,
-at the point where changing course is still free.
 
 ### When you think the instruction is wrong
 
