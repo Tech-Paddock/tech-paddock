@@ -8,9 +8,9 @@ State as of 2026-09-22.
 
 ## In flight
 
-**Three branches, stacked, from Joel's 2026-09-22 feedback:** `claude/cookbook-icon` (the race
-roundel, tab icon only), `-feedback-fixes` on it (toasts, the collapse, Recipes boxed, list adding on
-top), `-from-a-file` on that. **Merge in that order.** Everything before them is live, as #175.
+**One pull request carries Joel's 2026-09-22 feedback round**, from `claude/cookbook-from-a-file`:
+the icon, toasts, the collapse, Recipes boxed, list adding on top, and the file path. Combined on
+his word; `-icon` and `-feedback-fixes` are inside it and now only need deleting.
 
 **Remembered brands are live and empty** — `brand_preferences`, RLS on, zero policies, **zero rows**;
 its migration was **recorded under the version its filename declares**, unlike the three in item 26.
@@ -34,8 +34,8 @@ not routes. **Adding sits on top of both tabs**, collapsed on Recipes. **Four wa
 `source_url`, refused twice when illegible like a link. **Nothing a model wrote is saved until
 Keep it; the typed path saves straight away**, so the charter's "all three land as a draft" is
 false twice over now — the TD's. **Results are toasts** (`app/Toast.tsx`); a failed read stays inline.
-**Tab icon only, no home-screen icon** — the standup settled no install. **The icon is Joel's pick
-between Nos. 11 and 12** (artifact `8dHFRUnnZW4AJo9vem63HA`); the branch holds No. 7 until he says.
+**Tab icon only, no home-screen icon** — the standup settled no install. **The icon is No. 12**, the
+roundel on the car from above, Joel's pick on 2026-09-23 (artifact `8dHFRUnnZW4AJo9vem63HA`).
 **Its colours are exact and fixed, dark mode included** — his words: "it's perfect". No dark variant.
 
 **Three tables, all in `cookbook`**, reasoning in the migration headers. `recipes` stores **the whole

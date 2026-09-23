@@ -1,11 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Cookbook">
-  <!-- Race roundel. Chosen by Joel on 2026-09-22 from ten candidates.
-       Colours are the Clark livery's own, copied from lib/theme.css:
-       accent #0F5C33 is the Type 25's green, tone-4 #FFD84D its yellow
-       nose stripe, and the roundel is tone-1 #DCECE1 rather than white so
-       it sits in the palette. The C stands where a race number would. -->
+  <!-- The race roundel on the car, from above, no wheels. No. 12, chosen by
+       Joel on 2026-09-23 from eighteen candidates over two rounds.
+       The nose points at you: the yellow stripe runs down it into the
+       roundel, and the front wing crosses the bottom with its endplates.
+       The Type 25 had no wing (they arrived in 1968); it is drawn for the
+       idea. Colours are the Clark livery's, copied from lib/theme.css:
+       accent #0F5C33, tone-4 #FFD84D, ink #0A1A11, tone-1 #DCECE1.
+       **Fixed, with no dark variant**, on Joel's word: "I want to capture
+       the coloring exactly the way it is. It's perfect." -->
   <rect width="64" height="64" rx="14" fill="#0F5C33"/>
-  <rect x="28" y="0" width="8" height="64" fill="#FFD84D"/>
-  <circle cx="32" cy="32" r="18" fill="#DCECE1"/>
-  <path d="M39.5 24.5 A10.5 10.5 0 1 0 39.5 39.5" stroke="#0F5C33" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+  <path d="M23 0 H41 L37.5 44 H26.5 Z" fill="#0A1A11"/>
+  <rect x="30" y="0" width="4" height="44" fill="#FFD84D"/>
+  <circle cx="32" cy="29" r="9" fill="#DCECE1"/>
+  <path d="M35.78 25.22 A5.22 5.22 0 1 0 35.78 32.78" stroke="#0F5C33" stroke-width="2.7" stroke-linecap="round" fill="none"/>
+  <rect x="6" y="45" width="52" height="8" rx="2" fill="#FFD84D"/>
+  <rect x="6" y="41" width="3" height="14" rx="1" fill="#0A1A11"/>
+  <rect x="55" y="41" width="3" height="14" rx="1" fill="#0A1A11"/>
 </svg>
