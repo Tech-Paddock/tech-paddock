@@ -37,9 +37,8 @@ the repo's short names.
 
 ## The debrief is dead
 
-Joel stopped it 2026-09-22, and `claude/brief-drop-sign-off` deletes it: the spec, the board rule,
-`BOARD.html` and its kickoff URL. `CLAUDE.md` goes 521 → 370, **which resolves item 28 (TEC-5)** —
-close it in Linear once that merges. **No status rule survives**; ledger numbers stay `drift`'s.
+Joel stopped it; #183 deleted the spec, the board, `BOARD.html` and the status rule. `CLAUDE.md` is
+370 lines and **TEC-5 is closed**. **No status rule survives**; ledger numbers stay `drift`'s.
 
 ## The queue cleared 2026-09-22, and what it left
 
@@ -48,7 +47,8 @@ close it in Linear once that merges. **No status rule survives**; ledger numbers
 rebase and a full CI run, so **merges here are serial** and a batch costs a cycle each. One PR
 merged as it finishes never meets the rule.
 
-**Every dead branch is gone** — `main` is the only remote head, measured 2026-09-22.
+**Opening a pull request, updating a branch and merging each wait for Joel's click** — a hook, once
+`claude/platform-outward-action-gates` merges. **Joel's word decides scope**; nothing else codifies it.
 
 **#177's two extras are in its commits**: a handoff conflict resolved by taking TechPad Gen's own
 newer copy whole — lossless by inspection, never a judgement, because a handoff is not this seat's
