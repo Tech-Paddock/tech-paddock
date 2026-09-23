@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { asText, type GroceryItem, type TidyLine } from "@/lib/grocery";
 import type { ResolvedLink } from "@/lib/preferences";
 import Brands, { RememberForm } from "./Brands";
+import { useToast } from "./Toast";
 
 /**
  * A line as the server hands it over: the row, plus where its link should go and
@@ -33,7 +34,9 @@ export default function List({ refreshKey }: { refreshKey: number }) {
   const [items, setItems] = useState<ShoppingLine[] | null>(null);
   const [remembering, setRemembering] = useState<ShoppingLine | null>(null);
   const [brandsVersion, setBrandsVersion] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  // The read only; everything else is a toast. Same split as the book.
+  const [readError, setReadError] = useState<string | null>(null);
+  const toast = useToast();
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState<null | "adding" | "tidying" | "applying">(null);
@@ -46,12 +49,12 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't read the list.");
       setItems(body.items as ShoppingLine[]);
-      setError(null);
+      setReadError(null);
     } catch (e) {
       // Same discipline as the book: a failed read leaves `items` null rather
       // than empty, because "buy nothing" and "we could not look" are opposite
       // messages that render identically.
-      setError(e instanceof Error ? e.message : "Couldn't read the list.");
+      setReadError(e instanceof Error ? e.message : "Couldn't read the list.");
     }
   }, []);
 
@@ -73,7 +76,7 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       setTyped("");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't add that.");
+      toast.error(e instanceof Error ? e.message : "Couldn't add that.");
     } finally {
       setBusy(null);
     }
@@ -94,7 +97,7 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       });
       if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't tick that off.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't tick that off.");
+      toast.error(e instanceof Error ? e.message : "Couldn't tick that off.");
       await load();
     }
   }
@@ -111,7 +114,6 @@ export default function List({ refreshKey }: { refreshKey: number }) {
   async function clearEverything() {
     const all = (items ?? []).map((i) => i.id);
     if (all.length === 0) return;
-    setError(null);
     try {
       const response = await fetch("/api/grocery", {
         method: "DELETE",
@@ -122,7 +124,7 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       setItems([]);
       setConfirmingClear(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't clear the list.");
+      toast.error(e instanceof Error ? e.message : "Couldn't clear the list.");
     }
   }
 
@@ -138,21 +140,20 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't clear those.");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't clear those.");
+      toast.error(e instanceof Error ? e.message : "Couldn't clear those.");
     }
   }
 
   async function propose() {
     if (busy) return;
     setBusy("tidying");
-    setError(null);
     try {
       const response = await fetch("/api/grocery/tidy", { method: "POST" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't work out a tidier list.");
       setProposal(body.lines as TidyLine[]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't work out a tidier list.");
+      toast.error(e instanceof Error ? e.message : "Couldn't work out a tidier list.");
     } finally {
       setBusy(null);
     }
@@ -172,7 +173,7 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       setProposal(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't apply that.");
+      toast.error(e instanceof Error ? e.message : "Couldn't apply that.");
     } finally {
       setBusy(null);
     }
@@ -189,7 +190,7 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       // Clipboard access is refused often enough — an insecure origin, a
       // permission prompt declined — that failing silently would look like the
       // button doing nothing. Say so instead.
-      setError("Couldn't reach the clipboard. Select the lines and copy them by hand.");
+      toast.error("Couldn't reach the clipboard. Select the lines and copy them by hand.");
     }
   }
 
@@ -198,6 +199,35 @@ export default function List({ refreshKey }: { refreshKey: number }) {
 
   return (
     <section id="shop" className="flex scroll-mt-4 flex-col gap-3">
+      {/* **Adding sits at the top**, Joel on 2026-09-22. It is what you do most
+          on this tab, and under the list and the brands panel it was a scroll
+          away on a phone. Clearing what you bought stays under the list, next to
+          the lines it clears. */}
+      <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
+        <textarea
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          rows={2}
+          placeholder={"Milk\nEggs — the big box"}
+          aria-label="Add to the list, one per line"
+          className="rounded-lg border border-line bg-surface p-3 text-base"
+        />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={add}
+            disabled={typed.trim() === "" || busy !== null}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
+          >
+            {busy === "adding" ? "Adding…" : "Add to the list"}
+          </button>
+        </div>
+        <p className="text-xs text-ink-soft">
+          One line each. Anything after an em dash is a note for the shop — it is not searched,
+          because &ldquo;the small tin&rdquo; narrows a search to nothing.
+        </p>
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-base font-semibold">King Soopers list</h2>
         {items !== null ? (
@@ -252,12 +282,6 @@ export default function List({ refreshKey }: { refreshKey: number }) {
         </div>
       </div>
 
-      {error ? (
-        <p role="alert" className="rounded-lg border border-danger/60 bg-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
-
       {/* **A tidy is shown before it happens.** Merging two lines into one is
           right where losing a line is not, and the two look identical until you
           read them. `validateTidy` has already refused anything that drops or
@@ -295,7 +319,13 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       ) : null}
 
       {items === null ? (
-        <p className="text-sm text-ink-soft">Reading the list…</p>
+        readError ? (
+          <p role="alert" className="text-sm text-danger">
+            {readError}
+          </p>
+        ) : (
+          <p className="text-sm text-ink-soft">Reading the list…</p>
+        )
       ) : items.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line p-4 text-sm text-ink-soft">
           Nothing on it. Add a recipe&rsquo;s ingredients from the book, or type what you need.
@@ -340,6 +370,16 @@ export default function List({ refreshKey }: { refreshKey: number }) {
         </ul>
       )}
 
+      {bought.length > 0 ? (
+        <button
+          type="button"
+          onClick={clearBought}
+          className="self-end rounded-lg border border-line px-3 py-2 text-sm text-ink-soft"
+        >
+          Clear the {bought.length} bought
+        </button>
+      ) : null}
+
       {/* The editor opens under the list rather than inside the row: on a phone a
           form squeezed into a line is a form you cannot type in. */}
       {remembering ? (
@@ -360,39 +400,6 @@ export default function List({ refreshKey }: { refreshKey: number }) {
 
       <Brands version={brandsVersion} onChanged={() => void load()} />
 
-      <div className="flex flex-col gap-2">
-        <textarea
-          value={typed}
-          onChange={(e) => setTyped(e.target.value)}
-          rows={2}
-          placeholder={"Milk\nEggs — the big box"}
-          aria-label="Add to the list, one per line"
-          className="rounded-lg border border-line bg-surface p-3 text-base"
-        />
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={add}
-            disabled={typed.trim() === "" || busy !== null}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
-          >
-            {busy === "adding" ? "Adding…" : "Add to the list"}
-          </button>
-          {bought.length > 0 ? (
-            <button
-              type="button"
-              onClick={clearBought}
-              className="ml-auto rounded-lg border border-line px-3 py-2 text-sm text-ink-soft"
-            >
-              Clear the {bought.length} bought
-            </button>
-          ) : null}
-        </div>
-        <p className="text-xs text-ink-soft">
-          One line each. Anything after an em dash is a note for the shop — it is not searched,
-          because &ldquo;the small tin&rdquo; narrows a search to nothing.
-        </p>
-      </div>
     </section>
   );
 }

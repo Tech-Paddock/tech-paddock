@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Provenance from "./Provenance";
+import { useToast } from "./Toast";
 import { MACRO_KEYS, MACRO_LABELS, round, scale, type Macros } from "@/lib/macros";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
 import { methodSteps, perServing, type Recipe, type RecipeDraft, type RecipeOrigin } from "@/lib/recipes";
+import { MAX_FILE_BYTES, isFileMediaType, type RecipeFile } from "@/lib/upload";
+import { downscale } from "@/lib/image";
 
 /**
- * The book, and the three ways into it.
+ * The book, and the four ways into it. The fourth, a file, arrived 2026-09-22.
  *
  * **Nothing a model wrote is saved until you press Keep it** — generated or read
  * off a page, it is a draft on this screen and a row in the book only after that.
@@ -27,7 +30,40 @@ import { methodSteps, perServing, type Recipe, type RecipeDraft, type RecipeOrig
  * scroll to find. Collapsed by default, so the book is still what you see.
  */
 
-type Mode = "manual" | "generate" | "import";
+type Mode = "manual" | "generate" | "import" | "file";
+
+const MODE_LABELS: Record<Mode, string> = {
+  manual: "Type it",
+  generate: "Ask Claude",
+  import: "From a link",
+  file: "From a file",
+};
+
+/**
+ * Turn a chosen file into what the draft route accepts.
+ *
+ * **Photos are shrunk here, PDFs are sent as they are.** A phone photo is HEIC
+ * and several megabytes, and re-encoding it through a canvas makes it a JPEG
+ * well under the cap — see `lib/image.ts`. A PDF cannot be shrunk in a browser
+ * without a library, so it is checked against the cap and refused with a
+ * sentence if it is over, rather than failing at Vercel with an opaque 413.
+ */
+async function prepareFile(chosen: File): Promise<RecipeFile> {
+  const ready = chosen.type === "application/pdf" ? chosen : await downscale(chosen);
+  if (!isFileMediaType(ready.type)) {
+    throw new Error("That kind of file can't be read. Use a photo or a PDF.");
+  }
+  if (ready.size > MAX_FILE_BYTES) {
+    throw new Error("That file is over 3 MB. A photo of the page, or a shorter PDF, will fit.");
+  }
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Couldn't read that file."));
+    reader.readAsDataURL(ready);
+  });
+  return { mediaType: ready.type, data: dataUrl.slice(dataUrl.indexOf(",") + 1) };
+}
 
 const ORIGIN_LABELS: Record<RecipeOrigin, string> = {
   manual: "Yours",
@@ -55,8 +91,10 @@ function MacroRow({ macros, per }: { macros: Macros; per: string }) {
 
 export default function Book({ onAddedToList }: { onAddedToList?: () => void }) {
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  // Only for the read itself. Everything else reports through a toast; a book
+  // that could not be read is a state, and it stays on screen while it is true.
+  const [readError, setReadError] = useState<string | null>(null);
+  const toast = useToast();
   const [busy, setBusy] = useState<null | "drafting" | "keeping">(null);
   const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
 
@@ -67,6 +105,8 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   const [method, setMethod] = useState("");
   const [brief, setBrief] = useState("");
   const [url, setUrl] = useState("");
+  const [file, setFile] = useState<(RecipeFile & { name: string }) | null>(null);
+  const [preparing, setPreparing] = useState(false);
 
   const [draft, setDraft] = useState<RecipeDraft | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -79,10 +119,11 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't read the book.");
       setRecipes(body.recipes as Recipe[]);
+      setReadError(null);
     } catch (e) {
       // Deliberately leaves `recipes` null rather than setting it to []. An
       // unread book and an empty book must not render the same.
-      setError(e instanceof Error ? e.message : "Couldn't read the book.");
+      setReadError(e instanceof Error ? e.message : "Couldn't read the book.");
     }
   }, []);
 
@@ -93,8 +134,6 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   async function makeDraft() {
     if (busy) return;
     setBusy("drafting");
-    setError(null);
-    setNotice(null);
     try {
       const payload =
         mode === "manual"
@@ -108,7 +147,9 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
             }
           : mode === "generate"
             ? { mode, model, brief }
-            : { mode, model, url };
+            : mode === "import"
+              ? { mode, model, url }
+              : { mode, model, file: file && { mediaType: file.mediaType, data: file.data } };
 
       const response = await fetch("/api/recipes/draft", {
         method: "POST",
@@ -125,7 +166,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       if (mode === "manual") await save(drafted);
       else setDraft(drafted);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't draft that.");
+      toast.error(e instanceof Error ? e.message : "Couldn't draft that.");
     } finally {
       setBusy(null);
     }
@@ -152,26 +193,24 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     setMethod("");
     setBrief("");
     setUrl("");
-    setNotice(`"${(body.recipe as Recipe).name}" is in the book.`);
+    setFile(null);
+    toast.notice(`"${(body.recipe as Recipe).name}" is in the book.`);
     await load();
   }
 
   async function keepIt() {
     if (!draft || busy) return;
     setBusy("keeping");
-    setError(null);
     try {
       await save(draft);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't save that.");
+      toast.error(e instanceof Error ? e.message : "Couldn't save that.");
     } finally {
       setBusy(null);
     }
   }
 
   async function toList(recipe: Recipe) {
-    setError(null);
-    setNotice(null);
     try {
       const response = await fetch("/api/recipes/grocery", {
         method: "POST",
@@ -180,16 +219,14 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't add those.");
-      setNotice(`${body.added} ingredient${body.added === 1 ? "" : "s"} added to your list.`);
+      toast.notice(`${body.added} ingredient${body.added === 1 ? "" : "s"} added to your list.`);
       onAddedToList?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't add those.");
+      toast.error(e instanceof Error ? e.message : "Couldn't add those.");
     }
   }
 
   async function remove(recipe: Recipe) {
-    setError(null);
-    setNotice(null);
     try {
       const response = await fetch("/api/recipes", {
         method: "DELETE",
@@ -197,10 +234,10 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
         body: JSON.stringify({ id: recipe.id }),
       });
       if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't remove that.");
-      setNotice(`"${recipe.name}" is out of the book. Your list keeps anything you already added.`);
+      toast.notice(`"${recipe.name}" is out of the book. Your list keeps anything you already added.`);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't remove that.");
+      toast.error(e instanceof Error ? e.message : "Couldn't remove that.");
     }
   }
 
@@ -221,24 +258,30 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     );
   });
 
+  async function choose(chosen: File | undefined) {
+    if (!chosen) return;
+    setPreparing(true);
+    setFile(null);
+    try {
+      setFile({ ...(await prepareFile(chosen)), name: chosen.name });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't read that file.");
+    } finally {
+      setPreparing(false);
+    }
+  }
+
   const ready =
     mode === "manual"
       ? name.trim() !== "" && ingredients.trim() !== "" && Number(servings) >= 1
       : mode === "generate"
         ? brief.trim() !== ""
-        : /^https?:\/\/\S+$/i.test(url.trim());
+        : mode === "import"
+          ? /^https?:\/\/\S+$/i.test(url.trim())
+          : file !== null && !preparing;
 
   return (
     <div className="flex flex-col gap-8">
-      {error ? (
-        <p role="alert" className="rounded-lg border border-danger/60 bg-surface p-3 text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
-      {notice ? (
-        <p className="rounded-lg border border-line bg-surface p-3 text-sm text-ink-soft">{notice}</p>
-      ) : null}
-
       {/* ------------------------------------------------------------------ */}
       {/* Adding one. First on the page, collapsed until you want it.        */}
       {/* ------------------------------------------------------------------ */}
@@ -255,8 +298,12 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
         </button>
 
         {/* Hidden rather than unmounted: collapsing the panel must not throw away
-            a half-typed recipe or a draft you have not decided on yet. */}
-        <div id="add-panel" hidden={!adding} className="flex flex-col gap-3">
+            a half-typed recipe or a draft you have not decided on yet.
+            **The display class has to follow `adding` too.** `hidden` alone lost
+            to Tailwind's `flex`, which comes later in the cascade at the same
+            specificity, so the panel never closed and the sign flipped for
+            nothing — the bug Joel found on 2026-09-22. */}
+        <div id="add-panel" hidden={!adding} className={adding ? "flex flex-col gap-3" : "hidden"}>
         <div className="flex flex-wrap items-center gap-2">
           {/* The model picker sits here and nowhere else, because pricing a dish
               is the only judgement in the app. Reading the book calls nothing,
@@ -277,8 +324,10 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
           </label>
         </div>
 
-        <div className="flex gap-1 rounded-lg border border-line bg-surface p-1 text-sm">
-          {(["manual", "generate", "import"] as Mode[]).map((m) => (
+        {/* Two by two on a phone: four labels in one row would crush "From a
+            link" and "From a file" into two lines each. */}
+        <div className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-surface p-1 text-sm sm:grid-cols-4">
+          {(["manual", "generate", "import", "file"] as Mode[]).map((m) => (
             <button
               key={m}
               type="button"
@@ -286,11 +335,11 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
                 setMode(m);
                 setDraft(null);
               }}
-              className={`flex-1 rounded px-2 py-2 ${
+              className={`rounded px-2 py-2 ${
                 mode === m ? "bg-accent font-semibold text-accent-ink" : "text-ink-soft"
               }`}
             >
-              {m === "manual" ? "Type it" : m === "generate" ? "Ask Claude" : "From a link"}
+              {MODE_LABELS[m]}
             </button>
           ))}
         </div>
@@ -341,7 +390,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               className="rounded-lg border border-line bg-surface p-3 text-base"
             />
           </div>
-        ) : (
+        ) : mode === "import" ? (
           <div className="flex flex-col gap-2">
             <input
               value={url}
@@ -355,6 +404,39 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               Only the recipe is kept — the story and the ads are dropped, and the macros are worked
               out here rather than copied off the page.{" "}
               <b>If the page cannot be read you get an error, not a guess.</b>
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {/* A label wrapping a hidden input, so the whole box is the tap
+                target and it can say what is chosen. No `capture`: on a phone
+                that forces the camera, and a screenshot or a PDF is as likely. */}
+            <label
+              htmlFor="recipe-file"
+              className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-dashed border-line bg-surface p-5 text-center text-sm"
+            >
+              <span className="font-medium">
+                {preparing ? "Getting it ready…" : file ? file.name : "Choose a photo or a PDF"}
+              </span>
+              <span className="text-xs text-ink-soft">
+                {file ? "Tap to choose a different one" : "A cookbook page, a recipe card, a screenshot"}
+              </span>
+            </label>
+            <input
+              id="recipe-file"
+              type="file"
+              accept="image/*,application/pdf"
+              className="sr-only"
+              onChange={(e) => {
+                void choose(e.target.files?.[0]);
+                // Cleared so choosing the same file again still fires onChange.
+                e.target.value = "";
+              }}
+            />
+            <p className="text-xs text-ink-soft">
+              Only the recipe is kept. The file isn&rsquo;t saved anywhere, and any nutrition panel
+              in it is ignored: the macros are worked out here.{" "}
+              <b>If it can&rsquo;t be read, you get an error, not a guess.</b>
             </p>
           </div>
         )}
@@ -442,9 +524,12 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       {/* ------------------------------------------------------------------ */}
       {/* The book, under the form now. It is still the reason you came.     */}
       {/* ------------------------------------------------------------------ */}
-      <section id="book" className="flex scroll-mt-4 flex-col gap-3">
+      {/* Boxed and named "Recipes", Joel on 2026-09-22 — the same frame as the
+          panel above, so the page reads as two things rather than one form
+          trailing into a list. */}
+      <section id="book" className="flex scroll-mt-4 flex-col gap-3 rounded-lg border border-line p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold">What you could cook</h2>
+          <h2 className="text-base font-semibold">Recipes</h2>
           {recipes !== null && recipes.length > 0 ? (
             <input
               value={query}
@@ -458,10 +543,16 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
         </div>
 
         {recipes === null ? (
-          <p className="text-sm text-ink-soft">Reading the book…</p>
+          readError ? (
+            <p role="alert" className="text-sm text-danger">
+              {readError}
+            </p>
+          ) : (
+            <p className="text-sm text-ink-soft">Reading the book…</p>
+          )
         ) : recipes.length === 0 ? (
           <p className="rounded-lg border border-dashed border-line p-4 text-sm text-ink-soft">
-            Nothing in it yet. Write one below, describe one, or paste a link.
+            Nothing in it yet. Add one above: type it, describe it, or paste a link.
           </p>
         ) : shown.length === 0 ? (
           // Deliberately not the same sentence as an empty book. "Nothing here"

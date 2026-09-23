@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { estimateRecipeMacros, generateRecipe, importRecipe, type RecipeFields } from "@/lib/anthropic";
+import { estimateRecipeMacros, generateRecipe, importRecipe, readRecipeFile, type RecipeFields } from "@/lib/anthropic";
+import { validateRecipeFile } from "@/lib/upload";
 import { type RecipeDraft } from "@/lib/recipes";
 import { LookupError } from "@/lib/errors";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
@@ -10,15 +11,18 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 /**
- * Three ways into the book, and **none of them writes anything.**
+ * Four ways into the book, and **none of them writes anything.**
  *
  * - `manual` — you typed the recipe; the model only prices it.
  * - `generate` — you described what you wanted; the model writes it, then prices
  *   what it wrote.
  * - `import` — you pasted a link; the model reads the page, then prices what it
  *   read.
+ * - `file` — you uploaded a photo or a PDF; the model reads it, then prices what
+ *   it read. Added 2026-09-22. It lands as `imported` with no `source_url`,
+ *   because there is nowhere to point back to, and the file itself is not kept.
  *
- * All three end at the same approval, `POST /api/recipes`. **This route is the
+ * All four end at the same approval, `POST /api/recipes`. **This route is the
  * draft, and the draft is not the book.**
  *
  * **The macros are always ours.** Even an imported recipe whose page publishes a
@@ -91,8 +95,26 @@ export async function POST(request: NextRequest) {
       fields = read.fields;
       origin = "imported";
       sourceUrl = url;
+    } else if (mode === "file") {
+      const checked = validateRecipeFile(body.file);
+      if ("error" in checked) return NextResponse.json({ error: checked.error }, { status: 400 });
+
+      const read = await readRecipeFile({ file: checked.file, model });
+      // The same loud refusal as a page that could not be read.
+      if (!read.read || !read.fields) {
+        return NextResponse.json(
+          { error: `Nothing was imported. ${read.reason ?? "That file could not be read."}` },
+          { status: 422 }
+        );
+      }
+
+      fields = read.fields;
+      origin = "imported";
     } else {
-      return NextResponse.json({ error: "Type it, ask for one, or paste a link." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Type it, ask for one, paste a link, or choose a file." },
+        { status: 400 }
+      );
     }
 
     // An imported page that never said how many it serves comes back as 0. Four
@@ -115,7 +137,7 @@ export async function POST(request: NextRequest) {
       method: fields.method,
       note:
         [
-          assumedServings ? "The page did not say how many it serves; 4 assumed — change it." : null,
+          assumedServings ? `${mode === "file" ? "The file" : "The page"} did not say how many it serves; 4 assumed — change it.` : null,
           estimate.note,
         ]
           .filter(Boolean)

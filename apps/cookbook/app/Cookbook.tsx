@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Book from "./Book";
 import List from "./List";
+import { ToastProvider } from "./Toast";
 
 /**
  * The two tabs, and the one piece of state they share.
@@ -41,37 +42,39 @@ export default function Cookbook() {
   const [listVersion, setListVersion] = useState(0);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div role="tablist" aria-label="Cookbook" className="flex gap-1 rounded-lg border border-line bg-surface p-1">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            type="button"
-            id={`tab-${t.id}`}
-            aria-selected={tab === t.id}
-            aria-controls={`panel-${t.id}`}
-            onClick={() => setTab(t.id)}
-            className={`flex-1 rounded px-3 py-2 text-sm ${
-              tab === t.id ? "bg-accent font-semibold text-accent-ink" : "text-ink-soft"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+    <ToastProvider>
+      <div className="flex flex-col gap-6">
+        <div role="tablist" aria-label="Cookbook" className="flex gap-1 rounded-lg border border-line bg-surface p-1">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              type="button"
+              id={`tab-${t.id}`}
+              aria-selected={tab === t.id}
+              aria-controls={`panel-${t.id}`}
+              onClick={() => setTab(t.id)}
+              className={`flex-1 rounded px-3 py-2 text-sm ${
+                tab === t.id ? "bg-accent font-semibold text-accent-ink" : "text-ink-soft"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-      {/* **Both panels stay mounted; only the inactive one is hidden.** Unmounting
-          would throw away the book's fetched rows, your search text and any draft
-          you were part-way through every time you glanced at the list, and a draft
-          is unsaved work by definition. `hidden` keeps them off the accessibility
-          tree without costing that. */}
-      <div role="tabpanel" id="panel-recipes" aria-labelledby="tab-recipes" hidden={tab !== "recipes"}>
-        <Book onAddedToList={() => setListVersion((n) => n + 1)} />
+        {/* **Both panels stay mounted; only the inactive one is hidden.** Unmounting
+            would throw away the book's fetched rows, your search text and any draft
+            you were part-way through every time you glanced at the list, and a draft
+            is unsaved work by definition. `hidden` keeps them off the accessibility
+            tree without costing that. */}
+        <div role="tabpanel" id="panel-recipes" aria-labelledby="tab-recipes" hidden={tab !== "recipes"}>
+          <Book onAddedToList={() => setListVersion((n) => n + 1)} />
+        </div>
+        <div role="tabpanel" id="panel-shop" aria-labelledby="tab-shop" hidden={tab !== "shop"}>
+          <List refreshKey={listVersion} />
+        </div>
       </div>
-      <div role="tabpanel" id="panel-shop" aria-labelledby="tab-shop" hidden={tab !== "shop"}>
-        <List refreshKey={listVersion} />
-      </div>
-    </div>
+    </ToastProvider>
   );
 }
