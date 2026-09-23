@@ -11,7 +11,6 @@
 - [ ] CI is green — the `gate` job covers the per-app builds and `drift`; a new app under `apps/` needs no workflow change
 - [ ] No personal information anywhere in the diff — names, addresses, phone numbers, emails, employers, schools, resume content. For any `.docx`, that includes hyperlink targets in `.rels` parts and the author fields in `docProps/`, not just `document.xml`.
 - [ ] `HANDOFF.md` updated for every area this touches, and it describes what this change leaves behind
-- [ ] Second-order questions answered before this was built, not after — see `CLAUDE.md`
 - [ ] Any schema change has its migration file in this PR, and its shape is stated below
 
 ## Deployment
