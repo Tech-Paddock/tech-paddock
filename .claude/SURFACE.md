@@ -51,8 +51,9 @@ So: **count how often it is opened and in what state of mind, never how many rou
 ## If it is an app
 
 - **One screen.** A second screen needs a reason that survives being written down and is Joel's to
-  approve. Health's grocery list is the precedent and the bar: it earned one because it is the same
-  foods, one step before they are eaten — the same nouns, not new territory.
+  approve. Health's grocery list set the precedent and the bar: it earned one because it is the same
+  foods, one step before they are eaten — the same nouns, not new territory. The list has since
+  moved to the Cookbook with the recipes (TEC-15); the bar did not move with it.
 - **No index and no tabs.** There is nowhere else to go, because you did not come to browse. Anything
   secondary reaches the main screen as **a quiet footer link, never a tab** — Health's own
   formulation, and better than the one this guide would have supplied.
@@ -89,7 +90,7 @@ doing more work than it should.
 | Tool | Surface | Why |
 |---|---|---|
 | Coffee | **App** | At the grinder, several times a day, one decided thing. Installed to the home screen. |
-| Health | **App** | Just ate, phone in hand, log it and close. The grocery list is its approved second screen. |
+| Health | **App** | Just ate, phone in hand, log it and close. Its grocery list moved to the Cookbook (TEC-15). |
 | Resume Formatter | **Site** | Occasional, sitting down, arriving to look at what is there. |
 | Pipeline Tracker | **Site** | Reviewing a pipeline is surveying, not doing one decided thing. |
 | Message Editor | **Site** | Composing is unhurried and desk-bound. Frozen, so this is a record rather than a plan. |
