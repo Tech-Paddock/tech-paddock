@@ -61,8 +61,7 @@ this seat cannot.
 The `packages/` gap, Vercel state reading and the `migration repair` hook are in `DECISIONS.md`.
 
 - **Check the open list live as the first step of every merge**, never from memory.
-- **Every TEC issue ends with Next steps** (`CLAUDE.md`, 2026-09-23). All open ones did at adoption;
-  add the section to any issue missing it when you list the queue.
+- **Add Next steps to any TEC issue missing them** when you list the queue — the rule is `CLAUDE.md`'s.
 - **Read the real head SHA before passing `expectedHeadSha`.** Three inventions, three rejections.
 - **`Vercel – tp-message-editor` is red on `main` itself** — frozen editor, **not a gate failure.**
 - **`gate` runs after the whole build matrix**, so a green `drift` proves nothing.
