@@ -8,9 +8,9 @@ State as of 2026-09-22.
 
 ## In flight
 
-**One pull request carries Joel's 2026-09-22 feedback round**, from `claude/cookbook-from-a-file`:
-the icon, toasts, the collapse, Recipes boxed, list adding on top, and the file path. Combined on
-his word; `-icon` and `-feedback-fixes` are inside it and now only need deleting.
+**One pull request carries Joel's 2026-09-22 feedback round**, from `claude/cookbook-feedback-round`:
+the icon, toasts, the collapse, Recipes boxed, list adding on top, and the file path. It replaces the
+TD's #184 on his word. `-icon`, `-feedback-fixes` and `-from-a-file` are inside it, only to delete.
 
 **Remembered brands are live and empty** — `brand_preferences`, RLS on, zero policies, **zero rows**;
 its migration was **recorded under the version its filename declares**, unlike the three in item 26.
