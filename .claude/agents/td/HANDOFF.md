@@ -14,7 +14,8 @@ only what is true right now.
 prints one fixed line pointing at Linear, team TEC, so **every session has to call Linear itself** —
 Joel's choice over a generated copy, recorded in `DECISIONS.md`. **The connector authenticates as
 `claude@techpaddock.io`.** Issues carry `owner:` and `agent:` labels; old ledger numbers survive in
-titles. TEC-1 to 4 are Linear's onboarding issues, left alone.
+titles. **An issue takes one `agent:` label**, so cross-agent work is a parent (TD) with one
+sub-issue per agent (TEC-22 to 25 are the pattern).
 
 **`drift` checks the file stays gone** and no longer parses it. `CLAUDE.md`'s cap is now 400.
 **This seat's freshness is dated against `apps/editor`, `scripts` and `.github`**, so it can warn.
@@ -24,9 +25,7 @@ name and email. Nothing mechanical enforces it.
 
 **Coffee and the Resume Formatter have no `agent:`/`owner:` labels yet**; every other agent does.
 
-**Phase 3 is done.** #98 and #116 are closed; #116's live proposal is TEC-21. **`requested-by-joel`
-stays** (#189): the #186 hook is the gate, the quoted line is the record. A fresh session on `main`
-(2026-09-23) was pointed at Linear by the hook and listed TEC live — the last open step.
+**`requested-by-joel` stays** (#189): the #186 hook is the gate, the quoted line is the record.
 
 ## Build scope — TEC-10 (#191)
 
@@ -35,13 +34,18 @@ and **fails open**; drift fails a build that reads a path it does not watch (how
 spots: the file's header). **The hub diffs nothing and builds every production merge** — its
 prebuild reads nearly the whole repo — **and still skips previews**, which drift enforces.
 
-**TEC-9 parked:** contract on `claude/db-contacts-contract`, stacked on `claude/db-readme-cap` — merge the cap first.
+## Next for this seat
 
-## Cost, measured 2026-09-22
+- **TEC-8:** the hub's glance gets no `/api/summary` requests in production; TechPad Gen's evidence
+  points at `INTERNAL_API_SECRET` missing on `tp-home`. Confirm it live, then it is Joel's dashboard step.
+- **`CLAUDE.md` says the tracker writes `shared.contacts`; it only reads it** (#199). One line, Joel's.
+- **`KICKOFF.md`'s Health and Cookbook blocks are stale** — "day one", Cookbook "site". Drafting is yours.
+- **TEC-15 part 2** — file Health's drop of `health.grocery_items` once TEC-23 is live; apply at gate.
+- **TEC-7** waits on Joel's "pick up".
 
-**Cost = context × turns.** A fresh session of this seat checks out at ~16.5K tokens; a ~10-turn
-gate is **$0.24 fresh against $5.80 at 387K**, so **one session, one branch, end it.** A pull
-request is ~$5 at that size and free when Joel opens it in a browser. Full figures in #178.
+**Starting another agent from here works:** `create_session` with its kickoff block plus the task,
+`outcome_branch` set. **It cannot message you back**; a one-shot `create_trigger` aimed at its
+session is the only way to send it a follow-up. Delete the trigger once it fires.
 
 ## How merges work now
 
@@ -54,17 +58,13 @@ run: **merges here are serial**, and a batch costs a cycle each.
 **Editing `.claude/settings.json`, `CLAUDE.md` or deleting a shared file is refused by the session's
 permission classifier** until Joel authorises it in the conversation. Ask in chat; it then passes.
 
-## Stale branches on origin
-
-`claude/cookbook-feedback-fixes`, `claude/cookbook-icon`, `claude/cookbook-from-a-file` — all
-squash-merged in #185; each differs from `main` only by `main` being newer. **Joel deletes them**;
-this seat cannot.
-
 ## Traps only here
 
 The `packages/` gap, Vercel state reading and the `migration repair` hook are in `DECISIONS.md`.
 
 - **Check the open list live as the first step of every merge**, never from memory.
+- **Cost is context × turns** (#178): **one session, one branch, end it.**
+- **Three `claude/cookbook-*` branches are stale** — inside #185, nothing unmerged. Joel deletes them.
 - **Add Next steps to any TEC issue missing them** when you list the queue — the rule is `CLAUDE.md`'s.
 - **Read the real head SHA before passing `expectedHeadSha`.** Three inventions, three rejections.
 - **`Vercel – tp-message-editor` is red on `main` itself** — frozen editor, **not a gate failure.**
