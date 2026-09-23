@@ -6,9 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$(git rev-parse --show-toplevel 2>/dev/null)/.claude/OPEN-ITEMS.md\"; [ -f \"$f\" ] && jq -Rs \"{hookSpecificOutput:{hookEventName:\\\"SessionStart\\\",additionalContext:(\\\"OPEN ITEMS \u2014 lead your first message with these. Then read your charter and handoff at .claude/agents/<you>/.\\n\\n\\\" + .)}}\" < \"$f\" || true",
+            "command": "jq -n \"{hookSpecificOutput:{hookEventName:\\\"SessionStart\\\",additionalContext:\\\"Open items live in Linear, team TEC. List the ones on your plate before anything else and lead your first message with them. Then read your charter and handoff at .claude/agents/<you>/.\\\"}}\"",
             "timeout": 10,
-            "statusMessage": "Loading open items\u2026"
+            "statusMessage": "Pointing at Linear\u2026"
           }
         ]
       }
