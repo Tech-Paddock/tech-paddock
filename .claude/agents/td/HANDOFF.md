@@ -48,7 +48,8 @@ close it in Linear once that merges. **No status rule survives**; ledger numbers
 rebase and a full CI run, so **merges here are serial** and a batch costs a cycle each. One PR
 merged as it finishes never meets the rule.
 
-**Every dead branch is gone** — `main` is the only remote head, measured 2026-09-22.
+**Opening a pull request, updating a branch and merging each wait for Joel's click** — a hook, once
+`claude/platform-outward-action-gates` merges. **Joel's word decides scope**; nothing else codifies it.
 
 **#177's two extras are in its commits**: a handoff conflict resolved by taking TechPad Gen's own
 newer copy whole — lossless by inspection, never a judgement, because a handoff is not this seat's
