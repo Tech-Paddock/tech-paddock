@@ -343,10 +343,9 @@ Most rules here are convention: they hold because an agent chooses to comply. Th
    `middleware.ts` variants, the CI matrix, the file budgets. It measures rather than trusting the
    document. `node scripts/drift-check.mjs` runs it locally; `--json` is what The Garage renders.
 
-Notably **"do not open a pull request until Joel asks" is not one of them**, because every agent acts
-as the same GitHub account and nothing mechanical can tell an asked-for pull request from an
-unasked-for one. That rule holds on honesty, and it is the most important convention here for
-exactly that reason.
+**"Do not open a pull request until Joel asks" became enforced on 2026-09-23** (#186): the hook in
+item 2 holds every pull request an agent opens for his click. What still rests on honesty is the
+quote — `requested-by-joel` can see that the line is there, never that he said it.
 
 Every rule in this file was written after something went wrong: three branches editing it at once,
 six schema migrations that lived only in the database, a Vercel project serving an unprotected page
