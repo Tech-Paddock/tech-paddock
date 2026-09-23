@@ -266,13 +266,11 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
       .map((d) => [`.claude/agents/${d}/HANDOFF.md`, 80]),
     ...readdirSync(R(".claude/agents")).filter((d) => existsSync(R(".claude/agents", d, "RULES.md")))
       .map((d) => [`.claude/agents/${d}/RULES.md`, 370]),
-    [".claude/OPEN-ITEMS.md", 80],
     [".claude/DECISIONS.md", 400],
     // Tier 1 — auto-loaded into every session of every agent, so every line is paid
-    // again forever. 510 is a RATCHET at today's size, not a target: it stops growth
-    // without failing `main` on the day it lands. The target is 400 and it arrives
-    // with the compaction, because a cap set below the file is a red `main`.
-    ["CLAUDE.md", 530],
+    // again forever. 400 was the target the compaction set; the file landed well
+    // under it, so the ratchet came down to it with the ledger's retirement.
+    ["CLAUDE.md", 400],
     // Read on demand rather than auto-loaded. Budgeted against growth, deliberately
     // loose: this tier is where reasoning goes when it leaves CLAUDE.md, so squeezing
     // it would defeat the compaction it exists to receive.
@@ -306,8 +304,14 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
      the TD. One agent owns two apps and the TD owns one for the first time. A
      one-to-one map could not say that — it would have reported `apps/tracker` as an orphan while the
      charter plainly named an owner, which is the documentation and the disk
-     disagreeing in the direction this file exists to catch. */
-  const NAMED = { "techpad-gen": ["apps/home", "apps/tracker"], "td": ["apps/editor"] };
+     disagreeing in the direction this file exists to catch.
+
+     The TD's list is more than `apps/editor` because that app is FROZEN: dated
+     against it alone, the TD's handoff read `ok` forever while two merges went
+     by. `scripts` and `.github` are the CI and drift machinery this seat owns
+     and nobody else edits. `supabase/` is deliberately left out — app agents
+     author their own migrations. */
+  const NAMED = { "techpad-gen": ["apps/home", "apps/tracker"], "td": ["apps/editor", "scripts", ".github"] };
   const agents = existsSync(R(".claude/agents"))
     ? readdirSync(R(".claude/agents")).filter((d) => statSync(R(".claude/agents", d)).isDirectory()).sort()
     : [];
@@ -398,12 +402,8 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
 /* 7 ── Structures that were retired, staying retired. */
 add("worklogs stay retired", existsSync(R(".claude/worklogs")) ? "fail" : "ok",
   existsSync(R(".claude/worklogs")) ? ".claude/worklogs/ is back — see the communication layer in CLAUDE.md" : "absent");
-{
-  const l = read(R(".claude/OPEN-ITEMS.md"));
-  const done = l !== null && /^#+ *done/im.test(l);
-  add("ledger carries no Done archive", done ? "fail" : "ok",
-    done ? "a 'Done' heading is how it reached 588 lines last time" : "open items only");
-}
+add("ledger stays retired", existsSync(R(".claude/OPEN-ITEMS.md")) ? "fail" : "ok",
+  existsSync(R(".claude/OPEN-ITEMS.md")) ? ".claude/OPEN-ITEMS.md is back — open items live in Linear, team TEC" : "absent; open items are in Linear");
 
 /* 8 ── Prose that should be computed. Not a failure — a count in a document is
    not wrong the day it is written. It is wrong later, which is why it is a
@@ -484,93 +484,6 @@ add("worklogs stay retired", existsSync(R(".claude/worklogs")) ? "fail" : "ok",
   }
   add("no computable facts written as prose", hits.length === 0 ? "ok" : "warn",
     hits.length === 0 ? "no test counts or commit SHAs in prose" : hits.join("; "));
-}
-
-/* ── Ledger numbers are permanent ─────────────────────────────────────────
-   Numbers used to be positional: close an item and everything below shifted
-   up on the next write. On 2026-09-19 that happened four times in one day and
-   broke a parked row's cross-reference, three numbers in the TD's handoff, a
-   DECISIONS.md entry, and live references in two agents' branches — every one
-   of them pointing confidently at the wrong item rather than at nothing.
-
-   So a number now belongs to its item for good. Closing one leaves a gap, and
-   `Next number` in the ledger header is the high-water mark a new item takes.
-   This fails rather than warns: a silently reused number is the exact failure
-   the # column exists to prevent, and it is invisible in a diff. */
-{
-  const rel = ".claude/OPEN-ITEMS.md";
-  const text = read(R(rel));
-  if (text === null) {
-    add("ledger numbers are permanent", "fail", `${rel} is missing`);
-  } else {
-    const declared = text.match(/\*\*Next number:\s*(\d+)\.?\*\*/);
-    const nums = [...text.matchAll(/^(\d+)\. \*\*/gm)].map((m) => Number(m[1]));
-    const problems = [];
-
-    if (!declared) problems.push("header declares no `Next number:`");
-    const next = declared ? Number(declared[1]) : null;
-
-    const seen = new Set();
-    for (const n of nums) {
-      if (seen.has(n)) problems.push(`item ${n} appears twice`);
-      seen.add(n);
-    }
-    /* Ascending is measured WITHIN a section, never across the file — and the
-       difference is not cosmetic. The ledger groups by who is blocked (Blocking
-       everything else, Waiting on Joel, Waiting on an agent, Parked), while a
-       new item always takes the highest number there has ever been. Those two
-       rules point opposite ways: item 15 arriving in `Waiting on Joel` sits
-       above item 2 in `Waiting on an agent`, and a whole-file ascending rule
-       calls that correct file a failure.
-
-       It did. This check shipped on 2026-09-19 reading the file as one list, and
-       the first item added under it — 15, the morning after — tripped it. A
-       check that fails the next legitimate edit is worse than no check, because
-       the way past it is to renumber, which is the exact thing it exists to
-       stop. Within a section the rule still catches a row dropped in the wrong
-       place, and the baseline comparison below is what actually catches a
-       renumber. */
-    let section = "(before any heading)";
-    let prev = null;
-    for (const line of text.split("\n")) {
-      const h = line.match(/^## +(.+?)\s*$/);
-      if (h) { section = h[1]; prev = null; continue; }
-      const it = line.match(/^(\d+)\. \*\*/);
-      if (!it) continue;
-      const n = Number(it[1]);
-      if (prev !== null && n <= prev) problems.push(`item ${n} follows ${prev} under "${section}"`);
-      prev = n;
-    }
-    if (next !== null) {
-      const over = nums.filter((n) => n >= next);
-      if (over.length) problems.push(`${over.join(", ")} at or above Next number ${next} — bump the header when you add an item`);
-    }
-
-    /* The three rules above catch a duplicate, a missing header and a number
-       reaching into reserved space. They do NOT catch the failure this check
-       exists for: renumbering 1..N after a close produces a sequence that is
-       ascending, unique and inside the header — and every reference to the
-       items below the closed one is now wrong. The only way to see it is to
-       compare against what the numbers were, so that is what this does. */
-    const baseline = git("show", "origin/main:" + rel);
-    const titles = (t) =>
-      new Map([...t.matchAll(/^(\d+)\. \*\*(.+?)\*\*/gm)].map((m) => [m[2], Number(m[1])]));
-    if (baseline) {
-      const before = titles(baseline);
-      const moved = [];
-      for (const [title, n] of titles(text)) {
-        const was = before.get(title);
-        if (was !== undefined && was !== n) moved.push(`"${title.slice(0, 44)}" was ${was}, now ${n}`);
-      }
-      if (moved.length) problems.push(`items renumbered against origin/main: ${moved.join("; ")}`);
-    }
-
-    const checked = baseline ? "against origin/main" : "no origin/main to compare, numbering shape only";
-    add("ledger numbers are permanent", problems.length === 0 ? "ok" : "fail",
-      problems.length === 0
-        ? `${nums.length} items, ascending, all below Next number ${next} — ${checked}`
-        : problems.join("; "));
-  }
 }
 
 /* ── Output ──────────────────────────────────────────────────────────────── */

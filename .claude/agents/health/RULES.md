@@ -131,7 +131,7 @@ depends on it.
 ## What is settled and not yours to reopen
 
 - **It does not appear on the hub's glance.** Joel: *"leave it off for now."* No `/api/summary`, no
-  line in `SOURCES`, no request to TechPad Gen. Adding it later is one endpoint and one ledger row,
+  line in `SOURCES`, no request to TechPad Gen. Adding it later is one endpoint and one Linear issue,
   so nothing forecloses it.
 - **The livery is borrowed and is TechPad Gen's to settle.** `lib/livery.ts` pins `senna` because all
   five liveries were taken when this app was scaffolded. **That the tracker wearing it was paused

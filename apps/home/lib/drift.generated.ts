@@ -6,39 +6,49 @@
 import type { Drift } from "./platform";
 
 export const DRIFT: Drift = {
-  "generatedAt": "2026-09-19T22:35:55.588Z",
+  "generatedAt": "2026-09-23T01:22:03.490Z",
   "complete": true,
   "reason": "",
   "checks": [
     {
       "name": "identical: lib/auth.ts",
       "state": "ok",
-      "detail": "6 copies, all 315c0915"
+      "detail": "7 copies, all 97fd87d5"
     },
     {
       "name": "identical: lib/password.ts",
       "state": "ok",
-      "detail": "6 copies, all 6e97e2de"
+      "detail": "7 copies, all 83247956"
     },
     {
       "name": "identical: lib/theme.css",
       "state": "ok",
-      "detail": "6 copies, all fb1c02ec"
+      "detail": "7 copies, all fb26a9f0"
+    },
+    {
+      "name": "identical: lib/theme.ts",
+      "state": "ok",
+      "detail": "7 copies, all 5a79fb4a"
     },
     {
       "name": "identical: next.config.mjs",
       "state": "ok",
-      "detail": "6 copies, all 29e69287"
+      "detail": "7 copies, all 16bb6be2"
+    },
+    {
+      "name": "stamped copies match packages/shared",
+      "state": "ok",
+      "detail": "42 copies across 7 apps match — one edit, not 7"
     },
     {
       "name": "middleware.ts: a base copy plus the two scoped bypasses",
       "state": "ok",
-      "detail": "4 on the base copy, editor and tracker scoped — coffee+health+home+resume | editor | tracker"
+      "detail": "5 on the base copy, editor and tracker scoped — coffee+cookbook+health+home+resume | editor | tracker"
     },
     {
       "name": "CI derives its roster from apps/",
       "state": "ok",
-      "detail": "derived — 6 app folders will build"
+      "detail": "derived — 7 app folders will build"
     },
     {
       "name": "one stable gate in front of CI",
@@ -48,12 +58,17 @@ export const DRIFT: Drift = {
     {
       "name": "each app's build is scoped to its own folder",
       "state": "ok",
-      "detail": "6 apps, each skipping a merge that does not touch it"
+      "detail": "7 apps, each skipping a merge that does not touch it"
     },
     {
       "name": "budget: .claude/agents/coffee/HANDOFF.md",
       "state": "warn",
-      "detail": "79 / 80"
+      "detail": "80 / 80"
+    },
+    {
+      "name": "budget: .claude/agents/cookbook/HANDOFF.md",
+      "state": "warn",
+      "detail": "80 / 80"
     },
     {
       "name": "budget: .claude/agents/health/HANDOFF.md",
@@ -67,33 +82,93 @@ export const DRIFT: Drift = {
     },
     {
       "name": "budget: .claude/agents/td/HANDOFF.md",
-      "state": "fail",
-      "detail": "81 / 80"
+      "state": "warn",
+      "detail": "73 / 80"
     },
     {
       "name": "budget: .claude/agents/techpad-gen/HANDOFF.md",
       "state": "warn",
-      "detail": "78 / 80"
+      "detail": "80 / 80"
     },
     {
-      "name": "budget: .claude/OPEN-ITEMS.md",
+      "name": "budget: .claude/agents/coffee/RULES.md",
       "state": "warn",
-      "detail": "77 / 80"
+      "detail": "368 / 370"
+    },
+    {
+      "name": "budget: .claude/agents/cookbook/RULES.md",
+      "state": "ok",
+      "detail": "146 / 370"
+    },
+    {
+      "name": "budget: .claude/agents/health/RULES.md",
+      "state": "ok",
+      "detail": "156 / 370"
+    },
+    {
+      "name": "budget: .claude/agents/resume/RULES.md",
+      "state": "ok",
+      "detail": "322 / 370"
+    },
+    {
+      "name": "budget: .claude/agents/td/RULES.md",
+      "state": "ok",
+      "detail": "318 / 370"
+    },
+    {
+      "name": "budget: .claude/agents/techpad-gen/RULES.md",
+      "state": "ok",
+      "detail": "166 / 370"
     },
     {
       "name": "budget: .claude/DECISIONS.md",
+      "state": "ok",
+      "detail": "390 / 400"
+    },
+    {
+      "name": "budget: CLAUDE.md",
+      "state": "ok",
+      "detail": "357 / 400"
+    },
+    {
+      "name": "budget: .claude/agents/KICKOFF.md",
+      "state": "ok",
+      "detail": "174 / 220"
+    },
+    {
+      "name": "budget: .claude/agents/STANDUP.md",
       "state": "warn",
-      "detail": "260 / 260"
+      "detail": "103 / 110"
+    },
+    {
+      "name": "budget: .claude/SURFACE.md",
+      "state": "ok",
+      "detail": "110 / 120"
+    },
+    {
+      "name": "budget: .claude/HEALTH-PLAN.md",
+      "state": "warn",
+      "detail": "250 / 250"
+    },
+    {
+      "name": "budget: supabase/README.md",
+      "state": "warn",
+      "detail": "191 / 200"
     },
     {
       "name": "fresh: coffee",
       "state": "ok",
-      "detail": "2026-09-19, current with apps/coffee"
+      "detail": "2026-09-22, current with apps/coffee"
+    },
+    {
+      "name": "fresh: cookbook",
+      "state": "ok",
+      "detail": "2026-09-22, current with apps/cookbook"
     },
     {
       "name": "fresh: health",
       "state": "ok",
-      "detail": "2026-09-19, current with apps/health"
+      "detail": "2026-09-20, current with apps/health"
     },
     {
       "name": "fresh: resume",
@@ -103,22 +178,22 @@ export const DRIFT: Drift = {
     {
       "name": "fresh: td",
       "state": "ok",
-      "detail": "2026-09-19, current with apps/editor"
+      "detail": "2026-09-23, current with apps/editor + scripts + .github"
     },
     {
       "name": "fresh: techpad-gen",
       "state": "ok",
-      "detail": "2026-09-19, current with apps/home + apps/tracker"
+      "detail": "2026-09-22, current with apps/home + apps/tracker"
     },
     {
       "name": "every app has an owning agent",
       "state": "ok",
-      "detail": "6 apps, all owned"
+      "detail": "7 apps, all owned"
     },
     {
       "name": "migration versions named in prose exist",
       "state": "ok",
-      "detail": "18 migrations, every reference resolves"
+      "detail": "24 migrations, every reference resolves"
     },
     {
       "name": "worklogs stay retired",
@@ -126,24 +201,19 @@ export const DRIFT: Drift = {
       "detail": "absent"
     },
     {
-      "name": "ledger carries no Done archive",
+      "name": "ledger stays retired",
       "state": "ok",
-      "detail": "open items only"
+      "detail": "absent; open items are in Linear"
     },
     {
       "name": "no computable facts written as prose",
-      "state": "warn",
-      "detail": "CLAUDE.md:346 names a roster count"
-    },
-    {
-      "name": "ledger numbers are permanent",
       "state": "ok",
-      "detail": "10 items, ascending, all below Next number 19 — against origin/main"
+      "detail": "no test counts or commit SHAs in prose"
     }
   ],
   "counts": {
-    "ok": 18,
-    "warn": 7,
-    "fail": 1
+    "ok": 30,
+    "warn": 10,
+    "fail": 0
   }
 };

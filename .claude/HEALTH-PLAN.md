@@ -99,7 +99,7 @@ permanently, which is the one irreversible choice in this design.
 
 Joel, asked whether it belongs there: **"leave it off for now."** So no `/api/summary`, no line in
 `SOURCES` in `apps/home/lib/glance.ts`, and no request to TechPad Gen. It is a tool you click into.
-Adding it later is one endpoint and one ledger row, so nothing here forecloses it.
+Adding it later is one endpoint and one Linear issue, so nothing here forecloses it.
 
 ### Claude guesses the meal slot
 

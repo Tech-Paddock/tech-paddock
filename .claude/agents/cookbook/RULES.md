@@ -143,4 +143,4 @@ redeploy afterwards because Vercel bakes the environment in at build time. Until
 is scaffolded but not reachable, and `/api/health` is what says which step is missing.
 
 **Still not this agent's, and still the technical director's:** the Health↔Cookbook read contract
-and the grocery-list move, ledger items 22 and 23.
+and the grocery-list move, TEC-11 and TEC-15.

@@ -163,14 +163,6 @@ export async function loadPitWall(): Promise<PitWall> {
   const unavailable: { source: PitSource; why: string }[] = [];
   const items: PitItem[] = [];
 
-  // The repo half. Baked, so only as fresh as the last deploy — the page says so.
-  for (const w of PADDOCK.waiting) {
-    items.push({ state: "box", source: "repo", agent: null, title: w.title, detail: w.detail, ref: w.ref });
-  }
-  for (const p of PADDOCK.parked) {
-    items.push({ state: "clear", source: "repo", agent: null, title: p.title, detail: p.detail, ref: p.ref });
-  }
-
   const [gh, vc] = await Promise.all([github(), vercel()]);
   if ("items" in gh) items.push(...gh.items); else unavailable.push({ source: "github", why: gh.why });
   if ("items" in vc) items.push(...vc.items); else unavailable.push({ source: "vercel", why: vc.why });

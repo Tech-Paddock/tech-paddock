@@ -21,7 +21,8 @@ Three steps, every session, before any project work:
 3. **Your handoff** — `.claude/agents/<you>/HANDOFF.md`. What state your area is in and what to do
    next.
 
-The open-items ledger is printed into your session by a hook, so it is already there too.
+**Open items live in Linear, team TEC.** A hook reminds you; nothing prints them for you. List the
+ones labelled for you before anything else.
 
 **Once a change is agreed, cut a fresh branch named for it** — never reuse one. The branch comes
 *after* the agreement: until Joel has answered you do not yet know what the change is, and a branch
@@ -45,7 +46,7 @@ keeps things in one place. When you have something to say, find the reader first
 | `CLAUDE.md` | rules binding every agent | every session, automatic | overwrite |
 | `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | **overwrite · ≤350 lines · TD drafts, Joel approves** |
 | `agents/<you>/HANDOFF.md` | **your area's state right now** | every session | **overwrite · ≤80 lines** |
-| `.claude/OPEN-ITEMS.md` | **open requests, each with an owner** | every session, via hook | **overwrite · ≤80 lines** |
+| Linear, team TEC | **open requests, each with an owner** | every session, first | **one issue per request · `owner:` and `agent:` labels** |
 | `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append in its section; supersede in place · ≤400 lines** |
 | `/admin` — The Garage | facts about the running system | when you need a fact | **computed, never written** |
 | commits and pull request bodies | what landed, why, blast radius, who asked | at the gate, and afterwards | the event log |
@@ -61,8 +62,8 @@ which apps have tests, what is deployed — every one of these has gone stale he
 prose*. `/admin` reads them live and never guesses. A number you type today is wrong next week and
 nothing tells you.
 
-**A request is a ledger row with an owner.** That is how you ask another agent for something. Not a
-note in your handoff that nobody else reads — say it to the technical director, who owns the ledger.
+**A request is a Linear issue with an owner.** That is how you ask another agent for something. Not a
+note in your handoff that nobody else reads — say it to the technical director, who owns the queue.
 
 ### When a document reaches its cap
 
@@ -92,7 +93,7 @@ message in one had a better home. `read-all.sh` went with them.
 
 | Agent | Owns | Charter |
 |---|---|---|
-| Technical Director | gatekeeping, the ledger, merges, **DevOps — Vercel, DNS, CI, deploys**, **app surface**, **Postgres**, **`apps/editor`** (frozen) | `.claude/agents/td/` |
+| Technical Director | gatekeeping, the Linear queue, merges, **DevOps — Vercel, DNS, CI, deploys**, **app surface**, **Postgres**, **`apps/editor`** (frozen) | `.claude/agents/td/` |
 | TechPad Gen | `apps/home`, `apps/tracker`, **the visual theme of every app**, shared components | `.claude/agents/techpad-gen/` |
 | Resume Formatter | `apps/resume` | `.claude/agents/resume/` |
 | Coffee | `apps/coffee` | `.claude/agents/coffee/` |
@@ -116,7 +117,8 @@ wrong or the rule is, and that is a conversation before any code exists.
 - **Push to `main`.** Every change goes through a pull request, including small ones.
 - **Commit personal information or secrets.** Names, employers, schools, addresses, contact details,
   resume content. For a `.docx` that means every part of the archive — hyperlink targets in `.rels`
-  and the author fields in `docProps/`, not just `document.xml`.
+  and the author fields in `docProps/`, not just `document.xml`. **It includes anything read from
+  Linear**, whose user records carry a real name and email: refer to people by the roster's names.
 - **Make a check pass by weakening it.** No skipping or disabling a test, no loosening an assertion,
   no repairing the migration history, no empty commit to re-trigger CI. When something is red, either
   the code is wrong or the check is wrong. Say which one, and fix that.
@@ -138,7 +140,7 @@ wrong or the rule is, and that is a conversation before any code exists.
   change anyway, and it makes a cross-agent edit one pull request instead of six.
   **Your `HANDOFF.md` stays yours and always will.** That is state, not a rule, and a handoff written
   by anyone but the agent who did the work is the second-hand account these files exist to replace.
-  **Propose a charter change** — in your handoff, a pull request body, or a ledger row. Do not make it.
+  **Propose a charter change** — in your handoff, a pull request body, or a Linear issue. Do not make it.
 - **The technical director: the shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`,
   `middleware.ts`, or anything touching `SESSION_SECRET` and the shared cookie. **These are gated for two different reasons, and
   merging them is how the rule gets talked past.** `lib/auth.ts` and `lib/password.ts` genuinely are
@@ -337,7 +339,8 @@ Most rules here are convention: they hold because an agent chooses to comply. Th
 
 1. **`main` is protected**, confirmed against the GitHub API rather than assumed.
 2. **The `.claude/settings.json` hooks** run whether or not anyone wants them to — they refuse a push
-   to `main` and refuse rewriting the migration history, and they print the ledger into every session.
+   to `main`, refuse rewriting the migration history, hold opening, updating and merging a pull request
+   for Joel's click, and point every session at Linear.
 3. **`requested-by-joel`** fails a pull request whose body does not record who asked for it, and
    **`drift`** fails one where a rule in this file has stopped being true — the checksums, the three
    `middleware.ts` variants, the CI matrix, the file budgets. It measures rather than trusting the
