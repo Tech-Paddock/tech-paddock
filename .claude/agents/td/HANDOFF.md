@@ -10,7 +10,7 @@ only what is true right now.
 
 ## Linear holds the open items, and nothing prints them
 
-**`.claude/OPEN-ITEMS.md` is deleted** on `claude/brief-linear-phase-2`. The `SessionStart` hook
+**`.claude/OPEN-ITEMS.md` is deleted** (#187). The `SessionStart` hook
 prints one fixed line pointing at Linear, team TEC, so **every session has to call Linear itself** —
 Joel's choice over a generated copy, recorded in `DECISIONS.md`. **The connector authenticates as
 `claude@techpaddock.io`.** Issues carry `owner:` and `agent:` labels; old ledger numbers survive in
@@ -22,16 +22,18 @@ titles. TEC-1 to 4 are Linear's onboarding issues, left alone.
 **`CLAUDE.md` names Linear's user records under the personal-information rule** — they carry a real
 name and email. Nothing mechanical enforces it.
 
-**TEC-16 rode with Phase 2 (#187)** at Joel's direction: the Pit Wall no longer reads the ledger,
-so it has no Waiting on Joel or Parked rows. `apps/home` stays TechPad Gen's.
+**Coffee and the Resume Formatter have no `agent:`/`owner:` labels yet**; every other agent does.
 
-**Three handoffs still say "ledger"** — filed as TEC-17 (TechPad Gen), TEC-18 (Health) and TEC-19
-(Cookbook). Their charters are already corrected here. `agent:`/`owner:` labels for Health and
-Cookbook were created 2026-09-23; Coffee and Resume Formatter still have none.
+**Phase 3 is done.** #98 and #116 are closed; #116's live proposal is TEC-21. **`requested-by-joel`
+stays** (#189): the #186 hook is the gate, the quoted line is the record. A fresh session on `main`
+(2026-09-23) was pointed at Linear by the hook and listed TEC live — the last open step.
 
-**Phase 3:** #98 and #116 are closed; #116's live proposal is TEC-21. **`requested-by-joel` stays**
-(#189): the #186 hook is the gate, the quoted line is the record. **Left:** confirm a fresh session
-on `main` lists its Linear items, once this merges.
+## Build scope — TEC-10 (#191)
+
+**`scripts/build-scope.mjs` is the one reader of each `ignoreCommand`**: CI scopes each app with it
+and **fails open**; drift fails a build that reads a path it does not watch (how, and its blind
+spots: the file's header). **The hub diffs nothing and builds every production merge** — its
+prebuild reads nearly the whole repo — **and still skips previews**, which drift enforces.
 
 **TEC-9 parked:** contract on `claude/db-contacts-contract`, stacked on `claude/db-readme-cap` — merge the cap first.
 
