@@ -14,19 +14,21 @@ Directory setting.
 
 ```
 apps/
-  home/      → the hub        → techpaddock.io
-  editor/    → Message Editor → editor.techpaddock.io
-  tracker/   → Pipeline Tracker → tracker.techpaddock.io
-  resume/    → Resume Formatter → resume.techpaddock.io
-  coffee/    → Coffee         → coffee.techpaddock.io
-  health/    → Health         → health.techpaddock.io
+  home/      → the hub            → techpaddock.io
+  editor/    → Message Editor     → editor.techpaddock.io   (parked)
+  tracker/   → Pipeline Tracker   → tracker.techpaddock.io  (parked)
+  resume/    → Resume Formatter   → resume.techpaddock.io
+  coffee/    → Coffee             → coffee.techpaddock.io
+  health/    → Health             → health.techpaddock.io
+  cookbook/  → Cookbook           → cookbook.techpaddock.io
 ```
 
-The hub opens on what is live rather than on a list of links. It holds no database credentials: each
-tool exposes `/api/summary` and the hub fans out server-side, so adding a tool to the glance is a URL
-in `SOURCES` rather than new knowledge in the hub.
+The hub opens on what is live rather than on a list of links. It holds no database credential: a
+tool that belongs on the glance exposes `/api/summary` and the hub fans out server-side, so adding a
+tool to the glance is a URL in `SOURCES` rather than new knowledge in the hub. The tokens it does
+hold are for the Pit Wall's reads of GitHub and Vercel.
 
-**There is no root `package.json`** — work inside the relevant app folder (`cd apps/editor && npm
+**There is no root `package.json`** — work inside the relevant app folder (`cd apps/<app> && npm
 install`). Each app's `.env.example` documents its own environment variables, with the commands to
 generate the ones that need generating.
 
@@ -47,16 +49,17 @@ leaked publishable key and the data.
 
 ## What is actually running
 
-**Not written down here, on purpose.** Versions, test counts, the CI matrix, which apps have tests,
-what is deployed and what each project reports are all readable live at **`/admin`** — The Garage —
-on the hub. Every one of those facts has gone stale in prose at least once. A number typed into a
-document is wrong next week and nothing tells you.
+**Not written down here, on purpose.** Every fact of that kind has gone stale in prose at least
+once; a number typed into a document is wrong next week and nothing tells you. **`/admin`** — The
+Garage, on the hub — probes each project live, and shows what the repo declares and what `drift`
+reports as of the hub's last build. It does not show versions or test counts. What it covers, and
+what it does not, is in CLAUDE.md's shared foundation.
 
 ## Working here as an agent
 
-Read the rules in [CLAUDE.md](./CLAUDE.md) — loaded into every session automatically — then your own
-charter and handoff at `.claude/agents/<you>/`. Open items live in Linear, team TEC;
-a hook reminds you to list them.
+List your open items in Linear, team TEC, first — a hook reminds you. Then the rules in
+[CLAUDE.md](./CLAUDE.md), loaded into every session automatically, and your own charter and handoff
+at `.claude/agents/<you>/`.
 
 Agents here never run at the same time and cannot see each other, so the repo is the only channel
 between them. How that works is the communication layer section of CLAUDE.md.
