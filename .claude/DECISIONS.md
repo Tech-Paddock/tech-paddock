@@ -184,9 +184,10 @@ it; git keeps it.
 - **2026-09-23 — Agents do not write Vercel.** When the connector started exposing project-settings
   and env-var writes, Joel: *"follow charter."* Settings and env vars are his dashboard steps, like
   projects, domains and DNS. `CLAUDE.md` said changing an existing project's settings was fine and was
-  corrected on 2026-09-24. No hook holds those writes yet; TEC-35 proposes one that asks him.
+  corrected on 2026-09-24. Since TEC-35 a hook holds every Vercel call that is not a read for Joel's
+  click — a backstop for this rule, not a way round it.
 - **2026-09-24 — TEC-21: go.** Joel approved snapshotting macros onto Health's entries at log time.
-  `HEALTH-PLAN.md`'s 2026-09-22 decision stands — a correction does not reach backwards, and an entry
+  The Health plan's 2026-09-22 decision stands — a correction does not reach backwards, and an entry
   keeps the item id and version it snapshotted — and the code catches up through TEC-21. Until it
   lands, a correction still reaches past days, which is exactly what the decision exists to stop.
 - **2026-09-24 — Coffee's *Search again* keeps only the freshest result**, even when it finds less
@@ -205,6 +206,22 @@ it; git keeps it.
   reconcile. #194 is the case: it staled Health's and Cookbook's handoffs minutes after both were
   written. (2) A handoff never calls its own branch or pull request in flight — the gate merges after
   its author has gone, so the line is false from the merge on and nobody else may fix it.
+- **2026-09-24 — Login guessing is limited at Vercel's firewall, not in code** (TEC-7). Joel chose a
+  shared lockout table on 2026-09-19 and replaced it with a per-IP rate limit on `POST /api/login` in
+  every project: no code, no database credential for the hub, and no counter a stranger could fill to
+  lock Joel out of every app. The accepted cost: each project counts separately, and many addresses
+  get many guesses — the password stays the real control.
+- **2026-09-24 — Where things live.** GitHub holds code and rules. Linear holds all open work, the
+  parking lot (the `Parked` label) and a tool's design reasoning, as documents; the Health plan moved
+  there from `.claude/HEALTH-PLAN.md`. The Garage holds computed facts. **A handoff holds state and
+  traps, never a to-do**: a to-do in a handoff is visible only to its author's next session, and
+  every one found in the 2026-09-24 review had a better home as an issue.
+- **2026-09-24 — The hooks became one guard that fails closed** (TEC-35, on Joel's authorisation). It
+  parses a command instead of grepping it, because the grep both missed real pushes to main and
+  refused harmless commands — and a hook that fires on the wrong thing teaches agents to route around
+  hooks. Joel's Vercel and Supabase calls *ask* rather than refuse: they are Joel's, not forbidden.
+  Linear writes that break the issue rules are *refused*, never asked: Joel should not be clicking
+  through formatting.
 
 ## Mistakes — do not repeat
 

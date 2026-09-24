@@ -20,8 +20,7 @@ Every session, before any project work, in this order:
 3. **Your charter** — `.claude/agents/<you>/RULES.md`. Your job, your domain, your guardrails.
    **Nothing loads this for you.** Open it yourself. It is the specification for your work, not
    background reading.
-4. **Your handoff** — `.claude/agents/<you>/HANDOFF.md`. What state your area is in and what to do
-   next.
+4. **Your handoff** — `.claude/agents/<you>/HANDOFF.md`. What state your area is in, and its traps.
 
 **Once a change is agreed, cut a fresh branch named for it** — never reuse one. The branch comes
 *after* the agreement: until Joel has answered you do not yet know what the change is, and a branch
@@ -44,8 +43,9 @@ keeps things in one place. When you have something to say, find the reader first
 |---|---|---|---|
 | `CLAUDE.md` | rules binding every agent | every session, automatic | overwrite |
 | `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | **overwrite · ≤350 lines · TD drafts, Joel approves** |
-| `agents/<you>/HANDOFF.md` | **your area's state right now** | every session | **overwrite · ≤80 lines** |
-| Linear, team TEC | **open requests, each with an owner** | every session, first | **one issue per request · `owner:` and `agent:` labels · body ends with Next steps** |
+| `agents/<you>/HANDOFF.md` | **your area's state right now, and its traps** — never a to-do | every session | **overwrite · ≤80 lines** |
+| Linear, team TEC | **all open work, each request with an owner, and the parking lot** | every session, first | **one issue per request · `owner:` and `agent:` labels · body ends with Next steps · `Parked` label** |
+| Linear documents, team TEC | **a tool's design reasoning** — e.g. "Health — plan" | before designing a feature | **binds nothing: a rule goes in the charter** |
 | `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append in its section; supersede in place · ≤400 lines** |
 | `/admin` — The Garage | facts about the running system | when you need a fact | **computed, never written** — see *The shared foundation* for what it does and does not show |
 | commits and pull request bodies | what landed, why, blast radius, who asked | at the gate, and afterwards | the event log |
@@ -62,11 +62,12 @@ prose*. Point at where it is measured — `drift` for the repo's shape, `/admin`
 system — instead of copying the number. A number you type today is wrong next week and nothing
 tells you.
 
-**A request is a Linear issue with an owner.** That is how you ask another agent for something. Not a
-note in your handoff that nobody else reads — say it to the technical director, who owns the queue.
-**Its body ends with a Next steps section** — numbered, each step naming who acts, kept current by
-whoever changes the issue. The next session acts on it without reading the history; an issue that
-needs the history to act on is a note, not a request.
+**A request is a Linear issue with an owner.** That is how you ask another agent for something, and
+how you leave work for your own next session — a handoff holds state and traps, never a to-do (Joel,
+2026-09-24). Say it to the technical director, who owns the queue. **Its body ends with a Next steps
+section** — numbered, each step naming who acts, kept current by whoever changes the issue; a hook
+refuses an issue without it or its labels. The next session acts on it without reading the history;
+an issue that needs the history to act on is a note, not a request.
 
 ### When a document reaches its cap
 
@@ -132,8 +133,8 @@ wrong or the rule is, and that is a conversation before any code exists.
 - **Joel: create, delete, pause or reconfigure anything in Vercel** — a project, a domain, a DNS
   record, a project setting or an environment variable. No undo, and no test catches them. **Agents
   read Vercel state; they do not write it** — settings and env vars are Joel's dashboard steps
-  (Joel, 2026-09-23: "follow charter"). The connector exposes write tools anyway, and **no hook
-  holds them yet** (TEC-35): this rule is the only thing between an agent and those calls.
+  (Joel, 2026-09-23: "follow charter"). The connector exposes write tools anyway, so **a hook holds
+  every Vercel call that is not a read for Joel's click**: a backstop, not the route.
 - **Joel: edit this file.** It is approved before it changes. **If what you are about to build
   contradicts it, stop and ask before you build it.** Raising it in the pull request is the backstop
   for something discovered late, not the normal path — code already written applies pressure to
@@ -241,10 +242,10 @@ wrong or the rule is, and that is a conversation before any code exists.
   after merge, never your own branch or pull request as in flight**: the gate merges it after you
   have gone, and a line saying it is open is false from that moment, with nobody left who may fix
   it. Branch and pull request state are read live.
-  **The next session in your area starts from this file and nothing else.** A handoff composed from
-  a summary rather than from the work is fluent, second-hand and confidently wrong — the single
-  failure this project has paid for most. **Short sessions moved that risk rather than removing it**,
-  from mid-session to the gap between sessions, which this file is the only thing spanning.
+  **The next session in your area starts from this file and its issues, nothing else.** A handoff
+  composed from a summary rather than from the work is fluent, second-hand and confidently wrong —
+  the single failure this project has paid for most. **Short sessions moved that risk rather than
+  removing it**, from mid-session to the gap between sessions, which only this file and Linear span.
 - **Open every message to Joel with a horizontal rule.** A markdown `---` on its own line, as the
   very first line, before any prose. It is the one mark that separates your reply to him from the
   tool output, file dumps and command results scrolling past above it — he reads this terminal all
@@ -310,8 +311,9 @@ Per-tool detail lives in that tool's charter.
   reject valid sessions. The apps send
   `frame-ancestors 'self' https://techpaddock.io https://*.techpaddock.io` so only the hub embeds them.
 - **Every deployed app sits behind a password.** The failed-attempt counter lives in a per-browser
-  cookie, so a client that discards it is never locked out: **the password is the real control**, and
-  TEC-7 tracks a server-side lockout.
+  cookie, so a client that discards it is never locked out; the server-side limit is a per-IP rate
+  limit on `POST /api/login` in each project's Vercel Firewall (TEC-7 — not a shared table, which
+  would have handed the hub a database credential). **The password stays the real control.**
 - **`/admin` — The Garage, on the hub — is computed, not live throughout.** Its probes of each
   project run live. Its *Declared* and *Rules drift* panels are baked at the hub's last build (the hub
   builds on every production merge). Which tools it covers is `TOOLS` in `apps/home/lib/platform.ts`,
@@ -364,13 +366,13 @@ Most rules here are convention: they hold because an agent chooses to comply. Th
 1. **`main` is protected.** `gate` is a required check and branches must be up to date before they
    merge. No agent can read the ruleset itself, so which other checks it requires is known only by
    their effect.
-2. **The `.claude/settings.json` hooks** run whether or not anyone wants them to. They refuse a
-   `git push` naming `main`, refuse `supabase migration repair`, hold opening, updating and merging
-   a pull request for Joel's click, and point every session at Linear. **A hook holds only the tool
-   calls and spellings it names** — `+main`, `refs/heads/main`, auto-merge, the API commit tools,
-   `npx supabase@latest migration repair` and every Vercel or Supabase write are not held, so for
-   those the rule is convention and branch protection is the backstop for `main`. Hardening them is
-   TEC-35, which waits for Joel to authorise edits under `.claude/`.
+2. **The `.claude/settings.json` hooks** run whether or not anyone wants them to, through one guard,
+   `.claude/hooks/guard.mjs`, which **fails closed**. It refuses a push that would land on `main` in
+   any spelling or that it cannot read, and rewriting the migration history by CLI or SQL; holds
+   opening, changing, merging or reviewing a pull request, and the API commit tools, for Joel's
+   click; holds every Vercel and Supabase call that is not a read; refuses a Linear issue without its
+   labels or Next steps; and points every session at Linear. CI tests what it refuses. It stops
+   mistakes, not a determined agent — branch protection stays the backstop for `main`.
 3. **CI's `gate`** needs every app to typecheck, test and build, and `drift` to pass.
    **`requested-by-joel`** fails a pull request whose body does not record who asked for it.
    **`drift`** measures the repo instead of trusting a document: the stamped copies, the middleware

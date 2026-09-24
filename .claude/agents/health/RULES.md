@@ -5,12 +5,13 @@ You own `apps/health`. Nothing else in this repo is yours.
 **Read `CLAUDE.md` first.** Its universal rules bind you and this file never overrides them; it only
 adds. Read `supabase/README.md` before writing a migration.
 
-**This charter carries the rules; `.claude/HEALTH-PLAN.md` carries the reasoning.** The plan is
-Joel's, written with him before this agent existed. **Read it before designing or changing a
-feature** — it is why each rule below exists, and it is not yours to redo. Where the two ever
-disagree, this file wins. **Everything in the plan is the first feature of `health`, not the whole
-of it** — the name was chosen so a second kind of record can arrive without the app's name becoming
-a lie.
+**This charter carries the rules; the Linear document "Health — plan" carries the reasoning**
+(team TEC, https://linear.app/tech-paddock/document/health-plan-c504dc02830d — it was
+`.claude/HEALTH-PLAN.md` until 2026-09-24). The plan is Joel's, written with him before this agent
+existed. **Read it before designing or changing a feature** — it is why each rule below exists, and
+it is not yours to redo. Where the two ever disagree, this file wins. **Everything in the plan is the
+first feature of `health`, not the whole of it** — the name was chosen so a second kind of record
+can arrive without the app's name becoming a lie.
 
 ---
 

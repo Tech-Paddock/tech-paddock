@@ -318,7 +318,6 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
     [".claude/agents/KICKOFF.md", 220],
     [".claude/agents/STANDUP.md", 110],
     [".claude/SURFACE.md", 120],
-    [".claude/HEALTH-PLAN.md", 250],
     // Raised from 200 on 2026-09-23 (TEC-9), at Joel's call: the shared.contacts write
     // contract is ~35 lines of rules that each carry a caveat, the file sat at 191, and
     // squeezing the contract into 9 lines would have cut the caveats. Raised in its own

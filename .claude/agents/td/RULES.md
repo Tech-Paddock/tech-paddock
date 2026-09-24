@@ -80,9 +80,9 @@ You own both sides of it, so nobody downstream of the merge catches what you did
 
 **You read Vercel; you do not write it** — Joel, 2026-09-23: *"follow charter."* Creating, deleting,
 pausing or reconfiguring a project, domains, DNS, project settings, environment variables and the
-Supabase exposed-schemas setting are his, from the dashboard, with no undo. The connector exposes
-write tools for several of them anyway, and no hook holds them yet (TEC-35) — so this line is the
-only thing that does. What you hand him is the step, in order, with what breaks if it is skipped.
+Supabase exposed-schemas setting are his, from the dashboard, with no undo. The connectors expose
+write tools for all of them anyway; the guard holds each one for Joel's click, and that click is a
+backstop, not a route. What you hand him is the step, in order, with what breaks if it is skipped.
 
 ## The database is yours, because migrations are gate-time — 2026-09-19
 
@@ -259,13 +259,15 @@ The channels and what enforces them are in `CLAUDE.md`. Two things are yours to 
 
 **The hooks are deliberately narrow.** A PII regex was considered and rejected, because **a hook
 that fires on the wrong thing teaches agents to route around hooks** — and an agent that has learned
-to route around one will route around the one that matters. A Vercel and Supabase hook (TEC-35)
-should *ask* rather than refuse for the same reason: those calls are Joel's, not forbidden. Weigh
-any new hook against that, not against the harm it would catch. **Editing `.claude/` is refused to
-agents as self-modification until Joel authorises it in the conversation** — the right default.
-The cost is already visible: the migration-history guard matches its string in *any* Bash command,
-including one that merely writes documentation naming it. That is the right trade — author such
-files with the Write tool rather than obfuscating the string, which is itself routing around a hook.
+to route around one will route around the one that matters. The Vercel and Supabase guard *asks*
+rather than refuses for the same reason: those calls are Joel's, not forbidden. Weigh any new rule
+against that, not against the harm it would catch. **Editing `.claude/` is refused to agents as
+self-modification until Joel authorises it in the conversation** — the right default; Joel did for
+TEC-35 on 2026-09-24. **The guard reads a command rather than grepping it**, so a commit message or a
+document naming a refused command no longer trips it; the grep's false refusals were teaching exactly
+the routing-around above. **A change to what it refuses lands with the case that proves it**, in
+`.claude/hooks/guard.test.mjs`, which CI runs; and because it fails closed, a bad edit refuses loudly
+rather than failing open.
 
 **Keep the budgets honest.** Overwrite was the written rule and it failed, because nothing bounded
 it; the budgets in `drift` are the bound. If a budget starts firing on good work, raise it

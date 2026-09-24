@@ -26,7 +26,7 @@ is edited rarely, so any state written here is already going stale.
 >    communication layer is how you reach anyone.
 > 3. Read `.claude/agents/{FOLDER}/RULES.md` — your charter. **Nothing loads this for you.** Read it
 >    in full.
-> 4. Read `.claude/agents/{FOLDER}/HANDOFF.md` — the state of your area and what to do next.
+> 4. Read `.claude/agents/{FOLDER}/HANDOFF.md` — the state of your area and its traps.
 >
 > Then send me a short message before you start work, leading with your open items:
 >
@@ -124,8 +124,8 @@ is edited rarely, so any state written here is already going stale.
 
 > You own `apps/health`. Nothing else in this repo is yours.
 >
-> **The design is agreed and it is not yours to redo.** Your charter carries the rules;
-> `.claude/HEALTH-PLAN.md` carries Joel's reasoning behind them. **Read the plan before you design or
+> **The design is agreed and it is not yours to redo.** Your charter carries the rules; the Linear
+> document "Health — plan" carries Joel's reasoning behind them. **Read the plan before you design or
 > change a feature.**
 >
 > **Two rules decide whether this tool is worth trusting, and they are the same rule from both ends.**
