@@ -1,60 +1,53 @@
 # Supabase
 
 One Supabase project (`qyclakzsupyxgnqfgpiq`, `tech-paddock`) backs every app in this repo, with
-each tool in its own Postgres schema — `shared`, `editor`, `tracker`, `resume`, `coffee` — and
-never the default `public` schema.
+each tool in its own Postgres schema — `shared`, `editor`, `tracker`, `resume`, `coffee`, `health`
+and `cookbook` — and never the default `public` schema.
 
 The migration history lives here, at the repo root, rather than under any one app. One project
 means one history; splitting it per app is exactly how it drifted in the first place.
 
 ## History
 
+**The directory is the list.** Every file's header says what it does and what shape it is; the
+table that used to sit here stopped at `20260912213501` and nobody noticed. This section keeps only
+what the files cannot say about themselves.
+
 Six of the first seven migrations were applied directly to the project and only checked in
-afterwards, on 2026-09-11. Their contents are copied verbatim out of
-`supabase_migrations.schema_migrations`, so the files match what actually ran, not what someone
-remembers running. File timestamps are therefore much later than the migration versions — that is
-expected. Everything from `20260911202805` onward was written first and applied second, which is
-the order this directory exists to enforce.
+afterwards, on 2026-09-11, copied verbatim out of `supabase_migrations.schema_migrations` — so they
+match what actually ran, and their file timestamps are much later than their versions. Everything
+from `20260911202805` onward was written first and applied second, the order this directory exists
+to enforce.
 
-| Version | What it does |
-|---|---|
-| `20260906152749` | Schemas, `shared.contacts`, editor and tracker tables, the original resume content tables |
-| `20260908235234` | **Absent by design — see below** |
-| `20260909004741` | `purpose` and `tone` on `editor.message_history` |
-| `20260910051549` | Schema USAGE and default privileges for the API roles |
-| `20260910215015` | `editor.model_status`, the model drift check's singleton row |
-| `20260911034533` | Resume Formatter rebuild; drops the four original content tables |
-| `20260911144519` | `position` on `shared.contacts` |
-| `20260911202805` | The `coffee` schema and `coffee.bags`, plus the private `coffee-files` bucket |
-| `20260911202901` | Grants for the `coffee` schema — see below, this one is not optional |
-| `20260912034941` | Backgrounding the brew-guide search: in-flight, failure and provenance columns |
-| `20260912213501` | Splits a bag from its brews; `coffee.brews` with a generated `extraction_yield` |
+**The backfill could only copy what the history recorded.** `20260906152749` created four tables
+before `20260910051549` set default privileges, and their grants were applied outside the history.
+Until 2026-09-24 a rebuild gave `shared.contacts`, `editor.message_history`, `editor.style_guide`
+and `tracker.pipeline_threads` no grants at all; `record_original_table_grants` wrote them down
+from the live catalog.
 
-### Four versions were renamed on 2026-09-14, and why that is the honest direction
+### Renamed files, and why that is the honest direction
 
-The four `coffee` migrations were applied through the hosted API rather than the CLI, and **that
-path stamps its own version at the moment it runs and ignores the filename.** So the repo said
-`20260911203000_coffee_schema` while the database recorded `20260911202805`, and similarly for the
-other three. Nobody noticed, because nothing compares the two until you run `migration list`.
+The hosted API stamps its own version when it runs and ignores the filename, and nothing compares
+the two until you run `migration list`. Eight files reached `main` under a version that never ran
+and were renamed to the one that did:
 
-The files were renamed to the versions that actually ran. **The alternative — editing the database's
-recorded versions to match the filenames — was rejected, and the reason is worth keeping.** This
-directory exists so the database stops being the only record of its own shape; it does not follow
-that the repo overrules the database about *what already happened*. The database is the record of
-what ran and when. The repo is the record of what was intended. When they disagree about history,
-history wins, and the cheap side moves.
+- **2026-09-14** — the four `coffee` migrations, e.g. `20260911203000_coffee_schema` became
+  `20260911202805`.
+- **2026-09-18** — `20260918014500_resume_renders_outlive_templates` became `20260918041216`, a day
+  after it was applied at the gate (#107, renamed in #113).
+- **2026-09-22** — `coffee_suggested_recipe`, `health_entries_column_comments` and
+  `health_grocery_items` (TEC-13).
 
-It also means `supabase migration repair` was never needed, which matters because the brief forbids
-it. A rule that would have had to be argued around turned out not to apply.
+**Editing the database's recorded versions to match the filenames was rejected, and the reason is
+worth keeping.** This directory exists so the database stops being the only record of its own
+shape; it does not follow that the repo overrules the database about *what already happened*. The
+database is the record of what ran; the repo is the record of what was intended. When they
+disagree about history, history wins and the cheap side moves — which is also why `supabase
+migration repair` was never needed, and `CLAUDE.md` forbids it.
 
-The SQL was verified identical before renaming — statement by statement against
-`supabase_migrations.schema_migrations`, not eyeballed. The only difference is that the hosted API
-strips the leading comment block, so the *reasoning* for each migration lives in this directory and
-nowhere else. That is an argument for the files, not against them.
-
-**What to expect from this in future:** any migration applied through the hosted API will do this
-again. Name the file after the fact where you can, or rename it to match once applied, and check
-`migration list` afterwards rather than assuming.
+The coffee four were verified identical statement by statement against `schema_migrations`, not
+eyeballed. The hosted API strips the leading comment block, so the *reasoning* for each migration
+lives in this directory and nowhere else.
 
 ### The deliberate gap
 
@@ -63,17 +56,19 @@ added.** It is data, not schema, and the data is seven real contacts — named p
 companies. The repo's no-personal-information rule applies to migrations exactly as it applies to
 docx fixtures.
 
-Consequences to expect:
-
 - `supabase migration list` will always show `20260908235234` as present remotely and missing
-  locally. That is correct and permanent. **It should be the only difference** — as of 2026-09-23 it
-  is again, after three files were renamed to their recorded versions (TEC-13). A second
-  discrepancy appearing means something drifted and is worth reading rather than dismissing.
-- **Do not run `supabase migration repair` on it.** Repairing would edit the remote history to
-  match the repo, falsifying the record of what was actually applied in order to silence a gap we
-  chose on purpose.
-- A rebuild from these files produces the correct schema with an empty `shared.contacts`. Seed data
-  is re-entered through the apps.
+  locally. That is correct and permanent, and **it must be the only difference** — measured on
+  2026-09-24, just before `record_original_table_grants` was written: the remote recorded every
+  file here plus that one, and nothing else. A migration awaiting its gate is the one other
+  difference to expect, and only until it is applied. Anything else means something drifted and
+  is worth reading rather than dismissing.
+- **Do not run `supabase migration repair` on it.** It would edit the remote history to match the
+  repo, falsifying the record of what was applied in order to silence a gap we chose on purpose.
+- **A rebuild from these files produces production's schema and table grants, with an empty
+  `shared.contacts`** — checked against `pg_class.relacl` on 2026-09-24. The default privileges
+  belong to `postgres`, so replay as `postgres`, as the CLI and the hosted API both do. Seeding is
+  off in `config.toml` because this withheld file is the only seed there has ever been. What a
+  rebuild cannot restore is the dashboard's exposed-schemas list — below.
 
 ## Working with it
 
@@ -85,95 +80,69 @@ npx supabase@latest migration list                            # local vs remote
 npx supabase@latest db pull -f <name>                         # capture remote drift as a new file
 ```
 
-The remote project ref is not stored in `config.toml`; `link` writes it to `supabase/.temp/`, which
-is gitignored.
+`link` writes the project ref to `supabase/.temp/`, which is gitignored; it is not in
+`config.toml`. **Any schema change gets a file in this directory and goes through a pull
+request.** If the database changes first, `db pull` it back immediately.
 
-**Any schema change from here on gets a file in this directory and goes through a pull request.**
-If you change the database first, `db pull` it back immediately — the whole point of this directory
-is that the database stops being the only record of its own shape.
-
-`config.toml` is the generated default with one edit: `[api] schemas` lists the custom schemas
-alongside `public`, so a local stack exposes them. **Add a new schema there too** — it is easy to
-miss, and a local stack will simply not see the tables. Without it, `supabase start` would serve an API
-that cannot see any of this project's tables.
+`config.toml` is the generated default with two edits: seeding is off (above), and `[api] schemas`
+lists the custom schemas alongside `public`. **Add a new schema there too** — without it a local
+stack serves an API that cannot see the tables. It configures the local stack only.
 
 ## How a migration actually gets applied
 
-This section exists because it did not, and that silence is the most plausible root cause of the
-version drift above. The Resume Formatter found the gap on 2026-09-14 while trying to apply its own
-migration: this file documented `link`, `migration list` and `db pull` — how to inspect the history
-and how to capture drift — and never once said how anything gets *applied*. An agent that needs to
-apply a migration and finds no documented path invents one.
-
 **`supabase db push` does not work here, and it is not going to.** It refuses when the remote
-history contains a version the local directory does not have — *"Remote migration versions not found
-in local migrations directory"* — and it writes nothing. `20260908235234` is remote-only
-**permanently and on purpose**, because it is seven real contacts and this repo does not commit
-names. So the one condition `db push` requires is the one condition this project has deliberately
-chosen never to satisfy. That is not a bug to work around; it is the cost of the decision, and it
-was simply never written down.
+history holds a version the local directory lacks — *"Remote migration versions not found in local
+migrations directory"* — and writes nothing. `20260908235234` is remote-only permanently and on
+purpose, so the one condition `db push` needs is the one this project chose never to satisfy.
 
-**So: the technical director applies migrations through the hosted API, at gate time, before
-merging.** Not by hand in the SQL editor, not by an app agent, and not by Joel. That is now a rule
-in `CLAUDE.md` rather than a habit, alongside the shape rule that makes applying-before-merging safe
-in the first place.
+**So the technical director applies migrations through the hosted API** (the Supabase MCP's
+`apply_migration` is the same path) **at gate time, before merging.** Not by hand in the SQL
+editor, not by an app agent, and not by Joel. `CLAUDE.md` makes it a rule, alongside the shape rule
+that makes applying before merging safe.
 
-**The one thing to get right is the recorded version.** The hosted API stamps its own version from
-the clock at the moment it runs and ignores the filename — that is exactly how four `coffee`
-migrations came to disagree with the repo. Two ways to keep them in step:
-
-1. **Record the file's own version as part of applying it.** The version column is a sequence key,
-   not an audit timestamp, so writing the version the repo already declares is accurate and the
-   filename never has to change. **Preferred**, and to be proven on the next migration applied —
-   which is the resume one — rather than asserted here.
-2. **Rename the file to whatever got recorded.** What was done for the four `coffee` migrations,
-   retroactively. It works, but it means editing a branch after its author is finished with it.
-
-Either way, **read the history back afterwards** and confirm local and remote differ by exactly one
-version. Not doing that is the whole of how this went unnoticed for three days.
+**The recorded version is not the filename's.** The API stamps the clock at the moment it runs. So
+at the gate: apply, read `supabase_migrations.schema_migrations` back, and if the recorded version
+differs, **rename the file on the branch to match before merging**, so `main` never carries a name
+that did not run. Then confirm local and remote differ by exactly the withheld version. Gate records
+for #56, #159, #161 and #165 report a version that matched its filename, while #107, #114 and #158
+were stamped; how the matches happened was never written down, so a match is something to read
+back, never something to plan on. Not reading back is how four `coffee` versions went unnoticed
+for three days.
 
 ## A new schema does not inherit anything
 
-`20260910051549` granted schema USAGE by naming four schemas explicitly. It cannot cover a schema
-that did not exist when it ran, so **every new schema arrives with no USAGE for the API roles** and
-every query against it fails on permissions — not on anything visible in the application code.
-
-This already bit once: `coffee` was created with a correct, RLS-enabled migration and was still
-unreachable until `20260911202901` granted it. Note also that `ALTER DEFAULT PRIVILEGES` only
-affects tables created *after* it runs, so a schema's existing tables need `GRANT ALL ON ALL TABLES`
-as well.
+`20260910051549` granted schema USAGE by naming the schemas that existed then. It cannot cover a
+later schema, so **every new schema arrives with no USAGE for the API roles** and every query
+against it fails on permissions — not on anything visible in the application code. `ALTER DEFAULT
+PRIVILEGES` only affects tables created *after* it runs, so tables that already exist need `GRANT
+... ON ALL TABLES` as well. `20260910051549` lacked that for the tables before it, which is why a
+rebuild left them ungranted until `record_original_table_grants`.
 
 **Adding a schema means two migrations and one dashboard setting — three steps, not two.**
 
-1. The schema and its tables.
-2. Its grants. Copy `20260911202901_grant_coffee_schema_usage.sql` and change the schema name.
-3. **Add it to the hosted project's exposed schemas, in the Supabase dashboard**: Project Settings →
-   API → Exposed schemas. PostgREST only answers for schemas on that list, and it is not in this
-   repo. Adding the schema to `[api] schemas` in `config.toml` is *also* worth doing, but it
-   configures the **local** stack only and does nothing to the hosted project.
+1. The schema and its tables — or the schema alone, as `health` and `cookbook` did, so every table
+   that follows inherits step 2's default privileges.
+2. Its grants. Copy `20260920022508_grant_cookbook_schema_usage.sql` and change the schema name.
+3. **Add it to the hosted project's exposed schemas: Project Settings → API → Exposed schemas.**
+   PostgREST only answers for schemas on that list, and it is not in this repo.
 
-Step 3 is the one that is easy to miss, and it fails in a way that looks like a credentials problem.
-**This bit on 2026-09-12.** `coffee` had a correct migration, correct grants — verified directly:
-`service_role` had USAGE on the schema and SELECT on `coffee.bags` — and `coffee` was already listed
-in `config.toml`. The app still answered:
+Step 3 is the one that gets missed, and it fails looking like a credentials problem. **This bit on
+2026-09-12:** `coffee` had a correct migration and correct grants — `service_role` had USAGE and
+SELECT, verified directly — and the app still answered `Invalid schema: coffee` for an hour while
+the key was suspected. Adding it in the dashboard fixed it with no code change and no redeploy;
+PostgREST reloaded and logged `Schema cache loaded 8 Relations`, one more than before.
 
-```
-{"name":"database","ok":false,"detail":"Invalid schema: coffee"}
-```
-
-for about an hour, while the key was suspected instead. Adding `coffee` in the dashboard fixed it
-with no code change, no migration and no redeploy: PostgREST restarted and logged
-`Schema cache loaded 8 Relations` — 8 rather than 7, which is `coffee.bags` arriving.
-
-**How to check it from a session without dashboard access:** `postgrest_logs` reports the relation
-count on every reload. Count the tables across the schemas you expect to be exposed; if the log's
-number is short, one of them is not on the list.
-
-
+**Checking it without dashboard access.** `postgrest_logs` reports the relation count on every
+reload; if it is short of the tables you expect exposed, one schema is off the list. Or find a
+real request in `edge_logs`: **`health` was proven exposed on 2026-09-24 that way**, by a 200 on
+`/rest/v1/entries`. **Health's and Cookbook's `/api/health` cannot answer this question.** Both
+probe with `rpc("version")`, which resolves to `health.version()` or `cookbook.version()`; no app
+schema holds any function, so the probe fails whether or not the schema is exposed. The fix, a
+real table read like Coffee's and Resume's, is filed with those agents.
 
 ## `shared.contacts` — the write contract
 
-The one table two apps share on purpose, so the rules are a contract rather than one agent's note.
+A table two apps share on purpose, so the rules are a contract rather than one agent's note.
 Read from the code and the live catalog on 2026-09-23 (TEC-9), not from any description of them.
 
 | | Who | What the code does |
@@ -185,21 +154,19 @@ Read from the code and the live catalog on 2026-09-23 (TEC-9), not from any desc
 | **Reference** | `editor.message_history.contact_id`, `tracker.pipeline_threads.contact_id` | Foreign keys, `ON DELETE NO ACTION` |
 
 **Nothing prevents a duplicate.** The table has its primary key and no other constraint — no unique
-index, no trigger. The editor inserts without looking first; its typeahead showing existing names is
-the only guard, and it is a person reading a list. Adding a unique key is a schema change with real
-rows behind it, so it is a decision, not a fix.
+index, no trigger. The editor inserts without looking first and trims nothing; its typeahead is the
+only guard, and it is a person reading a list. A unique key is a schema change with real rows
+behind it, so it is a decision, not a fix.
 
-**A referenced contact cannot be deleted.** Both foreign keys are `NO ACTION`, so the delete fails and
-the route returns 500. That is the safe direction — history is never orphaned — but it means delete
-works only on a contact nothing points at.
+**A referenced contact cannot be deleted.** Both foreign keys are `NO ACTION`, so the delete fails
+and the route returns 500. That is the safe direction — history is never orphaned — but it means
+delete works only on a contact nothing points at.
 
 **`updated_at` moves only through the editor's PATCH.** There is no trigger, so any other write path
 would leave it stale unless it set it itself.
 
-**The tracker never writes this table** — `apps/tracker/app/api/contacts/route.ts` says so and the code
-agrees. It stores a `contact_id` in its own threads and nothing more. The Resume Formatter writes
-`tracker.pipeline_threads.contact_id` the same way; its `getSharedClient` is exported and never called
-(TEC-26).
+**The tracker never writes this table**; it stores a `contact_id` on its threads and nothing more.
+The Resume Formatter's `getSharedClient` is exported and never called (TEC-26).
 
 **The only create path is in the paused editor.** `tp-message-editor` deploys `BLOCKED`, so what
 creates contacts in production is its last good build, not necessarily this code.
@@ -207,16 +174,52 @@ creates contacts in production is its last good build, not necessarily this code
 **Adding a write path anywhere else changes this contract.** It goes to Joel through the technical
 director as a new cross-app contract, and this section changes in the same pull request.
 
+## `tracker.pipeline_threads` — the write contract
+
+Owned by the Pipeline Tracker (`apps/tracker`, TechPad Gen's) and written by the Resume Formatter
+(`apps/resume`) as well, which makes it a cross-app contract like the one above rather than either
+agent's note — the second table written across a tool boundary, after `shared.contacts`. **The
+tracker was parked by Joel on 2026-09-24.**
+Read from the code on 2026-09-24.
+
+| | Who | What the code does |
+|---|---|---|
+| **Insert** | Tracker — `POST /api/threads` | `company` unvalidated (a missing one is a 500); `stage` defaults to `Applied`, `last_touch_date` to today in UTC; `contact_id`, `next_action`, `notes` null when absent |
+| **Insert** | Resume — `PATCH /api/renders/[id]` with a company and no thread yet | `company`, `stage` `Applied`, `last_touch_date`, `next_action` `Follow up`, `notes` "*date* — resume sent" plus role and posting URL, `contact_id` (the UI never sends one) |
+| **Update** | Tracker — `PATCH /api/threads/[id]` | The request body as sent, plus `open_task_id = null` and `updated_at`. No column allowlist |
+| **Update** | Tracker — `lib/followUpTask.ts` | `open_task_id` only, after the To Do task exists |
+| **Update** | Resume — `PATCH /api/renders/[id]` on an existing thread (the render's, or one named in the body) | `company`, `last_touch_date`, `notes` (appended), `open_task_id = null`, `updated_at`, and `contact_id` only when sent |
+| **Delete** | Tracker — `DELETE /api/threads/[id]` | Hard delete; the renders that pointed at it keep their rows with `thread_id` null |
+| **Read** | Tracker (`/api/threads`, thread draft, dashboard, follow-up task); Resume (`/api/renders`, `/api/resumes`: `id, company, stage`) | Read-only |
+| **Reference** | `resume.renders.thread_id`, across schemas | Foreign key, `ON DELETE SET NULL`; `contact_id` → `shared.contacts`, `NO ACTION` |
+
+**Resume's write-through is not atomic.** It writes the thread first and links the render second,
+so a failed link followed by a retry creates a second thread for the same application. The notes
+merge is read-then-write: a notes edit in the tracker between the two is lost.
+
+**`stage` has a check constraint and no default**, so every writer sets it. **`updated_at` has no
+trigger**: it moves on the two PATCH paths only and nothing reads it.
+
+**The tracker also reads other apps' schemas, read-only**: `editor.message_history`,
+`resume.renders` and `resume.templates`, for the dashboard (`lib/dashboard.ts`). No constraint ties
+the reader to those columns, so changing one of them is a change to this contract too.
+
+**Adding a write path anywhere else changes this contract.** It goes to Joel through the technical
+director, and this section changes in the same pull request — exactly as for `shared.contacts`.
+
 ## Why the grants look alarming
 
-`20260910051549` sets:
+`20260910051549` sets this for each of its schemas, and every later schema's grants migration
+repeats it:
 
 ```sql
 ALTER DEFAULT PRIVILEGES IN SCHEMA <each> GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ```
 
 So every table created in these schemas is automatically granted to `anon` — including DELETE and
-TRUNCATE — whether or not the migration that creates it says anything about grants.
+TRUNCATE — whether or not its migration says anything about grants. The tables `20260906152749`
+created are the exception: they hold SELECT, INSERT, UPDATE and DELETE only, which is what
+production has and what `record_original_table_grants` records.
 
 That is intended, but it means **Row Level Security is the only control between a leaked
 publishable key and this data.** RLS is enabled on every table with zero policies, which is

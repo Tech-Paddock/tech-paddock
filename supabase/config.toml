@@ -64,10 +64,14 @@ schema_paths = []
 
 [db.seed]
 # If enabled, seeds the database after migrations during a db reset.
-enabled = true
+# Off on purpose. The only seed this project has ever had is migration
+# 20260908235234, withheld from the repo because it is real contacts (see
+# supabase/README.md). The default pointed at a ./seed.sql that never existed.
+# Migrations still run on `supabase start` and `db reset`; only seeding is off.
+enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+# sql_paths = ["./seed.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.
