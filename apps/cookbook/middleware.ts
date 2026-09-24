@@ -8,14 +8,28 @@ import {
   shouldRenewSession,
 } from "@/lib/auth";
 
+// What a signed-out browser may fetch: the login page, the login endpoint,
+// and the icons the login page itself shows. Exact paths, never prefixes. A
+// prefix admits every future route that happens to share it (`/login-history`,
+// `/api/logins`, `/favicon-maker`) without anyone deciding it should.
+const PUBLIC_ICONS = new Set([
+  "/favicon.ico",
+  "/icon.svg",
+  "/icon.png",
+  "/apple-icon.png",
+  "/apple-touch-icon.png",
+]);
+
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
 
   if (
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/api/login") ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon")
+    pathname === "/login" ||
+    pathname === "/api/login" ||
+    // Next reserves /_next/ for its own assets and data; no app route can live
+    // there, so this prefix cannot admit one.
+    pathname.startsWith("/_next/") ||
+    PUBLIC_ICONS.has(pathname)
   ) {
     return NextResponse.next();
   }
@@ -37,8 +51,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // The query string travels too, so /?app=coffee comes back to Coffee rather
+  // than to the hub's front page. The login page only follows it if it is a
+  // path on this origin (lib/safe-redirect.ts).
   const loginUrl = new URL("/login", request.url);
-  loginUrl.searchParams.set("from", pathname);
+  loginUrl.searchParams.set("from", pathname + search);
   return NextResponse.redirect(loginUrl);
 }
 
