@@ -110,9 +110,9 @@ jobs:
             # app the merge did not touch is byte-identical to the last build of
             # it; apps share no code except through packages/, which is in every
             # scope; and .github/workflows and supabase still rebuild everything.
-            # Most merges here are documentation, and each one cost seven cold
-            # builds that could not stop a deploy the same push had already
-            # started. What this gives up: a change outside the repo — the runner
+            # Most merges here are documentation, and each one cost a cold
+            # build of every app that could not stop a deploy the same push
+            # had already started. What this gives up: a change outside the repo — the runner
             # image, a registry — surfaces when an app next changes, which is
             # also when Vercel would next build it.
             #

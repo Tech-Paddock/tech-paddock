@@ -95,15 +95,15 @@ function yamlJob(yml, name) {
 
 /* 1 ── Files the rules call byte-identical across every app.
    A mismatch in the auth pair does not throw; it silently rejects valid
-   sessions on the other four, which looks like a login bug rather than a
+   sessions on every other app, which looks like a login bug rather than a
    config one. theme.css drifts loudly by comparison, but it is still one more
-   file that has to be edited five times.
+   file that would otherwise be edited once per app.
 
    next.config.mjs joined the list on 2026-09-19. It carries the security
    headers, and it is the one file here where drift is silent by construction:
    a missing header changes nothing anybody can see. apps/home had shipped with
    an empty config and no frame-ancestors for as long as the file existed, and
-   nothing said so until somebody read all six. */
+   nothing said so until somebody read every copy side by side. */
 for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme.ts", "next.config.mjs"]) {
   const present = APPS.map((a) => [a, md5(R("apps", a, rel))]).filter(([, h]) => h);
   if (present.length === 0) { add(`identical: ${rel}`, "warn", "not present in any app — cannot measure"); continue; }
@@ -119,13 +119,13 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
 }
 
 /* 1b ── The copies match packages/shared, which is the file they came from.
-   Check 1 asks whether the six agree with each other. That was the only
-   question worth asking while there was no original: six copies that agree are
+   Check 1 asks whether the copies agree with each other. That was the only
+   question worth asking while there was no original: copies that all agree are
    correct no matter which one somebody edited. Since packages/shared exists
-   there IS an original, and "all six agree" stops being sufficient — six copies
-   can agree perfectly and all six disagree with the canonical file, which is
-   exactly what happens when an agent edits one copy and helpfully syncs the
-   other five.
+   there IS an original, and "they all agree" stops being sufficient — every
+   copy can agree perfectly and every one disagree with the canonical file,
+   which is exactly what happens when an agent edits one copy and helpfully
+   syncs the rest.
 
    So this is the stronger question and check 1 is deliberately kept rather than
    replaced: it still answers on a branch where packages/shared has been deleted
@@ -303,7 +303,7 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
 /* ── Each app's Vercel build is scoped to its own folder ──────────────────
    Until 2026-09-19 every `ignoreCommand` read "skip previews, build
    everything else", which cannot see which folder changed. One merge rebuilt
-   all six apps, and since Vercel aliases whichever build finishes LAST rather
+   every app, and since Vercel aliases whichever build finishes LAST rather
    than the newest commit, two merges close together could leave an app
    serving the older one. It did: three merges four minutes apart on
    2026-09-18 left techpaddock.io on the Coffee-icon build.
@@ -697,7 +697,7 @@ add("ledger stays retired", existsSync(R(".claude/OPEN-ITEMS.md")) ? "fail" : "o
       if (/\b\d+\s+tests?\b/i.test(line)) { hits.push(`${rel}:${i + 1} names a test count`); return; }
       if (/^\s*\|/.test(line)) return; // tables carry examples for the rules below
       /* "the other four" — the rest of the roster, measured. CLAUDE.md said
-         "rejects valid sessions on the other four" with seven apps on disk,
+         "rejects valid sessions on the other four" long after the roster grew,
          and no pattern here could see it: no noun after the number. Counted
          when nothing noun-like follows or the noun is a roster noun; "the other
          two agents" is about something else and is left alone. */
