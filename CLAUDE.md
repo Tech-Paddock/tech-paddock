@@ -11,18 +11,16 @@ advice.
 
 ## Read this before you touch anything
 
-Three steps, every session, before any project work:
+Every session, before any project work, in this order:
 
-1. **This file.** It is already in your context. The universal rules below bind you whichever agent
+1. **Your open items — Linear, team TEC.** List the issues labelled for you and lead your first
+   message with them. The `SessionStart` hook reminds you; nothing prints them for you.
+2. **This file.** It is already in your context. The universal rules below bind you whichever agent
    you are.
-2. **Your charter** — `.claude/agents/<you>/RULES.md`. Your job, your domain, your guardrails.
+3. **Your charter** — `.claude/agents/<you>/RULES.md`. Your job, your domain, your guardrails.
    **Nothing loads this for you.** Open it yourself. It is the specification for your work, not
    background reading.
-3. **Your handoff** — `.claude/agents/<you>/HANDOFF.md`. What state your area is in and what to do
-   next.
-
-**Open items live in Linear, team TEC.** A hook reminds you; nothing prints them for you. List the
-ones labelled for you before anything else.
+4. **Your handoff** — `.claude/agents/<you>/HANDOFF.md`. What state your area is in, and its traps.
 
 **Once a change is agreed, cut a fresh branch named for it** — never reuse one. The branch comes
 *after* the agreement: until Joel has answered you do not yet know what the change is, and a branch
@@ -45,10 +43,11 @@ keeps things in one place. When you have something to say, find the reader first
 |---|---|---|---|
 | `CLAUDE.md` | rules binding every agent | every session, automatic | overwrite |
 | `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | **overwrite · ≤350 lines · TD drafts, Joel approves** |
-| `agents/<you>/HANDOFF.md` | **your area's state right now** | every session | **overwrite · ≤80 lines** |
-| Linear, team TEC | **open requests, each with an owner** | every session, first | **one issue per request · `owner:` and `agent:` labels · body ends with Next steps** |
+| `agents/<you>/HANDOFF.md` | **your area's state right now, and its traps** — never a to-do | every session | **overwrite · ≤80 lines** |
+| Linear, team TEC | **all open work, each request with an owner, and the parking lot** | every session, first | **one issue per request · `owner:` and `agent:` labels · body ends with Next steps · `Parked` label** |
+| Linear documents, team TEC | **a tool's design reasoning** — e.g. "Health — plan" | before designing a feature | **binds nothing: a rule goes in the charter** |
 | `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append in its section; supersede in place · ≤400 lines** |
-| `/admin` — The Garage | facts about the running system | when you need a fact | **computed, never written** |
+| `/admin` — The Garage | facts about the running system | when you need a fact | **computed, never written** — see *The shared foundation* for what it does and does not show |
 | commits and pull request bodies | what landed, why, blast radius, who asked | at the gate, and afterwards | the event log |
 
 **Three rules make this hold.**
@@ -59,20 +58,22 @@ find yourself restating something this file already says, link to it instead.
 
 **Anything computable is computed, never written in prose.** Test counts, checksums, the CI matrix,
 which apps have tests, what is deployed — every one of these has gone stale here *because it was
-prose*. `/admin` reads them live and never guesses. A number you type today is wrong next week and
-nothing tells you.
+prose*. Point at where it is measured — `drift` for the repo's shape, `/admin` for the running
+system — instead of copying the number. A number you type today is wrong next week and nothing
+tells you.
 
-**A request is a Linear issue with an owner.** That is how you ask another agent for something. Not a
-note in your handoff that nobody else reads — say it to the technical director, who owns the queue.
-**Its body ends with a Next steps section** — numbered, each step naming who acts, kept current by
-whoever changes the issue. The next session acts on it without reading the history; an issue that
-needs the history to act on is a note, not a request.
+**A request is a Linear issue with an owner.** That is how you ask another agent for something, and
+how you leave work for your own next session — a handoff holds state and traps, never a to-do (Joel,
+2026-09-24). Say it to the technical director, who owns the queue. **Its body ends with a Next steps
+section** — numbered, each step naming who acts, kept current by whoever changes the issue; a hook
+refuses an issue without it or its labels. The next session acts on it without reading the history;
+an issue that needs the history to act on is a note, not a request.
 
 ### When a document reaches its cap
 
-Caps are in the table above and enforced by `scripts/drift-check.mjs`, which **warns ten lines out
-and fails past the ceiling**. The warning is a prompt to compact, not a wall to route around. Take
-the file entry by entry:
+Every ceiling lives in one place, the budget list in `scripts/drift-check.mjs`; the table above
+repeats the three every agent writes to. `drift` **warns ten lines out and fails past the ceiling**.
+The warning is a prompt to compact, not a wall to route around. Take the file entry by entry:
 
 | The entry is | Do this | Because |
 |---|---|---|
@@ -86,9 +87,8 @@ nothing can honestly be cut, the cap is wrong — raise it in its own pull reque
 written down. **A budget that fires on good work is re-set deliberately; one that is quietly widened
 is a file winning.**
 
-**What is deliberately not a channel.** Worklogs were retired on 2026-09-16. They existed so a live
-agent could see what another live agent had claimed *right now*, which cannot happen, and every real
-message in one had a better home. `read-all.sh` went with them.
+**What is deliberately not a channel:** worklogs and the ledger file. Both are retired, `drift` fails
+if either comes back, and why is in `DECISIONS.md`.
 
 ---
 
@@ -96,8 +96,8 @@ message in one had a better home. `read-all.sh` went with them.
 
 | Agent | Owns | Charter |
 |---|---|---|
-| Technical Director | gatekeeping, the Linear queue, merges, **DevOps — Vercel, DNS, CI, deploys**, **app surface**, **Postgres**, **`apps/editor`** (frozen) | `.claude/agents/td/` |
-| TechPad Gen | `apps/home`, `apps/tracker`, **the visual theme of every app**, shared components | `.claude/agents/techpad-gen/` |
+| Technical Director | gatekeeping, the Linear queue, merges, **DevOps — Vercel, DNS, CI, deploys**, **app surface**, **Postgres**, **`apps/editor`** (parked and frozen) | `.claude/agents/td/` |
+| TechPad Gen | `apps/home`, `apps/tracker` (parked), **the visual theme of every app**, shared components | `.claude/agents/techpad-gen/` |
 | Resume Formatter | `apps/resume` | `.claude/agents/resume/` |
 | Coffee | `apps/coffee` | `.claude/agents/coffee/` |
 | Health | `apps/health` | `.claude/agents/health/` |
@@ -130,9 +130,11 @@ wrong or the rule is, and that is a conversation before any code exists.
 
 ### Never without asking first — and who to ask
 
-- **Joel: create or delete a Vercel project, add or remove a domain, or change a DNS record.** No
-  undo, and no test catches them. Changing settings on a project that already exists is fine — the
-  line is between configuring something that exists and creating, destroying or re-pointing it.
+- **Joel: create, delete, pause or reconfigure anything in Vercel** — a project, a domain, a DNS
+  record, a project setting or an environment variable. No undo, and no test catches them. **Agents
+  read Vercel state; they do not write it** — settings and env vars are Joel's dashboard steps
+  (Joel, 2026-09-23: "follow charter"). The connector exposes write tools anyway, so **a hook holds
+  every Vercel call that is not a read for Joel's click**: a backstop, not the route.
 - **Joel: edit this file.** It is approved before it changes. **If what you are about to build
   contradicts it, stop and ask before you build it.** Raising it in the pull request is the backstop
   for something discovered late, not the normal path — code already written applies pressure to
@@ -140,29 +142,32 @@ wrong or the rule is, and that is a conversation before any code exists.
 - **A charter is not the agent's to edit — settled 2026-09-20.** `agents/<you>/RULES.md` is a rule,
   and rules are decided and followed rather than owned: **the technical director drafts, Joel
   approves, you follow.** It was already the shape in practice, since Joel approved every charter
-  change anyway, and it makes a cross-agent edit one pull request instead of six.
+  change anyway, and it makes a cross-agent edit one pull request instead of one per agent.
   **Your `HANDOFF.md` stays yours and always will.** That is state, not a rule, and a handoff written
   by anyone but the agent who did the work is the second-hand account these files exist to replace.
-  **Propose a charter change** — in your handoff, a pull request body, or a Linear issue. Do not make it.
-- **The technical director: the shared auth plumbing** — `lib/auth.ts`, `lib/password.ts`,
-  `middleware.ts`, or anything touching `SESSION_SECRET` and the shared cookie. **These are gated for two different reasons, and
-  merging them is how the rule gets talked past.** `lib/auth.ts` and `lib/password.ts` genuinely are
-  byte-identical in every app — checksummed, not assumed — and a mismatch does not throw, it
-  silently rejects valid sessions on the other four. `middleware.ts` is **three distinct versions**:
-  `home`, `resume` and `coffee` share one, `editor` adds a scoped `/api/draft` bypass, `tracker`
-  adds `/api/summary` and waves `/api/cron/*` through. That divergence is deliberate, so "they are
-  all the same" is not the reason to leave it alone — and an agent who checks, finds three, and
-  concludes the rule is wrong has been handed that conclusion by the rule itself. **It is gated
-  because it *is* the password gate.** A bad edit does not break a login; it publishes an endpoint.
+  **Propose a charter change** as a Linear issue or in your pull request body. Do not make it.
+- **The technical director: the shared auth plumbing** — the stamped auth files (`lib/auth.ts`,
+  `lib/password.ts`, and the login handler in `lib/login.ts` with `lib/safe-redirect.ts`),
+  `middleware.ts`, or anything touching `SESSION_SECRET`, `INTERNAL_API_SECRET`, `CRON_SECRET` and
+  the shared cookie. **These are gated for two different reasons, and merging them is how the rule
+  gets talked past.** The stamped files genuinely are byte-identical in every app — checksummed, not
+  assumed — and a mismatch does not throw, it silently rejects valid sessions on every other app.
+  `middleware.ts` is **three distinct versions**: a base copy, `editor`'s scoped `/api/draft`
+  exception, and `tracker`'s `/api/summary` and cron exceptions, each behind its own secret. Which
+  app runs which is `drift`'s to measure, not this file's to list. That divergence is deliberate, so
+  "they are all the same" is not the reason to leave it alone — and an agent who checks, finds
+  three, and concludes the rule is wrong has been handed that conclusion by the rule itself. **It is
+  gated because it *is* the password gate.** A bad edit does not break a login; it publishes an
+  endpoint.
 
 ### Always
 
-- **One branch per change, named `claude/<area>-<description>`.** Area is the app folder where there
-  is one — `home`, `editor`, `tracker`, `resume`, `coffee`, `health` — otherwise the layer it
-  touches: `ci`, `db`, `brief`, `platform`. What has to be readable at a glance is **which area and
-  what change**.
-  A session's opening branch is named by the harness (`claude/kickoff-…`) and names neither; that is
-  expected and it is not the branch the work belongs on.
+- **One branch per change, named `claude/<area>-<description>`.** Area is the app's folder name under
+  `apps/` where there is one — `cookbook`, `health`, and so on — otherwise the layer it touches:
+  `ci`, `db`, `docs`, `platform`. What has to be readable at a glance is **which area and what
+  change**.
+  A session's opening branch is named by the harness and names neither; that is expected and it is
+  not the branch the work belongs on.
 - **Commit and push your work. Do not open a pull request until Joel asks for one.** This binds every
   agent, the technical director included. Work on your branch, commit as you go, push it, and when it
   is finished say so and stop. **A finished branch is the deliverable.** CI runs on every branch
@@ -196,20 +201,20 @@ wrong or the rule is, and that is a conversation before any code exists.
   CI failures, review comments — is the technical director's, and no other agent offers it. **Only
   one watcher gets the events**, and a second subscriber silently receives nothing rather than an
   error, so two agents watching means one is deaf to the thing it promised to watch.
-- **Adding or deprecating an app under `apps/` needs no CI change.** The matrix is derived from the
-  folders on disk, and one fixed-name `gate` job sits in front of it, so branch protection requires
-  a single check that never changes shape. Create the folder and it builds; delete it and it stops.
-  **What still cannot be automated is the Vercel project and the DNS record** — both outside the
-  repo, both without an undo. Everything else The Garage will tell you is missing.
+- **Adding or deprecating an app under `apps/` needs no CI change.** The matrix derives from the
+  folders on disk behind one fixed `gate` check, and `drift` fails either being undone. **What cannot
+  be automated is the Vercel project and the DNS record** — both outside the repo, both without an
+  undo, both Joel's (`.claude/agents/STANDUP.md`).
 - **TechPad Gen owns the theme, in every app.** Palette, tokens, type, spacing, and the shared
   component language. **Surface is not the theme and is the technical director's** — whether a tool
   is a site or an app decides its shell and its navigation, which is architecture, and it is settled
-  at standup rather than in a feature. **The rules are in `.claude/SURFACE.md`; read it before you
-  design a screen.** Page count is not the test — Coffee and the Resume Formatter have the same
-  number of routes and are not the same shape. **Using what exists is free and needs nobody** — build with the tokens already
-  there. **What needs TechPad Gen is changing or forking it.** One owner rather than five because the
-  hub embeds the tools in iframes, so two apps' buttons sit inches apart on one screen; drift there
-  is visible and makes one product look like several.
+  at standup rather than in a feature; Joel can overrule it. **The rules are in
+  `.claude/SURFACE.md`; read it before you design a screen.** Page count is not the test — Coffee and
+  the Resume Formatter have the same number of routes and are not the same shape. **Using what exists
+  is free and needs nobody** — build with the tokens already there. **What needs TechPad Gen is
+  changing or forking it.** One owner rather than one per app because the hub embeds the tools in
+  iframes, so two apps' buttons sit inches apart on one screen; drift there is visible and makes one
+  product look like several.
   **It is deliberately not a bottleneck.** You never wait on TechPad Gen to ship: duplicate the
   pattern locally, name it in your pull request, and let them decide later whether it becomes shared.
   A copy that is flagged is a decision deferred; a copy that is quiet is drift.
@@ -233,11 +238,14 @@ wrong or the rule is, and that is a conversation before any code exists.
   or in the pull request when Joel asks for one. A finished branch is where the session ends, and
   **sessions are ended deliberately now rather than run on**, so this is the normal case.
   **Say what is now true, not what you did** — the commit already records the what. If the change
-  makes your handoff's description wrong, correcting it is part of the change.
-  **The next session in your area starts from this file and nothing else.** A handoff composed from
-  a summary rather than from the work is fluent, second-hand and confidently wrong — the single
-  failure this project has paid for most. **Short sessions moved that risk rather than removing it**,
-  from mid-session to the gap between sessions, which this file is the only thing spanning.
+  makes your handoff's description wrong, correcting it is part of the change. **Write the state
+  after merge, never your own branch or pull request as in flight**: the gate merges it after you
+  have gone, and a line saying it is open is false from that moment, with nobody left who may fix
+  it. Branch and pull request state are read live.
+  **The next session in your area starts from this file and its issues, nothing else.** A handoff
+  composed from a summary rather than from the work is fluent, second-hand and confidently wrong —
+  the single failure this project has paid for most. **Short sessions moved that risk rather than
+  removing it**, from mid-session to the gap between sessions, which only this file and Linear span.
 - **Open every message to Joel with a horizontal rule.** A markdown `---` on its own line, as the
   very first line, before any prose. It is the one mark that separates your reply to him from the
   tool output, file dumps and command results scrolling past above it — he reads this terminal all
@@ -256,45 +264,60 @@ not going blindly: ask whatever you need in order to execute it correctly.
 
 Merging is the technical director's, and the gate is specified in `.claude/agents/td/RULES.md`.
 What every agent needs to know: **CI green on the current head, handoffs current, the request
-recorded, the Deployment section filled in, squash merge, branch deleted.** A stale handoff sends
-the change back; it does not get fixed by the TD on the way past.
+recorded, the Deployment section filled in, squash merge.** A stale handoff sends the change back; it
+does not get fixed by the TD on the way past. **One exception:** when a TD pull request changes
+another agent's charter, that agent's handoff is not required to change with it — nobody but that
+agent may write it — so the TD files a Linear issue asking the agent to reconcile its handoff.
+**Agents cannot delete a remote branch.** The merged branch goes when GitHub's *Automatically delete
+head branches* setting removes it, or when Joel does.
 
 ---
 
 ## The shared foundation
 
-Per-tool detail lives in that tool's charter. Live facts about what is deployed are at `/admin`.
+Per-tool detail lives in that tool's charter.
 
 - **One repo, monorepo layout.** One folder per tool under `apps/`, each with its own
   `package.json`, each pointed at by its own Vercel project via that project's Root Directory. There
   is no root `package.json`; work inside the relevant app folder. **`packages/shared` holds the one
-  real copy of every file that must be identical in every app** — `lib/auth.ts`, `lib/password.ts`,
-  `lib/theme.css`, `lib/theme.ts` and `next.config.mjs`. `node scripts/stamp-shared.mjs` writes the
-  copies, `--check` verifies them, and **`drift` fails a copy that disagrees**, so a session or
-  lockout fix is now **one edit and a command** rather than one edit per app. **Do not edit a copy**
-  — each opens with a banner saying so. **They are still copies, and deliberately so**: a root
-  workspace install would buy one real `import` and cost the per-app independence that the Vercel
-  Root Directories and the derived CI matrix both rest on. **`lib/supabase.ts` stays a per-app
-  variant** and the hub has none at all, which is the hub holding no database credential.
-- **One Supabase project**, each tool in its own Postgres schema — `shared`, `editor`, `tracker`,
-  `resume`, `coffee`, `health`, `cookbook` — never the default `public`. One migration history, at `supabase/`
-  in the repo root, never under an app. **Read `supabase/README.md` before writing one.** A new schema inherits
-  no grants at all, so adding one means two migrations and a dashboard setting — three steps.
+  real copy of every file that must be identical in every app** — the list is `MANIFEST` in
+  `scripts/stamp-shared.mjs`, and nowhere else. `node scripts/stamp-shared.mjs` writes the copies,
+  `--check` verifies them, and **`drift` fails a copy that disagrees**, so a session or lockout fix is
+  **one edit and a command** rather than one edit per app. **Do not edit a copy** — each opens with a
+  banner saying so. **They are still copies, and deliberately so**: a root workspace install would
+  buy one real `import` and cost the per-app independence that the Vercel Root Directories and the
+  derived CI matrix both rest on. **`lib/supabase.ts` stays a per-app variant** and the hub has none
+  at all, which is the hub holding no database credential.
+- **One Supabase project**, each tool in its own Postgres schema plus `shared` — never the default
+  `public`. One migration history, at `supabase/` in the repo root, never under an app. **Read
+  `supabase/README.md` before writing one.** A new schema inherits no grants at all, so adding one
+  means two migrations and a dashboard setting — three steps.
 - **Row Level Security on every table, deny-by-default, zero policies.** The server uses the service
   role key, which bypasses RLS. RLS exists purely as the fallback if a key ever leaks — and because
   `ALTER DEFAULT PRIVILEGES` grants `anon` table access automatically, it is the only control between
   a leaked publishable key and the data.
-- **One deliberately shared table: `shared.contacts`** — written and read by the Message Editor and
-  the Pipeline Tracker app, so a person exists once rather than as drifting duplicates. **The editor
-  is the technical director's and the tracker is TechPad Gen's as of 2026-09-19**, so the write rules
-  are a cross-app contract rather than one agent's internal note.
+- **A tool reaches into another tool's schema only by a written contract**, and the contracts live
+  in `supabase/README.md`, nowhere else. Two tables are written across a tool boundary:
+  `shared.contacts`, whose only writer is the Message Editor, so a person exists once rather than as
+  drifting duplicates; and `tracker.pipeline_threads`, which the Resume Formatter writes through when
+  a render names a company. The tracker also reads the editor's and the Resume Formatter's tables
+  directly. **The editor is the technical director's and the tracker is TechPad Gen's**, so these are
+  cross-app contracts rather than one agent's internal note, and a new one goes to Joel through the
+  technical director.
 - **No secrets reach the browser.** Every Supabase read/write and every Anthropic call happens
   through the app's own server-side API routes.
 - **One login covers every subdomain.** The session cookie is scoped to `.techpaddock.io`;
   `SESSION_SECRET` must be byte-identical across every Vercel project or the others silently
-  reject valid sessions. The tools send
+  reject valid sessions. The apps send
   `frame-ancestors 'self' https://techpaddock.io https://*.techpaddock.io` so only the hub embeds them.
-- **Every deployed app sits behind a password**, with lockout after repeated failed attempts.
+- **Every deployed app sits behind a password.** The failed-attempt counter lives in a per-browser
+  cookie, so a client that discards it is never locked out; the server-side limit is a per-IP rate
+  limit on `POST /api/login` in each project's Vercel Firewall (TEC-7 — not a shared table, which
+  would have handed the hub a database credential). **The password stays the real control.**
+- **`/admin` — The Garage, on the hub — is computed, not live throughout.** Its probes of each
+  project run live. Its *Declared* and *Rules drift* panels are baked at the hub's last build (the hub
+  builds on every production merge). Which tools it covers is `TOOLS` in `apps/home/lib/platform.ts`,
+  a list typed by hand. It shows no versions and no test counts.
 - **Prefer append over rewrite for anything that accumulates.** When a feature involves growing
   history, the default write path is a plain insert — cheap, instant, no model call — with any
   model-driven synthesis kept as a separate, deliberately triggered, batched step.
@@ -321,37 +344,43 @@ subdomain. Verified against the live account; the table gets corrected, not the 
 | Subdomain | Tool | Vercel project |
 |---|---|---|
 | `techpaddock.io` | hub (`apps/home`) | `tp-home` |
-| `editor.techpaddock.io` | Message Editor — **paused** | `tp-message-editor` |
-| `tracker.techpaddock.io` | Pipeline Tracker | `tp-tracker` |
+| `editor.techpaddock.io` | Message Editor — **parked and frozen** | `tp-message-editor` |
+| `tracker.techpaddock.io` | Pipeline Tracker — **parked** | `tp-tracker` |
 | `resume.techpaddock.io` | Resume Formatter | `tp-resume` |
 | `coffee.techpaddock.io` | Coffee | `tp-coffee-app` |
 | `health.techpaddock.io` | Health | `tp-health` |
 | `cookbook.techpaddock.io` | Cookbook | `tp-cookbook` |
 
-**The Message Editor is paused and its red check is expected — ignore it.** `tp-message-editor`
-deploys `BLOCKED` on every commit, so `Vercel – tp-message-editor` is red **on `main` itself** and
-every pull request here reads `mergeable_state: unstable`. **Not a gate failure, not a reason to
-hold a merge.** The general rule: **check a red status against `main` before treating it as yours** —
-red on both is the repo's weather, not your change.
+**A parked app's red check is expected — ignore it.** Joel pauses a parked app's Vercel project, so
+it deploys `BLOCKED` on every commit and its `Vercel – tp-…` check is red **on `main` itself**, which
+leaves every pull request reading `mergeable_state: unstable`. **Not a gate failure, not a reason to
+hold a merge**, and never a reason to unpause it. The general rule: **check a red status against
+`main` before treating it as yours** — red on both is the repo's weather, not your change.
 
 ---
 
 ## What is actually enforced
 
-Most rules here are convention: they hold because an agent chooses to comply. Three things do not.
+Most rules here are convention: they hold because an agent chooses to comply. These do not.
 
-1. **`main` is protected**, confirmed against the GitHub API rather than assumed.
-2. **The `.claude/settings.json` hooks** run whether or not anyone wants them to — they refuse a push
-   to `main`, refuse rewriting the migration history, hold opening, updating and merging a pull request
-   for Joel's click, and point every session at Linear.
-3. **`requested-by-joel`** fails a pull request whose body does not record who asked for it, and
-   **`drift`** fails one where a rule in this file has stopped being true — the checksums, the three
-   `middleware.ts` variants, the CI matrix, the file budgets. It measures rather than trusting the
-   document. `node scripts/drift-check.mjs` runs it locally; `--json` is what The Garage renders.
-
-**"Do not open a pull request until Joel asks" became enforced on 2026-09-23** (#186): the hook in
-item 2 holds every pull request an agent opens for his click. What still rests on honesty is the
-quote — `requested-by-joel` can see that the line is there, never that he said it.
+1. **`main` is protected.** `gate` is a required check and branches must be up to date before they
+   merge. No agent can read the ruleset itself, so which other checks it requires is known only by
+   their effect.
+2. **The `.claude/settings.json` hooks** run whether or not anyone wants them to, through one guard,
+   `.claude/hooks/guard.mjs`, which **fails closed**. It refuses a push that would land on `main` in
+   any spelling or that it cannot read, and rewriting the migration history by CLI or SQL; holds
+   opening, changing, merging or reviewing a pull request, and the API commit tools, for Joel's
+   click; holds every Vercel and Supabase call that is not a read; refuses a Linear issue without its
+   labels or Next steps; and points every session at Linear. CI tests what it refuses. It stops
+   mistakes, not a determined agent — branch protection stays the backstop for `main`.
+3. **CI's `gate`** needs every app to typecheck, test and build, and `drift` to pass.
+   **`requested-by-joel`** fails a pull request whose body does not record who asked for it.
+   **`drift`** measures the repo instead of trusting a document: the stamped copies, the middleware
+   shape and that every app has one, the CI matrix and the gate's shape, each `ignoreCommand` against
+   what its build reads, the file budgets, and retired structures staying retired — and it warns on
+   computable facts written into any `.md` except `DECISIONS.md`. **It does not read this file's
+   sentences**, which is why this file points at what drift measures rather than restating it.
+   `node scripts/drift-check.mjs` runs it locally; `--json` is what The Garage renders.
 
 Every rule in this file was written after something went wrong: three branches editing it at once,
 six schema migrations that lived only in the database, a Vercel project serving an unprotected page

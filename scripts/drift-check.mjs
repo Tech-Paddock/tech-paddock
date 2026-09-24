@@ -513,7 +513,7 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
     ...readdirSync(R(".claude/agents")).filter((d) => existsSync(R(".claude/agents", d, "HANDOFF.md")))
       .map((d) => [`.claude/agents/${d}/HANDOFF.md`, 80]),
     ...readdirSync(R(".claude/agents")).filter((d) => existsSync(R(".claude/agents", d, "RULES.md")))
-      .map((d) => [`.claude/agents/${d}/RULES.md`, 370]),
+      .map((d) => [`.claude/agents/${d}/RULES.md`, 350]),
     [".claude/DECISIONS.md", 400],
     // Tier 1 — auto-loaded into every session of every agent, so every line is paid
     // again forever. 400 was the target the compaction set; the file landed well
@@ -525,7 +525,6 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
     [".claude/agents/KICKOFF.md", 220],
     [".claude/agents/STANDUP.md", 110],
     [".claude/SURFACE.md", 120],
-    [".claude/HEALTH-PLAN.md", 250],
     // Raised from 200 on 2026-09-23 (TEC-9), at Joel's call: the shared.contacts write
     // contract is ~35 lines of rules that each carry a caveat, the file sat at 191, and
     // squeezing the contract into 9 lines would have cut the caveats. Raised in its own

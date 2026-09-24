@@ -15,57 +15,62 @@ of them has an undo.
    what it is for, what it stores, what it must never do. **The technical director is not in that
    conversation** and should not pre-empt it: a scaffold built before the design is a set of
    decisions nobody made.
-2. **It gets logged as a draft charter** — `.claude/agents/<agent>/RULES.md`, which is exactly the
-   file for *your job, your domain, the reasoning behind your design*. **That draft is the handoff
-   into this protocol.** Nothing else needs writing; if the design lives only in the conversation,
-   this protocol has nothing to work from and the standup has not started.
+2. **It gets logged as a draft charter** — `.claude/agents/<agent>/RULES.md`. **That draft is the
+   handoff into this protocol.** The technical director carries it into charter shape without
+   changing its substance, and Joel approves it — the same draft-and-approve every charter goes
+   through (`CLAUDE.md`). If the design lives only in the conversation, this protocol has nothing to
+   work from and the standup has not started.
 3. **The technical director scaffolds everything in the repo** — every step under *In the repo*
    below, on one branch, in one pull request.
 4. **And hands Joel a manual checklist** of the steps outside it, in order, with what breaks if one
    is skipped. **That list is short on purpose.** Everything that can be automated already is; what
    is left is genuinely outside the repo's reach.
 
-**Before step 3, the three things only Joel decides:**
+**Before step 3, three things are settled:**
 
-1. **The name.** It fixes three things at once: the folder `apps/<name>`, the subdomain, and the
-   Vercel project. Changing it later means touching DNS, so settle it before any folder exists.
-   **Check it against the existing roster for collision** — two agents whose names share a word make
-   every spoken reference ambiguous even when the folders differ.
-2. **Does it need its own Postgres schema?** If yes, that is **two migrations and one dashboard
-   setting** — read `supabase/README.md` before writing either. A new schema inherits no grants at
-   all, and the failure looks like a credentials problem.
-3. **Which surface — site or app?** **Read `.claude/SURFACE.md` and apply its three questions**;
-   the rules live there and are not restated here. It decides the shell, the navigation and whether
-   there is a home-screen install, so it is expensive to change once a screen exists. **A tool that
-   fits neither gets its surface designed here, with Joel**, and the answer is written into the
-   draft charter before anything is scaffolded.
+1. **The name — Joel's.** It fixes three things at once: the folder `apps/<name>`, the subdomain,
+   and the Vercel project. Changing it later means touching DNS, so settle it before any folder
+   exists. **Check it against the existing roster for collision** — two agents whose names share a
+   word make every spoken reference ambiguous even when the folders differ.
+2. **Does it need its own Postgres schema? — Joel's.** If yes, that is **two migrations and one
+   dashboard setting** — read `supabase/README.md` before writing either. A new schema inherits no
+   grants at all, and the failure looks like a credentials problem.
+3. **Which surface, site or app? — the technical director's, and Joel can overrule.** **Read
+   `.claude/SURFACE.md` and apply its three questions**; the rules live there and are not restated
+   here. It decides the shell, the navigation and whether there is a home-screen install, so it is
+   expensive to change once a screen exists. A tool that fits neither is SURFACE.md's case, not a
+   guess made here.
 
 ## What is already automatic — do not build these
 
 - **The CI matrix** derives the roster from `apps/` at run time. Create the folder and it builds.
 - **Branch protection** requires one fixed name, `gate`. Nothing to add per app, ever.
-- **The Garage** reads `apps/` at build time, so the new app appears in Declared on its own.
+- **The Garage** reads `apps/` at build time, so the new app appears in *Declared* on its own.
 
-Adding the folder is enough to be built, measured and reported. That is the whole of the rails.
+Adding the folder is enough to be built and measured. **Reported** — the live probes, the sidebar
+and the frame — comes from `TOOLS` in `apps/home/lib/platform.ts`, TechPad Gen's file: a Linear
+issue, not an edit you make.
 
 ## In the repo
 
 1. **`.claude/agents/<agent>/RULES.md` and `HANDOFF.md`.** The charter is the specification for the
-   work, and **Joel approves it before the agent runs under it.** An empty handoff is correct on day
-   one — say the area does not exist yet.
+   work, and **Joel approves it before the agent runs under it.** An empty handoff is correct before
+   the agent's first session — say the area does not exist yet.
 2. **A kickoff block in `.claude/agents/KICKOFF.md`**, after the common block. Nothing loads a
-   charter; the kickoff is what makes the agent open it.
+   charter; the kickoff is what makes the agent open it. Identity and rules, never state.
 3. **Two rows in `CLAUDE.md`** — the *Who you are* table and the domain map. **That is a `CLAUDE.md`
    edit, so Joel approves it**, in the same pull request as the rest.
-4. **The app folder**, copied from the nearest existing app. Three files are copied **verbatim** —
-   `lib/auth.ts`, `lib/password.ts`, `lib/theme.css`. `middleware.ts` takes the **base** copy unless
-   there is a reviewed reason not to: a fourth variant fails `drift` deliberately, because that is a
-   fourth version of the password gate.
+4. **The app folder**, copied from the nearest existing app. **The shared files are stamped, not
+   copied**: run `node scripts/stamp-shared.mjs`, which writes every file in its `MANIFEST`, banner
+   included — a hand copy fails `drift`. `middleware.ts` takes the **base** copy unless there is a
+   reviewed reason not to: a fourth variant fails `drift` deliberately, because that is a fourth
+   version of the password gate.
 5. **`.env.example`** — variable names and how to generate them, never a value.
 6. **`/api/health`.** Add `/api/summary` only if the tool belongs on the hub's glance; then it needs
    a line in `SOURCES` in `apps/home/lib/glance.ts`, which is **TechPad Gen's file** — a Linear issue,
-   not an edit you make.
-7. **Fix the roster counts in prose.** `grep -rni '\b(five|six|seven)\b' CLAUDE.md README.md .claude/`
+   not an edit you make, alongside the `TOOLS` entry above.
+7. **Fix the roster counts in prose.**
+   `grep -rniE '\b(four|five|six|seven|eight)\b' CLAUDE.md README.md .claude/ supabase/ packages/ scripts/`
    — every one of them is true right up until this day, and this is the day. Prefer removing the
    count to incrementing it; the next standup should find nothing here. `drift` does not catch all
    of them.
@@ -87,16 +92,14 @@ Adding the folder is enough to be built, measured and reported. That is the whol
 
 One message, written from the steps above, in this order and no other. Each line says what to do,
 where, and **what breaks if it is skipped** — because the order is the whole safety property and a
-checklist without consequences gets reordered.
-
-It ends with the kickoff block to paste, so standing the agent up and starting it are one handover
-rather than two.
+checklist without consequences gets reordered. It ends with the kickoff block to paste, so standing
+the agent up and starting it are one handover rather than two.
 
 ## Then verify, rather than assume
 
 - `node scripts/drift-check.mjs` — the new agent should appear under freshness, the new app should
   be owned, and the middleware check should still be `ok`.
-- `/admin` — the app shows in Declared, and Reported once it is deployed.
+- `/admin` — the app shows in *Declared*, and in *Reported* once `TOOLS` has it and it is deployed.
 - Open the subdomain in a private window and confirm it asks for the password.
 
 Finish by filing a Linear issue for the new agent with whatever it is waiting for, and give Joel the

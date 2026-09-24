@@ -1,6 +1,6 @@
 # Coffee — charter
 
-You own `apps/coffee`, live at `coffee.techpaddock.io`. Nothing else in this repo is yours.
+You own `apps/coffee` — `coffee.techpaddock.io`. Nothing else in this repo is yours.
 
 ---
 
@@ -31,28 +31,10 @@ close the tab mid-search.
 
 ## What you own
 
-```
-apps/coffee/
-  app/page.tsx                 the UI
-  app/api/identify/route.ts    vision call — reads the label
-  app/api/search/route.ts      web search call — finds the guide
-  app/api/bags/route.ts        list and create
-  app/api/bags/[id]/route.ts   read, update, delete
-  lib/anthropic.ts             both model calls live here
-  lib/guide.ts                 validation — the rule this tool lives or dies on
-  lib/guideDisplay.ts          how a tier is worded and lit — apart from guide.ts on purpose
-  lib/suggestion.ts            Claude's own recipe, and the columns it may write
-  lib/suggestOnBag.ts          running that generation and landing it on the row
-  lib/dates.ts                 a roast date as the label printed it, into a date column
-  lib/patch.ts                 what a bag cannot be saved without, and what actually changed
-  lib/methods.ts               the brew method vocabulary
-  lib/bags.ts                  previous-purchase and roaster-domain lookups
-  lib/image.ts                 browser-side downscale
-  lib/storage.ts               photo upload, signed URLs
-```
-
-Database: the `coffee` schema — `coffee.bags` and `coffee.brews`, one to many. Storage: the private `coffee-files`
-bucket.
+`apps/coffee` — read the folder for its inventory; a list here only goes stale. The `coffee` schema —
+`coffee.bags` and `coffee.brews`, one to many — and the private `coffee-files` bucket. Two files
+matter more than the rest: `lib/guide.ts` is the rule below, and `lib/guideDisplay.ts`, which words
+and lights a tier, is kept apart from it on purpose.
 
 ---
 
@@ -83,9 +65,9 @@ render beside the parsed values so a misparse is visible rather than invisible.
 #### The one recipe that is invented, and why it does not breach this
 
 **Joel asked for it on 2026-09-19**, having been asked twice what should happen when the roaster
-published nothing: *"failure to find a recipe should trigger sonnet five to generate a recommended
-recipe."* He owns this rule, so this is him deciding it, not an agent reading around it. **He
-approved this section the same day** — *"Approved amendment"* — so it is settled rather than proposed.
+published nothing — *"failure to find a recipe should trigger sonnet five to generate a recommended
+recipe"* — and approved this section the same day. He owns this rule, so this is him deciding it,
+not an agent reading around it.
 
 It does not breach §1 because §1 is a rule about `guide_*`, and `guide_*` is untouched.
 `validateGuide` still drops every parameter without a backing quote, a bag with no guide still reads
@@ -145,15 +127,17 @@ replaces it**, one tap under the indicator, which is the check rather than a sen
 So **a `coffee_specific` guide is not evidence of a per-lot recipe**, and anything later that treats
 it as one is reading more into the column than it holds. The one honest signal available is
 cross-bag — two bags from the same roaster carrying identical values means it is boilerplate — and
-it is deliberately not built, because there is one bag.
+it is not built yet.
 
 ### 3. The roaster's values stay separate from yours
 
 `guide_*` on the bag holds what was published; it is never overwritten by what you did. What you
 dialled in lives on `coffee.brews`, one row per attempt — **the bag's own `my_grinder`,
 `my_grind_setting`, `my_method` and `my_rating` columns were dropped on 2026-09-12** because one set
-of columns can only hold the last thing you tried, which is the opposite of dialling in. `my_notes`
-stays on the bag: it describes the coffee and outlives any one attempt at it.
+of columns can only hold the last thing you tried, which is the opposite of dialling in — a
+sequence of attempts whose whole value is comparing them. This is `CLAUDE.md`'s append over rewrite,
+applied to the thing that was accumulating. `my_notes` stays on the bag: it describes the coffee and
+outlives any one attempt at it.
 
 Brewing their filter coffee as espresso records what you did without erasing what they suggested.
 Keep it that way.
@@ -192,11 +176,6 @@ what is fixed the moment you buy it — identity, purchased date, photo, and the
 block — and `my_notes`, which describes the coffee and outlives any one attempt at it. Everything
 variable is a brew: brewer, brew method, grinder, grind setting, dose, water, brew time, beverage
 mass, TDS, rating, and notes about that cup.
-
-The dial-in used to live on the bag, as a single set of columns. One dial-in per bag can only
-record the last thing you tried, which is the opposite of what dialling in is — a sequence of
-attempts whose whole value is comparing them. This is the repo's "prefer append over rewrite for
-anything that accumulates", applied to the thing that was accumulating.
 
 **Deleting a bag deletes its brews**, by cascade, and its photo. The confirm names the brew count
 for that reason: losing a dial-in history silently is worse than losing the photo.
@@ -262,10 +241,11 @@ text, exactly as quoted — the two are rule 3 again.
 **The search can be run again from the shelf, and that refreshes the link.** Joel, 2026-09-20:
 *"Add refresh button to research for recipe. This should also refresh link."* Both halves are one
 call: the search writes `product_url` and `guide_url` through the same `guideColumns` the first run
-used, so the link is re-derived rather than patched. It runs at the default model and offers no
-dial — the model picker is a comparison harness you set up on the way in, and this is a button
-pressed in a kitchen. It polls the row rather than waiting, so closing the card cannot lose an
-answer that takes minutes.
+used, so the link is re-derived rather than patched. **Searching again keeps only the freshest
+result**, even when it finds less than the guide it replaces — Joel, 2026-09-24. It runs at the
+default model and offers no dial — the model picker is a comparison harness you set up on the way
+in, and this is a button pressed in a kitchen. It polls the row rather than waiting, so closing the
+card cannot lose an answer that takes minutes.
 
 **A bag is a purchase, so it needs a purchase date, and the error says so.** Joel, 2026-09-19:
 *"Error should say purchase date required."* The column stays nullable and the POST cannot demand
@@ -296,9 +276,9 @@ redirect and the install would silently never offer itself; allowing it through 
 `middleware.ts`, which is the password gate and is not Coffee's to change. If every tool
 should be installable, that pattern belongs to TechPad Gen, not here.
 
-The icon is a static import so it is served from `/_next/static`, the one prefix the middleware
-matcher excludes. Next's own `app/apple-icon.png` convention is served from a gated route, and iOS
-would fall back to a screenshot of the login page as the home screen icon.
+The icon is a static import so it is served from `/_next/static`, which the password gate always
+lets through. Next's own `app/apple-icon.png` convention is served from a route the gate would have
+to exempt, and without that iOS falls back to a screenshot of the login page as the icon.
 
 **An installed app has its own cookie jar**, so signing in inside it is expected rather than a
 session bug. It is also reached directly rather than through the hub's iframe.
@@ -309,59 +289,51 @@ rejects bodies over ~4.5MB with an opaque error. 1568px is Claude's optimal size
 accuracy.
 
 **The search model and its effort are selectable; the label reader is not.** Which model retrieves
-well enough is an open question, so the search offers Haiku 4.5, Sonnet 4.6 and Sonnet 5, with an
-effort level where the model has one, and records both on each bag — a guide is only comparable
-against another if you know what produced it, and effort is as much a part of that as the model.
+well enough is an open question, so the search offers every model in `SEARCH_MODELS`
+(`lib/models.ts`), with an effort level where the model has one, and records both on each bag — a
+guide is only comparable against another if you know what produced it, and effort is as much a part
+of that as the model.
 
-The models do not take the same request, which is why both controls are derived from a registry in
-`lib/models.ts` rather than being fixed dropdowns: the dynamic-filtering web tools need Sonnet 4.6
-or better, Haiku 4.5 rejects `output_config.effort` outright so its list of levels is empty, and
-`xhigh` exists on Sonnet 5 but not on Sonnet 4.6. Every one of those is a 400 rather than a
-degraded result, so a level the model does not take is refused by the route and never offered by
-the page — absent rather than greyed out, because a disabled control implies a setting that
-exists. Reading a label is transcription, is
-already fast, and stays on `claude-sonnet-5`.
+The models do not take the same request — web tool versions, whether effort is accepted at all, and
+which levels exist all differ — which is why both controls are derived from that registry rather than
+being fixed dropdowns. Every difference is a 400 rather than a degraded result, so a level the model
+does not take is refused by the route and never offered by the page — absent rather than greyed
+out, because a disabled control implies a setting that exists.
 
 Lowering the model does not lower the guard. `validateGuide` enforces quote-backing in code, so a
 weaker model cannot invent a recipe — it can only fail to find one and report `none`. That is what
 makes the comparison safe to run at all.
 
-**The identify call uses `effort: "low"`** with a JSON schema. Reading a label is transcription, not
-reasoning, and the round trip happens while you are standing in a kitchen holding the bag. The
+**The label reader is one fixed model, called with `effort: "low"`** and a JSON schema. Reading a
+label is transcription, not reasoning, it is already fast, and the round trip happens while you are
+standing in a kitchen holding the bag. The
 system prompt forbids guessing a roaster from the design or completing a partially visible word.
 
 ---
 
 ## Guardrails
 
-**Never touch:**
-
-- The shared auth plumbing. Gated in `CLAUDE.md`; the TD owns it.
-- Any app but `apps/coffee`, or any schema but `coffee`.
+**Never touch** another app, another schema, or the shared auth plumbing (`CLAUDE.md`).
 
 **Never do:**
 
 - Weaken `validateGuide`, or add a path that writes a `guide_*` value without a backing quote.
 - Store a brew parameter read from a site that is not the roaster's.
-- Put a migration under `apps/coffee/`. One Supabase project means one history, at `supabase/` in
-  the repo root — a previous branch got this wrong.
 - Add a table pre-emptively. A brew log, a timer, inventory and a method lookup table are all
   expected eventually; each arrives as its own table when it is actually built. Promoting the
   method enum to a table later is an additive migration.
 
-**Yours to use:** `ANTHROPIC_API_KEY` — shared with the Message Editor, and Coffee's arrival is why
-that variable is no longer editor-only.
-
----
+**Yours to use:** `ANTHROPIC_API_KEY`, which every app that calls a model carries.
 
 ## Guidelines
 
-- Run `npm test` and `npm run build` in `apps/coffee` before you push. Both pass on `main` today;
-  if either breaks, that is yours.
+- Run `npm test` and `npm run build` in `apps/coffee` before you push; if either breaks, that is
+  yours.
 - **The search step cannot be exercised from a Claude Code sandbox** — roaster domains are blocked
-  by the egress proxy. Tests cover the validation logic against recorded response shapes. The
-  search itself has to be verified on a deploy preview with a real bag. Do not conclude the feature
-  works because the tests pass.
+  by the egress proxy. Tests cover the validation logic against recorded
+  response shapes. The search itself is verified in production with a real bag, after merge:
+  previews are skipped by every `ignoreCommand`, so merge-then-look is the only live check
+  (`DECISIONS.md`, 2026-09-20). Do not conclude the feature works because the tests pass.
 - When you add a guide field, add its test first. Every existing field in `GUIDE_FIELDS` has one,
   and the quote-backing rule is only as strong as its coverage.
 - Prefer surfacing an uncertainty in the UI over resolving it in code. `dropped` exists because a

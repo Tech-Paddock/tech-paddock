@@ -1,6 +1,6 @@
 # Resume Formatter — charter
 
-You own `apps/resume`, live at `resume.techpaddock.io`. Nothing else in this repo is yours.
+You own `apps/resume` — `resume.techpaddock.io`. Nothing else in this repo is yours.
 
 ---
 
@@ -180,7 +180,7 @@ than a shape this code may assume. **It is not a nicety: the renderer used to te
 pass anything else straight through**, so a flattened template would have shipped the *template's*
 skills on every application while the tailored ones were dropped — reporting 100% coverage while
 doing it, because coverage asks whether the input's text arrived and never whether it was allowed
-to leave. Flat is the better shape (`CLAUDE.md` allows one table, and Career Highlights is it), but
+to leave. Flat is the better shape (*The ATS rules* below allow one table, and Career Highlights is it), but
 the renderer never flattens a table itself — that is the template's fix, not a rewrite at render
 time.
 
@@ -274,8 +274,8 @@ for the flat one unless the test needs a defect to bite on.
 
 ## Testing
 
-This app has the largest suite in the repo — `npm test`. CI runs `npm run test --if-present`, so
-these tests are a large part of why CI means anything here.
+`npm test`. CI runs it whenever this app's build scope changes, so these tests are a large part of
+why CI means anything here.
 
 - **Golden file:** fixed content + fixed spec renders byte-identical twice. This is what makes a
   saved render trustworthy as a record of what was actually sent.
@@ -297,13 +297,16 @@ the endpoint at 200 — that is a setup step, not a broken dependency.
 ## Guardrails
 
 **Never touch:** the shared auth plumbing (gated in `CLAUDE.md`; the TD owns it); any app but
-`apps/resume`; any schema but `resume`.
+`apps/resume`; any schema but `resume` — **except the sanctioned write-through into
+`tracker.pipeline_threads`**, whose contract is in `supabase/README.md`. The tracker app is parked;
+its table is not, and the write-through stands.
 
 **Never do:**
 
 - Reintroduce a model call. See above.
 - Let the coverage report overstate what the output contains.
-- Delete a template any render points at, or make the archived one active.
+- Delete the active template, or make the archived one active. Renders outlive their template
+  (#107, migration `20260918041216`), so a render pointing at one is no reason to refuse.
 - Emit a second table, a text box, an image, or contact details in a header or footer.
 - Put a migration under `apps/resume/`. They were moved to `supabase/` in the repo root
   deliberately — one project, one history.
@@ -314,8 +317,8 @@ the endpoint at 200 — that is a setup step, not a broken dependency.
 
 ## Guidelines
 
-- Run `npm test` before every push. The largest suite in the repo is not a burden here, it is the
-  reason changes to a deterministic renderer are safe to make at all.
+- Run `npm test` before every push. The suite is not a burden here, it is the reason changes to a
+  deterministic renderer are safe to make at all.
 - When a document defeats the rules, improve the rules or report it honestly. Never widen an
   assertion to make a fixture pass.
 - Prefer a named regression test over a comment. The `<w:sdt>` trap has one and it is why nobody has
