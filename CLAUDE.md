@@ -361,8 +361,9 @@ hold a merge**, and never a reason to unpause it. The general rule: **check a re
 
 Most rules here are convention: they hold because an agent chooses to comply. These do not.
 
-1. **`main` is protected.** One required check, `gate`, and branches must be up to date before they
-   merge. No agent can read the ruleset itself — only its effect.
+1. **`main` is protected.** `gate` is a required check and branches must be up to date before they
+   merge. No agent can read the ruleset itself, so which other checks it requires is known only by
+   their effect.
 2. **The `.claude/settings.json` hooks** run whether or not anyone wants them to. They refuse a push
    to `main`, parsed by refspec; refuse rewriting the migration history, by the CLI in any spelling
    or by an `execute_sql` write to `schema_migrations`; ask Joel before a pull request is opened,
