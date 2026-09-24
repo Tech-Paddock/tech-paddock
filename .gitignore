@@ -3,10 +3,18 @@ node_modules
 
 # next.js
 .next/
-out/
+# Anchored: an unanchored `out/` or `build` matched ANY folder of that name, so
+# a route at app/out/ or app/api/build/ was silently never committed — and the
+# build still passed, because nothing imports a route file.
+/out/
+apps/*/out/
 
 # production
-build
+/build
+apps/*/build/
+
+# vercel link / vercel pull — project ids and pulled env files, never committed
+.vercel
 
 # env
 .env

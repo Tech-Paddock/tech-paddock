@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { safeRedirectTarget } from "@/lib/safe-redirect";
 
 function LoginForm() {
   const router = useRouter();
@@ -16,11 +17,19 @@ function LoginForm() {
     setLoading(true);
     setError(null);
 
-    const res = await fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+    } catch {
+      // A dropped connection used to leave the button on "Checking…" for good.
+      setLoading(false);
+      setError("Couldn't reach the server. Check the connection and try again.");
+      return;
+    }
 
     setLoading(false);
 
@@ -30,7 +39,9 @@ function LoginForm() {
       return;
     }
 
-    router.push(params.get("from") ?? "/");
+    // Only a path on this origin is followed; anything else goes to "/".
+    // lib/safe-redirect.ts says why.
+    router.push(safeRedirectTarget(params.get("from"), window.location.origin));
   }
 
   return (
@@ -38,7 +49,7 @@ function LoginForm() {
       onSubmit={handleSubmit}
       className="w-full max-w-sm bg-surface border border-line rounded-2xl p-8 flex flex-col gap-4"
     >
-      <h1 className="text-xl font-semibold">Health</h1>
+      <h1 className="text-xl font-semibold">Cookbook</h1>
       <p className="text-sm text-ink/70">Enter the password to continue.</p>
       <div className="relative">
         <input
