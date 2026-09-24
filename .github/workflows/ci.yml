@@ -12,6 +12,18 @@ on:
   pull_request:
     types: [opened, reopened]
 
+# Nothing here writes to the repository, comments, or reads a secret, so the
+# token can read and do nothing else — whatever the organisation's default is.
+permissions:
+  contents: read
+
+# One run per ref at a time. A newer push to a branch makes the run for the
+# older commit pointless, so that one is cancelled. Not on main: every merge
+# there is its own production deploy, and its run is the record of it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   # The roster is whatever is on disk under apps/, read once, here.
   #
@@ -59,6 +71,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The scope step runs a repo script, so it runs on the Node the apps
+      # declare rather than whatever the runner image happens to ship.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       # Every job in the matrix still RUNS and still REPORTS, even when it has
       # nothing to build. That is deliberate and it is the whole trick.
       # Branch protection requires these checks by name, and a job skipped by a
@@ -66,27 +84,52 @@ jobs:
       # check is never satisfied and the pull request can never merge. Slow
       # builds would have been traded for stuck merges. Exiting early inside the
       # job keeps the green tick and skips the minute of work.
+      #
+      # Values from the event and the matrix reach the shell through `env:`,
+      # never through `${{ }}` inside the script, so a folder name is data and
+      # never code.
       - name: Does this app need building?
         id: scope
         working-directory: .
+        env:
+          APP: ${{ matrix.app }}
+          BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
+          decide() { echo "$1"; echo "reason=$1" >> "$GITHUB_OUTPUT"; echo "build=$2" >> "$GITHUB_OUTPUT"; }
 
-          # main is what production deploys from, so it is always built in full.
-          # A merge commit can touch one app while another was broken by the
-          # merge itself, and that is exactly when you want every app checked.
-          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
-            echo "reason=on main — building everything" >> "$GITHUB_OUTPUT"
-            echo "build=yes" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          git fetch origin main --quiet || true
-          base="$(git merge-base origin/main HEAD 2>/dev/null || true)"
-          if [ -z "$base" ]; then
-            echo "reason=no merge base with main — building to be safe" >> "$GITHUB_OUTPUT"
-            echo "build=yes" >> "$GITHUB_OUTPUT"
-            exit 0
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            # main is scoped by HEAD^..HEAD — the range each app's Vercel
+            # ignoreCommand diffs — so CI builds on main exactly what Vercel is
+            # about to deploy.
+            #
+            # It used to build every app on every merge, on the reasoning that a
+            # merge can break an app it did not touch. Here it cannot. Merges are
+            # squashed and branch protection requires a branch to be up to date,
+            # so the tree main lands on is the tree the branch already built; an
+            # app the merge did not touch is byte-identical to the last build of
+            # it; apps share no code except through packages/, which is in every
+            # scope; and .github/workflows and supabase still rebuild everything.
+            # Most merges here are documentation, and each one cost a cold
+            # build of every app that could not stop a deploy the same push
+            # had already started. What this gives up: a change outside the repo — the runner
+            # image, a registry — surfaces when an app next changes, which is
+            # also when Vercel would next build it.
+            #
+            # Fail open wherever HEAD^ is not the whole change: no parent, or a
+            # push that carried more than one commit.
+            if ! base="$(git rev-parse --verify --quiet 'HEAD^')"; then
+              decide "main has no parent commit — building to be safe" yes; exit 0
+            fi
+            if [ -n "${BEFORE:-}" ] && [ "$BEFORE" != "$base" ]; then
+              decide "this push to main carried more than one commit, so HEAD^ is not the whole change — building to be safe" yes; exit 0
+            fi
+          else
+            git fetch origin main --quiet || true
+            base="$(git merge-base origin/main HEAD 2>/dev/null || true)"
+            if [ -z "$base" ]; then
+              decide "no merge base with main — building to be safe" yes; exit 0
+            fi
           fi
 
           # This app's scope is whatever its Vercel ignoreCommand watches, read by
@@ -95,34 +138,34 @@ jobs:
           # shared things that can break any app: the workflow itself, and the
           # migration history every app reads.
           #
-          # Fail OPEN: a scope nobody can read builds. A skipped build is the
-          # silent failure; an extra one costs a minute.
-          if ! scope="$(node scripts/build-scope.mjs "${{ matrix.app }}")"; then
-            echo "reason=could not read apps/${{ matrix.app }}/vercel.json's scope — building to be safe" >> "$GITHUB_OUTPUT"
-            echo "build=yes" >> "$GITHUB_OUTPUT"
-            exit 0
+          # Fail OPEN: a scope nobody can read builds, and so does an empty one.
+          # A skipped build is the silent failure; an extra one costs a minute.
+          if ! scope="$(node scripts/build-scope.mjs "$APP")"; then
+            decide "could not read apps/$APP/vercel.json's scope — building to be safe" yes; exit 0
+          fi
+          if [ -z "$scope" ]; then
+            decide "build-scope printed nothing for apps/$APP — building to be safe" yes; exit 0
           fi
           if [ "$scope" = "ALWAYS" ]; then
-            echo "reason=apps/${{ matrix.app }} diffs nothing in its ignoreCommand, so it always builds" >> "$GITHUB_OUTPUT"
-            echo "build=yes" >> "$GITHUB_OUTPUT"
-            exit 0
+            decide "apps/$APP diffs nothing in its ignoreCommand, so it always builds" yes; exit 0
           fi
           read -r -a paths <<< "$scope"
 
           if git diff --quiet "$base" HEAD -- "${paths[@]}" ".github/workflows" "supabase"; then
-            echo "reason=nothing under ${scope}, .github/workflows or supabase changed" >> "$GITHUB_OUTPUT"
-            echo "build=no" >> "$GITHUB_OUTPUT"
+            decide "nothing under ${scope}, .github/workflows or supabase changed since ${base:0:7}" no
           else
-            echo "reason=changed since ${base}" >> "$GITHUB_OUTPUT"
-            echo "build=yes" >> "$GITHUB_OUTPUT"
+            decide "changed since ${base:0:7}" yes
           fi
 
       - name: Nothing to do
         if: steps.scope.outputs.build != 'yes'
         working-directory: .
-        run: echo "Skipped — ${{ steps.scope.outputs.reason }}. Reporting success so the required check is satisfied."
+        env:
+          REASON: ${{ steps.scope.outputs.reason }}
+        run: echo "Skipped — ${REASON}. Reporting success so the required check is satisfied."
 
-      - uses: actions/setup-node@v4
+      - name: Cache npm for this app
+        uses: actions/setup-node@v4
         if: steps.scope.outputs.build == 'yes'
         with:
           node-version: 24
@@ -149,6 +192,14 @@ jobs:
           EDITOR_BASE_URL: https://editor.techpaddock.io
           INTERNAL_API_SECRET: dummy
 
+      # `next build` type-checks only what the build compiles. Tests, the vitest
+      # config and anything else tsconfig includes are checked here, after the
+      # build because the build is what writes next-env.d.ts. --no-install: a
+      # missing typescript fails here instead of npx fetching a stranger's `tsc`.
+      - name: Typecheck
+        if: steps.scope.outputs.build == 'yes'
+        run: npx --no-install tsc --noEmit
+
   # The mechanical half of the weekly rules-drift audit, run on every push.
   #
   # Every one of these files grew monotonically for five days: the ledger from
@@ -171,6 +222,10 @@ jobs:
           # the newest commit in that agent's area, so it needs real history.
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
       - name: Rules match the repo they describe
         run: node scripts/drift-check.mjs
 
@@ -187,23 +242,24 @@ jobs:
   # longer what the ruleset names.
   #
   # `if: always()` is load-bearing. Without it this job is SKIPPED when a
-  # dependency fails, and a skipped required check never reports at all — the
-  # pull request would block forever on a green-looking board.
+  # dependency fails, and a skipped job is not a failed one — the gate would
+  # stop saying "red" at exactly the moment something is. drift fails the file
+  # if it goes, or if the gate stops waiting on roster, build or drift.
   gate:
     needs: [roster, build, drift]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Everything that has to pass, passed
+        env:
+          ROSTER: ${{ needs.roster.result }}
+          BUILD: ${{ needs.build.result }}
+          DRIFT: ${{ needs.drift.result }}
         run: |
-          roster="${{ needs.roster.result }}"
-          build="${{ needs.build.result }}"
-          drift="${{ needs.drift.result }}"
-
-          printf '  roster  %s\n  build   %s\n  drift   %s\n' "$roster" "$build" "$drift"
+          printf '  roster  %s\n  build   %s\n  drift   %s\n' "$ROSTER" "$BUILD" "$DRIFT"
 
           fail=0
-          for pair in "roster:$roster" "build:$build" "drift:$drift"; do
+          for pair in "roster:$ROSTER" "build:$BUILD" "drift:$DRIFT"; do
             name="${pair%%:*}"; result="${pair#*:}"
             if [ "$result" != "success" ]; then
               echo "::error::$name did not pass — it reported '$result'."

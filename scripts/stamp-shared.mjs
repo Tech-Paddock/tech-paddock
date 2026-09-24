@@ -13,11 +13,12 @@
  * folders on disk. A workspace install at the root would give us one real
  * import — and take the per-app independence all three of those rest on.
  *
- * So the copies stay, and what changes is that they stop being SIX EDITS. One
- * canonical file, a script that writes it outward, and a drift check that fails
- * a copy which has stopped agreeing. The duplication becomes mechanical rather
- * than remembered, which is the part that was actually costing us: lib/auth.ts
- * drifting does not throw, it silently rejects valid sessions on the other five.
+ * So the copies stay, and what changes is that they stop being one edit per
+ * app. One canonical file, a script that writes it outward, and a drift check
+ * that fails a copy which has stopped agreeing. The duplication becomes
+ * mechanical rather than remembered, which is the part that was actually
+ * costing us: lib/auth.ts drifting does not throw, it silently rejects valid
+ * sessions on every other app.
  *
  * ## The banner is the load-bearing half
  *
@@ -31,7 +32,7 @@
  *
  * ## What is deliberately NOT here
  *
- * `lib/supabase.ts` is five genuinely different files and one app that has none
+ * `lib/supabase.ts` is a genuinely different file per app, and one app has none
  * — the hub holds no database credential and that is a property worth keeping.
  * `middleware.ts` is three deliberate variants, and drift already measures that
  * shape; collapsing it here would be a fourth version of the password gate
@@ -40,7 +41,7 @@
  * first.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, realpathSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,6 +58,11 @@ export const MANIFEST = [
   { from: "lib/theme.ts", to: "lib/theme.ts" },
   { from: "next.config.mjs", to: "next.config.mjs" },
   { from: "app/ThemeControl.tsx", to: "app/ThemeControl.tsx" },
+  // The login path. The handler behind every app's /api/login, and the rule for
+  // where a successful login may send you. Both were hand-copied into every app
+  // until 2026-09-24, so a fix to either was one edit per app.
+  { from: "lib/login.ts", to: "lib/login.ts" },
+  { from: "lib/safe-redirect.ts", to: "lib/safe-redirect.ts" },
 ];
 
 export const SHARED_DIR = "packages/shared";
@@ -157,4 +163,19 @@ function main() {
   for (const w of written) console.log(`  ${w}`);
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
+/* Run main() only when invoked as a script, not when drift-check imports this.
+   Both sides are resolved through realpath: Node reports import.meta.url as the
+   real path, while argv[1] is whatever path was typed. Through a symlinked
+   checkout the two never matched, main() never ran, and `--check` exited 0
+   having checked nothing, which is a silent pass on the one command that
+   exists to fail. */
+const invokedDirectly = (() => {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
+
+if (invokedDirectly) main();
