@@ -6,9 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -n \"{hookSpecificOutput:{hookEventName:\\\"SessionStart\\\",additionalContext:\\\"Open items live in Linear, team TEC. List the ones on your plate before anything else and lead your first message with them. Then read your charter and handoff at .claude/agents/<you>/.\\\"}}\"",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"Open items live in Linear, team TEC. List the ones on your plate before anything else and lead your first message with them. Then read your charter and handoff at .claude/agents/<you>/.\"}}'",
             "timeout": 10,
-            "statusMessage": "Pointing at Linear\u2026"
+            "statusMessage": "Pointing at Linear…"
           }
         ]
       }
@@ -19,24 +19,37 @@
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(git push*)",
-            "command": "c=$(jq -r \".tool_input.command\"); if printf \"%s\" \"$c\" | grep -qE \"git[[:space:]]+push([[:space:]]+[^[:space:]]+)*[[:space:]]+(HEAD:)?main([[:space:]]|$)|git[[:space:]]+push[[:space:]]+.*:main([[:space:]]|$)\"; then jq -n \"{hookSpecificOutput:{hookEventName:\\\"PreToolUse\\\",permissionDecision:\\\"deny\\\",permissionDecisionReason:\\\"Pushing to main is forbidden by the Rules of Engagement in CLAUDE.md. Every change goes through a pull request. Push your branch and open one.\\\"}}\"; fi",
-            "timeout": 10
-          },
+            "command": "input=$(cat); case \"$input\" in *push*|*repair*|*schema_migrations*) ;; *) exit 0 ;; esac; g=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard.mjs\"; if ! command -v node >/dev/null 2>&1 || [ ! -f \"$g\" ]; then echo \"The repo's guard needs node and $g, and one is missing, so this command is refused rather than run unchecked.\" >&2; exit 2; fi; printf '%s' \"$input\" | node \"$g\" || exit 2",
+            "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "^mcp__.*[Gg]it[Hh]ub.*__.*(pull_request|merge|push_files|create_or_update_file|delete_file).*$",
+        "hooks": [
           {
             "type": "command",
-            "if": "Bash(*supabase*)",
-            "command": "c=$(jq -r \".tool_input.command\"); if printf \"%s\" \"$c\" | grep -qE \"supabase[[:space:]]+migration[[:space:]]+repair\"; then jq -n \"{hookSpecificOutput:{hookEventName:\\\"PreToolUse\\\",permissionDecision:\\\"deny\\\",permissionDecisionReason:\\\"migration repair rewrites the database's own record of what was applied. The gap it would close is deliberate \u2014 migration 20260908235234 is withheld because it contains personal data. See supabase/README.md.\\\"}}\"; fi",
+            "command": "g=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard.mjs\"; if ! command -v node >/dev/null 2>&1 || [ ! -f \"$g\" ]; then echo \"The repo's guard needs node and $g, and one is missing, so this call is refused rather than run unchecked.\" >&2; exit 2; fi; node \"$g\" || exit 2",
             "timeout": 10
           }
         ]
       },
       {
-        "matcher": "mcp__github__(create_pull_request|update_pull_request_branch|merge_pull_request)",
+        "matcher": "^mcp__.*([Ss]upabase|[Vv]ercel).*__.+$",
         "hooks": [
           {
             "type": "command",
-            "command": "jq -n \"{hookSpecificOutput:{hookEventName:\\\"PreToolUse\\\",permissionDecision:\\\"ask\\\",permissionDecisionReason:\\\"Opening a pull request, updating a branch and merging each wait for Joel's click. Joel settled this on 2026-09-23 after an instruction to prepare was read as permission to act.\\\"}}\"",
+            "command": "g=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard.mjs\"; if ! command -v node >/dev/null 2>&1 || [ ! -f \"$g\" ]; then echo \"The repo's guard needs node and $g, and one is missing, so this call is refused rather than run unchecked.\" >&2; exit 2; fi; node \"$g\" || exit 2",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "^mcp__.*[Ll]inear.*__(save_issue|create_issue|update_issue)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "g=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard.mjs\"; if ! command -v node >/dev/null 2>&1 || [ ! -f \"$g\" ]; then echo \"The repo's guard needs node and $g, and one is missing, so this call is refused rather than run unchecked.\" >&2; exit 2; fi; node \"$g\" || exit 2",
             "timeout": 10
           }
         ]
