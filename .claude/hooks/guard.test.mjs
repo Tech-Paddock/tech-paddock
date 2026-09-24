@@ -200,13 +200,13 @@ test("the migration history cannot be rewritten from a shell", () => {
   );
 });
 
-test("GitHub: pull requests wait for Joel, and nothing commits to main", () => {
+test("GitHub: merges and changes wait for Joel, opening does not, and nothing commits to main", () => {
   const body = 'Requested by Joel on 2026-09-24 — "close out"\n\n## Deployment\nNothing.';
   expectAll(
     [
-      [["create_pull_request", { title: "x", body, head: "claude/x", base: "main" }], "ask"],
-      [["create_pull_request", { title: "x", body: "no request line", head: "claude/x" }], "deny"],
-      [["create_pull_request", { title: "x", body, draft: true }], "deny"],
+      // Opening is Deployment's and is neither held nor checked (Joel, 2026-09-24).
+      [["create_pull_request", { title: "x", body, head: "claude/x", base: "main" }], "allow"],
+      [["create_pull_request", { title: "x", body: "no request line", head: "claude/x" }], "allow"],
       [["merge_pull_request", { pullNumber: 1, merge_method: "squash" }], "ask"],
       [["merge_pull_request", { pullNumber: 1 }], "deny"],
       [["merge_pull_request", { pullNumber: 1, merge_method: "merge" }], "deny"],

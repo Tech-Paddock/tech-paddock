@@ -1,69 +1,53 @@
 # Technical Director — handoff
 
-State as of 2026-09-24. `RULES.md` has the role and the gate, `DECISIONS.md` the reasoning; this is
-only what is true once the post-review branches have merged. State and traps only — open work is in
-Linear, team TEC.
+State as of 2026-09-24. `RULES.md` has the role, `DECISIONS.md` the reasoning; this is only what is
+true and the traps. Open work is in Linear, team TEC. **Branch and pull request state is never
+written here** — read it live.
 
 ---
 
-**Branch and pull request state is never written here** — read it live: `git ls-remote --heads
-origin`, the open pull request list, check runs on the head SHA.
-
 ## Where the work is
 
-**TEC-27 is the post-refactor review of 2026-09-24**: one sub-issue per owner (TEC-28 to 32), Joel's
-dashboard steps (TEC-33) and the hooks (TEC-35). **TEC-34 is the Next.js 14 → 16 upgrade** —
-14.2.35 is the last 14.x. **TEC-7 is decided: a Vercel firewall rate limit** on `POST /api/login`,
-added by Joel and verified by you, read-only. The parking lot is the `Parked` label: the tracker
-(TEC-36), the editor (TEC-37), TEC-14 and TEC-20.
+**The deployment layer is no longer yours.** Since 2026-09-24 the Deployment agent opens, gates,
+orders and merges every pull request, applies migrations at the gate and owns Vercel, DNS and CI.
+**You start every agent as your helper, from its preset, after Joel says go** — Opus 5.5 at medium
+for all of them. TEC-40 is that change.
 
-**Joel's calls on 2026-09-24**, all in `DECISIONS.md`: the tracker is parked; the editor was resumed
-only to take the login fix; TEC-21 is go; Coffee's "Search again" keeps only the freshest result;
-the charter cap is 350; TEC-7 is option A; the hooks were rebuilt on Joel's authorisation; open work,
-the parking lot and design reasoning live in Linear.
+**TEC-27, the post-refactor review, is merged** (#201 to #205) and its sub-issues TEC-28 to TEC-32
+are each agent's to work, started by you. **Still Joel's:** TEC-33 steps 3 and 4 (re-pause the
+editor, pause the tracker), step 6 and TEC-7 (the firewall rate limit), and TEC-38. **Still yours:**
+TEC-35 step 4 in a fresh session, and TEC-7's read-only check once the rule exists. **TEC-34** is the
+Next.js 14 → 16 upgrade. The parking lot is the `Parked` label.
 
-## What the review branches left behind
+## What is true now
 
-- **Login.** `from` is followed only when it is a path on the same origin (`lib/safe-redirect.ts`);
-  the login handler is one stamped file (`lib/login.ts`); middleware exceptions are exact paths; the
-  tracker's `/api/cron/*` needs the `CRON_SECRET` bearer at the gate as well as in the route; the
-  attempts cookie is unsigned (it was a free signed sample of `SESSION_SECRET`).
-- **Enforcement.** `drift` and CI are as `CLAUDE.md`'s *What is actually enforced* says. **The hooks
-  are one guard**: `.claude/hooks/guard.mjs` runs `decide.mjs`, and `guard.test.mjs` holds its cases,
-  which CI's drift job runs. It fails closed. Change what it refuses only with the case that proves it.
-- **Database.** A rebuild from `supabase/` now gets the original four tables' grants
-  (`record_original_table_grants`). The recorded version is whatever the hosted API stamped when it
-  was applied at the gate — rename the file to match before merging, as `supabase/README.md` says.
-- **The Health plan is the Linear document "Health — plan"**, not a repo file. Two applied migrations
-  still name `.claude/HEALTH-PLAN.md` in their comments; migrations are history and stay as written.
-- **The weekly Routine** "Weekly rules-drift audit" (Mondays 08:00 UTC) reads Linear, runs `drift`.
+- **Every project was READY in production on the login hardening** (#201, via #202's deploy) on
+  2026-09-24, the editor included. The TD's container cannot reach `*.techpaddock.io` — the network
+  policy refuses it — so the login behaviour itself was never checked from here.
+- **The hooks are one guard** (`.claude/hooks/guard.mjs` → `decide.mjs`, cases in `guard.test.mjs`,
+  run by CI). It fails closed. Opening a pull request is not held; merging is.
+- **Every agent edits Linear without asking Joel.** The guard still refuses an issue that breaks the
+  issue rules.
+- **The weekly Routine** "Weekly rules-drift audit" (Mondays 08:00 UTC) reads Linear and runs `drift`.
+  Its prompt still describes the TD as the gate; it is report-only, so that misleads nobody into
+  acting, but its next run will flag the change as drift.
 
 ## Traps only here
 
-- **`INTERNAL_API_SECRET` is one secret for two callers** (hub → tracker, tracker → editor). Joel had
-  no copy and Vercel never shows a sensitive value again, so it was rotated to one new value on
-  `tp-home`, `tp-tracker` and `tp-message-editor` (TEC-33 step 1). A 401 from the glance or the
-  draft button means the three disagree.
-- **A project env read cannot see team-shared variables.** `tp-home` showed only `GITHUB_TOKEN` and
-  `VERCEL_TOKEN` at project scope; `SESSION_SECRET` and `APP_PASSWORD_HASH` must be shared ones.
+- **The GitHub integration closes a Linear issue when a pull request naming it merges.** TEC-27 and
+  TEC-35 were closed that way with work still open. Reopen them, and name an issue in a title only
+  when merging finishes it.
+- **The auto-mode classifier can refuse work under `.claude/hooks/`** after an edit there, reads
+  included, as self-modification. Take it to Joel; never route round it.
+- **A Linear patch matches the stored text**, where a `TEC-n` you wrote is stored as an issue-mention
+  tag. Copy an anchor from `get_issue`'s output, tags and all; a retyped `TEC-n` never matches.
+- **A helper can be refused an action this session is allowed** — the permission system decides per
+  call. Take it to Joel; never re-run the refused action yourself.
 - **The hub holds `GITHUB_TOKEN` and `VERCEL_TOKEN`** for the Pit Wall's reads — the most powerful
   credentials in the estate, on the app that holds no database key. TEC-32 item 4 and TEC-33 step 5
   are how that shrinks.
-- **The Vercel connector lists write tools. Do not use them** — Joel, 2026-09-23: "follow charter".
-  The guard asks Joel on each; that click is a backstop, so hand Joel the step instead.
-- **A Linear patch matches the stored text**, where a `TEC-n` you wrote is stored as an issue-mention
-  tag. Copy an anchor from `get_issue`'s output, tags and all; a retyped `TEC-n` never matches.
-- **Spawning an agent's session from here works** (`create_session`, with `outcome_branch`), but
-  `CLAUDE.md` says agents never run at the same time and `KICKOFF.md` has them wait for Joel before
-  branching. **Do not spawn one until Joel sanctions it.** Subagents inside this session, each in its
-  own worktree, are fine and are how the review branches were built.
-- **A helper session can be refused a `git commit` the parent is allowed** — the permission system
-  decides per session. When that happens, take it to Joel; never re-run the refused action from here.
-- **Read the real head SHA before passing `expectedHeadSha`.** Three inventions, three rejections.
-- **A pull request body is a claim, not evidence** — read Vercel and Supabase live before repeating
-  its deployment steps to Joel.
 - **Build in a worktree, never the main checkout.** Building the hub rewrites three tracked
   `apps/home/lib/*.generated.ts` files; restore them before committing. TEC-32 item 6 ends it.
-- **Cost is context × turns.** One session, one branch, end it — a review session that fans out to
-  worktree subagents is the exception, and it should still end once the branches are pushed.
+- **Cost is context × turns.** A helper's report lands in your context: brief tightly, and end the
+  session once the branches are pushed.
 - **You cannot delete a remote branch**, and **you are a session, not a service.** Say which.

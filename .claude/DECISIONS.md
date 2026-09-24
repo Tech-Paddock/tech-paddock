@@ -152,16 +152,15 @@ it; git keeps it.
   would carry a question that has been answered. **What is still open is the livery, TEC-12, not
   this.** If a fourth app ever needs the *identical* registry, reopen it then — additive, and on
   evidence.
-- **2026-09-22 — DevOps is the technical director's, and now says so once.** Platform Config —
-  itself a 2026-09-11 merge of Supabase Config and Vercel Config, because the database's credentials
-  live in Vercel — was retired on 2026-09-19 and its domain split: Postgres stayed at the gate
-  because migrations are applied there, and Vercel, DNS and CI went to TechPad Gen as *deliveries* —
-  **a reason never written down anywhere**. The repo then carried four answers to one question.
-  **This is not new policy — it collapses four statements into one.** The one argument that survived
-  steelmanning was separation of duties, that a gate confirming its own merge marks its own homework;
-  it fails here because the independent re-read is a fresh session reading the same repo, which a
-  fresh **TD** session does equally well without a second charter to keep current. **The Vercel trap
-  list moves with the seat, verbatim**, or the move relocates the error it exists to prevent.
+- **2026-09-22, superseded 2026-09-24 — The deployment layer is Deployment's.** Platform Config's
+  Vercel, DNS and CI went to TechPad Gen on 2026-09-19 and to the TD with the merge on 2026-09-22,
+  so one seat owned both sides of the gap between merging and deploying; separation of duties was
+  rejected then because a fresh TD session re-reads the repo as well as a second seat would. **On
+  2026-09-24 Joel moved the whole layer to a new Deployment agent** — the pull request, the gate, the
+  merge order, the merge, migrations at gate time and DevOps: "Essentially it's the deployment layer
+  we are stripping out of your job." What changed the answer: the TD now starts and briefs every
+  agent, so a TD gate would check work it had directed. **One seat still owns both sides of the gap;
+  it moved seats.** The Vercel trap list moved with it, verbatim.
 - **2026-09-22 — Linear holds open items. GitHub stays the repo.** The plan was a Routine
   regenerating `.claude/OPEN-ITEMS.md` from Linear so a hook kept printing it; **Joel dropped the file
   instead** ("Let's drop the open items"), so the hook only points at Linear and **every session
@@ -222,6 +221,15 @@ it; git keeps it.
   hooks. Joel's Vercel and Supabase calls *ask* rather than refuse: they are Joel's, not forbidden.
   Linear writes that break the issue rules are *refused*, never asked: Joel should not be clicking
   through formatting.
+- **2026-09-24 — Every agent runs as the TD's helper, from a preset, and none opens its own pull
+  request.** Joel: "Subagents is the way to go", "You don't spin up agents without checking in",
+  "no one creates their own PRs". Helpers over separate sessions because a preset pins the model and
+  the effort and a separate session cannot set effort; the accepted cost is that an agent reaches
+  Joel only through the TD. **Opus 5.5 at medium for every agent**: Joel first said Opus 5.5 at high,
+  then asked whether Opus 5 would do for agents working from a brief. Opus 5.5 is the newer model and
+  the cheaper per token, so effort was the lever, not the model. **Opening a pull request is not
+  held by the hook** ("they will be spun up with intention, so there's no need for a check");
+  merging still is. **Every agent edits Linear without asking Joel.**
 
 ## Mistakes — do not repeat
 

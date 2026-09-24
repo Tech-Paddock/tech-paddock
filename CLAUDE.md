@@ -33,8 +33,9 @@ If you do not know which agent you are, stop and ask. Do not adopt a charter you
 
 ## The communication layer
 
-Agents here never run at the same time and cannot see each other. There is no way to ask another
-agent anything. **The repo is the only channel**, so this is how information moves.
+Agents run as helpers inside the technical director's session, each started from its preset only
+after Joel says go, and they cannot see each other. **The repo and Linear are the only channels
+between them**, so this is how information moves.
 
 **A channel is defined by its reader and its moment, not by its author.** That is the rule that
 keeps things in one place. When you have something to say, find the reader first.
@@ -67,7 +68,8 @@ how you leave work for your own next session — a handoff holds state and traps
 2026-09-24). Say it to the technical director, who owns the queue. **Its body ends with a Next steps
 section** — numbered, each step naming who acts, kept current by whoever changes the issue; a hook
 refuses an issue without it or its labels. The next session acts on it without reading the history;
-an issue that needs the history to act on is a note, not a request.
+an issue that needs the history to act on is a note, not a request. **Every agent edits Linear
+without asking Joel** (Joel, 2026-09-24); the hook still refuses an issue that breaks these rules.
 
 ### When a document reaches its cap
 
@@ -96,15 +98,17 @@ if either comes back, and why is in `DECISIONS.md`.
 
 | Agent | Owns | Charter |
 |---|---|---|
-| Technical Director | gatekeeping, the Linear queue, merges, **DevOps — Vercel, DNS, CI, deploys**, **app surface**, **Postgres**, **`apps/editor`** (parked and frozen) | `.claude/agents/td/` |
+| Technical Director | the Linear queue, **starting agents**, **app surface**, **Postgres** design and contracts, the shared auth plumbing, **`apps/editor`** (parked and frozen) | `.claude/agents/td/` |
+| Deployment | everything after a pushed commit: **pull requests, the gate, merge order, merges, migrations at gate time, DevOps — Vercel, DNS, CI, deploys** | `.claude/agents/deployment/` |
 | TechPad Gen | `apps/home`, `apps/tracker` (parked), **the visual theme of every app**, shared components | `.claude/agents/techpad-gen/` |
 | Resume Formatter | `apps/resume` | `.claude/agents/resume/` |
 | Coffee | `apps/coffee` | `.claude/agents/coffee/` |
 | Health | `apps/health` | `.claude/agents/health/` |
 | Cookbook | `apps/cookbook` | `.claude/agents/cookbook/` |
 
-Each folder holds `RULES.md` and `HANDOFF.md`. The prompts that start a session are in
-`.claude/agents/KICKOFF.md`.
+Each folder holds `RULES.md`, `HANDOFF.md` and `preset.md`, which pins the model and effort the
+agent runs on (Joel, 2026-09-24: Opus 5.5 at medium, for every agent). How an agent starts, and the
+technical director's own kickoff, are in `.claude/agents/KICKOFF.md`.
 
 ---
 
@@ -135,6 +139,9 @@ wrong or the rule is, and that is a conversation before any code exists.
   read Vercel state; they do not write it** — settings and env vars are Joel's dashboard steps
   (Joel, 2026-09-23: "follow charter"). The connector exposes write tools anyway, so **a hook holds
   every Vercel call that is not a read for Joel's click**: a backstop, not the route.
+- **Joel: starting an agent.** The technical director starts each one as a helper in the TD's
+  session, from its preset, and only after Joel says go — **"close out" is that go for Deployment**
+  on the branch it names (Joel, 2026-09-24: "You don't spin up agents without checking in").
 - **Joel: edit this file.** It is approved before it changes. **If what you are about to build
   contradicts it, stop and ask before you build it.** Raising it in the pull request is the backstop
   for something discovered late, not the normal path — code already written applies pressure to
@@ -168,39 +175,40 @@ wrong or the rule is, and that is a conversation before any code exists.
   change**.
   A session's opening branch is named by the harness and names neither; that is expected and it is
   not the branch the work belongs on.
-- **Commit and push your work. Do not open a pull request until Joel asks for one.** This binds every
-  agent, the technical director included. Work on your branch, commit as you go, push it, and when it
-  is finished say so and stop. **A finished branch is the deliverable.** CI runs on every branch
-  push, so nothing is unverified while it waits — and nothing is live either.
-  **When he asks, open it normally — not as a draft — and record the request in the body:**
+- **Commit and push your work; Deployment opens the pull request.** No agent opens its own, the
+  technical director included (Joel, 2026-09-24). Work on your branch, commit as you go, push it, and
+  when it is finished say so and stop. **A finished branch is the deliverable.** CI runs on every
+  branch push, so nothing is unverified while it waits — and nothing is live either.
+  **Deployment opens it normally — not as a draft — and records Joel's go in the body:**
 
   ```
   Requested by Joel on YYYY-MM-DD — "what he said"
   ```
 
-  **No other agent can see the conversation where he asked**, so the request lands in the repo or it
-  did not happen. `requested-by-joel` fails a body without that line. What no check can see is
+  **No other agent can see the conversation where he said it**, so the request lands in the repo or
+  it did not happen. `requested-by-joel` fails a body without that line. What no check can see is
   whether the quote is real, so **this rule rests further on honesty than the ones around it.**
 - **Three phrases from Joel mean three specific things.** They exist so he can move work without
   spelling out the steps each time, and so the steps are the same for every agent.
 
-  **"Close out."** Finish what you are on, commit and push, update your `HANDOFF.md`, and **open the
-  pull request** — body carrying `Requested by Joel on YYYY-MM-DD — "close out"`, blast radius, and
-  the Deployment section. Then say the branch is pushed and stop. **This is the ask the rule above
-  requires**; there is no separate permission to wait for.
+  **"Close out."** Finish what you are on, commit and push, update your `HANDOFF.md`, and hand the
+  branch over with its blast radius and Deployment section. Then stop. **It is also Joel's go for
+  Deployment**, which opens the pull request quoting him, gates it and merges it; there is no
+  separate permission to wait for.
 
-  **"Park it."** The same, without the pull request. Stop at the pushed branch. He uses this when he
+  **"Park it."** The same, without Deployment. Stop at the pushed branch. He uses this when he
   wants the work safe but not in the queue.
 
   **"Pick up: <thing>."** New work. Come back with what you understand the job to be, what you would
   do first, and anything it contradicts. **Do not cut a branch or write code until he answers** —
   until then you do not know what the change is, and the branch would be named after a guess.
 
-- **State your blast radius in the pull request:** which apps, which shared files.
-- **Only the technical director watches a pull request.** Subscribing to a pull request's activity —
-  CI failures, review comments — is the technical director's, and no other agent offers it. **Only
-  one watcher gets the events**, and a second subscriber silently receives nothing rather than an
-  error, so two agents watching means one is deaf to the thing it promised to watch.
+- **State your blast radius when you hand a branch over:** which apps, which shared files.
+  Deployment carries it into the pull request.
+- **Only the technical director's session watches a pull request**, and Deployment acts on what
+  arrives there. **Only one watcher gets the events**, and a second subscriber silently receives
+  nothing rather than an error, so two sessions watching means one is deaf to what it promised to
+  watch.
 - **Adding or deprecating an app under `apps/` needs no CI change.** The matrix derives from the
   folders on disk behind one fixed `gate` check, and `drift` fails either being undone. **What cannot
   be automated is the Vercel project and the DNS record** — both outside the repo, both without an
@@ -226,8 +234,8 @@ wrong or the rule is, and that is a conversation before any code exists.
   **Destructive changes split into two pull requests**: one stops using the column and ships, then a
   second drops it once that is live.
   **Say which shape it is in the Deployment section.** A migration whose shape is not stated is
-  treated as destructive until someone reads the SQL. **The technical director applies it at gate
-  time, before merging** — not Joel, and not the agent.
+  treated as destructive until someone reads the SQL. **Deployment applies it at gate time, before
+  merging** — not Joel, and not the agent that wrote it.
 - **Say what it takes to deploy it, every time.** Every pull request carries a **Deployment**
   section, and so does the message handing a finished branch over. Four things: what happens by
   itself on merge, what a human must do and in what order, how to verify it is genuinely live, and
@@ -262,14 +270,14 @@ not going blindly: ask whatever you need in order to execute it correctly.
 
 ### Merging
 
-Merging is the technical director's, and the gate is specified in `.claude/agents/td/RULES.md`.
-What every agent needs to know: **CI green on the current head, handoffs current, the request
-recorded, the Deployment section filled in, squash merge.** A stale handoff sends the change back; it
-does not get fixed by the TD on the way past. **One exception:** when a TD pull request changes
-another agent's charter, that agent's handoff is not required to change with it — nobody but that
-agent may write it — so the TD files a Linear issue asking the agent to reconcile its handoff.
-**Agents cannot delete a remote branch.** The merged branch goes when GitHub's *Automatically delete
-head branches* setting removes it, or when Joel does.
+Merging is Deployment's — the gate, the order and the squash merge — and the gate is specified in
+`.claude/agents/deployment/RULES.md`. What every agent needs to know: **CI green on the current
+head, handoffs current, the request recorded, the Deployment section filled in, squash merge.** A
+stale handoff sends the change back; it does not get fixed on the way past. **One exception:** when
+a TD pull request changes another agent's charter, that agent's handoff is not required to change
+with it — nobody but that agent may write it — so the TD files a Linear issue asking the agent to
+reconcile its handoff. **Agents cannot delete a remote branch.** The merged branch goes when
+GitHub's *Automatically delete head branches* setting removes it, or when Joel does.
 
 ---
 
@@ -369,10 +377,11 @@ Most rules here are convention: they hold because an agent chooses to comply. Th
 2. **The `.claude/settings.json` hooks** run whether or not anyone wants them to, through one guard,
    `.claude/hooks/guard.mjs`, which **fails closed**. It refuses a push that would land on `main` in
    any spelling or that it cannot read, and rewriting the migration history by CLI or SQL; holds
-   opening, changing, merging or reviewing a pull request, and the API commit tools, for Joel's
-   click; holds every Vercel and Supabase call that is not a read; refuses a Linear issue without its
-   labels or Next steps; and points every session at Linear. CI tests what it refuses. It stops
-   mistakes, not a determined agent — branch protection stays the backstop for `main`.
+   changing, merging or reviewing a pull request, and the API commit tools, for Joel's click —
+   opening one is not held (Joel, 2026-09-24); holds every Vercel and Supabase call that is not a
+   read; refuses a Linear issue without its labels or Next steps; and points every session at
+   Linear. CI tests what it refuses. It stops mistakes, not a determined agent — branch protection
+   stays the backstop for `main`.
 3. **CI's `gate`** needs every app to typecheck, test and build, and `drift` to pass.
    **`requested-by-joel`** fails a pull request whose body does not record who asked for it.
    **`drift`** measures the repo instead of trusting a document: the stamped copies, the middleware

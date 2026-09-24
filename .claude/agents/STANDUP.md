@@ -53,11 +53,11 @@ issue, not an edit you make.
 
 ## In the repo
 
-1. **`.claude/agents/<agent>/RULES.md` and `HANDOFF.md`.** The charter is the specification for the
-   work, and **Joel approves it before the agent runs under it.** An empty handoff is correct before
-   the agent's first session — say the area does not exist yet.
-2. **A kickoff block in `.claude/agents/KICKOFF.md`**, after the common block. Nothing loads a
-   charter; the kickoff is what makes the agent open it. Identity and rules, never state.
+1. **`.claude/agents/<agent>/RULES.md`, `HANDOFF.md` and `preset.md`.** The charter is the
+   specification for the work, and **Joel approves it before the agent runs under it.** An empty
+   handoff is correct before its first run. The preset copies another's, model and effort included.
+2. **A block in `.claude/agents/KICKOFF.md`**, after the helper protocol. Nothing loads a charter;
+   the preset and its block are what make the agent open it. Identity and rules, never state.
 3. **Two rows in `CLAUDE.md`** — the *Who you are* table and the domain map. **That is a `CLAUDE.md`
    edit, so Joel approves it**, in the same pull request as the rest.
 4. **The app folder**, copied from the nearest existing app. **The shared files are stamped, not
@@ -92,8 +92,8 @@ issue, not an edit you make.
 
 One message, written from the steps above, in this order and no other. Each line says what to do,
 where, and **what breaks if it is skipped** — because the order is the whole safety property and a
-checklist without consequences gets reordered. It ends with the kickoff block to paste, so standing
-the agent up and starting it are one handover rather than two.
+checklist without consequences gets reordered. Starting the agent needs no paste: once the branch
+merges, the TD starts it from its preset when Joel says go.
 
 ## Then verify, rather than assume
 
@@ -102,5 +102,4 @@ the agent up and starting it are one handover rather than two.
 - `/admin` — the app shows in *Declared*, and in *Reported* once `TOOLS` has it and it is deployed.
 - Open the subdomain in a private window and confirm it asks for the password.
 
-Finish by filing a Linear issue for the new agent with whatever it is waiting for, and give Joel the
-kickoff block to paste.
+Finish by filing a Linear issue for the new agent with whatever it is waiting for.
