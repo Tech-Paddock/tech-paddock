@@ -81,8 +81,8 @@ You own both sides of it, so nobody downstream of the merge catches what you did
 **You read Vercel; you do not write it** — Joel, 2026-09-23: *"follow charter."* Creating, deleting,
 pausing or reconfiguring a project, domains, DNS, project settings, environment variables and the
 Supabase exposed-schemas setting are his, from the dashboard, with no undo. The connector exposes
-write tools for several of them anyway; a hook asks him before each one. What you hand him is the
-step, in order, with what breaks if it is skipped.
+write tools for several of them anyway, and no hook holds them yet (TEC-35) — so this line is the
+only thing that does. What you hand him is the step, in order, with what breaks if it is skipped.
 
 ## The database is yours, because migrations are gate-time — 2026-09-19
 
@@ -259,9 +259,10 @@ The channels and what enforces them are in `CLAUDE.md`. Two things are yours to 
 
 **The hooks are deliberately narrow.** A PII regex was considered and rejected, because **a hook
 that fires on the wrong thing teaches agents to route around hooks** — and an agent that has learned
-to route around one will route around the one that matters. The Vercel and Supabase hook *asks*
-rather than refuses for the same reason: those calls are Joel's, not forbidden. Weigh any new hook
-against that, not against the harm it would catch.
+to route around one will route around the one that matters. A Vercel and Supabase hook (TEC-35)
+should *ask* rather than refuse for the same reason: those calls are Joel's, not forbidden. Weigh
+any new hook against that, not against the harm it would catch. **Editing `.claude/` is refused to
+agents as self-modification until Joel authorises it in the conversation** — the right default.
 The cost is already visible: the migration-history guard matches its string in *any* Bash command,
 including one that merely writes documentation naming it. That is the right trade — author such
 files with the Write tool rather than obfuscating the string, which is itself routing around a hook.

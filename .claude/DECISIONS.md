@@ -184,7 +184,7 @@ it; git keeps it.
 - **2026-09-23 — Agents do not write Vercel.** When the connector started exposing project-settings
   and env-var writes, Joel: *"follow charter."* Settings and env vars are his dashboard steps, like
   projects, domains and DNS. `CLAUDE.md` said changing an existing project's settings was fine and was
-  corrected on 2026-09-24; a hook now asks him before each Vercel or Supabase write that is his.
+  corrected on 2026-09-24. No hook holds those writes yet; TEC-35 proposes one that asks him.
 - **2026-09-24 — TEC-21: go.** Joel approved snapshotting macros onto Health's entries at log time.
   `HEALTH-PLAN.md`'s 2026-09-22 decision stands — a correction does not reach backwards, and an entry
   keeps the item id and version it snapshotted — and the code catches up through TEC-21. Until it

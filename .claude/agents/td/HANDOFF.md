@@ -27,8 +27,9 @@ cap is 350.
   the login handler is one stamped file (`lib/login.ts`); middleware exceptions are exact paths; the
   tracker's `/api/cron/*` needs the `CRON_SECRET` bearer at the gate as well as in the route; the
   attempts cookie is unsigned (it was a free signed sample of `SESSION_SECRET`).
-- **Enforcement.** The hooks and `drift` are as `CLAUDE.md`'s *What is actually enforced* says —
-  including the hook that asks Joel before any Vercel or Supabase write that is his.
+- **Enforcement.** `drift` and CI are as `CLAUDE.md`'s *What is actually enforced* says. **The
+  hooks are unchanged** — hardening them, and adding an ask-first hook on Joel's Vercel and Supabase
+  writes, is TEC-35 and waits for Joel to authorise edits under `.claude/`.
 - **Database.** A rebuild from `supabase/` now gets the original four tables' grants
   (`record_original_table_grants`). The recorded version is whatever the hosted API stamped when it
   was applied at the gate — rename the file to match before merging, as `supabase/README.md` says.
@@ -47,7 +48,7 @@ cap is 350.
   credentials in the estate, on the app that holds no database key. TEC-32 item 4 and TEC-33 step 5
   are how that shrinks.
 - **The Vercel connector lists write tools. Do not use them** — Joel, 2026-09-23: "follow charter".
-  The hook now asks him before each; hand him the step instead.
+  No hook holds them until TEC-35 lands; hand him the step instead.
 - **Spawning an agent's session from here works** (`create_session`, with `outcome_branch`), but
   `CLAUDE.md` says agents never run at the same time and `KICKOFF.md` has them wait for Joel before
   branching. **Do not spawn one until Joel sanctions it.** Subagents inside this session, each in its

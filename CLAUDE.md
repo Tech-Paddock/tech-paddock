@@ -132,8 +132,8 @@ wrong or the rule is, and that is a conversation before any code exists.
 - **Joel: create, delete, pause or reconfigure anything in Vercel** — a project, a domain, a DNS
   record, a project setting or an environment variable. No undo, and no test catches them. **Agents
   read Vercel state; they do not write it** — settings and env vars are Joel's dashboard steps
-  (Joel, 2026-09-23: "follow charter"). The connector exposes write tools anyway; a hook asks him
-  before each one.
+  (Joel, 2026-09-23: "follow charter"). The connector exposes write tools anyway, and **no hook
+  holds them yet** (TEC-35): this rule is the only thing between an agent and those calls.
 - **Joel: edit this file.** It is approved before it changes. **If what you are about to build
   contradicts it, stop and ask before you build it.** Raising it in the pull request is the backstop
   for something discovered late, not the normal path — code already written applies pressure to
@@ -364,14 +364,13 @@ Most rules here are convention: they hold because an agent chooses to comply. Th
 1. **`main` is protected.** `gate` is a required check and branches must be up to date before they
    merge. No agent can read the ruleset itself, so which other checks it requires is known only by
    their effect.
-2. **The `.claude/settings.json` hooks** run whether or not anyone wants them to. They refuse a push
-   to `main`, parsed by refspec; refuse rewriting the migration history, by the CLI in any spelling
-   or by an `execute_sql` write to `schema_migrations`; ask Joel before a pull request is opened,
-   updated, reviewed, auto-merged or merged, and before the API commit tools; ask Joel before the
-   Vercel and Supabase changes that are his — creating, pausing or reconfiguring projects, domains,
-   DNS, env vars, the firewall, promote and rollback; point every session at Linear; and fail closed
-   when `jq` or `node` is missing. **A hook holds only the tool calls it names**; anything else is
-   convention.
+2. **The `.claude/settings.json` hooks** run whether or not anyone wants them to. They refuse a
+   `git push` naming `main`, refuse `supabase migration repair`, hold opening, updating and merging
+   a pull request for Joel's click, and point every session at Linear. **A hook holds only the tool
+   calls and spellings it names** — `+main`, `refs/heads/main`, auto-merge, the API commit tools,
+   `npx supabase@latest migration repair` and every Vercel or Supabase write are not held, so for
+   those the rule is convention and branch protection is the backstop for `main`. Hardening them is
+   TEC-35, which waits for Joel to authorise edits under `.claude/`.
 3. **CI's `gate`** needs every app to typecheck, test and build, and `drift` to pass.
    **`requested-by-joel`** fails a pull request whose body does not record who asked for it.
    **`drift`** measures the repo instead of trusting a document: the stamped copies, the middleware
