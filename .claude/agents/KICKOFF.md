@@ -46,7 +46,8 @@ is edited rarely, so any state written here is already going stale.
 > is the deliverable. Update your `HANDOFF.md` before you hand it over, and say the branch is pushed.
 >
 > **Three phrases from me mean three specific things**, and they are spelled out in `CLAUDE.md`:
-> **"close out"** — finish, push, update your handoff, and Deployment takes it to merge;
+> **"close out"** — commit and push everything, park every open item in Linear, update your
+> handoff, and Deployment takes it to merge; you are then ready to be archived;
 > **"park it"** — the same without Deployment; **"pick up: X"** — new work, propose it before you
 > build or branch.
 >

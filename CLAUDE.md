@@ -191,10 +191,11 @@ wrong or the rule is, and that is a conversation before any code exists.
 - **Three phrases from Joel mean three specific things.** They exist so he can move work without
   spelling out the steps each time, and so the steps are the same for every agent.
 
-  **"Close out."** Finish what you are on, commit and push, update your `HANDOFF.md`, and hand the
-  branch over with its blast radius and Deployment section. Then stop. **It is also Joel's go for
-  Deployment**, which opens the pull request quoting him, gates it and merges it; there is no
-  separate permission to wait for.
+  **"Close out."** Leave nothing that lives only in the conversation, so the session can be
+  archived: every change committed and pushed, `HANDOFF.md` updated, and every open item — a
+  question, a follow-up, a step for Joel — parked in Linear with its Next steps. Then hand the branch
+  over with its blast radius and Deployment section, and stop. **It is also Joel's go for
+  Deployment**, which opens the pull request quoting him, gates it and merges it.
 
   **"Park it."** The same, without Deployment. Stop at the pushed branch. He uses this when he
   wants the work safe but not in the queue.

@@ -229,7 +229,9 @@ it; git keeps it.
   then asked whether Opus 5 would do for agents working from a brief. Opus 5.5 is the newer model and
   the cheaper per token, so effort was the lever, not the model. **Opening a pull request is not
   held by the hook** ("they will be spun up with intention, so there's no need for a check");
-  merging still is. **Every agent edits Linear without asking Joel.**
+  merging still is. **Every agent edits Linear without asking Joel.** **"Close out" now also means
+  the session is ready to archive**: nothing left only in the conversation — every open item is a
+  commit or a Linear issue.
 
 ## Mistakes — do not repeat
 

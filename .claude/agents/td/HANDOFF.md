@@ -29,8 +29,8 @@ Next.js 14 → 16 upgrade. The parking lot is the `Parked` label.
 - **Every agent edits Linear without asking Joel.** The guard still refuses an issue that breaks the
   issue rules.
 - **The weekly Routine** "Weekly rules-drift audit" (Mondays 08:00 UTC) reads Linear and runs `drift`.
-  Its prompt still describes the TD as the gate; it is report-only, so that misleads nobody into
-  acting, but its next run will flag the change as drift.
+  Its prompt still names the TD as the gate until TEC-42; it is report-only, so that misleads nobody
+  into acting, but a run before TEC-42 will report the move as drift.
 
 ## Traps only here
 
