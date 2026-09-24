@@ -1,3 +1,5 @@
+Requested by Joel on YYYY-MM-DD — "what he said"
+
 ## What changed
 
 ## Why
@@ -24,7 +26,7 @@ written; a blank section is indistinguishable from a forgotten one.
 - What breaks if the steps are skipped?
 -->
 
-## Brief impact
+## Rules impact
 <!--
 Does this change contradict anything settled — CLAUDE.md, your own charter at
 .claude/agents/<you>/RULES.md, the domain map, env vars, or a stated decision?
@@ -34,8 +36,10 @@ Flagging it at this point is the backstop for something you only discovered
 late, not the normal path — code already written applies pressure to approve it,
 which is what the rule exists to prevent.
 
-Never edit CLAUDE.md or another agent's charter in this PR. You may propose a
-change to your OWN charter here; Joel approves it.
+CLAUDE.md changes only with Joel's approval, given before the change is made.
+Charters are drafted by the technical director and approved by Joel. For your
+own charter, propose the change here, in your handoff or in a Linear issue —
+do not make it.
 
 Write "none" if nothing settled is affected.
 -->

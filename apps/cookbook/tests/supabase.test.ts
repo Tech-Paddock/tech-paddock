@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
-const createClient = vi.fn(() => ({}));
+// Typed as taking arguments so `mock.calls[0][2]` is the options object the
+// app passed, not an index into an empty tuple — `tsc --noEmit` checks tests.
+const createClient = vi.fn((..._args: unknown[]) => ({}));
 vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: unknown[]) => createClient(...a) }));
 
 /**
