@@ -34,9 +34,9 @@ Next.js 14 → 16 upgrade. The parking lot is the `Parked` label.
 
 ## Traps only here
 
-- **The GitHub integration closes a Linear issue when a pull request naming it merges.** TEC-27 and
-  TEC-35 were closed that way with work still open. Reopen them, and name an issue in a title only
-  when merging finishes it.
+- **The GitHub integration closes a Linear issue when a pull request naming it merges** — in its
+  title or its body. TEC-27 and TEC-35 were closed that way with work still open. After a merge,
+  reopen any issue whose Next steps are not all done.
 - **The auto-mode classifier can refuse work under `.claude/hooks/`** after an edit there, reads
   included, as self-modification. Take it to Joel; never route round it.
 - **A Linear patch matches the stored text**, where a `TEC-n` you wrote is stored as an issue-mention
