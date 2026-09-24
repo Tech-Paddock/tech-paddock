@@ -20,7 +20,7 @@
  * not watch fails before the app silently stops rebuilding — the #145 class.
  */
 
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { join, dirname, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -212,7 +212,17 @@ function splitArgs(s) {
   return out;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+/* Run as a script, not imported? Compared through realpath on both sides:
+   Node resolves symlinks in import.meta.url but not in argv[1], so through a
+   symlinked path (macOS /tmp is one) a plain comparison was false, nothing ran,
+   and the process exited 0 with empty output — which CI once read as "no paths,
+   nothing to build". */
+const isMain = () => {
+  try { return !!process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url)); }
+  catch { return false; }
+};
+
+if (isMain()) {
   const app = process.argv[2];
   if (!app) { console.error("usage: node scripts/build-scope.mjs <app>"); process.exit(64); }
   const w = watchedBy(app);
