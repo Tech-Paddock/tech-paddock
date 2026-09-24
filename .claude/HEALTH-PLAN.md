@@ -6,19 +6,20 @@ it, it is logged.
 Joel, on what it is for: **"it is used to record input and track macro nutrients across the day."**
 Macros here are macronutrients — protein, carbohydrate, fat — and calories beside them.
 
-**This is the design, not the state. Not a charter either** — it is the record of what was decided
-with Joel on 2026-09-16 while the shape was being talked through, so the session that builds a
-feature does not start from a summary of a summary. `.claude/agents/health/RULES.md` is the charter
-and binds; this explains the reasoning behind it. Where the two ever disagree, the charter wins.
+**This is the reasoning, not the rules and not the state.** It records what was decided with Joel
+from 2026-09-16 on, while the shape was being talked through, so the session that builds a feature
+does not start from a summary of a summary. `.claude/agents/health/RULES.md` carries the rules and
+binds; this explains why each one exists. Where the two ever disagree, the charter wins. **Read it
+before designing or changing a feature**, not every session.
 
 **What is built is not written here.** `.claude/agents/health/HANDOFF.md` says what is true right
-now and `/admin` reads the running system live — a build-state paragraph in this file went stale
-the day the app was scaffolded, which is why there is no longer one.
+now and `/admin` probes the running system — a build-state paragraph in this file went stale the day
+the app was scaffolded, which is why there is no longer one.
 
 **It was meant to be temporary and it is not.** The plan was to fold it into the charter and delete
-it; the charter has an 80-line budget and this is 240 lines of Joel's reasoning, so folding it in
-would have meant throwing most of it away. It stays, the charter points at it, and it is read as
-the *first feature* of `health` rather than the whole of the app.
+it; folding it in would have meant throwing most of Joel's reasoning away. So the rules moved to the
+charter and the reasoning stays here, read as the *first feature* of `health` rather than the whole
+of the app.
 
 ---
 
@@ -51,34 +52,21 @@ almost no columns.
 
 ### Rows split on things you ordered, not components
 
-A Chick-fil-A #1 is one row, even though it is three things in the bag. A #1 and a cookie is two
-rows.
-
-**The item name carries the whole specification.** "Chick-fil-A #1", "Chick-fil-A sandwich", "large
-fry", "medium fry" are four remembered items with four sets of numbers. No components, no modifiers,
-no per-instance overrides. Want precision, say more words.
-
-The rejected version decomposed a combo so "I skipped the fries" could remove a part — but that is
-not how you talk; you name what you actually ate. Keeping the combo whole also makes the cache work
-harder: "#1 from Chick-fil-A" is one row hit hundreds of times, where decomposing caches three
-things and recombines them on every log.
+The rule is the charter's. The rejected version decomposed a combo so "I skipped the fries" could
+remove a part — but that is not how you talk; you name what you actually ate. Keeping the combo
+whole also makes the cache work harder: "#1 from Chick-fil-A" is one row hit hundreds of times, where
+decomposing caches three things and recombines them on every log.
 
 ### Your database is read before anything external
 
-1. **Exact match** in your table — free, instant, no model call, identical to last time.
-2. **Near match** on the normalised item name. Needs the parse first, so it matches parsed names,
-   not raw dictated text.
-3. **Miss → outside.** Web search for branded items that publish real numbers; a model estimate for
-   "two eggs and toast", where searching buys nothing.
-4. **Approval writes it back**, so tier 3 runs at most once per distinct food, ever.
+The order is the charter's. **The reason is correctness, not cost.** A web search will cheerfully
+overwrite a correction you already made. Database-first means your approved rows are authoritative
+and never relitigated by a source that does not know your habits — and approval writing the answer
+back means the outside tier runs at most once per distinct food, ever.
 
-**The reason is correctness, not cost.** A web search will cheerfully overwrite a correction you
-already made. Database-first means your approved rows are authoritative and never relitigated by a
-source that does not know your habits.
-
-`apps/coffee/lib/bags.ts` does the second-order version worth copying: `findRoasterDomain` lets a
-verified domain pin the next search rather than merely skip it. Once Chick-fil-A resolves once,
-later lookups go to their published page instead of whatever a search surfaces.
+Coffee once pinned a follow-up search to a roaster domain it had verified. **Do not copy that**: it
+was removed in #176 because pinning narrowed the only channel by which a page enters the
+conversation, and the pinned search found nothing where the unpinned one found the recipe.
 
 ### Corrections are dictated, and they fix the canonical row
 
@@ -89,17 +77,16 @@ earlier draft is unnecessary and dropped.
 Correcting the draft before approving is the easy case. Correcting something already logged resolves
 to the most recent matching row.
 
-**A correction does not reach backwards — settled 2026-09-22, answering #116.** An entry snapshots
-the item's numbers when it is logged, so a past day's total never moves and a read is a plain sum.
-**The entry also stores the item id and the version it snapshotted.** Nothing recomputes, but a
-backfill stays possible; without the reference, every day logged before a correction is wrong
-permanently, which is the one irreversible choice in this design.
+**A correction does not reach backwards — settled 2026-09-22, answering #116; go given 2026-09-24.**
+An entry snapshots the item's numbers when it is logged, so a past day's total never moves and a read
+is a plain sum. **The entry also stores the item id and the version it snapshotted.** Nothing
+recomputes, but a backfill stays possible; without the reference, every day logged before a
+correction is wrong permanently, which is the one irreversible choice in this design. The code
+catches up through TEC-21.
 
 ### It does not appear on the hub's glance
 
-Joel, asked whether it belongs there: **"leave it off for now."** So no `/api/summary`, no line in
-`SOURCES` in `apps/home/lib/glance.ts`, and no request to TechPad Gen. It is a tool you click into.
-Adding it later is one endpoint and one Linear issue, so nothing here forecloses it.
+Joel, asked whether it belongs there: **"leave it off for now."** The consequences are the charter's.
 
 ### Claude guesses the meal slot
 
@@ -113,16 +100,9 @@ line to scrutinise, and it is load-bearing for the harness below.
 
 ### Models: Haiku 4.5 default, Sonnet 5 available
 
-Sonnet 4.6 deliberately left out — two models is a clean experiment.
-
-- **A registry, not two strings.** Haiku 4.5 returns a 400 for `output_config.effort` outright and
-  web tool versions differ between models, so a bare swap is an error. This is why
-  `apps/coffee/lib/models.ts` exists; copy its shape.
-- **No effort dial.** Sonnet 5 accepts one, Haiku rejects one. Two models is clean; two models times
-  five effort levels is a chore.
-- **Only the judgment call gets a model choice.** Parsing "a number one from Chick-fil-A" into one
-  item is a Haiku job at any setting. Coffee puts its toggle on `/api/search`, not `/api/identify` —
-  parse pinned to Haiku, the estimate is what varies.
+The rules are the charter's. Sonnet 4.6 was deliberately left out — two models is a clean experiment,
+and two models times five effort levels is a chore. Only the judgment call gets a model choice,
+because parsing "a number one from Chick-fil-A" into one item is a Haiku job at any setting.
 
 ## The name — settled 2026-09-17
 
@@ -134,11 +114,11 @@ change afterwards.
 rejected the narrower candidates deliberately. `fuel` and `intake` both name the *macro* feature,
 and a name that describes one feature is a ceiling on the app the moment a second one arrives.
 
-**So everything below is the first feature of `health`, not the whole of it.** Read it that way.
+**So everything here is the first feature of `health`, not the whole of it.** Read it that way.
 Where a decision here would be wrong for a second kind of record — weight, sleep, a workout — it is
-a decision about the macro tables specifically and says so, or it needs revisiting before the schema
-is written. The schema is named for the app, so it holds many tables by design; what must not happen
-is the first tables being shaped as though they were the only ones.
+a decision about the macro tables specifically and says so, or it needs revisiting before that
+schema is written. The schema is named for the app, so it holds many tables by design; what must not
+happen is the first tables being shaped as though they were the only ones.
 
 **This file was `MACRO-TRACKER-PLAN.md` until the name was settled.** Renamed rather than left
 alone, because the app is not the macro tracker.
@@ -146,27 +126,12 @@ alone, because the app is not the macro tracker.
 ## Guardrails — approved 2026-09-17
 
 **A guardrail is something that stays wrong even when it would make the app better.** That is the
-test each of these had to pass, and it is why they are written here rather than left to judgement:
-every one of them is a rule the agent will at some point have a good local reason to break.
+test each one had to pass, and it is why they are written down rather than left to judgement: every
+one of them is a rule the agent will at some point have a good local reason to break.
 
 Drafted by the technical director from what Joel had already written or decided, put to him as six
-candidates to strike or approve, and approved in full — **none struck**. They become the `Never`
-section of the new agent's `RULES.md` when the charter is written, and they do not get renegotiated
-inside a feature.
-
-1. **Never write without approval.** The draft is not the log. Approving is the only thing that
-   writes.
-2. **Never let a failed lookup look like "not found."** A database error surfaces; it never falls
-   through to the web. This is Coffee's trap and the one that would quietly undo the whole design —
-   nothing on screen changes, the numbers just start drifting again.
-3. **Never replace a hand-entered number without keeping the old one.** The correction made by hand
-   is the only real ground truth in the system.
-4. **Never put real food-log data in the repo.** Fixtures are invented food. The database is the
-   right home for what was actually eaten.
-5. **Never read or write another tool's schema.** Settled already; writing it down is what keeps it
-   settled.
-6. **Never estimate when the table already knows.** Database-first is a correctness rule, not a cost
-   optimisation — bypass is a deliberate tap and never a default.
+candidates to strike or approve, and approved in full — **none struck**. They are the `Never`
+section of the charter, which is their one home, and they do not get renegotiated inside a feature.
 
 ## The debug harness
 
@@ -193,8 +158,8 @@ different on screen or the validation stat quietly inflates.
 ### Only ask when they actually disagree
 
 Auto-collapse agreement and record it as a match; surface a choice only on real divergence. Needs a
-**numeric tolerance, not string equality** — 620 vs 625 is agreement, 620 vs 890 is not. Tolerance
-not yet chosen.
+**numeric tolerance, not string equality** — 620 vs 625 is agreement, 620 vs 890 is not. Joel has not
+chosen the tolerance.
 
 ### The picks are recorded, or it is not validation
 
@@ -208,7 +173,7 @@ Table says 620, Haiku says 625, Sonnet says 890 — you can take one and have it
 by appending a new version, never by overwriting the row in place**, and that version records the
 debug run and the model behind the number. Reads resolve to the newest, so the pick has the effect
 you want and the correction it replaced is still there. **Corrected 2026-09-22 answering #116** —
-the earlier wording let a pick overwrite in place, contradicting `health/RULES.md` guardrail 3.
+the earlier wording let a pick overwrite in place, contradicting guardrail 3.
 
 ### Two mechanics
 
@@ -216,35 +181,22 @@ Calls run **in parallel and independently**, or the comparison is contaminated. 
 and costs roughly double — fine for a validation window, worth knowing before wondering why it got
 sluggish.
 
-## Traps this repo has already paid for
+## "Not found" and "could not ask" are the same null row
 
-### "Not found" and "could not ask" are the same null row
-
-From `apps/coffee/lib/bags.ts`: "No previous purchase" and "the lookup failed" are both a null row,
-and only one of them is an answer. Swallowing the error made an unreachable database look like a
-first-time coffee.
+The trap this repo has already paid for, from `apps/coffee/lib/bags.ts`: "No previous purchase" and
+"the lookup failed" are both a null row, and only one of them is an answer. Swallowing the error made
+an unreachable database look like a first-time coffee.
 
 **Specifically nasty here:** if the lookup silently fails, the app does not error — it degrades into
 internet-first and keeps working. Nothing on screen changes; the numbers just quietly start drifting
-again, which is the one thing this design exists to prevent. Coffee's `LookupError` class solves it;
-take it wholesale.
-
-### The debug route needs no middleware edit
-
-`apps/home/app/(shell)/admin/page.tsx` is already a second surface in the same app, and the matcher
-is a catch-all negative — `/((?!_next/static|_next/image).*)` — so any extra route is behind the
-password gate automatically. That matters, because `middleware.ts` is gated on the TD and the debug
-surface must never need it.
+again, which is the one thing this design exists to prevent. That is why guardrail 2 exists.
 
 ---
 
-## What the technical director would raise at the gate
+## What the technical director raised at the gate
 
 **In [issue #98](https://github.com/Tech-Paddock/tech-paddock/issues/98)**, at Joel's request, rather
 than in this file — so the recommendations stay plainly the technical director's and this document
-stays plainly Joel's. One home, and this line is the pointer to it.
-
-The two worth reading before any schema is written are the same finding from opposite ends: **a
-winning debug pick overwrites the very row this design calls authoritative**, and **every such
-overwrite converts hand-entered ground truth into a model-derived number**, so the statistic the
-harness exists to produce is measured against a pool the harness itself keeps shrinking.
+stays plainly Joel's. Its central finding — that a winning debug pick would overwrite the row this
+design calls authoritative, turning hand-entered ground truth into model-derived numbers — is
+answered above: a pick appends a version.

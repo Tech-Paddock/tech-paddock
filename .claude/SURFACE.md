@@ -4,13 +4,13 @@
 arrive at it, and whether it is worth an icon on a home screen.
 
 **Read this before designing a screen**, and before answering step 3 of `.claude/agents/STANDUP.md`.
-Ledger item 7 existed because this was unwritten, and in that time Health had to invent the rule
-this would have supplied.
+It was unwritten for long enough to be a ledger item (closed pre-Linear ledger item 7), and in that
+time Health had to invent the rule this would have supplied.
 
 **Surface is not the theme.** Palette, tokens, type, spacing and the shared component language are
 TechPad Gen's, in every app. Surface is shell, navigation and whether there is an index — that is
-architecture, and it is the technical director's. Settled 2026-09-18; the entry is in
-`.claude/DECISIONS.md` and this file does not restate the reasoning.
+architecture, and it is the technical director's, with Joel able to overrule. Settled 2026-09-18;
+the entry is in `.claude/DECISIONS.md` and this file does not restate the reasoning.
 
 **Joel, 2026-09-18:** *most tools are websites; Coffee is the only real app, and Health will be.* A
 site is **a thin index grouped by verb wrapping one long page**. An app is **one screen, thumb-first,
@@ -52,8 +52,8 @@ So: **count how often it is opened and in what state of mind, never how many rou
 
 - **One screen.** A second screen needs a reason that survives being written down and is Joel's to
   approve. Health's grocery list set the precedent and the bar: it earned one because it is the same
-  foods, one step before they are eaten — the same nouns, not new territory. The list has since
-  moved to the Cookbook with the recipes (TEC-15); the bar did not move with it.
+  foods, one step before they are eaten — the same nouns, not new territory. The list is moving to
+  the Cookbook with the recipes (TEC-15); the bar does not move with it.
 - **No index and no tabs.** There is nowhere else to go, because you did not come to browse. Anything
   secondary reaches the main screen as **a quiet footer link, never a tab** — Health's own
   formulation, and better than the one this guide would have supplied.
@@ -65,7 +65,8 @@ So: **count how often it is opened and in what state of mind, never how many rou
 ## If it is a site
 
 - **A thin index grouped by verb**, not by entity. The index answers *what am I here to do*, not
-  *what objects exist*.
+  *what objects exist*. **It may be a tab bar** when each tab is a verb and each is one long page —
+  the Cookbook's Recipes · King Soopers list.
 - **One long page over many routes.** For a single-user tool with this much content, scrolling beats
   navigating: a route you have to find is worse than a section you scroll past.
 - **Not thumb-first**, and that is not a licence to ignore the phone. It still has to work there; it
@@ -90,22 +91,20 @@ doing more work than it should.
 | Tool | Surface | Why |
 |---|---|---|
 | Coffee | **App** | At the grinder, several times a day, one decided thing. Installed to the home screen. |
-| Health | **App** | Just ate, phone in hand, log it and close. Its grocery list moved to the Cookbook (TEC-15). |
+| Health | **App** | Just ate, phone in hand, log it and close. Its grocery list is moving to the Cookbook (TEC-15). |
 | Resume Formatter | **Site** | Occasional, sitting down, arriving to look at what is there. |
-| Pipeline Tracker | **Site** | Reviewing a pipeline is surveying, not doing one decided thing. |
-| Message Editor | **Site** | Composing is unhurried and desk-bound. Frozen, so this is a record rather than a plan. |
+| Cookbook | **Site** | A collection: you arrive to see what you could cook, which is question 2 answering *site* plainly. Its tabs are the verb index. The King Soopers hand-off is a phone-in-a-shop moment that reads *app*; it was weighed and did not win (TD ruling, 2026-09-24). |
+| Pipeline Tracker | **Site** | Reviewing a pipeline is surveying, not doing one decided thing. Parked, so a record rather than a plan. |
+| Message Editor | **Site** | Composing is unhurried and desk-bound. Parked and frozen, so a record rather than a plan. |
 | Hub | Neither | The index of tools. There is one, and it is the technical director's. |
 
-**The Cookbook is open and it is Joel's call at standup.** The technical director's read is **site**:
-a cookbook is a collection, and for a collection the index *is* the product — you arrive to see what
-you could cook, which is question 2 answering *site* plainly. The argument the other way is the
-King Soopers hand-off, which is a phone-in-a-shop moment and reads *app*. **If both are true the tool
-is two tools**, and that is the thing to settle at standup rather than to design around.
+**If a tool seems to be both, it may be two tools** — the thing to settle at standup rather than to
+design around.
 
 ## Who decides, and when
 
 **The technical director, settled at standup**, beside the name and the schema, and written into the
-draft charter before a folder exists. It is expensive to change afterwards because it is the shell:
+draft charter before a folder exists. Joel can overrule it. It is expensive to change afterwards because it is the shell:
 every screen is built inside the answer. **Using the existing surface costs nothing and needs
 nobody** — an app that stays one screen and a site that stays one long page are both already
 correct.
