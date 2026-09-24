@@ -1,10 +1,9 @@
 # Cookbook — charter
 
-**Written as a draft** on 2026-09-20 per `STANDUP.md` step 1 — the design conversation with Joel, in
-a session that was not yet an agent — and **carried through the rest of the protocol unchanged** by
-the technical director on the same day. Everything below the line is as that session wrote it. Only
-the heading above and the *Not yet true* section at the end were touched, because the standup is
-what made them false.
+**First written on 2026-09-20 per `STANDUP.md` step 1** — the design conversation with Joel, in a
+session that was not yet an agent — and carried through the standup by the technical director. It
+has been redrafted since as decisions landed (TEC-11, TEC-15), by the technical director with Joel
+approving each in its pull request, which is how every charter changes.
 
 **Read `CLAUDE.md` first.** Its universal rules bind this tool and this file never overrides them;
 it only adds.
@@ -21,33 +20,35 @@ purpose** as the design record — 1,624 lines argued out with Joel, most of it 
 else. Read the *Why* section of #151's body and its closing comment before changing anything here;
 re-deriving those decisions from scratch will produce worse answers slowly.
 
-**Settled today (2026-09-20), at standup, in this session:**
+**Settled at standup on 2026-09-20:**
 
 - **Name: Cookbook.** "Recipe" stays Coffee's word — a brew, not a dish — which is why the newcomer
   was renamed rather than the incumbent.
 - **Its own app, its own Postgres schema** (`cookbook`).
 - **Surface: site.** A cookbook is a collection; the index is the product — you arrive to see what
-  you could cook, which answers `SURFACE.md` question 2 plainly. Thin index grouped by verb, one
-  long page, not thumb-first, no home-screen install.
+  you could cook, which answers `SURFACE.md` question 2 plainly. Not thumb-first, no home-screen
+  install. **Its tabs — Recipes · King Soopers list — are that index**, one verb each, each tab one
+  long page: the technical director's ruling on 2026-09-24, after Joel asked for tabs on 2026-09-22.
 - **The grocery list moves here.** You shop from recipes, not from what you ate, so a list built
-  from Cookbook's own ingredients belongs beside the book rather than beside the log. **This is a
-  decision about where it ends up, not a migration plan** — see *The grocery list* below for what
-  that actually requires and who plans it.
+  from Cookbook's own ingredients belongs beside the book rather than beside the log. How it moves
+  is below.
 - **Health reads Cookbook to price a meal. Health does not own recipes.** The read is a cross-app
-  contract, and per `CLAUDE.md` it is the technical director's to design — not this charter's to
-  invent by writing an API shape here.
+  contract, and it is the technical director's to design — it is below, decided on 2026-09-23.
 
 ---
 
 ## What this tool is
 
-A recipe book, reached by three ways in — **one approval covers all three**:
+A recipe book, reached by four ways in:
 
 1. **Type it.** You write the recipe; the model only prices it.
 2. **Ask Claude.** You describe what you feel like; it writes one, then prices what it wrote.
 3. **From a link.** It reads the page, then prices what it read — never what the page published.
+4. **From a file.** A photo or a PDF of a recipe, read then priced, and never stored.
 
-All three land as a **draft**. The draft is not the book. Keeping it is the write.
+**Anything a model wrote lands as a draft, and keeping it is the write** — generated, or read off a
+page or a file. A recipe you typed saves straight away: the only thing a draft would add is the
+macros, an approval of your own words back.
 
 From the book: **log a serving** (by tapping a recipe or dictating "two servings of my chilli" —
 the parse and the price are Cookbook's; the log entry belongs to whichever app records what was
@@ -56,9 +57,8 @@ eaten, per the cross-app contract below), **add its ingredients to the grocery l
 
 ## What it stores
 
-Its own schema, `cookbook`, empty until this charter is approved and scaffolded — the tables are
-this agent's to design in full, the same way Health's were, not pre-empted here. Two are already
-implied by the settled decisions above and should not need reinventing:
+Its own schema, `cookbook`. The tables are this agent's to design, and the reasoning for each lives
+in its migration's header. Two things were implied by the settled decisions and hold:
 
 - **Recipes.** Store the whole pot; derive the serving — dividing is the lossless direction, and
   keeps "I got eight bowls, not six" a cheap edit. **Macros are static**, per Joel on 2026-09-18
@@ -74,7 +74,7 @@ implied by the settled decisions above and should not need reinventing:
 
 **Never another app's schema.** `lib/supabase.ts` pins `cookbook`; there is no default to override
 per query. This tool never reads or writes `health.*` directly — what it exposes to Health is
-through the contract the TD designs, not a cross-schema query.
+through the contract below, not a cross-schema query.
 
 ## Guardrails carried from the health-recipes design
 
@@ -92,26 +92,21 @@ get relitigated here.
 - **Refuse a name collision.** A recipe named the same as something that already means something
   else in this tool's own data must not silently take that name over.
 - **No merging without a look.** Pushing a recipe's ingredients onto the grocery list is additive;
-  tidying the list (if this tool keeps that feature) stays a deliberate tap, never something that
-  happens to the list as a side effect of adding to it.
+  tidying the list stays a deliberate tap, never something that happens to the list as a side
+  effect of adding to it.
 
-## The grocery list — what "moves here" actually requires
+## The grocery list — the move, in progress
 
-**Not built in this draft.** Health's `/list` is live, reachable, and (per Health's own handoff)
-the only screen besides the log itself. Moving its ownership to Cookbook is a schema and data
-question, not just a feature to add:
+**Cookbook's list is built, and Health's `/list` is still live.** Moving ownership is a schema and
+data question, not just a feature, and it is sequenced as TEC-15, Joel approving, 2026-09-23. Both
+tables held zero rows then, so nothing is copied.
 
-- Per `CLAUDE.md`, a destructive change splits into two pull requests — stop using it, ship; drop it
-  once that is live. Retiring Health's `grocery_items` table the moment Cookbook's exists would be
-  the wrong order if anything is ever logged into it first.
-- It touches Health's charter and code, which is not this agent's to edit.
-- **This is the technical director's to sequence**, alongside the read contract below — both are
-  cross-app, and both belong in the same conversation rather than two uncoordinated ones.
-
-**Sequenced 2026-09-23, Joel approving — TEC-15.** Both tables held zero rows, so nothing is copied.
-Your part comes first: **the list needs a URL of its own** — today it is tab state with no address —
-so Health's `/list` can redirect straight onto it. Then Health redirects and stops touching
-`health.grocery_items`; then that table is dropped. From then on the list is only yours.
+1. **Your part comes first — TEC-22:** the list needs a URL of its own (today it is tab state with
+   no address), so Health's `/list` can redirect straight onto it.
+2. **Health's part — TEC-23:** `/list` redirects there and Health stops touching
+   `health.grocery_items`.
+3. **The technical director's — TEC-15:** the table is dropped once that is live. A destructive
+   change splits into two pull requests (`CLAUDE.md`), and this is the second.
 
 Until Health's redirect is live, do not assume `/list` has gone, and never write to
 `health.grocery_items`.
@@ -120,7 +115,8 @@ Until Health's redirect is live, do not assume `/list` has gone, and never write
 
 Health prices a meal — works out its calories and macros — by reading Cookbook. **Health calls a
 Cookbook API from its server; it never reads `cookbook` tables** (option A, Joel, 2026-09-23,
-TEC-11). Health's charter points here rather than copying it. **Changing it is the TD's call.**
+TEC-11). Health's charter points here rather than copying it. **Changing it is the TD's call;
+building your side of it — `GET /api/servings`, TEC-24 — is yours.**
 
 - **One route: `GET /api/servings`.** Every recipe in the book, per serving:
   `{ recipes: [{ id, name, servings, per_serving: { kcal, protein_g, carbs_g, fat_g } }] }`.
@@ -137,28 +133,5 @@ TEC-11). Health's charter points here rather than copying it. **Changing it is t
   that is deliberate: this read happens when you log a meal, not on a timer.
 - **Down is never "not found".** A timeout, a 401 or a 5xx surfaces in Health as "couldn't reach the
   Cookbook", never as "no such recipe" — Health's second guardrail, unchanged.
-- **Health snapshots the numbers at log time** (TEC-21 when approved), so this is read once per
-  entry and a later edit to a recipe never rewrites a past day.
-
----
-
-## Open questions, and whose they are
-
-- **The recipe table design in full** — this agent's, once scaffolded, the same way Health's
-  `health.*` tables were left to Health rather than pre-empted at standup.
-
-## What the standup left, and what it did not
-
-**In the repo, all done:** the folder at `apps/cookbook`, the `cookbook` schema and its grants, a
-kickoff block, both rows in `CLAUDE.md`, `.env.example`, `/api/health`, and the shared files stamped
-from `packages/shared`. `app/page.tsx` is a placeholder that says it is one — **the screen is this
-agent's to design, and the tables before it.**
-
-**Outside the repo, Joel's and without an undo:** the Vercel project `tp-cookbook` with its Root
-Directory, its environment variables (`SESSION_SECRET` **byte-identical** to the others), the
-`cookbook.techpaddock.io` DNS record, **the exposed-schemas list in the Supabase dashboard**, and a
-redeploy afterwards because Vercel bakes the environment in at build time. Until those run this app
-is scaffolded but not reachable, and `/api/health` is what says which step is missing.
-
-**Still not this agent's, and still the technical director's:** the Health↔Cookbook read contract
-and the grocery-list move, TEC-11 and TEC-15.
+- **Health snapshots the numbers at log time** (TEC-21, approved 2026-09-24), so this is read once
+  per entry and a later edit to a recipe never rewrites a past day.
