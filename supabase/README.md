@@ -95,7 +95,7 @@ history holds a version the local directory lacks — *"Remote migration version
 migrations directory"* — and writes nothing. `20260908235234` is remote-only permanently and on
 purpose, so the one condition `db push` needs is the one this project chose never to satisfy.
 
-**So the technical director applies migrations through the hosted API** (the Supabase MCP's
+**So Deployment applies migrations through the hosted API** (the Supabase MCP's
 `apply_migration` is the same path) **at gate time, before merging.** Not by hand in the SQL
 editor, not by an app agent, and not by Joel. `CLAUDE.md` makes it a rule, alongside the shape rule
 that makes applying before merging safe.

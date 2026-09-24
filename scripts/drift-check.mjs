@@ -561,10 +561,16 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
 
      The TD's list is more than `apps/editor` because that app is FROZEN: dated
      against it alone, the TD's handoff read `ok` forever while two merges went
-     by. `scripts` and `.github` are the CI and drift machinery this seat owns
-     and nobody else edits. `supabase/` is deliberately left out — app agents
-     author their own migrations. */
-  const NAMED = { "techpad-gen": ["apps/home", "apps/tracker"], "td": ["apps/editor", "scripts", ".github"] };
+     by. `scripts` is the drift and stamping machinery this seat owns and
+     nobody else edits. `.github` — CI and the pull-request checks — went to
+     Deployment with the gate on 2026-09-24, and Deployment owns no app, so
+     without it here its handoff could never be dated. `supabase/` is
+     deliberately left out — app agents author their own migrations. */
+  const NAMED = {
+    "techpad-gen": ["apps/home", "apps/tracker"],
+    "td": ["apps/editor", "scripts"],
+    "deployment": [".github"],
+  };
   const agents = existsSync(R(".claude/agents"))
     ? readdirSync(R(".claude/agents")).filter((d) => statSync(R(".claude/agents", d)).isDirectory()).sort()
     : [];

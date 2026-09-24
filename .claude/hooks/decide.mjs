@@ -569,8 +569,11 @@ export function stripSql(sql) {
 
 const HELD =
   "It waits for Joel's click. Joel settled this on 2026-09-23 after an instruction to prepare was read as permission to act.";
+/* Opening a pull request is not held, and not checked: Deployment opens every
+   one, and it is only started after Joel says go (Joel, 2026-09-24: "they will
+   be spun up with intention, so there's no need for a check"). requested-by-joel
+   in CI still reads the body for the record of who asked. */
 const PR_ASK = {
-  create_pull_request: "Opening a pull request",
   update_pull_request: "Changing a pull request",
   update_pull_request_branch: "Updating a pull request's branch",
   merge_pull_request: "Merging a pull request",
@@ -587,12 +590,6 @@ function github(name, a) {
       return deny(`\`${name}\` would commit straight to ${branch ? "main" : "the default branch, which is main"}. Never push to main. ${PUSH_OWN_BRANCH}`);
     }
     return ask(`\`${name}\` commits to \`${branch}\` through the GitHub API, past the local push guard. ${HELD} A \`git push\` of your branch needs no click.`);
-  }
-  if (name === "create_pull_request") {
-    if (a.draft === true) return deny("Open the pull request normally, not as a draft (CLAUDE.md).");
-    if (!REQUESTED.test(String(a.body ?? ""))) {
-      return deny('The body has no request line. A pull request is opened only when Joel asks, and the body records it: `Requested by Joel on YYYY-MM-DD — "what he said"` (CLAUDE.md). If he has not asked, push the branch and stop.');
-    }
   }
   if (name === "update_pull_request" && typeof a.body === "string" && !REQUESTED.test(a.body)) {
     return deny('The new body drops the `Requested by Joel on YYYY-MM-DD — "what he said"` line. It is the only record of who asked for the pull request; keep it.');

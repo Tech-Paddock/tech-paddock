@@ -52,11 +52,12 @@ here: it calls the editor, the hub reads it, the Resume Formatter writes to it, 
 other tools' tables. None of those went away with the agent, and all of them break quietly rather
 than loudly.
 
-**Deliveries — Vercel, DNS and CI — are the technical director's.** They came here from Platform
-Config on 2026-09-19 and moved on 2026-09-22 to the seat that already held the merge, so one seat
-owns both sides of the gap between merging and deploying. **`lib/pitwall.ts` still reads Vercel**,
-so the deployment-state traps in `td/RULES.md` bind what the Pit Wall renders — read them there
-rather than keeping a copy here.
+**Deliveries — Vercel, DNS and CI — are Deployment's.** They came here from Platform Config on
+2026-09-19, moved to the technical director with the merge on 2026-09-22, and moved again with the
+merge to Deployment on 2026-09-24, so one seat still owns both sides of the gap between merging and
+deploying. **`lib/pitwall.ts` still reads Vercel**, so the deployment-state traps in
+`deployment/RULES.md` bind what the Pit Wall renders — read them there rather than keeping a copy
+here.
 
 Plus repo-wide odd jobs: shared UI conventions, cross-app consistency, anything that is nobody
 else's and is not infrastructure.
