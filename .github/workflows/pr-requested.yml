@@ -29,24 +29,54 @@ jobs:
           script: |
             const body = context.payload.pull_request.body || '';
 
-            // One line, anywhere in the body:
-            //   Requested by Joel on 2026-09-12 — "what he said"
-            const NOTE = /^\s*Requested by Joel on \d{4}-\d{2}-\d{2}\s*[—–-]\s*".+"/m;
+            // Only what a reader of the pull request can see counts. An HTML
+            // comment is invisible once rendered (an unclosed one hides the
+            // rest of the body), and a line inside a code fence is an example
+            // of the record, not the record — both used to pass.
+            const visible = [];
+            let fence = null;
+            for (const line of body.replace(/<!--[\s\S]*?(?:-->|$)/g, '').split(/\r?\n/)) {
+              const f = line.match(/^ {0,3}(`{3,}|~{3,})/);
+              if (fence) {
+                if (f && f[1][0] === fence[0] && f[1].length >= fence.length && !/\S/.test(line.slice(line.indexOf(f[1]) + f[1].length))) fence = null;
+                continue;
+              }
+              if (f) { fence = f[1]; continue; }
+              visible.push(line);
+            }
 
-            if (NOTE.test(body)) {
-              core.info('Request recorded in the pull request body.');
+            // One line, anywhere in what is visible:
+            //   Requested by Joel on 2026-09-12 — "what he said"
+            // It may be a bullet or bold, and the quotes may be curly. The date
+            // has to exist and not be in the future; the quote has to be filled.
+            const NOTE = /^\s*(?:[-*+]\s+)?(?:\*\*|__)?Requested by Joel on (\d{4})-(\d{2})-(\d{2})(?:\*\*|__)?\s*[—–-]\s*["“”]([^"“”]*)["“”]/;
+            const problems = [];
+            for (const line of visible) {
+              const m = line.match(NOTE);
+              if (!m) continue;
+              const [, y, mo, d, quote] = m;
+              const date = new Date(Date.UTC(+y, +mo - 1, +d));
+              const real = date.getUTCFullYear() === +y && date.getUTCMonth() === +mo - 1 && date.getUTCDate() === +d;
+              if (!real) { problems.push(`${y}-${mo}-${d} is not a calendar date.`); continue; }
+              // A day of slack for time zones; a request cannot postdate its record by more.
+              if (date.getTime() > Date.now() + 86400000) { problems.push(`${y}-${mo}-${d} is in the future.`); continue; }
+              if (!quote.trim() || /^what he said$/i.test(quote.trim())) { problems.push('The quote is empty or still the template placeholder.'); continue; }
+              core.info(`Request recorded in the pull request body: ${y}-${mo}-${d}.`);
               return;
             }
 
             core.setFailed(
               [
-                'This pull request does not record who asked for it.',
+                problems.length
+                  ? 'This pull request has a "Requested by Joel" line, but it does not hold up:\n  ' + problems.join('\n  ')
+                  : 'This pull request does not record who asked for it.',
                 '',
                 'Agents here commit and push; a pull request is opened only when Joel asks',
                 'for one. No other agent can see that conversation, so the request is',
                 'recorded here or it did not happen as far as the repo is concerned.',
                 '',
-                'Add one line to the pull request body, and this check passes:',
+                'Add one line to the pull request body — visible, not inside an HTML comment',
+                'or a code block — and this check passes:',
                 '',
                 '  Requested by Joel on YYYY-MM-DD — "what he said"',
                 '',

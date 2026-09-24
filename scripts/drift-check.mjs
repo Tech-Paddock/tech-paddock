@@ -28,8 +28,9 @@
  */
 
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expected as stampExpected, MANIFEST, SHARED_DIR } from "./stamp-shared.mjs";
@@ -53,6 +54,44 @@ const git = (...args) => {
   try { return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8" }).trim(); }
   catch { return null; }
 };
+
+/* Tracked files matching a pathspec, repo-relative. Without git (a build that
+   ships no .git) it walks the tree instead and says so, so a caller can report
+   what it actually scanned rather than claiming the tracked set. */
+const SKIP_DIRS = new Set(["node_modules", ".git", ".next"]);
+function trackedFiles(test, pathspecs) {
+  const out = git("ls-files", "-z", "--", ...pathspecs);
+  if (out !== null) return { files: out.split("\0").filter((f) => f && test(f)), how: "tracked" };
+  const files = [];
+  const walk = (d) => {
+    for (const e of readdirSync(R(d))) {
+      if (SKIP_DIRS.has(e)) continue;
+      const rel = d ? `${d}/${e}` : e;
+      if (statSync(R(rel)).isDirectory()) walk(rel); else if (test(rel)) files.push(rel);
+    }
+  };
+  walk("");
+  return { files, how: "walked (git unavailable)" };
+}
+
+/* One job's block from a workflow file, by indentation rather than a YAML
+   parser (there is no root package.json to install one into). The block runs
+   from `<indent><name>:` to the next line at the job's indentation or less,
+   comments included. null when the job is not there. */
+function yamlJob(yml, name) {
+  const ls = yml.split("\n");
+  const start = ls.findIndex((l) => /^jobs:\s*(#.*)?$/.test(l));
+  if (start < 0) return null;
+  const first = ls.slice(start + 1).find((l) => /^\s+[^\s#]/.test(l));
+  if (!first) return null;
+  const indent = first.match(/^\s*/)[0];
+  const head = new RegExp(`^${indent}${name}:\\s*(#.*)?$`);
+  const at = ls.findIndex((l, i) => i > start && head.test(l));
+  if (at < 0) return null;
+  let end = at + 1;
+  while (end < ls.length && !(/\S/.test(ls[end]) && ls[end].match(/^\s*/)[0].length <= indent.length)) end++;
+  return ls.slice(at, end).join("\n");
+}
 
 /* 1 ── Files the rules call byte-identical across every app.
    A mismatch in the auth pair does not throw; it silently rejects valid
@@ -160,32 +199,104 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
     add(name, "ok", `${base[0].length} on the base copy, editor and tracker scoped — ${shape.join(" | ")}`);
 }
 
+/* 2b ── The password gate EXISTS in every app, which check 2 cannot see.
+   Check 2 compares the middleware.ts files that are there; an app with none is
+   simply not in the comparison, so deleting one, or scaffolding a tool without
+   one, made the base group smaller and still read `ok`. An app with no
+   middleware serves every route in public, its service-role API routes
+   included — the "Vercel project serving an unprotected page" incident in
+   CLAUDE.md. Next.js also has other places it looks: a middleware.js, or
+   src/middleware.* once the app lives under src/. Any of those would replace or
+   bypass the reviewed file, so each one fails here rather than passing quietly. */
+{
+  const name = "password gate: every app has middleware.ts";
+  const apps = APPS.filter((a) => existsSync(R("apps", a, "package.json")));
+  const bad = [];
+  for (const a of apps) {
+    const has = (rel) => existsSync(R("apps", a, rel));
+    if (!has("middleware.ts")) bad.push(`${a}: no middleware.ts — every route it serves is public`);
+    for (const alt of ["middleware.js", "middleware.mjs", "middleware.cjs", "middleware.jsx", "middleware.tsx"])
+      if (has(alt)) bad.push(`${a}: ${alt} — Next.js would run it instead of, or beside, the reviewed middleware.ts`);
+    if (has("src")) {
+      const srcAlt = readdirSync(R("apps", a, "src")).filter((f) => /^middleware\./.test(f));
+      for (const f of srcAlt) bad.push(`${a}: src/${f} — a second password gate nobody reviewed`);
+      for (const d of ["app", "pages"])
+        if (has(`src/${d}`)) bad.push(`${a}: src/${d}/ — with the app under src/, Next.js ignores the root middleware.ts`);
+    }
+  }
+  if (apps.length === 0) add(name, "warn", "no app folder with a package.json — cannot measure");
+  else add(name, bad.length ? "fail" : "ok",
+    bad.length ? bad.join("; ") : `${apps.length} apps, each behind apps/<app>/middleware.ts and nothing else`);
+}
+
 /* 3 ── CI builds whatever is on disk, and one fixed name gates it.
    A hardcoded matrix does not fail when an app is missing from it — the app is
    simply never built. A per-app required-check list has the same shape of
    problem from the other side: deprecating an app leaves a required check that
    can never report. Both are fixed by deriving the roster and putting one
-   stable job in front, so this checks that neither has been undone. */
+   stable job in front, so this checks that neither has been undone.
+
+   It reads the parts that carry the weight, not just the names. The first
+   version passed with `if: always()` deleted, with the gate no longer waiting
+   on the builds, and with `fromJson('["home"]')` as the matrix — each of which
+   leaves `gate:` and `fromJson(` in the file while undoing what they are for. */
 {
   const ci = read(R(".github/workflows/ci.yml"));
-  if (!ci) add("CI derives its roster from apps/", "warn", "ci.yml not readable");
-  else {
+  if (!ci) {
+    add("CI derives its roster from apps/", "warn", "ci.yml not readable");
+    add("one stable gate in front of CI", "warn", "ci.yml not readable");
+  } else {
     const literal = ci.match(/app:\s*\[([^\]]+)\]/);
+    const matrix = yamlJob(ci, "build")?.match(/^\s+app:[ \t]*(.*)$/m)?.[1]?.replace(/\s+#.*$/, "").replace(/\s+/g, "");
     if (literal) {
-      const matrix = literal[1].split(",").map((s) => s.trim()).filter(Boolean);
-      const missing = APPS.filter((a) => !matrix.includes(a));
+      const listed = literal[1].split(",").map((s) => s.trim()).filter(Boolean);
+      const missing = APPS.filter((a) => !listed.includes(a));
       add("CI derives its roster from apps/", missing.length === 0 ? "warn" : "fail",
         missing.length === 0
           ? "matrix is hardcoded again — it matches today, but a new app will be skipped in silence"
           : `matrix is hardcoded AND already wrong — untested: ${missing.join(", ")}`);
-    } else if (/app:\s*\$\{\{\s*fromJson\(/.test(ci)) {
+    } else if (matrix === "${{fromJson(needs.roster.outputs.apps)}}") {
       add("CI derives its roster from apps/", "ok", `derived — ${APPS.length} app folders will build`);
+    } else if (matrix) {
+      add("CI derives its roster from apps/", "fail",
+        `the build matrix is \`${matrix}\`, not \`\${{ fromJson(needs.roster.outputs.apps) }}\` — whatever it lists is all that builds`);
     } else {
-      add("CI derives its roster from apps/", "fail", "no matrix found in ci.yml at all");
+      add("CI derives its roster from apps/", "fail", "no build job with an `app:` matrix found in ci.yml");
     }
-    add("one stable gate in front of CI", /^\s{2}gate:/m.test(ci) ? "ok" : "fail",
-      /^\s{2}gate:/m.test(ci) ? "gate job present — branch protection needs only that name"
-        : "the gate job is gone; required checks are per-app again and break on every roster change");
+
+    const gate = yamlJob(ci, "gate");
+    if (gate === null) {
+      add("one stable gate in front of CI", "fail",
+        "the gate job is gone; required checks are per-app again and break on every roster change");
+    } else {
+      const inner = gate.split("\n").slice(1).find((l) => /^\s+\S/.test(l) && !/^\s*#/.test(l))?.match(/^\s*/)[0] ?? "    ";
+      const key = (k) => {
+        const m = gate.match(new RegExp(`^${inner}${k}:[ \\t]*(.*)$`, "m"));
+        if (m) m[1] = m[1].replace(/\s+#.*$/, ""); // a trailing YAML comment is not part of the value
+        return m;
+      };
+      const needsLine = key("needs");
+      let needs = [];
+      if (needsLine) {
+        const v = needsLine[1].trim();
+        if (v.startsWith("[")) needs = v.replace(/[[\]\s]/g, "").split(",").filter(Boolean);
+        else if (v) needs = [v];
+        else {
+          for (const l of gate.slice(needsLine.index).split("\n").slice(1)) {
+            const item = l.match(new RegExp(`^${inner}\\s+-\\s*([\\w-]+)\\s*$`));
+            if (!item) break;
+            needs.push(item[1]);
+          }
+        }
+      }
+      const ifv = key("if")?.[1].replace(/\s+/g, "").replace(/^\$\{\{(.*)\}\}$/, "$1");
+      const missingNeeds = ["roster", "build", "drift"].filter((n) => !needs.includes(n));
+      const bad = [];
+      if (missingNeeds.length) bad.push(`gate no longer waits on ${missingNeeds.join(", ")} — it can go green while they are red`);
+      if (ifv !== "always()") bad.push(`gate's job-level \`if\` is ${ifv ? `\`${ifv}\`` : "missing"}, not \`always()\` — when a dependency fails the gate is SKIPPED instead of failing`);
+      add("one stable gate in front of CI", bad.length ? "fail" : "ok",
+        bad.length ? bad.join("; ") : "gate waits on roster, build and drift, and runs always() — branch protection needs only that name");
+    }
   }
 }
 
@@ -263,6 +374,102 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
           })());
 }
 
+/* ── Each ignoreCommand, RUN rather than read ─────────────────────────────
+   The check above reads the folder names in a command. It cannot see the two
+   one-line edits that stop an app deploying just as surely: dropping the
+   `cd "$(git rev-parse --show-toplevel)"` (Vercel runs the step from the Root
+   Directory, so `apps/coffee` then resolves to apps/coffee/apps/coffee and
+   never differs), or swapping the exits after `||`. Both passed drift and CI;
+   CI's own scope step runs from the repo root and cannot notice either.
+
+   So each command is executed the way Vercel executes it: `sh -c`, from
+   apps/<app>, VERCEL_ENV set, FORCE_BUILD unset — in a throwaway git repo that
+   mirrors the paths the commands watch. Exit 1 builds and exit 0 skips, so a
+   production merge touching the app must exit 1, one touching only another app
+   must exit 0 (a command with no `git diff`, the hub's, must build every
+   production merge instead), one touching packages/ must build every app,
+   and every command must skip a preview. No git or sh to run it with is a
+   warn with the reason, never an ok. */
+{
+  const name = "each ignoreCommand, run: builds its app, skips others";
+  const cmds = [];
+  for (const app of APPS) {
+    let cfg = null;
+    try { cfg = JSON.parse(read(R("apps", app, "vercel.json")) ?? "null"); } catch { /* reported above */ }
+    if (typeof cfg?.ignoreCommand === "string") cmds.push([app, cfg.ignoreCommand]);
+  }
+  const env = Object.fromEntries(Object.entries(process.env)
+    .filter(([k]) => k !== "FORCE_BUILD" && k !== "VERCEL_ENV" && !k.startsWith("GIT_")));
+  Object.assign(env, { GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" });
+  const probe = (bin, args) => { const r = spawnSync(bin, args, { env, encoding: "utf8" }); return !r.error && r.status === 0; };
+
+  if (cmds.length === 0) add(name, "warn", "no app has an ignoreCommand to run");
+  else if (!probe("git", ["--version"])) add(name, "warn", "git is not available here, so no command could be run — not measured");
+  else if (!probe("sh", ["-c", "exit 0"])) add(name, "warn", "sh is not available here, so no command could be run — not measured");
+  else {
+    let tmp = null;
+    const bad = [];
+    try {
+      tmp = mkdtempSync(join(tmpdir(), "drift-ignore-"));
+      const g = (...args) => {
+        const r = spawnSync("git", ["-c", "user.name=drift", "-c", "user.email=drift@localhost",
+          "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main", ...args], { cwd: tmp, env, encoding: "utf8" });
+        if (r.status !== 0) throw new Error(`git ${args[0]}: ${(r.stderr || r.error?.message || "").trim()}`);
+      };
+      const probeFile = (dir) => join(tmp, dir, ".drift-probe");
+      let n = 0;
+      const commit = (dir) => { writeFileSync(probeFile(dir), `${++n}\n`); g("add", "-A"); g("commit", "-q", "-m", `touch ${dir}`); };
+      g("init", "-q");
+      for (const dir of [...APPS.map((a) => `apps/${a}`), "packages"]) {
+        mkdirSync(join(tmp, dir), { recursive: true });
+        writeFileSync(probeFile(dir), "0\n");
+      }
+      g("add", "-A"); g("commit", "-q", "-m", "base");
+
+      const run = (app, cmd, vercelEnv) => {
+        const r = spawnSync("sh", ["-c", cmd], { cwd: join(tmp, "apps", app), encoding: "utf8", timeout: 10000,
+          env: { ...env, VERCEL_ENV: vercelEnv } });
+        return r.error ? `error (${r.error.code ?? r.error.message})` : r.status;
+      };
+      const expect = (app, cmd, vercelEnv, want, when, consequence) => {
+        const got = run(app, cmd, vercelEnv);
+        if (got !== want) bad.push(`${app}: ${when} it exits ${got}, not ${want} (${want === 1 ? "build" : "skip"}) — ${consequence}`);
+      };
+      const scoped = (cmd) => /\bgit\s+diff\b/.test(cmd);
+
+      const NEVER_LIVE = "Vercel would skip it too, so the change would silently never go live";
+      cmds.forEach(([app, cmd], i) => {
+        commit(`apps/${app}`);
+        expect(app, cmd, "production", 1, `on a production merge touching apps/${app}`, NEVER_LIVE);
+        const [other, otherCmd] = cmds[(i + 1) % cmds.length];
+        if (other !== app) {
+          if (scoped(otherCmd)) expect(other, otherCmd, "production", 0, `on a production merge touching only apps/${app}`,
+            "it rebuilds on merges that are not its own, and the last build to finish is the one Vercel serves");
+          else expect(other, otherCmd, "production", 1, `on a production merge touching only apps/${app}`,
+            "a command with no git diff has to build every production merge, and this one misses some");
+        }
+      });
+      commit("packages");
+      for (const [app, cmd] of cmds) expect(app, cmd, "production", 1, "on a production merge touching packages/",
+        "packages/shared is stamped into every app, so a change there has to rebuild it");
+      for (const [app, cmd] of cmds) expect(app, cmd, "preview", 0, "on a preview", "previews are ruled out, and this would build them");
+    } catch (e) {
+      add(name, "warn", `could not build the throwaway repo to run the commands in — not measured: ${e.message}`);
+      tmp && rmSync(tmp, { recursive: true, force: true });
+      tmp = false;
+    }
+    if (tmp !== false) {
+      tmp && rmSync(tmp, { recursive: true, force: true });
+      const always = cmds.filter(([, c]) => !/\bgit\s+diff\b/.test(c)).map(([a]) => a);
+      add(name, bad.length ? "fail" : "ok",
+        bad.length ? bad.join("; ")
+          : `${cmds.length} commands run as Vercel runs them: each builds its own folder and packages/, skips a preview` +
+            (cmds.length - always.length ? `, and ${cmds.length - always.length} skip another app's merge` : "") +
+            (always.length ? `; ${always.join(", ")} builds every production merge` : ""));
+    }
+  }
+}
+
 /* ── A build that reads a path it does not watch stops rebuilding ─────────
    The #145 class. An app whose build reads a file outside its own folder, but
    whose ignoreCommand does not diff that file, skips every merge that changes
@@ -328,7 +535,9 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
   for (const [rel, ceiling] of budgets) {
     const n = lines(R(rel));
     if (n === null) { add(`budget: ${rel}`, "warn", "missing"); continue; }
-    add(`budget: ${rel}`, n > ceiling ? "fail" : n > ceiling - 10 ? "warn" : "ok", `${n} / ${ceiling}`);
+    // CLAUDE.md: "warns ten lines out and fails past the ceiling" — so a file
+    // exactly ten lines under its ceiling already warns.
+    add(`budget: ${rel}`, n > ceiling ? "fail" : n >= ceiling - 10 ? "warn" : "ok", `${n} / ${ceiling}`);
   }
 }
 
@@ -371,9 +580,9 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
 
     const paths = NAMED[agent] ?? (APPS.includes(agent) ? [`apps/${agent}`] : []);
     if (!paths.length) {
-      // An agent owning no folder has nothing to date it against. Say so rather
-      // than reporting ok for something unmeasured.
-      add(`fresh: ${agent}`, "ok", `${stated}; owns no app folder, so freshness is not measurable here`);
+      // An agent owning no folder has nothing to date it against. That is a
+      // warn, never an ok: ok means measured, and this was not.
+      add(`fresh: ${agent}`, "warn", `${stated}; owns no folder this check can date it against — not measured`);
       continue;
     }
 
@@ -442,6 +651,24 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
   add("migration versions named in prose exist", bad.length === 0 ? "ok" : "warn",
     bad.length === 0 ? `${real.length} migrations, every reference resolves`
       : `names no file in supabase/migrations: ${bad.join("; ")}`);
+
+  /* The same question of the apps' own code. A comment or error message citing
+     a migration by version is an instruction to the next reader, and a version
+     with no file behind it sends them looking for something that is not there.
+     A warn naming the line: the app's own agent fixes the code, not this check.
+     Generated files are skipped — drift.generated.ts carries this check's own
+     output and would cite every version it reports. */
+  const { files, how } = trackedFiles((f) => f.startsWith("apps/") && /\.tsx?$/.test(f) && !f.endsWith(".generated.ts"), ["apps"]);
+  const cited = [];
+  for (const f of files) {
+    read(R(f))?.split("\n").forEach((line, i) => {
+      for (const v of new Set(line.match(/\b202\d{11}\b/g) ?? []))
+        if (v !== WITHHELD && !real.includes(v)) cited.push(`${f}:${i + 1} → ${v}`);
+    });
+  }
+  add("migration versions cited in app code exist", cited.length === 0 ? "ok" : "warn",
+    cited.length === 0 ? `${files.length} ${how} .ts/.tsx files under apps/, every cited version resolves`
+      : `names no file in supabase/migrations: ${cited.join("; ")}`);
 }
 
 /* 7 ── Structures that were retired, staying retired. */
@@ -452,17 +679,33 @@ add("ledger stays retired", existsSync(R(".claude/OPEN-ITEMS.md")) ? "fail" : "o
 
 /* 8 ── Prose that should be computed. Not a failure — a count in a document is
    not wrong the day it is written. It is wrong later, which is why it is a
-   warning naming where to look rather than an error. */
+   warning naming where to look rather than an error.
+
+   It reads every tracked .md except DECISIONS.md, which is history and says
+   what was true when it was written. It used to read a hand-picked list, and
+   the stale facts sat in the files it did not read: packages/shared/README.md
+   said "all six apps" with seven on disk. Tables are no longer exempt from the
+   test-count rule — a test count in a table cell goes stale exactly as fast. */
 {
-  const docs = [R("CLAUDE.md"), R("README.md"), R("supabase/README.md"), R(".claude/SURFACE.md"),
-    ...readdirSync(R(".claude/agents")).flatMap((d) => ["RULES.md", "HANDOFF.md"]
-      .map((f) => R(".claude/agents", d, f))).filter(existsSync)];
+  const words = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+  const num = (w) => words[w.toLowerCase()] ?? Number(w);
+  const { files: docs, how } = trackedFiles((f) => f.endsWith(".md") && f !== ".claude/DECISIONS.md", ["*.md"]);
   const hits = [];
-  for (const d of docs) {
-    const rel = d.replace(repoRoot + "/", "");
-    read(d).split("\n").forEach((line, i) => {
-      if (/^\s*[|>]/.test(line)) return; // tables and quotes carry examples
-      if (/\b\d+\s+tests?\b/i.test(line)) hits.push(`${rel}:${i + 1} names a test count`);
+  for (const rel of docs) {
+    read(R(rel))?.split("\n").forEach((line, i) => {
+      if (/^\s*>/.test(line)) return; // quotes carry examples
+      if (/\b\d+\s+tests?\b/i.test(line)) { hits.push(`${rel}:${i + 1} names a test count`); return; }
+      if (/^\s*\|/.test(line)) return; // tables carry examples for the rules below
+      /* "the other four" — the rest of the roster, measured. CLAUDE.md said
+         "rejects valid sessions on the other four" with seven apps on disk,
+         and no pattern here could see it: no noun after the number. Counted
+         when nothing noun-like follows or the noun is a roster noun; "the other
+         two agents" is about something else and is left alone. */
+      const other = line.match(/\bthe other (two|three|four|five|six|seven|eight|nine|ten|\d+)\b(?:\s+(apps|tools|projects|Vercel projects|subdomains)\b|(?=\s*(?:[.,;:)!?—–-]|$)))/i);
+      if (other && num(other[1]) >= 3 && num(other[1]) !== APPS.length - 1) {
+        hits.push(`${rel}:${i + 1} says "the other ${other[1]}"; apps/ holds ${APPS.length}, so the rest is ${APPS.length - 1}`);
+        return;
+      }
       else if (/\b[0-9a-f]{7,40}\b/.test(line) && /commit|sha|serves|deployed/i.test(line)) hits.push(`${rel}:${i + 1} names a commit`);
       /* A ROSTER count — "all five apps", "the four tools", "in five projects".
          These go stale the day an app is added or deprecated, which now happens
@@ -515,20 +758,25 @@ add("ledger stays retired", existsSync(R(".claude/OPEN-ITEMS.md")) ? "fail" : "o
          sit inches apart on one screen" and "two apps share a livery" are claims
          about a PAIR, not about the whole set, and both are correct sentences
          this check would otherwise have fired on. A roster of two would be a
-         deprecation event that gets read rather than quietly updated. */
-      else if (/\b(all|the|in|across|on)\s+(all\s+)?(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(apps|projects|agents|tools|copies|schemas|subdomains|domains|tables)\b/i.test(line))
+         deprecation event that gets read rather than quietly updated.
+
+         `apps` left the first pattern on 2026-09-24: an app count is MEASURED
+         by the second, so "all seven apps" is quiet while seven is true and
+         "all six apps" warns the day it is not — rather than every correct
+         app count warning forever for having a number in it. */
+      if (/\b[0-9a-f]{7,40}\b/.test(line) && /commit|sha|serves|deployed/i.test(line)) hits.push(`${rel}:${i + 1} names a commit`);
+      else if (/\b(all|the|in|across|on)\s+(all\s+)?(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(projects|agents|tools|copies|schemas|subdomains|domains|tables)\b/i.test(line))
         hits.push(`${rel}:${i + 1} names a roster count`);
       else {
-        const words = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
         const m = line.match(/\b(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(apps|app agents|Vercel projects)\b/i);
-        const n = m ? (words[m[1].toLowerCase()] ?? Number(m[1])) : null;
+        const n = m ? num(m[1]) : null;
         if (n !== null && n >= 3 && n !== APPS.length)
           hits.push(`${rel}:${i + 1} says "${m[1]} ${m[2]}"; apps/ holds ${APPS.length}`);
       }
     });
   }
   add("no computable facts written as prose", hits.length === 0 ? "ok" : "warn",
-    hits.length === 0 ? "no test counts or commit SHAs in prose" : hits.join("; "));
+    hits.length === 0 ? `${docs.length} ${how} .md files: no test counts, commit SHAs or wrong app counts` : hits.join("; "));
 }
 
 /* ── Output ──────────────────────────────────────────────────────────────── */
