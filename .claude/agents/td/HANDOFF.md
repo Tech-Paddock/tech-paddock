@@ -52,7 +52,7 @@ the parking lot and design reasoning live in Linear.
 - **The Vercel connector lists write tools. Do not use them** — Joel, 2026-09-23: "follow charter".
   The guard asks Joel on each; that click is a backstop, so hand Joel the step instead.
 - **A Linear patch matches the stored text**, where a `TEC-n` you wrote is stored as an issue-mention
-  tag. Anchor a patch on the plain words around a mention, never on the mention itself.
+  tag. Copy an anchor from `get_issue`'s output, tags and all; a retyped `TEC-n` never matches.
 - **Spawning an agent's session from here works** (`create_session`, with `outcome_branch`), but
   `CLAUDE.md` says agents never run at the same time and `KICKOFF.md` has them wait for Joel before
   branching. **Do not spawn one until Joel sanctions it.** Subagents inside this session, each in its
