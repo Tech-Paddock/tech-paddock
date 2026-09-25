@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addItems, readList, removeItems, setChecked } from "@/lib/grocery";
-import { LookupError } from "@/lib/errors";
+import { errorResponse } from "@/lib/respond";
 import { readPreferences, resolveLink } from "@/lib/preferences";
 
 export const dynamic = "force-dynamic";
@@ -30,8 +30,7 @@ export async function GET() {
       items: items.map((item) => ({ ...item, ...resolveLink(item, preferences) })),
     });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't read the list." }, { status: 500 });
+    return errorResponse(e, "Couldn't read the list.");
   }
 }
 
@@ -50,8 +49,7 @@ export async function POST(request: NextRequest) {
     const items = await addItems(lines.map((name: string) => ({ name, source: "manual" as const })));
     return NextResponse.json({ items }, { status: 201 });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't add that." }, { status: 500 });
+    return errorResponse(e, "Couldn't add that.");
   }
 }
 
@@ -73,8 +71,7 @@ export async function PATCH(request: NextRequest) {
     await setChecked(id, body.checked);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't tick that off." }, { status: 500 });
+    return errorResponse(e, "Couldn't tick that off.");
   }
 }
 
@@ -88,7 +85,6 @@ export async function DELETE(request: NextRequest) {
     await removeItems(ids);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't remove those." }, { status: 500 });
+    return errorResponse(e, "Couldn't remove those.");
   }
 }

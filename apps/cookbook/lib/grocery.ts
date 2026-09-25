@@ -1,5 +1,5 @@
 import { getServiceClient } from "./supabase";
-import { LookupError } from "./errors";
+import { ConflictError, InputError, LookupError } from "./errors";
 
 /**
  * The shopping list, and the two ways it leaves this app.
@@ -90,7 +90,7 @@ export async function addItems(
     }))
     .filter((l) => l.name.length > 0);
 
-  if (rows.length === 0) throw new LookupError("Nothing to add.");
+  if (rows.length === 0) throw new InputError("Nothing to add.");
 
   const { data, error } = await getServiceClient()
     .from("grocery_items")
@@ -178,7 +178,7 @@ function sourceOf(line: TidyLine, open: GroceryItem[]): GrocerySource {
 /** Apply an approved tidy: the absorbed rows go, the consolidated lines arrive. */
 export async function applyTidy(open: GroceryItem[], lines: TidyLine[]): Promise<GroceryItem[]> {
   const problem = validateTidy(open, lines);
-  if (problem) throw new LookupError(problem);
+  if (problem) throw new ConflictError(problem);
 
   const rows = lines.map((l) => ({ name: l.name, note: l.note, source: sourceOf(l, open) }));
 

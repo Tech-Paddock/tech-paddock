@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { estimateRecipeMacros, generateRecipe, importRecipe, readRecipeFile, type RecipeFields } from "@/lib/anthropic";
 import { validateRecipeFile } from "@/lib/upload";
 import { type RecipeDraft } from "@/lib/recipes";
-import { LookupError } from "@/lib/errors";
+import { statusOf } from "@/lib/errors";
+import { errorResponse } from "@/lib/respond";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
 
 export const dynamic = "force-dynamic";
@@ -146,7 +147,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ draft });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
+    // A model that answered with nothing usable throws a plain Error, and its own
+    // sentence says more than a fallback would. Typed failures map as they do
+    // everywhere else (lib/errors.ts).
+    if (statusOf(e) !== 500) return errorResponse(e, "");
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Couldn't draft that recipe." },
       { status: 500 }

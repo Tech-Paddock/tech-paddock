@@ -38,8 +38,16 @@ proposal that drops or doubles a line. **Clear empties everything and asks first
 **The grocery move (TEC-15).** Cookbook's list is live at `/list`; Health's `/list` is live too and
 **stays Health's until its redirect ships (TEC-23)**. The TD drops `health.grocery_items` after that.
 
-**Logging what you ate is not built here, by design.** Health prices a meal by reading Cookbook over
-the contract in `RULES.md` (TEC-11); Cookbook never writes a log.
+**`GET /api/servings` is live and is a contract** (TEC-11, its one home `RULES.md`): every recipe per
+serving, Cookbook doing the division, unrounded, behind the ordinary session. `toServingRows` in
+`lib/recipes.ts` builds it and `tests/servings.test.ts` holds its exact fields. **Logging what you
+ate is not built here, by design** — Health reads this route and keeps the log.
+
+**Every failure has one status, in `lib/errors.ts`** (TEC-29 item 7): `LookupError` is 503 and
+means only that the database did not answer, `InputError` is 400, `ConflictError` is 409 (a
+duplicate name, a tidy against a list that moved), anything else is 500. Routes report through
+`errorResponse` in `lib/respond.ts`. **Health reads a 503 as "couldn't reach the Cookbook"**, so
+throwing `LookupError` for anything but a database failure makes a bad input look like an outage.
 
 **`methodSteps` splits a method on numbered markers only** — why, and what it refuses, is in its tests.
 
