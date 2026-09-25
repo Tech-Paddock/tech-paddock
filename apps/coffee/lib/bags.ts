@@ -8,17 +8,15 @@ import { webHost, type Guide } from "./guide";
  * row, so "have I had this before" is a lookup rather than a uniqueness
  * constraint.
  */
-export async function findPreviousBag(roaster: string, coffeeName: string) {
+export async function findPreviousBag(roaster: string, coffeeName: string, excludeId: string | null = null) {
   const supabase = getServiceClient();
 
-  const { data: bag, error } = await supabase
-    .from("bags")
-    .select("id, created_at")
-    .ilike("roaster", roaster)
-    .ilike("coffee_name", coffeeName)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  let query = supabase.from("bags").select("id, created_at").ilike("roaster", roaster).ilike("coffee_name", coffeeName);
+  // The scan screen asks after it has saved the new bag, and the new bag is
+  // not a previous purchase of itself.
+  if (excludeId) query = query.neq("id", excludeId);
+
+  const { data: bag, error } = await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
 
   // "No previous purchase" and "the lookup failed" are both a null row, and
   // only one of them is an answer. Swallowing the error made an unreachable

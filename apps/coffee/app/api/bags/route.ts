@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
     // Report a lookup that could not run as a failure rather than as "no
     // previous purchase" — they are the same null, and only one is an answer.
     try {
-      return NextResponse.json({ previous: await findPreviousBag(roaster, coffeeName) });
+      const exclude = params.get("exclude")?.trim() || null;
+      return NextResponse.json({ previous: await findPreviousBag(roaster, coffeeName, exclude) });
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "The previous-purchase lookup failed." },
