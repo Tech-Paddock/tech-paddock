@@ -343,6 +343,22 @@ test("settings.json sends each tool to the guard it needs, and no other", () => 
   }
 });
 
+/* Joel, 2026-09-24: "All agents edit linear without asking." The allow rule is
+   Linear's alone, and it never outranks the ask list: deleting, retiring a
+   label, and the diff tools (merge_diff merges a GitHub pull request, outside
+   the guard's merge hold) still wait for his click. TEC-43. */
+test("settings.json lets Linear through without a click, except what cannot be undone", () => {
+  const { allow = [], ask = [], deny = [] } = settings.permissions ?? {};
+  assert.deepEqual(allow, ["mcp__Linear"], "allow is Linear's alone");
+  assert.deepEqual(deny, []);
+  for (const t of ["delete_attachment", "delete_comment", "delete_diff_comment", "delete_status_update", "retire_issue_label", "retire_project_label", "merge_diff", "update_diff", "submit_diff_review"]) {
+    assert.ok(ask.includes(`mcp__Linear__${t}`), `mcp__Linear__${t} must still ask`);
+  }
+  for (const rule of ask) assert.match(rule, /^mcp__Linear__\w+$/, `${rule} names one Linear tool`);
+  // The guard still sees Linear issue writes, whatever the allow rule says.
+  assert.ok(hookFor("mcp__Linear__save_issue"));
+});
+
 test("end to end: the real commands deny, ask and allow", () => {
   for (const shell of ["/bin/sh", "/bin/bash"]) {
     const push = (command) => run(hookFor("Bash"), { tool_name: "Bash", tool_input: { command }, cwd: FEATURE }, { shell });
