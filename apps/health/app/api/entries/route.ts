@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { saveEntry, DraftError, type Draft, type DraftItem } from "@/lib/log";
-import { LookupError } from "@/lib/items";
+import { LookupError, normalizeName } from "@/lib/items";
 import { isMeal } from "@/lib/meals";
 import { parseMacros } from "@/lib/macros";
 
@@ -40,7 +40,9 @@ export async function POST(request: NextRequest) {
     const macros = parseMacros(l.macros);
     const quantity = Number(l.quantity);
 
-    if (!name) return NextResponse.json({ error: "A line has no name." }, { status: 400 });
+    // A name of only punctuation normalises to nothing, which the database
+    // refuses; that is the request's fault, so a 400 rather than a 503.
+    if (!name || !normalizeName(name)) return NextResponse.json({ error: "A line has no name." }, { status: 400 });
     if (!macros) return NextResponse.json({ error: `"${name}" has no usable numbers.` }, { status: 400 });
     if (!Number.isFinite(quantity) || quantity <= 0) {
       return NextResponse.json({ error: `"${name}" needs a quantity above zero.` }, { status: 400 });

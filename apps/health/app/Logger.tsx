@@ -21,6 +21,8 @@ type DraftItem = {
   stale?: boolean;
   /** Client only: the lookup after a rename is in flight. */
   looking?: boolean;
+  /** Client only: the quantity as typed, so "0." can become "0.5". */
+  quantityText?: string;
 };
 
 type Draft = { dictated_text: string; meal: Meal; eaten_on: string; items: DraftItem[] };
@@ -50,9 +52,22 @@ export default function Logger() {
   // the same food could disagree about what the current numbers are.
   const [fixing, setFixing] = useState<string | null>(null);
 
-  // Resolved after mount: the server's day and the phone's day are different
-  // things, and the one that matters is the one the person is standing in.
-  useEffect(() => setDate(localDate(new Date())), []);
+  // The phone's day, never the server's, and **never fixed at mount**: the
+  // home-screen app is resumed from memory the next morning, and a date set
+  // once would log breakfast to yesterday. So it is re-read whenever the page
+  // comes back into view, and again at the moment of every parse.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") setDate(localDate(new Date()));
+    };
+    refresh();
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
 
   const loadDay = useCallback(async (on: string) => {
     try {
@@ -73,11 +88,16 @@ export default function Logger() {
     if (!text.trim() || busy) return;
     setBusy("parsing");
     setError(null);
+    // Computed now rather than read from state, so a page left open overnight
+    // still logs to the day you are actually in.
+    const now = new Date();
+    const today = localDate(now);
+    if (today !== date) setDate(today);
     try {
       const response = await fetch("/api/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, hour: new Date().getHours(), date }),
+        body: JSON.stringify({ text, hour: now.getHours(), date: today }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't read that.");
@@ -103,7 +123,9 @@ export default function Logger() {
       if (!response.ok) throw new Error(body.error ?? "Couldn't log that.");
       setDraft(null);
       setText("");
-      await loadDay(draft.eaten_on);
+      const today = localDate(new Date());
+      if (today !== date) setDate(today);
+      else await loadDay(today);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't log that.");
     } finally {
@@ -174,11 +196,11 @@ export default function Logger() {
   }
 
   const unready = draft
-    ? draft.items.filter((i) => i.error || i.stale || i.looking).map((i) => i.name)
+    ? draft.items.filter((i) => i.error || i.stale || i.looking || !(i.quantity > 0)).map((i) => i.name)
     : [];
 
   const draftTotal = draft
-    ? round(total(draft.items.filter((i) => !i.error && !i.stale).map((i) => ({ macros: i.macros, quantity: i.quantity }))))
+    ? round(total(draft.items.filter((i) => !i.error && !i.stale && i.quantity > 0).map((i) => ({ macros: i.macros, quantity: i.quantity }))))
     : null;
 
   return (
@@ -257,8 +279,14 @@ export default function Logger() {
                     inputMode="decimal"
                     min="0.25"
                     step="0.25"
-                    value={line.quantity}
-                    onChange={(e) => editLine(index, { quantity: Number(e.target.value) || 1 })}
+                    value={line.quantityText ?? String(line.quantity)}
+                    // Kept as typed: forcing an empty or "0" field back to 1
+                    // made "0.5" impossible to type. A line without a quantity
+                    // above zero holds approve instead.
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      editLine(index, { quantityText: e.target.value, quantity: Number.isFinite(n) ? n : 0 });
+                    }}
                     className="w-16 shrink-0 rounded border border-line bg-paper px-2 py-1.5 text-base"
                   />
                   <button

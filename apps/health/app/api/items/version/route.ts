@@ -56,13 +56,12 @@ export async function POST(request: NextRequest) {
   if (!itemId) return NextResponse.json({ error: "Which food?" }, { status: 400 });
   if (!macros) return NextResponse.json({ error: "Those numbers are not usable." }, { status: 400 });
 
-  const date = typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)
-    ? body.date
-    : new Date().toISOString().slice(0, 10);
-
-  if (kind === "change" && !/^\d{4}-\d{2}-\d{2}$/.test(body.date ?? "")) {
+  // Always the phone's date, never a UTC fallback. For a change it is the date
+  // the food changed; for a correction, today, which picks the era it corrects.
+  const date = typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : null;
+  if (!date) {
     return NextResponse.json(
-      { error: "A change needs the date the food changed — not today's date by default." },
+      { error: kind === "change" ? "A change needs the date the food changed — not today's date by default." : "Send today's date." },
       { status: 400 }
     );
   }
