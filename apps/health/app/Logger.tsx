@@ -17,6 +17,12 @@ type DraftItem = {
   known: boolean;
   item_id: string | null;
   error: string | null;
+  /** Client only: renamed since its lookup, so its numbers are gone until it is looked up again. */
+  stale?: boolean;
+  /** Client only: the lookup after a rename is in flight. */
+  looking?: boolean;
+  /** Client only: the quantity as typed, so "0." can become "0.5". */
+  quantityText?: string;
 };
 
 type Draft = { dictated_text: string; meal: Meal; eaten_on: string; items: DraftItem[] };
@@ -46,9 +52,22 @@ export default function Logger() {
   // the same food could disagree about what the current numbers are.
   const [fixing, setFixing] = useState<string | null>(null);
 
-  // Resolved after mount: the server's day and the phone's day are different
-  // things, and the one that matters is the one the person is standing in.
-  useEffect(() => setDate(localDate(new Date())), []);
+  // The phone's day, never the server's, and **never fixed at mount**: the
+  // home-screen app is resumed from memory the next morning, and a date set
+  // once would log breakfast to yesterday. So it is re-read whenever the page
+  // comes back into view, and again at the moment of every parse.
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible") setDate(localDate(new Date()));
+    };
+    refresh();
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
 
   const loadDay = useCallback(async (on: string) => {
     try {
@@ -69,11 +88,16 @@ export default function Logger() {
     if (!text.trim() || busy) return;
     setBusy("parsing");
     setError(null);
+    // Computed now rather than read from state, so a page left open overnight
+    // still logs to the day you are actually in.
+    const now = new Date();
+    const today = localDate(now);
+    if (today !== date) setDate(today);
     try {
       const response = await fetch("/api/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, hour: new Date().getHours(), date }),
+        body: JSON.stringify({ text, hour: now.getHours(), date: today }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't read that.");
@@ -99,7 +123,9 @@ export default function Logger() {
       if (!response.ok) throw new Error(body.error ?? "Couldn't log that.");
       setDraft(null);
       setText("");
-      await loadDay(draft.eaten_on);
+      const today = localDate(new Date());
+      if (today !== date) setDate(today);
+      else await loadDay(today);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't log that.");
     } finally {
@@ -108,25 +134,73 @@ export default function Logger() {
   }
 
   function editLine(index: number, change: Partial<DraftItem>) {
-    if (!draft) return;
-    const items = draft.items.map((line, i) =>
-      i === index
-        ? {
+    setDraft((current) => {
+      if (!current) return current;
+      const items = current.items.map((line, i) => {
+        if (i !== index) return line;
+        // A rename makes this a different food. Its numbers, provenance and item
+        // belong to the old name, so all of them go and it is looked up again
+        // when you leave the field — never carried across as though typed.
+        if (change.name !== undefined && change.name !== line.name) {
+          return {
             ...line,
-            ...change,
-            // Typing over a number makes it yours. Saying so here is what puts
-            // the right provenance on screen before you approve, rather than
-            // after — and the server re-derives it anyway rather than trusting
-            // this.
-            ...(change.macros ? { source: "hand" as MacroSource, model: null, source_url: null } : {}),
-          }
-        : line
-    );
-    setDraft({ ...draft, items });
+            name: change.name,
+            macros: { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
+            source: "estimate" as MacroSource,
+            model: null, source_url: null, note: null,
+            known: false, item_id: null, error: null,
+            stale: true,
+          };
+        }
+        return {
+          ...line,
+          ...change,
+          // Typing over a number makes it yours, and this is the one place that
+          // says so: the server records a number as hand-entered only when the
+          // line claims it, and refuses a difference nobody typed.
+          ...(change.macros ? { source: "hand" as MacroSource, model: null, source_url: null } : {}),
+        };
+      });
+      return { ...current, items };
+    });
   }
 
+  async function lookUpAgain(index: number) {
+    const line = draft?.items[index];
+    if (!draft || !line?.stale || line.looking) return;
+    if (!line.name.trim()) return;
+    const eatenOn = draft.eaten_on;
+    editLine(index, { looking: true });
+    let next: Partial<DraftItem>;
+    try {
+      const response = await fetch("/api/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: line.name, quantity: line.quantity, date: eatenOn }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? `Couldn't look up "${line.name}".`);
+      next = { ...(body.item as DraftItem), quantity: line.quantity };
+    } catch (e) {
+      next = { error: e instanceof Error ? e.message : `Couldn't look up "${line.name}".` };
+    }
+    setDraft((current) => {
+      if (!current) return current;
+      const items = current.items.map((l, i) =>
+        // Only land on the line it was asked for — renamed again meanwhile, it
+        // is still stale and asks again on its own blur.
+        i === index && l.name === line.name ? { ...l, ...next, stale: false, looking: false } : l
+      );
+      return { ...current, items };
+    });
+  }
+
+  const unready = draft
+    ? draft.items.filter((i) => i.error || i.stale || i.looking || !(i.quantity > 0)).map((i) => i.name)
+    : [];
+
   const draftTotal = draft
-    ? round(total(draft.items.filter((i) => !i.error).map((i) => ({ macros: i.macros, quantity: i.quantity }))))
+    ? round(total(draft.items.filter((i) => !i.error && !i.stale && i.quantity > 0).map((i) => ({ macros: i.macros, quantity: i.quantity }))))
     : null;
 
   return (
@@ -195,6 +269,7 @@ export default function Logger() {
                     aria-label="Food"
                     value={line.name}
                     onChange={(e) => editLine(index, { name: e.target.value })}
+                    onBlur={() => void lookUpAgain(index)}
                     className="min-w-0 flex-1 rounded border border-line bg-paper px-2 py-1.5 text-base"
                   />
                   <input
@@ -204,8 +279,14 @@ export default function Logger() {
                     inputMode="decimal"
                     min="0.25"
                     step="0.25"
-                    value={line.quantity}
-                    onChange={(e) => editLine(index, { quantity: Number(e.target.value) || 1 })}
+                    value={line.quantityText ?? String(line.quantity)}
+                    // Kept as typed: forcing an empty or "0" field back to 1
+                    // made "0.5" impossible to type. A line without a quantity
+                    // above zero holds approve instead.
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      editLine(index, { quantityText: e.target.value, quantity: Number.isFinite(n) ? n : 0 });
+                    }}
                     className="w-16 shrink-0 rounded border border-line bg-paper px-2 py-1.5 text-base"
                   />
                   <button
@@ -220,6 +301,10 @@ export default function Logger() {
 
                 {line.error ? (
                   <p className="text-sm text-danger">{line.error}</p>
+                ) : line.stale || line.looking ? (
+                  <p className="text-sm text-ink-soft">
+                    {line.looking ? "Looking it up…" : "Renamed — it is looked up again when you leave the field."}
+                  </p>
                 ) : (
                   <>
                     <div className="grid grid-cols-4 gap-2">
@@ -251,6 +336,13 @@ export default function Logger() {
           </ul>
 
           <footer className="flex flex-wrap items-center gap-3 border-t border-line px-3 py-3">
+            {/* A line that failed used to vanish on approve, logging a meal of
+                three as two. Approving now waits until every line has numbers. */}
+            {unready.length > 0 ? (
+              <p className="w-full text-sm text-danger">
+                Not ready: {unready.map((n) => `"${n}"`).join(", ")}. Fix or remove {unready.length === 1 ? "it" : "them"} to log.
+              </p>
+            ) : null}
             {draftTotal ? (
               <p className="text-sm">
                 <span className="font-semibold">{draftTotal.kcal} kcal</span>
@@ -270,7 +362,7 @@ export default function Logger() {
               <button
                 type="button"
                 onClick={approve}
-                disabled={busy !== null || draft.items.every((i) => i.error)}
+                disabled={busy !== null || draft.items.length === 0 || unready.length > 0}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
               >
                 {busy === "saving" ? "Logging…" : "Approve and log"}

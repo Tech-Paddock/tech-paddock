@@ -228,8 +228,9 @@ it; git keeps it.
   Joel only through the TD. **Opus 5.5 at medium for every agent**: Joel first said Opus 5.5 at high,
   then asked whether Opus 5 would do for agents working from a brief. Opus 5.5 is the newer model and
   the cheaper per token, so effort was the lever, not the model. **Opening a pull request is not
-  held by the hook** ("they will be spun up with intention, so there's no need for a check");
-  merging still is. **Every agent edits Linear without asking Joel.** **"Close out" now also means
+  held by the hook** ("they will be spun up with intention, so there's no need for a check").
+  *Superseded 2026-09-25: merging is not held either — Joel wants "only one gate", his go before the
+  TD starts Deployment, not a click per merge. Auto-merge, reviews and API commits still ask.* **Every agent edits Linear without asking Joel.** **"Close out" now also means
   the session is ready to archive**: nothing left only in the conversation — every open item is a
   commit or a Linear issue.
 

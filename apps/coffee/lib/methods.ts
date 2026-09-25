@@ -38,7 +38,15 @@ const ALIASES: [RegExp, BrewMethod][] = [
   [/\borigami\b/i, "origami"],
   [/\bv-?60\b|\bhario\b|\bcone\b/i, "v60"],
   [/\bespresso\b|\bportafilter\b|\bbasket\b/i, "espresso"],
-  [/\bbatch\b|\bauto-?drip\b|\bbrewer\b|\bmachine\b/i, "batch"],
+  // Named batch brewing only. "brewer" and "machine" used to land here too,
+  // so "any pour-over brewer" became Batch — a word every method shares,
+  // read as the one method it names least.
+  [/\bbatch\b|\bauto-?drip\b/i, "batch"],
+  // Wording that declines to name a brewer — "any pour-over brewer", "a drip
+  // coffee maker", "whatever you have" — is something said and unplaceable,
+  // which is what "other" means. It sits before the generic fallback because
+  // the fallback would otherwise round it to a V60 on the roaster's behalf.
+  [/\bany\b|\bwhatever\b|\bcoffee\s*maker\b|\bmachine\b/i, "other"],
   // Generic filter language last: it only wins if nothing specific matched.
   [/\bpour\s*-?\s*over\b|\bpourover\b|\bfilter\b|\bdrip\b/i, "v60"],
 ];

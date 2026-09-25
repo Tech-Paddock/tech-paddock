@@ -22,14 +22,15 @@ type Version = Macros & {
  * put as a question about the food rather than as a database word, because that
  * is the only form in which the answer is knowable:
  *
- * - *The number was wrong* — a correction. It reaches backwards through its
- *   era, so every past day that ate this food gets the new figure. The common
- *   case, and the default.
- * - *The food itself changed* — a change. It does not reach backwards, because
- *   the days before it really did have the old macros and moving them would
- *   falsify the log rather than fix it. It needs the date the food changed, not
- *   today's date, or the boundary is in the wrong place and the boundary is the
- *   only thing a change means.
+ * - *The number was wrong* — a correction. The common case, and the default.
+ * - *The food itself changed* — a change. It needs the date the food changed,
+ *   not today's date, or the boundary is in the wrong place and the boundary is
+ *   the only thing a change means.
+ *
+ * **Neither moves a day already logged** (TEC-21): every logged line keeps the
+ * numbers it was logged with, this line included. What the kind decides is
+ * which figure a later log of an earlier date picks up, and what a backfill
+ * would read to tell a day that was wrong from one that was right at the time.
  *
  * Nothing here overwrites. Every save appends, and the history below is what
  * makes that checkable rather than a promise.
@@ -136,7 +137,7 @@ export default function Correction({
           <span>
             The number was wrong.
             <span className="block text-[11px] text-ink-soft">
-              Fixes every past day you ate this.
+              Used from your next log on. Days already logged keep their numbers.
             </span>
           </span>
         </label>
@@ -153,7 +154,7 @@ export default function Correction({
           <span>
             The food itself changed.
             <span className="block text-[11px] text-ink-soft">
-              Leaves earlier days alone — they really did have the old numbers.
+              Used for anything eaten from that date. Earlier dates keep the old numbers.
             </span>
           </span>
         </label>

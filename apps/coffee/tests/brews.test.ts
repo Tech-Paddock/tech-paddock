@@ -12,6 +12,7 @@ import {
   withRatio,
   withWater,
   parseGrams,
+  parseWaterGrams,
   parseRatio,
   fromGuide,
   openingBrew,
@@ -234,11 +235,39 @@ describe("reading a roaster's own wording", () => {
     expect(parseGrams("to taste")).toBeNull();
   });
 
+  it("reads a thousands separator as part of the number", () => {
+    expect(parseGrams("1,000g")).toBe(1000);
+    expect(parseGrams("1,000 g water")).toBe(1000);
+  });
+
+  it("does not read ounces as grams", () => {
+    expect(parseGrams("12 oz")).toBeNull();
+    expect(parseGrams("12oz bag")).toBeNull();
+    // A mass given in both is read in grams.
+    expect(parseGrams("12 oz (340g)")).toBe(340);
+  });
+
+  it("reads a staged pour as the water it ends at", () => {
+    expect(parseWaterGrams("Bloom 50g, then to 300g")).toBe(300);
+    expect(parseWaterGrams("300 g water")).toBe(300);
+    expect(parseWaterGrams("1,000g")).toBe(1000);
+    expect(parseWaterGrams("12 oz")).toBeNull();
+    expect(parseWaterGrams(null)).toBeNull();
+  });
+
   it("divides a ratio rather than reading the second half off", () => {
     expect(parseRatio("1:17")).toBe(17);
     expect(parseRatio("1 : 16.5")).toBe(16.5);
     expect(parseRatio("60:1000")).toBe(16.7);
-    expect(parseRatio("2:1")).toBe(0.5);
+  });
+
+  it("reads a ratio written water-first the same way round", () => {
+    // "16:1" is sixteen grams of water per gram of coffee, as "1:16" is. It
+    // used to read as a sixteenth. "2:1" (formerly 0.5) is the same case: a
+    // brew with less water than coffee is not a brew.
+    expect(parseRatio("16:1")).toBe(16);
+    expect(parseRatio("16:1")).toBe(parseRatio("1:16"));
+    expect(parseRatio("2:1")).toBe(2);
   });
 
   it("is null for a ratio that is not one", () => {
@@ -309,6 +338,29 @@ describe("openingBrew", () => {
     const { draft, source } = openingBrew(null, null);
     expect(draft).toEqual(blankBrew());
     expect(source).toBe("blank");
+  });
+
+  it("opens with numbers that add up when your dose meets their recipe", () => {
+    // Your last brew recorded a dose and no water; the roaster published all
+    // three. Taking their 374g beside your 20g would open at 1:19 next to a
+    // ratio box saying 17. Their ratio is what scales, so it sets the water.
+    const { draft } = openingBrew({ brewer: "v60-02", dose_g: 20 }, guide);
+    expect(draft).toMatchObject({ dose_g: "20", ratio: "17", water_g: "340" });
+  });
+
+  it("takes their water when they gave no ratio, and derives the ratio from it", () => {
+    const { draft } = openingBrew({ brewer: "v60-02", dose_g: 20 }, { water: "300g" });
+    expect(draft).toMatchObject({ dose_g: "20", water_g: "300", ratio: "15" });
+  });
+
+  it("carries the roaster's brewer only where it is exactly one you own", () => {
+    expect(openingBrew(null, { method: "kalita" }).draft.brewer).toBe("kalita-wave");
+    expect(openingBrew(null, { method: "aeropress" }).draft.brewer).toBe("aeropress");
+    // Two V60s on the shelf and the roaster did not say which.
+    expect(openingBrew(null, { method: "v60" }).draft.brewer).toBe("");
+    expect(openingBrew(null, { method: "origami" }).draft.brewer).toBe("");
+    // Your last brew's brewer wins over theirs.
+    expect(openingBrew({ brewer: "v60-switch" }, { method: "kalita" }).draft.brewer).toBe("v60-switch");
   });
 
   it("carries no reading from either source", () => {

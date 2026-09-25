@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseDictation } from "@/lib/anthropic";
 import { resolveItem, type Draft } from "@/lib/log";
-import { LookupError } from "@/lib/items";
+import { LookupError, normalizeName } from "@/lib/items";
 import { isMeal } from "@/lib/meals";
+import { mergeSameFood } from "@/lib/approve";
 
 export const dynamic = "force-dynamic";
 // The estimate may search and read pages, and the page waits on this response
@@ -25,9 +26,10 @@ export async function POST(request: NextRequest) {
   }
 
   const hour = Number.isInteger(body.hour) && body.hour >= 0 && body.hour <= 23 ? body.hour : new Date().getHours();
-  const eatenOn = typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)
-    ? body.date
-    : new Date().toISOString().slice(0, 10);
+  // The phone's date, always sent. There is no server fallback: the server's
+  // day is UTC, and an evening meal would land on tomorrow.
+  const eatenOn = typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : null;
+  if (!eatenOn) return NextResponse.json({ error: "Send the day it was eaten." }, { status: 400 });
 
   let parsed;
   try {
@@ -47,8 +49,11 @@ export async function POST(request: NextRequest) {
     // Sequential rather than parallel: a repeat meal is all table hits and
     // costs nothing, and the misses are few enough that firing four searches at
     // once buys little and makes a rate limit the common failure.
+    // A food said twice is one line with the quantities added, merged before
+    // anything is estimated: two estimates of one food can disagree, and the
+    // second would otherwise land as a version of the first.
     const items = [];
-    for (const item of parsed.items) {
+    for (const item of mergeSameFood(parsed.items.filter((i) => normalizeName(i.name)))) {
       items.push(await resolveItem({ name: item.name, quantity: item.quantity, onDate: eatenOn }));
     }
 

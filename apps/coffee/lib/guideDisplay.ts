@@ -8,9 +8,10 @@
  * not to share a file.
  *
  * **The labels name where the instructions were found, never who they were
- * written for.** That is the only part a search can establish — Sweet Bloom
- * print one house recipe on every product page, so a tier-1 result means "this
- * was on the coffee's own page", not "the roaster wrote it for this lot".
+ * written for.** That is the only part a search can establish — a roaster
+ * that printed one house recipe on every product page would validate as tier
+ * 1 too, so a tier-1 result means "this was on the coffee's own page", not
+ * "the roaster wrote it for this lot".
  * `RULES.md` §2 is the long version. Wording that claims the second thing is
  * the one change that must not be made here.
  */
@@ -72,6 +73,20 @@ export function guidePresentation(status: GuideStatus): GuidePresentation {
  * reading like a found recipe is the single way this feature could damage the
  * thing the app is for, and it would happen through wording, here.
  */
+/**
+ * A recipe the roaster printed as a picture (TEC-46), and the picture beside it.
+ *
+ * The values were copied off an image rather than quoted from the page's
+ * text, so they are a reading — only as checkable as the picture next to
+ * them. That is why the image is always rendered beside the values and never
+ * behind a tap, and why the caption asks for the check rather than vouching.
+ */
+export const IMAGE_SOURCE_PRESENTATION = {
+  caption: "Copied off this image on the roaster's page — check the numbers against it.",
+  alt: "The roaster's recipe image the values above were copied from",
+  quoteNote: "read off the image",
+} as const;
+
 export const SUGGESTION_PRESENTATION = {
   label: "Suggested by Claude",
   note: "The roaster published nothing for this coffee. Claude suggested a starting point — it is not theirs, and nothing on a page says it.",
