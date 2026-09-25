@@ -73,6 +73,20 @@ export function guidePresentation(status: GuideStatus): GuidePresentation {
  * reading like a found recipe is the single way this feature could damage the
  * thing the app is for, and it would happen through wording, here.
  */
+/**
+ * A recipe the roaster printed as a picture (TEC-46), and the picture beside it.
+ *
+ * The values were copied off an image rather than quoted from the page's
+ * text, so they are a reading — only as checkable as the picture next to
+ * them. That is why the image is always rendered beside the values and never
+ * behind a tap, and why the caption asks for the check rather than vouching.
+ */
+export const IMAGE_SOURCE_PRESENTATION = {
+  caption: "Copied off this image on the roaster's page — check the numbers against it.",
+  alt: "The roaster's recipe image the values above were copied from",
+  quoteNote: "read off the image",
+} as const;
+
 export const SUGGESTION_PRESENTATION = {
   label: "Suggested by Claude",
   note: "The roaster published nothing for this coffee. Claude suggested a starting point — it is not theirs, and nothing on a page says it.",

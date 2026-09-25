@@ -190,3 +190,98 @@ describe("webHost", () => {
     }
   });
 });
+
+// TEC-46: a value read off a roaster's image reaches guide_* on the same terms
+// as a sentence — the text read off the image is the quote, the page is its
+// URL — and on one more: the image itself is stored beside it, to be shown.
+describe("validateGuide, for values read off an image", () => {
+  const PAGE = "https://www.middlestatecoffee.com/shop/jos-ramirez-guatemala";
+  const CARD = "https://images.squarespace-cdn.com/content/v1/abc/recipe-card.jpg?format=1500w";
+  const ELSEWHERE = "https://images.squarespace-cdn.com/content/v1/abc/about-us.jpg?format=1500w";
+  const IN_GALLERY = [{ url: CARD, inGallery: true }];
+
+  function card(over: Partial<RawGuide> = {}): RawGuide {
+    return {
+      status: "coffee_specific",
+      product_url: PAGE,
+      guide_url: PAGE,
+      params: { dose: "139.5g", water: "2300ml" },
+      quotes: [
+        { field: "dose", text: "dose 139.5g", url: PAGE, image: CARD },
+        { field: "water", text: "water 2300ml", url: PAGE, image: CARD },
+      ],
+      ...over,
+    };
+  }
+
+  it("keeps a value read off an image in this coffee's gallery, with the image beside its quote", () => {
+    const guide = validateGuide(card(), ["middlestatecoffee.com"], IN_GALLERY);
+    expect(guide.status).toBe("coffee_specific");
+    expect(guide.params).toEqual({ dose: "139.5g", water: "2300ml" });
+    expect(guide.quotes.map((q) => q.image)).toEqual([CARD, CARD]);
+    expect(guide.dropped).toEqual([]);
+  });
+
+  it("checks the page for the roaster's site, not the image's CDN host", () => {
+    // The card lives on Squarespace's CDN; the roaster's site is the page.
+    expect(validateGuide(card(), ["middlestatecoffee.com"], IN_GALLERY).status).toBe("coffee_specific");
+    const onRetailer = card({
+      product_url: "https://retailer.example/p/ramirez",
+      guide_url: "https://retailer.example/p/ramirez",
+      quotes: [{ field: "dose", text: "dose 139.5g", url: "https://retailer.example/p/ramirez", image: CARD }],
+    });
+    // A page that was not reached is refused, whatever its image.
+    expect(validateGuide(onRetailer, ["middlestatecoffee.com"], IN_GALLERY).status).toBe("none");
+  });
+
+  it("drops a value whose quote has no image to show", () => {
+    const guide = validateGuide(
+      card({
+        quotes: [
+          { field: "dose", text: "dose 139.5g", url: PAGE, image: CARD },
+          { field: "water", text: "water 2300ml", url: PAGE },
+        ],
+      }),
+      ["middlestatecoffee.com"],
+      IN_GALLERY
+    );
+    expect(guide.params).toEqual({ dose: "139.5g" });
+    expect(guide.dropped).toEqual([{ field: "water", value: "2300ml", reason: expect.stringMatching(/image/) }]);
+  });
+
+  it("drops a value citing an image that was never read", () => {
+    const guide = validateGuide(
+      card({ quotes: [{ field: "dose", text: "dose 139.5g", url: PAGE, image: "https://evil.example/x.jpg" }] }),
+      ["middlestatecoffee.com"],
+      IN_GALLERY
+    );
+    expect(guide.status).toBe("none");
+    expect(guide.dropped.map((d) => d.field).sort()).toEqual(["dose", "water"]);
+  });
+
+  it("earns tier 1 only from an image in this coffee's own gallery", () => {
+    const guide = validateGuide(
+      card({
+        quotes: [
+          { field: "dose", text: "dose 139.5g", url: PAGE, image: ELSEWHERE },
+          { field: "water", text: "water 2300ml", url: PAGE, image: ELSEWHERE },
+        ],
+      }),
+      ["middlestatecoffee.com"],
+      [{ url: ELSEWHERE, inGallery: false }]
+    );
+    expect(guide.status).toBe("roaster_generic");
+    expect(guide.params.dose).toBe("139.5g");
+  });
+
+  it("never lets a text search claim an image", () => {
+    // Only the image reader sets `image`. A text answer carrying one would put
+    // an arbitrary picture beside a sentence, as though it were the evidence.
+    const guide = validateGuide(
+      raw({ quotes: [{ field: "ratio", text: "We brew this at 1:16.", url: PRODUCT, image: "https://evil.example/x.jpg" }] }),
+      REACHED
+    );
+    expect(guide.params.ratio).toBe("1:16");
+    expect(guide.quotes[0]).not.toHaveProperty("image");
+  });
+});

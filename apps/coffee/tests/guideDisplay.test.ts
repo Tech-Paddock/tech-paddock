@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guidePresentation, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
+import { guidePresentation, IMAGE_SOURCE_PRESENTATION, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
 import { GUIDE_FIELDS } from "@/lib/guide";
 import type { GuideStatus } from "@/lib/guide";
 
@@ -79,5 +79,21 @@ describe("SUGGESTION_PRESENTATION", () => {
     const tiers = (["coffee_specific", "roaster_generic", "none"] as GuideStatus[]).map((s) => guidePresentation(s).dot);
     expect(tiers).not.toContain(SUGGESTION_PRESENTATION.dot);
     expect(SUGGESTION_PRESENTATION.label).not.toBe(guidePresentation("none").label);
+  });
+});
+
+describe("IMAGE_SOURCE_PRESENTATION", () => {
+  it("says the values were copied off the picture, and to check them against it", () => {
+    // A copy-out is a reading, not a quotation of the page's text (TEC-46).
+    // The image beside it is the check, and the caption says so.
+    expect(IMAGE_SOURCE_PRESENTATION.caption).toMatch(/image|picture/i);
+    expect(IMAGE_SOURCE_PRESENTATION.caption).toMatch(/check/i);
+  });
+
+  it("never words it as written for this coffee", () => {
+    const forbidden = /written for|for this (coffee|lot|bag)|bag[- ]specific/i;
+    expect(IMAGE_SOURCE_PRESENTATION.caption).not.toMatch(forbidden);
+    expect(IMAGE_SOURCE_PRESENTATION.alt).not.toMatch(forbidden);
+    expect(IMAGE_SOURCE_PRESENTATION.quoteNote).not.toMatch(forbidden);
   });
 });
