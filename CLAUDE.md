@@ -82,8 +82,8 @@ without asking Joel** (Joel, 2026-09-24); the hook still refuses an issue that b
 | Done | every Next step is done — the GitHub integration closes an issue whose pull request merges, so reopen it if steps remain |
 
 **Joel is the only assignee.** Assign him while a step waits on him — a decision, information or a
-dashboard action — and unassign him once his part is done. Agents are never assigned: they share one
-Linear user, so the `agent:` label names them.
+dashboard action — **mark that step ⭐**, and move the star or unassign him once his part is done.
+Agents are never assigned: they share one Linear user, so the `agent:` label names them.
 
 ### When a document reaches its cap
 
