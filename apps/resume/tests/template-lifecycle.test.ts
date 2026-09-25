@@ -200,6 +200,35 @@ describe("downloading a template", () => {
     expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("PK-the-original");
   });
 
+  /**
+   * TEC-31. A header value may not carry a character above U+00FF, and the
+   * uploaded name went into one verbatim — so an en dash or a curly apostrophe,
+   * both of which Word and macOS type for you, made the download a 500.
+   */
+  it.each([
+    ["an en dash", "House style – 2026.docx", "House style _ 2026.docx", "House%20style%20%E2%80%93%202026.docx"],
+    ["a curly apostrophe", "Joel’s template.docx", "Joel_s template.docx", "Joel%E2%80%99s%20template.docx"],
+  ])("serves a name containing %s, keeping it exactly in filename*", async (_what, name, fallback, encoded) => {
+    const { client } = fakeSupabase({ "templates.select": { data: { ...TEMPLATE, name }, error: null } });
+    mockModules({ resume: client, download: async () => Buffer.from("PK-the-original") });
+
+    const { GET } = await import("@/app/api/templates/[id]/file/route");
+    const res = await GET(req(), { params: { id: "t1" } });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Disposition")).toBe(
+      `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`
+    );
+    expect(decodeURIComponent(encoded)).toBe(name);
+  });
+
+  it("keeps a quote from ending the plain filename early", async () => {
+    const { contentDisposition } = await import("@/lib/serveDocx");
+    expect(contentDisposition('a "quoted" name.docx')).toBe(
+      `attachment; filename="a quoted name.docx"; filename*=UTF-8''a%20%22quoted%22%20name.docx`
+    );
+  });
+
   it("404s when the template has no stored file", async () => {
     const { client } = fakeSupabase({ "templates.select": { data: { ...TEMPLATE, file_path: null }, error: null } });
     mockModules({ resume: client });
