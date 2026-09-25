@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { estimateRecipeMacros, generateRecipe, importRecipe, readRecipeFile, type RecipeFields } from "@/lib/anthropic";
 import { validateRecipeFile } from "@/lib/upload";
-import { type RecipeDraft } from "@/lib/recipes";
-import { LookupError } from "@/lib/errors";
+import { MAX_STEER, readTurnedDown } from "@/lib/reroll";
+import { nameTaken, type RecipeDraft } from "@/lib/recipes";
+import { statusOf } from "@/lib/errors";
+import { errorResponse } from "@/lib/respond";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +62,16 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Before the pricing call, not after it: a typed recipe saves straight away,
+      // so a name already in the book would pay for a model call and then be
+      // refused at the insert.
+      if (await nameTaken(name)) {
+        return NextResponse.json(
+          { error: `"${name}" is already in the book. Rename it, or remove the one that is in there.` },
+          { status: 409 }
+        );
+      }
+
       fields = {
         name,
         servings,
@@ -72,7 +84,15 @@ export async function POST(request: NextRequest) {
       if (!brief) return NextResponse.json({ error: "Say what you feel like." }, { status: 400 });
       if (brief.length > 2000) return NextResponse.json({ error: "That is a long brief." }, { status: 413 });
 
-      fields = await generateRecipe({ brief, model });
+      // "Something else" (TEC-39 D): the same brief, plus every draft turned
+      // down this session and an optional reason. Both are the browser's state
+      // and are re-shaped here, never trusted as sent.
+      const avoid = readTurnedDown(body.turned_down);
+      if ("error" in avoid) return NextResponse.json({ error: avoid.error }, { status: 400 });
+      const steer = typeof body.steer === "string" ? body.steer.trim() : "";
+      if (steer.length > MAX_STEER) return NextResponse.json({ error: "That reason is long." }, { status: 413 });
+
+      fields = await generateRecipe({ brief, model, turnedDown: avoid.turnedDown, steer });
       origin = "generated";
     } else if (mode === "import") {
       const url = typeof body.url === "string" ? body.url.trim() : "";
@@ -146,7 +166,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ draft });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
+    // A model that answered with nothing usable throws a plain Error, and its own
+    // sentence says more than a fallback would. Typed failures map as they do
+    // everywhere else (lib/errors.ts).
+    if (statusOf(e) !== 500) return errorResponse(e, "");
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Couldn't draft that recipe." },
       { status: 500 }

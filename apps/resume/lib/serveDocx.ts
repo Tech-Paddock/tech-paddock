@@ -24,11 +24,11 @@ const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingm
 export async function serveDocx(path: string, preferredName?: string | null) {
   try {
     const bytes = await downloadDocx(path);
-    const name = (preferredName ?? path.split("/").pop() ?? "resume.docx").replace(/"/g, "");
+    const name = preferredName ?? path.split("/").pop() ?? "resume.docx";
     return new NextResponse(new Uint8Array(bytes), {
       headers: {
         "Content-Type": DOCX_TYPE,
-        "Content-Disposition": `attachment; filename="${name}"`,
+        "Content-Disposition": contentDisposition(name),
       },
     });
   } catch (err) {
@@ -37,4 +37,29 @@ export async function serveDocx(path: string, preferredName?: string | null) {
     }
     throw err;
   }
+}
+
+/**
+ * An attachment header that survives any filename a person can type.
+ *
+ * **A header value is a ByteString**: the Headers API throws on any character
+ * above U+00FF, so an en dash or a curly apostrophe in an uploaded name — both
+ * of which Word and macOS insert on their own — turned the template download
+ * into a 500. RFC 6266 carries the real name percent-encoded in `filename*`,
+ * which every current browser prefers, and a plain-ASCII `filename` beside it
+ * for anything that does not read the starred form.
+ *
+ * The fallback also drops `"` and `\`, which would end or escape the quoted
+ * value early, and control characters, which have no business in a header.
+ */
+export function contentDisposition(name: string): string {
+  const fallback =
+    name
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\x20-\x7e]/g, "_")
+      .replace(/["\\]/g, "")
+      .trim() || "resume.docx";
+  const encoded = encodeURIComponent(name).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }

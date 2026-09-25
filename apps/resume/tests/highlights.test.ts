@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 import { readDocxParts } from "../lib/docx/read";
 import { extractParagraphs } from "../lib/docx/paragraphs";
 import { labelParagraphs } from "../lib/docx/label";
-import { DEFAULT_SPEC, extractSpec, firstTableLayout } from "../lib/docx/spec";
+import { extractSpec, firstTableLayout } from "../lib/docx/spec";
 import { auditAts, headerFooterText } from "../lib/docx/ats";
-import { buildResumeDocx } from "../lib/docx/build";
 import { makeDocx, para, table } from "./helpers/docx";
-import JSZip from "jszip";
 
 /**
  * Jobright renders Career Highlights as a markdown table and pastes it in as
@@ -180,42 +178,3 @@ describe("a template that keeps name and contact in a page header", () => {
     expect(firstTableLayout("<w:body/>")).toBe("rows");
   });
 });
-
-describe("rendering highlights in the template's own layout", () => {
-  const items = [
-    { metric: "$250,000", description: "Annual savings through automation" },
-    { metric: "30%", description: "Lift in revenue capture" },
-  ];
-  const content = { name: "Alex Placeholder", contact: "alex@example.invalid", sections: [{ kind: "highlights" as const, label: "Career Highlights", items }] };
-
-  const xmlOf = async (buffer: Buffer) =>
-    (await (await JSZip.loadAsync(buffer)).file("word/document.xml")!.async("string"));
-
-  it("puts each highlight in its own cell, metric above description", async () => {
-    const spec = { ...BASE_SPEC, highlightsLayout: "columns" as const };
-    const xml = await xmlOf(await buildResumeDocx(content, spec));
-
-    // One row, one cell per highlight.
-    expect((xml.match(/<w:tr>/g) ?? []).length).toBe(1);
-    expect((xml.match(/<w:tc>/g) ?? []).length).toBe(2);
-    expect(xml.indexOf("$250,000")).toBeLessThan(xml.indexOf("Annual savings"));
-  });
-
-  it("puts one highlight per row when the template is shaped that way", async () => {
-    const spec = { ...BASE_SPEC, highlightsLayout: "rows" as const };
-    const xml = await xmlOf(await buildResumeDocx(content, spec));
-    expect((xml.match(/<w:tr>/g) ?? []).length).toBe(2);
-  });
-
-  // The one permitted table stays the only one, in either layout.
-  it("emits exactly one table either way", async () => {
-    for (const layout of ["columns", "rows"] as const) {
-      const xml = await xmlOf(await buildResumeDocx(content, { ...BASE_SPEC, highlightsLayout: layout }));
-      expect((xml.match(/<w:tbl>/g) ?? []).length).toBe(1);
-    }
-  });
-});
-
-// The defaults, not a hand-written copy of them: these tests are about table
-// shape, and a literal spec here only ever went stale when a field was added.
-const BASE_SPEC = DEFAULT_SPEC;

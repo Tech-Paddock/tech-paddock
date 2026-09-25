@@ -193,5 +193,6 @@ Then:
 > tempting. If you cannot tell whether something is execution or structure, it is structure, and
 > structure is mine.
 >
-> **Check the open list with a live call as the first step of every merge**, not from memory. Every
-> merge waits for my click; opening a pull request does not.
+> **Check the open list with a live call as the first step of every merge**, not from memory. My go
+> before you start is the one gate; merges within it do not wait for a click, so a branch outside
+> the set I approved is not yours to merge.

@@ -8,10 +8,9 @@
  * `apps/home` as its Vercel Root Directory, and files outside that directory
  * are present during the build but not reliably readable at runtime.
  *
- * Runs as `prebuild`, so a deploy always ships a fresh manifest. The output is
- * committed as well, so `tsc --noEmit` works on a clean checkout and so that a
- * pull request which changes an app's environment contract shows the manifest
- * changing alongside it.
+ * Runs before every build, dev server and test run (`npm run generate`), so a
+ * deploy always ships a fresh manifest. The output is gitignored: a committed
+ * copy was days stale and rewritten by every local build.
  *
  * Degrades to an empty manifest rather than failing the build: the hub must
  * still deploy if it is ever built outside the monorepo.

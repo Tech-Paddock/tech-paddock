@@ -22,17 +22,12 @@ import {
   type BrewSource,
   type GuideNumbers,
 } from "@/lib/brews";
-import {
-  MY_BREWERS,
-  MY_BREWER_LABELS,
-  GRINDERS,
-  myBrewerFor,
-  type MyBrewer,
-} from "@/lib/brewers";
+import { MY_BREWERS, MY_BREWER_LABELS, GRINDERS, type MyBrewer } from "@/lib/brewers";
 import type { Guide, GuideStatus } from "@/lib/guide";
-import { guidePresentation, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
+import { guidePresentation, IMAGE_SOURCE_PRESENTATION, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
 import type { Suggestion } from "@/lib/suggestion";
-import { parseLabelDate } from "@/lib/dates";
+import { roastDateFromLabel } from "@/lib/dates";
+import { searchIsRunning, searchIsStale, SEARCH_START_GRACE_MS, STALE_SEARCH_MESSAGE } from "@/lib/searchClock";
 import { changedFields, hasChanges, missingRequired } from "@/lib/patch";
 import { MODEL_LABELS, DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT, effortsFor, isEffortFor, type SearchModel } from "@/lib/models";
 
@@ -58,7 +53,8 @@ type Bag = Identity & {
   guide_temp: string | null;
   guide_grind: string | null;
   guide_time: string | null;
-  guide_quotes: { field: string; text: string; url: string }[];
+  // `image` is set on a value read off a picture on the page (TEC-46).
+  guide_quotes: { field: string; text: string; url: string; image?: string }[];
   guide_dropped: { field: string; value: string; reason: string }[];
   guide_model: string | null;
   guide_effort: string | null;
@@ -67,6 +63,10 @@ type Bag = Identity & {
   // page that was not there when the search started can still tell "still
   // working" from "never ran".
   guide_search_started_at: string | null;
+  // When a search last recorded an answer. It is how a poller tells "this run
+  // finished, and here is a warning beside its answer" from "this run failed
+  // and the answer on the row is an older one".
+  guide_fetched_at: string | null;
   // Claude's own, for a bag whose roaster published none. Deliberately not a
   // guide_* value and never rendered as one.
   suggested_recipe: Suggestion | null;
@@ -120,18 +120,25 @@ export default function CoffeePage() {
   const [bags, setBags] = useState<Bag[]>([]);
   const [query, setQuery] = useState("");
   const [libraryError, setLibraryError] = useState<string | null>(null);
+  // Which load is the latest. Typing "sweet" fires a request per pause, and
+  // they can come back in any order; an older one landing last would put the
+  // results for "swe" under a box that says "sweet".
+  const latestLoad = useRef(0);
 
   const loadBags = useCallback(async (q: string) => {
+    const ticket = ++latestLoad.current;
     // A failed load used to do nothing at all, which rendered as "No bags
     // yet. Scan one." — a confident statement about data that was never
     // read. An empty library and a broken one must not look the same.
     try {
       const res = await fetch(`/api/bags${q ? `?q=${encodeURIComponent(q)}` : ""}`);
       const data = await res.json();
+      if (ticket !== latestLoad.current) return;
       if (!res.ok) throw new Error(data.error ?? "Couldn't load the library.");
       setBags(data.bags ?? []);
       setLibraryError(null);
     } catch (e) {
+      if (ticket !== latestLoad.current) return;
       setLibraryError(e instanceof Error ? e.message : "Couldn't load the library.");
       setBags([]);
     }
@@ -206,8 +213,11 @@ function Scan({ onSaved }: { onSaved: () => void }) {
   const [labelRoastDate, setLabelRoastDate] = useState<string | null>(null);
   const [stage, setStage] = useState<"idle" | "reading" | "confirm" | "searching" | "review" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
+  // Said beside an answer the search did record, never instead of one.
+  const [warning, setWarning] = useState<string | null>(null);
   const [previous, setPrevious] = useState<PreviousBag | null>(null);
-  const [carried, setCarried] = useState(false);
+  // The previous-purchase lookup failing is not "you have never had this".
+  const [previousError, setPreviousError] = useState<string | null>(null);
   const [model, setModel] = useState<SearchModel>(DEFAULT_SEARCH_MODEL);
   const [effort, setEffort] = useState<string>(DEFAULT_EFFORT);
   const [bagId, setBagId] = useState<string | null>(null);
@@ -229,11 +239,20 @@ function Scan({ onSaved }: { onSaved: () => void }) {
 
       // Blanks rather than nulls so every field is typeable: this screen is
       // also the manual-entry path when the photo can't be read.
-      setIdentity({ ...EMPTY, ...stripNulls(data.identity as Identity) });
+      //
+      // The roast date is the one field with a date column behind it, so the
+      // label's wording becomes a date here or not at all — the input shows
+      // only YYYY-MM-DD, and the save refuses anything else. What could not
+      // be read is kept for the hint beside the field.
+      const read = data.identity as Identity;
+      const roast = roastDateFromLabel(read?.roast_date);
+      setIdentity({ ...EMPTY, ...stripNulls(read), roast_date: roast.value });
+      setLabelRoastDate(roast.unread);
       setStage("confirm");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
       setIdentity({ ...EMPTY });
+      setLabelRoastDate(null);
       setStage("confirm");
     }
   }
@@ -253,9 +272,9 @@ function Scan({ onSaved }: { onSaved: () => void }) {
       return;
     }
     setError(null);
+    setWarning(null);
     setWaited(0);
     setStage("searching");
-    void lookForPrevious(identity.roaster, identity.coffee_name);
 
     try {
       const body = new FormData();
@@ -272,6 +291,13 @@ function Scan({ onSaved }: { onSaved: () => void }) {
         purchased_date: (data.bag.purchased_date as string) ?? "",
         roast_date: (data.bag.roast_date as string) ?? "",
       });
+
+      // After the save, not beside it. Run alongside, the lookup could read
+      // the library before this bag was in it or after — and once it is in,
+      // "the most recent purchase of this coffee" is this one, which has no
+      // brews, so a repeat purchase read as a first. Excluding the bag just
+      // saved is what makes the answer about an earlier purchase.
+      void lookForPrevious(identity.roaster, identity.coffee_name, id);
 
       // Fired, not awaited. This request routinely outlives the page's
       // patience, and its answer is read back off the row instead.
@@ -294,12 +320,23 @@ function Scan({ onSaved }: { onSaved: () => void }) {
     }
   }
 
-  async function lookForPrevious(roaster: string, coffeeName: string) {
-    const res = await fetch(
-      `/api/bags?roaster=${encodeURIComponent(roaster)}&coffee_name=${encodeURIComponent(coffeeName)}`
-    );
-    if (!res.ok) return;
-    setPrevious(((await res.json()).previous as PreviousBag) ?? null);
+  async function lookForPrevious(roaster: string, coffeeName: string, exclude: string) {
+    // The route reports a lookup that could not run as a 500, precisely so
+    // it is not read as "no previous purchase". Dropping that response here
+    // undid it: a broken lookup and a first-time coffee rendered the same.
+    try {
+      const res = await fetch(
+        `/api/bags?roaster=${encodeURIComponent(roaster)}&coffee_name=${encodeURIComponent(coffeeName)}` +
+          `&exclude=${encodeURIComponent(exclude)}`
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "The previous-purchase lookup failed.");
+      setPrevious((data.previous as PreviousBag) ?? null);
+      setPreviousError(null);
+    } catch (e) {
+      setPrevious(null);
+      setPreviousError(e instanceof Error ? e.message : "The previous-purchase lookup failed.");
+    }
   }
 
   // Poll the saved row. The search writes its answer there, so this survives
@@ -307,24 +344,45 @@ function Scan({ onSaved }: { onSaved: () => void }) {
   useEffect(() => {
     if (stage !== "searching" || !bagId) return;
     const started = Date.now();
+    let seenRunning = false;
 
     const tick = async () => {
       setWaited(Math.round((Date.now() - started) / 1000));
-      const res = await fetch(`/api/bags/${bagId}`);
+      // No photo: this runs every four seconds and never shows one.
+      const res = await fetch(`/api/bags/${bagId}?photo=0`);
       if (!res.ok) return;
       const bag = (await res.json()).bag as Bag;
       setSaved(bag);
 
+      if (bag.guide_status !== "not_searched") {
+        // An answer landed. Anything in the error column beside it is the
+        // warning it was recorded with, not a failure.
+        setGuide(guideFromBag(bag));
+        setWarning(bag.guide_search_error);
+        setStage("review");
+        return;
+      }
       if (bag.guide_search_error) {
         setError(bag.guide_search_error);
         setStage("review");
         return;
       }
-      if (bag.guide_status === "not_searched") return;
-
-      const found = guideFromBag(bag);
-      setGuide(found);
-      setStage("review");
+      if (bag.guide_search_started_at) {
+        seenRunning = true;
+        // A stamp nothing can still be working under: the function was
+        // stopped without reaching the line that records why.
+        if (searchIsStale(bag.guide_search_started_at)) {
+          setError(STALE_SEARCH_MESSAGE);
+          setStage("review");
+        }
+        return;
+      }
+      // Neither running nor answered. Past the grace period, and never seen
+      // running, the request that starts the search did not get through.
+      if (!seenRunning && Date.now() - started > SEARCH_START_GRACE_MS) {
+        setError("The search did not start. The bag is saved — run it again from the shelf with Search again.");
+        setStage("review");
+      }
     };
 
     const timer = setInterval(() => void tick(), 4000);
@@ -403,6 +461,7 @@ function Scan({ onSaved }: { onSaved: () => void }) {
         <button
           onClick={() => {
             setIdentity({ ...EMPTY });
+            setLabelRoastDate(null);
             setStage("confirm");
           }}
           className="text-sm text-ink/60 underline"
@@ -470,13 +529,14 @@ function Scan({ onSaved }: { onSaved: () => void }) {
               onChange={(e) => setIdentity({ ...identity, roast_date: e.target.value })}
               className="border border-line rounded-lg px-3 py-2 bg-surface disabled:opacity-60 w-full min-w-0"
             />
-            {labelRoastDate && (
+            {labelRoastDate && !identity.roast_date && (
               // Said, but not readable as one date. Naming it is the whole
               // point: an empty box here otherwise reads as a bag that did not
-              // print a roast date at all.
+              // print a roast date at all. It covers both kinds of unreadable
+              // — "05/06/26", which is two dates, and wording that is none.
               <span className="text-xs text-ink-soft">
-                The label says <strong>{labelRoastDate}</strong>, which could be more than one date. Type the one
-                you read.
+                The label says <strong>{labelRoastDate}</strong>, which couldn&apos;t be read as one date. Type the
+                date you read.
               </span>
             )}
           </label>
@@ -532,6 +592,19 @@ function Scan({ onSaved }: { onSaved: () => void }) {
       )}
 
       {stage !== "confirm" && guide && <GuideCard guide={guide} />}
+
+      {stage !== "confirm" && warning && (
+        // Beside the answer, in the quiet voice: the search did record one,
+        // and this is what it recorded it despite.
+        <p className="text-xs text-ink-soft bg-surface border border-line rounded-lg px-3 py-2">{warning}</p>
+      )}
+
+      {stage !== "confirm" && previousError && (
+        <p className="text-xs text-urgent">
+          Couldn&apos;t check whether you&apos;ve had this before, so this is not saying you haven&apos;t:{" "}
+          {previousError}
+        </p>
+      )}
 
       {stage !== "confirm" && previous && (
         <section className="bg-surface border border-accent rounded-2xl p-4 flex flex-col gap-2">
@@ -632,6 +705,8 @@ function GuideCard({ guide }: { guide: Guide }) {
           ))}
         </dl>
       )}
+
+      <RecipeImages quotes={guide.quotes} />
 
       {guide.dropped.length > 0 && (
         <p className="text-xs text-ink-soft">
@@ -734,23 +809,29 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
 
     setSaving(true);
     setError(null);
-    const res = await fetch(`/api/bags/${bag.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    setSaving(false);
+    try {
+      const res = await fetch(`/api/bags/${bag.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
 
-    // A save that failed used to close the card as though it had worked. The
-    // next render read the row back and quietly showed the old values.
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Couldn't save that bag.");
-      return;
+      // A save that failed used to close the card as though it had worked. The
+      // next render read the row back and quietly showed the old values.
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Couldn't save that bag.");
+      }
+
+      setOpen(false);
+      onChanged();
+    } catch (e) {
+      // A dropped connection throws rather than answering, and without this
+      // the button sat on "Saving…" forever with nothing said.
+      setError(e instanceof Error ? e.message : "Couldn't save that bag.");
+    } finally {
+      setSaving(false);
     }
-
-    setOpen(false);
-    onChanged();
   }
 
   const guideRows = [
@@ -888,6 +969,7 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
               ) : (
                 <p className="text-sm text-ink/60">Nothing recorded from the roaster.</p>
               )}
+              <RecipeImages quotes={bag.guide_quotes ?? []} />
             </div>
 
             {/* Only where the roaster published nothing. A tier-2 house guide
@@ -950,7 +1032,7 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
           <Brews
             bagId={bag.id}
             onCount={setBrewCount}
-            guide={{ dose: bag.guide_dose, water: bag.guide_water, ratio: bag.guide_ratio }}
+            guide={{ dose: bag.guide_dose, water: bag.guide_water, ratio: bag.guide_ratio, method: bag.guide_method }}
           />
         </div>
       )}
@@ -1073,9 +1155,23 @@ function Brews({
     setRating(null);
   }
 
+  /**
+   * Remove one logged brew, once the row has asked. A failure is said rather
+   * than swallowed: the list was reloaded either way, so a delete that did
+   * not happen used to look exactly like one that did not need to.
+   */
   async function removeBrew(id: string) {
-    await fetch(`/api/brews/${id}`, { method: "DELETE" });
-    await load();
+    setError(null);
+    try {
+      const res = await fetch(`/api/brews/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Couldn't remove that brew.");
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't remove that brew.");
+    }
   }
 
   return (
@@ -1248,6 +1344,7 @@ function Brews({
  * time and ratio are the two you actually compare between attempts.
  */
 function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
+  const [confirming, setConfirming] = useState(false);
   const pct = brew.tds_percent == null ? null : Number(brew.tds_percent);
   const ey = brew.extraction_yield == null ? null : Number(brew.extraction_yield);
   const dose = brew.dose_g == null ? null : Number(brew.dose_g);
@@ -1302,9 +1399,30 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
 
       {brew.notes && <span className="text-sm text-ink/70">{brew.notes}</span>}
 
-      <button onClick={onDelete} className="self-start text-xs text-urgent underline mt-1">
-        Remove
-      </button>
+      {/* Two taps, the second replacing the first, for the reason the bag's
+          own delete asks: a brew is one step of a dial-in, and losing it to a
+          stray tap on a phone cannot be undone. */}
+      {confirming ? (
+        <span className="flex items-center gap-3 mt-1 text-xs">
+          <span className="text-ink/70">Remove this brew?</span>
+          <button
+            onClick={() => {
+              setConfirming(false);
+              onDelete();
+            }}
+            className="text-urgent underline font-medium"
+          >
+            Yes, remove
+          </button>
+          <button onClick={() => setConfirming(false)} className="text-ink-soft underline">
+            Keep it
+          </button>
+        </span>
+      ) : (
+        <button onClick={() => setConfirming(true)} className="self-start text-xs text-urgent underline mt-1">
+          Remove
+        </button>
+      )}
     </div>
   );
 }
@@ -1407,12 +1525,23 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
  * lands on the row. Closing the card — or the tab — cannot lose it.
  */
 function Research({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
-  const [searching, setSearching] = useState(false);
+  // **Starts from the row.** A card opened while a search is already running
+  // on this bag — started from the scan screen, from another tab, or by this
+  // button before the card was closed — shows it running and offers no second
+  // one. It used to start idle, so two searches could race for one row. The
+  // route refuses a second one too; this is the same rule, visible.
+  const alreadyRunning = searchIsRunning(bag.guide_search_started_at);
+  const [searching, setSearching] = useState(alreadyRunning);
   const [error, setError] = useState<string | null>(null);
+  // Said beside the answer this search recorded, not in place of one.
+  const [warning, setWarning] = useState<string | null>(null);
   // Held in refs so a re-render of the library — which hands this component a
   // new onChanged every time — restarts the interval without forgetting that
   // the search was already seen running.
-  const seenRunning = useRef(false);
+  const seenRunning = useRef(alreadyRunning);
+  // The answer the row held when this search started, so "a new answer
+  // landed" can be told from "the old one is still there".
+  const answeredBefore = useRef(bag.guide_fetched_at);
   const changed = useRef(onChanged);
   changed.current = onChanged;
 
@@ -1422,7 +1551,9 @@ function Research({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
       return;
     }
     setError(null);
+    setWarning(null);
     seenRunning.current = false;
+    answeredBefore.current = bag.guide_fetched_at;
     setSearching(true);
 
     // Fired, not awaited — the same call the scan screen makes, for the same
@@ -1443,12 +1574,19 @@ function Research({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
     const launched = Date.now();
 
     const tick = async () => {
-      const res = await fetch(`/api/bags/${bag.id}`);
+      // No photo: this runs every four seconds and never shows one.
+      const res = await fetch(`/api/bags/${bag.id}?photo=0`);
       if (!res.ok) return;
       const fresh = (await res.json()).bag as Bag;
 
       if (fresh.guide_search_started_at) {
         seenRunning.current = true;
+        // A stamp nothing can still be working under: the function was
+        // stopped without reaching the line that records why.
+        if (searchIsStale(fresh.guide_search_started_at)) {
+          setSearching(false);
+          setError(STALE_SEARCH_MESSAGE);
+        }
         return;
       }
 
@@ -1456,15 +1594,22 @@ function Research({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
       // going", and the difference is whether this ever saw it running —
       // which is the same distinction the row exists to make. Give the
       // route a grace period to stamp the row before believing the second.
-      if (!seenRunning.current && Date.now() - launched < 20_000) return;
+      if (!seenRunning.current && Date.now() - launched < SEARCH_START_GRACE_MS) return;
 
       setSearching(false);
-      // A search that failed recorded why. Reporting nothing here would be
-      // the empty-and-unread confusion this app keeps paying for.
-      setError(
-        fresh.guide_search_error ??
-          (seenRunning.current ? null : "The search did not start. Nothing on this bag changed.")
-      );
+      // A search that recorded an answer may have recorded a warning beside
+      // it; one that failed recorded why instead. Reporting nothing here
+      // would be the empty-and-unread confusion this app keeps paying for.
+      const answered = !!fresh.guide_fetched_at && fresh.guide_fetched_at !== answeredBefore.current;
+      if (answered) {
+        setWarning(fresh.guide_search_error);
+        setError(null);
+      } else {
+        setError(
+          fresh.guide_search_error ??
+            (seenRunning.current ? null : "The search did not start. Nothing on this bag changed.")
+        );
+      }
       changed.current();
     };
 
@@ -1487,6 +1632,7 @@ function Research({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
         </span>
       )}
       {error && <span className="text-xs text-urgent text-right">{error}</span>}
+      {warning && !error && <span className="text-xs text-ink-soft text-right">{warning}</span>}
     </div>
   );
 }
@@ -1608,7 +1754,7 @@ function GuideStatusHeader({
   guideUrl,
 }: {
   status: GuideStatus;
-  quotes: { text: string }[];
+  quotes: { text: string; image?: string }[];
   guideUrl: string | null;
 }) {
   const { label, dot } = guidePresentation(status);
@@ -1657,7 +1803,7 @@ function GuideStatusHeader({
  * the summary of it. It was a collapsed `<details>` under the table, which
  * put the evidence one tap away from the claim it backs.
  */
-function Quotes({ quotes }: { quotes: { text: string }[] }) {
+function Quotes({ quotes }: { quotes: { text: string; image?: string }[] }) {
   if (!quotes?.length) return null;
   return (
     <div className="flex flex-col gap-2">
@@ -1666,10 +1812,46 @@ function Quotes({ quotes }: { quotes: { text: string }[] }) {
         {quotes.map((q, i) => (
           <li key={i} className="border-l-2 border-line pl-3 text-sm text-ink/70 italic">
             &ldquo;{q.text}&rdquo;
+            {q.image && <span className="not-italic text-xs text-ink-soft"> — {IMAGE_SOURCE_PRESENTATION.quoteNote}</span>}
           </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * The picture a recipe was copied off, directly under the values it backs
+ * (TEC-46).
+ *
+ * **Always shown, never behind the disclosure** the text quotes sit in. A
+ * sentence quoted from a page is checkable from the words alone; a copy-out
+ * of an image is a reading, and it is only as checkable as the picture beside
+ * it. That is the condition that lets it into `guide_*` at all, so the image
+ * is on screen wherever the values are.
+ *
+ * The image is served from the roaster's CDN, not stored here. It is linked
+ * full size, and requested with no referrer, so the roaster's host sees an
+ * image load and not which bag in this app asked for it.
+ */
+function RecipeImages({ quotes }: { quotes: { image?: string }[] }) {
+  const images = Array.from(new Set((quotes ?? []).map((q) => q.image).filter((u): u is string => !!u)));
+  if (images.length === 0) return null;
+  return (
+    <figure className="flex flex-col gap-2 mt-3">
+      {images.map((src) => (
+        <a key={src} href={src} target="_blank" rel="noreferrer" className="block">
+          <img
+            src={src}
+            alt={IMAGE_SOURCE_PRESENTATION.alt}
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            className="rounded-lg w-full max-h-96 object-contain bg-paper border border-line"
+          />
+        </a>
+      ))}
+      <figcaption className="text-xs text-ink-soft">{IMAGE_SOURCE_PRESENTATION.caption}</figcaption>
+    </figure>
   );
 }
 

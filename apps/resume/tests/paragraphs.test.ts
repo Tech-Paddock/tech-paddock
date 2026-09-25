@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readDocxParts, inflatedSize, MAX_INFLATED_BYTES, DocxReadError } from "../lib/docx/read";
+import { readDocxParts, inflatedBytes, MAX_INFLATED_BYTES, DocxReadError } from "../lib/docx/read";
+import { loadDocx } from "../lib/reskin/container";
 import { extractParagraphs } from "../lib/docx/paragraphs";
 
 const fixture = (name: string) => readFileSync(join(__dirname, "fixtures", name));
@@ -30,7 +31,7 @@ describe("tab stops are not tab characters", () => {
   it("keeps the real tab that sets a date against its right stop", async () => {
     const paras = await load("template-flat-sample.docx");
     const entry = paras.find((p) => p.text.includes("Lakeside Systems"))!;
-    expect(entry.text).toContain("\tJan 2026 - Present");
+    expect(entry.text).toContain("\tNov 2022 - Present");
     expect(entry.text.startsWith("\t")).toBe(false);
   });
 
@@ -124,14 +125,60 @@ describe("malicious input", () => {
     expect(outcome).toBe("inflated_too_large");
   }, 30000);
 
+  /**
+   * TEC-31. The size the guard summed was the one each entry *declares* — a
+   * number in the file, free to understate. An archive that lies about it
+   * passed, and was then inflated whole. The bytes are counted as they come out
+   * of the decompressor now.
+   */
+  it("refuses a bomb that understates its own size", async () => {
+    const JSZip = (await import("jszip")).default;
+    const padding = new Uint8Array(1024 * 1024).fill(32);
+    const bomb = await new JSZip()
+      .file("word/document.xml", padding)
+      .generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+    // Rewrite the declared uncompressed size, in the local header and the
+    // central directory, to 100 bytes.
+    for (let i = 0; i + 4 <= bomb.length; i += 1) {
+      const sig = bomb.readUInt32LE(i);
+      if (sig === 0x04034b50) bomb.writeUInt32LE(100, i + 22);
+      if (sig === 0x02014b50) bomb.writeUInt32LE(100, i + 24);
+    }
+    const declared = (await JSZip.loadAsync(bomb)).files["word/document.xml"] as unknown as {
+      _data: { uncompressedSize: number };
+    };
+    expect(declared._data.uncompressedSize).toBe(100);
+
+    const outcome = await readDocxParts(bomb, 64 * 1024).then(
+      () => "resolved",
+      (err: { code?: string }) => err.code
+    );
+    expect(outcome).toBe("inflated_too_large");
+  }, 30000);
+
+  /** TEC-31. The guard sat on the reader of the renderer's output; the upload
+   *  itself is opened by the reskin engine's `loadDocx`, which had none. */
+  it("refuses a bomb at the upload, before the renderer reads it", async () => {
+    const JSZip = (await import("jszip")).default;
+    const padding = new Uint8Array(1024 * 1024).fill(32);
+    const bomb = await new JSZip()
+      .file("word/document.xml", padding)
+      .generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+    const outcome = await loadDocx(bomb, "the tailored resume", 64 * 1024).then(
+      () => "resolved",
+      (err: { code?: string }) => err.code
+    );
+    expect(outcome).toBe("inflated_too_large");
+  }, 30000);
+
   it("reports the real fixtures as far below the production ceiling", async () => {
     const JSZip = (await import("jszip")).default;
     const zip = await JSZip.loadAsync(fixture("jobright-sample.docx"));
-    const size = inflatedSize(zip);
-    // Null would mean the guard is disabled, which is how it shipped the first
-    // time: directory entries have no size and were poisoning the total.
-    expect(size).not.toBeNull();
-    expect(size!).toBeLessThan(MAX_INFLATED_BYTES / 10);
+    const size = await inflatedBytes(zip, MAX_INFLATED_BYTES);
+    // Zero would mean the guard counted nothing, which is how it shipped the
+    // first time: directory entries have no size and were poisoning the total.
+    expect(size).toBeGreaterThan(0);
+    expect(size).toBeLessThan(MAX_INFLATED_BYTES / 10);
     await expect(readDocxParts(fixture("jobright-sample.docx"))).resolves.toBeTruthy();
   });
 });

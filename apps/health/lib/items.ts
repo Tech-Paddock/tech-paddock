@@ -66,17 +66,42 @@ const NUMBER_WORDS: Record<string, string> = {
 
 export function normalizeName(name: string): string {
   return name
+    // "jalapeño" and "jalapeno" are one food. Decompose, then drop the accents,
+    // and keep letters in any script rather than only a–z — "crème brûlée" was
+    // becoming "cr me br l e", which no other spelling ever met.
+    .normalize("NFKD")
+    .replace(/\p{M}+/gu, "")
     .toLowerCase()
     .replace(/&/g, " and ")
     // "#1" and "no. 1" both read as "number 1", so they meet "number one".
     .replace(/#/g, " number ")
     .replace(/\bno\.?\s+(?=\d)/g, " number ")
-    .replace(/[^a-z0-9]+/g, " ")
+    // An apostrophe joins rather than splits: "Wendy's" is one word.
+    .replace(/['’]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim()
     .split(" ")
-    .map((w) => NUMBER_WORDS[w] ?? w)
+    .map((w) => NUMBER_WORDS[w] ?? foldPlural(w))
     .join(" ")
     .trim();
+}
+
+/**
+ * Singular and plural meet at one key: "large fry" and "large fries", "cookie"
+ * and "cookies". Not English grammar — a stem both spellings reach, applied the
+ * same way to either, so what matters is that they agree, not that the key is a
+ * real word ("cookie" keys as "cooky"). Short words and the -ss/-us/-is endings
+ * ("glass", "hummus") are left alone.
+ */
+export function foldPlural(word: string): string {
+  if (word.length <= 3 || /\d/.test(word)) return word;
+  let w = word;
+  if (w.endsWith("s") && !/(ss|us|is)$/.test(w)) w = w.slice(0, -1);
+  // "sandwiches" / "sandwich", "boxes" / "box", "potatoes" / "potato".
+  if (/(ch|sh|ss|x|z|o)e$/.test(w)) w = w.slice(0, -1);
+  // "fries" / "fry", "brownies" / "brownie": both end in "y".
+  if (w.length > 3 && w.endsWith("ie")) w = `${w.slice(0, -2)}y`;
+  return w;
 }
 
 /**
@@ -86,15 +111,19 @@ export function normalizeName(name: string): string {
  * `effective_from` on or before that day, then within that era take the most
  * recently written row.
  *
- * That single rule gives both behaviours the two kinds need:
+ * **It runs at log time only** (TEC-21): each logged line snapshots what this
+ * returns, so a day already logged never re-resolves and no later version moves
+ * it. The rule still decides which figure a new log picks up:
  *
  * - A **correction** carries the `effective_from` of the era it corrects, so it
- *   supersedes inside that era without starting a new one — and every past day
- *   in that era resolves to it. The number was always wrong; now it is right,
- *   backwards.
+ *   supersedes inside that era without starting a new one — a log dated anywhere
+ *   in that era picks it up. The number was always wrong.
  * - A **change** carries its own later `effective_from`, so it starts a new era
- *   and days before it keep resolving to the older one. The food itself changed;
- *   Tuesday really did have the old macros and must not be falsified.
+ *   and a log dated before it still picks up the older one. The food itself
+ *   changed; Tuesday really did have the old macros.
+ *
+ * `kind` is also what a backfill of snapshotted days would read: a correction
+ * says the days before it were wrong, a change says they were right.
  *
  * The fallback matters more than it looks: an entry dated before an item's
  * earliest version resolves to that earliest version rather than to nothing. A

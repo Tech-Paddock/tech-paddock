@@ -88,7 +88,7 @@ async function setArchived(id: string, target: { is_active: boolean }, archived:
  * id, version and a hash of its exact bytes at render time.
  *
  * So `renders.template_id` is nullable with `on delete set null` (migration
- * 20260918014500), and the render keeps its own account of its origin. Archiving
+ * 20260918041216), and the render keeps its own account of its origin. Archiving
  * remains the normal path; this is for clearing out test runs.
  *
  * **Still refused for the active template** — that guard is untouched, because

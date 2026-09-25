@@ -97,8 +97,8 @@ describe("comparing a finished resume against the document its text came from", 
   describe("text that moved rather than went missing", () => {
     it("accepts an employer line that had a job title inserted into it", () => {
       const result = compareContent(
-        doc("Northwind Athletics Jan 2026 - Present"),
-        doc("Northwind Athletics", "   Sr. Platform Administrator", "\tJan 2026 - Present")
+        doc("Northwind Athletics Nov 2022 - Present"),
+        doc("Northwind Athletics", "   Sr. Platform Administrator", "\tNov 2022 - Present")
       );
       expect(result.missing).toEqual([]);
     });

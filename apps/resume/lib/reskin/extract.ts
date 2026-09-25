@@ -1,7 +1,9 @@
 import type { Block } from "./blocks";
 import { extractText, isBold, isItalic, hasNumPr, splitRows, splitCells, cellParagraphs } from "./blocks";
 import { matchSectionKey, splitCompanyAndTitleDate, type SectionKey } from "./sections";
-import type { SourceContent, ExperienceEntry, CompetencyRow, StatCell } from "./types";
+import { isHeadingCandidate, isKnownHeading, rankSizes } from "../docx/headings";
+import { extractParagraphs, type Para } from "../docx/paragraphs";
+import type { SourceContent, ExperienceEntry, CompetencyRow, StatCell, UnplacedSection } from "./types";
 
 interface RawExpLine {
   text: string;
@@ -19,7 +21,11 @@ interface RawExpLine {
  * line whose whole text equals one of them is a heading rather than body copy.
  */
 export function extractSourceContent(blocks: Block[]): SourceContent {
-  let currentSection: SectionKey | null = null;
+  const isUnknownHeading = unknownHeadingTest(blocks);
+  // "unplaced" is a heading this template has no section for. Everything under
+  // it is counted and reported rather than collected.
+  let currentSection: SectionKey | "unplaced" | null = null;
+  const unplaced: UnplacedSection[] = [];
   const summaryParts: string[] = [];
   const expLines: RawExpLine[] = [];
   let careerHighlights: StatCell[] | null = null;
@@ -38,9 +44,21 @@ export function extractSourceContent(blocks: Block[]): SourceContent {
           currentSection = key;
           continue;
         }
+        // A heading with no section here — "Projects" after Experience. It ends
+        // the section before it, which used to run on and read every project as
+        // another job. Front matter is left alone: nothing is collected there,
+        // and the name block is exactly where a large one-off line lives.
+        if (currentSection !== null && (isKnownHeading(text) || isUnknownHeading(block))) {
+          currentSection = "unplaced";
+          unplaced.push({ heading: text, lines: 0 });
+          continue;
+        }
       }
 
       switch (currentSection) {
+        case "unplaced":
+          unplaced[unplaced.length - 1].lines += 1;
+          break;
         case null:
           // Front matter — the name and contact block. Deliberately dropped: the
           // template's own header is always kept, and pulling a second copy of
@@ -81,6 +99,7 @@ export function extractSourceContent(blocks: Block[]): SourceContent {
     } else if (block.type === "tbl") {
       if (currentSection === "careerHighlights") careerHighlights = statCellsFromTable(block.raw);
       else if (currentSection === "competencies") competencies = competencyRowsFromTable(block.raw);
+      else if (currentSection === "unplaced") unplaced[unplaced.length - 1].lines += 1;
     }
   }
 
@@ -96,6 +115,31 @@ export function extractSourceContent(blocks: Block[]): SourceContent {
     careerHighlights,
     experience: groupExperienceEntries(expLines),
     competencies,
+    ...(unplaced.length > 0 ? { unplacedSections: unplaced } : {}),
+  };
+}
+
+/**
+ * Is this block a heading the vocabulary does not know?
+ *
+ * Text alone cannot say — an unknown heading is by definition not in the list —
+ * so this asks the question `lib/docx/headings.ts` already answers for the lint
+ * and the outline: set at the document's recurring heading size, with no date
+ * range and no interior tab. Italic is excluded as well: a job title set at the
+ * heading size is italic in every source seen, and a heading never has been, so
+ * a title line cannot end Experience early.
+ */
+function unknownHeadingTest(blocks: Block[]): (block: Block) => boolean {
+  const paraOf = new Map<Block, Para>();
+  for (const block of blocks) {
+    if (block.type !== "p") continue;
+    const para = extractParagraphs(block.raw)[0];
+    if (para && para.text.trim()) paraOf.set(block, para);
+  }
+  const { heading } = rankSizes([...paraOf.values()]);
+  return (block) => {
+    const p = paraOf.get(block);
+    return heading !== null && !!p && p.size === heading && !p.italic && isHeadingCandidate(p);
   };
 }
 

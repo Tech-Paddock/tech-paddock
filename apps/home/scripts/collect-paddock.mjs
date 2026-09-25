@@ -9,9 +9,7 @@
  * exist during the build and are not reliably readable at runtime.
  *
  * Build-time means these rows are only as fresh as the last deploy, and the page
- * says so out loud rather than implying otherwise. Once GITHUB_TOKEN is set the
- * same content is read live through the Contents API and this becomes the floor
- * rather than the ceiling.
+ * says so out loud rather than implying otherwise. Nothing reads them live.
  *
  * The parsing is deliberately dumb, and that is a decision rather than laziness.
  * Handoffs are prose written for people; the moment a UI depends on their shape,

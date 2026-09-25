@@ -1,5 +1,5 @@
 import { getServiceClient } from "./supabase";
-import { LookupError } from "./errors";
+import { ConflictError, InputError, LookupError } from "./errors";
 
 /**
  * The shopping list, and the two ways it leaves this app.
@@ -12,10 +12,29 @@ import { LookupError } from "./errors";
  * list rather than being reopened.
  *
  * **This is `cookbook.grocery_items`, not Health's table.** Health's `/list` is
- * live and stays Health's until the technical director sequences the move
- * (ledger item 23 — destructive, so two pull requests). Nothing here writes
- * `health.*`, and nothing here assumes that screen disappears on any date.
+ * live and stays Health's until its redirect onto this app's `/list` ships
+ * (TEC-15 — destructive, so two pull requests). Nothing here writes `health.*`,
+ * and nothing here assumes that screen disappears on any date.
  */
+
+/**
+ * A typed line, split into what is searched and what is only for the shopper.
+ *
+ * **Anything after the first " — " is a note** (TEC-29 item 3): "Milk — the
+ * small tin" searches King Soopers for *Milk*, because "the small tin" narrows a
+ * search to nothing. The help text under the add box promised this before
+ * anything did it. Only a spaced em dash splits, so a hyphenated name never does.
+ */
+export function splitLine(line: string): { name: string; note: string | null } {
+  const at = line.indexOf(" — ");
+  if (at === -1) return { name: line.trim(), note: null };
+  const name = line.slice(0, at).trim();
+  const note = line.slice(at + 3).trim();
+  // A line that is all note ("— the small tin") keeps its words as the name
+  // rather than becoming a nameless row the database refuses.
+  if (!name) return { name: line.replace(/^\s*—\s*/, "").trim(), note: null };
+  return { name, note: note || null };
+}
 
 export type GrocerySource = "manual" | "recipe";
 
@@ -26,7 +45,39 @@ export type GroceryItem = {
   source: GrocerySource;
   checked: boolean;
   created_at: string;
+  /**
+   * Names of the recipes this line came from — a snapshot, plain text, no join
+   * (TEC-39 B; reasoning in the `cookbook_menu_and_line_recipes` migration).
+   * Empty for a typed line and for recipe lines added before the column existed.
+   */
+  recipes: string[];
 };
+
+const COLUMNS = "id, name, note, source, checked, created_at, recipes";
+
+/** `text[]` can come back null from an older client or row; a line always has a list. */
+function hydrate(row: Record<string, unknown>): GroceryItem {
+  return { ...(row as unknown as GroceryItem), recipes: Array.isArray(row.recipes) ? (row.recipes as string[]) : [] };
+}
+
+/**
+ * The recipe names a merged line should carry: every absorbed line's, in order,
+ * **without duplicates** — two recipes' olive oil becomes one line naming both,
+ * and the same recipe twice names it once.
+ */
+export function unionRecipes(lines: Pick<GroceryItem, "recipes">[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of lines) {
+    for (const name of line.recipes ?? []) {
+      const key = name.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(name.trim());
+    }
+  }
+  return out;
+}
 
 /**
  * A King Soopers search for one line.
@@ -71,34 +122,32 @@ export function asText(items: GroceryItem[]): string {
 export async function readList(): Promise<GroceryItem[]> {
   const { data, error } = await getServiceClient()
     .from("grocery_items")
-    .select("id, name, note, source, checked, created_at")
+    .select(COLUMNS)
     .order("checked", { ascending: true })
     .order("created_at", { ascending: true });
 
   if (error) throw new LookupError(`Couldn't read the list: ${error.message}`);
-  return (data ?? []) as GroceryItem[];
+  return (data ?? []).map((r) => hydrate(r as Record<string, unknown>));
 }
 
 export async function addItems(
-  lines: { name: string; note?: string | null; source?: GrocerySource }[]
+  lines: { name: string; note?: string | null; source?: GrocerySource; recipes?: string[] }[]
 ): Promise<GroceryItem[]> {
   const rows = lines
     .map((l) => ({
       name: l.name.trim(),
       note: l.note?.trim() || null,
       source: l.source ?? ("manual" as GrocerySource),
+      recipes: unionRecipes([{ recipes: l.recipes ?? [] }]),
     }))
     .filter((l) => l.name.length > 0);
 
-  if (rows.length === 0) throw new LookupError("Nothing to add.");
+  if (rows.length === 0) throw new InputError("Nothing to add.");
 
-  const { data, error } = await getServiceClient()
-    .from("grocery_items")
-    .insert(rows)
-    .select("id, name, note, source, checked, created_at");
+  const { data, error } = await getServiceClient().from("grocery_items").insert(rows).select(COLUMNS);
 
   if (error) throw new LookupError(`Couldn't add that: ${error.message}`);
-  return (data ?? []) as GroceryItem[];
+  return (data ?? []).map((r) => hydrate(r as Record<string, unknown>));
 }
 
 export async function setChecked(id: string, checked: boolean): Promise<void> {
@@ -135,12 +184,16 @@ export type TidyLine = {
  *
  * Every open line must be absorbed exactly once. Not zero times, which loses an
  * item; not twice, which would let one row vanish into two lines and double what
- * you buy.
+ * you buy. And every proposed line must absorb at least one, or it is shopping
+ * the model added.
  */
 export function validateTidy(open: GroceryItem[], lines: TidyLine[]): string | null {
   const seen = new Map<string, number>();
   for (const line of lines) {
     if (!line.name.trim()) return "A proposed line has no name.";
+    // A line that replaces nothing is a line nobody listed — the tidy adding
+    // shopping rather than consolidating it (TEC-29 item 8).
+    if (line.absorbed.length === 0) return `"${line.name.trim()}" isn't on your list.`;
     for (const id of line.absorbed) {
       seen.set(id, (seen.get(id) ?? 0) + 1);
     }
@@ -178,9 +231,15 @@ function sourceOf(line: TidyLine, open: GroceryItem[]): GrocerySource {
 /** Apply an approved tidy: the absorbed rows go, the consolidated lines arrive. */
 export async function applyTidy(open: GroceryItem[], lines: TidyLine[]): Promise<GroceryItem[]> {
   const problem = validateTidy(open, lines);
-  if (problem) throw new LookupError(problem);
+  if (problem) throw new ConflictError(problem);
 
-  const rows = lines.map((l) => ({ name: l.name, note: l.note, source: sourceOf(l, open) }));
+  const rows = lines.map((l) => ({
+    name: l.name,
+    note: l.note,
+    source: sourceOf(l, open),
+    // The merged line names every recipe its rows came from (TEC-39 B).
+    recipes: unionRecipes(l.absorbed.map((id) => open.find((i) => i.id === id) ?? { recipes: [] })),
+  }));
 
   // Write first, then delete. The other order has a window where a failed insert
   // leaves you with no list at all, in a shop, which is the one outcome worth

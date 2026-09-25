@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { searchFor, searchUrl } from "../lib/grocery";
+import { isKingSoopersProduct } from "../lib/kingsoopers";
 import {
   matchPreference,
   normalizePhrase,
@@ -103,6 +104,21 @@ describe("resolveLink", () => {
   });
 });
 
+describe("isKingSoopersProduct — what Paste accepts", () => {
+  it("accepts a product page", () => {
+    expect(isKingSoopersProduct("https://www.kingsoopers.com/p/fairlife-2-milk/0020262400000")).toBe(true);
+    expect(isKingSoopersProduct("  https://kingsoopers.com/p/eggs/0001111060903  ")).toBe(true);
+  });
+
+  it("refuses a search, another shop, plain http and plain words", () => {
+    expect(isKingSoopersProduct("https://www.kingsoopers.com/q/milk")).toBe(false);
+    expect(isKingSoopersProduct("https://www.kroger.com/p/fairlife/0020262400000")).toBe(false);
+    expect(isKingSoopersProduct("http://www.kingsoopers.com/p/fairlife/0020262400000")).toBe(false);
+    expect(isKingSoopersProduct("fairlife 2%")).toBe(false);
+    expect(isKingSoopersProduct("https://www.kingsoopers.com.evil.example/p/x")).toBe(false);
+  });
+});
+
 describe("readDraft", () => {
   it("refuses a product preference with no link", () => {
     const read = readDraft({ phrase: "milk", kind: "product" });
@@ -122,13 +138,29 @@ describe("readDraft", () => {
   });
 
   it("drops the payload that does not belong to the kind", () => {
-    const read = readDraft({ phrase: "whole milk", kind: "plain", url: "https://example.com", terms: "x" });
+    const read = readDraft({ phrase: "milk", kind: "terms", url: "https://example.com", terms: "fairlife 2%" });
     expect("row" in read && read.row.url).toBeNull();
-    expect("row" in read && read.row.terms).toBeNull();
+    expect("row" in read && read.row.terms).toBe("fairlife 2%");
   });
 
-  it("keeps the brand, because a line that cannot say what it picked is not legible", () => {
+  it("refuses plain, from the editor and from a batch alike (TEC-39)", () => {
+    const read = readDraft({ phrase: "whole milk", kind: "plain" });
+    expect("error" in read && read.error).toContain("whole milk");
+  });
+
+  it("keeps a brand a batch sends, though the editor no longer asks for one", () => {
     const read = readDraft({ phrase: "milk", kind: "terms", terms: "fairlife 2%", brand: "Fairlife" });
     expect("row" in read && read.row.brand).toBe("Fairlife");
+  });
+
+  it("leaves note and brand out of the write when they were not sent — editing keeps the note (TEC-29)", () => {
+    const read = readDraft({ phrase: "milk", kind: "terms", terms: "fairlife 2%" });
+    expect("row" in read && "note" in read.row).toBe(false);
+    expect("row" in read && "brand" in read.row).toBe(false);
+  });
+
+  it("clears a note only when a blank one is sent on purpose", () => {
+    const read = readDraft({ phrase: "milk", kind: "terms", terms: "fairlife 2%", note: "  " });
+    expect("row" in read && read.row.note).toBeNull();
   });
 });

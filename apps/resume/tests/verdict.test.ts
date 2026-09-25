@@ -1,5 +1,23 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { verdictFor, type VerdictInput } from "@/lib/verdict";
+import { readDocxParts } from "@/lib/docx/read";
+import { extractParagraphs } from "@/lib/docx/paragraphs";
+import { auditAts } from "@/lib/docx/ats";
+import { compareLines } from "@/lib/docx/compare";
+import { linesTaken, reskin } from "@/lib/reskin/generate";
+
+const fixture = (n: string) => readFileSync(join(__dirname, "fixtures", n));
+
+/** The verdict exactly as the reformat route and the Reformat tab compute it. */
+async function verdictOfRender(template: string) {
+  const { docx, changeLog, content } = await reskin(fixture(template), fixture("jobright-sample.docx"));
+  const rendered = await readDocxParts(docx);
+  const paras = extractParagraphs(rendered.document);
+  const coverage = compareLines(linesTaken(content), paras);
+  return { verdict: verdictFor({ coverage, findings: auditAts(rendered, paras), changeLog }), coverage };
+}
 
 const clean: VerdictInput = { coverage: { missing: [] }, findings: [], changeLog: [] };
 
@@ -45,14 +63,33 @@ describe("the reformat verdict", () => {
     const v = verdictFor({
       ...clean,
       changeLog: [
-        { section: "Professional Experience", action: "trimmed-surplus" },
-        { section: "Professional Experience", action: "trimmed-surplus" },
+        { section: "Professional Experience", action: "input-dropped" },
+        { section: "Professional Experience", action: "input-dropped" },
       ],
     });
     expect(v.pass).toBe(false);
     expect(v.reasons[0]).toBe(
       "2 entries had nowhere to go in the template and were dropped — Professional Experience."
     );
+  });
+
+  /** TEC-31. A template line the input had no counterpart for is not a loss of
+   *  the input, and it used to share an action name with one — so the verdict
+   *  failed every ordinary reformat whose source had fewer bullets than the
+   *  template. It is a note now, and never votes. */
+  it("does not fail when the template had lines the input did not fill, and notes them", () => {
+    const v = verdictFor({
+      ...clean,
+      changeLog: [
+        { section: "Professional Experience", action: "template-trimmed" },
+        { section: "Core Competencies", action: "template-trimmed" },
+      ],
+    });
+    expect(v.pass).toBe(true);
+    expect(v.reasons).toEqual([]);
+    expect(v.notes).toEqual([
+      "2 template lines with no counterpart in the source were left out — Professional Experience, Core Competencies.",
+    ]);
   });
 
   it("fails when a template section went unfilled, because it ships the template's own words", () => {
@@ -97,12 +134,27 @@ describe("the reformat verdict", () => {
         { severity: "warning", message: "Warning thing." },
       ],
       changeLog: [
-        { section: "Professional Experience", action: "trimmed-surplus" },
+        { section: "Professional Experience", action: "input-dropped" },
         { section: "Summary", action: "not-found-in-input" },
       ],
     });
     expect(v.pass).toBe(false);
     expect(v.reasons).toHaveLength(4);
     expect(v.notes).toEqual(["Warning thing."]);
+  });
+
+  /**
+   * TEC-31, end to end. The current template's structure and the repo's own
+   * source export arrive at 100% coverage with no blocking finding, and the
+   * verdict used to read FAIL anyway — because a template bullet the source had
+   * no counterpart for was logged under the same action as input that had
+   * nowhere to go. A unit test of `verdictFor` alone could not have caught it:
+   * the misreading lived between the renderer's vocabulary and the verdict's.
+   */
+  it("passes the repo's own fixture pair, which lost nothing", async () => {
+    const { verdict, coverage } = await verdictOfRender("template-flat-sample.docx");
+    expect(coverage.missing).toEqual([]);
+    expect(verdict.reasons).toEqual([]);
+    expect(verdict.pass).toBe(true);
   });
 });

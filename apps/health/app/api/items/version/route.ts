@@ -11,10 +11,11 @@ export const dynamic = "force-dynamic";
  * interchangeable:
  *
  * - `correction` — the number was always wrong. It takes the `effective_from`
- *   of the era in effect on the given date, so it supersedes inside that era
- *   and every past day in it resolves to the new figure.
+ *   of the era in effect on the given date, so it supersedes inside that era.
  * - `change` — the food itself changed. It takes its own date and starts a new
- *   era, so days before it keep the numbers they actually had.
+ *   era, so a log dated before it still picks up the older numbers.
+ *
+ * Neither moves a day already logged: those carry a snapshot (TEC-21).
  *
  * **A change must carry the date the food changed, not the date you noticed.**
  * Defaulting that would silently misdate the boundary, and the boundary is the
@@ -55,13 +56,12 @@ export async function POST(request: NextRequest) {
   if (!itemId) return NextResponse.json({ error: "Which food?" }, { status: 400 });
   if (!macros) return NextResponse.json({ error: "Those numbers are not usable." }, { status: 400 });
 
-  const date = typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)
-    ? body.date
-    : new Date().toISOString().slice(0, 10);
-
-  if (kind === "change" && !/^\d{4}-\d{2}-\d{2}$/.test(body.date ?? "")) {
+  // Always the phone's date, never a UTC fallback. For a change it is the date
+  // the food changed; for a correction, today, which picks the era it corrects.
+  const date = typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date) ? body.date : null;
+  if (!date) {
     return NextResponse.json(
-      { error: "A change needs the date the food changed — not today's date by default." },
+      { error: kind === "change" ? "A change needs the date the food changed — not today's date by default." : "Send today's date." },
       { status: 400 }
     );
   }

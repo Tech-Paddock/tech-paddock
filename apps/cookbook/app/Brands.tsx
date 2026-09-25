@@ -2,48 +2,78 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Preference, PreferenceKind } from "@/lib/preferences";
+import { isKingSoopersProduct } from "@/lib/kingsoopers";
 
 /**
- * The brands you have told it about — the editor, and the panel that lists them.
+ * Your brands — the panel that lists them, and the one editor.
  *
- * **Both live on the shop section rather than on a settings page.** The surface
- * is settled as *site*: one long page, a thin index by verb. A preferences route
- * would be a second place to go and the only thing it would hold is this.
+ * **Remembering happens only here** (Joel, 2026-09-24, TEC-39). The list's lines
+ * used to carry a *remember* link each; they are just the item and its link now,
+ * and **Remember a brand** opens the editor empty. It lives at the bottom of the
+ * King Soopers list tab, collapsed, rather than on a settings page: a preferences
+ * route would be a second place to go and the only thing it would hold is this.
+ *
+ * **Why remembering cannot read the product you picked.** A line's link opens
+ * King Soopers in a new tab, cross-origin, and this project's proxy refuses
+ * kingsoopers.com server-side, so nothing here can see where you ended up. Copy
+ * the product page's address there, then **Paste** here: that is the floor, and
+ * Joel knows it is.
  */
 
-const KINDS: { value: PreferenceKind; label: string; hint: string }[] = [
-  { value: "product", label: "This exact product", hint: "Paste the King Soopers page you buy from." },
+const KINDS: { value: Exclude<PreferenceKind, "plain">; label: string; hint: string }[] = [
+  { value: "product", label: "This exact product", hint: "Copy the product page's address at King Soopers, then Paste." },
   { value: "terms", label: "Better search words", hint: "What you would type in the shop's search box." },
-  { value: "plain", label: "Just search it plainly", hint: "Use this to stop a broader brand reaching this line." },
 ];
 
 export function RememberForm({
-  phrase,
   existing,
   onSaved,
   onCancel,
 }: {
-  phrase: string;
+  /** The row being edited, or null for a new one. The caller keys this form by it. */
   existing: Preference | null;
   onSaved: () => void;
   onCancel: () => void;
 }) {
-  const [text, setText] = useState(existing?.phrase ?? phrase);
-  const [kind, setKind] = useState<PreferenceKind>(existing?.kind ?? "terms");
+  const [text, setText] = useState(existing?.phrase ?? "");
+  // A row saved as `plain` before 2026-09-24 opens as terms: plain is no longer
+  // something the editor can write.
+  const [kind, setKind] = useState<Exclude<PreferenceKind, "plain">>(
+    existing?.kind === "product" ? "product" : "terms"
+  );
   const [url, setUrl] = useState(existing?.url ?? "");
   const [terms, setTerms] = useState(existing?.terms ?? "");
-  const [brand, setBrand] = useState(existing?.brand ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  async function paste() {
+    setError(null);
+    try {
+      const copied = (await navigator.clipboard.readText()).trim();
+      if (!isKingSoopersProduct(copied)) {
+        setError("That isn't a King Soopers product page. Copy the address from the product's own page.");
+        return;
+      }
+      setUrl(copied);
+    } catch {
+      // Refused often enough — a declined prompt, or the hub framing this page —
+      // that a silent failure would look like the button doing nothing.
+      setError("Couldn't read the clipboard. Paste the address into the box instead.");
+    }
+  }
 
   async function save() {
     if (busy) return;
     setBusy(true);
+    setError(null);
     try {
+      // **No brand and no note in this body, on purpose.** A field left out is a
+      // field the save leaves alone (`readDraft`), so editing a rule never wipes
+      // the note a batch gave it.
       const response = await fetch("/api/preferences", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phrase: text, kind, url, terms, brand }),
+        body: JSON.stringify({ phrase: text, kind, url, terms }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't save that.");
@@ -59,21 +89,16 @@ export function RememberForm({
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface-raised p-3">
-      <label className="text-xs text-ink-soft">
-        Whenever a line mentions
+      <label className="flex items-center gap-2 text-xs text-ink-soft">
+        Item
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-line bg-surface p-2 text-base"
-          aria-label="The words to match on"
+          placeholder="milk"
+          className="w-40 rounded border border-line bg-surface px-2 py-1 text-sm"
+          aria-label="Item"
         />
       </label>
-      {/* Said out loud, because it is the whole rule and it is not obvious from a
-          text box: the narrower phrase is the one that decides. */}
-      <p className="text-[11px] text-ink-soft">
-        Write it the way you shop — <b>milk</b>, not <b>2% milk 52oz</b>. The longest phrase that
-        matches a line wins, so a narrower one you add later quietly takes over.
-      </p>
 
       <div className="flex flex-wrap gap-2">
         {KINDS.map((k) => (
@@ -92,15 +117,23 @@ export function RememberForm({
       <p className="text-[11px] text-ink-soft">{chosen?.hint}</p>
 
       {kind === "product" ? (
-        <input
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://www.kingsoopers.com/p/…"
-          aria-label="The product page"
-          className="rounded-lg border border-line bg-surface p-2 text-base"
-        />
-      ) : null}
-      {kind === "terms" ? (
+        <div className="flex gap-2">
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://www.kingsoopers.com/p/…"
+            aria-label="The product page"
+            className="min-w-0 flex-1 rounded-lg border border-line bg-surface p-2 text-base"
+          />
+          <button
+            type="button"
+            onClick={paste}
+            className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs"
+          >
+            Paste
+          </button>
+        </div>
+      ) : (
         <input
           value={terms}
           onChange={(e) => setTerms(e.target.value)}
@@ -108,15 +141,7 @@ export function RememberForm({
           aria-label="The words to search"
           className="rounded-lg border border-line bg-surface p-2 text-base"
         />
-      ) : null}
-
-      <input
-        value={brand}
-        onChange={(e) => setBrand(e.target.value)}
-        placeholder="Brand, so the line can say what it picked (optional)"
-        aria-label="Brand"
-        className="rounded-lg border border-line bg-surface p-2 text-sm"
-      />
+      )}
 
       {error ? <p className="text-xs text-danger">{error}</p> : null}
 
@@ -137,11 +162,12 @@ export function RememberForm({
   );
 }
 
-export default function Brands({ version, onChanged }: { version: number; onChanged: () => void }) {
+export default function Brands({ onChanged }: { onChanged: () => void }) {
   const [preferences, setPreferences] = useState<Preference[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Preference | null>(null);
+  // The row being edited, "new" for an empty form, or null for no form.
+  const [editing, setEditing] = useState<Preference | "new" | null>(null);
   const [paste, setPaste] = useState("");
   const [outcome, setOutcome] = useState<string | null>(null);
 
@@ -161,7 +187,7 @@ export default function Brands({ version, onChanged }: { version: number; onChan
 
   useEffect(() => {
     if (open) void load();
-  }, [open, load, version]);
+  }, [open, load]);
 
   async function forget(id: string) {
     const response = await fetch("/api/preferences", {
@@ -233,8 +259,7 @@ export default function Brands({ version, onChanged }: { version: number; onChan
 
           {preferences?.length === 0 ? (
             <p className="text-xs text-ink-soft">
-              Nothing yet. Tap <b>remember</b> beside a line the next time its link takes you
-              somewhere wrong.
+              Nothing yet. <b>Remember a brand</b> the next time a line&rsquo;s link takes you somewhere wrong.
             </p>
           ) : null}
 
@@ -248,7 +273,7 @@ export default function Brands({ version, onChanged }: { version: number; onChan
                       {p.kind === "plain"
                         ? " — searched plainly, on purpose"
                         : p.kind === "product"
-                          ? ` — ${p.brand ?? "a product page"}`
+                          ? " — a product page"
                           : ` — “${p.terms}”`}
                     </span>
                   </span>
@@ -273,8 +298,11 @@ export default function Brands({ version, onChanged }: { version: number; onChan
 
           {editing ? (
             <RememberForm
-              phrase={editing.phrase}
-              existing={editing}
+              // **Keyed by the row**, or the form keeps the last row's values:
+              // its state is set once, so edit milk, then edit eggs, and the
+              // form still said milk — and saving rewrote milk (TEC-29 item 1).
+              key={editing === "new" ? "new" : editing.id}
+              existing={editing === "new" ? null : editing}
               onCancel={() => setEditing(null)}
               onSaved={() => {
                 setEditing(null);
@@ -282,7 +310,15 @@ export default function Brands({ version, onChanged }: { version: number; onChan
                 onChanged();
               }}
             />
-          ) : null}
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditing("new")}
+              className="self-start rounded-lg border border-line px-3 py-1.5 text-xs"
+            >
+              Remember a brand
+            </button>
+          )}
 
           {/* The receipts path. The aggregation happens in a session that has the
               receipts; this only ever sees the rows it produced, and the receipts
@@ -293,7 +329,7 @@ export default function Brands({ version, onChanged }: { version: number; onChan
               value={paste}
               onChange={(e) => setPaste(e.target.value)}
               rows={4}
-              placeholder={'[{"phrase":"milk","kind":"terms","terms":"fairlife 2%","brand":"Fairlife"}]'}
+              placeholder={'[{"phrase":"milk","kind":"terms","terms":"fairlife 2%"}]'}
               aria-label="A batch of preferences as JSON"
               className="mt-2 w-full rounded-lg border border-line bg-surface p-2 font-mono text-xs"
             />

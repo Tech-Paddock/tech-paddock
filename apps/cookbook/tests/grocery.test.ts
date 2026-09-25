@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asText, searchUrl, validateTidy, type GroceryItem, type TidyLine } from "@/lib/grocery";
+import { asText, searchUrl, splitLine, unionRecipes, validateTidy, type GroceryItem, type TidyLine } from "@/lib/grocery";
 
 /**
  * The shopping list's pure half, and it is mostly one function.
@@ -16,6 +16,7 @@ function item(over: Partial<GroceryItem> & { id: string; name: string }): Grocer
     source: "manual",
     checked: false,
     created_at: "2026-09-20T00:00:00Z",
+    recipes: [],
     ...over,
   };
 }
@@ -83,5 +84,54 @@ describe("what leaves the app", () => {
     expect(searchUrl(item({ id: "a", name: "whole  milk", note: "the small tin" }))).toBe(
       "https://www.kingsoopers.com/q/whole%20milk"
     );
+  });
+});
+
+describe("a typed line with a note (TEC-29 item 3)", () => {
+  // Until 2026-09-25 nothing produced a note: the add box stored the whole line
+  // as the name, so "Milk — the small tin" was searched exactly as typed. These
+  // run a typed line all the way to what leaves the app.
+  it("splits on the first spaced em dash into a name and a note", () => {
+    expect(splitLine("Milk — the small tin")).toEqual({ name: "Milk", note: "the small tin" });
+    expect(splitLine("Eggs — the big box — free range")).toEqual({
+      name: "Eggs",
+      note: "the big box — free range",
+    });
+  });
+
+  it("leaves a line with no note, or only a hyphen, whole", () => {
+    expect(splitLine("Milk")).toEqual({ name: "Milk", note: null });
+    expect(splitLine("Half-and-half")).toEqual({ name: "Half-and-half", note: null });
+    expect(splitLine("Milk — ")).toEqual({ name: "Milk", note: null });
+  });
+
+  it("searches only the name, and copies the note back out", () => {
+    const typed = item({ id: "a", ...splitLine("Milk — the small tin") });
+    expect(searchUrl(typed)).toBe("https://www.kingsoopers.com/q/Milk");
+    expect(asText([typed])).toBe("Milk — the small tin");
+  });
+});
+
+describe("which recipes a line came from (TEC-39 B)", () => {
+  it("a merged line names every recipe its rows came from, once each, in order", () => {
+    expect(
+      unionRecipes([
+        { recipes: ["Green bean almondine"] },
+        { recipes: ["Chicken thighs", "green bean almondine "] },
+        { recipes: [] },
+      ])
+    ).toEqual(["Green bean almondine", "Chicken thighs"]);
+  });
+
+  it("a typed line, or an old recipe line, names none", () => {
+    expect(unionRecipes([{ recipes: [] }])).toEqual([]);
+  });
+});
+
+describe("a tidy that adds shopping (TEC-29 item 8)", () => {
+  it("refuses a proposed line that absorbs no line on the list", () => {
+    expect(
+      validateTidy(open, [line("Garlic", ["a", "b"]), line("Eggs", ["c"]), line("Bread", [])])
+    ).toContain("Bread");
   });
 });

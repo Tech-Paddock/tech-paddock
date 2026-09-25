@@ -29,8 +29,16 @@ export function fakeSupabase(tables: Record<string, Result | ((call: Call) => Re
     const chain: Record<string, unknown> = {
       select: () => chain,
       order: () => chain,
-      limit: () => chain,
-      in: () => chain,
+      // Recorded, so a test can assert a list is not silently capped and that
+      // an id list is batched.
+      limit: (n: number) => {
+        call.filters.push(["limit", n]);
+        return chain;
+      },
+      in: (column: string, values: unknown[]) => {
+        call.filters.push([`in:${column}`, values]);
+        return chain;
+      },
       // Null checks record themselves as filters so a test can assert which
       // branch of the templates list ran — archived or live.
       is: (column: string, value: unknown) => {

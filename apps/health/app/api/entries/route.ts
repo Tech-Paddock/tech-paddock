@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { saveEntry, type Draft, type DraftItem } from "@/lib/log";
-import { LookupError } from "@/lib/items";
+import { saveEntry, DraftError, type Draft, type DraftItem } from "@/lib/log";
+import { LookupError, normalizeName } from "@/lib/items";
 import { isMeal } from "@/lib/meals";
 import { parseMacros } from "@/lib/macros";
 
@@ -12,9 +12,9 @@ const SOURCES = ["hand", "web", "estimate"];
  * Approve a draft. **The only route in this app that writes to the log.**
  *
  * The draft comes back from the browser where it may have been edited, so every
- * field is re-validated here rather than trusted. Whether an edit becomes a new
- * version is decided in `saveEntry` by re-resolving and comparing, not by a flag
- * the client sends.
+ * field is re-validated here rather than trusted. `saveEntry` re-resolves every
+ * line and refuses one whose draft no longer matches the table — a line renamed
+ * after its lookup, or numbers that differ without being typed over.
  */
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
@@ -40,7 +40,9 @@ export async function POST(request: NextRequest) {
     const macros = parseMacros(l.macros);
     const quantity = Number(l.quantity);
 
-    if (!name) return NextResponse.json({ error: "A line has no name." }, { status: 400 });
+    // A name of only punctuation normalises to nothing, which the database
+    // refuses; that is the request's fault, so a 400 rather than a 503.
+    if (!name || !normalizeName(name)) return NextResponse.json({ error: "A line has no name." }, { status: 400 });
     if (!macros) return NextResponse.json({ error: `"${name}" has no usable numbers.` }, { status: 400 });
     if (!Number.isFinite(quantity) || quantity <= 0) {
       return NextResponse.json({ error: `"${name}" needs a quantity above zero.` }, { status: 400 });
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
       note: typeof l.note === "string" ? l.note : null,
       known: l.known === true,
       item_id: typeof l.item_id === "string" ? l.item_id : null,
-      // A line that failed is dropped by saveEntry rather than logged as zero.
+      // A line that failed is refused by saveEntry, never logged as zero.
       error: typeof l.error === "string" && l.error ? l.error : null,
     });
   }
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(saved, { status: 201 });
   } catch (e) {
+    if (e instanceof DraftError) return NextResponse.json({ error: e.message }, { status: 409 });
     if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Couldn't log that." },
