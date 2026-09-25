@@ -29,8 +29,7 @@ Next.js 14 → 16 upgrade. The parking lot is the `Parked` label.
 - **Every agent edits Linear without asking Joel, and no click prompts it**: `.claude/settings.json`
   allows the Linear server, but deleting, retiring a label and the diff tools still ask — `merge_diff`
   merges a pull request outside the guard's hold (TEC-43). The guard still refuses a malformed issue.
-  **An issue waiting on Joel is assigned to him**, and unassigned when his part is done (Joel,
-  2026-09-25); agents share one Linear user, so the `agent:` label, not the assignee, names them.
+  **Merging still waits for Joel's click** — he kept it on 2026-09-25.
 - **The weekly Routine** "Weekly rules-drift audit" (Mondays 08:00 UTC) reads Linear and runs `drift`.
   Its prompt still names the TD as the gate until TEC-42; it is report-only, so that misleads nobody
   into acting, but a run before TEC-42 will report the move as drift.
