@@ -1016,14 +1016,14 @@ function ReformatShell() {
                     </p>
                   ) : inspection.content.missing.length === 0 ? (
                     <p className="text-sm">
-                      Every line of {inspection.sourceFilename} appears in the finished document.
+                      Every line a reformat takes from {inspection.sourceFilename} appears in the finished document.
                     </p>
                   ) : (
                     <div className="flex flex-col gap-2">
                       <p className="text-sm text-urgent font-medium">
                         {inspection.content.missing.length} line
-                        {inspection.content.missing.length === 1 ? "" : "s"} of {inspection.sourceFilename} reached the
-                        finished document nowhere:
+                        {inspection.content.missing.length === 1 ? "" : "s"} a reformat takes from{" "}
+                        {inspection.sourceFilename} reached the finished document nowhere:
                       </p>
                       <ul className="flex flex-col divide-y divide-line">
                         {inspection.content.missing.map((line) => (

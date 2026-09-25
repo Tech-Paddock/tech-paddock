@@ -21,10 +21,18 @@ const EDITABLE = ["my_notes", "purchased_date", "roast_date"] as const;
 
 const DATES: readonly string[] = ["purchased_date", "roast_date"];
 
-export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await getServiceClient().from("bags").select("*").eq("id", params.id).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "No such bag." }, { status: 404 });
+
+  // `?photo=0` is the pollers: they read the row every four seconds while a
+  // search runs and never show the photo, so signing a fresh URL for each
+  // read was a storage call bought for nothing. `photo_url` is then absent
+  // rather than null, so nothing can mistake it for a bag without a photo.
+  if (request.nextUrl.searchParams.get("photo") === "0") {
+    return NextResponse.json({ bag: data });
+  }
 
   return NextResponse.json({
     bag: { ...data, photo_url: data.photo_path ? await signedPhotoUrl(data.photo_path) : null },

@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { PitItem, PitSource, PitState, PitWall as PitWallData } from "@/lib/pitwall";
+import type { PitSource, PitState, PitWall as PitWallData } from "@/lib/pitwall";
+import { filterItems } from "@/lib/pitfilter";
 
 /**
  * The board.
@@ -28,16 +29,7 @@ export default function PitWall({ data }: { data: PitWallData }) {
   const [source, setSource] = useState<"" | PitSource>("");
   const [agent, setAgent] = useState("");
 
-  const rows = useMemo(
-    () =>
-      data.items.filter(
-        (i: PitItem) =>
-          (!state || i.state === state) &&
-          (!source || i.source === source) &&
-          (!agent || i.agent === agent)
-      ),
-    [data.items, state, source, agent]
-  );
+  const rows = useMemo(() => filterItems(data.items, { state, source, agent }), [data.items, state, source, agent]);
 
   const count = (s: PitState) => rows.filter((r) => r.state === s).length;
   const sources = Array.from(new Set(data.items.map((i) => i.source))).sort();
@@ -62,7 +54,9 @@ export default function PitWall({ data }: { data: PitWallData }) {
             onClick={() => setAgent(agent === a.id ? "" : a.id)}
           >
             <span className="pit-car-name">{a.name}</span>
-            <span className="pit-car-seen">{a.lastSeen ?? "—"}</span>
+            <span className="pit-car-seen" title="The State as of line of this agent's handoff">
+              {a.asOf ? `handoff ${a.asOf}` : "—"}
+            </span>
           </button>
         ))}
       </div>
@@ -115,8 +109,8 @@ export default function PitWall({ data }: { data: PitWallData }) {
         <div className="pit-unavailable">
           <p className="pit-unavailable-title">Not reported</p>
           <ul>
-            {data.unavailable.map((u) => (
-              <li key={u.source}>
+            {data.unavailable.map((u, n) => (
+              <li key={`${u.source}-${n}`}>
                 <span className="pit-tag pit-src">{u.source}</span> {u.why}
               </li>
             ))}

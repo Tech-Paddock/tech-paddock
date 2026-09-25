@@ -6,13 +6,17 @@
   },
   "private": true,
   "scripts": {
+    "generate": "node scripts/collect-declared.mjs && node scripts/collect-paddock.mjs && node scripts/collect-drift.mjs",
+    "predev": "npm run generate",
     "dev": "next dev",
+    "prebuild": "npm run generate",
     "build": "next build",
     "start": "next start",
+    "pretest": "npm run generate",
+    "test": "vitest run",
     "declared": "node scripts/collect-declared.mjs",
     "paddock": "node scripts/collect-paddock.mjs",
-    "drift": "node scripts/collect-drift.mjs",
-    "prebuild": "node scripts/collect-declared.mjs && node scripts/collect-paddock.mjs && node scripts/collect-drift.mjs"
+    "drift": "node scripts/collect-drift.mjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -25,6 +29,7 @@
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.9"
   }
 }

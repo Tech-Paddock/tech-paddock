@@ -21,28 +21,39 @@ import { getServiceClient } from "./supabase";
  */
 export async function suggestOnBag(
   bagId: string,
-  bag: { roaster: string; coffee_name: string; origin?: string | null; process?: string | null; varietal?: string | null; roast_date?: string | null }
+  bag: { roaster: string; coffee_name: string; origin?: string | null; process?: string | null; varietal?: string | null; roast_date?: string | null },
+  /** Stops the model call when the caller's own time runs out. */
+  signal?: AbortSignal
 ): Promise<{ suggestion: Suggestion | null; error: string | null }> {
   let suggestion: Suggestion | null = null;
   let error: string | null = null;
 
   try {
-    suggestion = await suggestRecipe({
-      roaster: bag.roaster,
-      coffeeName: bag.coffee_name,
-      origin: bag.origin,
-      process: bag.process,
-      varietal: bag.varietal,
-      roastDate: bag.roast_date,
-    });
+    suggestion = await suggestRecipe(
+      {
+        roaster: bag.roaster,
+        coffeeName: bag.coffee_name,
+        origin: bag.origin,
+        process: bag.process,
+        varietal: bag.varietal,
+        roastDate: bag.roast_date,
+      },
+      signal
+    );
     // A model that answered with nothing usable is a failure worth saying out
     // loud rather than a bag that silently has no suggestion. The two are the
     // same null in the column, and only one of them is an answer.
     if (!suggestion) error = "Claude did not return a recipe that could be read.";
   } catch (e) {
-    error = e instanceof Error ? e.message : "The suggestion failed.";
+    error = signal?.aborted
+      ? "The search left no time for a suggestion. Ask for one below."
+      : e instanceof Error
+        ? e.message
+        : "The suggestion failed.";
   }
 
+  // On a failure only the error is written: a good suggestion already on the
+  // bag outlives a failed "Ask again" rather than being deleted by it.
   const { error: writeError } = await getServiceClient()
     .from("bags")
     .update(suggestionColumns(suggestion, error))

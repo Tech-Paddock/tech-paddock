@@ -63,11 +63,20 @@ export function renderIntoTemplate(
   const changeLog: ChangeLogEntry[] = [];
   const output: Block[] = [];
 
-  for (const section of segmentTemplate(bodyBlocks)) {
+  const sections = segmentTemplate(bodyBlocks);
+  // The summary goes in one place. A template with a Summary heading gets it
+  // there; the preamble slot is only for a template without one. Filling both,
+  // as this once did, wrote the summary into the document twice.
+  const hasSummarySection = sections.some((s) => s.key === "summary");
+
+  for (const section of sections) {
     if (section.headerBlockIdx !== null) output.push(bodyBlocks[section.headerBlockIdx]);
 
     switch (section.key) {
       case "preamble":
+        if (hasSummarySection) output.push(...section.blockIdxs.map((i) => bodyBlocks[i]));
+        else output.push(...renderSummary(bodyBlocks, section.blockIdxs, content, changeLog));
+        break;
       case "summary":
         output.push(...renderSummary(bodyBlocks, section.blockIdxs, content, changeLog));
         break;
@@ -91,6 +100,14 @@ export function renderIntoTemplate(
         });
         break;
     }
+  }
+
+  for (const u of content.unplacedSections ?? []) {
+    changeLog.push({
+      section: u.heading,
+      action: "input-dropped",
+      detail: `The source's "${u.heading}" section (${u.lines} ${u.lines === 1 ? "line" : "lines"}) has no section in the template, so it was not carried over. Add one to the template to keep it.`,
+    });
   }
 
   return { blocks: [...output, ...tailBlocks], changeLog };
@@ -264,6 +281,25 @@ function renderCareerHighlights(
       action: "replaced",
       detail: "Changed from the template — updated with the input's text.",
     });
+
+    // A count mismatch is never silent. The table's cells are its layout, so a
+    // cell is neither added nor removed here — but which highlights went where
+    // is a change-log line each. A template cell the input did not reach ships
+    // the template's own figure; an input highlight with no cell does not ship.
+    for (let i = highlights.length; i < templateCells.length; i += 1) {
+      log.push({
+        section: "Career Highlights",
+        action: "not-found-in-input",
+        detail: `Highlight ${i + 1} keeps the template's own text ("${templateCells[i].stat}") — the input has ${highlights.length}.`,
+      });
+    }
+    for (let i = templateCells.length; i < highlights.length; i += 1) {
+      log.push({
+        section: "Career Highlights",
+        action: "input-dropped",
+        detail: `Highlight ${i + 1} ("${highlights[i].stat}") has no cell in the template's table, so it was dropped — the template has ${templateCells.length}.`,
+      });
+    }
   }
   return out;
 }
@@ -395,7 +431,7 @@ function renderCompetenciesParagraphs(
       rewritten.set(idx, null);
       log.push({
         section: "Core Competencies",
-        action: "trimmed-surplus",
+        action: "template-trimmed",
         detail: `Template line ${i + 1} dropped — no matching input row.`,
       });
       return;
@@ -457,7 +493,7 @@ function renderCompetenciesTable(
       } else if (i < rows.length) {
         log.push({
           section: "Core Competencies",
-          action: "trimmed-surplus",
+          action: "template-trimmed",
           detail: `Template row ${i + 1} dropped — no matching input row.`,
         });
       } else {
@@ -513,7 +549,7 @@ function renderExperience(
   if (interiorBlanks > 0) {
     log.push({
       section: "Professional Experience",
-      action: "trimmed-surplus",
+      action: "template-trimmed",
       detail: `Dropped ${interiorBlanks} blank line(s) between entries — spacing comes from each header's own paragraph spacing.`,
     });
   }
@@ -547,6 +583,29 @@ function renderExperience(
     return idxs.map((i) => blocks[i]);
   }
 
+  // Everything in the section that is not a paragraph: the open and close tags
+  // of a content control, a bookmark, a table. The entries are regrouped, so
+  // these cannot keep their exact places — but they were being dropped, and a
+  // dropped `<w:sdt>` opener whose closer sits in the next section is malformed
+  // XML. So each is kept, in its original order among the others: those before
+  // the first line go before the entries and the rest after. Order among the
+  // markers is all well-formedness needs, since a paragraph is a whole element
+  // wherever it lands.
+  const firstLineIdx = lines.find((l) => !l.isBlank)?.idx ?? Infinity;
+  const nonParagraph = idxs.filter((i) => blocks[i].type !== "p");
+  const leading = nonParagraph.filter((i) => i < firstLineIdx);
+  const trailing = nonParagraph.filter((i) => i > firstLineIdx);
+  for (const i of nonParagraph) {
+    if (blocks[i].type !== "tbl") continue;
+    log.push({
+      section: "Professional Experience",
+      action: "kept-unchanged",
+      detail:
+        "A table inside Professional Experience was kept as the template has it. Jobs are never written into a table, so it carries the template's own text — remove it from the template.",
+    });
+  }
+  for (const i of leading) out.push(blocks[i]);
+
   for (let i = 0; i < Math.max(entries.length, content.experience.length); i += 1) {
     const input = content.experience[i];
     if (i < entries.length && input) {
@@ -554,7 +613,7 @@ function renderExperience(
     } else if (i < entries.length) {
       log.push({
         section: "Professional Experience",
-        action: "trimmed-surplus",
+        action: "template-trimmed",
         detail: `Template entry ${i + 1} dropped — no matching job in the input.`,
       });
     } else {
@@ -566,6 +625,7 @@ function renderExperience(
       out.push(...renderEntry(blocks, entries[entries.length - 1], input, log));
     }
   }
+  for (const i of trailing) out.push(blocks[i]);
   for (const idx of trailingBlankIdxs) out.push(blocks[idx]);
 
   return out;
@@ -637,7 +697,7 @@ function renderEntry(
     } else if (i < entry.bulletIdxs.length) {
       log.push({
         section: "Professional Experience",
-        action: "trimmed-surplus",
+        action: "template-trimmed",
         detail: `${input.company}: template bullet ${i + 1} dropped — no matching input bullet.`,
       });
     } else if (bulletTemplateRaw) {
@@ -646,6 +706,16 @@ function renderEntry(
         section: "Professional Experience",
         action: "cloned-overflow",
         detail: `${input.company}: bullet ${i + 1} cloned from the template's last bullet.`,
+      });
+    } else {
+      // The template's entry has no bullet to clone, so this one has nowhere to
+      // go. It used to fall out of the loop with nothing said; the content check
+      // would still have counted it missing, but the change log is where the
+      // reason lives.
+      log.push({
+        section: "Professional Experience",
+        action: "input-dropped",
+        detail: `${input.company}: bullet ${i + 1} dropped — the template's entry has no bullet to clone.`,
       });
     }
   }

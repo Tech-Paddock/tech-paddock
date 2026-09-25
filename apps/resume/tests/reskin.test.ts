@@ -1,10 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { XMLValidator } from "fast-xml-parser";
-import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
+import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
 import { getBodyInner, loadDocx, withBodyInner } from "../lib/reskin/container";
-import { joinBody, splitBody } from "../lib/reskin/blocks";
+import { extractText, joinBody, splitBody } from "../lib/reskin/blocks";
 import { extractSourceContent } from "../lib/reskin/extract";
 import { renderIntoTemplate } from "../lib/reskin/render";
 import { reskin } from "../lib/reskin/generate";
@@ -104,16 +105,184 @@ describe("the XML it emits", () => {
     const b = await render();
     expect(a.outBody).toBe(b.outBody);
   });
+
+  /**
+   * TEC-31. The body was deterministic and the file was not: the rewritten
+   * `word/document.xml` entry took the wall-clock time as its zip timestamp, so
+   * two renders of the same inputs a few seconds apart hashed differently and
+   * `content_hash` could not identify a render. The clock is set a day apart
+   * here, rather than hoping two runs straddle a second, so this cannot pass by
+   * luck and cannot fail under load.
+   */
+  it("is deterministic to the byte — the same inputs give the same file on different days", async () => {
+    const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2031-01-01T00:00:00Z"));
+      const first = await reskin(TEMPLATE(), SOURCE());
+      vi.setSystemTime(new Date("2031-01-02T12:34:56Z"));
+      const second = await reskin(TEMPLATE(), SOURCE());
+      expect(sha(second.docx)).toBe(sha(first.docx));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /** The same bug's other half: JSZip added a `word/` folder entry, stamped with
+   *  the current time, to an archive that never had one. */
+  it("writes back exactly the template's parts, adding none", async () => {
+    const { docx } = await reskin(TEMPLATE(), SOURCE());
+    const names = async (b: Buffer) => Object.keys((await JSZip.loadAsync(b)).files).sort();
+    expect(await names(docx)).toEqual(await names(TEMPLATE()));
+  });
+});
+
+/**
+ * TEC-31. Experience regroups its paragraphs into entries and emitted nothing
+ * else, so a `<w:sdt>` opened in Experience and closed in the next section left
+ * a dangling closer — malformed XML, a document Word refuses — and a table or a
+ * bookmark there vanished with nothing said.
+ */
+describe("what Experience does with blocks that are not paragraphs", () => {
+  const p = (text: string, pPr = "") => `<w:p>${pPr}<w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+  const BULLET = '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>';
+  const SDT_OPEN = '<w:sdt><w:sdtPr><w:id w:val="1"/></w:sdtPr><w:sdtContent>';
+  const SDT_CLOSE = "</w:sdtContent></w:sdt>";
+  const BOOKMARK = '<w:bookmarkStart w:id="0" w:name="jobs"/>';
+  const TABLE = `<w:tbl><w:tr><w:tc>${p("A template table cell")}</w:tc></w:tr></w:tbl>`;
+  const templateBody = [
+    p("Professional Experience"),
+    SDT_OPEN,
+    BOOKMARK,
+    p("Template Co   Template Title"),
+    p("Template bullet one.", BULLET),
+    TABLE,
+    p("Core Competencies"),
+    SDT_CLOSE,
+    p("Systems: Alpha"),
+  ].join("");
+  const content = {
+    summary: null,
+    careerHighlights: null,
+    competencies: null,
+    experience: [{ company: "Acme Corp", title: "Analyst", date: "Jan 2020 - Present", bullets: ["Did a thing."] }],
+  };
+
+  it("keeps a content control opened there well formed", () => {
+    const { blocks } = renderIntoTemplate(splitBody(templateBody), content);
+    const out = joinBody(blocks);
+    expect(XMLValidator.validate(`<w:body>${out}</w:body>`)).toBe(true);
+    expect(out.indexOf("<w:sdt>")).toBeLessThan(out.indexOf("Acme Corp"));
+    expect(out).toContain(SDT_CLOSE);
+  });
+
+  it("keeps a bookmark and a table, and says so about the table", () => {
+    const { blocks, changeLog } = renderIntoTemplate(splitBody(templateBody), content);
+    const out = joinBody(blocks);
+    expect(out).toContain(BOOKMARK);
+    expect(out).toContain("A template table cell");
+    expect(changeLog).toContainEqual(
+      expect.objectContaining({ section: "Professional Experience", action: "kept-unchanged", detail: expect.stringMatching(/table/) })
+    );
+  });
 });
 
 describe("reading the source document", () => {
+  const para = (runs: string, pPr = "") => `<w:p>${pPr}${runs}</w:p>`;
+  const run = (text: string, rPr = "") => `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ""}<w:t xml:space="preserve">${text}</w:t></w:r>`;
+  const TAB = "<w:r><w:tab/></w:r>";
+  const BULLET = '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>';
+  const TAB_STOP = '<w:pPr><w:tabs><w:tab w:val="right" w:pos="10800"/></w:tabs></w:pPr>';
+
+  /**
+   * TEC-31. A run-level `<w:tab/>` was dropped on the way out of the source, so a
+   * positioned line's fields ran together — company "Acme CorpJan", date
+   * "2020 - Present" — and the content check still read 100%, because the glued
+   * text did arrive.
+   */
+  it("reads a tab between company and date as a field boundary", () => {
+    const body = [
+      para(run("Professional Experience")),
+      para(run("Acme Corp", "<w:b/>") + TAB + run("Jan 2020 - Present", "<w:b/>"), TAB_STOP),
+      para(run("Operations Analyst", "<w:i/>")),
+      para(run("Did a representative thing."), BULLET),
+    ].join("");
+    const [entry] = extractSourceContent(splitBody(body)).experience;
+    expect(entry).toEqual({
+      company: "Acme Corp",
+      title: "Operations Analyst",
+      date: "Jan 2020 - Present",
+      bullets: ["Did a representative thing."],
+    });
+  });
+
+  it("splits company, title and date that share one tabbed line", () => {
+    const body = [
+      para(run("Experience")),
+      para(run("Acme Corp", "<w:b/>") + TAB + run("Analyst", "<w:b/>") + TAB + run("Mar 2019 - 2021", "<w:b/>")),
+      para(run("Did a representative thing."), BULLET),
+    ].join("");
+    const [entry] = extractSourceContent(splitBody(body)).experience;
+    expect(entry).toMatchObject({ company: "Acme Corp", title: "Analyst", date: "Mar 2019 - 2021" });
+  });
+
+  /**
+   * TEC-31. A heading the renderer had no section for did not end the section
+   * before it, so a Projects section after Experience was read as more jobs —
+   * and shipped in the output as a sixth employer.
+   */
+  describe("a source section the template has no place for", () => {
+    const H = '<w:b/><w:sz w:val="22"/>';
+    const body = (projectsHeading: string) =>
+      [
+        para(run("Professional Experience", H)),
+        para(run("Acme Corp", '<w:b/><w:sz w:val="21"/>') + TAB + run("Jan 2020 - Present", '<w:sz w:val="21"/>')),
+        para(run("Operations Analyst", '<w:i/><w:sz w:val="21"/>')),
+        para(run("Did a representative thing."), BULLET),
+        para(run(projectsHeading, H)),
+        para(run("Sample Project", '<w:b/><w:sz w:val="21"/>')),
+        para(run("Built a representative prototype."), BULLET),
+        para(run("Core Competencies", H)),
+        para(run("Systems: Alpha, Beta")),
+      ].join("");
+
+    it.each([
+      ["a heading the vocabulary knows but the template has no section for", "Projects"],
+      ["a heading the vocabulary does not know, found by its size", "Side Ventures"],
+    ])("stops at %s, and reports it", (_what, heading) => {
+      const content = extractSourceContent(splitBody(body(heading)));
+      expect(content.experience.map((e) => e.company)).toEqual(["Acme Corp"]);
+      expect(content.competencies).toEqual([{ label: "Systems", items: "Alpha, Beta" }]);
+      expect(content.unplacedSections).toEqual([{ heading, lines: 2 }]);
+    });
+
+    it("logs it as input with nowhere to go, which the verdict fails on", async () => {
+      const template = await loadDocx(fixture("template-flat-sample.docx"));
+      const { changeLog } = renderIntoTemplate(
+        splitBody(getBodyInner(template.documentXml).bodyInner),
+        extractSourceContent(splitBody(body("Projects")))
+      );
+      expect(changeLog).toContainEqual(expect.objectContaining({ section: "Projects", action: "input-dropped" }));
+    });
+
+    it("reports nothing on the repo's own source, which has no such section", async () => {
+      expect(extractSourceContent(splitBody(await bodyOf(SOURCE()))).unplacedSections).toBeUndefined();
+    });
+  });
+
+  /** The other half of the `<w:tab>` trap: a tab *stop* is not text. */
+  it("does not invent a tab from a paragraph's tab stops", () => {
+    expect(extractText(para(run("Acme Corp"), TAB_STOP))).toBe("Acme Corp");
+    expect(extractText(para(TAB + run("Acme Corp"), TAB_STOP))).toBe("\tAcme Corp");
+  });
+
   it("pulls every job apart into company, title and date", async () => {
     const content = extractSourceContent(splitBody(await bodyOf(SOURCE())));
     expect(content.experience).toHaveLength(5);
     expect(content.experience[0]).toMatchObject({
       company: "Northwind Athletics",
       title: "Sr. Platform Administrator",
-      date: "Jan 2026 - Present",
+      date: "Nov 2022 - Present",
     });
     expect(content.experience[4].company).toBe("Trellis Construction Group");
   });

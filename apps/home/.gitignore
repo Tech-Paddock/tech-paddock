@@ -1,5 +1,7 @@
 node_modules
 .next/
-out/
+/out/
 *.tsbuildinfo
 next-env.d.ts
+# Regenerated before every build, dev server and test run (npm run generate).
+lib/*.generated.ts
