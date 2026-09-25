@@ -1,5 +1,5 @@
 import type { Glance, SummaryItem } from "@/lib/glance";
-import { isQuiet } from "@/lib/glance";
+import { isQuiet, nothingAnswered } from "@/lib/glance";
 
 /**
  * Counts and singles, never lists.
@@ -57,7 +57,10 @@ function CountRow({
 
 export default function GlancePanel({ glance }: { glance: Glance }) {
   const quiet = isQuiet(glance);
-  const allDown = glance.unavailable.length > 0 && glance.rhythm.length === 0;
+  // Keyed on whether anything answered, not on whether a rhythm line came back —
+  // a source can answer with no rhythm, and that is not "can't reach".
+  const allDown = glance.unavailable.length > 0 && nothingAnswered(glance);
+  const why = glance.unavailable.map((u) => `${u.tool} (${u.why})`).join(", ");
 
   return (
     <div className="glance">
@@ -66,8 +69,8 @@ export default function GlancePanel({ glance }: { glance: Glance }) {
 
       {allDown ? (
         <p className="description">
-          {glance.unavailable.join(", ")} did not answer. The tools themselves are still reachable
-          from the sidebar.
+          {why} did not answer, so nothing here is a count. The tools themselves are still
+          reachable from the sidebar.
         </p>
       ) : quiet ? (
         <p className="description">
@@ -107,7 +110,7 @@ export default function GlancePanel({ glance }: { glance: Glance }) {
       </div>
 
       {glance.unavailable.length > 0 && !allDown && (
-        <p className="slot-note">Couldn&apos;t reach {glance.unavailable.join(", ")}.</p>
+        <p className="slot-note">Couldn&apos;t reach {why} — what is above is only what the others said.</p>
       )}
       {glance.degraded.length > 0 && (
         <p className="slot-note">Partial data — {glance.degraded.join("; ")}</p>
