@@ -1,8 +1,9 @@
 import { getServiceClient } from "./supabase";
 import {
-  findItem, upsertItem, addVersion, versionsOf, resolveVersion, eraFor,
+  findItem, upsertItem, addVersion, resolveVersion, eraFor,
   LookupError, type ItemVersion,
 } from "./items";
+import { decideLine, duplicateFoods, type LineDecision } from "./approve";
 import { estimateMacros } from "./anthropic";
 import { total, round, type Macros, type MacroSource } from "./macros";
 import type { Meal } from "./meals";
@@ -130,12 +131,16 @@ export function macrosOf(v: ItemVersion): Macros {
   };
 }
 
-/** Exact equality, because a draft's numbers are either untouched or typed over. */
-export function sameMacros(a: Macros, b: Macros): boolean {
-  return (
-    a.kcal === b.kcal && a.protein_g === b.protein_g &&
-    a.carbs_g === b.carbs_g && a.fat_g === b.fat_g
-  );
+/**
+ * A draft that cannot be logged as it stands — a line that failed, a food named
+ * twice, a line renamed after its lookup. The client's to fix, so it is a 409
+ * rather than a broken database's 503, and nothing has been written.
+ */
+export class DraftError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DraftError";
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -146,76 +151,88 @@ export function sameMacros(a: Macros, b: Macros): boolean {
  * Guardrail 1: the draft is not the log, and approving is the only thing that
  * writes. Everything above this line is read-only.
  *
- * **Whether a line becomes a new version is decided here, from the numbers
- * themselves rather than from a flag the client sends.** A client flag is a
- * claim; re-resolving and comparing is a measurement, and this is the write
- * path for the table the whole design calls authoritative.
+ * **Every line is decided before anything is written** (`decideLine`), so a
+ * draft refused for one line leaves no half-written food behind for the others.
+ * A number is recorded as yours only when the line says it was typed over —
+ * never inferred from a difference; a difference nobody typed is a stale draft.
  *
- * A number typed over by hand becomes a `correction` — the default kind, and
- * the right one: you are saying the figure was wrong, not that the food changed.
- * A food that actually changed is a different gesture, made deliberately from
- * the item's own screen, and it is the one that does not reach backwards.
+ * **Each line snapshots the numbers it was logged with, and the version they
+ * came from** (TEC-21). A day's total is then a plain sum that no later
+ * correction moves, and the version id is what a backfill would read.
  */
 export async function saveEntry(draft: Draft): Promise<{ id: string }> {
   const supabase = getServiceClient();
 
-  const rows: {
-    item_id: string; quantity: number; position: number;
-    resolved_source: MacroSource; resolved_model: string | null;
+  // A line that failed used to be skipped silently, so a meal of three logged
+  // as two with nothing said. Refuse it and let the screen say which.
+  const failed = draft.items.filter((l) => l.error).map((l) => l.name);
+  if (failed.length > 0) {
+    throw new DraftError(`Couldn't work out ${failed.map((n) => `"${n}"`).join(", ")}. Fix or remove it before logging.`);
+  }
+  const dupes = duplicateFoods(draft.items.map((l) => l.name));
+  if (dupes.length > 0) {
+    throw new DraftError(`${dupes.map((n) => `"${n}"`).join(", ")} is on this draft twice. Make it one line with a quantity.`);
+  }
+
+  // Reads and decisions first. A throw from findItem is a broken database.
+  const plans: {
+    line: DraftItem; index: number; versions: ItemVersion[];
+    decision: Exclude<LineDecision, { action: "reject" }>;
   }[] = [];
-
   for (const [index, line] of draft.items.entries()) {
-    if (line.error) continue;
+    const remembered = await findItem(line.name);
+    const versions = remembered?.versions ?? [];
+    const current = resolveVersion(versions, draft.eaten_on);
+    const decision = decideLine(line, remembered?.item.id ?? null, current);
+    if (decision.action === "reject") throw new DraftError(decision.reason);
+    plans.push({ line, index, versions, decision });
+  }
 
-    const item = await upsertItem(line.name);
-    const existing = await versionsOf(item.id);
-    const current = resolveVersion(existing, draft.eaten_on);
-
-    let source = line.source;
-    let model = line.model;
-
-    if (!current) {
-      // First time this food has been eaten: the draft's numbers become its
-      // first version, carrying whatever produced them.
-      await addVersion({
+  // Then writes. Versions are knowledge about the food and stand even if the
+  // entry below fails; they are append-only, so nothing is lost either way.
+  const rows: Record<string, unknown>[] = [];
+  for (const { line, index, versions, decision } of plans) {
+    let version: ItemVersion;
+    if (decision.action === "reuse") {
+      version = decision.version;
+    } else if (decision.action === "first") {
+      const item = await upsertItem(line.name);
+      version = await addVersion({
         itemId: item.id,
         macros: line.macros,
         kind: "correction",
         effectiveFrom: draft.eaten_on,
-        source: line.source,
-        model: line.source === "hand" ? null : line.model,
-        sourceUrl: line.source_url,
-        note: line.note,
+        source: decision.source,
+        model: decision.model,
+        sourceUrl: decision.source_url,
+        note: decision.note,
       });
-    } else if (!sameMacros(macrosOf(current), line.macros)) {
-      // Typed over. That is a correction to the era in effect on this date, so
-      // it reaches backwards through that era and nothing is overwritten.
-      await addVersion({
-        itemId: item.id,
+    } else {
+      // Typed over: a correction to the era in effect on this date. It fixes the
+      // food from here on and moves no day already logged.
+      version = await addVersion({
+        itemId: line.item_id as string,
         macros: line.macros,
         kind: "correction",
-        effectiveFrom: eraFor(existing, draft.eaten_on),
+        effectiveFrom: eraFor(versions, draft.eaten_on),
         source: "hand",
         model: null,
         note: "Corrected while approving a log entry.",
       });
-      source = "hand";
-      model = null;
-    } else {
-      source = current.source;
-      model = current.model;
     }
 
     rows.push({
-      item_id: item.id,
+      item_id: version.item_id,
+      item_version_id: version.id,
+      ...macrosOf(version),
       quantity: line.quantity,
       position: index,
-      resolved_source: source,
-      resolved_model: source === "hand" ? null : model,
+      resolved_source: version.source,
+      resolved_model: version.source === "hand" ? null : version.model,
     });
   }
 
-  if (rows.length === 0) throw new LookupError("Nothing in this draft could be logged.");
+  if (rows.length === 0) throw new DraftError("Nothing in this draft to log.");
 
   const { data: entry, error } = await supabase
     .from("entries")
@@ -267,29 +284,51 @@ export type LoggedEntry = {
 
 export type Day = { date: string; entries: LoggedEntry[]; total: Macros };
 
+type SnapshotColumns = {
+  item_version_id: string | null;
+  kcal: number | string | null; protein_g: number | string | null;
+  carbs_g: number | string | null; fat_g: number | string | null;
+};
+
+type RawLine = SnapshotColumns & {
+  id: string; item_id: string; quantity: number; position: number;
+  resolved_source: MacroSource; resolved_model: string | null;
+};
+
+/** The numbers a line was logged with, or null for a line written before snapshots. */
+export function snapshotOf(line: SnapshotColumns): Macros | null {
+  if (line.item_version_id === null || line.kcal === null || line.protein_g === null ||
+      line.carbs_g === null || line.fat_g === null) return null;
+  return {
+    kcal: Number(line.kcal),
+    protein_g: Number(line.protein_g),
+    carbs_g: Number(line.carbs_g),
+    fat_g: Number(line.fat_g),
+  };
+}
+
 /**
- * A day, with every line resolved to the version that applies **to that day**
- * rather than to the newest one.
+ * A day, as it was logged: **a plain sum of each line's snapshot** (TEC-21). A
+ * correction made since does not move it.
  *
- * That is the whole reason entries reference an item's identity instead of
- * carrying a copy of its numbers: a correction made today fixes last Tuesday,
- * and a change made today leaves last Tuesday alone.
+ * A line with no snapshot can only have been written by the code before
+ * snapshots, in the minutes between the migration and this code going live. It
+ * is resolved the old way rather than summed as zero, because a silently
+ * missing total is the failure this app is least allowed to have. The fallback
+ * goes when the columns become NOT NULL.
  */
 export async function readDay(date: string): Promise<Day> {
   const supabase = getServiceClient();
 
   const { data, error } = await supabase
     .from("entries")
-    .select("id, dictated_text, meal, eaten_on, created_at, entry_items(id, item_id, quantity, position, resolved_source, resolved_model)")
+    .select("id, dictated_text, meal, eaten_on, created_at, entry_items(id, item_id, quantity, position, resolved_source, resolved_model, item_version_id, kcal, protein_g, carbs_g, fat_g)")
     .eq("eaten_on", date)
     .order("created_at", { ascending: true });
 
   if (error) throw new LookupError(`Couldn't read ${date}: ${error.message}`);
 
-  const raw = (data ?? []) as {
-    id: string; dictated_text: string; meal: Meal;
-    entry_items: { id: string; item_id: string; quantity: number; position: number; resolved_source: MacroSource; resolved_model: string | null }[];
-  }[];
+  const raw = (data ?? []) as { id: string; dictated_text: string; meal: Meal; entry_items: RawLine[] }[];
 
   const itemIds = [...new Set(raw.flatMap((e) => e.entry_items.map((i) => i.item_id)))];
   if (itemIds.length === 0) return { date, entries: [], total: { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 } };
@@ -297,30 +336,37 @@ export async function readDay(date: string): Promise<Day> {
   const { data: itemRows, error: itemError } = await supabase
     .from("items").select("id, name").in("id", itemIds);
   if (itemError) throw new LookupError(`Couldn't read the foods for ${date}: ${itemError.message}`);
-
-  const { data: versionRows, error: versionError } = await supabase
-    .from("item_versions").select("*").in("item_id", itemIds);
-  if (versionError) throw new LookupError(`Couldn't read the numbers for ${date}: ${versionError.message}`);
-
   const names = new Map((itemRows ?? []).map((i) => [i.id as string, i.name as string]));
+
+  const unsnapshotted = [...new Set(raw.flatMap((e) =>
+    e.entry_items.filter((l) => snapshotOf(l) === null).map((l) => l.item_id)))];
   const byItem = new Map<string, ItemVersion[]>();
-  for (const v of (versionRows ?? []) as ItemVersion[]) {
-    byItem.set(v.item_id, [...(byItem.get(v.item_id) ?? []), v]);
+  if (unsnapshotted.length > 0) {
+    const { data: versionRows, error: versionError } = await supabase
+      .from("item_versions").select("*").in("item_id", unsnapshotted);
+    if (versionError) throw new LookupError(`Couldn't read the numbers for ${date}: ${versionError.message}`);
+    for (const v of (versionRows ?? []) as ItemVersion[]) {
+      byItem.set(v.item_id, [...(byItem.get(v.item_id) ?? []), v]);
+    }
   }
 
   const entries: LoggedEntry[] = raw.map((e) => {
     const items: LoggedItem[] = [...e.entry_items]
       .sort((a, b) => a.position - b.position)
       .map((line) => {
-        const version = resolveVersion(byItem.get(line.item_id) ?? [], date);
+        let macros = snapshotOf(line);
+        if (!macros) {
+          const version = resolveVersion(byItem.get(line.item_id) ?? [], date);
+          if (!version) throw new LookupError(`A line on ${date} has no numbers recorded.`);
+          macros = macrosOf(version);
+        }
         return {
           id: line.id,
           item_id: line.item_id,
           name: names.get(line.item_id) ?? "Unknown",
           quantity: Number(line.quantity),
-          macros: version ? macrosOf(version) : { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
-          // What answered at approval time, which is what makes a day's totals
-          // readable later: your own log, or a model.
+          macros,
+          // What answered at approval time: your own log, or a model.
           source: line.resolved_source,
           model: line.resolved_model,
         };

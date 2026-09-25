@@ -1,22 +1,12 @@
 import type { DocxParts } from "./read";
 import type { Para } from "./paragraphs";
-import { isHeadingLike } from "./headings";
+import { isHeadingLike, isKnownHeading } from "./headings";
 
 export type AtsFinding = {
   code: string;
   severity: "blocking" | "warning";
   message: string;
 };
-
-/** Section headings a parser is likely to recognise. Creative ones cost you matches. */
-export const KNOWN_HEADINGS = new Set([
-  "summary", "professional summary", "objective",
-  "career highlights", "highlights",
-  "professional experience", "experience", "work experience", "employment",
-  "core competencies", "skills", "technical skills",
-  "education", "certifications", "education & certifications",
-  "projects", "volunteer", "hobbies", "interests",
-]);
 
 /**
  * Mechanical check of the ATS rules in CLAUDE.md. One table is permitted —
@@ -77,7 +67,9 @@ export function auditAts(parts: DocxParts, paras: Para[]): AtsFinding[] {
   }
 
   const unknown = paras
-    .filter((p) => isHeadingLike(p, paras) && !KNOWN_HEADINGS.has(p.text.trim().toLowerCase()))
+    // Headings a parser is likely to recognise — creative ones cost matches — are
+    // the vocabulary in `./headings`, the same one the renderer reads sections by.
+    .filter((p) => isHeadingLike(p, paras) && !isKnownHeading(p.text))
     .map((p) => p.text.trim());
   if (unknown.length > 0) {
     findings.push({

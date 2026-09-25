@@ -4,6 +4,8 @@ import { fileLabel, sortResumeFiles, type ResumeFile, type TemplateSpec } from "
 
 export const dynamic = "force-dynamic";
 
+const THREAD_BATCH = 100;
+
 /**
  * Every resume file this app holds, as one typed list.
  *
@@ -28,8 +30,9 @@ export async function GET() {
     supabase
       .from("renders")
       .select("id, created_at, submitted_at, thread_id, coverage, source_file_path, output_file_path")
-      .order("created_at", { ascending: false })
-      .limit(50),
+      // No limit. This list is the Resume tab, and it capped renders at fifty
+      // with nothing on screen saying so — the fifty-first simply was not there.
+      .order("created_at", { ascending: false }),
   ]);
 
   if (templates.error) return fail(500, "db_error", templates.error.message);
@@ -42,14 +45,17 @@ export async function GET() {
   // render only says where it went once joined back to it. A failure is
   // reported rather than swallowed: every row silently reading "no job" looks
   // like missing data, not like a broken cross-schema read.
-  let threads: Record<string, { company: string; stage: string }> = {};
-  if (threadIds.length > 0) {
+  //
+  // In batches, because the ids travel in the request URL: with no cap on the
+  // list, one `in` over every thread would eventually outgrow it.
+  const threads: Record<string, { company: string; stage: string }> = {};
+  for (let i = 0; i < threadIds.length; i += THREAD_BATCH) {
     const { data, error } = await getTrackerClient()
       .from("pipeline_threads")
       .select("id, company, stage")
-      .in("id", threadIds);
+      .in("id", threadIds.slice(i, i + THREAD_BATCH));
     if (error) return fail(502, "tracker_error", `Couldn't read tracker threads: ${error.message}`);
-    threads = Object.fromEntries((data ?? []).map((t) => [t.id as string, { company: t.company, stage: t.stage }]));
+    for (const t of data ?? []) threads[t.id as string] = { company: t.company, stage: t.stage };
   }
 
   const files: ResumeFile[] = [];

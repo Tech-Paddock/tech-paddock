@@ -15,10 +15,10 @@ import { LookupError } from "./items";
  * came with them. What is left here is the *random items* half — the recipe
  * half is not arriving, because it is already built over there.
  *
- * **Where this list itself ends up is not this file's to assume.** It stays
- * Health's until the technical director sequences the move, which is
- * destructive and therefore two pull requests. Nothing here should read as
- * though that has a date.
+ * **This list is moving to Cookbook**, sequenced by the technical director on
+ * 2026-09-23: Cookbook's list gets its own URL, then `/list` redirects there and
+ * this file stops touching `health.grocery_items`, then the table is dropped
+ * once that is live — destructive, so its own pull request.
  */
 
 /**
@@ -185,6 +185,10 @@ export async function applyTidy(open: GroceryItem[], lines: TidyLine[]): Promise
     return sources.size === 1 ? ([...sources][0] as GrocerySource) : "manual";
   };
 
+  // Write first, then delete. The other order has a window where a failed
+  // insert leaves no list at all, in a shop; a duplicated list is annoying and
+  // recoverable by ticking. Cookbook's copy already does it this way.
+  const added = await addItems(lines.map((l) => ({ name: l.name, note: l.note, source: sourceOf(l) })));
   await removeItems(open.map((i) => i.id));
-  return addItems(lines.map((l) => ({ name: l.name, note: l.note, source: sourceOf(l) })));
+  return added;
 }

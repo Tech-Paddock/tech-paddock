@@ -56,8 +56,8 @@ describe("telling a section heading from a job", () => {
   const paras: Para[] = [
     para({ text: "Jordan Avery", size: 40 }),
     para({ text: "Professional Experience" }),
-    para({ text: "Lakeside Systems   Senior Administrator\tJan 2026 - Present" }),
-    para({ text: "Harbor Point Group   Consultant\tOct 2024 - Jan 2026" }),
+    para({ text: "Lakeside Systems   Senior Administrator\tNov 2022 - Present" }),
+    para({ text: "Harbor Point Group   Consultant\tAug 2021 - Nov 2022" }),
     para({ text: "Where I Have Made An Impact" }),
     para({ text: "Education" }),
   ];

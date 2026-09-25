@@ -572,11 +572,16 @@ const HELD =
 /* Opening a pull request is not held, and not checked: Deployment opens every
    one, and it is only started after Joel says go (Joel, 2026-09-24: "they will
    be spun up with intention, so there's no need for a check"). requested-by-joel
-   in CI still reads the body for the record of who asked. */
+   in CI still reads the body for the record of who asked.
+
+   Merging and updating are not held either, since 2026-09-25: Joel asked for
+   "only one gate" — his go before the TD starts Deployment on a set of branches
+   — and not a click on every merge after it. So a squash merge, a body edit
+   that keeps the request line, and bringing a branch up to date go through.
+   What still asks is what no gate covers: auto-merge merges on a timer, not in
+   the train Joel approved; a review can approve, which is a human's act; and
+   the API commit tools below write past the local push guard. */
 const PR_ASK = {
-  update_pull_request: "Changing a pull request",
-  update_pull_request_branch: "Updating a pull request's branch",
-  merge_pull_request: "Merging a pull request",
   enable_pr_auto_merge: "Turning on auto-merge, which merges with no click once checks pass,",
   pull_request_review_write: "Writing a pull request review, which can approve it,",
 };
@@ -652,7 +657,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const KINDS = ["owner:", "agent:"];
 /* Who can act on a step: the roster by name, and the words for everyone or
    no one. Names are case-sensitive so `/api/health` does not count as Health. */
-const ACTOR = /\b(Joel|TD|TechPad Gen|Resume Formatter|Resume|Coffee|Health|Cookbook)\b/;
+const ACTOR = /\b(Joel|TD|Deployment|TechPad Gen|Resume Formatter|Resume|Coffee|Health|Cookbook)\b/;
 const ACTOR_WORDS = /\b(technical director|every ?one|every ?body|no ?one|nobody|each agent|every agent|each owner|whoever)\b/i;
 // A finished step has nobody left to act.
 const DONE = /^(~~|\*\*Done\b|Done\b)/;
@@ -737,7 +742,7 @@ export function nextSteps(body) {
     .filter((it) => !DONE.test(it.text) && !ACTOR.test(it.text) && !ACTOR_WORDS.test(it.text))
     .map((it) => it.n);
   if (nameless.length) {
-    return [`step ${nameless.join(", ")} of Next steps does not name who acts (start it with the actor: Joel, TD, TechPad Gen, Resume Formatter, Coffee, Health or Cookbook)`];
+    return [`step ${nameless.join(", ")} of Next steps does not name who acts (start it with the actor: Joel, TD, Deployment, TechPad Gen, Resume Formatter, Coffee, Health or Cookbook)`];
   }
   return [];
 }

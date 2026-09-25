@@ -29,7 +29,7 @@ describe("labelling a Jobright export", () => {
     expect(experience.entries.length).toBeGreaterThanOrEqual(5);
     const first = experience.entries[0];
     expect(first.company).toBe("Northwind Athletics");
-    expect(first.dates).toMatch(/Jan\s*2026/);
+    expect(first.dates).toMatch(/Nov\s*2022/);
     expect(first.bullets.length).toBeGreaterThan(3);
     // The date must not be left fused onto the company name.
     expect(first.company).not.toMatch(/\d{4}/);
@@ -69,7 +69,7 @@ describe("coverage tells the truth", () => {
       para(0, "Jordan Rivers", { size: 50 }),
       para(1, "Professional Experience", { size: 22 }),
       para(2, "Orphaned bullet with nowhere to go", { listId: "1" }),
-      para(3, "Northwind Athletics Jan 2026 - Present", { size: 21 }),
+      para(3, "Northwind Athletics Nov 2022 - Present", { size: 21 }),
       para(4, "A bullet that does have a home", { listId: "1" }),
     ] as Parameters<typeof labelParagraphs>[0];
 

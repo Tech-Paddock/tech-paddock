@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Provenance from "../Provenance";
 import { MACRO_KEYS, MACRO_LABELS, type Macros, type MacroSource } from "@/lib/macros";
+import { localDate } from "@/lib/meals";
+import type { Judgement } from "@/lib/harness";
 
 type Side = {
-  macros: Macros;
-  source_url: string | null;
-  note: string | null;
+  macros?: Macros;
+  source_url?: string | null;
+  note?: string | null;
   error?: string;
   label: string;
   model: string;
@@ -19,9 +21,10 @@ type Comparison = {
   baseline: { macros: Macros; source: MacroSource; model: string | null; item_id: string } | null;
   haiku: Side;
   sonnet: Side;
-  agreed: boolean;
-  disagreements: (keyof Macros)[];
+  verdict: Judgement;
 };
+
+const fields = (keys: (keyof Macros)[]) => keys.map((k) => MACRO_LABELS[k].toLowerCase()).join(", ");
 
 /**
  * Run both models on one food and keep the better answer.
@@ -46,6 +49,8 @@ export default function Harness() {
 
   async function compare() {
     if (!name.trim() || busy) return;
+    // Two paid model calls, both of which may search. Worth one tap to confirm.
+    if (!window.confirm(`Run Haiku and Sonnet on "${name.trim()}"? That is two paid model calls.`)) return;
     setBusy(true);
     setError(null);
     setRun(null);
@@ -54,7 +59,7 @@ export default function Harness() {
       const response = await fetch("/api/debug/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, date: localDate(new Date()) }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't run that comparison.");
@@ -67,22 +72,16 @@ export default function Harness() {
   }
 
   async function pick(which: "haiku" | "sonnet" | "baseline") {
-    if (!run || busy) return;
+    // One pick per run; the server refuses a second one too.
+    if (!run || busy || picked) return;
     setBusy(true);
     setError(null);
     try {
-      const side = which === "baseline" ? null : run[which];
+      // Only the run and the choice: the server reads the numbers from the run.
       const response = await fetch("/api/debug/pick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          comparison_id: run.id,
-          name: run.name,
-          picked: which,
-          macros: side ? side.macros : run.baseline?.macros,
-          model: side?.model,
-          source_url: side?.source_url,
-        }),
+        body: JSON.stringify({ comparison_id: run.id, picked: which, date: localDate(new Date()) }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't apply that pick.");
@@ -121,8 +120,8 @@ export default function Harness() {
           {busy ? "Running both…" : "Run both models"}
         </button>
         <p className="text-xs text-ink-soft">
-          Both run in parallel and neither sees the other. You wait for the slower one, and it costs
-          two estimates — which is what a validation window costs.
+          Both run in parallel and neither sees the other. Each is compared with your stored number
+          when there is one. You wait for the slower one, and it costs two paid estimates.
         </p>
       </section>
 
@@ -134,22 +133,7 @@ export default function Harness() {
 
       {run ? (
         <section className="flex flex-col gap-3">
-          {run.agreed ? (
-            <p className="rounded-lg border border-line bg-surface p-3 text-sm">
-              <span className="font-semibold">They agree.</span>{" "}
-              <span className="text-ink-soft">
-                Recorded as a match — there is nothing to choose between them, so nothing is asked
-                of you.
-              </span>
-            </p>
-          ) : (
-            <p className="rounded-lg border border-warn/60 bg-surface p-3 text-sm">
-              <span className="font-semibold">They disagree</span>
-              <span className="text-ink-soft">
-                {" "}on {run.disagreements.map((k) => MACRO_LABELS[k].toLowerCase()).join(", ")}.
-              </span>
-            </p>
-          )}
+          <Summary run={run} />
 
           <div className="grid gap-3 sm:grid-cols-3">
             <Column
@@ -168,17 +152,17 @@ export default function Harness() {
                   ? "This figure came from Haiku too — a match here measures run-to-run variance, not accuracy."
                   : null
               }
-              onPick={run.baseline && !run.agreed ? () => pick("baseline") : undefined}
+              onPick={run.baseline && run.verdict.needsPick && !picked ? () => pick("baseline") : undefined}
               pickLabel="Keep this"
               pickedNow={picked === "baseline"}
               busy={busy}
             />
             <Column
               title={run.haiku.label}
-              macros={run.haiku.error ? null : run.haiku.macros}
-              empty={run.haiku.error ?? "No answer."}
+              macros={run.haiku.macros ?? null}
+              empty={run.haiku.error ? `Failed: ${run.haiku.error}` : "No answer."}
               footer={
-                run.haiku.error ? null : (
+                !run.haiku.macros ? null : (
                   <Provenance
                     source={run.haiku.source_url ? "web" : "estimate"}
                     model={run.haiku.model}
@@ -186,17 +170,17 @@ export default function Harness() {
                   />
                 )
               }
-              onPick={run.haiku.error || run.agreed ? undefined : () => pick("haiku")}
+              onPick={run.haiku.macros && run.verdict.needsPick && !picked ? () => pick("haiku") : undefined}
               pickLabel="Keep this"
               pickedNow={picked === "haiku"}
               busy={busy}
             />
             <Column
               title={run.sonnet.label}
-              macros={run.sonnet.error ? null : run.sonnet.macros}
-              empty={run.sonnet.error ?? "No answer."}
+              macros={run.sonnet.macros ?? null}
+              empty={run.sonnet.error ? `Failed: ${run.sonnet.error}` : "No answer."}
               footer={
-                run.sonnet.error ? null : (
+                !run.sonnet.macros ? null : (
                   <Provenance
                     source={run.sonnet.source_url ? "web" : "estimate"}
                     model={run.sonnet.model}
@@ -204,7 +188,7 @@ export default function Harness() {
                   />
                 )
               }
-              onPick={run.sonnet.error || run.agreed ? undefined : () => pick("sonnet")}
+              onPick={run.sonnet.macros && run.verdict.needsPick && !picked ? () => pick("sonnet") : undefined}
               pickLabel="Keep this"
               pickedNow={picked === "sonnet"}
               busy={busy}
@@ -220,6 +204,44 @@ export default function Harness() {
           ) : null}
         </section>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * What the run found, in words. A side that failed is named as a failure — it
+ * used to read "They disagree on ." with nothing after "on".
+ */
+function Summary({ run }: { run: Comparison }) {
+  const v = run.verdict;
+  const lines: { text: string; loud: boolean }[] = [];
+  for (const side of v.failed) {
+    lines.push({ text: `${run[side].label} failed: ${run[side].error ?? "no answer"}.`, loud: true });
+  }
+  if (run.baseline) {
+    for (const [side, agreesNow, differs] of [
+      ["haiku", v.haikuVsBaseline, v.differs.haiku],
+      ["sonnet", v.sonnetVsBaseline, v.differs.sonnet],
+    ] as const) {
+      if (agreesNow === null) continue;
+      lines.push(agreesNow
+        ? { text: `${run[side].label} reproduces your log.`, loud: false }
+        : { text: `${run[side].label} differs from your log on ${fields(differs)}.`, loud: true });
+    }
+  } else if (v.failed.length === 0) {
+    lines.push(v.agreed
+      ? { text: "Nothing stored yet, and the two models agree.", loud: false }
+      : { text: `Nothing stored yet, and the models differ on ${fields(v.differs.models)}.`, loud: true });
+  }
+
+  return (
+    <div className={`flex flex-col gap-1 rounded-lg border bg-surface p-3 text-sm ${lines.some((l) => l.loud) ? "border-warn/60" : "border-line"}`}>
+      {lines.map((l) => (
+        <p key={l.text} className={l.loud ? "font-semibold" : "text-ink-soft"}>{l.text}</p>
+      ))}
+      <p className="text-ink-soft">
+        {v.needsPick ? "Keep one of them below. A run can be picked from once." : "Recorded — there is nothing to choose, so nothing is asked of you."}
+      </p>
     </div>
   );
 }

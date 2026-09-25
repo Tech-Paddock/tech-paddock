@@ -35,7 +35,10 @@ actually reads:
 - List membership (`w:numPr`) and bullet glyphs
 - Section headers, verbatim — they are generic and the parser matches on them
 - Section rules drawn as images in the Jobright export
-- Date strings and their separators, and the company/title/date concatenation
+- The shape of every date string and its separators, and the company/title/date concatenation.
+  **The dates themselves are not the export's**: every month-year was shifted by one fixed offset
+  (TEC-31), because a real employment timeline is personal information even with the names gone.
+  A fixed offset keeps every range in order and every gap the same length.
 - `metric` / `description` split in Career Highlights
 - The empty `styles.xml` in the Jobright export (no named styles at all)
 - Content nested inside `<w:sdt>` content controls in the template
