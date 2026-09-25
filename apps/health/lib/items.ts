@@ -86,15 +86,19 @@ export function normalizeName(name: string): string {
  * `effective_from` on or before that day, then within that era take the most
  * recently written row.
  *
- * That single rule gives both behaviours the two kinds need:
+ * **It runs at log time only** (TEC-21): each logged line snapshots what this
+ * returns, so a day already logged never re-resolves and no later version moves
+ * it. The rule still decides which figure a new log picks up:
  *
  * - A **correction** carries the `effective_from` of the era it corrects, so it
- *   supersedes inside that era without starting a new one — and every past day
- *   in that era resolves to it. The number was always wrong; now it is right,
- *   backwards.
+ *   supersedes inside that era without starting a new one — a log dated anywhere
+ *   in that era picks it up. The number was always wrong.
  * - A **change** carries its own later `effective_from`, so it starts a new era
- *   and days before it keep resolving to the older one. The food itself changed;
- *   Tuesday really did have the old macros and must not be falsified.
+ *   and a log dated before it still picks up the older one. The food itself
+ *   changed; Tuesday really did have the old macros.
+ *
+ * `kind` is also what a backfill of snapshotted days would read: a correction
+ * says the days before it were wrong, a change says they were right.
  *
  * The fallback matters more than it looks: an entry dated before an item's
  * earliest version resolves to that earliest version rather than to nothing. A
