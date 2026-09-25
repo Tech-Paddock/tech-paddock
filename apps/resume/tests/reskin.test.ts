@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { XMLValidator } from "fast-xml-parser";
-import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
+import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
 import { getBodyInner, loadDocx, withBodyInner } from "../lib/reskin/container";
 import { joinBody, splitBody } from "../lib/reskin/blocks";
@@ -103,6 +104,36 @@ describe("the XML it emits", () => {
     const a = await render();
     const b = await render();
     expect(a.outBody).toBe(b.outBody);
+  });
+
+  /**
+   * TEC-31. The body was deterministic and the file was not: the rewritten
+   * `word/document.xml` entry took the wall-clock time as its zip timestamp, so
+   * two renders of the same inputs a few seconds apart hashed differently and
+   * `content_hash` could not identify a render. The clock is set a day apart
+   * here, rather than hoping two runs straddle a second, so this cannot pass by
+   * luck and cannot fail under load.
+   */
+  it("is deterministic to the byte — the same inputs give the same file on different days", async () => {
+    const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2031-01-01T00:00:00Z"));
+      const first = await reskin(TEMPLATE(), SOURCE());
+      vi.setSystemTime(new Date("2031-01-02T12:34:56Z"));
+      const second = await reskin(TEMPLATE(), SOURCE());
+      expect(sha(second.docx)).toBe(sha(first.docx));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /** The same bug's other half: JSZip added a `word/` folder entry, stamped with
+   *  the current time, to an archive that never had one. */
+  it("writes back exactly the template's parts, adding none", async () => {
+    const { docx } = await reskin(TEMPLATE(), SOURCE());
+    const names = async (b: Buffer) => Object.keys((await JSZip.loadAsync(b)).files).sort();
+    expect(await names(docx)).toEqual(await names(TEMPLATE()));
   });
 });
 

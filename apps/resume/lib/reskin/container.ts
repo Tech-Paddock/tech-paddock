@@ -42,7 +42,14 @@ export async function loadDocx(bytes: ArrayBuffer | Uint8Array | Buffer, label =
  * from the stored bytes; there is no shared cached copy to corrupt.
  */
 export async function saveWithDocumentXml(original: DocxContainer, newDocumentXml: string): Promise<Buffer> {
-  original.zip.file(DOCUMENT_PART, newDocumentXml);
+  // The entry keeps the template's own timestamp, and JSZip is told not to
+  // invent a `word/` folder entry. Either one stamps the current time into the
+  // archive, so the same two inputs gave different bytes and a different
+  // `content_hash` from one second to the next — and a render is only a
+  // trustworthy record if the same inputs give the same file. The folder entry
+  // was also a part the template never had.
+  const date = original.zip.file(DOCUMENT_PART)?.date;
+  original.zip.file(DOCUMENT_PART, newDocumentXml, { createFolders: false, ...(date ? { date } : {}) });
   return original.zip.generateAsync({ type: "nodebuffer" });
 }
 
