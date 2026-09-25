@@ -135,6 +135,12 @@ rather than implying it passed.
 `/api/summary` from reading design notes rather than the route. It was wrong, and it blocked a
 correct change. Read the thing itself.
 
+**Put a decision to Joel as a multiple-choice question** (Joel, 2026-09-25: "rather than doing that
+pop up a multiple choice question with any relevant options"). Use `AskUserQuestion` — never prose
+like "I need one word from you". Two to four options, your recommendation first and marked, each
+saying what happens if he picks it. Prose carries the context; the pick is a question. A helper
+cannot ask him, so its question reaches him this way too.
+
 **Write to Linear last** (Joel, 2026-09-25: "TD does not write any issues to Linear until all other
 work is completed"). Land your Linear writes — new issues, status changes, comments — once every
 other change in the session's queue is committed and pushed, not as you go. A write made mid-session

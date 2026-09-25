@@ -251,6 +251,9 @@ wrong or the rule is, and that is a conversation before any code exists.
   **Say which shape it is in the Deployment section.** A migration whose shape is not stated is
   treated as destructive until someone reads the SQL. **Deployment applies it at gate time, before
   merging** — not Joel, and not the agent that wrote it.
+  **Cite a migration by its name, never its number** — `the health_entry_items_snapshot migration`.
+  The hosted database records its own version and the file is renamed to match at the gate, so a
+  number written before then is wrong after it (Joel, 2026-09-25).
 - **Say what it takes to deploy it, every time.** Every pull request carries a **Deployment**
   section, and so does the message handing a finished branch over. Four things: what happens by
   itself on merge, what a human must do and in what order, how to verify it is genuinely live, and
