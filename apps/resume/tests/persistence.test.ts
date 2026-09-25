@@ -233,7 +233,7 @@ describe("recording where a render went", () => {
     // notes is a running log — the earlier entry survives.
     expect(payload.notes).toContain("Earlier note worth keeping");
     expect(payload.notes).toContain("Product Analyst II");
-    // Touching a thread frees the stale check to raise a fresh Google Task.
+    // Touching a thread frees the stale check to raise a fresh Microsoft To Do task.
     expect(payload.open_task_id).toBeNull();
   });
 
