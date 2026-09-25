@@ -43,7 +43,10 @@ const probes: Record<string, () => Promise<Omit<Check, "name">>> = {
    * 2026-09-12 with the key suspected the whole time.
    */
   async database() {
-    const { error } = await getServiceClient().rpc("version");
+    // A one-row read of a table this app owns, as Coffee does. Until 2026-09-25
+    // this called `rpc("version")`, and no such function exists in `cookbook`,
+    // so the probe failed on every deploy and blamed the dashboard (TEC-29).
+    const { error } = await getServiceClient().from("recipes").select("id").limit(1);
     if (!error) return { ok: true, detail: "cookbook schema reachable" };
     return {
       ok: false,

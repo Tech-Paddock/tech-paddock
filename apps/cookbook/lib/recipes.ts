@@ -178,6 +178,20 @@ export async function getRecipe(id: string): Promise<Recipe | null> {
   return data ? hydrate(data as Record<string, unknown>) : null;
 }
 
+/**
+ * Is this name already in the book? **A courtesy, not the rule** — the unique
+ * index is the rule, and `saveRecipe` still catches the collision from the
+ * insert. This exists so a typed recipe is refused before it pays for a pricing
+ * call it can never keep (TEC-29 item 8). Compared through `normalizeName`, the
+ * index's own expression.
+ */
+export async function nameTaken(name: string): Promise<boolean> {
+  const { data, error } = await getServiceClient().from("recipes").select("name");
+  if (error) throw new LookupError(`Couldn't read the book: ${error.message}`);
+  const wanted = normalizeName(name);
+  return (data ?? []).some((r) => normalizeName(String((r as { name: unknown }).name)) === wanted);
+}
+
 // ---------------------------------------------------------------------------
 // The write path. Keeping a draft is the only thing that reaches it.
 // ---------------------------------------------------------------------------
@@ -311,14 +325,38 @@ export function methodSteps(method: string | null): string[] {
   // a line that is already one step is how a tidy list becomes a ragged one.
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
+  // **A marker splits only when it is the next number in the run** (TEC-29 item
+  // 4). "Heat the oven to gas mark 4. Bake until golden." has a marker by shape
+  // and a setting by meaning; what tells them apart is that no step 3 came before
+  // it. The run carries across lines, so "1. Chop.\n2. Fry. 3. Serve." still
+  // splits at 3. A run starts only at 1 — at a line start, or mid-line when a 2
+  // follows it.
+  let last = 0;
+
   const out: string[] = [];
   for (const line of lines) {
-    const cuts: number[] = [];
-    for (const m of line.matchAll(marker)) {
+    const found = [...line.matchAll(marker)].map((m) => ({
       // The marker may have consumed a leading space; the step starts at the digit.
-      const at = m.index + (m[0].length - m[0].trimStart().length);
-      if (at > 0) cuts.push(at);
-    }
+      at: m.index + (m[0].length - m[0].trimStart().length),
+      n: Number.parseInt(m[0].trim(), 10),
+    }));
+
+    const cuts: number[] = [];
+    found.forEach(({ at, n }, i) => {
+      if (at === 0) {
+        // The author's own line break already made this a step; it only sets
+        // where the run has got to.
+        last = n;
+        return;
+      }
+      // Mid-line, a 1 is a step only when a 2 follows it: "Serves 1. Enjoy."
+      // ends in a number and starts no run.
+      const next = n === 1 ? found[i + 1]?.n === 2 : n === last + 1;
+      if (next) {
+        cuts.push(at);
+        last = n;
+      }
+    });
     if (cuts.length === 0) {
       out.push(line);
       continue;

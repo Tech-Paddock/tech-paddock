@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { estimateRecipeMacros, generateRecipe, importRecipe, readRecipeFile, type RecipeFields } from "@/lib/anthropic";
 import { validateRecipeFile } from "@/lib/upload";
-import { type RecipeDraft } from "@/lib/recipes";
+import { nameTaken, type RecipeDraft } from "@/lib/recipes";
 import { statusOf } from "@/lib/errors";
 import { errorResponse } from "@/lib/respond";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
@@ -58,6 +58,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: "List what goes in it — the macros come from that." },
           { status: 400 }
+        );
+      }
+
+      // Before the pricing call, not after it: a typed recipe saves straight away,
+      // so a name already in the book would pay for a model call and then be
+      // refused at the insert.
+      if (await nameTaken(name)) {
+        return NextResponse.json(
+          { error: `"${name}" is already in the book. Rename it, or remove the one that is in there.` },
+          { status: 409 }
         );
       }
 

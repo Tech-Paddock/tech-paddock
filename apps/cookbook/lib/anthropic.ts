@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { MODELS, DEFAULT_MODEL, type ModelId } from "./models";
+import { MODELS, DEFAULT_MODEL, requestShape, type ModelId } from "./models";
 import { parseMacros, type Macros } from "./macros";
 import { FILE_TYPES, type RecipeFile } from "./upload";
+import { unfetchedRead, type ResultBlock } from "./fetchRun";
 
 /**
  * The five model calls this app makes, and the reasoning for each one's model.
@@ -9,17 +10,35 @@ import { FILE_TYPES, type RecipeFile } from "./upload";
  * `CLAUDE.md`: model choice is per task, and the choice and the reason are
  * recorded at the call site. These are those call sites.
  *
- * **None of them sends `output_config`.** The JSON shape is asked for in the
- * prompt and validated in code afterwards. That is the conservative path on
- * purpose: `effort` moving under `output_config` has caught this project once,
- * Haiku 4.5 rejects the key where Sonnet 5 accepts it, and the import call
- * carries a server tool where a response format is awkward anyway. Validating in
- * code is required regardless — a model response is untrusted input — so the
- * structured-output parameter would buy tidiness rather than safety.
+ * **The four calls without a tool send a JSON schema** (`output_config.format`),
+ * and **every call's request shape comes from `requestShape` in `lib/models.ts`**:
+ * an explicit effort and room to think for Sonnet 5, no effort for Haiku 4.5,
+ * which rejects it but accepts the format (TEC-29 item 7 — this header said the
+ * opposite until 2026-09-25). The import carries a server tool and keeps asking
+ * for its JSON in the prompt. **Every response is still validated in code** — a
+ * model response is untrusted input whatever constrained it.
+ *
+ * **Every response's `stop_reason` is checked** (`finished`). A turn cut off at
+ * `max_tokens` is a truncated answer, and reading JSON out of one is how a
+ * half-priced recipe would look like a whole one.
  *
  * **Nothing here writes anything.** Every function returns a draft or a
  * proposal; the write is a separate, deliberate approval.
  */
+
+type ModelResponse = { stop_reason: string; content: { type: string; text?: string }[] };
+
+/** Refuse a response that did not finish, in a sentence rather than a parse failure. */
+function finished(response: ModelResponse, model: ModelId): ModelResponse {
+  if (response.stop_reason === "end_turn" || response.stop_reason === "stop_sequence") return response;
+  if (response.stop_reason === "max_tokens") {
+    throw new Error(`${MODELS[model].label} ran out of room before it finished. Nothing was kept — try again.`);
+  }
+  if (response.stop_reason === "refusal") {
+    throw new Error(`${MODELS[model].label} declined that one. Nothing was kept.`);
+  }
+  throw new Error(`${MODELS[model].label} stopped early (${response.stop_reason}). Nothing was kept.`);
+}
 
 let client: Anthropic | null = null;
 
@@ -48,11 +67,16 @@ export function looseJson<T = unknown>(text: string): T | null {
   return null;
 }
 
+/**
+ * The text of a response. **Joined with nothing**: with citations or a server
+ * tool, one answer arrives split across several text blocks, and a newline
+ * between them lands in the middle of a JSON string.
+ */
 function textOf(response: { content: { type: string; text?: string }[] }): string {
   return response.content
     .filter((b) => b.type === "text")
     .map((b) => b.text ?? "")
-    .join("\n");
+    .join("");
 }
 
 /**
@@ -60,6 +84,9 @@ function textOf(response: { content: { type: string; text?: string }[] }): strin
  * result. Resuming means handing the paused turn back. **Without this the answer
  * is silently truncated rather than erroring**, which here would mean a
  * confidently wrong recipe instead of a visible failure.
+ *
+ * Returns every block from every turn as well as the final text, because
+ * whether a page was really fetched is in the tool-result blocks, not the text.
  */
 async function runWithTools(params: {
   model: ModelId;
@@ -67,26 +94,91 @@ async function runWithTools(params: {
   tools: unknown[];
   content: string;
   maxTokens: number;
-}): Promise<string> {
+}): Promise<{ text: string; blocks: ResultBlock[] }> {
   const messages: Record<string, unknown>[] = [{ role: "user", content: params.content }];
+  const blocks: ResultBlock[] = [];
 
   for (let i = 0; i < 6; i++) {
     const response = (await getClient().messages.create({
       model: params.model,
-      max_tokens: params.maxTokens,
+      ...requestShape(params.model, { maxTokens: params.maxTokens, effort: "low" }),
       system: params.system,
       tools: params.tools,
       messages,
-    } as never)) as { stop_reason: string; content: { type: string; text?: string }[] };
+    } as never)) as ModelResponse;
 
+    blocks.push(...(response.content as ResultBlock[]));
     if (response.stop_reason === "pause_turn") {
       messages.push({ role: "assistant", content: response.content });
       continue;
     }
-    return textOf(response);
+    return { text: textOf(finished(response, params.model)), blocks };
   }
-  return "";
+  throw new Error(`${MODELS[params.model].label} kept pausing and never finished reading the page.`);
 }
+
+/** `["string", "null"]` and friends, for the schemas below. */
+const nullable = (type: string) => ({ type: [type, "null"] });
+
+const MACRO_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    kcal: { type: "number" },
+    protein_g: { type: "number" },
+    carbs_g: { type: "number" },
+    fat_g: { type: "number" },
+    note: nullable("string"),
+  },
+  required: ["kcal", "protein_g", "carbs_g", "fat_g", "note"],
+};
+
+const RECIPE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    name: { type: "string" },
+    servings: { type: "integer" },
+    ingredients: { type: "array", items: { type: "string" } },
+    method: { type: "string" },
+  },
+  required: ["name", "servings", "ingredients", "method"],
+};
+
+const READ_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    read: { type: "boolean" },
+    reason: nullable("string"),
+    name: nullable("string"),
+    servings: nullable("integer"),
+    ingredients: { type: ["array", "null"], items: { type: "string" } },
+    method: nullable("string"),
+  },
+  required: ["read", "reason", "name", "servings", "ingredients", "method"],
+};
+
+const TIDY_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    lines: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          name: { type: "string" },
+          note: nullable("string"),
+          absorbed: { type: "array", items: { type: "integer" } },
+        },
+        required: ["name", "note", "absorbed"],
+      },
+    },
+  },
+  required: ["lines"],
+};
 
 export type RecipeFields = {
   name: string;
@@ -131,7 +223,9 @@ export async function estimateRecipeMacros(params: {
 
   const response = (await getClient().messages.create({
     model,
-    max_tokens: 2048,
+    // Medium: this is the one judgement in the app, but it is arithmetic over a
+    // list in hand, not an open problem.
+    ...requestShape(model, { maxTokens: 2048, effort: "medium", schema: MACRO_SCHEMA }),
     system: RECIPE_MACRO_SYSTEM,
     messages: [
       {
@@ -144,9 +238,9 @@ export async function estimateRecipeMacros(params: {
           `"fat_g": number, "note": string or null} for the WHOLE dish. Put nothing after the JSON.`,
       },
     ],
-  } as never)) as { content: { type: string; text?: string }[] };
+  } as never)) as ModelResponse;
 
-  const parsed = looseJson<Record<string, unknown>>(textOf(response));
+  const parsed = looseJson<Record<string, unknown>>(textOf(finished(response, model)));
   const macros = parseMacros(parsed);
   if (!macros) {
     throw new Error(`${MODELS[model].label} did not return usable macros for "${recipe.name}".`);
@@ -179,7 +273,7 @@ export async function generateRecipe(params: {
 
   const response = (await getClient().messages.create({
     model,
-    max_tokens: 3072,
+    ...requestShape(model, { maxTokens: 3072, effort: "medium", schema: RECIPE_SCHEMA }),
     system: GENERATE_SYSTEM,
     messages: [
       {
@@ -190,9 +284,9 @@ export async function generateRecipe(params: {
           `"method": string}. Put nothing after the JSON.`,
       },
     ],
-  } as never)) as { content: { type: string; text?: string }[] };
+  } as never)) as ModelResponse;
 
-  const fields = readRecipeFields(looseJson<Record<string, unknown>>(textOf(response)));
+  const fields = readRecipeFields(looseJson<Record<string, unknown>>(textOf(finished(response, model))));
   if (!fields) throw new Error(`${MODELS[model].label} did not return a usable recipe.`);
   return fields;
 }
@@ -226,9 +320,10 @@ export type RecipeImport = { read: boolean; fields: RecipeFields | null; reason:
  * Read a recipe off a page.
  *
  * **A page that could not be read is refused rather than guessed, and that is
- * enforced twice.** The prompt asks for `read: false`; the check below
- * independently rejects anything claimed as read that produced no ingredients.
- * Two enforcements rather than one because a prompt can only ask, and this is
+ * enforced twice — three times since 2026-09-25.** The prompt asks for
+ * `read: false`; the checks below independently reject anything claimed as read
+ * that produced no ingredients, and anything read without a fetch that returned
+ * a page. More than one because a prompt can only ask, and this is
  * Coffee's trap wearing an apron — there the rule exists because *"you would
  * actually brew it"*, and here you would actually cook it.
  *
@@ -243,7 +338,7 @@ export async function importRecipe(params: {
 }): Promise<RecipeImport> {
   const model = params.model ?? DEFAULT_MODEL;
 
-  const raw = await runWithTools({
+  const { text: raw, blocks } = await runWithTools({
     model,
     system: IMPORT_SYSTEM,
     // The fetch tool version differs between the two models; lib/models.ts is
@@ -274,6 +369,12 @@ export async function importRecipe(params: {
       reason: reason ?? "Nothing on that page looked like a recipe with ingredients.",
     };
   }
+
+  // The third, and the only one that asks the model nothing. A recipe written
+  // from the slug has ingredients and says `read: true`; what it cannot have is
+  // a fetch that returned a page. See `lib/fetchRun.ts`.
+  const unfetched = unfetchedRead(blocks);
+  if (unfetched) return { read: false, fields: null, reason: unfetched };
 
   return { read: true, fields, reason: null };
 }
@@ -330,7 +431,8 @@ export async function readRecipeFile(params: {
 
   const response = (await getClient().messages.create({
     model,
-    max_tokens: 4096,
+    // Low: reading print off a page is transcription, not judgement.
+    ...requestShape(model, { maxTokens: 4096, effort: "low", schema: READ_SCHEMA }),
     system: FILE_SYSTEM,
     messages: [
       {
@@ -348,9 +450,9 @@ export async function readRecipeFile(params: {
         ],
       },
     ],
-  } as never)) as { content: { type: string; text?: string }[] };
+  } as never)) as ModelResponse;
 
-  const parsed = looseJson<Record<string, unknown>>(textOf(response));
+  const parsed = looseJson<Record<string, unknown>>(textOf(finished(response, model)));
   const reason = typeof parsed?.reason === "string" ? parsed.reason.trim() || null : null;
 
   if (!parsed || parsed.read !== true) {
@@ -425,28 +527,34 @@ const TIDY_SYSTEM = `You consolidate a shopping list.
 
 export type TidyProposal = { name: string; note: string | null; absorbed: string[] };
 
+/**
+ * **Lines go to the model as short numbers, not their ids** (TEC-29 item 8). A
+ * UUID is 36 characters the model has to echo back exactly, once per line, and on
+ * a long list that alone ran out the output budget. The numbers are mapped back
+ * here; one that names no line maps to a marker `validateTidy` refuses as "not on
+ * your list", so a wrong number can never absorb a real line.
+ */
 export async function tidyList(
   items: { id: string; name: string; note: string | null }[]
 ): Promise<TidyProposal[]> {
   const response = (await getClient().messages.create({
     model: TIDY_MODEL,
-    max_tokens: 2048,
+    ...requestShape(TIDY_MODEL, { maxTokens: 4096, effort: "low", schema: TIDY_SCHEMA }),
     system: TIDY_SYSTEM,
     messages: [
       {
         role: "user",
         content:
           `The list:\n${items
-            .map((i) => `- id ${i.id}: ${i.name}${i.note ? ` (${i.note})` : ""}`)
+            .map((i, n) => `${n + 1}. ${i.name}${i.note ? ` (${i.note})` : ""}`)
             .join("\n")}\n\n` +
           `Return a JSON object: {"lines": [{"name": string, "note": string or null, ` +
-          `"absorbed": [id, ...]}]}. Every id above appears in exactly one absorbed list. ` +
-          `Put nothing after the JSON.`,
+          `"absorbed": [number, ...]}]}. Every number above appears in exactly one absorbed list.`,
       },
     ],
-  } as never)) as { content: { type: string; text?: string }[] };
+  } as never)) as ModelResponse;
 
-  const raw = looseJson<{ lines?: unknown }>(textOf(response));
+  const raw = looseJson<{ lines?: unknown }>(textOf(finished(response, TIDY_MODEL)));
   if (!Array.isArray(raw?.lines)) return [];
 
   return raw.lines
@@ -455,10 +563,15 @@ export async function tidyList(
       return {
         name: typeof o.name === "string" ? o.name.trim() : "",
         note: typeof o.note === "string" && o.note.trim() ? o.note.trim() : null,
-        absorbed: Array.isArray(o.absorbed)
-          ? o.absorbed.filter((x): x is string => typeof x === "string")
-          : [],
+        absorbed: Array.isArray(o.absorbed) ? o.absorbed.map((x) => idForNumber(items, x)) : [],
       };
     })
     .filter((l) => l.name.length > 0);
+}
+
+/** The id behind a line number, or a marker no real line has. Exported for the tests. */
+export function idForNumber(items: { id: string }[], n: unknown): string {
+  const k = typeof n === "string" ? Number(n) : n;
+  if (typeof k === "number" && Number.isInteger(k) && k >= 1 && k <= items.length) return items[k - 1].id;
+  return `no line ${String(n)}`;
 }

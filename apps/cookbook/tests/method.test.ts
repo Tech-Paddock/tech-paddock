@@ -60,6 +60,31 @@ describe("methodSteps", () => {
     ]);
   });
 
+  it("never splits on a number that is not the next step — gas mark 4 (TEC-29)", () => {
+    expect(methodSteps("Heat the oven to gas mark 4. Bake until golden.")).toEqual([
+      "Heat the oven to gas mark 4. Bake until golden.",
+    ]);
+  });
+
+  it("keeps a setting inside a numbered step while still splitting the next step", () => {
+    expect(methodSteps("1. Heat the oven to gas mark 4. Grease a tin. 2. Bake until golden.")).toEqual([
+      "1. Heat the oven to gas mark 4. Grease a tin.",
+      "2. Bake until golden.",
+    ]);
+  });
+
+  it("does not start a run on a lone 1", () => {
+    expect(methodSteps("Serves 1. Enjoy it hot.")).toEqual(["Serves 1. Enjoy it hot."]);
+  });
+
+  it("starts a run mid-line when a 2 follows", () => {
+    expect(methodSteps("Method: 1. Chop the onion. 2. Fry it.")).toEqual([
+      "Method:",
+      "1. Chop the onion.",
+      "2. Fry it.",
+    ]);
+  });
+
   it("splits a method that is both numbered and already broken", () => {
     expect(methodSteps("1. Chop the onion.\n2. Fry it. 3. Serve.")).toEqual([
       "1. Chop the onion.",
