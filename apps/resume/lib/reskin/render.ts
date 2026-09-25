@@ -63,11 +63,20 @@ export function renderIntoTemplate(
   const changeLog: ChangeLogEntry[] = [];
   const output: Block[] = [];
 
-  for (const section of segmentTemplate(bodyBlocks)) {
+  const sections = segmentTemplate(bodyBlocks);
+  // The summary goes in one place. A template with a Summary heading gets it
+  // there; the preamble slot is only for a template without one. Filling both,
+  // as this once did, wrote the summary into the document twice.
+  const hasSummarySection = sections.some((s) => s.key === "summary");
+
+  for (const section of sections) {
     if (section.headerBlockIdx !== null) output.push(bodyBlocks[section.headerBlockIdx]);
 
     switch (section.key) {
       case "preamble":
+        if (hasSummarySection) output.push(...section.blockIdxs.map((i) => bodyBlocks[i]));
+        else output.push(...renderSummary(bodyBlocks, section.blockIdxs, content, changeLog));
+        break;
       case "summary":
         output.push(...renderSummary(bodyBlocks, section.blockIdxs, content, changeLog));
         break;
@@ -272,6 +281,25 @@ function renderCareerHighlights(
       action: "replaced",
       detail: "Changed from the template — updated with the input's text.",
     });
+
+    // A count mismatch is never silent. The table's cells are its layout, so a
+    // cell is neither added nor removed here — but which highlights went where
+    // is a change-log line each. A template cell the input did not reach ships
+    // the template's own figure; an input highlight with no cell does not ship.
+    for (let i = highlights.length; i < templateCells.length; i += 1) {
+      log.push({
+        section: "Career Highlights",
+        action: "not-found-in-input",
+        detail: `Highlight ${i + 1} keeps the template's own text ("${templateCells[i].stat}") — the input has ${highlights.length}.`,
+      });
+    }
+    for (let i = templateCells.length; i < highlights.length; i += 1) {
+      log.push({
+        section: "Career Highlights",
+        action: "input-dropped",
+        detail: `Highlight ${i + 1} ("${highlights[i].stat}") has no cell in the template's table, so it was dropped — the template has ${templateCells.length}.`,
+      });
+    }
   }
   return out;
 }
