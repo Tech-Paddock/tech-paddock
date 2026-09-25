@@ -17,6 +17,10 @@ type DraftItem = {
   known: boolean;
   item_id: string | null;
   error: string | null;
+  /** Client only: renamed since its lookup, so its numbers are gone until it is looked up again. */
+  stale?: boolean;
+  /** Client only: the lookup after a rename is in flight. */
+  looking?: boolean;
 };
 
 type Draft = { dictated_text: string; meal: Meal; eaten_on: string; items: DraftItem[] };
@@ -108,25 +112,73 @@ export default function Logger() {
   }
 
   function editLine(index: number, change: Partial<DraftItem>) {
-    if (!draft) return;
-    const items = draft.items.map((line, i) =>
-      i === index
-        ? {
+    setDraft((current) => {
+      if (!current) return current;
+      const items = current.items.map((line, i) => {
+        if (i !== index) return line;
+        // A rename makes this a different food. Its numbers, provenance and item
+        // belong to the old name, so all of them go and it is looked up again
+        // when you leave the field — never carried across as though typed.
+        if (change.name !== undefined && change.name !== line.name) {
+          return {
             ...line,
-            ...change,
-            // Typing over a number makes it yours. Saying so here is what puts
-            // the right provenance on screen before you approve, rather than
-            // after — and the server re-derives it anyway rather than trusting
-            // this.
-            ...(change.macros ? { source: "hand" as MacroSource, model: null, source_url: null } : {}),
-          }
-        : line
-    );
-    setDraft({ ...draft, items });
+            name: change.name,
+            macros: { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 },
+            source: "estimate" as MacroSource,
+            model: null, source_url: null, note: null,
+            known: false, item_id: null, error: null,
+            stale: true,
+          };
+        }
+        return {
+          ...line,
+          ...change,
+          // Typing over a number makes it yours, and this is the one place that
+          // says so: the server records a number as hand-entered only when the
+          // line claims it, and refuses a difference nobody typed.
+          ...(change.macros ? { source: "hand" as MacroSource, model: null, source_url: null } : {}),
+        };
+      });
+      return { ...current, items };
+    });
   }
 
+  async function lookUpAgain(index: number) {
+    const line = draft?.items[index];
+    if (!draft || !line?.stale || line.looking) return;
+    if (!line.name.trim()) return;
+    const eatenOn = draft.eaten_on;
+    editLine(index, { looking: true });
+    let next: Partial<DraftItem>;
+    try {
+      const response = await fetch("/api/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: line.name, quantity: line.quantity, date: eatenOn }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? `Couldn't look up "${line.name}".`);
+      next = { ...(body.item as DraftItem), quantity: line.quantity };
+    } catch (e) {
+      next = { error: e instanceof Error ? e.message : `Couldn't look up "${line.name}".` };
+    }
+    setDraft((current) => {
+      if (!current) return current;
+      const items = current.items.map((l, i) =>
+        // Only land on the line it was asked for — renamed again meanwhile, it
+        // is still stale and asks again on its own blur.
+        i === index && l.name === line.name ? { ...l, ...next, stale: false, looking: false } : l
+      );
+      return { ...current, items };
+    });
+  }
+
+  const unready = draft
+    ? draft.items.filter((i) => i.error || i.stale || i.looking).map((i) => i.name)
+    : [];
+
   const draftTotal = draft
-    ? round(total(draft.items.filter((i) => !i.error).map((i) => ({ macros: i.macros, quantity: i.quantity }))))
+    ? round(total(draft.items.filter((i) => !i.error && !i.stale).map((i) => ({ macros: i.macros, quantity: i.quantity }))))
     : null;
 
   return (
@@ -195,6 +247,7 @@ export default function Logger() {
                     aria-label="Food"
                     value={line.name}
                     onChange={(e) => editLine(index, { name: e.target.value })}
+                    onBlur={() => void lookUpAgain(index)}
                     className="min-w-0 flex-1 rounded border border-line bg-paper px-2 py-1.5 text-base"
                   />
                   <input
@@ -220,6 +273,10 @@ export default function Logger() {
 
                 {line.error ? (
                   <p className="text-sm text-danger">{line.error}</p>
+                ) : line.stale || line.looking ? (
+                  <p className="text-sm text-ink-soft">
+                    {line.looking ? "Looking it up…" : "Renamed — it is looked up again when you leave the field."}
+                  </p>
                 ) : (
                   <>
                     <div className="grid grid-cols-4 gap-2">
@@ -251,6 +308,13 @@ export default function Logger() {
           </ul>
 
           <footer className="flex flex-wrap items-center gap-3 border-t border-line px-3 py-3">
+            {/* A line that failed used to vanish on approve, logging a meal of
+                three as two. Approving now waits until every line has numbers. */}
+            {unready.length > 0 ? (
+              <p className="w-full text-sm text-danger">
+                Not ready: {unready.map((n) => `"${n}"`).join(", ")}. Fix or remove {unready.length === 1 ? "it" : "them"} to log.
+              </p>
+            ) : null}
             {draftTotal ? (
               <p className="text-sm">
                 <span className="font-semibold">{draftTotal.kcal} kcal</span>
@@ -270,7 +334,7 @@ export default function Logger() {
               <button
                 type="button"
                 onClick={approve}
-                disabled={busy !== null || draft.items.every((i) => i.error)}
+                disabled={busy !== null || draft.items.length === 0 || unready.length > 0}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
               >
                 {busy === "saving" ? "Logging…" : "Approve and log"}

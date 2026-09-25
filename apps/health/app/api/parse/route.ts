@@ -3,6 +3,7 @@ import { parseDictation } from "@/lib/anthropic";
 import { resolveItem, type Draft } from "@/lib/log";
 import { LookupError } from "@/lib/items";
 import { isMeal } from "@/lib/meals";
+import { mergeSameFood } from "@/lib/approve";
 
 export const dynamic = "force-dynamic";
 // The estimate may search and read pages, and the page waits on this response
@@ -47,8 +48,11 @@ export async function POST(request: NextRequest) {
     // Sequential rather than parallel: a repeat meal is all table hits and
     // costs nothing, and the misses are few enough that firing four searches at
     // once buys little and makes a rate limit the common failure.
+    // A food said twice is one line with the quantities added, merged before
+    // anything is estimated: two estimates of one food can disagree, and the
+    // second would otherwise land as a version of the first.
     const items = [];
-    for (const item of parsed.items) {
+    for (const item of mergeSameFood(parsed.items)) {
       items.push(await resolveItem({ name: item.name, quantity: item.quantity, onDate: eatenOn }));
     }
 
