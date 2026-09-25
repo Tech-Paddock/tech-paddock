@@ -1,6 +1,6 @@
 # Technical Director — handoff
 
-State as of 2026-09-24. `RULES.md` has the role, `DECISIONS.md` the reasoning; this is only what is
+State as of 2026-09-25. `RULES.md` has the role, `DECISIONS.md` the reasoning; this is only what is
 true and the traps. Open work is in Linear, team TEC. **Branch and pull request state is never
 written here** — read it live.
 
