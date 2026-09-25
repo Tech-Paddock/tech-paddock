@@ -111,3 +111,21 @@ function readDate(text: string): string | null {
 
   return null;
 }
+
+/**
+ * A label's roast date as the confirm screen holds it: the form field, and
+ * what to say beside it.
+ *
+ * `value` is what goes in the date input — YYYY-MM-DD or empty — and it is the
+ * only thing ever posted, so the save route never meets "08.14.26" and never
+ * refuses a bag that scanned perfectly. `unread` is the label's own wording
+ * when it could not be read as one date, for the hint beside the empty box.
+ *
+ * Until 2026-09-25 the page imported `parseLabelDate` and never called it: the
+ * label's text went straight into the form, the date input showed it as
+ * blank, and the save was refused with "roast date must be YYYY-MM-DD".
+ */
+export function roastDateFromLabel(raw: string | null | undefined): { value: string; unread: string | null } {
+  const { iso, text } = parseLabelDate(raw);
+  return { value: iso ?? "", unread: text };
+}

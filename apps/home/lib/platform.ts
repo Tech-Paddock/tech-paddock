@@ -88,27 +88,19 @@ export type Drift = {
  * sidebar alone. `apps/editor` is untouched and `editor.techpaddock.io` still
  * serves — it is simply not one of the tools the hub lists or embeds.
  *
- * **The Pipeline Tracker is deliberately absent.** `tp-tracker` is paused, so
- * every entry it had here pointed somewhere that does not answer: a sidebar row,
- * an iframe target, and a row in The Garage's table. Joel removed it from all
- * three on 2026-09-18 rather than from the sidebar alone.
+ * **The Pipeline Tracker is deliberately absent from the tools.** It is parked
+ * (Joel, 2026-09-24), so it has no sidebar row and no frame. It is still the
+ * glance's only source, though, so it is in `PARKED` below and The Garage and
+ * the Pit Wall still probe it — embedding a tool and depending on one are
+ * different questions. Un-parking it means moving its entry from there to here.
+ * `apps/tracker` is untouched and still builds in CI — the roster CI derives
+ * comes from the folders on disk, never from this file.
  *
- * **The Cookbook was added 2026-09-20, on Joel's word that it is live.** Not on
- * the Health terms below: `tp-cookbook` serves `cookbook.techpaddock.io`, its
- * latest production deployment is `READY`, and the domain is verified — all
- * three read off the deployment state rather than a project field, which is the
- * rule this app has been caught by before.
- *
- * **Health is deliberately present before it serves.** `tp-health` has no Root
- * Directory and no domain attached yet, so until those are set its sidebar row
- * and frame lead nowhere. That is the intended state rather than an oversight:
- * this file is what the platform is *supposed* to be, and The Garage's job is to
- * show the gap. A tool missing from here is invisible; a tool listed and down is
- * a question with an answer.
- * **The cost of that is recorded rather than hidden**: the hub no longer states
- * anywhere that `tp-tracker` is supposed to exist, so un-parking it means
- * putting this entry back. `apps/tracker` is untouched and still builds in CI —
- * the roster CI derives comes from the folders on disk, never from this file.
+ * **A tool is listed here on the platform's word, not on hope**: its latest
+ * production deployment is ready and its domain verified, both read off the
+ * deployment state rather than a project field, which is the rule this app has
+ * been caught by before. A tool listed and down is a question with an answer; a
+ * tool missing from here is invisible.
  */
 export type ToolSlug = "resume" | "coffee" | "health" | "cookbook";
 
@@ -129,16 +121,53 @@ export const HUB: Project = {
   vercelProject: "tp-home",
 };
 
-/** Everything the platform deploys, hub first. */
+/**
+ * Projects the hub depends on but does not embed — the glance calls the
+ * tracker's `/api/summary`, so whether it answers and whether it holds the same
+ * secret are the hub's business even while it has no sidebar row.
+ */
+export const PARKED: (Project & { parked: true })[] = [
+  {
+    slug: "tracker",
+    name: "Pipeline Tracker",
+    url: "https://tracker.techpaddock.io",
+    vercelProject: "tp-tracker",
+    parked: true,
+  },
+];
+
+/** What the hub embeds and deploys, hub first. The Garage's Declared table. */
 export const PROJECTS: Project[] = [HUB, ...TOOLS];
 
 /**
- * The environment variables this app reads. Presence is reported; a value is
- * never read for display, only tested for existence.
+ * What the hub probes: everything it embeds, plus what it depends on without
+ * embedding. Liveness, the shared-secret check and the Pit Wall's deployment
+ * rows all read this, never `TOOLS` — that was how the tracker went unprobed.
  */
-export const HUB_ENV_NAMES = [
-  "SESSION_SECRET",
-  "APP_PASSWORD_HASH",
-  "INTERNAL_API_SECRET",
-  "TRACKER_BASE_URL",
-] as const;
+export const PROBED: (Project & { parked?: true })[] = [...PROJECTS, ...PARKED];
+
+export type HubEnv = { name: string; optional: boolean; why: string };
+
+/**
+ * The environment variables this app reads. Presence is reported; a value is
+ * never read for display, only tested for existence. `.env.example` declares
+ * the same names — the Garage's Declared panel reads that file, this list is
+ * what the running deployment is asked about.
+ */
+export const HUB_ENV: HubEnv[] = [
+  { name: "SESSION_SECRET", optional: false, why: "the shared login cookie" },
+  { name: "APP_PASSWORD_HASH", optional: false, why: "the password gate" },
+  { name: "INTERNAL_API_SECRET", optional: false, why: "the glance's request to each tool" },
+  { name: "GITHUB_TOKEN", optional: true, why: "the Pit Wall: pull requests, branches, deployments" },
+  { name: "TRACKER_BASE_URL", optional: true, why: "overrides https://tracker.techpaddock.io" },
+];
+
+/**
+ * Names this app used to read and no longer does. Reported only if still set,
+ * because a credential nothing reads is a credential that can only leak.
+ * `VERCEL_TOKEN` was a full-power team token held for one read, and the Pit Wall
+ * now reads deployment state from GitHub's deployment statuses instead.
+ */
+export const HUB_ENV_RETIRED: { name: string; why: string }[] = [
+  { name: "VERCEL_TOKEN", why: "no longer read — the Pit Wall reads deployments from GitHub. Delete it from tp-home." },
+];
