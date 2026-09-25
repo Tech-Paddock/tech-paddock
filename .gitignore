@@ -29,3 +29,7 @@ npm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Helper worktrees (every agent preset runs with isolation: worktree). A nested
+# checkout, never content: committing it pushes a gitlink to another branch.
+/.claude/worktrees/

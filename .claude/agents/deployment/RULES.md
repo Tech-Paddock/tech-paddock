@@ -41,7 +41,10 @@ Requested by Joel on YYYY-MM-DD — "what he said"
 
 `requested-by-joel` fails a body without it. **Opening a pull request does not wait for Joel's
 click** (Joel, 2026-09-24: "they will be spun up with intention, so there's no need for a check").
-**Merging still does** — the guard holds it.
+**Merging does not either, since 2026-09-25:** Joel's go before the TD starts you is the one gate
+("only one gate"), and it covers exactly the branches the TD names in your brief. **Nothing enforces
+that scope** — the guard no longer asks on a merge — so a branch outside the brief is not yours to
+merge, however green. Auto-merge and approving a review still wait for his click.
 
 ## The gate
 
