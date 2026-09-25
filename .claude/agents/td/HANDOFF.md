@@ -15,7 +15,7 @@ for all of them. TEC-40 is that change.
 
 **TEC-27, the post-refactor review, is merged** (#201 to #205) and its sub-issues TEC-28 to TEC-32
 are each agent's to work, started by you. **Still Joel's:** TEC-33 steps 3 and 4 (re-pause the
-editor, pause the tracker), step 6 and TEC-7 (the firewall rate limit), and TEC-38. **Still yours:**
+editor, pause the tracker), and step 6 with TEC-7 (the firewall rate limit). **Still yours:**
 TEC-35 step 4 in a fresh session, and TEC-7's read-only check once the rule exists. **TEC-34** is the
 Next.js 14 → 16 upgrade. The parking lot is the `Parked` label.
 
@@ -26,8 +26,11 @@ Next.js 14 → 16 upgrade. The parking lot is the `Parked` label.
   policy refuses it — so the login behaviour itself was never checked from here.
 - **The hooks are one guard** (`.claude/hooks/guard.mjs` → `decide.mjs`, cases in `guard.test.mjs`,
   run by CI). It fails closed. Opening a pull request is not held; merging is.
-- **Every agent edits Linear without asking Joel.** The guard still refuses an issue that breaks the
-  issue rules.
+- **Every agent edits Linear without asking Joel, and no click prompts it**: `.claude/settings.json`
+  allows the Linear server, but deleting, retiring a label and the diff tools still ask — `merge_diff`
+  merges a pull request outside the guard's hold (TEC-43). The guard still refuses a malformed issue.
+  **An issue waiting on Joel is assigned to him**, and unassigned when his part is done (Joel,
+  2026-09-25); agents share one Linear user, so the `agent:` label, not the assignee, names them.
 - **The weekly Routine** "Weekly rules-drift audit" (Mondays 08:00 UTC) reads Linear and runs `drift`.
   Its prompt still names the TD as the gate until TEC-42; it is report-only, so that misleads nobody
   into acting, but a run before TEC-42 will report the move as drift.
