@@ -271,10 +271,12 @@ export async function saveRecipe(draft: RecipeDraft): Promise<Recipe> {
 /**
  * Take a recipe out of the book.
  *
- * **Nothing else goes with it.** Lines already on the shopping list stay —
- * they were copied as text when you added them, not linked — so removing a
- * recipe in the shop does not empty your list. Anything logged elsewhere is
- * untouched by construction: this app has never written to another schema.
+ * **Only its menu entry goes with it**, by the foreign key's cascade — a menu
+ * entry for a recipe that no longer exists has nothing to show. Lines already on
+ * the shopping list stay — they were copied as text when you added them, names
+ * included, not linked — so removing a recipe in the shop does not empty your
+ * list. Anything logged elsewhere is untouched by construction: this app has
+ * never written to another schema.
  */
 export async function deleteRecipe(id: string): Promise<void> {
   const { error } = await getServiceClient().from("recipes").delete().eq("id", id);
@@ -292,7 +294,9 @@ export async function toGroceryList(recipe: Recipe): Promise<number> {
   const lines = recipe.ingredients.map((i) => i.trim()).filter(Boolean);
   if (lines.length === 0) throw new InputError("That recipe has no ingredients listed.");
 
-  const added = await addItems(lines.map((name) => ({ name, source: "recipe" as const })));
+  // Each line names the recipe it came from, as the recipe is called now: a
+  // snapshot, so renaming the recipe later leaves the line alone (TEC-39 B).
+  const added = await addItems(lines.map((name) => ({ name, source: "recipe" as const, recipes: [recipe.name] })));
   return added.length;
 }
 

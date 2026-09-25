@@ -45,7 +45,39 @@ export type GroceryItem = {
   source: GrocerySource;
   checked: boolean;
   created_at: string;
+  /**
+   * Names of the recipes this line came from — a snapshot, plain text, no join
+   * (TEC-39 B; reasoning in the `cookbook_menu_and_line_recipes` migration).
+   * Empty for a typed line and for recipe lines added before the column existed.
+   */
+  recipes: string[];
 };
+
+const COLUMNS = "id, name, note, source, checked, created_at, recipes";
+
+/** `text[]` can come back null from an older client or row; a line always has a list. */
+function hydrate(row: Record<string, unknown>): GroceryItem {
+  return { ...(row as unknown as GroceryItem), recipes: Array.isArray(row.recipes) ? (row.recipes as string[]) : [] };
+}
+
+/**
+ * The recipe names a merged line should carry: every absorbed line's, in order,
+ * **without duplicates** — two recipes' olive oil becomes one line naming both,
+ * and the same recipe twice names it once.
+ */
+export function unionRecipes(lines: Pick<GroceryItem, "recipes">[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const line of lines) {
+    for (const name of line.recipes ?? []) {
+      const key = name.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(name.trim());
+    }
+  }
+  return out;
+}
 
 /**
  * A King Soopers search for one line.
@@ -90,34 +122,32 @@ export function asText(items: GroceryItem[]): string {
 export async function readList(): Promise<GroceryItem[]> {
   const { data, error } = await getServiceClient()
     .from("grocery_items")
-    .select("id, name, note, source, checked, created_at")
+    .select(COLUMNS)
     .order("checked", { ascending: true })
     .order("created_at", { ascending: true });
 
   if (error) throw new LookupError(`Couldn't read the list: ${error.message}`);
-  return (data ?? []) as GroceryItem[];
+  return (data ?? []).map((r) => hydrate(r as Record<string, unknown>));
 }
 
 export async function addItems(
-  lines: { name: string; note?: string | null; source?: GrocerySource }[]
+  lines: { name: string; note?: string | null; source?: GrocerySource; recipes?: string[] }[]
 ): Promise<GroceryItem[]> {
   const rows = lines
     .map((l) => ({
       name: l.name.trim(),
       note: l.note?.trim() || null,
       source: l.source ?? ("manual" as GrocerySource),
+      recipes: unionRecipes([{ recipes: l.recipes ?? [] }]),
     }))
     .filter((l) => l.name.length > 0);
 
   if (rows.length === 0) throw new InputError("Nothing to add.");
 
-  const { data, error } = await getServiceClient()
-    .from("grocery_items")
-    .insert(rows)
-    .select("id, name, note, source, checked, created_at");
+  const { data, error } = await getServiceClient().from("grocery_items").insert(rows).select(COLUMNS);
 
   if (error) throw new LookupError(`Couldn't add that: ${error.message}`);
-  return (data ?? []) as GroceryItem[];
+  return (data ?? []).map((r) => hydrate(r as Record<string, unknown>));
 }
 
 export async function setChecked(id: string, checked: boolean): Promise<void> {
@@ -203,7 +233,13 @@ export async function applyTidy(open: GroceryItem[], lines: TidyLine[]): Promise
   const problem = validateTidy(open, lines);
   if (problem) throw new ConflictError(problem);
 
-  const rows = lines.map((l) => ({ name: l.name, note: l.note, source: sourceOf(l, open) }));
+  const rows = lines.map((l) => ({
+    name: l.name,
+    note: l.note,
+    source: sourceOf(l, open),
+    // The merged line names every recipe its rows came from (TEC-39 B).
+    recipes: unionRecipes(l.absorbed.map((id) => open.find((i) => i.id === id) ?? { recipes: [] })),
+  }));
 
   // Write first, then delete. The other order has a window where a failed insert
   // leaves you with no list at all, in a shop, which is the one outcome worth

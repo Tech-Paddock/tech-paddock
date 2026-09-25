@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Provenance from "./Provenance";
+import Menu from "./Menu";
 import { useToast } from "./Toast";
 import { MACRO_KEYS, MACRO_LABELS, round, scale, type Macros } from "@/lib/macros";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
@@ -114,6 +115,19 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   const [query, setQuery] = useState("");
   // The recipe whose ingredients are on their way to the list, if any.
   const [listing, setListing] = useState<string | null>(null);
+  // Bumped whenever the menu may have changed: a recipe added to the list, or
+  // one removed from the book (which takes it off the menu too).
+  const [menuVersion, setMenuVersion] = useState(0);
+
+  /** From the menu: open that recipe in the book and bring it into view. */
+  function openFromMenu(recipeId: string) {
+    setQuery("");
+    setOpenId(recipeId);
+    // After the render that clears the search and opens the card.
+    setTimeout(() => {
+      document.getElementById(`recipe-${recipeId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
 
   const load = useCallback(async () => {
     try {
@@ -225,8 +239,13 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't add those.");
-      toast.notice(`${body.added} ingredient${body.added === 1 ? "" : "s"} added to your list.`);
+      const count = `${body.added} ingredient${body.added === 1 ? "" : "s"}`;
+      // The lines landed either way; only the menu entry can have failed, and
+      // it is said so rather than hidden behind a success.
+      if (body.menu === false) toast.error(`${count} added to your list, but it couldn't go on the menu.`);
+      else toast.notice(`${count} added to your list, and "${recipe.name}" is on the menu.`);
       onAddedToList?.();
+      setMenuVersion((n) => n + 1);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't add those.");
     } finally {
@@ -244,6 +263,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't remove that.");
       toast.notice(`"${recipe.name}" is out of the book. Your list keeps anything you already added.`);
       await load();
+      setMenuVersion((n) => n + 1);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't remove that.");
     }
@@ -529,6 +549,11 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
         </div>
       </section>
 
+      {/* On the menu, then the book: stacked on a phone, side by side on a wide
+          screen with the menu on the left (Joel, 2026-09-24, TEC-39 C). */}
+      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start lg:gap-6">
+      <Menu recipes={recipes} version={menuVersion} onOpen={openFromMenu} />
+
       {/* ------------------------------------------------------------------ */}
       {/* The book, under the form now. It is still the reason you came.     */}
       {/* ------------------------------------------------------------------ */}
@@ -584,7 +609,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
           </ul>
         )}
       </section>
-
+      </div>
     </div>
   );
 }
@@ -613,7 +638,8 @@ function RecipeCard({
   const priced = Number.isFinite(helpings) && helpings > 0 ? scale(serving, helpings) : null;
 
   return (
-    <li className="rounded-lg border border-line bg-surface">
+    // The id is what "On the menu" scrolls to.
+    <li id={`recipe-${recipe.id}`} className="scroll-mt-4 rounded-lg border border-line bg-surface">
       {/* **A lean pill: the name gives way, the facts do not.** `truncate` rather
           than a character count — a count that fits a laptop overflows a phone,
           and this is mostly a phone object. `min-w-0` is what lets the name

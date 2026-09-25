@@ -31,7 +31,9 @@ export default function Shell({ tab }: { tab: Tab }) {
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6">
+      {/* Wider on a large screen only so "On the menu" can sit beside the book
+          (TEC-39 C); the list tab keeps its own narrower column. */}
+      <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-6 lg:max-w-4xl">
         <Cookbook initialTab={tab} />
       </div>
     </main>
