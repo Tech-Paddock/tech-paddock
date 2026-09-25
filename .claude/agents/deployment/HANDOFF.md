@@ -47,9 +47,19 @@ merge commits are in `git log`; the issues they served are TEC-45 and TEC-43.
 - **Helper worktrees live under `.claude/worktrees/`** — every preset sets `isolation: worktree`.
   **Never commit that folder**, whatever the Stop hook asks; committing it pushes a nested checkout.
   `.gitignore` ignores it (TEC-48), so a folder there that shows as untracked means that line is gone.
-- **`gh` is not installed.** Read check runs through the GitHub connector, or unauthenticated
-  `curl` on `api.github.com/repos/…/commits/<sha>/check-runs`, and wait on the `gate` run for the
-  exact head you pushed.
+- **`gh` is not installed.** Read check runs through the GitHub connector, or `curl` on
+  `api.github.com/repos/…/commits/<sha>/check-runs` (the proxy's limit is generous), and wait on
+  the `gate` run for the exact head you pushed. **With a pull request open, one push runs `gate`
+  twice** (push and pull request events): wait until every `gate` on that head has completed.
+- **A helper worktree refuses git inside a loop, a variable or a `git -C`** — the isolation check
+  cannot prove it stays in the worktree. Run each git command plainly, from the worktree; write a
+  file first (`git show … > file`) when another tool needs a branch's content.
+- **The 2026-09-25 train's six merges (#211–#216) asked no click**, #211 and #212 included, before
+  the guard change (#213) had landed. Whether a merge prompts is the permission system's call per
+  session, not something to predict from the guard's source.
+- **A train can stop overnight between merges** (the second, 2026-09-25, did). Resume from live
+  state: the open pull requests, each head against `main`, and `list_migrations` for whether a
+  branch's migration is already applied — never from the brief's table or an earlier report.
 - **The hosted API renames migrations.** It records its own version and ignores the filename. Read
   `list_migrations` back before merging, never after, and rename the file on the branch to match.
 - **A merge makes every other open pull request stale**, because `main` requires branches to be up
