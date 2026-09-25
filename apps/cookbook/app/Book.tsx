@@ -112,6 +112,8 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
+  // The recipe whose ingredients are on their way to the list, if any.
+  const [listing, setListing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -211,6 +213,10 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   }
 
   async function toList(recipe: Recipe) {
+    // One at a time. A second tap while the first is in flight used to put the
+    // ingredients on the list twice (TEC-29 item 8).
+    if (listing) return;
+    setListing(recipe.id);
     try {
       const response = await fetch("/api/recipes/grocery", {
         method: "POST",
@@ -223,6 +229,8 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       onAddedToList?.();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't add those.");
+    } finally {
+      setListing(null);
     }
   }
 
@@ -568,6 +576,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
                 recipe={recipe}
                 open={openId === recipe.id}
                 onToggle={() => setOpenId(openId === recipe.id ? null : recipe.id)}
+                listing={listing === recipe.id}
                 onList={() => toList(recipe)}
                 onRemove={() => remove(recipe)}
               />
@@ -583,17 +592,22 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
 function RecipeCard({
   recipe,
   open,
+  listing,
   onToggle,
   onList,
   onRemove,
 }: {
   recipe: Recipe;
   open: boolean;
+  listing: boolean;
   onToggle: () => void;
   onList: () => void;
   onRemove: () => void;
 }) {
   const [count, setCount] = useState("1");
+  // **Remove asks first** (TEC-29 item 8): it is permanent, and it sat one tap
+  // from Add to list.
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const serving = perServing(recipe);
   const helpings = Number(count);
   const priced = Number.isFinite(helpings) && helpings > 0 ? scale(serving, helpings) : null;
@@ -647,10 +661,9 @@ function RecipeCard({
 
           {/* **Pricing helpings, and deliberately not logging them.**
               Multiplying a stored serving is arithmetic in this browser — no
-              model, no request, nothing written. Handing the result to whatever
-              records what you ate is a cross-app contract and it belongs to the
-              technical director (ledger item 22). Building a write here would be
-              inventing that contract by shipping one. */}
+              model, no request, nothing written. Logging what you ate is
+              Health's: it reads `GET /api/servings` under the contract in
+              `RULES.md` (TEC-11), and this app never writes a log. */}
           <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -673,18 +686,40 @@ function RecipeCard({
             <button
               type="button"
               onClick={onList}
-              disabled={recipe.ingredients.length === 0}
+              disabled={recipe.ingredients.length === 0 || listing}
               className="ml-auto rounded border border-line px-3 py-1.5 text-sm disabled:opacity-50"
             >
-              Add to list
+              {listing ? "Adding…" : "Add to list"}
             </button>
-            <button
-              type="button"
-              onClick={onRemove}
-              className="rounded border border-line px-3 py-1.5 text-sm text-ink-soft"
-            >
-              Remove
-            </button>
+            {confirmingRemove ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmingRemove(false);
+                    onRemove();
+                  }}
+                  className="rounded border border-danger/60 px-3 py-1.5 text-sm text-danger"
+                >
+                  Remove — sure?
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingRemove(false)}
+                  className="rounded border border-line px-3 py-1.5 text-sm text-ink-soft"
+                >
+                  Keep it
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmingRemove(true)}
+                className="rounded border border-line px-3 py-1.5 text-sm text-ink-soft"
+              >
+                Remove
+              </button>
+            )}
           </div>
           <p className="text-[11px] text-ink-soft">
             Pricing helpings reads the numbers above and calls nothing. Removing takes the recipe out

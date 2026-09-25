@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addItems, readList, removeItems, setChecked } from "@/lib/grocery";
+import { addItems, readList, removeItems, setChecked, splitLine } from "@/lib/grocery";
 import { errorResponse } from "@/lib/respond";
 import { readPreferences, resolveLink } from "@/lib/preferences";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  *
  * This reads and writes `cookbook.grocery_items`. Health's `health.grocery_items`
  * is a different table belonging to a different app, and moving that one is the
- * technical director's (ledger item 23).
+ * technical director's (TEC-15).
  */
 
 /**
@@ -46,7 +46,8 @@ export async function POST(request: NextRequest) {
   if (lines.length === 0) return NextResponse.json({ error: "Nothing to add." }, { status: 400 });
 
   try {
-    const items = await addItems(lines.map((name: string) => ({ name, source: "manual" as const })));
+    // "Milk — the small tin" is a name and a note; only the name is searched.
+    const items = await addItems(lines.map((line: string) => ({ ...splitLine(line), source: "manual" as const })));
     return NextResponse.json({ items }, { status: 201 });
   } catch (e) {
     return errorResponse(e, "Couldn't add that.");

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { asText, type GroceryItem, type TidyLine } from "@/lib/grocery";
 import type { ResolvedLink } from "@/lib/preferences";
-import Brands, { RememberForm } from "./Brands";
+import Brands from "./Brands";
 import { useToast } from "./Toast";
 
 /**
@@ -32,8 +32,6 @@ type ShoppingLine = GroceryItem & ResolvedLink;
  */
 export default function List({ refreshKey }: { refreshKey: number }) {
   const [items, setItems] = useState<ShoppingLine[] | null>(null);
-  const [remembering, setRemembering] = useState<ShoppingLine | null>(null);
-  const [brandsVersion, setBrandsVersion] = useState(0);
   // The read only; everything else is a toast. Same split as the book.
   const [readError, setReadError] = useState<string | null>(null);
   const toast = useToast();
@@ -204,6 +202,9 @@ export default function List({ refreshKey }: { refreshKey: number }) {
           away on a phone. Clearing what you bought stays under the list, next to
           the lines it clears. */}
       <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
+        {/* Named, Joel on 2026-09-24 (TEC-39): the same frame as "Add a recipe"
+            on the other tab, so both tabs open on a box that says what it is. */}
+        <h2 className="text-base font-semibold">Add items</h2>
         <textarea
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
@@ -333,16 +334,32 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       ) : (
         <ul className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
           {items.map((item) => (
-            <li key={item.id} className="flex items-center gap-3 px-3 py-2">
-              <input
-                type="checkbox"
-                checked={item.checked}
-                onChange={() => tick(item)}
-                aria-label={item.name}
-                className="size-4 shrink-0 accent-accent"
-              />
-              <span className={`min-w-0 flex-1 text-sm ${item.checked ? "text-ink-soft line-through" : ""}`}>
-                {item.name}
+            <li key={item.id} className="flex items-center gap-1 px-1">
+              {/* **The checkbox is its own tap target, with a gap before the
+                  name**, so ticking a line in the shop never opens King Soopers
+                  (TEC-39). The label pads it to a thumb's width. */}
+              <label className="flex shrink-0 cursor-pointer items-center self-stretch px-2 py-2">
+                <input
+                  type="checkbox"
+                  checked={item.checked}
+                  onChange={() => tick(item)}
+                  aria-label={`Got ${item.name}`}
+                  className="size-4 accent-accent"
+                />
+              </label>
+              <span className={`min-w-0 flex-1 py-2 pr-2 text-sm ${item.checked ? "text-ink-soft line-through" : ""}`}>
+                {/* **The name is the link** (Joel, 2026-09-24). It goes to your
+                    remembered product or search when one decides this line, and
+                    to a plain search of the name when none does — the server
+                    resolved which. */}
+                <a
+                  href={item.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-line decoration-dotted underline-offset-2"
+                >
+                  {item.name}
+                </a>
                 {item.note ? <span className="text-ink-soft"> — {item.note}</span> : null}
                 {/* Where the line came from, which is the whole reason the column
                     shipped before the book that writes it did. */}
@@ -350,21 +367,6 @@ export default function List({ refreshKey }: { refreshKey: number }) {
                   <span className="ml-1.5 text-[11px] text-ink-soft">from a recipe</span>
                 ) : null}
               </span>
-              <a
-                href={item.href}
-                target="_blank"
-                rel="noreferrer"
-                className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2"
-              >
-                {item.via && item.via.kind !== "plain" ? item.via.brand ?? "your brand" : "look it up"}
-              </a>
-              <button
-                type="button"
-                onClick={() => setRemembering(item)}
-                className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2"
-              >
-                remember
-              </button>
             </li>
           ))}
         </ul>
@@ -380,25 +382,8 @@ export default function List({ refreshKey }: { refreshKey: number }) {
         </button>
       ) : null}
 
-      {/* The editor opens under the list rather than inside the row: on a phone a
-          form squeezed into a line is a form you cannot type in. */}
-      {remembering ? (
-        <RememberForm
-          phrase={remembering.name}
-          /* The rule already deciding this line, when there is one. Opening the
-             line's own words instead is how you write `2 cups whole milk` into
-             the table and shadow the rule you meant to edit. */
-          existing={remembering.via}
-          onCancel={() => setRemembering(null)}
-          onSaved={() => {
-            setRemembering(null);
-            setBrandsVersion((v) => v + 1);
-            void load();
-          }}
-        />
-      ) : null}
-
-      <Brands version={brandsVersion} onChanged={() => void load()} />
+      {/* Remembering a brand happens only in here, since 2026-09-24 (TEC-39). */}
+      <Brands onChanged={() => void load()} />
 
     </section>
   );

@@ -12,10 +12,29 @@ import { ConflictError, InputError, LookupError } from "./errors";
  * list rather than being reopened.
  *
  * **This is `cookbook.grocery_items`, not Health's table.** Health's `/list` is
- * live and stays Health's until the technical director sequences the move
- * (ledger item 23 — destructive, so two pull requests). Nothing here writes
- * `health.*`, and nothing here assumes that screen disappears on any date.
+ * live and stays Health's until its redirect onto this app's `/list` ships
+ * (TEC-15 — destructive, so two pull requests). Nothing here writes `health.*`,
+ * and nothing here assumes that screen disappears on any date.
  */
+
+/**
+ * A typed line, split into what is searched and what is only for the shopper.
+ *
+ * **Anything after the first " — " is a note** (TEC-29 item 3): "Milk — the
+ * small tin" searches King Soopers for *Milk*, because "the small tin" narrows a
+ * search to nothing. The help text under the add box promised this before
+ * anything did it. Only a spaced em dash splits, so a hyphenated name never does.
+ */
+export function splitLine(line: string): { name: string; note: string | null } {
+  const at = line.indexOf(" — ");
+  if (at === -1) return { name: line.trim(), note: null };
+  const name = line.slice(0, at).trim();
+  const note = line.slice(at + 3).trim();
+  // A line that is all note ("— the small tin") keeps its words as the name
+  // rather than becoming a nameless row the database refuses.
+  if (!name) return { name: line.replace(/^\s*—\s*/, "").trim(), note: null };
+  return { name, note: note || null };
+}
 
 export type GrocerySource = "manual" | "recipe";
 
@@ -135,12 +154,16 @@ export type TidyLine = {
  *
  * Every open line must be absorbed exactly once. Not zero times, which loses an
  * item; not twice, which would let one row vanish into two lines and double what
- * you buy.
+ * you buy. And every proposed line must absorb at least one, or it is shopping
+ * the model added.
  */
 export function validateTidy(open: GroceryItem[], lines: TidyLine[]): string | null {
   const seen = new Map<string, number>();
   for (const line of lines) {
     if (!line.name.trim()) return "A proposed line has no name.";
+    // A line that replaces nothing is a line nobody listed — the tidy adding
+    // shopping rather than consolidating it (TEC-29 item 8).
+    if (line.absorbed.length === 0) return `"${line.name.trim()}" isn't on your list.`;
     for (const id of line.absorbed) {
       seen.set(id, (seen.get(id) ?? 0) + 1);
     }
