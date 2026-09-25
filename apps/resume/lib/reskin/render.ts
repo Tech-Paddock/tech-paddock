@@ -583,6 +583,29 @@ function renderExperience(
     return idxs.map((i) => blocks[i]);
   }
 
+  // Everything in the section that is not a paragraph: the open and close tags
+  // of a content control, a bookmark, a table. The entries are regrouped, so
+  // these cannot keep their exact places — but they were being dropped, and a
+  // dropped `<w:sdt>` opener whose closer sits in the next section is malformed
+  // XML. So each is kept, in its original order among the others: those before
+  // the first line go before the entries and the rest after. Order among the
+  // markers is all well-formedness needs, since a paragraph is a whole element
+  // wherever it lands.
+  const firstLineIdx = lines.find((l) => !l.isBlank)?.idx ?? Infinity;
+  const nonParagraph = idxs.filter((i) => blocks[i].type !== "p");
+  const leading = nonParagraph.filter((i) => i < firstLineIdx);
+  const trailing = nonParagraph.filter((i) => i > firstLineIdx);
+  for (const i of nonParagraph) {
+    if (blocks[i].type !== "tbl") continue;
+    log.push({
+      section: "Professional Experience",
+      action: "kept-unchanged",
+      detail:
+        "A table inside Professional Experience was kept as the template has it. Jobs are never written into a table, so it carries the template's own text — remove it from the template.",
+    });
+  }
+  for (const i of leading) out.push(blocks[i]);
+
   for (let i = 0; i < Math.max(entries.length, content.experience.length); i += 1) {
     const input = content.experience[i];
     if (i < entries.length && input) {
@@ -602,6 +625,7 @@ function renderExperience(
       out.push(...renderEntry(blocks, entries[entries.length - 1], input, log));
     }
   }
+  for (const i of trailing) out.push(blocks[i]);
   for (const idx of trailingBlankIdxs) out.push(blocks[idx]);
 
   return out;

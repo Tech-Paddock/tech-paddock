@@ -137,6 +137,56 @@ describe("the XML it emits", () => {
   });
 });
 
+/**
+ * TEC-31. Experience regroups its paragraphs into entries and emitted nothing
+ * else, so a `<w:sdt>` opened in Experience and closed in the next section left
+ * a dangling closer — malformed XML, a document Word refuses — and a table or a
+ * bookmark there vanished with nothing said.
+ */
+describe("what Experience does with blocks that are not paragraphs", () => {
+  const p = (text: string, pPr = "") => `<w:p>${pPr}<w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+  const BULLET = '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>';
+  const SDT_OPEN = '<w:sdt><w:sdtPr><w:id w:val="1"/></w:sdtPr><w:sdtContent>';
+  const SDT_CLOSE = "</w:sdtContent></w:sdt>";
+  const BOOKMARK = '<w:bookmarkStart w:id="0" w:name="jobs"/>';
+  const TABLE = `<w:tbl><w:tr><w:tc>${p("A template table cell")}</w:tc></w:tr></w:tbl>`;
+  const templateBody = [
+    p("Professional Experience"),
+    SDT_OPEN,
+    BOOKMARK,
+    p("Template Co   Template Title"),
+    p("Template bullet one.", BULLET),
+    TABLE,
+    p("Core Competencies"),
+    SDT_CLOSE,
+    p("Systems: Alpha"),
+  ].join("");
+  const content = {
+    summary: null,
+    careerHighlights: null,
+    competencies: null,
+    experience: [{ company: "Acme Corp", title: "Analyst", date: "Jan 2020 - Present", bullets: ["Did a thing."] }],
+  };
+
+  it("keeps a content control opened there well formed", () => {
+    const { blocks } = renderIntoTemplate(splitBody(templateBody), content);
+    const out = joinBody(blocks);
+    expect(XMLValidator.validate(`<w:body>${out}</w:body>`)).toBe(true);
+    expect(out.indexOf("<w:sdt>")).toBeLessThan(out.indexOf("Acme Corp"));
+    expect(out).toContain(SDT_CLOSE);
+  });
+
+  it("keeps a bookmark and a table, and says so about the table", () => {
+    const { blocks, changeLog } = renderIntoTemplate(splitBody(templateBody), content);
+    const out = joinBody(blocks);
+    expect(out).toContain(BOOKMARK);
+    expect(out).toContain("A template table cell");
+    expect(changeLog).toContainEqual(
+      expect.objectContaining({ section: "Professional Experience", action: "kept-unchanged", detail: expect.stringMatching(/table/) })
+    );
+  });
+});
+
 describe("reading the source document", () => {
   const para = (runs: string, pPr = "") => `<w:p>${pPr}${runs}</w:p>`;
   const run = (text: string, rPr = "") => `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ""}<w:t xml:space="preserve">${text}</w:t></w:r>`;
