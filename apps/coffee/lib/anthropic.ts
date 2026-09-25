@@ -4,6 +4,15 @@ import { coerceSuggestion, type Suggestion } from "./suggestion";
 import { SEARCH_MODELS, DEFAULT_SEARCH_MODEL, isEffortFor, type SearchModel } from "./models";
 import { concludeSearch, readTurn, SearchFailed, type ResultBlock, type SearchOutcome } from "./searchRun";
 import { SEARCH_BUDGET_MS } from "./searchClock";
+import {
+  combineReads,
+  galleryImagesIn,
+  imageGuide,
+  isFetchableUrl,
+  RECIPE_CARD_SCHEMA,
+  shouldReadImages,
+  type ImageRead,
+} from "./recipeImage";
 
 /**
  * Reading a label is transcription and it is already fast, so it stays on the
@@ -248,7 +257,156 @@ export async function searchBrewGuide(params: {
   // `lib/searchRun.ts`, where they can be tested without an API call. A `none`
   // the run could not earn is thrown from there, so the route records why on
   // the row and leaves the bag's guide untouched.
-  return concludeSearch(text, blocks);
+  const outcome = concludeSearch(text, blocks);
+
+  // A recipe printed as a picture never reached the model above: `web_fetch`
+  // reads a page as text. So below tier 1, with a product page known, the
+  // page's gallery is read too (TEC-47), inside the same clock. Which answer
+  // the bag keeps is decided in `lib/recipeImage.ts`.
+  if (!shouldReadImages(outcome.guide)) return outcome;
+  return combineReads(outcome, await readRecipeImages(outcome.guide.product_url as string, deadline));
+}
+
+/**
+ * Transcribing a printed card is the label reader's job in another shape, so
+ * it runs on the same model, at `effort: "low"`, with a JSON schema — and, like
+ * the label reader, with no web tools: it reads the images it is handed and
+ * nothing else.
+ */
+const RECIPE_CARD_MODEL = "claude-sonnet-5";
+
+const RECIPE_CARD_SYSTEM = `You copy brewing recipes off images from a coffee roaster's product page.
+
+Some roasters print their recipe as a picture — a recipe card, a table, a label — instead of as
+text. You are shown the images from one product page, numbered. If any of them prints a brewing
+recipe, copy it out. If none does, return an empty list. An empty list is a correct and useful
+answer.
+
+Absolute rules:
+
+- Copy only what is printed. Never fill in, infer, convert, calculate or complete a value. If a
+  value is not printed, it is null.
+- For every value you report, give in the matching _printed key the exact text it was copied from,
+  as printed, including its label if it has one (for example "dose 139.5g").
+- One entry per recipe. A card with two columns (say, batch and espresso) is two entries. Put the
+  column's printed heading in heading, or null if it has none.
+- image is the number of the image the recipe is printed on.
+- water is the water that goes into the brew. A yield, a beverage weight or an espresso's "out"
+  is not water: leave water null rather than put one of those there.
+- method is the brew method or brewer as printed. grind is a grind size or setting, not the name
+  of a grinder.
+- Ignore anything that is not a brewing recipe: tasting notes, prices, origin details.`;
+
+/** Image types the API takes. Anything else on a gallery is skipped. */
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+/** Under the API's per-image ceiling with room to spare once base64 adds a third. */
+const MAX_IMAGE_BYTES = 3_500_000;
+
+/** A product page is text; one bigger than this is not one worth reading. */
+const MAX_PAGE_BYTES = 3_000_000;
+
+const FETCH_HEADERS = {
+  // Some storefronts refuse a request that does not look like a browser.
+  "user-agent": "Mozilla/5.0 (compatible; PaddockCoffee/1.0; +https://coffee.techpaddock.io)",
+  accept: "text/html,application/xhtml+xml,image/avif,image/webp,image/*;q=0.9,*/*;q=0.8",
+};
+
+/** One fetch, bounded by its own timeout and by the search's clock. */
+function bounded(signal: AbortSignal, ms: number): AbortSignal {
+  return AbortSignal.any([signal, AbortSignal.timeout(ms)]);
+}
+
+/**
+ * Read the product page's gallery for a printed recipe.
+ *
+ * **Never throws.** Every way this can fail is an `ImageRead` of kind
+ * `failed`, which the caller records as a warning beside the text search's
+ * answer: the search already has an answer, and a card that could not be read
+ * must neither erase it nor pass as "there was no card".
+ *
+ * The server fetches the page and the images itself, because the model's
+ * `web_fetch` returns text only — which is the whole reason this exists.
+ */
+export async function readRecipeImages(productUrl: string, signal: AbortSignal): Promise<ImageRead> {
+  try {
+    if (!isFetchableUrl(productUrl)) return { kind: "skipped" };
+
+    const page = await fetch(productUrl, { headers: FETCH_HEADERS, redirect: "follow", cache: "no-store", signal: bounded(signal, 20_000) });
+    if (!page.ok) return { kind: "failed", message: `the product page returned ${page.status}` };
+    const type = page.headers.get("content-type") ?? "";
+    if (!/html/i.test(type)) return { kind: "failed", message: `the product page is not HTML (${type || "no type"})` };
+    // A redirect lands wherever it lands; the check that it is still the
+    // roaster's site is `validateGuide`'s, against this URL.
+    const reachedUrl = page.url || productUrl;
+    const html = (await page.text()).slice(0, MAX_PAGE_BYTES);
+
+    const gallery = galleryImagesIn(html, reachedUrl).filter((i) => isFetchableUrl(i.url));
+    // A page with no gallery has no card to read. That is an answer, not a failure.
+    if (gallery.length === 0) return { kind: "read", guide: imageGuide({ recipes: [] }, { url: productUrl, reachedUrl }, []).guide, espresso: false };
+
+    const loaded = (
+      await Promise.all(
+        gallery.map(async (image) => {
+          try {
+            const res = await fetch(image.url, { headers: FETCH_HEADERS, cache: "no-store", signal: bounded(signal, 15_000) });
+            const mediaType = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+            if (!res.ok || !IMAGE_TYPES.has(mediaType)) return null;
+            const bytes = Buffer.from(await res.arrayBuffer());
+            if (bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) return null;
+            return { image, mediaType: mediaType as Anthropic.Base64ImageSource["media_type"], data: bytes.toString("base64") };
+          } catch {
+            return null;
+          }
+        })
+      )
+    ).filter((x): x is NonNullable<typeof x> => x !== null);
+
+    if (loaded.length === 0) {
+      return { kind: "failed", message: `none of the ${gallery.length} gallery image${gallery.length === 1 ? "" : "s"} loaded` };
+    }
+
+    const content: Anthropic.ContentBlockParam[] = loaded.flatMap((l, i) => [
+      { type: "text" as const, text: `Image ${i + 1}:` },
+      { type: "image" as const, source: { type: "base64" as const, media_type: l.mediaType, data: l.data } },
+    ]);
+    content.push({
+      type: "text",
+      text: "These are the images from one coffee's product page. Copy out any brewing recipe printed on them.",
+    });
+
+    const response = await getClient().messages.create(
+      {
+        model: RECIPE_CARD_MODEL,
+        max_tokens: 2048,
+        output_config: { effort: "low", format: { type: "json_schema", schema: RECIPE_CARD_SCHEMA } },
+        system: RECIPE_CARD_SYSTEM,
+        messages: [{ role: "user", content }],
+      },
+      { signal }
+    );
+    if (response.stop_reason !== "end_turn") {
+      return { kind: "failed", message: `the image reader stopped early (${response.stop_reason ?? "no reason given"})` };
+    }
+
+    const answer = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
+    let copyOut: unknown;
+    try {
+      copyOut = JSON.parse(answer?.text ?? "");
+    } catch {
+      return { kind: "failed", message: "the image reader's answer was not the JSON it was asked for" };
+    }
+
+    // Only the images actually shown are passed on, in the order they were
+    // numbered, so an image number in the answer resolves to what was read.
+    return {
+      kind: "read",
+      ...imageGuide(copyOut, { url: productUrl, reachedUrl }, loaded.map((l) => l.image)),
+    };
+  } catch (error) {
+    if (signal.aborted) return { kind: "failed", message: "the search's time ran out before they were read" };
+    return { kind: "failed", message: error instanceof Error ? error.message : "an unknown error" };
+  }
 }
 
 /**

@@ -34,12 +34,22 @@ constraint on where a guide may come from.
   the route refuses a second with 409, and the button starts from the row's running search.
 - **A failing run writes its error only onto its own stamp**, so it cannot land beside a recipe
   another run saved. A successful run always overwrites — freshest wins (Joel, 2026-09-24).
-- **The label's roast date is read**: `roastDateFromLabel` puts ISO in the form, or leaves it empty with
-  the label's wording beside it. `noUnusedLocals` is on.
-- **`myBrewerFor` is wired into `openingBrew`**, and dose/ratio/water now open consistent: with your
-  dose, their ratio sets the water.
-- A failed suggestion writes only `suggested_error`; the search's automatic suggestion gets only the
-  time left in the function. Photos are signed in one batch; pollers pass `?photo=0`.
+- **The label's roast date is read** (`roastDateFromLabel`). **`myBrewerFor` feeds `openingBrew`**; with
+  your dose, their ratio sets the water. A failed suggestion writes only `suggested_error`.
+
+### What TEC-47 made true (2026-09-25, under TEC-46's rule)
+
+- **A recipe printed as an image is read.** Below tier 1 with a product page, `searchBrewGuide` fetches
+  the page itself, takes its **product-gallery** images (≤6; `og:image` only if no gallery is
+  recognisable, never the page's other images) and one `claude-sonnet-5` call at `effort: "low"`, no
+  tools, copies out any printed recipe. Rules are pure in `lib/recipeImage.ts`; fetches in `anthropic.ts`.
+- **It goes through `validateGuide`** with its `images` argument: printed text is the quote, the page
+  is the quote's URL and gets the site check (the image's CDN host is never checked), and the image URL
+  is a key on each quote in `guide_quotes` — **no migration**. No image to show → dropped. Tier 1 needs
+  every image in the gallery. A text answer's `image` key is stripped.
+- **Filter/batch beats espresso**, on the card and against a text-found filter guide; the unchosen
+  recipe is not `dropped`. A read that fails is a warning beside the text answer, never a silent `none`.
+- **The image renders under the values it backs**, outside the quote disclosure (`RecipeImages`).
 
 ## Traps specific to this app
 
@@ -53,11 +63,13 @@ constraint on where a guide may come from.
   "No Recipe Found", dropped for "never reached". TEC-58 is the check.
 - **`maxDuration = 300` in `app/api/search/route.ts` is a literal** (Next reads it statically) and must
   equal `SEARCH_STALE_MS`. Change one, change both.
-- **Neither model call can be exercised from a Claude Code sandbox** — roaster domains are blocked by
-  the egress proxy and the suggestion needs a real key. **Do not conclude either works because the
-  tests pass.**
+- **No model call can be exercised from a Claude Code sandbox** — roaster domains are blocked and the
+  calls need a real key. **Do not conclude any works because the tests pass.** The image read has never
+  met a real page: gallery detection is a class/id pattern (`GALLERY`), and a theme it misses reads as
+  "no card" with no warning. Middlestate's José Ramirez bag is the live test.
+- **TDS, extraction, beverage yield and grinder have no `guide_*` column.** The card shows them; the
+  copy-out is told not to put a yield in `water`.
 - **`parseRatio` reads larger over smaller**: "16:1" and "1:16" are both 16, and "2:1" is 2.
-- **A bag needs a purchase date, and the error names it.** `lib/patch.ts` holds both halves.
 - **`product_url` is still never quote-backed.** It is cleared when its fetch fails in a run, but a
   page the model names and nobody fetched is stored as named, and `Beans ↗` links it straight out.
 - **Two brewer vocabularies; `myBrewerFor` crosses only on an exact match.** A bare "V60" does not map.
@@ -65,5 +77,3 @@ constraint on where a guide may come from.
 - **The icon is a pour-over in the JPS livery**, every colour a token, **no alpha**, **a static
   import** from `/_next/static` — the one prefix middleware excludes.
 - **"Beans ↗" is a *sibling* of the expand toggle** — an `<a>` in a `<button>` is invalid markup.
-- **`guide_status` records where instructions were read, not who they were written for**, so nothing
-  ranks or filters on tier 1.

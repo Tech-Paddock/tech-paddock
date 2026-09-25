@@ -24,7 +24,7 @@ import {
 } from "@/lib/brews";
 import { MY_BREWERS, MY_BREWER_LABELS, GRINDERS, type MyBrewer } from "@/lib/brewers";
 import type { Guide, GuideStatus } from "@/lib/guide";
-import { guidePresentation, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
+import { guidePresentation, IMAGE_SOURCE_PRESENTATION, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
 import type { Suggestion } from "@/lib/suggestion";
 import { roastDateFromLabel } from "@/lib/dates";
 import { searchIsRunning, searchIsStale, SEARCH_START_GRACE_MS, STALE_SEARCH_MESSAGE } from "@/lib/searchClock";
@@ -53,7 +53,8 @@ type Bag = Identity & {
   guide_temp: string | null;
   guide_grind: string | null;
   guide_time: string | null;
-  guide_quotes: { field: string; text: string; url: string }[];
+  // `image` is set on a value read off a picture on the page (TEC-46).
+  guide_quotes: { field: string; text: string; url: string; image?: string }[];
   guide_dropped: { field: string; value: string; reason: string }[];
   guide_model: string | null;
   guide_effort: string | null;
@@ -705,6 +706,8 @@ function GuideCard({ guide }: { guide: Guide }) {
         </dl>
       )}
 
+      <RecipeImages quotes={guide.quotes} />
+
       {guide.dropped.length > 0 && (
         <p className="text-xs text-ink-soft">
           {guide.dropped.length} value{guide.dropped.length === 1 ? "" : "s"} discarded for having no source on the
@@ -966,6 +969,7 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
               ) : (
                 <p className="text-sm text-ink/60">Nothing recorded from the roaster.</p>
               )}
+              <RecipeImages quotes={bag.guide_quotes ?? []} />
             </div>
 
             {/* Only where the roaster published nothing. A tier-2 house guide
@@ -1750,7 +1754,7 @@ function GuideStatusHeader({
   guideUrl,
 }: {
   status: GuideStatus;
-  quotes: { text: string }[];
+  quotes: { text: string; image?: string }[];
   guideUrl: string | null;
 }) {
   const { label, dot } = guidePresentation(status);
@@ -1799,7 +1803,7 @@ function GuideStatusHeader({
  * the summary of it. It was a collapsed `<details>` under the table, which
  * put the evidence one tap away from the claim it backs.
  */
-function Quotes({ quotes }: { quotes: { text: string }[] }) {
+function Quotes({ quotes }: { quotes: { text: string; image?: string }[] }) {
   if (!quotes?.length) return null;
   return (
     <div className="flex flex-col gap-2">
@@ -1808,10 +1812,46 @@ function Quotes({ quotes }: { quotes: { text: string }[] }) {
         {quotes.map((q, i) => (
           <li key={i} className="border-l-2 border-line pl-3 text-sm text-ink/70 italic">
             &ldquo;{q.text}&rdquo;
+            {q.image && <span className="not-italic text-xs text-ink-soft"> — {IMAGE_SOURCE_PRESENTATION.quoteNote}</span>}
           </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * The picture a recipe was copied off, directly under the values it backs
+ * (TEC-46).
+ *
+ * **Always shown, never behind the disclosure** the text quotes sit in. A
+ * sentence quoted from a page is checkable from the words alone; a copy-out
+ * of an image is a reading, and it is only as checkable as the picture beside
+ * it. That is the condition that lets it into `guide_*` at all, so the image
+ * is on screen wherever the values are.
+ *
+ * The image is served from the roaster's CDN, not stored here. It is linked
+ * full size, and requested with no referrer, so the roaster's host sees an
+ * image load and not which bag in this app asked for it.
+ */
+function RecipeImages({ quotes }: { quotes: { image?: string }[] }) {
+  const images = Array.from(new Set((quotes ?? []).map((q) => q.image).filter((u): u is string => !!u)));
+  if (images.length === 0) return null;
+  return (
+    <figure className="flex flex-col gap-2 mt-3">
+      {images.map((src) => (
+        <a key={src} href={src} target="_blank" rel="noreferrer" className="block">
+          <img
+            src={src}
+            alt={IMAGE_SOURCE_PRESENTATION.alt}
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            className="rounded-lg w-full max-h-96 object-contain bg-paper border border-line"
+          />
+        </a>
+      ))}
+      <figcaption className="text-xs text-ink-soft">{IMAGE_SOURCE_PRESENTATION.caption}</figcaption>
+    </figure>
   );
 }
 

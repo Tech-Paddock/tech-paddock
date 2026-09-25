@@ -21,7 +21,15 @@ export type GuideField = (typeof GUIDE_FIELDS)[number];
 
 export type GuideStatus = "coffee_specific" | "roaster_generic" | "none" | "not_searched";
 
-export type Quote = { field: GuideField; text: string; url: string };
+/**
+ * One backed value's evidence. `url` is always the page. `image` is set only
+ * for a value read off a picture on that page (TEC-46): the image the text was
+ * copied from, stored so it can be shown beside the value it backs.
+ */
+export type Quote = { field: GuideField; text: string; url: string; image?: string };
+
+/** An image the recipe reader was shown, and whether it is in this coffee's own gallery. */
+export type ImageSource = { url: string; inGallery: boolean };
 
 /** What the model hands back, before any of it is trusted. */
 export type RawGuide = {
@@ -80,7 +88,18 @@ function sameSite(a: string | null, b: string | null): boolean {
  * find anything is a separate question, and `lib/searchRun.ts` answers it
  * before the answer is allowed anywhere near the row.
  */
-export function validateGuide(raw: RawGuide, reachedHosts: readonly string[]): Guide {
+export function validateGuide(
+  raw: RawGuide,
+  reachedHosts: readonly string[],
+  /**
+   * Set only when the values were read off images (TEC-46): the images the
+   * reader was actually shown. Every value then needs a quote carrying one of
+   * them, and tier 1 needs every one of them to be in this coffee's gallery.
+   * Left out, the values are text off a page, and any `image` a quote carries
+   * is stripped — only the image reader may put a picture beside a value.
+   */
+  images?: readonly ImageSource[]
+): Guide {
   // A URL that is not a web page is no URL at all: it is neither stored nor
   // accepted as the page a quote was read on.
   const productUrl = host(raw.product_url) ? (raw.product_url as string).trim() : null;
@@ -91,7 +110,7 @@ export function validateGuide(raw: RawGuide, reachedHosts: readonly string[]): G
 
   // A quote counts only if it has real text and points at a page the model
   // says it read. Anything else is a citation to nowhere.
-  const quotes = (Array.isArray(raw.quotes) ? raw.quotes : []).filter(
+  const cited = (Array.isArray(raw.quotes) ? raw.quotes : []).filter(
     (q): q is Quote =>
       !!q &&
       typeof q.text === "string" &&
@@ -100,6 +119,21 @@ export function validateGuide(raw: RawGuide, reachedHosts: readonly string[]): G
       readable.has(q.url) &&
       (GUIDE_FIELDS as readonly string[]).includes(q.field)
   );
+
+  // A copy-out is a reading of a picture, not a quotation of the page's text,
+  // so it is only as checkable as the picture shown next to it: a value read
+  // off an image with no image stored to show is dropped (TEC-46). Each quote
+  // is rebuilt rather than passed through, so nothing else the model added to
+  // it reaches the row.
+  const shown = new Map((images ?? []).map((i) => [i.url, i]));
+  const imageless = new Set<GuideField>();
+  const quotes: Quote[] = [];
+  for (const q of cited) {
+    const base = { field: q.field, text: q.text, url: q.url };
+    if (!images) quotes.push(base);
+    else if (typeof q.image === "string" && shown.has(q.image)) quotes.push({ ...base, image: q.image });
+    else imageless.add(q.field);
+  }
 
   const backing = new Map<GuideField, Quote>();
   for (const q of quotes) if (!backing.has(q.field)) backing.set(q.field, q);
@@ -113,7 +147,11 @@ export function validateGuide(raw: RawGuide, reachedHosts: readonly string[]): G
 
     const quote = backing.get(field);
     if (!quote) {
-      dropped.push({ field, value, reason: "no source sentence" });
+      dropped.push({
+        field,
+        value,
+        reason: imageless.has(field) ? "no image stored to show beside it" : "no source sentence",
+      });
       continue;
     }
 
@@ -181,8 +219,16 @@ export function validateGuide(raw: RawGuide, reachedHosts: readonly string[]): G
   // method however the model labelled it, so tier 1 has to be earned rather
   // than claimed: we only keep it when the instructions were read on the
   // product page itself. Everything else that found something is tier 2.
+  //
+  // Read off an image, the place is the picture's as well as the page's: only
+  // an image in this coffee's own product gallery can earn tier 1, and one
+  // anywhere else on the site is the roaster's house material (TEC-46).
+  const kept = quotes.filter((q) => q.field === "method" || params[q.field as Exclude<GuideField, "method">]);
+  const inGallery = !images || kept.every((q) => shown.get(q.image as string)?.inGallery === true);
   const status: GuideStatus =
-    raw.status === "coffee_specific" && productUrl && guideUrl === productUrl ? "coffee_specific" : "roaster_generic";
+    raw.status === "coffee_specific" && productUrl && guideUrl === productUrl && inGallery
+      ? "coffee_specific"
+      : "roaster_generic";
 
   return {
     status,
@@ -190,7 +236,7 @@ export function validateGuide(raw: RawGuide, reachedHosts: readonly string[]): G
     guide_url: guideUrl,
     method,
     params,
-    quotes: quotes.filter((q) => q.field === "method" || params[q.field as Exclude<GuideField, "method">]),
+    quotes: kept,
     dropped,
   };
 }
