@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveItem } from "@/lib/log";
-import { LookupError } from "@/lib/items";
+import { LookupError, normalizeName } from "@/lib/items";
 
 export const dynamic = "force-dynamic";
 // A miss goes outside, which may search and read a page.
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
 
   const name = typeof body.name === "string" ? body.name.trim() : "";
-  if (!name) return NextResponse.json({ error: "Name the food first." }, { status: 400 });
+  if (!name || !normalizeName(name)) return NextResponse.json({ error: "Name the food first." }, { status: 400 });
   if (name.length > 200) return NextResponse.json({ error: "That is longer than one food." }, { status: 413 });
 
   const quantity = Number(body.quantity);

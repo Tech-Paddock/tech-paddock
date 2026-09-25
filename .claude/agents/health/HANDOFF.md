@@ -27,6 +27,15 @@ including the line you opened the correction from. `resolveVersion` runs only at
 **`kind` keeps a job**: it is what a backfill would read to tell a day that was wrong (`correction`)
 from one that was right at the time (`change`). No backfill exists; it would be a deliberate step.
 
+**The dates are the phone's, always sent** — no route falls back to UTC — and the page re-reads
+"today" when it comes back into view and at every parse. **"From the web" is checked, not claimed.** `lib/webEvidence.ts` keeps a cited URL only when that
+run's own `web_search` / `web_fetch` results contain it; otherwise the number is an estimate.
+
+**`/debug` judges each model against your stored number** (`lib/harness.ts`), not only against the
+other, and stores both pairs on the run (`20260925134842`). It asks for a pick only on a real
+disagreement; a failed side is named, never a match. **A pick is one-shot**: claimed on the row
+first, numbers read from the stored run rather than the request, time recorded.
+
 **Approving decides every line before writing anything** — `lib/approve.ts:decideLine`, tested.
 A number is `hand` only when the line says it was typed over; a difference nobody typed, a line
 whose `item_id` no longer matches its name, a failed line or a food on the draft twice is a 409
@@ -36,16 +45,17 @@ lines from one dictation merge, quantities added, before anything is estimated.
 
 ## The grocery list
 
-`/list` adds lines, ticks them off, copies the lot, or taps one into a King Soopers search. **It
-leaves as text or a link — no stored credential, no OAuth, no `middleware.ts` edit.** **Tidy is the
-one model call and it is two-step**: Haiku proposes a merge, `validateTidy` refuses one that drops or
-double-counts a line before you see it, you approve what survives.
+`/list` leaves as text or a King Soopers search link — no stored credential, no OAuth, no
+`middleware.ts` edit. **Tidy is two-step**: Haiku proposes a merge, `validateTidy` refuses one that
+drops or double-counts a line, you approve what survives, and it inserts before it deletes.
 
-**The list is leaving for Cookbook** (TEC-15, sequenced 2026-09-23; the charters say so since that
-change merged). It stays here until Health's part lands; recipes already left on 2026-09-20.
+**The list is leaving for Cookbook** (TEC-15); it stays here until Health's part of the move lands.
 
 ## Traps specific to this seat
 
+- **`normalizeName` is the item key.** It folds accents, apostrophes and simple plurals ("Large
+  Fries" meets "Large Fry"). Changing it once `health.items` has rows splits one food into two
+  keys, so a change then needs a migration that re-keys the table, not only a code edit.
 - **The snapshot columns are nullable until a follow-up makes them `NOT NULL`.** `readDay` resolves
   a line with no snapshot the old way rather than summing it as zero; that fallback goes with the
   follow-up. The CHECK `entry_items_snapshot_whole` makes a snapshot all-or-nothing.
@@ -53,11 +63,6 @@ change merged). It stays here until Health's part lands; recipes already left on
   have diverged. Do not let a third copy happen quietly.
 - **The livery is borrowed and has a collision.** `senna`, which the parked tracker also wears, maps
   `--sev-warn` onto the accent, so "over target" and "on track" are one colour. TechPad Gen's.
-- **A failed lookup must never look like "not found."** `LookupError` keeps them apart and every
-  route turns it into a 503. Degrading into internet-first changes nothing on screen.
 - **`eaten_at` is not the time you ate.** The app never sets it, so it duplicates `created_at`;
   `eaten_on` is what a day's total reads. Both carry column comments.
-- **The hosted API stamps its own migration version and ignores your filename.** Check
-  `migration list` rather than assuming.
-- **`www.kingsoopers.com` is refused by the egress proxy**, so the `/q/` search shape could not be
-  verified live. One constant in `lib/grocery.ts`, and its comment says how much it is worth.
+- **`www.kingsoopers.com` is refused by the egress proxy**; the `/q/` link shape is unverified.

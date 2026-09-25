@@ -40,9 +40,13 @@ const probes: Record<string, () => Promise<Omit<Check, "name">>> = {
    * error**, which reads like a bad key and is not one. That step is outside
    * this repo and is the one the standup protocol says gets missed, so this
    * probe is the thing that tells you it was.
+   *
+   * **A real table read, not an RPC.** It was `rpc("version")`, which resolves
+   * to `health.version()` — no such function exists, so the probe failed on
+   * every deployment and blamed the exposed-schemas list for it.
    */
   async database() {
-    const { error } = await getServiceClient().rpc("version");
+    const { error } = await getServiceClient().from("items").select("id").limit(1);
     if (!error) return { ok: true, detail: "health schema reachable" };
     return {
       ok: false,
