@@ -575,6 +575,9 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
     "td": ["apps/editor", "scripts"],
     "deployment": [".github"],
   };
+  // Which agent owns an app folder: a NAMED entry, or the agent of that name.
+  const ownerOf = (app) =>
+    Object.entries(NAMED).find(([, ps]) => ps.includes(`apps/${app}`))?.[0] ?? app;
   const agents = existsSync(R(".claude/agents"))
     ? readdirSync(R(".claude/agents")).filter((d) => statSync(R(".claude/agents", d)).isDirectory()).sort()
     : [];
@@ -608,11 +611,35 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
     // next manifest entry is swept by existing, with nobody having to remember.
     const SWEPT = ["vercel.json", ".env.example", "package-lock.json",
                    ...MANIFEST.map((m) => m.to)];
+    /* A commit that changes the apps of more than one agent is cross-cutting:
+       no app agent writes one, since each stays inside its own folder, so it is
+       never a reason for that agent's handoff to be stale. #201 rewrote the
+       login route, page and middleware in every app, and #202 every
+       package.json's engines line; together they flagged five agents stale for
+       work none of them did (TEC-44), and a warning that fires on everyone at
+       once teaches everyone to ignore it. Judged by the commit, not the path,
+       because a path rule cannot tell a TD's engines bump from an agent's new
+       dependency in the same package.json. `--full-diff` lists every file the
+       commit touched, not only the ones under this agent's path.
+       Only an app folder is judged this way: `scripts` and `.github` are
+       where the TD and Deployment make their cross-cutting changes, so there a
+       commit spanning every app is their own work and still dates them. */
+    const ownDate = (path) => {
+      const log = git("log", "--full-diff", "--format=@%ad", "--date=short", "--name-only", "--",
+        path, ...SWEPT.map((f) => `:(exclude)${path}/${f}`));
+      if (!log) return null;
+      for (const entry of log.split("@").filter(Boolean)) {
+        const [date, ...files] = entry.split("\n").map((l) => l.trim()).filter(Boolean);
+        const owners = new Set(files.map((f) => f.match(/^apps\/([^/]+)\//)?.[1])
+          .filter(Boolean).map(ownerOf));
+        if (!path.startsWith("apps/") || owners.size <= 1) return date;
+      }
+      return null;
+    };
     /* An agent owning several apps is as stale as its most recently changed
        one, so this takes the newest date across all of them and names which. */
     const dated = paths
-      .map((path) => [path, git("log", "-1", "--format=%ad", "--date=short", "--", path,
-        ...SWEPT.map((f) => `:(exclude)${path}/${f}`))])
+      .map((path) => [path, ownDate(path)])
       .filter(([, d]) => d)
       .sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0));
     const label = paths.join(" + ");
