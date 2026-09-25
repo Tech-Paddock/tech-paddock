@@ -1,36 +1,59 @@
 # Deployment — handoff
 
-State as of 2026-09-24. `RULES.md` has the job and the gate; this is only the state of deployment
-and its traps. Open work is in Linear, team TEC, labelled `agent:Deployment`.
+State as of 2026-09-25. `RULES.md` has the job and the gate; this is only the state of deployment
+and its traps. Open work is in Linear, team TEC, labelled `agent:Deployment`. Branch and pull request
+state is never written here — read it live.
 
 ---
 
-**Day one.** This seat was carved out of the technical director's on 2026-09-24 and has not run yet.
-The last gate the TD ran was the post-refactor review, #201 to #205, merged in that order the same
-day. Branch and pull request state is never written here — read it live.
+**The seat has run.** Its first train, on 2026-09-25 (Joel: "Merge everything"), took the `drift`
+ceiling raise for `CLAUDE.md`, the Linear status and assignee rule in `CLAUDE.md`, and the Linear
+permission rule in `.claude/settings.json` to `main`, in that order, each through Joel's click. The
+merge commits are in `git log`; the issues they served are TEC-45 and TEC-43.
 
 ## What is true now
 
+- **Every merge waits for Joel's click** (Joel, 2026-09-25: "Yes merging should check with me").
+  The guard asks on `merge_pull_request`; opening a pull request does not ask. A denied click is a
+  stop: report it, never route around it.
+- **Linear writes go through without a prompt**; `delete_*`, `retire_*` and the Linear diff tools
+  still ask, since `merge_diff` would merge a pull request outside the guard's hold. The rule loads
+  when a session starts, so a session begun before it landed still prompts.
+- **Linear statuses and assignees follow the table in `CLAUDE.md`.** In Review means the branch is
+  with Deployment; once it merges, the issue is In Progress while steps remain, Done when none do.
+  Unassign Joel and mark his ⭐ steps done once he has clicked the merge he was waiting on.
+- **GitHub's *Automatically delete head branches* is on** in effect: the three branches of the first
+  train were gone from the remote as soon as each merged. Check with `git ls-remote --heads` rather
+  than a local `git branch -r`, which keeps stale refs until a prune.
 - **Every app is live on the login hardening** (#201) except the parked ones, whose Vercel projects
-  Joel pauses: the editor was resumed once to take it, and the tracker is parked. Read deployment
-  state before assuming either is serving new code.
-- **`INTERNAL_API_SECRET` was rotated to one new value** on `tp-home`, `tp-tracker` and
-  `tp-message-editor` before #201 merged (TEC-33 step 1). A 401 from the hub's glance or the editor's
-  draft button means the three disagree.
+  Joel pauses. Read deployment state before assuming either is serving new code.
+- **`INTERNAL_API_SECRET` is one value** on `tp-home`, `tp-tracker` and `tp-message-editor`
+  (TEC-33). A 401 from the hub's glance or the editor's draft button means the three disagree.
 - **The migration history is clean**: the repo and `list_migrations` differ by exactly
   `20260908235234`, withheld because it seeds personal data.
-- **The hooks are one guard** (#204), and they load when a session starts.
 
 ## Traps only here
 
-- **The hosted API renamed the last migration.** `record_original_table_grants` was written under
-  one version and recorded as `20260924190943`; the file was renamed at the gate. Expect it every
-  time — read `list_migrations` back before merging, never after.
-- **A merge makes every other open pull request stale**, because `main` requires branches to be up to
-  date. Budget a CI run per branch per merge; a five-branch train is five sequential runs.
+- **Linear's GitHub integration moves issues on its own, whatever `CLAUDE.md`'s table says.** It
+  sets an issue to In Progress when a pull request linked to it opens — over In Review, which the
+  table says it should be — and to Done when a pull request that closes it merges, even with Next
+  steps left (TEC-40 went Done on its merge; TEC-43 and TEC-45 only went In Progress). After every
+  merge, re-read each linked issue and set its status by the table, and read them once more at the
+  end of the run, since the integration can fire after your edit.
+- **Helper worktrees live under `.claude/worktrees/`** — every preset sets `isolation: worktree`.
+  **Never commit that folder**, whatever the Stop hook asks; committing it pushes a nested checkout.
+  Until TEC-48's `.gitignore` line lands it shows as untracked in the parent checkout.
+- **`gh` is not installed.** Read check runs through the GitHub connector, or unauthenticated
+  `curl` on `api.github.com/repos/…/commits/<sha>/check-runs`, and wait on the `gate` run for the
+  exact head you pushed.
+- **The hosted API renames migrations.** It records its own version and ignores the filename. Read
+  `list_migrations` back before merging, never after, and rename the file on the branch to match.
+- **A merge makes every other open pull request stale**, because `main` requires branches to be up
+  to date. Budget a CI run per branch per merge; a stacked branch whose base squash-merged takes
+  `main` by a merge commit, and when its content already matched, the merge changes no file.
 - **Stamped files make every app handoff look stale.** A change to `packages/shared` rewrites a file
-  in every app, so `drift`'s `fresh:` check warns on every app agent at once. That is a warning about
-  the check, not five stale handoffs, and it is not yours to fix by editing them.
+  in every app, so `drift`'s `fresh:` check warns on every app agent at once (TEC-44). That is a
+  warning about the check, not five stale handoffs, and not yours to fix by editing them.
 - **A project env read cannot see team-shared variables.** `SESSION_SECRET` and `APP_PASSWORD_HASH`
   are shared ones, so a project read that lacks them proves nothing.
 - **The Vercel connector lists write tools. Do not use them** — hand Joel the step.
