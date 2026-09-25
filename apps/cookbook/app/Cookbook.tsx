@@ -75,7 +75,9 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
           <Book onAddedToList={() => setListVersion((n) => n + 1)} />
         </div>
         <div role="tabpanel" id="panel-shop" aria-labelledby="tab-shop" hidden={tab !== "shop"}>
-          <List refreshKey={listVersion} />
+          <div className="mx-auto w-full max-w-2xl">
+            <List refreshKey={listVersion} />
+          </div>
         </div>
       </div>
     </ToastProvider>

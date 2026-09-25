@@ -361,9 +361,12 @@ export default function List({ refreshKey }: { refreshKey: number }) {
                   {item.name}
                 </a>
                 {item.note ? <span className="text-ink-soft"> — {item.note}</span> : null}
-                {/* Where the line came from, which is the whole reason the column
-                    shipped before the book that writes it did. */}
-                {item.source === "recipe" ? (
+                {/* Where the line came from: the recipes by name, plain text
+                    (TEC-39 B). A recipe line from before the names were kept
+                    still says only "from a recipe"; a typed line says nothing. */}
+                {item.recipes.length > 0 ? (
+                  <span className="text-[11px] text-ink-soft"> · {item.recipes.join(", ")}</span>
+                ) : item.source === "recipe" ? (
                   <span className="ml-1.5 text-[11px] text-ink-soft">from a recipe</span>
                 ) : null}
               </span>

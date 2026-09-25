@@ -25,8 +25,13 @@ false`, no ingredients, or **no fetch that returned a page** (`lib/fetchRun.ts`)
 thinking headroom, Haiku 4.5 gets no effort (it 400s). The four calls without a tool send a JSON
 schema; every call checks `stop_reason`. Tidy sends line numbers, not UUIDs.
 
-**Three tables in `cookbook`**, reasoning in the migration headers. `recipes` stores **the whole pot**;
-`grocery_items` is this app's list; `brand_preferences` held **zero rows** on 2026-09-23 (seed: TEC-51).
+**Four tables in `cookbook`**, reasoning in the migration headers. `recipes` stores **the whole pot**;
+`grocery_items` is this app's list; `brand_preferences` held **zero rows** on 2026-09-23 (seed: TEC-51);
+`menu` is **On the menu** — left of the book on a wide screen, above it on a phone: one row per
+recipe, put there only by *Add to list*, shown for seven rolling days and never deleted by time; ✕
+removes the row only, and removing the recipe cascades. **A list line carries the names of the
+recipes it came from** (`grocery_items.recipes`, a snapshot; Tidy unions them); older recipe lines
+still say "from a recipe".
 **`macro_source` has no `web`**, so a lifted number is not storable. **A duplicate name or phrase is
 refused by a unique index.**
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asText, searchUrl, splitLine, validateTidy, type GroceryItem, type TidyLine } from "@/lib/grocery";
+import { asText, searchUrl, splitLine, unionRecipes, validateTidy, type GroceryItem, type TidyLine } from "@/lib/grocery";
 
 /**
  * The shopping list's pure half, and it is mostly one function.
@@ -16,6 +16,7 @@ function item(over: Partial<GroceryItem> & { id: string; name: string }): Grocer
     source: "manual",
     checked: false,
     created_at: "2026-09-20T00:00:00Z",
+    recipes: [],
     ...over,
   };
 }
@@ -108,6 +109,22 @@ describe("a typed line with a note (TEC-29 item 3)", () => {
     const typed = item({ id: "a", ...splitLine("Milk — the small tin") });
     expect(searchUrl(typed)).toBe("https://www.kingsoopers.com/q/Milk");
     expect(asText([typed])).toBe("Milk — the small tin");
+  });
+});
+
+describe("which recipes a line came from (TEC-39 B)", () => {
+  it("a merged line names every recipe its rows came from, once each, in order", () => {
+    expect(
+      unionRecipes([
+        { recipes: ["Green bean almondine"] },
+        { recipes: ["Chicken thighs", "green bean almondine "] },
+        { recipes: [] },
+      ])
+    ).toEqual(["Green bean almondine", "Chicken thighs"]);
+  });
+
+  it("a typed line, or an old recipe line, names none", () => {
+    expect(unionRecipes([{ recipes: [] }])).toEqual([]);
   });
 });
 
