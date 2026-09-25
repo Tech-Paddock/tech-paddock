@@ -1,14 +1,15 @@
 # Health — handoff
 
-State as of 2026-09-23. Read `RULES.md` and `.claude/HEALTH-PLAN.md` first. Open items: Linear, TEC.
+State as of 2026-09-25. Read `RULES.md`, then the Linear document "Health — plan" (team TEC) before
+changing a feature. Open work is the Linear issues labelled `agent:Health`, nothing here.
 
 ---
 
 ## The macro log is live
 
-Merged as #122 and deployed. Dictate what you ate, approve the draft, it is logged with the day's
-running total; `/debug` runs both models on one food and keeps every run. **Every table is still
-empty, measured 2026-09-20** — nothing logged, the harness never run, nothing to measure yet.
+Dictate what you ate, approve the draft, it is logged with the day's running total; `/debug` runs
+both models on one food and keeps every run. **Every `health` table held 0 rows on 2026-09-25**
+(`pg_stat_user_tables`) — nothing logged yet, the harness never run.
 
 ## How it works, in the order it matters
 
@@ -16,65 +17,52 @@ empty, measured 2026-09-20** — nothing logged, the harness never run, nothing 
 a miss goes outside to one model call; approval writes it back, so outside runs once per food ever.
 
 **Item numbers are append-only.** `health.items` is identity, `health.item_versions` is what it
-weighed over time, nothing updated in place. **`kind` cannot be retrofitted**: a `correction` says
-the number was always wrong and reaches backwards through its era, a `change` says the food itself
-changed and does not. Settled in [#116](https://github.com/Tech-Paddock/tech-paddock/issues/116);
-`correction` is the default deliberately, because guessing it wrong is visible and guessing `change`
-wrong strands old days.
+weighed over time, nothing updated in place. `lib/items.ts:resolveVersion` picks the version for a
+date: the era with the greatest `effective_from` on or before it, then the newest row in that era.
 
-**Read `lib/items.ts:resolveVersion` first.** Era with the greatest `effective_from` on or before the
-day, then the most recent row in it. Entries reference identity and never a copy of the numbers, so
-`readDay` resolves per day; `app/Correction.tsx` lists earlier versions, which makes it checkable.
+**Each logged line snapshots its numbers** (TEC-21, migration `20260925134431`): `entry_items`
+carries the four macros and the `item_version_id` they were copied from. `readDay` is a plain sum,
+so **a correction fixes the food from the next log on and never moves a day already logged** —
+including the line you opened the correction from. `resolveVersion` runs only at log time.
+**`kind` keeps a job**: it is what a backfill would read to tell a day that was wrong (`correction`)
+from one that was right at the time (`change`). No backfill exists; it would be a deliberate step.
+
+**The dates are the phone's, always sent** — no route falls back to UTC — and the page re-reads
+"today" when it comes back into view and at every parse. **"From the web" is checked, not claimed.** `lib/webEvidence.ts` keeps a cited URL only when that
+run's own `web_search` / `web_fetch` results contain it; otherwise the number is an estimate.
+
+**`/debug` judges each model against your stored number** (`lib/harness.ts`), not only against the
+other, and stores both pairs on the run (`20260925134842`). It asks for a pick only on a real
+disagreement; a failed side is named, never a match. **A pick is one-shot**: claimed on the row
+first, numbers read from the stored run rather than the request, time recorded.
+
+**Approving decides every line before writing anything** — `lib/approve.ts:decideLine`, tested.
+A number is `hand` only when the line says it was typed over; a difference nobody typed, a line
+whose `item_id` no longer matches its name, a failed line or a food on the draft twice is a 409
+and nothing is written. **A renamed draft line is cleared and looked up again** through
+`/api/resolve` when the field loses focus; approve waits until every line has numbers. Same-name
+lines from one dictation merge, quantities added, before anything is estimated.
 
 ## The grocery list
 
-`/list` adds lines, ticks them off, copies the lot, or taps one into a King Soopers search. **It
-leaves as text or a link — no stored credential, no OAuth, no `middleware.ts` edit**, the cheap
-version Joel chose over pushing into a Kroger cart. **Tidy is the one model call and it is two-step**:
-Haiku proposes a merge, `validateTidy` refuses one that drops or double-counts a line before you see
-it, you approve what survives. A prompt can only ask, and this is the one screen where a model's
-output would delete something you typed.
+`/list` leaves as text or a King Soopers search link — no stored credential, no OAuth, no
+`middleware.ts` edit. **Tidy is two-step**: Haiku proposes a merge, `validateTidy` refuses one that
+drops or double-counts a line, you approve what survives, and it inserts before it deletes.
 
-**Recipes left on 2026-09-20** for their own app and schema; you read them to price a meal and own
-none of them. **The list follows them to Cookbook** (TEC-15, sequence approved 2026-09-23) and is
-still here until TEC-23 lands. `RULES.md` on `main` still reads as though it is permanently yours;
-the charter drafts are on the TD's `claude/brief-grocery-move`.
-
-## Agreed with Joel, not started
-
-**Targets, a dashboard, and deleting a meal.** Targets that rebalance against each other; consumed
-against left; deleting an entry takes its lines. Joel approved the mockups' commitments 2026-09-19:
-
-1. **A target needs an effective date**, for the reason `kind` exists — change your budget in March
-   and February is still scored against February's.
-2. **Deleting an entry must not delete the food.** The cascade drops `entry_items` only, or a
-   mis-logged lunch throws away approved macros.
-3. **None of it calls a model.** Joel: *"macro tracker should only be reading from database."*
-4. **The split clamps at zero** rather than showing a negative gram.
+**The list is leaving for Cookbook** (TEC-15); it stays here until Health's part of the move lands.
 
 ## Traps specific to this seat
 
-- **`lib/models.ts` is Coffee's registry copied verbatim, flagged rather than quiet.** Approved in
-  #116. Do not let a third copy happen quietly, and do not cite an issue number in a comment.
-- **The livery is borrowed and has a collision.** `senna`, which the tracker also wears, maps
-  `--sev-warn` onto the accent, so "over target" and "on track" are one colour. The mockups use the
-  danger colour instead. **Both TechPad Gen's to settle**, not yours.
-- **A failed lookup must never look like "not found."** `LookupError` keeps them apart and every
-  route turns it into a 503. Degrading into internet-first changes nothing on screen.
+- **`normalizeName` is the item key.** It folds accents, apostrophes and simple plurals ("Large
+  Fries" meets "Large Fry"). Changing it once `health.items` has rows splits one food into two
+  keys, so a change then needs a migration that re-keys the table, not only a code edit.
+- **The snapshot columns are nullable until a follow-up makes them `NOT NULL`.** `readDay` resolves
+  a line with no snapshot the old way rather than summing it as zero; that fallback goes with the
+  follow-up. The CHECK `entry_items_snapshot_whole` makes a snapshot all-or-nothing.
+- **`lib/models.ts` is Coffee's registry duplicated and flagged, not a verbatim copy** — the two
+  have diverged. Do not let a third copy happen quietly.
+- **The livery is borrowed and has a collision.** `senna`, which the parked tracker also wears, maps
+  `--sev-warn` onto the accent, so "over target" and "on track" are one colour. TechPad Gen's.
 - **`eaten_at` is not the time you ate.** The app never sets it, so it duplicates `created_at`;
   `eaten_on` is what a day's total reads. Both carry column comments.
-- **The hosted API stamps its own version and ignores your filename.** #122's was renamed at the
-  gate to match what ran. Check `migration list` rather than assuming.
-- **`www.kingsoopers.com` is refused by the egress proxy**, so the `/q/` search shape could not be
-  verified live. One constant in `lib/grocery.ts`, and its comment says how much it is worth.
-
-## Next
-
-**Use it before building more** — without runs the harness cannot say whether Haiku reproduces a
-number you already approved. Unset by Joel, neither blocking: **the agreement rate that retires the
-harness** and **the divergence tolerance** (10%-or-25 kcal, 20%-or-5 g).
-
-**Filed and waiting — start none of them until its blocker clears:**
-- **TEC-21** — snapshot macros onto entries at log time, your 2026-09-22 proposal. Joel's go.
-- **TEC-23** — `/list` redirects to Cookbook, grocery code goes, no migration. Cookbook's list URL.
-- **TEC-25** — read recipe macros from Cookbook's `/api/servings`. That endpoint live; after TEC-21.
+- **`www.kingsoopers.com` is refused by the egress proxy**; the `/q/` link shape is unverified.

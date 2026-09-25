@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { toolErrorsIn, unearnedNone } from "@/lib/searchRun";
+import {
+  concludeSearch,
+  reachedUrlsIn,
+  readTurn,
+  SearchFailed,
+  toolErrorsIn,
+  toolFailuresIn,
+  unearnedNone,
+  type ResultBlock,
+  type ToolFailure,
+} from "@/lib/searchRun";
 
 describe("toolErrorsIn", () => {
   it("reads an error out of a web_search result block", () => {
@@ -57,15 +67,29 @@ describe("toolErrorsIn", () => {
   });
 });
 
+
+const fail = (tool: "web_search" | "web_fetch", code: string, url: string | null = null): ToolFailure => ({ tool, code, url });
+
 describe("unearnedNone", () => {
-  it("refuses a none that was reached past a failed tool", () => {
-    // The whole point: this is the shape that used to be written to the row as
-    // "this roaster publishes no brewing instructions".
-    expect(unearnedNone("none", ["web_search: max_uses_exceeded"])).toMatch(/could not complete/);
+  it("refuses a none reached past a service failure", () => {
+    // The shape that used to be written to the row as "this roaster
+    // publishes no brewing instructions" when the search could not look.
+    expect(unearnedNone("none", [fail("web_search", "too_many_requests")])).toMatch(/could not complete/);
+    expect(unearnedNone("none", [fail("web_fetch", "unavailable")])).toContain("web_fetch: unavailable");
   });
 
-  it("names what failed, so the row says which of the two it was", () => {
-    expect(unearnedNone("none", ["web_fetch: url_not_accessible"])).toContain("web_fetch: url_not_accessible");
+  it("believes a none past a failure the model caused itself", () => {
+    // Refusing these kept the bag `not_searched` forever, and the suggestion
+    // refuses a bag in that state — a genuine "no recipe" became a permanent
+    // error. The run could recover from each of these, and had the chance to.
+    for (const code of ["max_uses_exceeded", "url_not_in_prior_context", "url_not_accessible", "query_too_long"]) {
+      expect(unearnedNone("none", [fail("web_fetch", code)])).toBeNull();
+    }
+  });
+
+  it("treats an error code it does not know as the service's", () => {
+    // A code the API grows later is "could not look" until someone reads it.
+    expect(unearnedNone("none", [fail("web_search", "some_new_outage")])).toMatch(/could not complete/);
   });
 
   it("believes a none that nothing got in the way of", () => {
@@ -73,9 +97,153 @@ describe("unearnedNone", () => {
   });
 
   it("leaves a guide that found something alone, whatever failed along the way", () => {
-    // A failure that did not stop the retrieval is not evidence against it,
-    // and the quotes are their own evidence.
-    expect(unearnedNone("coffee_specific", ["web_fetch: url_not_accessible"])).toBeNull();
-    expect(unearnedNone("roaster_generic", ["web_search: too_many_requests"])).toBeNull();
+    expect(unearnedNone("coffee_specific", [fail("web_fetch", "unavailable")])).toBeNull();
+    expect(unearnedNone("roaster_generic", [fail("web_search", "too_many_requests")])).toBeNull();
+  });
+});
+
+describe("toolFailuresIn", () => {
+  it("names the URL a failed fetch was asked for", () => {
+    expect(
+      toolFailuresIn([
+        { type: "server_tool_use", id: "t1", name: "web_fetch", input: { url: "https://roaster.example/old" } },
+        { type: "web_fetch_tool_result", tool_use_id: "t1", content: { error_code: "url_not_accessible" } },
+      ])
+    ).toEqual([{ tool: "web_fetch", code: "url_not_accessible", url: "https://roaster.example/old" }]);
+  });
+});
+
+describe("reachedUrlsIn", () => {
+  it("collects fetched documents and listed search results, and nothing that failed", () => {
+    expect(
+      reachedUrlsIn([
+        { type: "web_search_tool_result", content: [{ type: "web_search_result", url: "https://a.example/1" }] },
+        { type: "web_fetch_tool_result", content: { type: "web_fetch_result", url: "https://b.example/2" } },
+        { type: "web_fetch_tool_result", content: { error_code: "url_not_accessible" } },
+        { type: "text", text: "https://c.example/said-but-never-read" },
+      ])
+    ).toEqual(["https://a.example/1", "https://b.example/2"]);
+  });
+});
+
+describe("readTurn", () => {
+  it("resumes a paused turn", () => {
+    expect(readTurn({ stop_reason: "pause_turn", content: [] })).toEqual({ resume: true });
+  });
+
+  it("joins a split answer back together exactly as it was cut", () => {
+    // Web search splits text at citation boundaries, and a boundary can fall
+    // inside a JSON string. A newline there broke JSON.parse.
+    const turn = readTurn({
+      stop_reason: "end_turn",
+      content: [
+        { type: "text", text: '{"status":"roaster_generic","quotes":[{"text":"Brew at a 1:' },
+        { type: "text", text: '16 ratio."}]}' },
+      ],
+    });
+    expect(turn).toEqual({ resume: false, text: '{"status":"roaster_generic","quotes":[{"text":"Brew at a 1:16 ratio."}]}' });
+    expect(() => JSON.parse((turn as { text: string }).text)).not.toThrow();
+  });
+
+  it("refuses an answer cut off at max_tokens rather than reading it as none", () => {
+    expect(() => readTurn({ stop_reason: "max_tokens", content: [{ type: "text", text: '{"status":"coff' }] })).toThrow(
+      SearchFailed
+    );
+  });
+
+  it("refuses a refusal rather than reading it as none", () => {
+    expect(() => readTurn({ stop_reason: "refusal", content: [] })).toThrow(/declined/);
+  });
+
+  it("refuses any other stop it was not built for", () => {
+    expect(() => readTurn({ stop_reason: "tool_use", content: [] })).toThrow(/unexpected reason \(tool_use\)/);
+  });
+});
+
+describe("concludeSearch", () => {
+  const PRODUCT = "https://roaster.example/products/example-lot";
+  const GUIDE = "https://roaster.example/pages/brew";
+
+  const answer = (over: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      status: "roaster_generic",
+      product_url: PRODUCT,
+      guide_url: GUIDE,
+      params: { ratio: "1:16" },
+      quotes: [{ field: "ratio", text: "We brew at 1:16.", url: GUIDE }],
+      ...over,
+    });
+
+  const fetched = (url: string, id = url): ResultBlock[] => [
+    { type: "server_tool_use", id, name: "web_fetch", input: { url } },
+    { type: "web_fetch_tool_result", tool_use_id: id, content: { type: "web_fetch_result", url } },
+  ];
+
+  const failedFetch = (url: string, code: string, id = `f-${url}`): ResultBlock[] => [
+    { type: "server_tool_use", id, name: "web_fetch", input: { url } },
+    { type: "web_fetch_tool_result", tool_use_id: id, content: { error_code: code } },
+  ];
+
+  it("keeps a guide read on a page the run fetched", () => {
+    const { guide, warning } = concludeSearch(answer(), fetched(GUIDE));
+    expect(guide.status).toBe("roaster_generic");
+    expect(guide.params.ratio).toBe("1:16");
+    expect(warning).toBeNull();
+  });
+
+  it("refuses a guide on a site the run never reached, however confidently it is cited", () => {
+    const { guide } = concludeSearch(answer(), []);
+    expect(guide.status).toBe("none");
+    expect(guide.dropped[0].reason).toMatch(/never reached/);
+  });
+
+  it("records none with a warning when the model's own fetch failed", () => {
+    const { guide, warning } = concludeSearch(
+      JSON.stringify({ status: "none", product_url: null }),
+      failedFetch("https://roaster.example/x", "url_not_in_prior_context")
+    );
+    expect(guide.status).toBe("none");
+    expect(warning).toMatch(/Recorded as no recipe/);
+    expect(warning).toContain("url_not_in_prior_context");
+  });
+
+  it("throws, recording nothing, when the service failed under a none", () => {
+    expect(() => concludeSearch(JSON.stringify({ status: "none" }), [{ type: "web_search_tool_result", content: { error_code: "unavailable" } }])).toThrow(
+      /could not complete/
+    );
+  });
+
+  it("clears a product link whose page no longer loads", () => {
+    // The roaster moved or removed the page. Keeping the link would hand the
+    // next search a dead page as a known one, and leave it under "Beans ↗".
+    const { guide, warning } = concludeSearch(
+      JSON.stringify({ status: "none", product_url: PRODUCT }),
+      failedFetch(PRODUCT, "url_not_accessible")
+    );
+    expect(guide.status).toBe("none");
+    expect(guide.product_url).toBeNull();
+    expect(warning).toMatch(/link was cleared/);
+  });
+
+  it("keeps a product link that did load, even when another fetch failed", () => {
+    const { guide } = concludeSearch(JSON.stringify({ status: "none", product_url: PRODUCT }), [
+      ...fetched(PRODUCT),
+      ...failedFetch("https://roaster.example/other", "url_not_accessible"),
+    ]);
+    expect(guide.product_url).toBe(PRODUCT);
+  });
+
+  it("reads an answer split mid-string once it is rejoined", () => {
+    const whole = answer();
+    const cut = whole.indexOf("1:16");
+    const turn = readTurn({
+      stop_reason: "end_turn",
+      content: [
+        { type: "text", text: whole.slice(0, cut + 2) },
+        { type: "text", text: whole.slice(cut + 2) },
+      ],
+    });
+    const { guide } = concludeSearch((turn as { text: string }).text, fetched(GUIDE));
+    expect(guide.status).toBe("roaster_generic");
   });
 });

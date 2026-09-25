@@ -62,7 +62,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
           company: body.company.trim(),
           last_touch_date: touch,
           notes: merged,
-          // Touching a thread clears its open Google Task, so the stale check can
+          // Touching a thread clears its open Microsoft To Do task, so the stale check can
           // raise a fresh one next time it goes cold. The tracker's own edit path
           // does the same.
           open_task_id: null,
