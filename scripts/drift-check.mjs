@@ -512,8 +512,12 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
     // agent must arrive already budgeted rather than silently unmeasured.
     ...readdirSync(R(".claude/agents")).filter((d) => existsSync(R(".claude/agents", d, "HANDOFF.md")))
       .map((d) => [`.claude/agents/${d}/HANDOFF.md`, 80]),
+    // Coffee's is 365, not 350: raised on 2026-09-25 at Joel's call ("add 15 lines to
+    // line count"). Its charter sat at 340 with every rule load-bearing, and TEC-46
+    // (a recipe printed as an image counts; filter beats espresso) needs about
+    // twenty lines that bind the build. Raised in its own change, not the one that fills it.
     ...readdirSync(R(".claude/agents")).filter((d) => existsSync(R(".claude/agents", d, "RULES.md")))
-      .map((d) => [`.claude/agents/${d}/RULES.md`, 350]),
+      .map((d) => [`.claude/agents/${d}/RULES.md`, d === "coffee" ? 365 : 350]),
     [".claude/DECISIONS.md", 400],
     // Tier 1 — auto-loaded into every session of every agent, so every line is paid
     // again forever. 400 was the target the compaction set; the file landed well

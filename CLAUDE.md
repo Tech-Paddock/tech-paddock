@@ -43,7 +43,7 @@ keeps things in one place. When you have something to say, find the reader first
 | Channel | Carries | Read when | Shape |
 |---|---|---|---|
 | `CLAUDE.md` | rules binding every agent | every session, automatic | overwrite |
-| `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | **overwrite · ≤350 lines · TD drafts, Joel approves** |
+| `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | **overwrite · ≤350 lines (Coffee 365) · TD drafts, Joel approves** |
 | `agents/<you>/HANDOFF.md` | **your area's state right now, and its traps** — never a to-do | every session | **overwrite · ≤80 lines** |
 | Linear, team TEC | **all open work, each request with an owner, and the parking lot** | every session, first | **one issue per request · `owner:` and `agent:` labels · body ends with Next steps · `Parked` label** |
 | Linear documents, team TEC | **a tool's design reasoning** — e.g. "Health — plan" | before designing a feature | **binds nothing: a rule goes in the charter** |
