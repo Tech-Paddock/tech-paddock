@@ -13,15 +13,17 @@ merge commits are in `git log`; the issues they served are TEC-45 and TEC-43.
 
 ## What is true now
 
-- **Every merge waits for Joel's click** (Joel, 2026-09-25: "Yes merging should check with me").
-  The guard asks on `merge_pull_request`; opening a pull request does not ask. A denied click is a
-  stop: report it, never route around it.
-- **Linear writes go through without a prompt**; `delete_*`, `retire_*` and the Linear diff tools
-  still ask, since `merge_diff` would merge a pull request outside the guard's hold. The rule loads
-  when a session starts, so a session begun before it landed still prompts.
+- **Joel's go before the TD starts you is the one gate** (Joel, 2026-09-25: "only one gate";
+  TEC-43). The guard no longer asks on a squash merge or a pull request update; auto-merge and a
+  review still ask, and a merge that is not a squash is refused. **Nothing enforces the brief's
+  scope**, so a branch outside it is not yours to merge. The guard runs from the checkout the
+  session's hooks load from, so an older checkout may still ask: a denied click is still a stop.
+- **As a helper you make no Linear writes**: a helper's still prompt Joel (TEC-59), so list every
+  status and Next-steps change in your report and the TD applies them. `delete_*`, `retire_*` and
+  the Linear diff tools ask in any session, since `merge_diff` would merge outside the guard.
 - **Linear statuses and assignees follow the table in `CLAUDE.md`.** In Review means the branch is
   with Deployment; once it merges, the issue is In Progress while steps remain, Done when none do.
-  Unassign Joel and mark his ⭐ steps done once he has clicked the merge he was waiting on.
+  Joel's ⭐ steps are dashboard work and decisions, never a merge click.
 - **GitHub's *Automatically delete head branches* is on** in effect: the three branches of the first
   train were gone from the remote as soon as each merged. Check with `git ls-remote --heads` rather
   than a local `git branch -r`, which keeps stale refs until a prune.
@@ -53,9 +55,9 @@ merge commits are in `git log`; the issues they served are TEC-45 and TEC-43.
 - **A merge makes every other open pull request stale**, because `main` requires branches to be up
   to date. Budget a CI run per branch per merge; a stacked branch whose base squash-merged takes
   `main` by a merge commit, and when its content already matched, the merge changes no file.
-- **Stamped files make every app handoff look stale.** A change to `packages/shared` rewrites a file
-  in every app, so `drift`'s `fresh:` check warns on every app agent at once (TEC-44). That is a
-  warning about the check, not five stale handoffs, and not yours to fix by editing them.
+- **`drift`'s `fresh:` ignores a commit spanning several agents' apps** (TEC-44), so a stamped-file
+  or engines change no longer flags every app handoff. A `fresh:` warning is now about that one
+  agent's own work — and still never yours to fix by editing their handoff.
 - **A project env read cannot see team-shared variables.** `SESSION_SECRET` and `APP_PASSWORD_HASH`
   are shared ones, so a project read that lacks them proves nothing.
 - **The Vercel connector lists write tools. Do not use them** — hand Joel the step.

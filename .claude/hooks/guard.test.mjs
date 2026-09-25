@@ -200,21 +200,22 @@ test("the migration history cannot be rewritten from a shell", () => {
   );
 });
 
-test("GitHub: merges and changes wait for Joel, opening does not, and nothing commits to main", () => {
+test("GitHub: after Joel's one gate, merging and updating go through; auto-merge, reviews and API commits wait; nothing commits to main", () => {
   const body = 'Requested by Joel on 2026-09-24 — "close out"\n\n## Deployment\nNothing.';
   expectAll(
     [
       // Opening is Deployment's and is neither held nor checked (Joel, 2026-09-24).
       [["create_pull_request", { title: "x", body, head: "claude/x", base: "main" }], "allow"],
       [["create_pull_request", { title: "x", body: "no request line", head: "claude/x" }], "allow"],
-      [["merge_pull_request", { pullNumber: 1, merge_method: "squash" }], "ask"],
+      // Joel, 2026-09-25: "only one gate" — his go before Deployment starts, not a click per merge.
+      [["merge_pull_request", { pullNumber: 1, merge_method: "squash" }], "allow"],
       [["merge_pull_request", { pullNumber: 1 }], "deny"],
       [["merge_pull_request", { pullNumber: 1, merge_method: "merge" }], "deny"],
       [["enable_pr_auto_merge", { pullNumber: 1 }], "ask"], // got through
-      [["update_pull_request", { pullNumber: 1, title: "y" }], "ask"], // got through
-      [["update_pull_request", { pullNumber: 1, body }], "ask"],
+      [["update_pull_request", { pullNumber: 1, title: "y" }], "allow"],
+      [["update_pull_request", { pullNumber: 1, body }], "allow"],
       [["update_pull_request", { pullNumber: 1, body: "rewritten without the line" }], "deny"],
-      [["update_pull_request_branch", { pullNumber: 1 }], "ask"],
+      [["update_pull_request_branch", { pullNumber: 1 }], "allow"],
       [["pull_request_review_write", { method: "submit_pending", event: "APPROVE" }], "ask"], // got through
       [["push_files", { branch: "main", files: [] }], "deny"], // got through
       [["create_or_update_file", { branch: "refs/heads/main", path: "x" }], "deny"], // got through
@@ -277,6 +278,7 @@ test("Linear: an issue has an owner, an agent, and ends with Next steps that nam
   assert.equal(create({ description: "## Next steps\n\nJust prose, no steps." }), "deny");
   assert.equal(create({ description: "## Next steps\n\n1. **TD:** x\n2. Verify it in the logs." }), "deny");
   assert.equal(create({ description: "## Next steps\n\n1. The technical director builds it." }), "allow");
+  assert.equal(create({ description: "## Next steps\n\n1. **Deployment:** take it to merge." }), "allow");
   assert.equal(create({ description: "## Next steps\n\n1. **Nobody:** nothing until it is un-parked." }), "allow");
   assert.equal(create({ description: "```\n## Next steps\n1. TD: x\n```\n" }), "deny");
   assert.equal(create({ description: "## Next steps\n\n1. Check /api/health answers." }), "deny");
@@ -366,8 +368,10 @@ test("end to end: the real commands deny, ask and allow", () => {
     assert.equal(push("git push -u origin claude/feature").decision, "allow", shell);
     assert.equal(push("ls -la").decision, "allow", shell);
     assert.equal(push("ls -la").status, 0, shell);
-    const pr = run(hookFor("mcp__github__merge_pull_request"), { tool_name: "mcp__github__merge_pull_request", tool_input: { merge_method: "squash" } }, { shell });
-    assert.equal(pr.decision, "ask", shell);
+    const pr = run(hookFor("mcp__github__merge_pull_request"), { tool_name: "mcp__github__merge_pull_request", tool_input: { merge_method: "rebase" } }, { shell });
+    assert.equal(pr.decision, "deny", shell);
+    const auto = run(hookFor("mcp__github__enable_pr_auto_merge"), { tool_name: "mcp__github__enable_pr_auto_merge", tool_input: {} }, { shell });
+    assert.equal(auto.decision, "ask", shell);
     const env = run(hookFor("mcp__Vercel__create_project_env"), { tool_name: "mcp__Vercel__create_project_env", tool_input: {} }, { shell });
     assert.equal(env.decision, "ask", shell);
   }
