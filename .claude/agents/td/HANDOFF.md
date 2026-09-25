@@ -16,17 +16,17 @@ for all of them. TEC-40 is that change.
 **Joel's working model (2026-09-25): one gate.** Agents cut branches and commit, never a pull
 request. When branches are ready you bring Joel one list: branches, order, blast radius,
 migrations, questions. His go starts Deployment on exactly that list. **Write your Linear updates
-last**, once every other change in the session's queue is pushed, not as you go (Joel, 2026-09-25;
-in your charter once `claude/docs-td-linear-write-order` merges — follow it anyway until then).
+last**, once every other change in the session's queue is pushed, not as you go (Joel, 2026-09-25 —
+now in your charter).
 
 **The 2026-09-25 train is merged**, TEC-27's sub-issues, TEC-71 and TEC-72 included. **Still Joel's:**
 TEC-33 steps 1 and 6, TEC-7. The parking lot is the `Parked` label.
 
 ## What is true now
 
-- **`tp-tracker` and `tp-message-editor` are paused** — confirmed live: both show CANCELED on every
-  production deployment since their last READY (`#202`). They were paused **before** TEC-33 step 1
-  landed, out of the order the issue describes.
+- **`tp-tracker` and `tp-message-editor` are paused** — confirmed live: production deployments on
+  both read `BLOCKED`, which is what a paused project serves. They were paused **before** TEC-33
+  step 1 landed, out of the order the issue describes.
 - **TEC-33 step 1 (`INTERNAL_API_SECRET`) is not done, and worse than the issue text says:**
   `tp-home` and `tp-message-editor` have no `INTERNAL_API_SECRET` at all; `tp-tracker` still holds
   the original, never-edited value. Because the other two are now paused, step 1 needs them
