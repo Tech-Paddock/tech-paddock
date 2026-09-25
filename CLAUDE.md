@@ -339,8 +339,9 @@ Per-tool detail lives in that tool's charter.
   would have handed the hub a database credential). **The password stays the real control.**
 - **`/admin` — The Garage, on the hub — is computed, not live throughout.** Its probes of each
   project run live. Its *Declared* and *Rules drift* panels are baked at the hub's last build (the hub
-  builds on every production merge). Which tools it covers is `TOOLS` in `apps/home/lib/platform.ts`,
-  a list typed by hand. It shows no versions and no test counts.
+  builds on every production merge). Which projects it probes is `PROBED` in
+  `apps/home/lib/platform.ts` — the embedded tools, `TOOLS`, plus the parked ones — a list typed by
+  hand. It shows no versions and no test counts.
 - **Prefer append over rewrite for anything that accumulates.** When a feature involves growing
   history, the default write path is a plain insert — cheap, instant, no model call — with any
   model-driven synthesis kept as a separate, deliberately triggered, batched step.
