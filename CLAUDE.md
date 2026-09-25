@@ -189,6 +189,10 @@ wrong or the rule is, and that is a conversation before any code exists.
   change**.
   A session's opening branch is named by the harness and names neither; that is expected and it is
   not the branch the work belongs on.
+- **A known-stale branch or pull request is renamed `stale_<name>`, never deleted.** Agents cannot
+  delete a remote branch (see *Merging*), so marking is how a dead branch stops reading as open work
+  in a plain branch list or the Pit Wall. Any agent may rename its own; **only the technical director
+  and Deployment may rename another agent's.**
 - **Commit and push your work; Deployment opens the pull request.** No agent opens its own, the
   technical director included (Joel, 2026-09-24). Work on your branch, commit as you go, push it, and
   when it is finished say so and stop. **A finished branch is the deliverable.** CI runs on every
