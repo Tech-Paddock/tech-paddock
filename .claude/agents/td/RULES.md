@@ -135,6 +135,13 @@ rather than implying it passed.
 `/api/summary` from reading design notes rather than the route. It was wrong, and it blocked a
 correct change. Read the thing itself.
 
+**Write to Linear last** (Joel, 2026-09-25: "TD does not write any issues to Linear until all other
+work is completed"). Land your Linear writes — new issues, status changes, comments — once every
+other change in the session's queue is committed and pushed, not as you go. A write made mid-session
+can be overtaken by work still to come; batching to the end means the record reflects where things
+actually landed rather than where they stood partway through. A read-only check (a Vercel read, a
+git fetch) is not a Linear write and isn't held by this.
+
 ---
 
 ## What you can and cannot do
