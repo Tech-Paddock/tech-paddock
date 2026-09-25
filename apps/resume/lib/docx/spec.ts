@@ -19,7 +19,8 @@ export type RunStyle = {
   italic: boolean;
 };
 
-/** The formatting captured from a template, and the only thing the builder reads. */
+/** The formatting captured from a template, stored in `templates.spec`. Nothing renders from it: the
+ *  builder that read it was removed with TEC-31, and the reskin engine reads the template itself. */
 export type TemplateSpec = {
   font: string;
   /** Points. */

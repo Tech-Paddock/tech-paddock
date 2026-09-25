@@ -7,7 +7,7 @@ import { fakeSupabase, mockModules } from "./helpers/fakeSupabase";
  * The database double covers write ordering and branch selection, not SQL. The
  * foreign key from `renders.template_id` is what actually decides what happens
  * to a render when its template goes — `on delete set null` since migration
- * 20260918014500 — and it is only ever exercised against the real project. These
+ * 20260918041216 — and it is only ever exercised against the real project. These
  * tests cover what this route does and does not do around it.
  */
 
@@ -49,7 +49,7 @@ describe("deleting a template", () => {
    * carries `template_snapshot`: the engine, the template's id, its version and
    * a hash of its exact bytes at render time. Deleting the row takes nothing
    * the render needed. `renders.template_id` is nullable with `on delete set
-   * null` as of migration 20260918014500, and the render survives with a null
+   * null` as of migration 20260918041216, and the render survives with a null
    * there and its snapshot intact.
    *
    * The route no longer counts renders at all, which is the assertion below:

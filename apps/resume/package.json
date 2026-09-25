@@ -14,7 +14,6 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "bcryptjs": "^2.4.3",
-    "docx": "^9.0.2",
     "fast-xml-parser": "^4.5.7",
     "jszip": "^3.10.2",
     "next": "^14.2.15",

@@ -1,13 +1,7 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import { readDocxParts } from "../lib/docx/read";
 import { extractParagraphs } from "../lib/docx/paragraphs";
 import { DEFAULT_SPEC, dominantColor, extractSpec, isTrioLine, normalizeSpec } from "../lib/docx/spec";
-import { labelParagraphs } from "../lib/docx/label";
-import { buildResumeDocx } from "../lib/docx/build";
-import { auditAts } from "../lib/docx/ats";
 import { makeDocx, para, runs, stylesWithDefaults, table } from "./helpers/docx";
 
 /**
@@ -224,96 +218,6 @@ describe("reading the Career Highlights cell", () => {
   });
 });
 
-describe("rendering in the template's colours", () => {
-  const xmlOf = async (buffer: Buffer) => (await (await JSZip.loadAsync(buffer)).file("word/document.xml")!.async("string"));
-
-  const content = {
-    name: "Alex Placeholder",
-    contact: "alex@example.invalid · 555-0100",
-    sections: [
-      {
-        kind: "entries" as const,
-        label: "Professional Experience",
-        entries: [
-          { company: "Fabrikam", title: "Senior Consultant", dates: "Jan 2024 – Present", bullets: ["Did a thing."] },
-        ],
-      },
-      {
-        kind: "highlights" as const,
-        label: "Career Highlights",
-        items: [{ metric: "$250,000", description: "Annual savings through automation" }],
-      },
-    ],
-  };
-
-  it("puts the template's own colours on the document it builds", async () => {
-    const spec = await specOf(await joelish());
-    const xml = await xmlOf(await buildResumeDocx(content, spec));
-    const styles = await (await JSZip.loadAsync(await buildResumeDocx(content, spec)))
-      .file("word/styles.xml")!
-      .async("string");
-
-    // Prose and bullets state no colour of their own, exactly as in the template,
-    // and inherit the document default — so this one line is what stops them
-    // rendering black.
-    expect(styles).toContain(`<w:color w:val="${NEAR_BLACK}"/>`);
-    for (const color of [ACCENT, GREY, MUTED]) {
-      expect(xml).toContain(`w:val="${color}"`);
-    }
-  });
-
-  it("sets the employer, title and dates each the way the template does", async () => {
-    const spec = await specOf(await joelish());
-    const paras = extractParagraphs(await xmlOf(await buildResumeDocx(content, spec)));
-    const line = paras.find((p) => p.text.includes("Fabrikam"))!;
-    const [company, title, dates] = line.runs;
-
-    expect(company).toMatchObject({ size: 22, color: NEAR_BLACK, bold: true, italic: false });
-    expect(title).toMatchObject({ size: 21, color: GREY, bold: false, italic: true });
-    expect(dates).toMatchObject({ size: 20, color: GREY, bold: false, italic: false });
-  });
-
-  it("sets the highlights metric and description the way the template does", async () => {
-    const spec = await specOf(await joelish());
-    const paras = extractParagraphs(await xmlOf(await buildResumeDocx(content, spec)));
-    const metric = paras.find((p) => p.text.includes("$250,000"))!;
-    const description = paras.find((p) => p.text.includes("Annual savings"))!;
-
-    expect(metric.runs[0]).toMatchObject({ size: 25, color: ACCENT, bold: true });
-    expect(description.runs[0]).toMatchObject({ size: 18, color: MUTED, bold: false });
-  });
-
-  // A size the template never stated must not be invented. Emitting one would pin
-  // the title to a value nothing in the document asks for.
-  it("leaves a size off the run when the template states none", async () => {
-    const spec = { ...DEFAULT_SPEC, entry: { ...DEFAULT_SPEC.entry, title: { size: null, color: null, bold: false, italic: true } } };
-    const paras = extractParagraphs(await xmlOf(await buildResumeDocx(content, spec)));
-    const title = paras.find((p) => p.text.includes("Fabrikam"))!.runs[1];
-
-    expect(title.size).toBeNull();
-    expect(title.italic).toBe(true);
-  });
-
-  // Colour is decoration; the parse is the point. None of this is allowed to cost
-  // an ATS finding.
-  it("stays ATS-clean", async () => {
-    const spec = await specOf(await joelish());
-    const built = await buildResumeDocx(content, spec);
-    const rebuilt = await readDocxParts(built);
-    expect(auditAts(rebuilt, extractParagraphs(rebuilt.document))).toEqual([]);
-  });
-
-  it("still renders the real fixtures clean", async () => {
-    const template = await readDocxParts(readFileSync(join(__dirname, "fixtures", "template-sample.docx")));
-    const spec = extractSpec(template, extractParagraphs(template.document));
-    const source = await readDocxParts(readFileSync(join(__dirname, "fixtures", "jobright-sample.docx")));
-    const { content: real } = labelParagraphs(extractParagraphs(source.document));
-
-    const rebuilt = await readDocxParts(await buildResumeDocx(real, spec));
-    expect(auditAts(rebuilt, extractParagraphs(rebuilt.document)).filter((f) => f.severity === "blocking")).toEqual([]);
-  });
-});
-
 describe("a spec stored before these fields existed", () => {
   // resume.templates.spec is JSON with no version. A spec written by an earlier
   // release has no `entry` object, and `spec.entry.company` off it throws — the
@@ -333,14 +237,6 @@ describe("a spec stored before these fields existed", () => {
     bulletGlyph: "•",
     highlightsStyle: "table",
   };
-
-  it("renders rather than throwing", async () => {
-    const built = await buildResumeDocx(
-      { name: "Alex Placeholder", contact: null, sections: [] },
-      normalizeSpec(OLD)
-    );
-    expect(built.byteLength).toBeGreaterThan(0);
-  });
 
   it("keeps the employer at the size that spec was rendering it", () => {
     // Not the body size, which is what a missing size would fall back to.
