@@ -8,9 +8,10 @@
  * not to share a file.
  *
  * **The labels name where the instructions were found, never who they were
- * written for.** That is the only part a search can establish — Sweet Bloom
- * print one house recipe on every product page, so a tier-1 result means "this
- * was on the coffee's own page", not "the roaster wrote it for this lot".
+ * written for.** That is the only part a search can establish — a roaster
+ * that printed one house recipe on every product page would validate as tier
+ * 1 too, so a tier-1 result means "this was on the coffee's own page", not
+ * "the roaster wrote it for this lot".
  * `RULES.md` §2 is the long version. Wording that claims the second thing is
  * the one change that must not be made here.
  */
