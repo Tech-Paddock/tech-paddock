@@ -1,20 +1,20 @@
 "use client";
 
 import type { Glance, SummaryItem } from "@/lib/glance";
-import { isStale } from "@/lib/glance";
+import { isStale, nothingAnswered } from "@/lib/glance";
+import type { Density } from "./Landing";
 
 /**
  * The Morning Paper. Design approved by Joel on 2026-09-16.
  *
- * **There is no fold, and that is a change to a settled decision.** DECISIONS.md
- * still records "above the fold carries no job-search content at all — a privacy
- * requirement, because two days a week the screen is in an office". Joel lifted
- * it: *"drop above the fold below, ill manage privacy."* So the page no longer
- * enforces a privacy boundary in its layout, and what is owed — job search
- * included — leads, which is what the rest of that same decision asks for.
+ * **There is no fold.** Joel lifted it the same day — *"drop above the fold
+ * below, ill manage privacy"* — and `DECISIONS.md` records it. What is owed,
+ * job search included, leads the page. Do not reintroduce a fold as a safety
+ * feature.
  *
- * That amendment is his to make and needs recording in DECISIONS.md; this
- * comment is not the record, only a pointer to why the code stopped matching it.
+ * **A count the hub never received is "—", never 0.** Zero is an answer; the
+ * page used to print "0 gone quiet — nothing outstanding" for a request it had
+ * not made, next to a small line admitting the source did not answer.
  *
  * **It leads with what is owed, not what arrived.** Threads gone quiet are a
  * task and get names; replies received are a statistic and get a number. That is
@@ -28,13 +28,6 @@ import { isStale } from "@/lib/glance";
  * them. Density is deliberately not polarity: polarity is one site-wide
  * preference shared by cookie across every app, density is local to this page.
  */
-
-export type Density = "dispatch" | "timing";
-
-export const DENSITIES: { id: Density; name: string; note: string }[] = [
-  { id: "dispatch", name: "Dispatch", note: "Room to read" },
-  { id: "timing", name: "Timing", note: "Everything at once" },
-];
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = [
@@ -85,17 +78,38 @@ function Figure({
   count,
   name,
   top,
+  unknown,
+  partial,
 }: {
   count: number;
   name: string;
   top: SummaryItem | null;
+  /** No source answered, so there is no count — only a reason. */
+  unknown: string | null;
+  /** Some sources did not answer, so this is a floor rather than a total. */
+  partial: boolean;
 }) {
+  if (unknown) {
+    return (
+      <div className="paper-figure">
+        <span className="paper-figure-count">—</span>
+        <span className="paper-figure-name">{name}</span>
+        <span className="paper-figure-top">not reported — {unknown}</span>
+      </div>
+    );
+  }
   return (
     <div className="paper-figure">
       <span className="paper-figure-count">{count}</span>
-      <span className="paper-figure-name">{name}</span>
+      <span className="paper-figure-name">{partial ? `${name}, at least` : name}</span>
       <span className="paper-figure-top">
-        {top ? top.label : count === 0 ? "nothing outstanding" : "no single one stands out"}
+        {top
+          ? top.label
+          : count > 0
+            ? "no single one stands out"
+            : partial
+              ? "none from the sources that answered"
+              : "nothing outstanding"}
       </span>
     </div>
   );
@@ -109,11 +123,16 @@ export default function Paper({
   density: Density;
 }) {
   // A source that never answered is a louder case than a stale one, not a
-  // quieter one — so both raise the banner. An earlier version keyed it on
-  // staleness alone, and a tool that was entirely absent said nothing at all.
+  // quieter one — so both raise the banner, and so does one that answered with
+  // gaps. An earlier version keyed it on staleness alone, and a tool that was
+  // entirely absent said nothing at all.
   const stale = glance.sources.filter((s) => isStale(s));
-  const silent = stale.length + glance.unavailable.length;
+  const silent = stale.length + glance.unavailable.length + glance.degraded.length;
   const owed = glance.commitments;
+  const unknown = nothingAnswered(glance)
+    ? glance.unavailable.map((u) => `${u.tool}: ${u.why}`).join("; ") || "no source configured"
+    : null;
+  const partial = glance.unavailable.length > 0;
 
   return (
     <article className={`paper paper-${density}`}>
@@ -139,14 +158,42 @@ export default function Paper({
             </div>
           ) : (
             <p className="paper-note">
-              {glance.unavailable.length > 0
-                ? "Not reported — the source did not answer."
-                : "Nothing owed."}
+              {unknown
+                ? `Not reported — ${unknown}.`
+                : partial
+                  ? "Nothing owed from the sources that answered."
+                  : "Nothing owed."}
             </p>
           )}
 
-          <Figure count={glance.decay.count} name="gone quiet" top={glance.decay.top} />
-          <Figure count={glance.looseEnds.count} name="loose ends" top={glance.looseEnds.top} />
+          <Figure
+            count={glance.decay.count}
+            name="gone quiet"
+            top={glance.decay.top}
+            unknown={unknown}
+            partial={partial}
+          />
+          <Figure
+            count={glance.looseEnds.count}
+            name="loose ends"
+            top={glance.looseEnds.top}
+            unknown={unknown}
+            partial={partial}
+          />
+
+          {/* A tool telling the hub it is not set up — a missing key, an
+              integration never connected. Owed in its own way, so it sits here
+              rather than among the statistics. */}
+          {glance.health.length > 0 && (
+            <>
+              <h2 className="paper-head">Needs setup</h2>
+              <div className="paper-owed-list">
+                {glance.health.map((item) => (
+                  <Owed key={`${item.label}-${item.href}`} item={item} />
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="paper-column">
@@ -183,10 +230,10 @@ export default function Paper({
               </span>
             </p>
           ))}
-          {glance.unavailable.map((tool) => (
-            <p key={tool} className="paper-source paper-stale">
-              <span className="paper-source-name">{tool}</span>
-              <span className="paper-source-when">did not answer at all</span>
+          {glance.unavailable.map((u) => (
+            <p key={u.tool} className="paper-source paper-stale">
+              <span className="paper-source-name">{u.tool}</span>
+              <span className="paper-source-when">did not answer — {u.why}</span>
             </p>
           ))}
           {glance.degraded.map((d) => (
@@ -214,9 +261,9 @@ export default function Paper({
 
       {silent > 0 && (
         <p className="paper-banner">
-          {silent === 1 ? "A source is" : `${silent} sources are`} silent or past three times the
-          expected cadence. What is shown above may be old or missing, and this page will not guess
-          which.
+          {silent === 1 ? "One source warning" : `${silent} source warnings`} — silent, past three
+          times the expected cadence, or answering with gaps. What is shown above may be old or
+          missing, and this page will not guess which.
         </p>
       )}
     </article>

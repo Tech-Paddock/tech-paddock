@@ -1,6 +1,6 @@
 import { DECLARED } from "@/lib/declared.generated";
 import { DRIFT } from "@/lib/drift.generated";
-import { PROJECTS, type DriftCheck, type DriftState } from "@/lib/platform";
+import { PROBED, type DriftCheck, type DriftState } from "@/lib/platform";
 import { countByStatus, runDiagnostics, severityFor, type Probe } from "@/lib/diagnostics";
 
 /**
@@ -57,7 +57,10 @@ function DriftRow({ check }: { check: DriftCheck }) {
 export default async function AdminPage() {
   const diag = await runDiagnostics();
   const live = countByStatus(diag.liveness);
-  const missingEnv = diag.hubEnv.filter((e) => !e.set);
+  const required = diag.hubEnv.filter((e) => !e.optional);
+  const missingEnv = required.filter((e) => !e.set);
+  const optionalUnset = diag.hubEnv.filter((e) => e.optional && !e.set);
+  const withHealth = DECLARED.apps.filter((a) => a.hasHealthRoute).map((a) => a.slug);
   const declaredFor = (slug: string) => DECLARED.apps.find((a) => a.slug === slug);
 
   // Worst first, and the passing ones are listed by name below rather than
@@ -89,10 +92,11 @@ export default async function AdminPage() {
         <div className="stat">
           <span className="slot-label">Hub config</span>
           <span className="stat-value">
-            {diag.hubEnv.length - missingEnv.length} of {diag.hubEnv.length}
+            {required.length - missingEnv.length} of {required.length}
           </span>
           <span className="stat-sub">
-            {missingEnv.length === 0 ? "all set" : `${missingEnv.map((e) => e.name).join(", ")} missing`}
+            {missingEnv.length === 0 ? "required: all set" : `${missingEnv.map((e) => e.name).join(", ")} missing`}
+            {optionalUnset.length > 0 && ` · optional unset: ${optionalUnset.map((e) => e.name).join(", ")}`}
           </span>
         </div>
         <div className="stat">
@@ -107,6 +111,38 @@ export default async function AdminPage() {
         the function at deploy time, so a variable changed in the dashboard since the last deploy
         will still read as it was — a redeploy is what makes a change real, not saving the setting.
       </p>
+
+      {diag.retiredSet.length > 0 && (
+        <div className="slots">
+          {diag.retiredSet.map((e) => (
+            <div key={e.name} className="slot slot-static sev-warn">
+              <span className="slot-label">retired</span>
+              <span className="slot-body">
+                <span className="slot-title">{e.name} is still set on this deployment</span>
+                <span className="slot-detail">{e.why}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <h2 className="admin-section">
+        Environment <span className="admin-qualifier">what this deployment reads, set or not</span>
+      </h2>
+      <div className="slots">
+        {diag.hubEnv.map((e) => (
+          <div key={e.name} className={`slot slot-static sev-${e.set ? "info" : e.optional ? "warn" : "urgent"}`}>
+            <span className="slot-label">{e.set ? "set" : e.optional ? "unset" : "missing"}</span>
+            <span className="slot-body">
+              <span className="slot-title">
+                <code>{e.name}</code>
+                {e.optional ? " · optional" : ""}
+              </span>
+              <span className="slot-detail">{e.why}</span>
+            </span>
+          </div>
+        ))}
+      </div>
 
       <h2 className="admin-section">
         Live connections <span className="admin-qualifier">public /login on each project</span>
@@ -128,7 +164,8 @@ export default async function AdminPage() {
           </h2>
           <p className="admin-note">
             A mismatched <code>INTERNAL_API_SECRET</code> fails silently, so it is asserted here
-            rather than assumed. Only the tracker exposes an endpoint the hub may call.
+            rather than assumed. Probed on every project whose repo folder has an{" "}
+            <code>/api/summary</code> route — read at build time, not listed by hand.
           </p>
           <div className="slots">
             {diag.internal.map((p) => (
@@ -156,12 +193,15 @@ export default async function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {PROJECTS.map((project) => {
+              {PROBED.map((project) => {
                 const d = declaredFor(project.slug);
                 const inCi = DECLARED.ciMatrix.includes(project.slug);
                 return (
                   <tr key={project.slug}>
-                    <td>{project.slug}</td>
+                    <td>
+                      {project.slug}
+                      {project.parked ? " (parked)" : ""}
+                    </td>
                     <td>
                       <code>{project.vercelProject}</code>
                     </td>
@@ -259,10 +299,17 @@ export default async function AdminPage() {
           <span className="slot-body">
             <span className="slot-title">Whether each tool&apos;s database and keys are healthy</span>
             <span className="slot-detail">
-              Only <code>resume</code> and <code>coffee</code> have a <code>/api/health</code> route,
-              and both sit behind the password gate with no internal-secret carve-out, so the hub
-              gets 401. Fixing it needs a middleware carve-out per app, which is shared auth
-              plumbing and not this app&apos;s to change.
+              {withHealth.length === 0 ? (
+                <>No app has a <code>/api/health</code> route.</>
+              ) : (
+                <>
+                  {withHealth.join(", ")} {withHealth.length === 1 ? "has" : "have"} a{" "}
+                  <code>/api/health</code> route (read from the repo at build time), but each sits
+                  behind the password gate with no internal-secret carve-out, so the hub gets 401.
+                </>
+              )}{" "}
+              Fixing it needs a middleware carve-out per app, which is shared auth plumbing and not
+              this app&apos;s to change.
             </span>
           </span>
         </div>
@@ -271,16 +318,18 @@ export default async function AdminPage() {
           <span className="slot-body">
             <span className="slot-title">Which commit each project is serving</span>
             <span className="slot-detail">
-              Vercel exposes the deployed SHA to the app itself, not to a sibling. A one-line public
-              endpoint per project would make deploy drift visible here — the thing that went
-              unnoticed for hours when the GitHub App lost its installation.
+              The Pit Wall reads the commit of each project&apos;s latest production deployment from
+              the statuses Vercel posts to GitHub — but a rollback or a redeploy started from the
+              Vercel dashboard posts none, so what is serving can differ. Vercel exposes the serving
+              SHA to the app itself, not to a sibling; a one-line public endpoint per project would
+              close this.
             </span>
           </span>
         </div>
         <div className="slot slot-static sev-info">
           <span className="slot-label">by design</span>
           <span className="slot-body">
-            <span className="slot-title">Whether SESSION_SECRET matches across the five projects</span>
+            <span className="slot-title">Whether SESSION_SECRET matches across every project</span>
             <span className="slot-detail">
               Nothing may echo it, so no page can ever check it. The only safe signal is
               behavioural: log in here, then open a tool and see whether it asks again.
