@@ -76,8 +76,10 @@ gets talked past later.
 
 **The hub holds no database credential.** It reads no schema directly and is the only app with **no
 Supabase dependency**. Keep it that way unless there is a reason that survives scrutiny. The keys it
-does hold are `INTERNAL_API_SECRET`, for the glance, and `GITHUB_TOKEN` and `VERCEL_TOKEN`, for the
-Pit Wall's reads.
+does hold are `INTERNAL_API_SECRET`, for the glance, and `GITHUB_TOKEN`, for the Pit Wall, which
+reads each project's production deployment from the statuses Vercel posts to GitHub (TEC-32).
+**`VERCEL_TOKEN` is retired** — a full-power team token for reads the hub no longer makes — and The
+Garage warns for as long as it is still set.
 
 **The hub knows nothing about any tool.** `lib/glance.ts` fans out server-side to each tool's
 `/api/summary` and renders whatever comes back. Adding a tool to the glance is a line in `SOURCES`,

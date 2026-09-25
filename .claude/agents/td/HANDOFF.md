@@ -13,11 +13,17 @@ orders and merges every pull request, applies migrations at the gate and owns Ve
 **You start every agent as your helper, from its preset, after Joel says go** — Opus 5.5 at medium
 for all of them. TEC-40 is that change.
 
-**TEC-27, the post-refactor review, is merged** (#201 to #205) and its sub-issues TEC-28 to TEC-32
-are each agent's to work, started by you. **Still Joel's:** TEC-33 steps 3 and 4 (re-pause the
-editor, pause the tracker), and step 6 with TEC-7 (the firewall rate limit). **Still yours:**
-TEC-35 step 4 in a fresh session, and TEC-7's read-only check once the rule exists. **TEC-34** is the
-Next.js 14 → 16 upgrade. The parking lot is the `Parked` label.
+**Joel's working model (2026-09-25): one gate.** Agents cut branches and commit, never a pull
+request. When branches are ready you bring Joel one list: branches, order, blast radius,
+migrations, questions. His go starts Deployment on exactly that list, and he hears nothing more
+about pull requests or merges unless a question comes up. **Nothing enforces the list's scope** now
+that merging asks no click (TEC-43). **Roll up only serious questions**; small calls in an app are
+yours, logged on the issue.
+
+**TEC-27's sub-issues TEC-28 to TEC-32 are built and merged**, and the follow-ups each agent filed are in
+Linear. **Still Joel's:** TEC-33 step 1 (rotate `INTERNAL_API_SECRET`) first, then its steps 3, 4
+and 6 (TEC-7). **Still yours:** TEC-7's read-only check once the firewall rule exists, TEC-34 (Next.js
+14 → 16), TEC-59 (helpers' Linear prompts) and TEC-26. The parking lot is the `Parked` label.
 
 ## What is true now
 
@@ -25,11 +31,12 @@ Next.js 14 → 16 upgrade. The parking lot is the `Parked` label.
   2026-09-24, the editor included. The TD's container cannot reach `*.techpaddock.io` — the network
   policy refuses it — so the login behaviour itself was never checked from here.
 - **The hooks are one guard** (`.claude/hooks/guard.mjs` → `decide.mjs`, cases in `guard.test.mjs`,
-  run by CI). It fails closed. Opening a pull request is not held; merging is.
-- **Every agent edits Linear without asking Joel, and no click prompts it**: `.claude/settings.json`
-  allows the Linear server, but deleting, retiring a label and the diff tools still ask — `merge_diff`
-  merges a pull request outside the guard's hold (TEC-43). The guard still refuses a malformed issue.
-  **Merging still waits for Joel's click** — he kept it on 2026-09-25.
+  run by CI). It fails closed. Opening, updating and squash-merging a pull request are not held;
+  auto-merge, reviews and the API commit tools still ask.
+- **Linear writes from this session go through without a prompt; a helper's still prompt Joel**
+  (TEC-59). Until that is fixed, **helpers make no Linear writes**: they list the changes in their
+  report and you apply them. Deletes, label retirement and the diff tools still ask (the `ask` list
+  in `.claude/settings.json`). Joel asked for no Linear friction; removing that list needs his words.
 - **The weekly Routine** "Weekly rules-drift audit" (Mondays 08:00 UTC) reads Linear and runs `drift`.
   Its prompt still names the TD as the gate until TEC-42; it is report-only, so that misleads nobody
   into acting, but a run before TEC-42 will report the move as drift.
@@ -45,11 +52,11 @@ Next.js 14 → 16 upgrade. The parking lot is the `Parked` label.
   tag. Copy an anchor from `get_issue`'s output, tags and all; a retyped `TEC-n` never matches.
 - **A helper can be refused an action this session is allowed** — the permission system decides per
   call. Take it to Joel; never re-run the refused action yourself.
-- **The hub holds `GITHUB_TOKEN` and `VERCEL_TOKEN`** for the Pit Wall's reads — the most powerful
-  credentials in the estate, on the app that holds no database key. TEC-32 item 4 and TEC-33 step 5
-  are how that shrinks.
-- **Build in a worktree, never the main checkout.** Building the hub rewrites three tracked
-  `apps/home/lib/*.generated.ts` files; restore them before committing. TEC-32 item 6 ends it.
+- **The hub no longer reads `VERCEL_TOKEN`** (TEC-32), but it stays set until Joel deletes it
+  (TEC-32's ⭐ step); The Garage warns while it is.
+- **The auto-mode classifier refuses edits to `.claude/` and to another agent's charter** as
+  self-modification or instruction poisoning, even with an approved issue behind it. It cleared
+  once Joel's own words named the change. Ask him for them; never route round it.
 - **Cost is context × turns.** A helper's report lands in your context: brief tightly, and end the
   session once the branches are pushed.
 - **You cannot delete a remote branch**, and **you are a session, not a service.** Say which.
