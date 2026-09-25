@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
-import { uploadPhoto, signedPhotoUrl, StorageError, IMAGE_TYPES } from "@/lib/storage";
+import { uploadPhoto, signedPhotoUrls, StorageError, isImageType } from "@/lib/storage";
 import { findPreviousBag, guideColumns, searchPattern } from "@/lib/bags";
 import { isIsoDate } from "@/lib/dates";
-import type { Guide } from "@/lib/guide";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +19,8 @@ export async function GET(request: NextRequest) {
     // Report a lookup that could not run as a failure rather than as "no
     // previous purchase" — they are the same null, and only one is an answer.
     try {
-      return NextResponse.json({ previous: await findPreviousBag(roaster, coffeeName) });
+      const exclude = params.get("exclude")?.trim() || null;
+      return NextResponse.json({ previous: await findPreviousBag(roaster, coffeeName, exclude) });
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "The previous-purchase lookup failed." },
@@ -47,13 +47,14 @@ export async function GET(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Photos live in a private bucket, so the list carries short-lived signed
-  // URLs rather than paths the browser can't resolve.
-  const bags = await Promise.all(
-    (data ?? []).map(async (bag) => ({
-      ...bag,
-      photo_url: bag.photo_path ? await signedPhotoUrl(bag.photo_path) : null,
-    }))
-  );
+  // URLs rather than paths the browser can't resolve — signed in one batch,
+  // rather than one storage round trip per bag on every load.
+  const rows = data ?? [];
+  const urls = await signedPhotoUrls(rows.map((bag) => bag.photo_path).filter((p): p is string => !!p));
+  const bags = rows.map((bag) => ({
+    ...bag,
+    photo_url: bag.photo_path ? (urls.get(bag.photo_path) ?? null) : null,
+  }));
 
   return NextResponse.json({ bags });
 }
@@ -77,15 +78,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A roaster and a coffee name are required." }, { status: 400 });
   }
 
-  let guide: Guide | null = null;
-  const guideRaw = field("guide");
-  if (guideRaw) {
-    try {
-      guide = JSON.parse(guideRaw) as Guide;
-    } catch {
-      return NextResponse.json({ error: "The guide payload wasn't valid JSON." }, { status: 400 });
-    }
-  }
+  // **No guide is accepted here, and nothing here writes one.** This route
+  // took a client-supplied `guide`, `guide_model` and `guide_effort` until
+  // 2026-09-25 and wrote them straight into the `guide_*` columns without
+  // `validateGuide` — a path around the rule this app exists for (RULES §1),
+  // and a bare 500 on a guide with no `params`. The page never sent them: a
+  // bag is saved first and the search writes its guide, so the only guide
+  // this route can know about is none at all. Anything sent under those
+  // names is ignored like any other unknown field.
 
   // Both dates are checked here, not just the one the form used to send.
   // roast_date is read off a label by a vision model and went straight into a
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     let photoPath: string | null = null;
     const photo = form.get("photo");
     if (photo instanceof File && photo.size > 0) {
-      if (!IMAGE_TYPES.includes(photo.type)) {
+      if (!isImageType(photo.type)) {
         return NextResponse.json({ error: "That photo isn't a supported image type." }, { status: 415 });
       }
       if (photo.size > MAX_BYTES) {
@@ -128,7 +128,9 @@ export async function POST(request: NextRequest) {
         varietal: field("varietal"),
         roast_date: dates.roast_date,
         photo_path: photoPath,
-        ...guideColumns(guide, field("guide_model"), field("guide_effort")),
+        // Every guide column at its "not searched yet" value, from the one
+        // mapping that knows them all.
+        ...guideColumns(null),
         purchased_date: dates.purchased_date,
         my_notes: field("my_notes"),
       })

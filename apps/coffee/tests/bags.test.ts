@@ -14,7 +14,7 @@ const stub = vi.hoisted(() => ({
 vi.mock("@/lib/supabase", () => {
   const make = (table: string) => {
     const chain: Record<string, unknown> = {};
-    for (const link of ["select", "ilike", "order", "limit", "not", "eq"]) chain[link] = () => chain;
+    for (const link of ["select", "ilike", "order", "limit", "not", "eq", "neq"]) chain[link] = () => chain;
     chain.maybeSingle = async () => stub.byTable[table] ?? stub.result;
     return chain;
   };
@@ -40,7 +40,7 @@ function bagWithBrew(brew: unknown) {
 
 describe("hostOf", () => {
   it("reduces a product URL to the host we can pin a search to", () => {
-    expect(hostOf("https://sweetbloomcoffee.com/products/maria-gutierrez")).toBe("sweetbloomcoffee.com");
+    expect(hostOf("https://sweetbloomcoffee.com/products/example-lot")).toBe("sweetbloomcoffee.com");
     expect(hostOf("https://www.sweetbloomcoffee.com/pages/brew-guides")).toBe("sweetbloomcoffee.com");
     expect(hostOf("https://SHOP.SweetBloomCoffee.com/x")).toBe("shop.sweetbloomcoffee.com");
   });
@@ -48,7 +48,7 @@ describe("hostOf", () => {
   it("returns null rather than a guess for anything unparseable", () => {
     // A domain we cannot derive is left unpinned. Inventing one from the
     // roaster's name is the same failure mode as inventing a recipe.
-    for (const bad of [null, undefined, "", "sweetbloomcoffee.com", "not a url"]) {
+    for (const bad of [null, undefined, "", "sweetbloomcoffee.com", "not a url", "javascript:alert(1)"]) {
       expect(hostOf(bad)).toBeNull();
     }
   });
@@ -59,24 +59,24 @@ describe("hostOf", () => {
 describe("findPreviousBag", () => {
   it("answers null when this coffee is genuinely new", async () => {
     answers(null);
-    await expect(findPreviousBag("Sweet Bloom", "Maria Gutierrez")).resolves.toBeNull();
+    await expect(findPreviousBag("Sweet Bloom", "Example Lot")).resolves.toBeNull();
   });
 
   it("answers null when the previous bag was bought but never brewed", async () => {
     bagWithBrew(null);
-    await expect(findPreviousBag("Sweet Bloom", "Maria Gutierrez")).resolves.toBeNull();
+    await expect(findPreviousBag("Sweet Bloom", "Example Lot")).resolves.toBeNull();
   });
 
   it("answers null when the last brew recorded no dial-in at all", async () => {
     bagWithBrew({ brewer: null, brew_method: null, grinder: null, grind_setting: null });
-    await expect(findPreviousBag("Sweet Bloom", "Maria Gutierrez")).resolves.toBeNull();
+    await expect(findPreviousBag("Sweet Bloom", "Example Lot")).resolves.toBeNull();
   });
 
   it("carries the last brew's dial-in forward", async () => {
     // The dial-in belongs to a brew now, so this reads the most recent one
     // rather than anything stored on the bag.
     bagWithBrew({ brewer: "v60-02", brew_method: "3 pours", grinder: "Fellow Ode 2", grind_setting: "7" });
-    await expect(findPreviousBag("Sweet Bloom", "Maria Gutierrez")).resolves.toMatchObject({
+    await expect(findPreviousBag("Sweet Bloom", "Example Lot")).resolves.toMatchObject({
       brewer: "v60-02",
       grind_setting: "7",
     });
@@ -84,8 +84,8 @@ describe("findPreviousBag", () => {
 
   it("throws rather than pass a failed lookup off as a first purchase", async () => {
     fails("permission denied for schema coffee");
-    await expect(findPreviousBag("Sweet Bloom", "Maria Gutierrez")).rejects.toBeInstanceOf(LookupError);
-    await expect(findPreviousBag("Sweet Bloom", "Maria Gutierrez")).rejects.toThrow(
+    await expect(findPreviousBag("Sweet Bloom", "Example Lot")).rejects.toBeInstanceOf(LookupError);
+    await expect(findPreviousBag("Sweet Bloom", "Example Lot")).rejects.toThrow(
       /permission denied for schema coffee/
     );
   });

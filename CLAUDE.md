@@ -43,7 +43,7 @@ keeps things in one place. When you have something to say, find the reader first
 | Channel | Carries | Read when | Shape |
 |---|---|---|---|
 | `CLAUDE.md` | rules binding every agent | every session, automatic | overwrite |
-| `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | **overwrite · ≤350 lines · TD drafts, Joel approves** |
+| `agents/<you>/RULES.md` | your job, your domain, the reasoning behind your design | every session | **overwrite · ≤350 lines (Coffee 365) · TD drafts, Joel approves** |
 | `agents/<you>/HANDOFF.md` | **your area's state right now, and its traps** — never a to-do | every session | **overwrite · ≤80 lines** |
 | Linear, team TEC | **all open work, each request with an owner, and the parking lot** | every session, first | **one issue per request · `owner:` and `agent:` labels · body ends with Next steps · `Parked` label** |
 | Linear documents, team TEC | **a tool's design reasoning** — e.g. "Health — plan" | before designing a feature | **binds nothing: a rule goes in the charter** |
@@ -391,12 +391,13 @@ Most rules here are convention: they hold because an agent chooses to comply. Th
    their effect.
 2. **The `.claude/settings.json` hooks** run whether or not anyone wants them to, through one guard,
    `.claude/hooks/guard.mjs`, which **fails closed**. It refuses a push that would land on `main` in
-   any spelling or that it cannot read, and rewriting the migration history by CLI or SQL; holds
-   changing, merging or reviewing a pull request, and the API commit tools, for Joel's click —
-   opening one is not held (Joel, 2026-09-24); holds every Vercel and Supabase call that is not a
-   read; refuses a Linear issue without its labels or Next steps; and points every session at
-   Linear. CI tests what it refuses. It stops mistakes, not a determined agent — branch protection
-   stays the backstop for `main`.
+   any spelling or that it cannot read, a merge that is not a squash, and rewriting the migration
+   history by CLI or SQL; holds auto-merge, a pull request review and the API commit tools for
+   Joel's click — opening, updating and merging are not held, because **Joel's one gate is his go
+   before Deployment starts** (Joel, 2026-09-25: "only one gate"); holds every Vercel and Supabase
+   call that is not a read; refuses a Linear issue without its labels or Next steps; and points
+   every session at Linear. CI tests what it refuses. It stops mistakes, not a determined agent —
+   branch protection stays the backstop for `main`.
 3. **CI's `gate`** needs every app to typecheck, test and build, and `drift` to pass.
    **`requested-by-joel`** fails a pull request whose body does not record who asked for it.
    **`drift`** measures the repo instead of trusting a document: the stamped copies, the middleware
