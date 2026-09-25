@@ -3,6 +3,7 @@ import { MODELS, DEFAULT_MODEL, requestShape, type ModelId } from "./models";
 import { parseMacros, type Macros } from "./macros";
 import { FILE_TYPES, type RecipeFile } from "./upload";
 import { unfetchedRead, type ResultBlock } from "./fetchRun";
+import { generatePrompt, type TurnedDown } from "./reroll";
 
 /**
  * The five model calls this app makes, and the reasoning for each one's model.
@@ -268,6 +269,9 @@ const GENERATE_SYSTEM = `You invent one recipe a home cook can actually make ton
 export async function generateRecipe(params: {
   brief: string;
   model?: ModelId;
+  /** "Something else": drafts already turned down this session, and why (TEC-39 D). */
+  turnedDown?: TurnedDown[];
+  steer?: string;
 }): Promise<RecipeFields> {
   const model = params.model ?? DEFAULT_MODEL;
 
@@ -278,10 +282,7 @@ export async function generateRecipe(params: {
     messages: [
       {
         role: "user",
-        content:
-          `What they asked for: ${params.brief}\n\n` +
-          `Return a JSON object: {"name": string, "servings": number, "ingredients": [string], ` +
-          `"method": string}. Put nothing after the JSON.`,
+        content: generatePrompt(params.brief, params.turnedDown, params.steer),
       },
     ],
   } as never)) as ModelResponse;

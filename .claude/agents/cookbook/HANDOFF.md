@@ -13,13 +13,15 @@ in Linear under `agent:Cookbook`** — never here.
 is the King Soopers list** (TEC-22); both render `app/Shell.tsx`, and switching tabs replaces the
 address. Signed out, `/list` goes through `/login?from=/list` and back. **Each tab opens on its add
 box** — "Add a recipe" collapsed, "Add items" open. Results are toasts; a failed read stays inline.
-**Tab icon only, no home-screen install** — icon No. 12, Joel's pick on 2026-09-23; **its colours
-are exact and fixed, dark mode included**, with no dark variant.
+**Tab icon only, no install** — No. 12, Joel's pick; **its colours are fixed, dark mode included.**
 
 **Four ways in** — type it, ask Claude, from a link, from a file. **Nothing a model wrote is saved
 until Keep it; the typed path saves straight away**, after a name check that spares it a pricing
 call it could not keep. A file is **never stored**. **An import is refused three times**: `read:
-false`, no ingredients, or **no fetch that returned a page** (`lib/fetchRun.ts`).
+false`, no ingredients, or **no fetch that returned a page** (`lib/fetchRun.ts`). **"Something else"**
+on a Claude draft re-asks with every draft turned down, plus an optional reason (`lib/reroll.ts`).
+**Bin it is a turn-down too** (Joel, 2026-09-25). The pile is browser state: Keep it clears it,
+and so does "Work it out" on a new brief; the same brief keeps it.
 
 **Model requests come from `requestShape` in `lib/models.ts`**: Sonnet 5 gets an explicit effort and
 thinking headroom, Haiku 4.5 gets no effort (it 400s). The four calls without a tool send a JSON
@@ -57,9 +59,8 @@ did not answer; `InputError` 400; `ConflictError` 409; anything else 500, via `l
 like an outage there.
 
 **`methodSteps` splits only on the next number in a run** — gas mark 4 stays put; the edges are in
-its tests. `/api/health` probes the database with a one-row read of `recipes`.
-
-**`lib/models.ts` is the third copy of Coffee's model registry**, flagged rather than shared.
+its tests. `/api/health` reads one row of `recipes`. **`lib/models.ts` is the third copy of Coffee's
+model registry**, flagged rather than shared.
 
 ## Traps specific to this area
 
@@ -72,7 +73,7 @@ its tests. `/api/health` probes the database with a one-row read of `recipes`.
 - **The re-estimate guardrail was reconsidered and kept** (Joel, 2026-09-22). Do not re-ask.
 - **A client component must not import a lib file that imports `supabase.ts`** — a pure helper the
   browser needs gets its own file, as `lib/kingsoopers.ts` does.
-- **Read Vercel and Supabase live before writing a deployment step.** #159's body said the project
-  and the domain did not exist; **both already did**.
-- **`claude/health-recipes` is kept on purpose** as the design record. `claude/cookbook-feedback-fixes`,
-  `-from-a-file` and `-icon` are merged history awaiting deletion: never build on or revive them.
+- **Read Vercel and Supabase live before writing a deployment step** — #159 said two things did
+  not exist that already did.
+- **`claude/health-recipes` is the design record, kept on purpose.** `claude/cookbook-feedback-fixes`,
+  `-from-a-file` and `-icon` are merged history awaiting deletion: never revive them.
