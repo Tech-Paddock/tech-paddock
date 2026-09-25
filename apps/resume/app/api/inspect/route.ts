@@ -3,7 +3,12 @@ import { DocxReadError, readDocxParts } from "@/lib/docx/read";
 import { extractParagraphs } from "@/lib/docx/paragraphs";
 import { auditAts } from "@/lib/docx/ats";
 import { outlineOf } from "@/lib/docx/outline";
-import { compareContent } from "@/lib/docx/compare";
+import { compareContent, compareLines, type ContentCheck } from "@/lib/docx/compare";
+import type { Para } from "@/lib/docx/paragraphs";
+import { getBodyInner } from "@/lib/reskin/container";
+import { splitBody } from "@/lib/reskin/blocks";
+import { extractSourceContent } from "@/lib/reskin/extract";
+import { linesTaken } from "@/lib/reskin/generate";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +76,7 @@ export async function POST(request: NextRequest) {
     // absent comparison — an unread source and an attached one must not look
     // the same.
     const content = source
-      ? compareContent(extractParagraphs((await readDocxParts(await source.arrayBuffer())).document), paragraphs)
+      ? compareAgainstSource((await readDocxParts(await source.arrayBuffer())).document, paragraphs)
       : null;
 
     return NextResponse.json({
@@ -89,6 +94,26 @@ export async function POST(request: NextRequest) {
     console.error("inspect failed", error);
     return fail(500, "read_failed", "Couldn't read that document. It may be corrupt or password-protected.");
   }
+}
+
+/**
+ * Check the finished document for the lines a reformat takes from the source —
+ * the same lines, by the same function, the reformat route checks.
+ *
+ * **It compared the whole source**, and the reformat deliberately leaves part of
+ * the source behind: the name and contact block, because the template's own is
+ * kept, and Education, Certifications and Hobbies, which are the template's.
+ * Every one of those read as a dropped line on every reformat — the cry-wolf
+ * failure the content check already has a regression test against.
+ *
+ * A source the extractor takes nothing from (no heading it recognises) is
+ * compared whole instead. Checking zero lines would report 100% over a document
+ * nobody looked at, and a report that cannot find anything must not read as
+ * verified.
+ */
+function compareAgainstSource(sourceXml: string, finished: Para[]): ContentCheck {
+  const taken = linesTaken(extractSourceContent(splitBody(getBodyInner(sourceXml).bodyInner)));
+  return taken.length > 0 ? compareLines(taken, finished) : compareContent(extractParagraphs(sourceXml), finished);
 }
 
 function fail(status: number, code: string, error: string) {

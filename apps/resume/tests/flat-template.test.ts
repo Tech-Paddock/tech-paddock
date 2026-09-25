@@ -101,7 +101,7 @@ describe("Core Competencies without a table", () => {
     );
     const lines = texts(blocks).filter((t) => /^[A-Z][a-z]+:/.test(t));
     expect(lines).toHaveLength(1);
-    expect(changeLog.some((c) => c.section === "Core Competencies" && c.action === "trimmed-surplus")).toBe(true);
+    expect(changeLog.some((c) => c.section === "Core Competencies" && c.action === "template-trimmed")).toBe(true);
   });
 
   /**
@@ -180,6 +180,27 @@ describe("front matter in the body", () => {
     expect(entry.detail).toMatch(/no summary paragraph/i);
   });
 
+  /** TEC-31. Both the preamble slot and the Summary section were filled, so a
+   *  template with a Summary heading shipped the summary twice. */
+  it("writes the summary once, under the Summary heading, when the template has one", () => {
+    const preambleProse = "A tagline above the headings long enough to read as ordinary prose rather than a label.";
+    const { blocks, changeLog } = renderIntoTemplate(
+      [
+        para("Jordan Avery"),
+        para(preambleProse),
+        para("Summary"),
+        para("The template's own summary, long enough to read as ordinary prose rather than a label."),
+        para("Career Highlights"),
+      ],
+      content({ summary: "REPLACED SUMMARY TEXT" })
+    );
+
+    const lines = texts(blocks);
+    expect(lines.filter((l) => l === "REPLACED SUMMARY TEXT")).toHaveLength(1);
+    expect(lines).toEqual(["Jordan Avery", preambleProse, "Summary", "REPLACED SUMMARY TEXT", "Career Highlights"]);
+    expect(changeLog.filter((c) => c.section === "Summary")).toHaveLength(1);
+  });
+
   it("does not mistake the contact line for the summary", () => {
     const { blocks } = renderIntoTemplate(
       [
@@ -202,7 +223,7 @@ describe("front matter in the body", () => {
  * two fields are separated by **no character at all** — the tab is an element,
  * not text. A tab-aware extractor (python-docx) copes; an extractor that simply
  * concatenates `<w:t>` elements, which is most of the simple ones, reads
- * `Sr. AdministratorJan 2026 - Present` and parses neither field.
+ * `Sr. AdministratorNov 2022 - Present` and parses neither field.
  *
  * The template answers this with a trailing space on the title run, invisible
  * against a right tab stop. The renderer has to carry it over, or the fix is
@@ -215,15 +236,15 @@ describe("the gap a template writes into a run", () => {
     '<w:r><w:t xml:space="preserve">   </w:t></w:r>' +
     '<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">Senior Administrator </w:t></w:r>' +
     "<w:r><w:tab/></w:r>" +
-    "<w:r><w:t>Jan 2026 - Present</w:t></w:r></w:p>";
+    "<w:r><w:t>Nov 2022 - Present</w:t></w:r></w:p>";
 
   it("survives a company, title and date rewrite", () => {
-    const { raw, unplaced } = replaceInlineHeaderLine(headerLine, "Harbor Point", "Consultant", "Oct 2024 - Present");
+    const { raw, unplaced } = replaceInlineHeaderLine(headerLine, "Harbor Point", "Consultant", "Aug 2021 - Present");
     expect(unplaced).toEqual([]);
 
     // What an extractor that ignores <w:tab/> sees.
     const concatenated = [...raw.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((m) => m[1]).join("");
-    expect(concatenated).toBe("Harbor Point   Consultant Oct 2024 - Present");
+    expect(concatenated).toBe("Harbor Point   Consultant Aug 2021 - Present");
     expect(concatenated).not.toContain("ConsultantOct");
   });
 });
@@ -249,5 +270,36 @@ describe("what the current template's structure keeps", () => {
   it("places company, title and date in their own runs rather than composing the line", async () => {
     const { changeLog } = await reskin(TEMPLATE(), SOURCE());
     expect(changeLog.some((c) => /no separate run/.test(c.detail))).toBe(false);
+  });
+});
+
+/**
+ * TEC-31. A count mismatch between the input's highlights and the template's
+ * cells was silent: surplus input was dropped and surplus template cells kept
+ * their own figures, and nothing in the change log said either. The table's
+ * cells are its layout, so none is added or removed — but each mismatch is a
+ * line, and the actions are ones the verdict reads.
+ */
+describe("Career Highlights whose count differs from the template's", () => {
+  const highlights = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ stat: `${i + 1}0%`, desc: `Representative outcome number ${i + 1}.` }));
+  const logFor = async (n: number) =>
+    renderIntoTemplate(await blocksOf(TEMPLATE()), content({ careerHighlights: highlights(n) })).changeLog.filter(
+      (c) => c.section === "Career Highlights"
+    );
+
+  it("says which template cells kept their own text when the input has fewer", async () => {
+    const kept = (await logFor(1)).filter((c) => c.action === "not-found-in-input");
+    expect(kept.length).toBeGreaterThan(0);
+    expect(kept[0].detail).toMatch(/^Highlight 2 keeps the template's own text/);
+  });
+
+  it("says which input highlights were dropped when the input has more", async () => {
+    const cells = (await logFor(1)).filter((c) => c.action === "not-found-in-input").length + 1;
+    const log = await logFor(cells + 2);
+    const dropped = log.filter((c) => c.action === "input-dropped");
+    expect(dropped).toHaveLength(2);
+    expect(dropped[0].detail).toContain(`Highlight ${cells + 1}`);
+    expect(log.some((c) => c.action === "not-found-in-input")).toBe(false);
   });
 });
