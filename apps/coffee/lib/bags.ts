@@ -1,5 +1,5 @@
 import { getServiceClient } from "./supabase";
-import type { Guide } from "./guide";
+import { webHost, type Guide } from "./guide";
 
 /**
  * The bag you bought last time, if this is a repeat purchase. Matched on
@@ -8,17 +8,15 @@ import type { Guide } from "./guide";
  * row, so "have I had this before" is a lookup rather than a uniqueness
  * constraint.
  */
-export async function findPreviousBag(roaster: string, coffeeName: string) {
+export async function findPreviousBag(roaster: string, coffeeName: string, excludeId: string | null = null) {
   const supabase = getServiceClient();
 
-  const { data: bag, error } = await supabase
-    .from("bags")
-    .select("id, created_at")
-    .ilike("roaster", roaster)
-    .ilike("coffee_name", coffeeName)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  let query = supabase.from("bags").select("id, created_at").ilike("roaster", roaster).ilike("coffee_name", coffeeName);
+  // The scan screen asks after it has saved the new bag, and the new bag is
+  // not a previous purchase of itself.
+  if (excludeId) query = query.neq("id", excludeId);
+
+  const { data: bag, error } = await query.order("created_at", { ascending: false }).limit(1).maybeSingle();
 
   // "No previous purchase" and "the lookup failed" are both a null row, and
   // only one of them is an answer. Swallowing the error made an unreachable
@@ -59,12 +57,9 @@ export class LookupError extends Error {
  * model from a string that only looks like one.
  */
 export function hostOf(url: string | null | undefined): string | null {
-  if (!url) return null;
-  try {
-    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
-  } catch {
-    return null;
-  }
+  // One definition of "a web page's host", shared with `validateGuide`, so a
+  // `javascript:` URL is refused in both places or in neither.
+  return webHost(url);
 }
 
 /**

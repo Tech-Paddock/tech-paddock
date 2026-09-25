@@ -3,7 +3,7 @@
  * be tested without a database or a browser.
  */
 
-import { DEFAULT_GRINDER } from "@/lib/brewers";
+import { DEFAULT_GRINDER, myBrewerFor } from "@/lib/brewers";
 
 /** A refractometer reads percent. Everything else quotes ppm. They are the same number. */
 export const PPM_PER_PERCENT = 10_000;
@@ -115,6 +115,8 @@ export type GuideNumbers = {
   dose?: string | null;
   water?: string | null;
   ratio?: string | null;
+  /** The roaster's brewer, as the `guide_method` vocabulary. Crosses to yours only via `myBrewerFor`. */
+  method?: string | null;
 };
 
 export function blankBrew(): BrewDraft {
@@ -287,20 +289,59 @@ export function withWater(draft: BrewDraft, value: string): BrewDraft {
  * confident nonsense this app exists not to produce.
  */
 export function parseGrams(text: string | null | undefined): number | null {
-  if (!text || text.includes(":")) return null;
-  const match = /(\d+(?:\.\d+)?)/.exec(text);
-  if (!match) return null;
-  const n = Number(match[1]);
-  return Number.isFinite(n) && n > 0 ? n : null;
+  return gramsIn(text)[0] ?? null;
 }
 
 /**
- * The second half of a ratio — "1:17" is 17, "2:1" is 0.5.
+ * The water a roaster's wording ends at — "Bloom 50g, then to 300g" is 300.
+ *
+ * A pour is written as its stages, and every stage is a running total on the
+ * way to the last one, so the largest mass named is the water. The first one
+ * is the bloom, and reading it as the recipe's water put 50g in the box.
+ */
+export function parseWaterGrams(text: string | null | undefined): number | null {
+  const masses = gramsIn(text);
+  return masses.length ? Math.max(...masses) : null;
+}
+
+/**
+ * Units that are not grams and are not converted. "12 oz" is a bag size or a
+ * cup, not twelve grams of anything, and converting ounces on the roaster's
+ * authority is a rounding this app does not do. Millilitres pass: water is
+ * weighed and a millilitre of it is a gram.
+ */
+const NOT_GRAMS = /^(oz|ounces?|fl|cups?|tbsps?|tablespoons?|tsps?|teaspoons?|lbs?|pounds?|kg|kilos?|l|litres?|liters?|scoops?)$/i;
+
+/** Every mass in a string, in order, as grams. Nothing for a ratio or a time. */
+function gramsIn(text: string | null | undefined): number[] {
+  // A colon means a ratio or a brew time, and reading "1:17" as one gram of
+  // coffee is the kind of confident nonsense this app exists not to produce.
+  if (!text || text.includes(":")) return [];
+  const masses: number[] = [];
+  // Thousands separators are part of the number: "1,000g" is a thousand, not
+  // one gram followed by some zeros.
+  const pattern = /(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s*([A-Za-zµ]*)/g;
+  for (const match of text.matchAll(pattern)) {
+    if (NOT_GRAMS.test(match[3])) continue;
+    const n = Number(match[1].replace(/,/g, "") + (match[2] ?? ""));
+    if (Number.isFinite(n) && n > 0) masses.push(n);
+  }
+  return masses;
+}
+
+/**
+ * Grams of water per gram of coffee — "1:17" is 17, and so is "17:1".
  *
  * Divided rather than read off, because a roaster writing "2:30" for a brew
  * time and a roaster writing "1:17" for a ratio are indistinguishable by
  * shape. Only `guide_ratio` is ever passed here, and dividing at least keeps
  * a "60:1000" style statement correct instead of returning 1000.
+ *
+ * **Larger over smaller, whichever side it is written on.** Roasters write
+ * "16:1" as often as "1:16", and both mean sixteen grams of water per gram of
+ * coffee — a brew with less water than coffee is not a brew. Reading "16:1"
+ * the other way round gave a sixteenth, and a form that then computed a
+ * water mass from it.
  */
 export function parseRatio(text: string | null | undefined): number | null {
   if (!text) return null;
@@ -309,7 +350,7 @@ export function parseRatio(text: string | null | undefined): number | null {
   const left = Number(match[1]);
   const right = Number(match[2]);
   if (!Number.isFinite(left) || !Number.isFinite(right) || left <= 0 || right <= 0) return null;
-  return Math.round((right / left) * 10) / 10;
+  return Math.round((Math.max(left, right) / Math.min(left, right)) * 10) / 10;
 }
 
 /**
@@ -378,7 +419,7 @@ export function fromGuide(guide: GuideNumbers | null | undefined): Partial<BrewD
   if (!guide) return {};
 
   const dose = parseGrams(guide.dose);
-  const statedWater = parseGrams(guide.water);
+  const statedWater = parseWaterGrams(guide.water);
   const statedRatio = parseRatio(guide.ratio);
 
   const water = statedWater ?? waterFor(dose, statedRatio);
@@ -417,24 +458,56 @@ export function openingBrew(
 
   let usedGuide = false;
   const draft = { ...repeated };
-  for (const key of ["dose_g", "water_g", "ratio"] as const) {
-    if (draft[key]) continue;
-    const value = suggested[key];
-    if (!value) continue;
-    draft[key] = value;
+
+  // The brewer, where the roaster's corresponds exactly to one on your shelf
+  // and your last brew did not already say. `myBrewerFor` is the whole of
+  // that rule: a bare "V60" or an Origami leaves it for you to choose.
+  if (!draft.brewer) {
+    const brewer = myBrewerFor(guide?.method);
+    if (brewer) {
+      draft.brewer = brewer;
+      usedGuide = true;
+    }
+  }
+
+  // **Dose, ratio and water are one decision, so they are filled as one.**
+  // Taking each blank field from whichever source had it could open the form
+  // with your dose from last time and the roaster's water — two numbers that
+  // are each right and do not add up to the ratio beside them. So:
+  //
+  // - the dose is yours if you have one, theirs otherwise;
+  // - water you poured last time stands, and the ratio follows from it;
+  // - otherwise, with your dose, their *ratio* sets the water — a ratio is the
+  //   part of a recipe that survives scaling, which is the reason to brew to
+  //   one — and their water is used only when they gave no ratio;
+  // - with their dose, their own water and ratio come with it, as published.
+  const doseIsTheirs = !draft.dose_g && !!suggested.dose_g;
+  if (doseIsTheirs) {
+    draft.dose_g = suggested.dose_g!;
     usedGuide = true;
   }
 
-  // The two sources can each supply half of the arithmetic — your dose from
-  // last time, their ratio — so the third field is closed out once rather
-  // than left blank beside the two that determine it.
   if (!draft.water_g) {
-    const water = waterFor(num(draft.dose_g), num(draft.ratio));
-    if (water != null) draft.water_g = String(water);
+    const dose = num(draft.dose_g);
+    const fromRatio = !doseIsTheirs && dose ? waterFor(dose, num(suggested.ratio ?? "")) : null;
+    const water = fromRatio != null ? String(fromRatio) : (suggested.water_g ?? "");
+    if (water) {
+      draft.water_g = water;
+      usedGuide = true;
+    }
   }
+
   if (!draft.ratio) {
-    const ratio = ratioFor(num(draft.dose_g), num(draft.water_g));
-    if (ratio != null) draft.ratio = String(ratio);
+    // Derived from the two masses so the three fields agree — except when all
+    // three are the roaster's, where their published ratio is kept as they
+    // wrote it rather than re-derived from rounded grams.
+    const allTheirs = doseIsTheirs && !repeated.water_g;
+    const derived = ratioFor(num(draft.dose_g), num(draft.water_g));
+    const ratio = allTheirs && suggested.ratio ? suggested.ratio : derived != null ? String(derived) : (suggested.ratio ?? "");
+    if (ratio) {
+      draft.ratio = ratio;
+      if (ratio === suggested.ratio) usedGuide = true;
+    }
   }
 
   // A form that says where its numbers came from is the same habit as showing

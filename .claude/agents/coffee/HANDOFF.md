@@ -1,6 +1,7 @@
 # Coffee — handoff
 
-State as of 2026-09-22. Read `RULES.md` first; this file is only what is true right now.
+State as of 2026-09-25. Read `RULES.md` first; this file is only what is true right now and its traps.
+Open work is in Linear, team TEC, under `agent:Coffee`.
 
 ---
 
@@ -10,71 +11,59 @@ State as of 2026-09-22. Read `RULES.md` first; this file is only what is true ri
 screen. The whole flow has run end to end against a real bag.
 
 **Save comes before the search**, and the page polls the row rather than waiting: the search takes
-minutes with nothing on the connection, so a phone calls it dead. Two answers were lost that way.
-**It can be run again from the shelf**, and that refreshes the link too.
+minutes with nothing on the connection, so a phone calls it dead. **Search again** re-runs it from the
+shelf and refreshes the link. **Nothing is pinned up front** (#176); `validateGuide` is the whole
+constraint on where a guide may come from.
 
-### What changed on 2026-09-22
+### What TEC-28 made true (2026-09-25)
 
-**Research is a trigger, not a second kind of search.** It posts the bag and nothing else; the route
-sources the product URL **off the row, never off the request**, and falls back to its own default
-model and effort. One message shape either way, so the search cannot tell which button started it.
-A link the roaster has moved costs one fetch and then searches as normal, never a dead end.
-
-**Nothing is pinned up front.** `findRoasterDomain` is gone and no search sets `allowed_domains`.
-Pinning narrowed the only channel by which a page can enter the conversation — `web_fetch` reaches
-nothing search surfaced — and the rows measure it: Sweet Bloom unpinned came back tier 1 with four
-quotes, Sweet Bloom pinned came back `none`, no code change between them. **`validateGuide`'s host
-check is untouched and is now the whole constraint**, which is what it was for every first search
-this app has ever run.
-
-**A search that failed is no longer stored as one that found nothing.** Web search and web fetch do
-not raise — a failure is a result block carrying an `error_code` inside an HTTP 200, and reading only
-the text blocks turned that into a confident `none` about the roaster. Running out of resume turns
-did the same, an empty string parsing to `{}`. **`lib/searchRun.ts` holds the rule**, pure and apart
-from the SDK so it has tests: a `none` reached past a failed tool is refused and written to
-`guide_search_error`, which the page already shows; a run that found something stands regardless.
-
-### Settled elsewhere
-
-The suggestion, the comparison harness, the bag/brew split, the measurement rules and `openingBrew`
-are in `RULES.md` and are deliberately not restated here. **None of them changed this session.**
+- **Only the search writes `guide_*`.** `POST /api/bags` takes no guide; a bag is saved at
+  `not_searched` through `guideColumns(null)`.
+- **"The roaster's own site" is anchored on evidence.** A guide needs a product page on an http(s)
+  host, and must be on that same site **and** on a host the run reached — taken from the tool result
+  blocks by `reachedUrlsIn` in `lib/searchRun.ts`, never from the answer. `javascript:` and friends are
+  not URLs anywhere (`webHost` in `lib/guide.ts`, which `hostOf` now shares).
+- **The whole step from API response to stored outcome is pure and tested** in `lib/searchRun.ts`:
+  `readTurn` (only `end_turn` answers; `max_tokens`, `refusal` and anything else throw; split text
+  blocks rejoin with nothing between them), `concludeSearch` (validation, tool failures, stale link).
+- **A `none` is refused only for service failures** — `too_many_requests`, `unavailable`, and any code
+  not on the model-level list. A model-caused failure records `none` **with a warning** in
+  `guide_search_error`, beside the answer; a product link whose fetch failed is cleared.
+- **The search has a clock.** 270 s budget inside the route's 300 s `maxDuration`
+  (`lib/searchClock.ts`); a stamp older than 300 s reads as failed on both pollers. One search per bag:
+  the route refuses a second with 409, and the button starts from the row's running search.
+- **A failing run writes its error only onto its own stamp**, so it cannot land beside a recipe
+  another run saved. A successful run always overwrites — freshest wins (Joel, 2026-09-24).
+- **The label's roast date is read**: `roastDateFromLabel` puts ISO in the form, or leaves it empty with
+  the label's wording beside it. `noUnusedLocals` is on.
+- **`myBrewerFor` is wired into `openingBrew`**, and dose/ratio/water now open consistent: with your
+  dose, their ratio sets the water.
+- A failed suggestion writes only `suggested_error`; the search's automatic suggestion gets only the
+  time left in the function. Photos are signed in one batch; pollers pass `?photo=0`.
 
 ## Traps specific to this app
 
-- **An empty result and an unread result must not render the same.** **Five times now** — the fifth
-  was the search itself, fixed above. **Adding a read path here? Check this first.**
-- **A bag needs a purchase date, and the error names it.** That empty field sent `{}` and the page
-  said "Couldn't save that bag" about a bag saved minutes earlier. `lib/patch.ts` holds both halves.
+- **An empty result and an unread result must not render the same.** It has recurred in this app more
+  than any other defect — the library, the brews list, the previous-purchase lookup, the search
+  itself, the label date. **Adding a read path here? Check this first.**
+- **`guide_search_error` holds two things, told apart by `guide_status`/`guide_fetched_at`.** Beside
+  a fresh answer it is a warning; with no new answer it is the failure. Read both before showing it.
+- **The reached-host anchor has never met a real response.** If the `_20260209` tools' results do not
+  arrive as `web_fetch_tool_result` / `web_search_tool_result` blocks, every guide becomes
+  "No Recipe Found", dropped for "never reached". TEC-58 is the check.
+- **`maxDuration = 300` in `app/api/search/route.ts` is a literal** (Next reads it statically) and must
+  equal `SEARCH_STALE_MS`. Change one, change both.
 - **Neither model call can be exercised from a Claude Code sandbox** — roaster domains are blocked by
   the egress proxy and the suggestion needs a real key. **Do not conclude either works because the
   tests pass.**
-- **`product_url` is stored having never been read**, on a `none` as much as on a hit — never
-  quote-backed, never host-checked, and `Beans ↗` links it straight out. Maria Gutierrez holds
-  `/products/maria-gutierrez` where Sweet Bloom's verified shape is `/product/…-3/`. **Open, and
-  Joel's**: he accepted a link failing because a roaster moved it, which is not one we invented.
-- **Two brewer vocabularies; `myBrewerFor` crosses only on an exact match.** A bare "V60" does not
-  map — two are on the shelf and the roaster did not say which. Rounding is the same invention.
+- **`parseRatio` reads larger over smaller**: "16:1" and "1:16" are both 16, and "2:1" is 2.
+- **A bag needs a purchase date, and the error names it.** `lib/patch.ts` holds both halves.
+- **`product_url` is still never quote-backed.** It is cleared when its fetch fails in a run, but a
+  page the model names and nobody fetched is stored as named, and `Beans ↗` links it straight out.
+- **Two brewer vocabularies; `myBrewerFor` crosses only on an exact match.** A bare "V60" does not map.
 - **A date input on iOS sets its own minimum width**, turned off in `globals.css`.
-- **The icon is a pour-over in the JPS livery**, every colour a token, **no alpha**. **A static
-  import**, from `/_next/static` — the one prefix middleware excludes.
+- **The icon is a pour-over in the JPS livery**, every colour a token, **no alpha**, **a static
+  import** from `/_next/static` — the one prefix middleware excludes.
 - **"Beans ↗" is a *sibling* of the expand toggle** — an `<a>` in a `<button>` is invalid markup.
 - **`guide_status` records where instructions were read, not who they were written for**, so nothing
-  ranks or filters on tier 1. **The Sweet Bloom example `RULES.md` gives for it is wrong** — Next 1.
-
-## In flight
-
-**`claude/coffee-search-reads-the-product-page`** — the 2026-09-22 change above. Suite, build and
-drift clean; no migration, nothing shared touched. **Pull request opened at Joel's close-out**, so
-only the TD's merge is left. Nothing else of mine is open; the rest are merged and off the remote.
-
-## Next
-
-1. **`RULES.md` §2 is wrong about Sweet Bloom, and our own data says so.** It has them printing one
-   house recipe — "1:17, 900µm, 2:40" — on every product page, and builds the tier-1 caveat on that.
-   The Jhonny Alvarado row we actually retrieved reads 18g / 305g / **850µm / 23-25s**. Joel,
-   2026-09-22: *"Sweetbloom dials their recipes for all their beans."* **A charter is not this
-   agent's to edit** — the TD drafts and Joel approves. Proposed, not made.
-2. **The unpinned search has never run against a real bag.** Maria Gutierrez is the test: it went
-   `none` while pinned, and the roaster publishes a recipe for it.
-3. **Still open**: one coffee twice, Haiku then Sonnet 5 at `high`, compare the tiers; and the
-   suggestion has still never run against a real bag either.
+  ranks or filters on tier 1.

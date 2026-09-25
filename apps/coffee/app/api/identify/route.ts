@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { identifyBag } from "@/lib/anthropic";
-import { IMAGE_TYPES } from "@/lib/storage";
+import { isImageType } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   if (!(photo instanceof File)) {
     return NextResponse.json({ error: "Attach a photo of the bag." }, { status: 400 });
   }
-  if (!IMAGE_TYPES.includes(photo.type)) {
+  if (!isImageType(photo.type)) {
     return NextResponse.json(
       { error: `${photo.type || "That file"} isn't a supported image. Use JPEG, PNG, WebP or GIF.` },
       { status: 415 }

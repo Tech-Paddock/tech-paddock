@@ -92,7 +92,15 @@ export function coerceSuggestion(raw: unknown, model: string, now: Date = new Da
  * the database, so it is the one place a widening mistake would have to pass
  * through.
  */
-export function suggestionColumns(suggestion: Suggestion | null, error: string | null = null) {
+export function suggestionColumns(
+  suggestion: Suggestion | null,
+  error: string | null = null
+): { suggested_recipe?: Suggestion | null; suggested_error: string | null } {
+  // **A failure writes only the failure.** Until 2026-09-25 it wrote
+  // `suggested_recipe: null` as well, so a failed "Ask again" deleted the good
+  // suggestion it was asked to replace. The recipe column is now touched only
+  // by a suggestion that exists.
+  if (!suggestion && error) return { suggested_error: error };
   return {
     suggested_recipe: suggestion,
     suggested_error: error,

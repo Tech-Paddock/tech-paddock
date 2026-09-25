@@ -1,9 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { BREW_METHODS } from "./methods";
-import { validateGuide, type Guide, type RawGuide } from "./guide";
 import { coerceSuggestion, type Suggestion } from "./suggestion";
 import { SEARCH_MODELS, DEFAULT_SEARCH_MODEL, isEffortFor, type SearchModel } from "./models";
-import { toolErrorsIn, unearnedNone } from "./searchRun";
+import { concludeSearch, readTurn, SearchFailed, type ResultBlock, type SearchOutcome } from "./searchRun";
+import { SEARCH_BUDGET_MS } from "./searchClock";
 
 /**
  * Reading a label is transcription and it is already fast, so it stays on the
@@ -48,7 +48,10 @@ const IDENTITY_SCHEMA = {
  * the right setting and keeps the round trip short while you're standing in
  * a kitchen holding the bag.
  */
-export async function identifyBag(image: { media_type: string; data: string }): Promise<BagIdentity> {
+export async function identifyBag(image: {
+  media_type: Anthropic.Base64ImageSource["media_type"];
+  data: string;
+}): Promise<BagIdentity> {
   const response = await getClient().messages.create({
     model: IDENTIFY_MODEL,
     max_tokens: 1024,
@@ -64,7 +67,7 @@ export async function identifyBag(image: { media_type: string; data: string }): 
       {
         role: "user",
         content: [
-          { type: "image", source: { type: "base64", ...image } as never },
+          { type: "image", source: { type: "base64", ...image } },
           {
             type: "text",
             text: "Read this coffee bag. Return the roaster, the coffee name, and the origin, process, varietal and roast date if printed.",
@@ -72,9 +75,9 @@ export async function identifyBag(image: { media_type: string; data: string }): 
         ],
       },
     ],
-  } as never);
+  });
 
-  const text = (response as { content: { type: string; text?: string }[] }).content.find((b) => b.type === "text");
+  const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
   try {
     return JSON.parse(text?.text ?? "{}") as BagIdentity;
   } catch {
@@ -140,14 +143,14 @@ export async function searchBrewGuide(params: {
   productUrl?: string | null;
   model?: SearchModel;
   effort?: string | null;
-}): Promise<Guide> {
+}): Promise<SearchOutcome> {
   const model = params.model ?? DEFAULT_SEARCH_MODEL;
   const spec = SEARCH_MODELS[model];
   // Only a level this model accepts is sent. Anything else is dropped rather
   // than passed through, because the request would fail rather than degrade.
   const effort = isEffortFor(model, params.effort) ? params.effort : null;
 
-  const tools: Record<string, unknown>[] = [
+  const tools: Anthropic.ToolUnion[] = [
     { type: spec.search, name: "web_search", max_uses: 6 },
     { type: spec.fetch, name: "web_fetch", max_uses: 6 },
   ];
@@ -158,7 +161,7 @@ export async function searchBrewGuide(params: {
   // about the bag that is present or absent, not a second mode of searching:
   // a prompt that branched would make a re-search a different process from the
   // first search, which is the thing Joel ruled out on 2026-09-22.
-  const messages: Record<string, unknown>[] = [
+  const messages: Anthropic.MessageParam[] = [
     {
       role: "user",
       content:
@@ -179,73 +182,84 @@ export async function searchBrewGuide(params: {
     },
   ];
 
-  let raw = "";
-  let answered = false;
-  const toolErrors: string[] = [];
+  // The search's own clock, inside the route's `maxDuration` — see
+  // `lib/searchClock.ts`. It spans every resumed turn, so ten turns cannot add
+  // up to more time than the platform will give the function.
+  const deadline = AbortSignal.timeout(SEARCH_BUDGET_MS);
+
+  // Every block of every turn: the tool results are the evidence of what the
+  // run did, and `concludeSearch` reads them rather than the answer's word.
+  const blocks: ResultBlock[] = [];
+  let text: string | null = null;
+
   // Server tools can end a turn with stop_reason "pause_turn" rather than a
   // result. Resume by handing the paused turn back; without this the answer is
   // silently truncated instead of erroring. Ten, because ten is where the
   // server's own sampling loop pauses — a lower cap here just cuts off a search
   // that was still working.
   for (let i = 0; i < 10; i++) {
-    const response = (await getClient().messages.create({
+    const request: Anthropic.MessageCreateParamsNonStreaming = {
       model,
-      max_tokens: 8192,
+      max_tokens: searchMaxTokens(effort),
       // Omitted rather than defaulted for a model that has no effort control:
       // sending it anyway is a 400, not a no-op.
       ...(effort ? { output_config: { effort } } : {}),
+      // Each resume re-sends the whole conversation, fetched pages included.
+      // Caching the prefix makes a resume pay for what is new rather than for
+      // everything read so far. Top-level, so the breakpoint moves to the end
+      // of the conversation on each turn by itself.
+      cache_control: { type: "ephemeral" },
       system: SEARCH_SYSTEM,
       tools,
       messages,
-    } as never)) as { stop_reason: string; content: { type: string; text?: string; content?: unknown }[] };
+    };
 
-    toolErrors.push(...toolErrorsIn(response.content));
+    let response: Anthropic.Message;
+    try {
+      response = await getClient().messages.create(request, { signal: deadline });
+    } catch (error) {
+      if (deadline.aborted) {
+        throw new SearchFailed(
+          `The search was still working after ${Math.round(SEARCH_BUDGET_MS / 1000)} seconds and was stopped before it answered.`
+        );
+      }
+      throw error;
+    }
 
-    if (response.stop_reason === "pause_turn") {
+    blocks.push(...(response.content as ResultBlock[]));
+
+    const turn = readTurn(response as { stop_reason: string | null; content: ResultBlock[] });
+    if (turn.resume) {
       messages.push({ role: "assistant", content: response.content });
       continue;
     }
-    raw = response.content
-      .filter((b) => b.type === "text")
-      .map((b) => b.text ?? "")
-      .join("\n");
-    answered = true;
+    text = turn.text;
     break;
   }
 
   // Running out of resumes is not an answer. Left as it was, the empty string
   // parsed to {} and came out as a confident tier-3 `none` — a search that was
   // cut off mid-flight, recorded as "this roaster publishes nothing".
-  if (!answered) {
-    throw new Error("The search was still working after 10 turns and was stopped before it answered.");
+  if (text === null) {
+    throw new SearchFailed("The search was still working after 10 turns and was stopped before it answered.");
   }
 
-  const guide = validateGuide(parseGuideJson(raw), null);
-
-  // A `none` reached past a tool that failed is not an answer about the
-  // roaster. Thrown rather than returned, so the route records why on the row
-  // and leaves the bag's guide untouched — the rule itself is in
-  // `lib/searchRun.ts`, where it can be tested without an API call.
-  const unearned = unearnedNone(guide.status, toolErrors);
-  if (unearned) throw new Error(unearned);
-
-  return guide;
+  // Validation, the tool failures and the stale link are all decided in
+  // `lib/searchRun.ts`, where they can be tested without an API call. A `none`
+  // the run could not earn is thrown from there, so the route records why on
+  // the row and leaves the bag's guide untouched.
+  return concludeSearch(text, blocks);
 }
 
-/** The model is asked for bare JSON but answers after a search narrative often enough to matter. */
-function parseGuideJson(text: string): RawGuide {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidates = [fenced?.[1], text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1), text];
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    try {
-      const parsed = JSON.parse(candidate.trim());
-      if (parsed && typeof parsed === "object") return parsed as RawGuide;
-    } catch {
-      // Try the next shape.
-    }
-  }
-  return {};
+/**
+ * Room for the answer. At `xhigh` and `max` the model thinks more, and the
+ * thinking comes out of this same budget — 8192 left a long search able to
+ * spend its whole allowance thinking and stop at `max_tokens` before it wrote
+ * the JSON. 16000 stays under the SDK's non-streaming ceiling (about 21,000),
+ * past which it refuses the request and demands streaming.
+ */
+function searchMaxTokens(effort: string | null): number {
+  return effort === "xhigh" || effort === "max" ? 16_000 : 8192;
 }
 
 export const METHOD_VOCABULARY = BREW_METHODS;
@@ -323,7 +337,7 @@ export async function suggestRecipe(bag: {
   process?: string | null;
   varietal?: string | null;
   roastDate?: string | null;
-}): Promise<Suggestion | null> {
+}, signal?: AbortSignal): Promise<Suggestion | null> {
   const known = [
     `Roaster: ${bag.roaster}`,
     `Coffee: ${bag.coffeeName}`,
@@ -350,9 +364,9 @@ export async function suggestRecipe(bag: {
           `Suggest a starting point for brewing it.`,
       },
     ],
-  } as never);
+  }, { signal });
 
-  const text = (response as { content: { type: string; text?: string }[] }).content.find((b) => b.type === "text");
+  const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
   let raw: unknown = null;
   try {
     raw = JSON.parse(text?.text ?? "null");

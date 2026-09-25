@@ -43,14 +43,26 @@ export type Guide = {
   dropped: { field: GuideField; value: string; reason: string }[];
 };
 
-function host(url: string | null | undefined): string | null {
-  if (!url) return null;
+/**
+ * A web page's host, `www.` stripped and lowercased, or null.
+ *
+ * **Only `http:` and `https:` are pages.** `new URL("javascript:alert(1)")`
+ * parses without complaint, and a URL this app stores is one it links
+ * straight out to — so anything but a web address is not a page, whatever the
+ * model called it.
+ */
+export function webHost(url: string | null | undefined): string | null {
+  if (typeof url !== "string" || !url.trim()) return null;
   try {
-    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    const parsed = new URL(url.trim());
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.hostname.replace(/^www\./, "").toLowerCase() || null;
   } catch {
     return null;
   }
 }
+
+const host = webHost;
 
 /** Same registrable site, so "sweetbloomcoffee.com" covers "shop.sweetbloomcoffee.com". */
 function sameSite(a: string | null, b: string | null): boolean {
@@ -68,9 +80,11 @@ function sameSite(a: string | null, b: string | null): boolean {
  * find anything is a separate question, and `lib/searchRun.ts` answers it
  * before the answer is allowed anywhere near the row.
  */
-export function validateGuide(raw: RawGuide, roasterDomain?: string | null): Guide {
-  const productUrl = typeof raw.product_url === "string" && raw.product_url ? raw.product_url : null;
-  const guideUrl = typeof raw.guide_url === "string" && raw.guide_url ? raw.guide_url : null;
+export function validateGuide(raw: RawGuide, reachedHosts: readonly string[]): Guide {
+  // A URL that is not a web page is no URL at all: it is neither stored nor
+  // accepted as the page a quote was read on.
+  const productUrl = host(raw.product_url) ? (raw.product_url as string).trim() : null;
+  const guideUrl = host(raw.guide_url) ? (raw.guide_url as string).trim() : null;
   const dropped: Guide["dropped"] = [];
 
   const readable = new Set([productUrl, guideUrl].filter(Boolean) as string[]);
@@ -118,15 +132,33 @@ export function validateGuide(raw: RawGuide, roasterDomain?: string | null): Gui
   }
 
   // Tier 2 is "the roaster's own site only", and since 2026-09-22 this is the
-  // whole of that constraint rather than a re-check behind one: the search is
-  // no longer pinned to a domain up front. `roasterDomain` stays as the way a
-  // caller can name the anchor; with none, the anchor is the product page the
-  // model itself reported, which is what every first search has always used.
-  const domain = roasterDomain ? host(`https://${roasterDomain.replace(/^https?:\/\//, "")}`) : null;
+  // whole of that constraint: nothing is pinned up front. Until 2026-09-25 it
+  // was anchored on the product URL the model *reported*, and with no product
+  // URL there was no check at all — a guide read off a blog, with no product
+  // page named, went straight through.
+  //
+  // Two things have to hold now, and neither rests on the model's word alone:
+  //
+  // - **There is a product page on a real web host.** The roaster's site is
+  //   the site this coffee is sold on; with no product page nothing says
+  //   whose site the guide was read on.
+  // - **The guide was read on a host this run actually reached** — one the
+  //   fetch tool returned or the search tool listed, taken off the response
+  //   blocks by `lib/searchRun.ts` rather than off the answer — and it is the
+  //   same site as the product page. A retailer selling the coffee is a
+  //   different site from the roaster's, so it fails even when it was reached.
+  const productHost = host(productUrl);
   const guideHost = host(guideUrl);
-  const anchor = domain ?? host(productUrl);
+  const reached = reachedHosts.map((h) => host(`https://${h.replace(/^https?:\/\//, "")}`));
+  const refusal = !productHost
+    ? "no product page was named, so nothing says whose site this is"
+    : !sameSite(guideHost, productHost)
+      ? `read from ${guideHost ?? "an unknown host"}, not the roaster's site`
+      : !reached.some((h) => sameSite(guideHost, h))
+        ? `read from ${guideHost}, which this search never reached`
+        : null;
 
-  if (anchor && !sameSite(guideHost, anchor)) {
+  if (refusal) {
     return {
       status: "none",
       product_url: productUrl,
@@ -139,7 +171,7 @@ export function validateGuide(raw: RawGuide, roasterDomain?: string | null): Gui
         ...GUIDE_FIELDS.filter((f) => backing.has(f)).map((field) => ({
           field,
           value: String(raw.params?.[field] ?? ""),
-          reason: `read from ${guideHost ?? "an unknown host"}, not the roaster's site`,
+          reason: refusal,
         })),
       ],
     };
