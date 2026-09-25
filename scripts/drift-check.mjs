@@ -518,7 +518,11 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
     // Tier 1 — auto-loaded into every session of every agent, so every line is paid
     // again forever. 400 was the target the compaction set; the file landed well
     // under it, so the ratchet came down to it with the ledger's retirement.
-    ["CLAUDE.md", 400],
+    // Raised to 450 on 2026-09-25 at Joel's call ("expand cap to 450"): #206 left the
+    // file at 398, and the next rule (TEC-45, what a Linear status means and when
+    // Joel is assigned) binds every agent, so it belongs here rather than in a charter.
+    // Raised in its own change, not the one that fills it.
+    ["CLAUDE.md", 450],
     // Read on demand rather than auto-loaded. Budgeted against growth, deliberately
     // loose: this tier is where reasoning goes when it leaves CLAUDE.md, so squeezing
     // it would defeat the compaction it exists to receive.
