@@ -71,6 +71,20 @@ refuses an issue without it or its labels. The next session acts on it without r
 an issue that needs the history to act on is a note, not a request. **Every agent edits Linear
 without asking Joel** (Joel, 2026-09-24); the hook still refuses an issue that breaks these rules.
 
+**A status means one thing, and whoever changes the work changes it** (Joel, 2026-09-25):
+
+| Status | Means |
+|---|---|
+| Backlog | parked, or waiting on another issue to land first |
+| Todo | ready to be worked, with a clear next step |
+| In Progress | an agent has committed work toward it — **a session only discussing it changes nothing** |
+| In Review | the branch is pushed and with Deployment: pull request, gate, merge |
+| Done | every Next step is done — the GitHub integration closes an issue whose pull request merges, so reopen it if steps remain |
+
+**Joel is the only assignee.** Assign him while a step waits on him — a decision, information or a
+dashboard action — and unassign him once his part is done. Agents are never assigned: they share one
+Linear user, so the `agent:` label names them.
+
 ### When a document reaches its cap
 
 Every ceiling lives in one place, the budget list in `scripts/drift-check.mjs`; the table above
