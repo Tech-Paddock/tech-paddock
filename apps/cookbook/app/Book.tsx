@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Provenance from "./Provenance";
+import Menu from "./Menu";
 import { useToast } from "./Toast";
 import { MACRO_KEYS, MACRO_LABELS, round, scale, type Macros } from "@/lib/macros";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
 import { methodSteps, perServing, type Recipe, type RecipeDraft, type RecipeOrigin } from "@/lib/recipes";
 import { MAX_FILE_BYTES, isFileMediaType, type RecipeFile } from "@/lib/upload";
+import { MAX_STEER, pileForAsk, turnDown, type TurnedDown } from "@/lib/reroll";
 import { downscale } from "@/lib/image";
 
 /**
@@ -95,7 +97,18 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   // that could not be read is a state, and it stays on screen while it is true.
   const [readError, setReadError] = useState<string | null>(null);
   const toast = useToast();
-  const [busy, setBusy] = useState<null | "drafting" | "keeping">(null);
+  const [busy, setBusy] = useState<null | "drafting" | "rerolling" | "keeping">(null);
+  // "Something else": the drafts turned down since this ask began, and why.
+  const [turnedDown, setTurnedDown] = useState<TurnedDown[]>([]);
+  const [steer, setSteer] = useState("");
+  // The brief the pile was built against; a different brief is a fresh ask.
+  const [pileBrief, setPileBrief] = useState("");
+
+  /** Bin it — a turn-down, the same as "Something else" (Joel, 2026-09-25). */
+  function binIt() {
+    if (draft?.origin === "generated") setTurnedDown(turnDown(turnedDown, draft));
+    setDraft(null);
+  }
   const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
 
   const [mode, setMode] = useState<Mode>("manual");
@@ -112,6 +125,21 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
+  // The recipe whose ingredients are on their way to the list, if any.
+  const [listing, setListing] = useState<string | null>(null);
+  // Bumped whenever the menu may have changed: a recipe added to the list, or
+  // one removed from the book (which takes it off the menu too).
+  const [menuVersion, setMenuVersion] = useState(0);
+
+  /** From the menu: open that recipe in the book and bring it into view. */
+  function openFromMenu(recipeId: string) {
+    setQuery("");
+    setOpenId(recipeId);
+    // After the render that clears the search and opens the card.
+    setTimeout(() => {
+      document.getElementById(`recipe-${recipeId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
 
   const load = useCallback(async () => {
     try {
@@ -131,9 +159,26 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     void load();
   }, [load]);
 
-  async function makeDraft() {
+  /**
+   * Draft one. **With `reroll`, it is "Something else"** (TEC-39 D): the draft on
+   * screen joins the pile turned down this session, and the same brief goes back
+   * with the whole pile and the optional reason, so the third reroll avoids both
+   * earlier ones. **Bin it turns a draft down too** (Joel, 2026-09-25), so a
+   * "Work it out" on the same brief after binning still avoids it; a new brief
+   * is a fresh ask and starts a new pile (`pileForAsk`). Nothing is saved until
+   * Keep it, and the pile is forgotten on leaving the page.
+   */
+  async function makeDraft(reroll = false) {
     if (busy) return;
-    setBusy("drafting");
+    setBusy(reroll ? "rerolling" : "drafting");
+
+    const pile: TurnedDown[] =
+      reroll && draft
+        ? turnDown(turnedDown, draft)
+        : mode === "generate"
+          ? pileForAsk(turnedDown, pileBrief, brief)
+          : [];
+
     try {
       const payload =
         mode === "manual"
@@ -146,7 +191,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               method,
             }
           : mode === "generate"
-            ? { mode, model, brief }
+            ? { mode, model, brief, turned_down: pile, steer: reroll ? steer : "" }
             : mode === "import"
               ? { mode, model, url }
               : { mode, model, file: file && { mediaType: file.mediaType, data: file.data } };
@@ -165,6 +210,11 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       // Every other path stops here and waits for Keep it.
       if (mode === "manual") await save(drafted);
       else setDraft(drafted);
+      // Only once the new draft is here: a reroll that failed leaves the draft
+      // you had on screen, and it has not been turned down yet.
+      setTurnedDown(pile);
+      setPileBrief(brief);
+      setSteer("");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't draft that.");
     } finally {
@@ -187,6 +237,9 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     const body = await response.json();
     if (!response.ok) throw new Error(body.error ?? "Couldn't save that.");
     setDraft(null);
+    // A kept recipe ends the search; the next ask starts with nothing to avoid.
+    setTurnedDown([]);
+    setSteer("");
     setName("");
     setServings("4");
     setIngredients("");
@@ -211,6 +264,10 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   }
 
   async function toList(recipe: Recipe) {
+    // One at a time. A second tap while the first is in flight used to put the
+    // ingredients on the list twice (TEC-29 item 8).
+    if (listing) return;
+    setListing(recipe.id);
     try {
       const response = await fetch("/api/recipes/grocery", {
         method: "POST",
@@ -219,10 +276,17 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't add those.");
-      toast.notice(`${body.added} ingredient${body.added === 1 ? "" : "s"} added to your list.`);
+      const count = `${body.added} ingredient${body.added === 1 ? "" : "s"}`;
+      // The lines landed either way; only the menu entry can have failed, and
+      // it is said so rather than hidden behind a success.
+      if (body.menu === false) toast.error(`${count} added to your list, but it couldn't go on the menu.`);
+      else toast.notice(`${count} added to your list, and "${recipe.name}" is on the menu.`);
       onAddedToList?.();
+      setMenuVersion((n) => n + 1);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't add those.");
+    } finally {
+      setListing(null);
     }
   }
 
@@ -236,6 +300,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't remove that.");
       toast.notice(`"${recipe.name}" is out of the book. Your list keeps anything you already added.`);
       await load();
+      setMenuVersion((n) => n + 1);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't remove that.");
     }
@@ -443,7 +508,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
 
         <button
           type="button"
-          onClick={makeDraft}
+          onClick={() => makeDraft()}
           disabled={!ready || busy !== null}
           className="rounded-lg bg-accent px-4 py-3 text-base font-semibold text-accent-ink disabled:opacity-50"
         >
@@ -499,19 +564,50 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
                 ) : null}
               </details>
             </div>
-            <footer className="flex gap-2 border-t border-line px-3 py-3">
+            {/* "Something else" only for a recipe Claude wrote: a page or a
+                file says what it says, and asking again would read the same. */}
+            {draft.origin === "generated" ? (
+              <div className="flex flex-col gap-1 border-t border-line px-3 pt-3">
+                <input
+                  value={steer}
+                  onChange={(e) => setSteer(e.target.value)}
+                  maxLength={MAX_STEER}
+                  placeholder="Not this because… (optional)"
+                  aria-label="Why not this one"
+                  className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+                />
+                {turnedDown.length > 0 ? (
+                  <p className="text-[11px] text-ink-soft">
+                    Steering clear of {turnedDown.map((d) => d.name).join(", ")}.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            <footer className="flex flex-wrap gap-2 border-t border-line px-3 py-3">
               <button
                 type="button"
-                onClick={() => setDraft(null)}
+                onClick={binIt}
                 className="rounded-lg border border-line px-3 py-2 text-sm"
               >
                 Bin it
               </button>
+              {draft.origin === "generated" ? (
+                <button
+                  type="button"
+                  onClick={() => makeDraft(true)}
+                  disabled={busy !== null}
+                  className="ml-auto rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50"
+                >
+                  {busy === "rerolling" ? "Thinking again…" : "Something else"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={keepIt}
                 disabled={busy !== null}
-                className="ml-auto rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
+                className={`${
+                  draft.origin === "generated" ? "" : "ml-auto "
+                }rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50`}
               >
                 {busy === "keeping" ? "Saving…" : "Keep it"}
               </button>
@@ -520,6 +616,11 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
         ) : null}
         </div>
       </section>
+
+      {/* On the menu, then the book: stacked on a phone, side by side on a wide
+          screen with the menu on the left (Joel, 2026-09-24, TEC-39 C). */}
+      <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start lg:gap-6">
+      <Menu recipes={recipes} version={menuVersion} onOpen={openFromMenu} />
 
       {/* ------------------------------------------------------------------ */}
       {/* The book, under the form now. It is still the reason you came.     */}
@@ -568,6 +669,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
                 recipe={recipe}
                 open={openId === recipe.id}
                 onToggle={() => setOpenId(openId === recipe.id ? null : recipe.id)}
+                listing={listing === recipe.id}
                 onList={() => toList(recipe)}
                 onRemove={() => remove(recipe)}
               />
@@ -575,7 +677,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
           </ul>
         )}
       </section>
-
+      </div>
     </div>
   );
 }
@@ -583,23 +685,29 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
 function RecipeCard({
   recipe,
   open,
+  listing,
   onToggle,
   onList,
   onRemove,
 }: {
   recipe: Recipe;
   open: boolean;
+  listing: boolean;
   onToggle: () => void;
   onList: () => void;
   onRemove: () => void;
 }) {
   const [count, setCount] = useState("1");
+  // **Remove asks first** (TEC-29 item 8): it is permanent, and it sat one tap
+  // from Add to list.
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const serving = perServing(recipe);
   const helpings = Number(count);
   const priced = Number.isFinite(helpings) && helpings > 0 ? scale(serving, helpings) : null;
 
   return (
-    <li className="rounded-lg border border-line bg-surface">
+    // The id is what "On the menu" scrolls to.
+    <li id={`recipe-${recipe.id}`} className="scroll-mt-4 rounded-lg border border-line bg-surface">
       {/* **A lean pill: the name gives way, the facts do not.** `truncate` rather
           than a character count — a count that fits a laptop overflows a phone,
           and this is mostly a phone object. `min-w-0` is what lets the name
@@ -647,10 +755,9 @@ function RecipeCard({
 
           {/* **Pricing helpings, and deliberately not logging them.**
               Multiplying a stored serving is arithmetic in this browser — no
-              model, no request, nothing written. Handing the result to whatever
-              records what you ate is a cross-app contract and it belongs to the
-              technical director (ledger item 22). Building a write here would be
-              inventing that contract by shipping one. */}
+              model, no request, nothing written. Logging what you ate is
+              Health's: it reads `GET /api/servings` under the contract in
+              `RULES.md` (TEC-11), and this app never writes a log. */}
           <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -673,18 +780,40 @@ function RecipeCard({
             <button
               type="button"
               onClick={onList}
-              disabled={recipe.ingredients.length === 0}
+              disabled={recipe.ingredients.length === 0 || listing}
               className="ml-auto rounded border border-line px-3 py-1.5 text-sm disabled:opacity-50"
             >
-              Add to list
+              {listing ? "Adding…" : "Add to list"}
             </button>
-            <button
-              type="button"
-              onClick={onRemove}
-              className="rounded border border-line px-3 py-1.5 text-sm text-ink-soft"
-            >
-              Remove
-            </button>
+            {confirmingRemove ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmingRemove(false);
+                    onRemove();
+                  }}
+                  className="rounded border border-danger/60 px-3 py-1.5 text-sm text-danger"
+                >
+                  Remove — sure?
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingRemove(false)}
+                  className="rounded border border-line px-3 py-1.5 text-sm text-ink-soft"
+                >
+                  Keep it
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmingRemove(true)}
+                className="rounded border border-line px-3 py-1.5 text-sm text-ink-soft"
+              >
+                Remove
+              </button>
+            )}
           </div>
           <p className="text-[11px] text-ink-soft">
             Pricing helpings reads the numbers above and calls nothing. Removing takes the recipe out

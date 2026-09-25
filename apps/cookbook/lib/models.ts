@@ -46,13 +46,38 @@ export type ModelId = keyof typeof MODELS;
  * good one — and nothing a model produces is stored until you press Keep it.
  * Where the judgement is worth more than the latency, the picker on the screen
  * is right there.
- *
- * **No `effort` is ever sent, to either model.** Sonnet 5 accepts
- * `output_config.effort` and Haiku 4.5 rejects it outright, so the asymmetry is
- * real and the conservative path is to send neither. `effort` moving under
- * `output_config` has already caught this project once.
  */
 export const DEFAULT_MODEL: ModelId = "claude-haiku-4-5";
+
+export type Effort = "low" | "medium";
+
+/**
+ * What a request has to carry for this model: its output budget and its
+ * `output_config`.
+ *
+ * **The two models do not take the same request, and until 2026-09-25 this app
+ * pretended they did** (TEC-29 item 7). Sonnet 5 thinks by default — omitting
+ * `thinking` runs it adaptive — and at the API's default effort, `high`, so a
+ * 2,048-token budget that was generous for Haiku could be spent thinking before
+ * a word of JSON arrived. Haiku 4.5 has no thinking unless asked and **rejects
+ * `output_config.effort` with a 400**, but accepts `output_config.format`.
+ *
+ * So: Sonnet 5 gets an explicit effort and room to think; Haiku gets neither,
+ * and both get the schema when the caller has one. `effort` lives under
+ * `output_config` — it moving there caught this project once.
+ */
+export function requestShape(
+  model: ModelId,
+  opts: { maxTokens: number; effort: Effort; schema?: Record<string, unknown> }
+): { max_tokens: number; output_config?: Record<string, unknown> } {
+  const format = opts.schema ? { format: { type: "json_schema", schema: opts.schema } } : {};
+  if (model === "claude-sonnet-5") {
+    // Thinking tokens count against max_tokens. The headroom is for the
+    // thinking, not a bigger answer — the answer is the same JSON either way.
+    return { max_tokens: opts.maxTokens + 12000, output_config: { effort: opts.effort, ...format } };
+  }
+  return { max_tokens: opts.maxTokens, ...(opts.schema ? { output_config: format } : {}) };
+}
 
 export function isModelId(value: unknown): value is ModelId {
   return typeof value === "string" && value in MODELS;

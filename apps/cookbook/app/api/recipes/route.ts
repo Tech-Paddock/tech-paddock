@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listRecipes, saveRecipe, deleteRecipe, type RecipeDraft, type RecipeOrigin } from "@/lib/recipes";
-import { LookupError } from "@/lib/errors";
+import { errorResponse } from "@/lib/respond";
 import { parseMacros } from "@/lib/macros";
 import { MODELS, type ModelId } from "@/lib/models";
 
@@ -16,8 +16,7 @@ export async function GET() {
   try {
     return NextResponse.json({ recipes: await listRecipes() });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't read the book." }, { status: 500 });
+    return errorResponse(e, "Couldn't read the book.");
   }
 }
 
@@ -81,8 +80,7 @@ export async function POST(request: NextRequest) {
   try {
     return NextResponse.json({ recipe: await saveRecipe(draft) }, { status: 201 });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't save that recipe." }, { status: 500 });
+    return errorResponse(e, "Couldn't save that recipe.");
   }
 }
 
@@ -96,7 +94,6 @@ export async function DELETE(request: NextRequest) {
     await deleteRecipe(id);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't remove that recipe." }, { status: 500 });
+    return errorResponse(e, "Couldn't remove that recipe.");
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addItems, readList, removeItems, setChecked } from "@/lib/grocery";
-import { LookupError } from "@/lib/errors";
+import { addItems, readList, removeItems, setChecked, splitLine } from "@/lib/grocery";
+import { errorResponse } from "@/lib/respond";
 import { readPreferences, resolveLink } from "@/lib/preferences";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  *
  * This reads and writes `cookbook.grocery_items`. Health's `health.grocery_items`
  * is a different table belonging to a different app, and moving that one is the
- * technical director's (ledger item 23).
+ * technical director's (TEC-15).
  */
 
 /**
@@ -30,8 +30,7 @@ export async function GET() {
       items: items.map((item) => ({ ...item, ...resolveLink(item, preferences) })),
     });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't read the list." }, { status: 500 });
+    return errorResponse(e, "Couldn't read the list.");
   }
 }
 
@@ -47,11 +46,11 @@ export async function POST(request: NextRequest) {
   if (lines.length === 0) return NextResponse.json({ error: "Nothing to add." }, { status: 400 });
 
   try {
-    const items = await addItems(lines.map((name: string) => ({ name, source: "manual" as const })));
+    // "Milk — the small tin" is a name and a note; only the name is searched.
+    const items = await addItems(lines.map((line: string) => ({ ...splitLine(line), source: "manual" as const })));
     return NextResponse.json({ items }, { status: 201 });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't add that." }, { status: 500 });
+    return errorResponse(e, "Couldn't add that.");
   }
 }
 
@@ -73,8 +72,7 @@ export async function PATCH(request: NextRequest) {
     await setChecked(id, body.checked);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't tick that off." }, { status: 500 });
+    return errorResponse(e, "Couldn't tick that off.");
   }
 }
 
@@ -88,7 +86,6 @@ export async function DELETE(request: NextRequest) {
     await removeItems(ids);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't remove those." }, { status: 500 });
+    return errorResponse(e, "Couldn't remove those.");
   }
 }

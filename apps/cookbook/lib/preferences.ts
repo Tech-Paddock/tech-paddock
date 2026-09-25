@@ -5,17 +5,16 @@ import { searchFor, type GroceryItem } from "./grocery";
 /**
  * Remembered brands for the shopping list.
  *
- * **The link beside a line is a generic search until you have an opinion.** This
- * is where the opinions live: tap *milk* and land on the milk you actually buy,
- * rather than on a wall of every milk King Soopers sells.
+ * **A line's link is a generic search until you have an opinion.** This is where
+ * the opinions live: tap *milk* and land on the milk you actually buy, rather
+ * than on a wall of every milk King Soopers sells.
  *
- * **Three kinds, because "no brand" is a real answer and not a missing row.**
- * `product` is a page you pasted, `terms` is better words to search, and `plain`
- * is *search this the ordinary way* — which exists so a narrow phrase can
- * override a broad one. Joel's own case is the worked example: `milk` means
- * Fairlife 2%, `whole milk` means plain whole milk. Without `plain`, the only
- * way to stop `milk` reaching `whole milk` is to never write `milk` down, which
- * is the version that needs a row per wording.
+ * **Two kinds are written: `product`, a page you pasted, and `terms`, better
+ * words to search.** A third, `plain` — *search this the ordinary way*, so a
+ * narrow phrase could override a broad one — was dropped from the editor and
+ * from Paste a batch by Joel on 2026-09-24 (TEC-39). The enum and the database
+ * still hold it, and `resolveLink` still honours a row that has it, because
+ * dropping a value is a destructive change that zero rows did not justify.
  *
  * **Longest match wins.** `2 cups whole milk` contains both phrases; `whole
  * milk` is longer, so it decides. That one rule is what keeps the table the size
@@ -109,11 +108,9 @@ export type ResolvedLink = {
   /**
    * The preference that decided it, or null when nothing did.
    *
-   * **The whole row, not a summary of it**, so *remember* on a line that already
-   * has a brand opens the rule that is already deciding it. A summary meant the
-   * editor prefilled the line's own words — and saving that wrote a second,
-   * narrower row (`2 cups whole milk`) that shadowed the rule it was meant to
-   * edit. Everything here is already in the page: the link is the payload.
+   * The whole row, so anything on the list that wants to say which rule decided
+   * a line can. Nothing on a line shows it since 2026-09-24 (TEC-39): the name
+   * is the link, and remembering happens in Your brands.
    */
   via: Preference | null;
 };
@@ -180,15 +177,20 @@ export function readDraft(raw: unknown): { row: PreferenceDraft } | { error: str
   const phrase = typeof o.phrase === "string" ? o.phrase.trim().replace(/\s+/g, " ") : "";
   if (!phrase) return { error: "A preference needs a phrase to match on." };
 
+  // **`plain` is no longer written** (Joel, 2026-09-24, TEC-39): only *this
+  // exact product* and *better search words* remain, from the editor and from
+  // Paste a batch alike. The database still accepts `plain` and `resolveLink`
+  // still honours a row that has it; nothing here makes a new one.
   const kind = o.kind;
-  if (kind !== "product" && kind !== "terms" && kind !== "plain") {
-    return { error: `"${phrase}": kind must be product, terms or plain.` };
+  if (kind === "plain") {
+    return { error: `"${phrase}": plain is no longer a kind — use product or terms.` };
+  }
+  if (kind !== "product" && kind !== "terms") {
+    return { error: `"${phrase}": kind must be product or terms.` };
   }
 
   const url = typeof o.url === "string" ? o.url.trim() : "";
   const terms = typeof o.terms === "string" ? o.terms.trim().replace(/\s+/g, " ") : "";
-  const brand = typeof o.brand === "string" ? o.brand.trim() : "";
-  const note = typeof o.note === "string" ? o.note.trim() : "";
 
   if (kind === "product") {
     if (!url) return { error: `"${phrase}": a product preference needs a url.` };
@@ -203,16 +205,19 @@ export function readDraft(raw: unknown): { row: PreferenceDraft } | { error: str
     return { error: `"${phrase}": a terms preference needs the words to search.` };
   }
 
-  return {
-    row: {
-      phrase,
-      kind,
-      url: kind === "product" ? url : null,
-      terms: kind === "terms" ? terms : null,
-      brand: brand || null,
-      note: note || null,
-    },
+  const row: PreferenceDraft = {
+    phrase,
+    kind,
+    url: kind === "product" ? url : null,
+    terms: kind === "terms" ? terms : null,
   };
+  // **Only what was sent** (TEC-29 item 2). The editor sends no note, and a
+  // missing note used to become `null` and be written — so editing a brand
+  // deleted its note. A field left out now stays out of the write, and the row
+  // keeps what it had; a blank string still clears it on purpose.
+  if (typeof o.brand === "string") row.brand = o.brand.trim() || null;
+  if (typeof o.note === "string") row.note = o.note.trim() || null;
+  return { row };
 }
 
 /**

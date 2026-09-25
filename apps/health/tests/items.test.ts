@@ -118,7 +118,33 @@ describe("normalizeName", () => {
     expect(normalizeName("CFA #1")).not.toBe(normalizeName("Chick-fil-A #1"));
   });
 
-  it("folds punctuation, case and spacing", () => {
-    expect(normalizeName("  Ben & Jerry's   Half-Baked ")).toBe("ben and jerry s half baked");
+  it("folds punctuation, case and spacing, and an apostrophe joins rather than splits", () => {
+    // The possessive then folds like a plural, so "Jerry's" and "Jerrys" meet.
+    expect(normalizeName("  Ben & Jerry's   Half-Baked ")).toBe("ben and jerry half baked");
+    expect(normalizeName("Ben and Jerrys half baked")).toBe(normalizeName("Ben & Jerry's Half-Baked"));
+  });
+
+  it("drops accents and keeps letters outside a–z", () => {
+    expect(normalizeName("Jalapeño Poppers")).toBe(normalizeName("jalapeno popper"));
+    expect(normalizeName("Crème brûlée")).toBe("creme brulee");
+    expect(normalizeName("Öl")).not.toBe("");
+  });
+
+  it("folds simple plurals so one food is one key", () => {
+    expect(normalizeName("Large Fries")).toBe(normalizeName("Large Fry"));
+    expect(normalizeName("Chocolate chip cookies")).toBe(normalizeName("chocolate chip cookie"));
+    expect(normalizeName("Two sandwiches")).toBe(normalizeName("2 sandwich"));
+    expect(normalizeName("Baked potatoes")).toBe(normalizeName("baked potato"));
+    expect(normalizeName("Pies")).toBe(normalizeName("pie"));
+  });
+
+  it("leaves words that only look plural alone", () => {
+    expect(normalizeName("Hummus")).toBe("hummus");
+    expect(normalizeName("Swiss cheese")).toBe("swiss cheese");
+    expect(normalizeName("Large Fries")).not.toBe(normalizeName("Medium Fries"));
+  });
+
+  it("is empty for a name with nothing in it, which the routes refuse", () => {
+    expect(normalizeName(" !!! ")).toBe("");
   });
 });

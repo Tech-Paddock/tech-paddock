@@ -17,7 +17,7 @@ import type { Livery } from "./theme";
  * of one flagged one.
  *
  * The fix is TechPad Gen's: a sixth and seventh livery, or a deliberate rule
- * that some apps share. It is on the ledger rather than left in this comment.
+ * that some apps share. It is TEC-12 in Linear rather than left in this comment.
  * Scaffolding did not wait on it, per the rule that says duplicate the pattern
  * locally and name it rather than blocking on the theme owner.
  */

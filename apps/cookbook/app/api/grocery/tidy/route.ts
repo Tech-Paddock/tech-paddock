@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tidyList } from "@/lib/anthropic";
 import { applyTidy, readList, validateTidy, type TidyLine } from "@/lib/grocery";
-import { LookupError } from "@/lib/errors";
+import { statusOf } from "@/lib/errors";
+import { errorResponse } from "@/lib/respond";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,10 @@ export async function POST() {
 
     return NextResponse.json({ open, lines });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
+    // A model that answered with nothing usable throws a plain Error, and its own
+    // sentence says more than a fallback would. Typed failures map as they do
+    // everywhere else (lib/errors.ts).
+    if (statusOf(e) !== 500) return errorResponse(e, "");
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Couldn't work out a tidier list." },
       { status: 500 }
@@ -83,7 +87,6 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ items: await applyTidy(open, lines) });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't apply that." }, { status: 500 });
+    return errorResponse(e, "Couldn't apply that.");
   }
 }

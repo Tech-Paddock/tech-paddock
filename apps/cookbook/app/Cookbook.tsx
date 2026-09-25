@@ -4,23 +4,24 @@ import { useState } from "react";
 import Book from "./Book";
 import List from "./List";
 import { ToastProvider } from "./Toast";
+import { TABS, pathFor, type Tab } from "@/lib/tabs";
 
 /**
  * The two tabs, and the one piece of state they share.
  *
- * **Tabs, and that is a reversal.** This app shipped as *site* — a thin index by
- * verb over one long page — and `SURFACE.md` still uses it as that rule's worked
- * example. Joel asked for tabs on 2026-09-22 after living with the page: adding a
- * recipe and shopping are different errands minutes apart, and scrolling past the
- * whole book to reach the list stopped being cheaper than a tap. **`SURFACE.md`
- * and `CLAUDE.md` are the technical director's to bring in line** — the note is in
- * this seat's `HANDOFF.md` and went to Joel to route. Until then this component is
- * deliberately the only place the contradiction lives, rather than being spread
- * through the app where it would be harder to undo.
+ * **Tabs are the verb index.** The surface is *site*, settled at standup on
+ * 2026-09-20, and its tabs are that index, one verb each: the technical
+ * director's ruling on 2026-09-24, after Joel asked for tabs on 2026-09-22.
+ * Adding a recipe and shopping are different errands minutes apart, and scrolling
+ * past the whole book to reach the list stopped being cheaper than a tap.
  *
- * **Still one route.** Tabs here are state, not navigation: no router, no URL to
- * get out of step with what is on screen, and a reload lands you back on the book.
- * That keeps the reversal to what Joel actually asked for.
+ * **Each tab has an address** since TEC-22: `/` is the book and `/list` is the
+ * list, which Health's `/list` redirects onto while the list moves here. Switching
+ * tabs replaces the address rather than navigating, so nothing is re-rendered
+ * from the server and nothing on screen is thrown away — and a reload, a bookmark
+ * or a shared link lands on the tab it names. **Replaced, not pushed**: a tab is
+ * a view of one page, and Back should leave the app rather than walk you back
+ * through every tab you glanced at.
  *
  * Adding a recipe's ingredients to the list happens in the book and shows up in
  * the list, so something has to own the fact that the list is now stale. A counter
@@ -28,18 +29,20 @@ import { ToastProvider } from "./Toast";
  * components fetching their own data and neither one holding the other's.
  */
 
-type Tab = "recipes" | "shop";
+export type { Tab };
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "recipes", label: "Recipes" },
-  // Named for where it actually goes. Every link on it is a King Soopers search,
-  // so "Shopping list" was one word vaguer than the thing deserves.
-  { id: "shop", label: "King Soopers list" },
-];
-
-export default function Cookbook() {
-  const [tab, setTab] = useState<Tab>("recipes");
+export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab }) {
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [listVersion, setListVersion] = useState(0);
+
+  function choose(next: Tab) {
+    setTab(next);
+    const path = pathFor(next);
+    // Only the path changes. Any query string — the hub framing this page — stays.
+    if (window.location.pathname !== path) {
+      window.history.replaceState(null, "", path + window.location.search);
+    }
+  }
 
   return (
     <ToastProvider>
@@ -53,7 +56,7 @@ export default function Cookbook() {
               id={`tab-${t.id}`}
               aria-selected={tab === t.id}
               aria-controls={`panel-${t.id}`}
-              onClick={() => setTab(t.id)}
+              onClick={() => choose(t.id)}
               className={`flex-1 rounded px-3 py-2 text-sm ${
                 tab === t.id ? "bg-accent font-semibold text-accent-ink" : "text-ink-soft"
               }`}
@@ -72,7 +75,9 @@ export default function Cookbook() {
           <Book onAddedToList={() => setListVersion((n) => n + 1)} />
         </div>
         <div role="tabpanel" id="panel-shop" aria-labelledby="tab-shop" hidden={tab !== "shop"}>
-          <List refreshKey={listVersion} />
+          <div className="mx-auto w-full max-w-2xl">
+            <List refreshKey={listVersion} />
+          </div>
         </div>
       </div>
     </ToastProvider>

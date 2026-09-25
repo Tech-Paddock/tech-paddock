@@ -135,10 +135,10 @@ PostgREST reloaded and logged `Schema cache loaded 8 Relations`, one more than b
 **Checking it without dashboard access.** `postgrest_logs` reports the relation count on every
 reload; if it is short of the tables you expect exposed, one schema is off the list. Or find a
 real request in `edge_logs`: **`health` was proven exposed on 2026-09-24 that way**, by a 200 on
-`/rest/v1/entries`. **Health's and Cookbook's `/api/health` cannot answer this question.** Both
-probe with `rpc("version")`, which resolves to `health.version()` or `cookbook.version()`; no app
-schema holds any function, so the probe fails whether or not the schema is exposed. The fix, a
-real table read like Coffee's and Resume's, is filed with those agents.
+`/rest/v1/entries`. Or read each app's `/api/health`: every one now probes with a real table read
+(Health `items`, Cookbook `recipes`, as Coffee and Resume already did), so a 200 there means its
+schema is exposed. They used to call `rpc("version")`, which no app schema defines, so that probe
+failed whether or not the schema was exposed (TEC-29, TEC-30).
 
 ## `shared.contacts` — the write contract
 
