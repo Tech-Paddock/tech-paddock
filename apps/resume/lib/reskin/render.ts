@@ -395,7 +395,7 @@ function renderCompetenciesParagraphs(
       rewritten.set(idx, null);
       log.push({
         section: "Core Competencies",
-        action: "trimmed-surplus",
+        action: "template-trimmed",
         detail: `Template line ${i + 1} dropped — no matching input row.`,
       });
       return;
@@ -457,7 +457,7 @@ function renderCompetenciesTable(
       } else if (i < rows.length) {
         log.push({
           section: "Core Competencies",
-          action: "trimmed-surplus",
+          action: "template-trimmed",
           detail: `Template row ${i + 1} dropped — no matching input row.`,
         });
       } else {
@@ -513,7 +513,7 @@ function renderExperience(
   if (interiorBlanks > 0) {
     log.push({
       section: "Professional Experience",
-      action: "trimmed-surplus",
+      action: "template-trimmed",
       detail: `Dropped ${interiorBlanks} blank line(s) between entries — spacing comes from each header's own paragraph spacing.`,
     });
   }
@@ -554,7 +554,7 @@ function renderExperience(
     } else if (i < entries.length) {
       log.push({
         section: "Professional Experience",
-        action: "trimmed-surplus",
+        action: "template-trimmed",
         detail: `Template entry ${i + 1} dropped — no matching job in the input.`,
       });
     } else {
@@ -637,7 +637,7 @@ function renderEntry(
     } else if (i < entry.bulletIdxs.length) {
       log.push({
         section: "Professional Experience",
-        action: "trimmed-surplus",
+        action: "template-trimmed",
         detail: `${input.company}: template bullet ${i + 1} dropped — no matching input bullet.`,
       });
     } else if (bulletTemplateRaw) {
@@ -646,6 +646,16 @@ function renderEntry(
         section: "Professional Experience",
         action: "cloned-overflow",
         detail: `${input.company}: bullet ${i + 1} cloned from the template's last bullet.`,
+      });
+    } else {
+      // The template's entry has no bullet to clone, so this one has nowhere to
+      // go. It used to fall out of the loop with nothing said; the content check
+      // would still have counted it missing, but the change log is where the
+      // reason lives.
+      log.push({
+        section: "Professional Experience",
+        action: "input-dropped",
+        detail: `${input.company}: bullet ${i + 1} dropped — the template's entry has no bullet to clone.`,
       });
     }
   }

@@ -101,7 +101,7 @@ describe("Core Competencies without a table", () => {
     );
     const lines = texts(blocks).filter((t) => /^[A-Z][a-z]+:/.test(t));
     expect(lines).toHaveLength(1);
-    expect(changeLog.some((c) => c.section === "Core Competencies" && c.action === "trimmed-surplus")).toBe(true);
+    expect(changeLog.some((c) => c.section === "Core Competencies" && c.action === "template-trimmed")).toBe(true);
   });
 
   /**
