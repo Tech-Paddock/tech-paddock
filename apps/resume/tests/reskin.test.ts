@@ -176,6 +176,50 @@ describe("reading the source document", () => {
     expect(entry).toMatchObject({ company: "Acme Corp", title: "Analyst", date: "Mar 2019 - 2021" });
   });
 
+  /**
+   * TEC-31. A heading the renderer had no section for did not end the section
+   * before it, so a Projects section after Experience was read as more jobs —
+   * and shipped in the output as a sixth employer.
+   */
+  describe("a source section the template has no place for", () => {
+    const H = '<w:b/><w:sz w:val="22"/>';
+    const body = (projectsHeading: string) =>
+      [
+        para(run("Professional Experience", H)),
+        para(run("Acme Corp", '<w:b/><w:sz w:val="21"/>') + TAB + run("Jan 2020 - Present", '<w:sz w:val="21"/>')),
+        para(run("Operations Analyst", '<w:i/><w:sz w:val="21"/>')),
+        para(run("Did a representative thing."), BULLET),
+        para(run(projectsHeading, H)),
+        para(run("Sample Project", '<w:b/><w:sz w:val="21"/>')),
+        para(run("Built a representative prototype."), BULLET),
+        para(run("Core Competencies", H)),
+        para(run("Systems: Alpha, Beta")),
+      ].join("");
+
+    it.each([
+      ["a heading the vocabulary knows but the template has no section for", "Projects"],
+      ["a heading the vocabulary does not know, found by its size", "Side Ventures"],
+    ])("stops at %s, and reports it", (_what, heading) => {
+      const content = extractSourceContent(splitBody(body(heading)));
+      expect(content.experience.map((e) => e.company)).toEqual(["Acme Corp"]);
+      expect(content.competencies).toEqual([{ label: "Systems", items: "Alpha, Beta" }]);
+      expect(content.unplacedSections).toEqual([{ heading, lines: 2 }]);
+    });
+
+    it("logs it as input with nowhere to go, which the verdict fails on", async () => {
+      const template = await loadDocx(fixture("template-flat-sample.docx"));
+      const { changeLog } = renderIntoTemplate(
+        splitBody(getBodyInner(template.documentXml).bodyInner),
+        extractSourceContent(splitBody(body("Projects")))
+      );
+      expect(changeLog).toContainEqual(expect.objectContaining({ section: "Projects", action: "input-dropped" }));
+    });
+
+    it("reports nothing on the repo's own source, which has no such section", async () => {
+      expect(extractSourceContent(splitBody(await bodyOf(SOURCE()))).unplacedSections).toBeUndefined();
+    });
+  });
+
   /** The other half of the `<w:tab>` trap: a tab *stop* is not text. */
   it("does not invent a tab from a paragraph's tab stops", () => {
     expect(extractText(para(run("Acme Corp"), TAB_STOP))).toBe("Acme Corp");

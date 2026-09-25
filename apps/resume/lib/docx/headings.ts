@@ -15,6 +15,78 @@ import type { Para } from "./paragraphs";
  * fix it once. It is one home now.
  */
 
+/** The sections the renderer knows how to fill or carry through. */
+export type SectionKey =
+  | "summary"
+  | "careerHighlights"
+  | "experience"
+  | "competencies"
+  | "education"
+  | "certifications"
+  | "hobbies";
+
+/**
+ * **The one heading vocabulary** — every heading text this app recognises, and
+ * the section each one opens.
+ *
+ * It was three lists: the renderer's aliases in `reskin/sections.ts`, the ATS
+ * lint's `KNOWN_HEADINGS`, and — by run shape rather than by text — the spec
+ * extractor's idea of what was not a heading. They had already disagreed: the
+ * lint knew "Projects" and the renderer did not, so a source's Projects section
+ * was read as more jobs under Experience.
+ *
+ * `null` is a heading a parser recognises that this template has no section
+ * for. It still ends the section before it — which is the point — and whatever
+ * sits under it is reported as not carried over rather than being folded into
+ * whatever came first.
+ */
+const SECTION_HEADINGS: Record<string, SectionKey | null> = {
+  summary: "summary",
+  "professional summary": "summary",
+  objective: "summary",
+  "career highlights": "careerHighlights",
+  highlights: "careerHighlights",
+  "professional experience": "experience",
+  experience: "experience",
+  "work experience": "experience",
+  employment: "experience",
+  "core competencies": "competencies",
+  skills: "competencies",
+  "technical skills": "competencies",
+  // "Education & Certifications" as one heading maps to education; the split
+  // headings each get their own section.
+  "education & certifications": "education",
+  "education and certifications": "education",
+  education: "education",
+  certifications: "certifications",
+  "certifications & licenses": "certifications",
+  "licenses & certifications": "certifications",
+  hobbies: "hobbies",
+  interests: "hobbies",
+  projects: null,
+  volunteer: null,
+};
+
+export function normalizeHeadingText(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, " ").replace(/:$/, "");
+}
+
+/** Own keys only: a paragraph reading "constructor" is not a heading. */
+const lookup = (text: string): SectionKey | null | undefined => {
+  const key = normalizeHeadingText(text);
+  return Object.prototype.hasOwnProperty.call(SECTION_HEADINGS, key) ? SECTION_HEADINGS[key] : undefined;
+};
+
+/** A heading a parser would recognise — the ATS lint's question, and the extractor's. */
+export function isKnownHeading(text: string): boolean {
+  return lookup(text) !== undefined;
+}
+
+/** The section a heading opens, or null for text that opens none this app fills. */
+export function sectionKeyOf(text: string): SectionKey | null {
+  return lookup(text) ?? null;
+}
+
 /**
  * A date range, in the shapes a resume writes one.
  *

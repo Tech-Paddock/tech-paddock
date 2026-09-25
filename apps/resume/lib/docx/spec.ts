@@ -1,6 +1,7 @@
 import type { DocxParts } from "./read";
 import type { Para, Run } from "./paragraphs";
 import { looksLikeContact } from "./label";
+import { isHeadingCandidate } from "./headings";
 
 /**
  * How one run of text is set.
@@ -157,7 +158,12 @@ export function extractSpec(parts: DocxParts, paras: Para[]): TemplateSpec {
   // heading size. Without excluding those, "the first paragraph at the heading
   // size" can be an employer rather than a heading — true today only because a
   // heading happens to come first in the document.
-  const headings = prose.filter((p) => p.size !== null && p.size / 2 === spec.headingSize && !isEntryLine(p));
+  // Whether a line could be a heading at all is `./headings`' question, the same
+  // one the lint and the outline ask. The run shape is kept as well, because it
+  // is what this file reads the trio's formatting from.
+  const headings = prose.filter(
+    (p) => p.size !== null && p.size / 2 === spec.headingSize && isHeadingCandidate(p) && !isTrioLine(p)
+  );
   if (headings.length > 0) spec.headingBold = headings[0].bold;
 
   // ——— Colour ———
@@ -199,7 +205,7 @@ export function extractSpec(parts: DocxParts, paras: Para[]): TemplateSpec {
   // The ranked size is the fallback, in place before anything is measured, so a
   // template with no entry line in it still renders the employer as it always has.
   spec.entry.company = { ...spec.entry.company, size: spec.entrySize };
-  const entryLine = prose.find(isEntryLine);
+  const entryLine = prose.find(isTrioLine);
   if (entryLine) {
     const runs = entryLine.runs.filter((r) => r.text.trim());
     const italic = runs.find((r) => r.italic);
@@ -262,8 +268,13 @@ const hexColor = (raw: string | null): string | null =>
   raw && /^[0-9A-Fa-f]{6}$/.test(raw) ? raw.toUpperCase() : null;
 
 /**
- * The employer / title / dates line, recognised by its shape rather than by
- * position or by matching a date.
+ * The employer / title / dates line, recognised by its run shape — which is
+ * where the trio's sizes and colours are read from.
+ *
+ * **Not `isEntryLine` from `./headings`, and deliberately named differently.**
+ * That one asks whether a line is a job (a date range makes one); this asks
+ * whether a line's runs are laid out so the trio's formatting can be read off
+ * them. Two functions of one name answering two questions was the drift.
  *
  * Three runs in one paragraph, the first bold and a later one italic, is what
  * every entry line in Joel's template looks like and what no heading, contact
@@ -271,7 +282,7 @@ const hexColor = (raw: string | null): string | null =>
  * sizes and colours are read from, and it has to be kept out of the heading
  * ranking, since its first run is set at the heading size.
  */
-export function isEntryLine(p: Para): boolean {
+export function isTrioLine(p: Para): boolean {
   if (p.listId || p.inTable) return false;
   const runs = p.runs.filter((r) => r.text.trim());
   return runs.length >= 2 && runs[0].bold && runs.slice(1).some((r) => r.italic);

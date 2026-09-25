@@ -93,6 +93,14 @@ export function renderIntoTemplate(
     }
   }
 
+  for (const u of content.unplacedSections ?? []) {
+    changeLog.push({
+      section: u.heading,
+      action: "input-dropped",
+      detail: `The source's "${u.heading}" section (${u.lines} ${u.lines === 1 ? "line" : "lines"}) has no section in the template, so it was not carried over. Add one to the template to keep it.`,
+    });
+  }
+
   return { blocks: [...output, ...tailBlocks], changeLog };
 }
 

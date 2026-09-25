@@ -1,62 +1,26 @@
 /**
- * Section names, normalised to a canonical key.
+ * Section names and entry-line parsing for the reskin engine.
  *
- * Matched by text rather than by Word style, because source resumes — Jobright's
- * output very much included — do not reliably use heading styles.
+ * **What is a heading is decided in `lib/docx/headings.ts`, and only there.**
+ * This file used to keep its own alias table and its own date range beside that
+ * file's, and the two had drifted. It reads from there now.
  */
 
-export type SectionKey =
-  | "summary"
-  | "careerHighlights"
-  | "experience"
-  | "competencies"
-  | "education"
-  | "certifications"
-  | "hobbies";
+import { DATE_RANGE, sectionKeyOf, type SectionKey } from "../docx/headings";
 
-const HEADER_ALIASES: Record<string, SectionKey> = {
-  summary: "summary",
-  "professional summary": "summary",
-  objective: "summary",
-  "career highlights": "careerHighlights",
-  highlights: "careerHighlights",
-  "professional experience": "experience",
-  experience: "experience",
-  "work experience": "experience",
-  employment: "experience",
-  "core competencies": "competencies",
-  skills: "competencies",
-  "technical skills": "competencies",
-  // "Education & Certifications" as one heading maps to education; the split
-  // headings each get their own section.
-  "education & certifications": "education",
-  "education and certifications": "education",
-  education: "education",
-  certifications: "certifications",
-  "certifications & licenses": "certifications",
-  "licenses & certifications": "certifications",
-  hobbies: "hobbies",
-  interests: "hobbies",
-};
+export type { SectionKey };
 
-export function normalizeHeaderText(text: string): string {
-  return text.trim().toLowerCase().replace(/\s+/g, " ").replace(/:$/, "");
-}
-
+/** The section a heading opens — matched by text rather than by Word style,
+ *  because source resumes, Jobright's very much included, do not reliably use
+ *  heading styles. */
 export function matchSectionKey(text: string): SectionKey | null {
-  return HEADER_ALIASES[normalizeHeaderText(text)] ?? null;
+  return sectionKeyOf(text);
 }
 
 /** Loose prose comparison, for the Career Highlights diff check. */
 export function normalizeForCompare(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, " ").replace(/[.,;:]+$/, "");
 }
-
-const MONTH = "(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\\.?";
-const DATE_RANGE_RE = new RegExp(
-  `\\b(?:${MONTH}\\s+)?\\d{4}\\s*[-–—]\\s*(?:Present|Current|(?:${MONTH}\\s+)?\\d{4})`,
-  "i"
-);
 
 export interface ExpHeaderLine {
   text: string;
@@ -81,7 +45,7 @@ export function splitCompanyAndTitleDate(headerLines: ExpHeaderLine[]): {
   title: string;
   date: string;
 } {
-  const stripDate = (s: string) => s.replace(DATE_RANGE_RE, "").replace(/[\s|,·•-]+$/, "").trim();
+  const stripDate = (s: string) => s.replace(DATE_RANGE, "").replace(/[\s|,·•-]+$/, "").trim();
 
   // A tab separates fields exactly as a line break does — `Acme Corp⇥Jan 2020 –
   // Present` is two fields positioned on one line — so each tabbed segment is
@@ -98,7 +62,7 @@ export function splitCompanyAndTitleDate(headerLines: ExpHeaderLine[]): {
 
   let date = "";
   for (const line of segments) {
-    const m = line.text.match(DATE_RANGE_RE);
+    const m = line.text.match(DATE_RANGE);
     if (m) {
       date = m[0].trim();
       break;

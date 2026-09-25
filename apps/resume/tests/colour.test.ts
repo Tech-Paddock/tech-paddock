@@ -4,7 +4,7 @@ import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import { readDocxParts } from "../lib/docx/read";
 import { extractParagraphs } from "../lib/docx/paragraphs";
-import { DEFAULT_SPEC, dominantColor, extractSpec, isEntryLine, normalizeSpec } from "../lib/docx/spec";
+import { DEFAULT_SPEC, dominantColor, extractSpec, isTrioLine, normalizeSpec } from "../lib/docx/spec";
 import { labelParagraphs } from "../lib/docx/label";
 import { buildResumeDocx } from "../lib/docx/build";
 import { auditAts } from "../lib/docx/ats";
@@ -176,8 +176,8 @@ describe("reading the employer, title and dates", () => {
     const entry = paras.find((p) => p.text.includes("Senior Consultant"));
     const heading = paras.find((p) => p.text.trim() === "Professional Experience");
 
-    expect(entry && isEntryLine(entry)).toBe(true);
-    expect(heading && isEntryLine(heading)).toBe(false);
+    expect(entry && isTrioLine(entry)).toBe(true);
+    expect(heading && isTrioLine(heading)).toBe(false);
   });
 
   it("falls back to the ranked size when no entry line can be measured", async () => {

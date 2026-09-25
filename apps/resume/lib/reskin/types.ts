@@ -29,6 +29,18 @@ export interface SourceContent {
   careerHighlights: StatCell[] | null;
   experience: ExperienceEntry[];
   competencies: CompetencyRow[] | null;
+  /**
+   * Sections of the source the template has nowhere to put — a "Projects"
+   * heading, say — with how many lines sat under each. Absent when there are
+   * none. Reported in the change log as `input-dropped`, because they are
+   * source text that does not reach the output.
+   */
+  unplacedSections?: UnplacedSection[];
+}
+
+export interface UnplacedSection {
+  heading: string;
+  lines: number;
 }
 
 /**
