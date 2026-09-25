@@ -15,52 +15,46 @@ for all of them. TEC-40 is that change.
 
 **Joel's working model (2026-09-25): one gate.** Agents cut branches and commit, never a pull
 request. When branches are ready you bring Joel one list: branches, order, blast radius,
-migrations, questions. His go starts Deployment on exactly that list, and he hears nothing more
-about pull requests or merges unless a question comes up. **Nothing enforces the list's scope** now
-that merging asks no click (TEC-43). **Roll up only serious questions**; small calls in an app are
-yours, logged on the issue.
+migrations, questions. His go starts Deployment on exactly that list. **Write your Linear updates
+last**, once every other change in the session's queue is pushed, not as you go (Joel, 2026-09-25 —
+now in your charter).
 
-**The 2026-09-25 train is merged: all 17 branches, #211–#227.** Joel's live checks on TEC-28, TEC-32
-and TEC-47 are done. **Joel pauses the editor and the tracker once all deployments are done**
-(2026-09-25: "too much stuff in flight"). Confirm TEC-33 step 1, the `INTERNAL_API_SECRET` rotation,
-is live before he does, because a paused project can't redeploy. **Joel answered on TEC-7 (option A:
-add the rules), TEC-12, TEC-42, TEC-59 and TEC-33**, so read those comments first. **TEC-34 (Next.js
-14 → 16) is on hold** (Joel). The parking lot is the `Parked` label.
+**The 2026-09-25 train is merged**, TEC-27's sub-issues, TEC-71 and TEC-72 included. **Still Joel's:**
+TEC-33 steps 1 and 6, TEC-7. The parking lot is the `Parked` label.
 
 ## What is true now
 
-- **Every project was READY in production on the login hardening** (#201, via #202's deploy) on
-  2026-09-24, the editor included. The TD's container cannot reach `*.techpaddock.io` — the network
-  policy refuses it — so the login behaviour itself was never checked from here.
-- **The hooks are one guard** (`.claude/hooks/guard.mjs` → `decide.mjs`, cases in `guard.test.mjs`,
-  run by CI). It fails closed. Opening, updating and squash-merging a pull request are not held;
-  auto-merge, reviews and the API commit tools still ask.
-- **Linear writes from this session go through without a prompt; a helper's still prompt Joel**
-  (TEC-59). Until that is fixed, **helpers make no Linear writes**: they list the changes in their
-  report and you apply them. Deletes, label retirement and the diff tools still ask (the `ask` list
-  in `.claude/settings.json`). Joel asked for no Linear friction; removing that list needs his words.
-- **The weekly Routine** "Weekly rules-drift audit" (Mondays 08:00 UTC) reads Linear and runs `drift`.
-  Its prompt still names the TD as the gate until TEC-42; it is report-only, so that misleads nobody
-  into acting, but a run before TEC-42 will report the move as drift.
+- **`tp-tracker` and `tp-message-editor` are paused** — confirmed live: production deployments on
+  both read `BLOCKED`, which is what a paused project serves. They were paused **before** TEC-33
+  step 1 landed, out of the order the issue describes.
+- **TEC-33 step 1 (`INTERNAL_API_SECRET`) is not done, and worse than the issue text says:**
+  `tp-home` and `tp-message-editor` have no `INTERNAL_API_SECRET` at all; `tp-tracker` still holds
+  the original, never-edited value. Because the other two are now paused, step 1 needs them
+  **resumed first** — a paused project can't redeploy to pick up a new value.
+- **`VERCEL_TOKEN` is off `tp-home`** — confirmed live; only `GITHUB_TOKEN` remains there now.
+- **TEC-7: Joel chose option A** ("Go with option A, add the rules"). The firewall rate limit is
+  still not published on any project — confirmed by reading each one's firewall config, parked ones
+  included.
+- **A stale branch or pull request is renamed `stale_<name>`, never deleted** (CLAUDE.md, *Always*).
+  No agent's toolset exposes a branch rename or delete call, TD included, and the guard's `git push`
+  reader only refuses a push that lands on `main` — deleting elsewhere isn't hook-refused, just not
+  yet tooled. The three known-stale Cookbook branches still need Joel's dashboard until a tool exists.
+- **Helper Linear writes still prompt Joel; the main session's don't** (TEC-59, open). Helpers make
+  no Linear writes until it's fixed: they list changes in their report and you apply them.
 
 ## Traps only here
 
-- **The GitHub integration closes a Linear issue when a pull request naming it merges** — in its
-  title or its body. TEC-27 and TEC-35 were closed that way with work still open. After a merge,
-  reopen any issue whose Next steps are not all done.
-- **The auto-mode classifier can refuse work under `.claude/hooks/`** after an edit there, reads
-  included, as self-modification. Take it to Joel; never route round it.
-- **A Linear patch matches the stored text**, where a `TEC-n` you wrote is stored as an issue-mention
-  tag. Copy an anchor from `get_issue`'s output, tags and all; a retyped `TEC-n` never matches.
-- **A helper can be refused an action this session is allowed** — the permission system decides per
-  call. Take it to Joel; never re-run the refused action yourself.
-- **Put a decision to Joel as a multiple-choice question** (`AskUserQuestion`), never prose. It is
-  in your charter once TEC-71 merges; follow it anyway until then.
-- **A migration is recorded under a new version at the gate** and the file is renamed to match, so
-  cite it by name (TEC-72). Plan the one-line handoff fix the author owes if an id was cited.
-- **The auto-mode classifier refuses edits to `.claude/` and to another agent's charter** as
-  self-modification or instruction poisoning, even with an approved issue behind it. It cleared
-  once Joel's own words named the change. Ask him for them; never route round it.
-- **Cost is context × turns.** A helper's report lands in your context: brief tightly, and end the
+- **The GitHub integration closes a Linear issue when a pull request naming it merges.** After a
+  merge, reopen any issue whose Next steps are not all done.
+- **The auto-mode classifier can refuse work under `.claude/hooks/` or another agent's charter** as
+  self-modification, even with an approved issue behind it. Ask Joel for the words that clear it;
+  never route round it.
+- **A Linear patch matches the stored text.** Copy an anchor from `get_issue`'s output, tags and
+  all; a retyped `TEC-n` never matches.
+- **A helper can be refused an action this session is allowed.** Take it to Joel; never re-run the
+  refused action yourself.
+- **A migration is recorded under a new version at the gate** and the file renamed to match — cite
+  it by name, never its number (TEC-72).
+- **Cost is context × turns.** A helper's report lands in your context: brief tightly, end the
   session once the branches are pushed.
-- **You cannot delete a remote branch**, and **you are a session, not a service.** Say which.
+- **You are a session, not a service.** Nothing is watching once the window closes.
