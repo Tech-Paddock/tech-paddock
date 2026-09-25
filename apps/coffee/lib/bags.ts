@@ -1,5 +1,5 @@
 import { getServiceClient } from "./supabase";
-import type { Guide } from "./guide";
+import { webHost, type Guide } from "./guide";
 
 /**
  * The bag you bought last time, if this is a repeat purchase. Matched on
@@ -59,12 +59,9 @@ export class LookupError extends Error {
  * model from a string that only looks like one.
  */
 export function hostOf(url: string | null | undefined): string | null {
-  if (!url) return null;
-  try {
-    return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
-  } catch {
-    return null;
-  }
+  // One definition of "a web page's host", shared with `validateGuide`, so a
+  // `javascript:` URL is refused in both places or in neither.
+  return webHost(url);
 }
 
 /**
