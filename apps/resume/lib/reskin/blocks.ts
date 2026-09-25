@@ -57,8 +57,31 @@ export function joinBody(blocks: Block[]): string {
  */
 const TEXT_RUN_RE = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g;
 
+/**
+ * Run text and run-level tabs, in document order.
+ *
+ * **`<w:tab/>` means two things and the parent decides which** — the trap
+ * `RULES.md` names. Inside a run it is a tab character; inside
+ * `<w:pPr><w:tabs>` it declares a tab *stop* and carries no text at all. So
+ * paragraph properties are cut away first, and only what is left is read.
+ *
+ * Dropping run-level tabs, as this once did, glued the fields of a positioned
+ * line together: `Acme Corp⇥Jan 2020 – Present` read as company "Acme CorpJan"
+ * and date "2020 – Present", at 100% coverage, because the glued text still
+ * arrived.
+ */
+const TEXT_OR_TAB_RE = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>|<w:tab\s*\/>/g;
+
 export function extractText(raw: string): string {
-  return decodeXmlEntities([...raw.matchAll(TEXT_RUN_RE)].map((m) => m[1]).join(""));
+  const withoutProps = raw.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/g, "");
+  return decodeXmlEntities(
+    [...withoutProps.matchAll(TEXT_OR_TAB_RE)].map((m) => (m[1] === undefined ? "\t" : m[1])).join("")
+  );
+}
+
+/** A run's `<w:t>` text alone — exactly what `replaceRunText` overwrites. */
+function runOwnText(runRaw: string): string {
+  return decodeXmlEntities([...runRaw.matchAll(TEXT_RUN_RE)].map((m) => m[1]).join(""));
 }
 
 export function getStyleId(raw: string): string | null {
@@ -169,7 +192,7 @@ export function clearRunText(runRaw: string): string {
  * against a right tab stop and survives every extractor.
  */
 function replaceRunTextKeepingGap(runRaw: string, newText: string): string {
-  const trailing = extractText(runRaw).match(/\s+$/)?.[0] ?? "";
+  const trailing = runOwnText(runRaw).match(/\s+$/)?.[0] ?? "";
   return replaceRunText(runRaw, `${newText}${trailing}`);
 }
 

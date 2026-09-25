@@ -76,15 +76,28 @@ export interface ExpHeaderLine {
  * across both is that the company line is bold and the title line italic. The
  * date is pulled out by pattern from whichever line carries it.
  */
-export function splitCompanyAndTitleDate(lines: ExpHeaderLine[]): {
+export function splitCompanyAndTitleDate(headerLines: ExpHeaderLine[]): {
   company: string;
   title: string;
   date: string;
 } {
   const stripDate = (s: string) => s.replace(DATE_RANGE_RE, "").replace(/[\s|,·•-]+$/, "").trim();
 
+  // A tab separates fields exactly as a line break does — `Acme Corp⇥Jan 2020 –
+  // Present` is two fields positioned on one line — so each tabbed segment is
+  // read as a line of its own, keeping its line's weight and slant. A segment
+  // that is nothing but the date range is spent once the date is taken, and is
+  // dropped so it cannot be mistaken for the company or the title.
+  const segments = headerLines.flatMap((l) =>
+    l.text
+      .split("\t")
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .map((text) => ({ ...l, text }))
+  );
+
   let date = "";
-  for (const line of lines) {
+  for (const line of segments) {
     const m = line.text.match(DATE_RANGE_RE);
     if (m) {
       date = m[0].trim();
@@ -92,6 +105,7 @@ export function splitCompanyAndTitleDate(lines: ExpHeaderLine[]): {
     }
   }
 
+  const lines = segments.filter((l) => stripDate(l.text) !== "");
   const italicLine = lines.find((l) => l.italic);
   const boldLine = lines.find((l) => l.bold && !l.italic) ?? lines.find((l) => l !== italicLine);
 

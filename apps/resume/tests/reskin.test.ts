@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
 import { getBodyInner, loadDocx, withBodyInner } from "../lib/reskin/container";
-import { joinBody, splitBody } from "../lib/reskin/blocks";
+import { extractText, joinBody, splitBody } from "../lib/reskin/blocks";
 import { extractSourceContent } from "../lib/reskin/extract";
 import { renderIntoTemplate } from "../lib/reskin/render";
 import { reskin } from "../lib/reskin/generate";
@@ -138,6 +138,50 @@ describe("the XML it emits", () => {
 });
 
 describe("reading the source document", () => {
+  const para = (runs: string, pPr = "") => `<w:p>${pPr}${runs}</w:p>`;
+  const run = (text: string, rPr = "") => `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ""}<w:t xml:space="preserve">${text}</w:t></w:r>`;
+  const TAB = "<w:r><w:tab/></w:r>";
+  const BULLET = '<w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>';
+  const TAB_STOP = '<w:pPr><w:tabs><w:tab w:val="right" w:pos="10800"/></w:tabs></w:pPr>';
+
+  /**
+   * TEC-31. A run-level `<w:tab/>` was dropped on the way out of the source, so a
+   * positioned line's fields ran together — company "Acme CorpJan", date
+   * "2020 - Present" — and the content check still read 100%, because the glued
+   * text did arrive.
+   */
+  it("reads a tab between company and date as a field boundary", () => {
+    const body = [
+      para(run("Professional Experience")),
+      para(run("Acme Corp", "<w:b/>") + TAB + run("Jan 2020 - Present", "<w:b/>"), TAB_STOP),
+      para(run("Operations Analyst", "<w:i/>")),
+      para(run("Did a representative thing."), BULLET),
+    ].join("");
+    const [entry] = extractSourceContent(splitBody(body)).experience;
+    expect(entry).toEqual({
+      company: "Acme Corp",
+      title: "Operations Analyst",
+      date: "Jan 2020 - Present",
+      bullets: ["Did a representative thing."],
+    });
+  });
+
+  it("splits company, title and date that share one tabbed line", () => {
+    const body = [
+      para(run("Experience")),
+      para(run("Acme Corp", "<w:b/>") + TAB + run("Analyst", "<w:b/>") + TAB + run("Mar 2019 - 2021", "<w:b/>")),
+      para(run("Did a representative thing."), BULLET),
+    ].join("");
+    const [entry] = extractSourceContent(splitBody(body)).experience;
+    expect(entry).toMatchObject({ company: "Acme Corp", title: "Analyst", date: "Mar 2019 - 2021" });
+  });
+
+  /** The other half of the `<w:tab>` trap: a tab *stop* is not text. */
+  it("does not invent a tab from a paragraph's tab stops", () => {
+    expect(extractText(para(run("Acme Corp"), TAB_STOP))).toBe("Acme Corp");
+    expect(extractText(para(TAB + run("Acme Corp"), TAB_STOP))).toBe("\tAcme Corp");
+  });
+
   it("pulls every job apart into company, title and date", async () => {
     const content = extractSourceContent(splitBody(await bodyOf(SOURCE())));
     expect(content.experience).toHaveLength(5);
