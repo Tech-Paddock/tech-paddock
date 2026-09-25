@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { isIsoDate, parseLabelDate } from "../lib/dates";
+import { isIsoDate, parseLabelDate, roastDateFromLabel } from "../lib/dates";
+
+describe("roastDateFromLabel", () => {
+  it("puts a date the label printed another way into the form as YYYY-MM-DD", () => {
+    // The bag that failed to save: the label said 08.14.26.
+    expect(roastDateFromLabel("08.14.26")).toEqual({ value: "2026-08-14", unread: null });
+    expect(roastDateFromLabel("Roasted 14 Aug 2026")).toEqual({ value: "2026-08-14", unread: null });
+  });
+
+  it("leaves an ambiguous date out of the form and says what the label said", () => {
+    expect(roastDateFromLabel("05/06/26")).toEqual({ value: "", unread: "05/06/26" });
+  });
+
+  it("is an empty field and no hint when the label printed no date", () => {
+    expect(roastDateFromLabel(null)).toEqual({ value: "", unread: null });
+    expect(roastDateFromLabel("")).toEqual({ value: "", unread: null });
+  });
+});
 
 describe("parseLabelDate", () => {
   it("takes an ISO date as it stands", () => {

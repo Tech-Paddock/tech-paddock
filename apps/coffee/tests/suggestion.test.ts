@@ -87,8 +87,17 @@ describe("suggestionColumns", () => {
     }
   });
 
-  it("records a failure as a failure, not as a bag with no suggestion", () => {
-    expect(suggestionColumns(null, "overloaded")).toEqual({ suggested_recipe: null, suggested_error: "overloaded" });
+  it("records a failure as a failure, and leaves the recipe already on the bag alone", () => {
+    // A failed "Ask again" used to write suggested_recipe: null and delete the
+    // good suggestion it was asked to replace. The column is now absent from
+    // the update, so the row keeps what it had.
+    expect(suggestionColumns(null, "overloaded")).toEqual({ suggested_error: "overloaded" });
+    expect("suggested_recipe" in suggestionColumns(null, "overloaded")).toBe(false);
     expect(suggestionColumns(null)).toEqual({ suggested_recipe: null, suggested_error: null });
+  });
+
+  it("clears an old failure when a suggestion lands", () => {
+    const suggestion = coerceSuggestion({ method: "v60" }, "m", AT);
+    expect(suggestionColumns(suggestion)).toEqual({ suggested_recipe: suggestion, suggested_error: null });
   });
 });

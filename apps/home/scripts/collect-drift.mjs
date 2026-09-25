@@ -10,8 +10,9 @@
  * Runs as `prebuild`, beside collect-declared.mjs and for the same reason: the
  * app is deployed with `apps/home` as its Vercel Root Directory, so files above
  * that directory are present during the build but not reliably readable at
- * runtime. The output is committed as well, so `tsc --noEmit` works on a clean
- * checkout and so a pull request that changes drift shows it changing.
+ * runtime. The output is gitignored: it is regenerated before every build, dev
+ * server and test run (`npm run generate`), and a committed copy only ever went
+ * stale and churned in every local diff.
  *
  * The script is SPAWNED rather than imported: it has top-level side effects and
  * ends in `process.exit`, so importing it would take this process with it.
@@ -25,20 +26,12 @@ import { execFileSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseDrift, unmeasured } from "./drift-parse.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..", "..", "..");
 const script = join(repoRoot, "scripts", "drift-check.mjs");
 const out = join(here, "..", "lib", "drift.generated.ts");
-
-const STATES = new Set(["ok", "warn", "fail"]);
-
-const unmeasured = (reason) => ({
-  complete: false,
-  reason,
-  checks: [],
-  counts: { ok: 0, warn: 0, fail: 0 },
-});
 
 function measure() {
   if (!existsSync(script)) {
@@ -58,39 +51,7 @@ function measure() {
     return unmeasured(`The drift check could not be run: ${error.message.split("\n")[0]}`);
   }
 
-  let parsed;
-  try {
-    parsed = JSON.parse(stdout);
-  } catch {
-    return unmeasured("The drift check produced output that is not JSON.");
-  }
-
-  if (!Array.isArray(parsed?.checks)) {
-    return unmeasured("The drift check returned no `checks` array — its output shape has changed.");
-  }
-
-  /**
-   * One malformed entry makes the whole thing unreadable rather than silently
-   * dropping that row. A panel showing four checks out of five, with nothing
-   * saying so, is the exact failure this page exists to not commit.
-   */
-  const checks = [];
-  for (const c of parsed.checks) {
-    if (!c || typeof c.name !== "string" || !STATES.has(c.state)) {
-      return unmeasured("The drift check returned a check this page cannot read — its contract has changed.");
-    }
-    checks.push({ name: c.name, state: c.state, detail: typeof c.detail === "string" ? c.detail : "" });
-  }
-
-  /**
-   * Counted from the rows that are actually rendered rather than taken from the
-   * script's own `counts`. The two agree today; recounting means the numbers at
-   * the top of the panel can never disagree with the rows underneath them.
-   */
-  const counts = { ok: 0, warn: 0, fail: 0 };
-  for (const c of checks) counts[c.state]++;
-
-  return { complete: true, reason: "", checks, counts };
+  return parseDrift(stdout);
 }
 
 const measured = measure();
