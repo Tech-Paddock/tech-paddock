@@ -89,6 +89,21 @@ describe("POST /api/inspect", () => {
     expect(body.content.missing.length).toBeGreaterThan(0);
   });
 
+  /**
+   * TEC-31. Diagnostics compared the whole source, and a reformat deliberately
+   * leaves the name, the contact block and the static sections behind — so it
+   * reported those as dropped on every real reformat. It checks the lines a
+   * reformat takes now, as the reformat route does.
+   */
+  it("finds nothing missing in a real reformat checked against its own source", async () => {
+    const { reskin } = await import("../lib/reskin/generate");
+    const { docx } = await reskin(fixture("template-flat-sample.docx"), fixture("jobright-sample.docx"));
+    const res = await POST(uploadPair("reformatted.docx", docx, "jobright-sample.docx", fixture("jobright-sample.docx")));
+    const body = await res.json();
+    expect(body.content.totalLines).toBeGreaterThan(0);
+    expect(body.content.missing).toEqual([]);
+  });
+
   it("finds nothing missing when the document is compared against itself", async () => {
     const res = await POST(
       uploadPair(

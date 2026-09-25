@@ -60,25 +60,42 @@ export function verdictFor(r: VerdictInput): Verdict {
 
   // Input the template had no room for. Also a content loss, and invisible in
   // the finished document, which is exactly why it has to be said here.
-  const trimmed = r.changeLog.filter((c) => c.action === "trimmed-surplus");
-  if (trimmed.length > 0) {
+  //
+  // `input-dropped` only. A *template* line the input had no counterpart for is
+  // `template-trimmed`, and it is not a loss: reading it as one failed the repo's
+  // own fixture pair at 100% coverage, and failed every render on the older
+  // template over a blank line that is a property of the template.
+  const dropped = r.changeLog.filter((c) => c.action === "input-dropped");
+  if (dropped.length > 0) {
     reasons.push(
-      `${trimmed.length} ${plural(trimmed.length, "entry", "entries")} had nowhere to go in the template and ` +
-        `${plural(trimmed.length, "was", "were")} dropped — ${sections(trimmed)}.`
+      `${dropped.length} ${plural(dropped.length, "entry", "entries")} had nowhere to go in the template and ` +
+        `${plural(dropped.length, "was", "were")} dropped — ${sections(dropped)}.`
     );
   }
 
   // A section of the template the source never filled. Not a loss, but the
-  // document goes out carrying the template's own words for it.
+  // document goes out carrying the template's own words for it. Counted by
+  // section, because the sentence says sections.
   const unfilled = r.changeLog.filter((c) => c.action === "not-found-in-input");
   if (unfilled.length > 0) {
+    const n = new Set(unfilled.map((c) => c.section)).size;
     reasons.push(
-      `The source did not fill ${unfilled.length} ${plural(unfilled.length, "section", "sections")} of the ` +
+      `The source did not fill ${n} ${plural(n, "section", "sections")} of the ` +
         `template, which keeps its own text — ${sections(unfilled)}.`
     );
   }
 
   const notes = r.findings.filter((f) => f.severity === "warning").map((f) => f.message);
+
+  // Template lines with no counterpart in the input were left out. Worth saying,
+  // never worth failing over.
+  const trimmed = r.changeLog.filter((c) => c.action === "template-trimmed");
+  if (trimmed.length > 0) {
+    notes.push(
+      `${trimmed.length} template ${plural(trimmed.length, "line", "lines")} with no counterpart in the source ` +
+        `${plural(trimmed.length, "was", "were")} left out — ${sections(trimmed)}.`
+    );
+  }
 
   return { pass: reasons.length === 0, reasons, notes };
 }

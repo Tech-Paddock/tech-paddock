@@ -22,6 +22,22 @@ describe("normalizeMethod", () => {
     expect(normalizeMethod("pourover")).toBe("v60");
   });
 
+  it("does not round wording that names no brewer to Batch or a V60", () => {
+    // "brewer" and "machine" used to mean Batch, and bare "drip" a V60, so
+    // both of these were placed on the roaster's behalf when neither says
+    // which brewer. Something said and unplaceable is "other".
+    expect(normalizeMethod("any pour-over brewer")).toBe("other");
+    expect(normalizeMethod("drip coffee maker")).toBe("other");
+    expect(normalizeMethod("Brew on whatever you have")).toBe("other");
+  });
+
+  it("still places named batch brewing, and a named brewer beside generic words", () => {
+    expect(normalizeMethod("Batch brew, 60g per litre")).toBe("batch");
+    expect(normalizeMethod("Auto-drip")).toBe("batch");
+    expect(normalizeMethod("Hario V60 brewer")).toBe("v60");
+    expect(normalizeMethod("Espresso machine")).toBe("espresso");
+  });
+
   it("distinguishes unrecognizable text from no text", () => {
     // "other" means they said something we couldn't place, which is worth
     // storing; null means they said nothing, which is not.

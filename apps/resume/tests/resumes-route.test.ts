@@ -44,6 +44,37 @@ async function get(tables: Parameters<typeof fakeSupabase>[0], tracker?: unknown
   return { res, body: (await res.json()) as { files?: ResumeFile[]; error?: string } };
 }
 
+/** TEC-31. Renders were capped at fifty with nothing saying so. */
+describe("how much of the history it returns", () => {
+  it("returns every render rather than a silent first fifty, joining threads in batches", async () => {
+    const renders = Array.from({ length: 230 }, (_, i) => ({
+      ...RENDER,
+      id: `r${i}`,
+      created_at: `2026-09-12T00:00:${String(i % 60).padStart(2, "0")}Z`,
+      thread_id: `th${i}`,
+    }));
+    const { client, calls } = fakeSupabase({
+      "templates.select": { data: [], error: null },
+      "renders.select": { data: renders, error: null },
+    });
+    const tracker = fakeSupabase({
+      "pipeline_threads.select": (call) => {
+        const ids = call.filters.find(([k]) => k === "in:id")?.[1] as string[];
+        return { data: ids.map((id) => ({ id, company: `Co ${id}`, stage: "Applied" })), error: null };
+      },
+    });
+    mockModules({ resume: client, tracker: tracker.client });
+    const { GET } = await import("@/app/api/resumes/route");
+    const body = (await (await GET()).json()) as { files: ResumeFile[] };
+
+    expect(calls.find((c) => c.table === "renders")?.filters.some(([k]) => k === "limit")).toBe(false);
+    expect(body.files.filter((f) => f.kind === "output")).toHaveLength(230);
+    expect(body.files.every((f) => f.company !== null)).toBe(true);
+    const batches = tracker.calls.map((c) => (c.filters.find(([k]) => k === "in:id")?.[1] as string[]).length);
+    expect(batches).toEqual([100, 100, 30]);
+  });
+});
+
 describe("the merged list", () => {
   it("gives a render two rows — what went in and what came out — sharing the render's id", async () => {
     const { res, body } = await get({

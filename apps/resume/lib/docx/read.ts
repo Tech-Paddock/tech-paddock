@@ -23,20 +23,71 @@ export type DocxParts = {
  */
 export const MAX_INFLATED_BYTES = 64 * 1024 * 1024;
 
-export function inflatedSize(zip: JSZip): number | null {
+/**
+ * How many bytes the archive actually inflates to, counted by inflating it —
+ * stopping as soon as the count passes `limit`, so a bomb is never held whole.
+ *
+ * **The count this replaced trusted the archive.** It summed the uncompressed
+ * size each entry *declares*, which is a number in the file and costs an
+ * attacker nothing to understate; the real inflation then ran to completion
+ * before anything compared the two. Counting the bytes as they come out of the
+ * decompressor is the only figure the uploader does not choose.
+ */
+type StreamHelper = {
+  on(event: "data", cb: (chunk: Uint8Array) => void): StreamHelper;
+  on(event: "error", cb: (err: Error) => void): StreamHelper;
+  on(event: "end", cb: () => void): StreamHelper;
+  pause(): StreamHelper;
+  resume(): StreamHelper;
+};
+
+export async function inflatedBytes(zip: JSZip, limit: number): Promise<number> {
   let total = 0;
   for (const name of Object.keys(zip.files)) {
     const entry = zip.files[name];
-    // Directory entries carry no size. Counting them as "unknown" made this
-    // return null for every real archive, which silently disabled the check.
     if (entry.dir) continue;
-    // Not public API, so treat a genuinely missing size as unknown rather than
-    // as zero — better to skip the check than to under-count and allow a bomb.
-    const size = (entry as { _data?: { uncompressedSize?: number } })?._data?.uncompressedSize;
-    if (typeof size !== "number") return null;
-    total += size;
+    await new Promise<void>((resolve, reject) => {
+      // Documented in JSZip's API (`JSZipObject#internalStream`) and missing from
+      // its type definitions; it streams the decompressor's output and pauses.
+      const stream = (entry as unknown as { internalStream(type: "uint8array"): StreamHelper }).internalStream(
+        "uint8array"
+      );
+      stream
+        .on("data", (chunk: Uint8Array) => {
+          total += chunk.length;
+          if (total > limit) {
+            stream.pause();
+            resolve();
+          }
+        })
+        .on("error", reject)
+        .on("end", () => resolve())
+        .resume();
+    });
+    if (total > limit) break;
   }
   return total;
+}
+
+/**
+ * Refuse an archive that inflates past `limit`. Both readers call this before
+ * reading a part: the untrusted upload goes through `loadDocx` in the reskin
+ * engine first, and guarding only this file's reader left the upload itself
+ * unguarded while the renderer's own output was checked.
+ */
+export async function assertInflatesWithin(zip: JSZip, limit = MAX_INFLATED_BYTES): Promise<void> {
+  let inflated: number;
+  try {
+    inflated = await inflatedBytes(zip, limit);
+  } catch {
+    throw new DocxReadError("not_a_docx", "That file isn't a readable .docx — part of the archive is corrupt.");
+  }
+  if (inflated > limit) {
+    throw new DocxReadError(
+      "inflated_too_large",
+      `That archive expands to more than ${(limit / 1024 / 1024).toFixed(0)}MB, far larger than any resume. Refusing to read it.`
+    );
+  }
 }
 
 export async function readDocxParts(
@@ -50,13 +101,7 @@ export async function readDocxParts(
     throw new DocxReadError("not_a_docx", "That file isn't a readable .docx — a PDF or Word 97 .doc renamed to .docx will land here too.");
   }
 
-  const inflated = inflatedSize(zip);
-  if (inflated !== null && inflated > maxInflatedBytes) {
-    throw new DocxReadError(
-      "inflated_too_large",
-      `That archive expands to ${(inflated / 1024 / 1024).toFixed(0)}MB, far larger than any resume. Refusing to read it.`
-    );
-  }
+  await assertInflatesWithin(zip, maxInflatedBytes);
 
   const document = await zip.file("word/document.xml")?.async("string");
   if (!document) {

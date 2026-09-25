@@ -2,9 +2,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "./models";
 import { MEALS, mealForHour, isMeal, type Meal } from "./meals";
 import { parseMacros, type Macros } from "./macros";
+import { urlsReadIn, earnedUrl, type ResultBlock } from "./webEvidence";
 
 /**
- * The two model calls this app makes, and the reasoning for each one's model.
+ * The three model calls this app makes, and the reasoning for each one's model.
  *
  * `CLAUDE.md`: model choice is per task and the choice and the reason are
  * recorded at the call site. These are those call sites.
@@ -46,11 +47,26 @@ export function looseJson<T = unknown>(text: string): T | null {
   return null;
 }
 
-function textOf(response: { content: { type: string; text?: string }[] }): string {
-  return response.content
+/**
+ * The answer's text. Joined with nothing, not a newline: a cited answer arrives
+ * split across several text blocks at the citation boundaries, sometimes
+ * mid-token, and a newline inside a JSON number or key breaks the parse.
+ */
+export function textOf(content: { type: string; text?: string }[]): string {
+  return content
     .filter((b) => b.type === "text")
     .map((b) => b.text ?? "")
-    .join("\n");
+    .join("");
+}
+
+/**
+ * A turn that stopped for any reason but finishing has no answer worth reading:
+ * `max_tokens` is a truncated JSON, `refusal` is no JSON at all. Say which,
+ * rather than letting it surface as "did not return usable macros".
+ */
+function assertFinished(stop: string | null, what: string): void {
+  if (stop === "end_turn" || stop === "stop_sequence") return;
+  throw new Error(`${what} stopped early (${stop ?? "no stop reason"}), so there is no answer to read.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +112,7 @@ export async function parseDictation(params: {
 }): Promise<ParsedDictation> {
   const fallbackMeal = mealForHour(params.hour);
 
-  const response = (await getClient().messages.create({
+  const response = await getClient().messages.create({
     model: PARSE_MODEL,
     max_tokens: 2048,
     system: PARSE_SYSTEM,
@@ -110,9 +126,10 @@ export async function parseDictation(params: {
           `"items": [{"name": string, "quantity": number}]}. Put nothing after the JSON.`,
       },
     ],
-  } as never)) as { content: { type: string; text?: string }[] };
+  });
+  assertFinished(response.stop_reason, "Reading that");
 
-  const raw = looseJson<{ meal?: unknown; items?: unknown }>(textOf(response));
+  const raw = looseJson<{ meal?: unknown; items?: unknown }>(textOf(response.content));
 
   const items: ParsedItem[] = Array.isArray(raw?.items)
     ? raw.items
@@ -134,7 +151,10 @@ export async function parseDictation(params: {
 
 export type Estimate = {
   macros: Macros;
-  /** Set when the model read a page rather than answering from its own knowledge. */
+  /**
+   * Set only when the page it names is among this run's own search or fetch
+   * results — checked in code, never taken on the model's word.
+   */
   source_url: string | null;
   note: string | null;
 };
@@ -166,12 +186,19 @@ export async function estimateMacros(params: {
   const model = params.model ?? DEFAULT_MODEL;
   const spec = MODELS[model];
 
-  const tools = [
-    { type: spec.search, name: "web_search", max_uses: 4 },
-    { type: spec.fetch, name: "web_fetch", max_uses: 4 },
-  ];
+  // Spelled out per version rather than built from the registry's string, so
+  // the SDK's own types check each tool instead of a cast silencing them.
+  const search: Anthropic.ToolUnion = spec.search === "web_search_20260209"
+    ? { type: "web_search_20260209", name: "web_search", max_uses: 4 }
+    : { type: "web_search_20250305", name: "web_search", max_uses: 4 };
+  // A nutrition page is a table, not a book. Capping what one fetch brings into
+  // context bounds the cost of a page that turns out to be a whole menu.
+  const fetchTool: Anthropic.ToolUnion = spec.fetch === "web_fetch_20260209"
+    ? { type: "web_fetch_20260209", name: "web_fetch", max_uses: 4, max_content_tokens: 20000 }
+    : { type: "web_fetch_20250910", name: "web_fetch", max_uses: 4, max_content_tokens: 20000 };
+  const tools = [search, fetchTool];
 
-  const messages: Record<string, unknown>[] = [
+  const messages: Anthropic.MessageParam[] = [
     {
       role: "user",
       content:
@@ -184,26 +211,33 @@ export async function estimateMacros(params: {
   ];
 
   let raw = "";
+  let stop: string | null = null;
+  // Every block the run produced, across paused turns, so the pages it read can
+  // be checked against the page it cites.
+  const seen: ResultBlock[] = [];
   // Server tools can end a turn with stop_reason "pause_turn" rather than a
   // result. Resume by handing the paused turn back; without this the answer is
   // silently truncated rather than erroring — which in this app would mean a
   // confidently wrong number instead of a visible failure.
   for (let i = 0; i < 6; i++) {
-    const response = (await getClient().messages.create({
+    const response = await getClient().messages.create({
       model,
       max_tokens: 4096,
       system: ESTIMATE_SYSTEM,
       tools,
       messages,
-    } as never)) as { stop_reason: string; content: { type: string; text?: string }[] };
+    });
+    seen.push(...response.content);
+    stop = response.stop_reason;
 
-    if (response.stop_reason === "pause_turn") {
+    if (stop === "pause_turn") {
       messages.push({ role: "assistant", content: response.content });
       continue;
     }
-    raw = textOf(response);
+    raw = textOf(response.content);
     break;
   }
+  assertFinished(stop, `${MODELS[model].label}'s estimate for "${params.name}"`);
 
   const parsed = looseJson<Record<string, unknown>>(raw);
   const macros = parseMacros(parsed);
@@ -211,12 +245,16 @@ export async function estimateMacros(params: {
     throw new Error(`${MODELS[model].label} did not return usable macros for "${params.name}".`);
   }
 
-  const url = typeof parsed?.source_url === "string" ? parsed.source_url.trim() : "";
-  return {
-    macros,
-    source_url: url.startsWith("http") ? url : null,
-    note: typeof parsed?.note === "string" && parsed.note.trim() ? parsed.note.trim() : null,
-  };
+  const claimed = typeof parsed?.source_url === "string" ? parsed.source_url.trim() : "";
+  const source_url = earnedUrl(claimed, urlsReadIn(seen));
+  let note = typeof parsed?.note === "string" && parsed.note.trim() ? parsed.note.trim() : null;
+  if (claimed && !source_url) {
+    // Said so on the line, because a quietly dropped citation looks the same
+    // as a model that never claimed one.
+    note = [note, "It cited a page it did not read this run, so this is labelled an estimate."]
+      .filter(Boolean).join(" ");
+  }
+  return { macros, source_url, note };
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +290,7 @@ export type TidyProposal = { name: string; note: string | null; absorbed: string
 export async function tidyList(
   items: { id: string; name: string; note: string | null }[]
 ): Promise<TidyProposal[]> {
-  const response = (await getClient().messages.create({
+  const response = await getClient().messages.create({
     model: TIDY_MODEL,
     max_tokens: 2048,
     system: TIDY_SYSTEM,
@@ -268,9 +306,10 @@ export async function tidyList(
           `Put nothing after the JSON.`,
       },
     ],
-  } as never)) as { content: { type: string; text?: string }[] };
+  });
+  assertFinished(response.stop_reason, "Tidying the list");
 
-  const raw = looseJson<{ lines?: unknown }>(textOf(response));
+  const raw = looseJson<{ lines?: unknown }>(textOf(response.content));
   if (!Array.isArray(raw?.lines)) return [];
 
   return raw.lines
