@@ -97,6 +97,19 @@ numbers — and letting a suggestion in there would make the two interchangeable
 where you act on them. **A suggestion is something you read and type in**, and typing it is the
 moment you decide to use it. Do not reopen this by making it a convenience.
 
+#### A recipe printed as an image counts, and the image is its proof
+
+Joel, 2026-09-25: *"Update rule 1 of charter."* Some roasters publish their recipe only as a picture
+(a recipe card in the product gallery) that a page read as text never sees. A value read off one
+reaches `guide_*` on the same terms as a sentence: its quote is the text read off the image, its URL
+is **the page the image was on**, which gets the usual roaster-site check, and the image's own URL
+is stored beside it. The image's host is not checked, since roasters' images routinely sit on a CDN.
+The copy-out copies only what is printed and never fills in or infers. **The image renders beside
+the values it backs, always**: a copy-out is a reading, not a quotation, so it is only as checkable
+as the picture next to it, and that is what keeps it inside this rule. A value with no stored image
+to show is dropped. Tier 1 is still earned by place: an image in this coffee's own gallery can be
+`coffee_specific`; one anywhere else on the site is `roaster_generic`.
+
 ### 2. Three tiers, and which one answered is stored
 
 1. `coffee_specific` — instructions published for this exact coffee, on its product page
@@ -145,6 +158,11 @@ Keep it that way.
 ---
 
 ## Design decisions, and why
+
+**Filter and batch beat espresso.** Joel, 2026-09-25: *"Always prefer filter/batch over espresso."*
+A bag holds one guide; when a roaster prints both, filter (pour-over, batch or immersion) is stored,
+and espresso only when it is the only recipe. The other was not chosen, so it is neither a `dropped`
+value nor a failure.
 
 **Two brewer vocabularies, not one.** `guide_method` records what the roaster published and stays
 broad, because it describes the world; `my_brewer` names the five things actually on the shelf.
@@ -306,19 +324,16 @@ makes the comparison safe to run at all.
 
 **The label reader is one fixed model, called with `effort: "low"`** and a JSON schema. Reading a
 label is transcription, not reasoning, it is already fast, and the round trip happens while you are
-standing in a kitchen holding the bag. The
-system prompt forbids guessing a roaster from the design or completing a partially visible word.
+standing in a kitchen holding the bag. The system prompt forbids guessing a roaster from the design
+or completing a partially visible word.
 
 ---
 
 ## Guardrails
 
-**Never touch** another app, another schema, or the shared auth plumbing (`CLAUDE.md`).
-
 **Never do:**
 
 - Weaken `validateGuide`, or add a path that writes a `guide_*` value without a backing quote.
-- Store a brew parameter read from a site that is not the roaster's.
 - Add a table pre-emptively. A brew log, a timer, inventory and a method lookup table are all
   expected eventually; each arrives as its own table when it is actually built. Promoting the
   method enum to a table later is an additive migration.
@@ -327,14 +342,10 @@ system prompt forbids guessing a roaster from the design or completing a partial
 
 ## Guidelines
 
-- Run `npm test` and `npm run build` in `apps/coffee` before you push; if either breaks, that is
-  yours.
 - **The search step cannot be exercised from a Claude Code sandbox** — roaster domains are blocked
-  by the egress proxy. Tests cover the validation logic against recorded
-  response shapes. The search itself is verified in production with a real bag, after merge:
-  previews are skipped by every `ignoreCommand`, so merge-then-look is the only live check
-  (`DECISIONS.md`, 2026-09-20). Do not conclude the feature works because the tests pass.
+  by the egress proxy. Tests cover the validation logic against recorded response shapes. The search
+  itself is verified in production with a real bag, after merge: previews are skipped by every
+  `ignoreCommand`, so merge-then-look is the only live check (`DECISIONS.md`, 2026-09-20). Do not
+  conclude the feature works because the tests pass.
 - When you add a guide field, add its test first. Every existing field in `GUIDE_FIELDS` has one,
   and the quote-backing rule is only as strong as its coverage.
-- Prefer surfacing an uncertainty in the UI over resolving it in code. `dropped` exists because a
-  value the model could not back is worth showing, not hiding.

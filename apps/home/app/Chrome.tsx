@@ -3,9 +3,9 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { TOOLS, type ToolSlug } from "@/lib/platform";
 import { LIVERY } from "@/lib/livery";
 import ThemeControl, { LiveryBadge } from "./ThemeControl";
+import { APPS, selectedIndexFrom } from "./apps";
 
 /**
  * The hub's chrome — topbar, sidebar, and the box everything else renders into.
@@ -21,35 +21,10 @@ import ThemeControl, { LiveryBadge } from "./ThemeControl";
  * sidebar offering links it cannot follow.
  */
 
-// Names and URLs come from lib/platform.ts so the chrome and the admin page
-// cannot drift apart; only presentation lives here. Typing this as a Record over
-// ToolSlug means adding a tool to that file breaks this build until it is given
-// an icon — rather than rendering a nameless blank in the sidebar.
-//
-// It carried a `tone` off the livery's four-step gold ramp until the landing's
-// tiles were removed: the sidebar is the only place a tool is listed now, and it
-// draws every row the same. The --tone-*-bg tokens those steps read still exist
-// in lib/theme.css, which is byte-identical in all five apps — retiring them is a
-// theme change across all of them rather than part of removing this app's tiles.
-const PRESENTATION: Record<ToolSlug, { icon: string }> = {
-  resume: { icon: "📄" },
-  coffee: { icon: "☕" },
-  health: { icon: "🥗" },
-  cookbook: { icon: "📖" },
-};
-
-export const APPS = TOOLS.map((tool) => ({
-  slug: tool.slug,
-  name: tool.name,
-  href: tool.url,
-  ...PRESENTATION[tool.slug],
-}));
-
-/** Which tool `?app=` names, or null for the landing. Shared with Landing. */
-export function selectedIndexFrom(slug: string | null) {
-  const i = APPS.findIndex((a) => a.slug === slug);
-  return i === -1 ? null : i;
-}
+// The tool list and its icons are in ./apps.ts, shared with the server-rendered
+// landing. The --tone-*-bg tokens the old landing tiles read still exist in
+// lib/theme.css, which is byte-identical in every app — retiring them is a theme
+// change across all of them rather than part of removing this app's tiles.
 
 function Bar({ children }: { children: React.ReactNode }) {
   const router = useRouter();
