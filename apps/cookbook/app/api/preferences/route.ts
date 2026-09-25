@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LookupError } from "@/lib/errors";
+import { errorResponse } from "@/lib/respond";
 import {
   importPreferences,
   readDraft,
@@ -23,8 +23,7 @@ export async function GET() {
   try {
     return NextResponse.json({ preferences: await readPreferences() });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't read your brands." }, { status: 500 });
+    return errorResponse(e, "Couldn't read your brands.");
   }
 }
 
@@ -44,8 +43,7 @@ export async function POST(request: NextRequest) {
     if ("error" in read) return NextResponse.json({ error: read.error }, { status: 400 });
     return NextResponse.json({ preference: await savePreference(read.row) });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't save that." }, { status: 500 });
+    return errorResponse(e, "Couldn't save that.");
   }
 }
 
@@ -60,7 +58,6 @@ export async function DELETE(request: NextRequest) {
     await removePreference(body.id);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't forget that one." }, { status: 500 });
+    return errorResponse(e, "Couldn't forget that one.");
   }
 }

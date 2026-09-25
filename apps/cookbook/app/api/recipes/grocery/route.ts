@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRecipe, toGroceryList } from "@/lib/recipes";
-import { LookupError } from "@/lib/errors";
+import { errorResponse } from "@/lib/respond";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +30,6 @@ export async function POST(request: NextRequest) {
     const added = await toGroceryList(recipe);
     return NextResponse.json({ added }, { status: 201 });
   } catch (e) {
-    if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
-    return NextResponse.json({ error: "Couldn't add those to the list." }, { status: 500 });
+    return errorResponse(e, "Couldn't add those to the list.");
   }
 }

@@ -1,5 +1,5 @@
 import { getServiceClient } from "./supabase";
-import { LookupError } from "./errors";
+import { ConflictError, InputError, LookupError } from "./errors";
 import { round, type Macros, type MacroSource } from "./macros";
 import { addItems } from "./grocery";
 
@@ -14,10 +14,10 @@ import { addItems } from "./grocery";
  *
  * **What is deliberately not here: any link to another app's data.** In Health
  * a recipe owned a `health.items` row, which made logging a serving free. A
- * separate app cannot write that table, and the replacement is a cross-app
- * contract the technical director designs — ledger item 22. So this file reads
- * and writes `cookbook` and nothing else, and does not grow a column, a route or
- * a type shaped like a guess at that contract.
+ * separate app cannot write that table. The replacement is the contract in
+ * `RULES.md` (TEC-11): Health's server calls `GET /api/servings`, and
+ * `toServingRows` below is Cookbook's side of it. So this file reads and writes
+ * `cookbook` and nothing else, and nothing here writes another app's log.
  */
 
 export type RecipeOrigin = "manual" | "generated" | "imported";
@@ -104,6 +104,39 @@ export function servingLabel(recipe: Recipe): Macros {
 }
 
 /**
+ * One recipe as Health reads it: `GET /api/servings`, the contract in `RULES.md`
+ * (TEC-11, TEC-24). **The contract's one home is the charter**; this is its shape
+ * in code, and `tests/servings.test.ts` holds it.
+ */
+export type ServingRow = {
+  id: string;
+  name: string;
+  servings: number;
+  per_serving: Macros;
+};
+
+/**
+ * The book, per serving. **Cookbook does the division** — the table stores the
+ * whole pot, and Health never learns that convention. Through `perServing`, the
+ * app's only divider, so the screen and the contract cannot disagree.
+ *
+ * **Not rounded.** Health snapshots these numbers at log time and multiplies them
+ * by however many servings were eaten; rounding here would round before the
+ * multiply. Display rounding is the reader's.
+ *
+ * **Additive only.** A new field is free; renaming or removing one is a contract
+ * change and the technical director's.
+ */
+export function toServingRows(recipes: Recipe[]): ServingRow[] {
+  return recipes.map((r) => ({
+    id: r.id,
+    name: r.name,
+    servings: r.servings,
+    per_serving: perServing(r),
+  }));
+}
+
+/**
  * Numeric columns come back as strings from PostgREST, and `text[]` can come
  * back null on an older row. Both would render as `NaN` and a crash rather than
  * as a number and an empty list.
@@ -186,7 +219,7 @@ const UNIQUE_VIOLATION = "23505";
  */
 export async function saveRecipe(draft: RecipeDraft): Promise<Recipe> {
   const problem = validateDraft(draft);
-  if (problem) throw new LookupError(problem);
+  if (problem) throw new InputError(problem);
 
   const name = draft.name.trim();
 
@@ -212,7 +245,7 @@ export async function saveRecipe(draft: RecipeDraft): Promise<Recipe> {
 
   if (error) {
     if (error.code === UNIQUE_VIOLATION) {
-      throw new LookupError(
+      throw new ConflictError(
         `"${name}" is already in the book. Rename it, or remove the one that is in there.`
       );
     }
@@ -243,7 +276,7 @@ export async function deleteRecipe(id: string): Promise<void> {
  */
 export async function toGroceryList(recipe: Recipe): Promise<number> {
   const lines = recipe.ingredients.map((i) => i.trim()).filter(Boolean);
-  if (lines.length === 0) throw new LookupError("That recipe has no ingredients listed.");
+  if (lines.length === 0) throw new InputError("That recipe has no ingredients listed.");
 
   const added = await addItems(lines.map((name) => ({ name, source: "recipe" as const })));
   return added.length;
