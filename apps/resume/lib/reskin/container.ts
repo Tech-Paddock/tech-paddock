@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { DocxReadError } from "../docx/read";
+import { DocxReadError, MAX_INFLATED_BYTES, assertInflatesWithin } from "../docx/read";
 
 /**
  * The template's own zip, held open so the output can be written back into it.
@@ -21,13 +21,20 @@ const DOCUMENT_PART = "word/document.xml";
  * Throws `DocxReadError` rather than a local error type, so the API routes keep
  * mapping an unreadable upload to a 422 through the handler they already have.
  */
-export async function loadDocx(bytes: ArrayBuffer | Uint8Array | Buffer, label = "upload"): Promise<DocxContainer> {
+export async function loadDocx(
+  bytes: ArrayBuffer | Uint8Array | Buffer,
+  label = "upload",
+  maxInflatedBytes = MAX_INFLATED_BYTES
+): Promise<DocxContainer> {
   let zip: JSZip;
   try {
     zip = await JSZip.loadAsync(bytes);
   } catch {
     throw new DocxReadError("not_a_docx", `${label} isn't a Word .docx — it could not be read as a zip archive.`);
   }
+  // Before any part is read. This is where the uploaded file is first opened,
+  // so this is where a decompression bomb has to be stopped.
+  await assertInflatesWithin(zip, maxInflatedBytes);
   const file = zip.file(DOCUMENT_PART);
   if (!file) {
     throw new DocxReadError("not_a_docx", `${label} has no ${DOCUMENT_PART}, so it isn't a Word .docx.`);
