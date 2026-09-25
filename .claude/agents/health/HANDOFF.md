@@ -20,7 +20,7 @@ a miss goes outside to one model call; approval writes it back, so outside runs 
 weighed over time, nothing updated in place. `lib/items.ts:resolveVersion` picks the version for a
 date: the era with the greatest `effective_from` on or before it, then the newest row in that era.
 
-**Each logged line snapshots its numbers** (TEC-21, migration `20260925032830`): `entry_items`
+**Each logged line snapshots its numbers** (TEC-21, migration `20260925134431`): `entry_items`
 carries the four macros and the `item_version_id` they were copied from. `readDay` is a plain sum,
 so **a correction fixes the food from the next log on and never moves a day already logged** —
 including the line you opened the correction from. `resolveVersion` runs only at log time.
@@ -32,7 +32,7 @@ from one that was right at the time (`change`). No backfill exists; it would be 
 run's own `web_search` / `web_fetch` results contain it; otherwise the number is an estimate.
 
 **`/debug` judges each model against your stored number** (`lib/harness.ts`), not only against the
-other, and stores both pairs on the run (`20260925033815`). It asks for a pick only on a real
+other, and stores both pairs on the run (`20260925134842`). It asks for a pick only on a real
 disagreement; a failed side is named, never a match. **A pick is one-shot**: claimed on the row
 first, numbers read from the stored run rather than the request, time recorded.
 
