@@ -27,8 +27,10 @@ merge commits are in `git log`; the issues they served are TEC-45 and TEC-43.
   than a local `git branch -r`, which keeps stale refs until a prune.
 - **Every app is live on the login hardening** (#201) except the parked ones, whose Vercel projects
   Joel pauses. Read deployment state before assuming either is serving new code.
-- **`INTERNAL_API_SECRET` is one value** on `tp-home`, `tp-tracker` and `tp-message-editor`
-  (TEC-33). A 401 from the hub's glance or the editor's draft button means the three disagree.
+- **`INTERNAL_API_SECRET` is not yet one value.** Rotating it to one value on `tp-home`,
+  `tp-tracker` and `tp-message-editor` is TEC-33 step 1, Joel's, and has not happened; that step
+  also adds it to `tp-home`, which may not hold it at all. Until it is done, a 401 from the hub's
+  glance or the editor's draft button means the rotation is pending, not that three values disagree.
 - **The migration history is clean**: the repo and `list_migrations` differ by exactly
   `20260908235234`, withheld because it seeds personal data.
 
@@ -42,7 +44,7 @@ merge commits are in `git log`; the issues they served are TEC-45 and TEC-43.
   end of the run, since the integration can fire after your edit.
 - **Helper worktrees live under `.claude/worktrees/`** — every preset sets `isolation: worktree`.
   **Never commit that folder**, whatever the Stop hook asks; committing it pushes a nested checkout.
-  Until TEC-48's `.gitignore` line lands it shows as untracked in the parent checkout.
+  `.gitignore` ignores it (TEC-48), so a folder there that shows as untracked means that line is gone.
 - **`gh` is not installed.** Read check runs through the GitHub connector, or unauthenticated
   `curl` on `api.github.com/repos/…/commits/<sha>/check-runs`, and wait on the `gate` run for the
   exact head you pushed.
