@@ -8,7 +8,7 @@ import { MACRO_KEYS, MACRO_LABELS, round, scale, type Macros } from "@/lib/macro
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
 import { methodSteps, perServing, type Recipe, type RecipeDraft, type RecipeOrigin } from "@/lib/recipes";
 import { MAX_FILE_BYTES, isFileMediaType, type RecipeFile } from "@/lib/upload";
-import { MAX_STEER, MAX_TURNED_DOWN, type TurnedDown } from "@/lib/reroll";
+import { MAX_STEER, pileForAsk, turnDown, type TurnedDown } from "@/lib/reroll";
 import { downscale } from "@/lib/image";
 
 /**
@@ -101,6 +101,14 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   // "Something else": the drafts turned down since this ask began, and why.
   const [turnedDown, setTurnedDown] = useState<TurnedDown[]>([]);
   const [steer, setSteer] = useState("");
+  // The brief the pile was built against; a different brief is a fresh ask.
+  const [pileBrief, setPileBrief] = useState("");
+
+  /** Bin it — a turn-down, the same as "Something else" (Joel, 2026-09-25). */
+  function binIt() {
+    if (draft?.origin === "generated") setTurnedDown(turnDown(turnedDown, draft));
+    setDraft(null);
+  }
   const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
 
   const [mode, setMode] = useState<Mode>("manual");
@@ -155,18 +163,21 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
    * Draft one. **With `reroll`, it is "Something else"** (TEC-39 D): the draft on
    * screen joins the pile turned down this session, and the same brief goes back
    * with the whole pile and the optional reason, so the third reroll avoids both
-   * earlier ones. A fresh "Work it out" starts a new pile — it is a new ask.
-   * Nothing is saved until Keep it, and the pile is forgotten on leaving the page.
+   * earlier ones. **Bin it turns a draft down too** (Joel, 2026-09-25), so a
+   * "Work it out" on the same brief after binning still avoids it; a new brief
+   * is a fresh ask and starts a new pile (`pileForAsk`). Nothing is saved until
+   * Keep it, and the pile is forgotten on leaving the page.
    */
   async function makeDraft(reroll = false) {
     if (busy) return;
     setBusy(reroll ? "rerolling" : "drafting");
 
-    let pile: TurnedDown[] = [];
-    if (reroll && draft) {
-      // Oldest dropped first past the cap, so the newest refusals always travel.
-      pile = [...turnedDown, { name: draft.name, ingredients: draft.ingredients }].slice(-MAX_TURNED_DOWN);
-    }
+    const pile: TurnedDown[] =
+      reroll && draft
+        ? turnDown(turnedDown, draft)
+        : mode === "generate"
+          ? pileForAsk(turnedDown, pileBrief, brief)
+          : [];
 
     try {
       const payload =
@@ -202,6 +213,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       // Only once the new draft is here: a reroll that failed leaves the draft
       // you had on screen, and it has not been turned down yet.
       setTurnedDown(pile);
+      setPileBrief(brief);
       setSteer("");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't draft that.");
@@ -574,7 +586,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
             <footer className="flex flex-wrap gap-2 border-t border-line px-3 py-3">
               <button
                 type="button"
-                onClick={() => setDraft(null)}
+                onClick={binIt}
                 className="rounded-lg border border-line px-3 py-2 text-sm"
               >
                 Bin it

@@ -19,8 +19,9 @@ box** — "Add a recipe" collapsed, "Add items" open. Results are toasts; a fail
 until Keep it; the typed path saves straight away**, after a name check that spares it a pricing
 call it could not keep. A file is **never stored**. **An import is refused three times**: `read:
 false`, no ingredients, or **no fetch that returned a page** (`lib/fetchRun.ts`). **"Something else"**
-on a Claude draft re-asks with every draft turned down since that ask, plus an optional reason
-(`lib/reroll.ts`); the pile is browser state, cleared by Keep it or a fresh "Work it out".
+on a Claude draft re-asks with every draft turned down, plus an optional reason (`lib/reroll.ts`).
+**Bin it is a turn-down too** (Joel, 2026-09-25). The pile is browser state: Keep it clears it,
+and so does "Work it out" on a new brief; the same brief keeps it.
 
 **Model requests come from `requestShape` in `lib/models.ts`**: Sonnet 5 gets an explicit effort and
 thinking headroom, Haiku 4.5 gets no effort (it 400s). The four calls without a tool send a JSON

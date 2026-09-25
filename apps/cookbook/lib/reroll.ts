@@ -47,6 +47,26 @@ export function readTurnedDown(raw: unknown): { turnedDown: TurnedDown[] } | { e
   return { turnedDown };
 }
 
+/**
+ * A draft turned down — by "Something else" or by **Bin it**, which Joel ruled is
+ * a turn-down too (2026-09-25: "yes it's a draft turn down"). The pile keeps the
+ * newest past the cap, so the latest refusals always travel.
+ */
+export function turnDown(pile: TurnedDown[], draft: TurnedDown): TurnedDown[] {
+  return [...pile, { name: draft.name, ingredients: draft.ingredients }].slice(-MAX_TURNED_DOWN);
+}
+
+/**
+ * The pile a "Work it out" carries. **A new brief is a fresh ask and starts
+ * empty** (Joel, 2026-09-25: keep the reset as it is). The same brief after a
+ * Bin it is the same ask, so what was binned is still avoided — otherwise
+ * binning would count as a turn-down and then be forgotten on the very next tap.
+ */
+export function pileForAsk(pile: TurnedDown[], pileBrief: string, brief: string): TurnedDown[] {
+  const same = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+  return same(pileBrief) === same(brief) ? pile : [];
+}
+
 /** The user message for a generate call: the brief, and on a reroll what to steer away from. */
 export function generatePrompt(brief: string, turnedDown: TurnedDown[] = [], steer = ""): string {
   const parts = [`What they asked for: ${brief}`];

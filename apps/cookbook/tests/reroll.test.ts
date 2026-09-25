@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_TURNED_DOWN, generatePrompt, readTurnedDown } from "@/lib/reroll";
+import { MAX_TURNED_DOWN, generatePrompt, pileForAsk, readTurnedDown, turnDown } from "@/lib/reroll";
 
 /**
  * "Something else" (TEC-39 D). The bug was the model never seeing what it had
@@ -30,6 +30,31 @@ describe("the generate prompt", () => {
   it("carries the optional reason when there is one", () => {
     expect(generatePrompt("a side", [], "too much butter")).toContain("too much butter");
     expect(generatePrompt("a side", [], "   ")).not.toContain("Why they turned");
+  });
+});
+
+describe("turning a draft down — Something else and Bin it alike (Joel, 2026-09-25)", () => {
+  const beans = { name: "Green bean almondine", ingredients: ["300g green beans"] };
+  const asparagus = { name: "Asparagus almondine", ingredients: ["300g asparagus"] };
+
+  it("adds the binned draft to the pile, after what was already there", () => {
+    expect(turnDown([beans], asparagus)).toEqual([beans, asparagus]);
+  });
+
+  it("keeps the newest past the cap", () => {
+    const full = Array.from({ length: MAX_TURNED_DOWN }, (_, n) => ({ name: `Dish ${n}`, ingredients: [] }));
+    const next = turnDown(full, beans);
+    expect(next).toHaveLength(MAX_TURNED_DOWN);
+    expect(next.at(-1)).toEqual(beans);
+    expect(next[0].name).toBe("Dish 1");
+  });
+
+  it("a Work it out on the same brief after binning still avoids the binned draft", () => {
+    expect(pileForAsk([beans], "a side for roast chicken", "  A side for  roast chicken ")).toEqual([beans]);
+  });
+
+  it("a new brief is a fresh ask and starts an empty pile", () => {
+    expect(pileForAsk([beans], "a side for roast chicken", "a quick pasta")).toEqual([]);
   });
 });
 
