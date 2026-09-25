@@ -223,7 +223,7 @@ describe("front matter in the body", () => {
  * two fields are separated by **no character at all** — the tab is an element,
  * not text. A tab-aware extractor (python-docx) copes; an extractor that simply
  * concatenates `<w:t>` elements, which is most of the simple ones, reads
- * `Sr. AdministratorJan 2026 - Present` and parses neither field.
+ * `Sr. AdministratorNov 2022 - Present` and parses neither field.
  *
  * The template answers this with a trailing space on the title run, invisible
  * against a right tab stop. The renderer has to carry it over, or the fix is
@@ -236,15 +236,15 @@ describe("the gap a template writes into a run", () => {
     '<w:r><w:t xml:space="preserve">   </w:t></w:r>' +
     '<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">Senior Administrator </w:t></w:r>' +
     "<w:r><w:tab/></w:r>" +
-    "<w:r><w:t>Jan 2026 - Present</w:t></w:r></w:p>";
+    "<w:r><w:t>Nov 2022 - Present</w:t></w:r></w:p>";
 
   it("survives a company, title and date rewrite", () => {
-    const { raw, unplaced } = replaceInlineHeaderLine(headerLine, "Harbor Point", "Consultant", "Oct 2024 - Present");
+    const { raw, unplaced } = replaceInlineHeaderLine(headerLine, "Harbor Point", "Consultant", "Aug 2021 - Present");
     expect(unplaced).toEqual([]);
 
     // What an extractor that ignores <w:tab/> sees.
     const concatenated = [...raw.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((m) => m[1]).join("");
-    expect(concatenated).toBe("Harbor Point   Consultant Oct 2024 - Present");
+    expect(concatenated).toBe("Harbor Point   Consultant Aug 2021 - Present");
     expect(concatenated).not.toContain("ConsultantOct");
   });
 });

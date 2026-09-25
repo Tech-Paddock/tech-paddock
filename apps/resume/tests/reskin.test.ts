@@ -282,7 +282,7 @@ describe("reading the source document", () => {
     expect(content.experience[0]).toMatchObject({
       company: "Northwind Athletics",
       title: "Sr. Platform Administrator",
-      date: "Jan 2026 - Present",
+      date: "Nov 2022 - Present",
     });
     expect(content.experience[4].company).toBe("Trellis Construction Group");
   });

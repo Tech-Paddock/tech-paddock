@@ -188,7 +188,7 @@ export function clearRunText(runRaw: string): string {
  * where a `<w:tab/>` is the only thing between the title and the date, the two
  * fields are separated by no character at all, and an extractor that
  * concatenates `<w:t>` elements without handling tabs — which is most of the
- * simple ones — reads `AdministratorJan 2026`. A trailing space is invisible
+ * simple ones — reads `AdministratorNov 2022`. A trailing space is invisible
  * against a right tab stop and survives every extractor.
  */
 function replaceRunTextKeepingGap(runRaw: string, newText: string): string {

@@ -31,7 +31,7 @@ describe("tab stops are not tab characters", () => {
   it("keeps the real tab that sets a date against its right stop", async () => {
     const paras = await load("template-flat-sample.docx");
     const entry = paras.find((p) => p.text.includes("Lakeside Systems"))!;
-    expect(entry.text).toContain("\tJan 2026 - Present");
+    expect(entry.text).toContain("\tNov 2022 - Present");
     expect(entry.text.startsWith("\t")).toBe(false);
   });
 
