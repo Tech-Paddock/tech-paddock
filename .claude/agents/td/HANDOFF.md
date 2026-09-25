@@ -20,10 +20,12 @@ about pull requests or merges unless a question comes up. **Nothing enforces the
 that merging asks no click (TEC-43). **Roll up only serious questions**; small calls in an app are
 yours, logged on the issue.
 
-**TEC-27's sub-issues TEC-28 to TEC-32 are built and merged**, and the follow-ups each agent filed are in
-Linear. **Still Joel's:** TEC-33 step 1 (rotate `INTERNAL_API_SECRET`) first, then its steps 3, 4
-and 6 (TEC-7). **Still yours:** TEC-7's read-only check once the firewall rule exists, TEC-34 (Next.js
-14 → 16), TEC-59 (helpers' Linear prompts) and TEC-26. The parking lot is the `Parked` label.
+**The 2026-09-25 train is merged: all 17 branches, #211–#227.** Joel's live checks on TEC-28, TEC-32
+and TEC-47 are done. **Joel pauses the editor and the tracker once all deployments are done**
+(2026-09-25: "too much stuff in flight"). Confirm TEC-33 step 1, the `INTERNAL_API_SECRET` rotation,
+is live before he does, because a paused project can't redeploy. **Joel answered on TEC-7 (option A:
+add the rules), TEC-12, TEC-42, TEC-59 and TEC-33**, so read those comments first. **TEC-34 (Next.js
+14 → 16) is on hold** (Joel). The parking lot is the `Parked` label.
 
 ## What is true now
 
@@ -52,8 +54,10 @@ and 6 (TEC-7). **Still yours:** TEC-7's read-only check once the firewall rule e
   tag. Copy an anchor from `get_issue`'s output, tags and all; a retyped `TEC-n` never matches.
 - **A helper can be refused an action this session is allowed** — the permission system decides per
   call. Take it to Joel; never re-run the refused action yourself.
-- **The hub no longer reads `VERCEL_TOKEN`** (TEC-32), but it stays set until Joel deletes it
-  (TEC-32's ⭐ step); The Garage warns while it is.
+- **Put a decision to Joel as a multiple-choice question** (`AskUserQuestion`), never prose. It is
+  in your charter once TEC-71 merges; follow it anyway until then.
+- **A migration is recorded under a new version at the gate** and the file is renamed to match, so
+  cite it by name (TEC-72). Plan the one-line handoff fix the author owes if an id was cited.
 - **The auto-mode classifier refuses edits to `.claude/` and to another agent's charter** as
   self-modification or instruction poisoning, even with an approved issue behind it. It cleared
   once Joel's own words named the change. Ask him for them; never route round it.

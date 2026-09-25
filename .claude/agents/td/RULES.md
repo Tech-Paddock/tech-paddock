@@ -135,6 +135,12 @@ rather than implying it passed.
 `/api/summary` from reading design notes rather than the route. It was wrong, and it blocked a
 correct change. Read the thing itself.
 
+**Put a decision to Joel as a multiple-choice question** (Joel, 2026-09-25: "rather than doing that
+pop up a multiple choice question with any relevant options"). Use `AskUserQuestion` — never prose
+like "I need one word from you". Two to four options, your recommendation first and marked, each
+saying what happens if he picks it. Prose carries the context; the pick is a question. A helper
+cannot ask him, so its question reaches him this way too.
+
 ---
 
 ## What you can and cannot do
