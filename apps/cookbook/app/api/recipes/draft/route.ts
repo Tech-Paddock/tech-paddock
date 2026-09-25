@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { estimateRecipeMacros, generateRecipe, importRecipe, readRecipeFile, type RecipeFields } from "@/lib/anthropic";
 import { validateRecipeFile } from "@/lib/upload";
+import { MAX_STEER, readTurnedDown } from "@/lib/reroll";
 import { nameTaken, type RecipeDraft } from "@/lib/recipes";
 import { statusOf } from "@/lib/errors";
 import { errorResponse } from "@/lib/respond";
@@ -83,7 +84,15 @@ export async function POST(request: NextRequest) {
       if (!brief) return NextResponse.json({ error: "Say what you feel like." }, { status: 400 });
       if (brief.length > 2000) return NextResponse.json({ error: "That is a long brief." }, { status: 413 });
 
-      fields = await generateRecipe({ brief, model });
+      // "Something else" (TEC-39 D): the same brief, plus every draft turned
+      // down this session and an optional reason. Both are the browser's state
+      // and are re-shaped here, never trusted as sent.
+      const avoid = readTurnedDown(body.turned_down);
+      if ("error" in avoid) return NextResponse.json({ error: avoid.error }, { status: 400 });
+      const steer = typeof body.steer === "string" ? body.steer.trim() : "";
+      if (steer.length > MAX_STEER) return NextResponse.json({ error: "That reason is long." }, { status: 413 });
+
+      fields = await generateRecipe({ brief, model, turnedDown: avoid.turnedDown, steer });
       origin = "generated";
     } else if (mode === "import") {
       const url = typeof body.url === "string" ? body.url.trim() : "";

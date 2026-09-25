@@ -8,6 +8,7 @@ import { MACRO_KEYS, MACRO_LABELS, round, scale, type Macros } from "@/lib/macro
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
 import { methodSteps, perServing, type Recipe, type RecipeDraft, type RecipeOrigin } from "@/lib/recipes";
 import { MAX_FILE_BYTES, isFileMediaType, type RecipeFile } from "@/lib/upload";
+import { MAX_STEER, MAX_TURNED_DOWN, type TurnedDown } from "@/lib/reroll";
 import { downscale } from "@/lib/image";
 
 /**
@@ -96,7 +97,10 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   // that could not be read is a state, and it stays on screen while it is true.
   const [readError, setReadError] = useState<string | null>(null);
   const toast = useToast();
-  const [busy, setBusy] = useState<null | "drafting" | "keeping">(null);
+  const [busy, setBusy] = useState<null | "drafting" | "rerolling" | "keeping">(null);
+  // "Something else": the drafts turned down since this ask began, and why.
+  const [turnedDown, setTurnedDown] = useState<TurnedDown[]>([]);
+  const [steer, setSteer] = useState("");
   const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
 
   const [mode, setMode] = useState<Mode>("manual");
@@ -147,9 +151,23 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     void load();
   }, [load]);
 
-  async function makeDraft() {
+  /**
+   * Draft one. **With `reroll`, it is "Something else"** (TEC-39 D): the draft on
+   * screen joins the pile turned down this session, and the same brief goes back
+   * with the whole pile and the optional reason, so the third reroll avoids both
+   * earlier ones. A fresh "Work it out" starts a new pile — it is a new ask.
+   * Nothing is saved until Keep it, and the pile is forgotten on leaving the page.
+   */
+  async function makeDraft(reroll = false) {
     if (busy) return;
-    setBusy("drafting");
+    setBusy(reroll ? "rerolling" : "drafting");
+
+    let pile: TurnedDown[] = [];
+    if (reroll && draft) {
+      // Oldest dropped first past the cap, so the newest refusals always travel.
+      pile = [...turnedDown, { name: draft.name, ingredients: draft.ingredients }].slice(-MAX_TURNED_DOWN);
+    }
+
     try {
       const payload =
         mode === "manual"
@@ -162,7 +180,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               method,
             }
           : mode === "generate"
-            ? { mode, model, brief }
+            ? { mode, model, brief, turned_down: pile, steer: reroll ? steer : "" }
             : mode === "import"
               ? { mode, model, url }
               : { mode, model, file: file && { mediaType: file.mediaType, data: file.data } };
@@ -181,6 +199,10 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       // Every other path stops here and waits for Keep it.
       if (mode === "manual") await save(drafted);
       else setDraft(drafted);
+      // Only once the new draft is here: a reroll that failed leaves the draft
+      // you had on screen, and it has not been turned down yet.
+      setTurnedDown(pile);
+      setSteer("");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't draft that.");
     } finally {
@@ -203,6 +225,9 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     const body = await response.json();
     if (!response.ok) throw new Error(body.error ?? "Couldn't save that.");
     setDraft(null);
+    // A kept recipe ends the search; the next ask starts with nothing to avoid.
+    setTurnedDown([]);
+    setSteer("");
     setName("");
     setServings("4");
     setIngredients("");
@@ -471,7 +496,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
 
         <button
           type="button"
-          onClick={makeDraft}
+          onClick={() => makeDraft()}
           disabled={!ready || busy !== null}
           className="rounded-lg bg-accent px-4 py-3 text-base font-semibold text-accent-ink disabled:opacity-50"
         >
@@ -527,7 +552,26 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
                 ) : null}
               </details>
             </div>
-            <footer className="flex gap-2 border-t border-line px-3 py-3">
+            {/* "Something else" only for a recipe Claude wrote: a page or a
+                file says what it says, and asking again would read the same. */}
+            {draft.origin === "generated" ? (
+              <div className="flex flex-col gap-1 border-t border-line px-3 pt-3">
+                <input
+                  value={steer}
+                  onChange={(e) => setSteer(e.target.value)}
+                  maxLength={MAX_STEER}
+                  placeholder="Not this because… (optional)"
+                  aria-label="Why not this one"
+                  className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+                />
+                {turnedDown.length > 0 ? (
+                  <p className="text-[11px] text-ink-soft">
+                    Steering clear of {turnedDown.map((d) => d.name).join(", ")}.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            <footer className="flex flex-wrap gap-2 border-t border-line px-3 py-3">
               <button
                 type="button"
                 onClick={() => setDraft(null)}
@@ -535,11 +579,23 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               >
                 Bin it
               </button>
+              {draft.origin === "generated" ? (
+                <button
+                  type="button"
+                  onClick={() => makeDraft(true)}
+                  disabled={busy !== null}
+                  className="ml-auto rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50"
+                >
+                  {busy === "rerolling" ? "Thinking again…" : "Something else"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={keepIt}
                 disabled={busy !== null}
-                className="ml-auto rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
+                className={`${
+                  draft.origin === "generated" ? "" : "ml-auto "
+                }rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50`}
               >
                 {busy === "keeping" ? "Saving…" : "Keep it"}
               </button>
