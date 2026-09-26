@@ -257,7 +257,7 @@ export async function searchBrewGuide(params: {
   // `lib/searchRun.ts`, where they can be tested without an API call. A `none`
   // the run could not earn is thrown from there, so the route records why on
   // the row and leaves the bag's guide untouched.
-  const outcome = concludeSearch(text, blocks);
+  const outcome = concludeSearch(text, blocks, params.roaster);
 
   // A recipe printed as a picture never reached the model above: `web_fetch`
   // reads a page as text. So below tier 1, with a product page known, the

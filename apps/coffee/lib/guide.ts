@@ -79,6 +79,71 @@ function sameSite(a: string | null, b: string | null): boolean {
 }
 
 /**
+ * Words a roaster's name carries that its domain routinely leaves out —
+ * "Sweet Bloom Coffee Roasters" is at sweetbloomcoffee.com. Only these are
+ * set aside; every other word of the name has to be in the host.
+ */
+const NAME_FILLER = new Set(["the", "and", "co", "company", "coffee", "coffees", "roaster", "roasters", "roasting", "roastery", "roasterie"]);
+
+/** A string as bare lowercase letters and digits, accents folded. */
+function squash(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/['’]/g, "");
+}
+
+/**
+ * Whether a page is on a host that carries the roaster's name (TEC-68).
+ *
+ * **The product page is the anchor every other site check is made against**,
+ * so it cannot be checked against itself: a retailer's page named as the
+ * product page made the retailer "the roaster's site", and every guide and
+ * gallery image on it passed. The one fact about whose site it should be that
+ * the model did not supply is the name on the bag, which a person confirmed.
+ *
+ * Every word of the name, less `NAME_FILLER`, has to appear in the host — all
+ * of them, because one ("sweet") is in a green-coffee retailer's host as well.
+ * A name with nothing left to match matches nothing: the check fails closed.
+ *
+ * **A roaster whose domain does not carry its name fails this**, and its
+ * guides with it. That is the price of the anchor, and it shows: the values
+ * are dropped with the reason beside them, never silently.
+ */
+export function bearsRoasterName(url: string | null | undefined, roaster: string): boolean {
+  const pageHost = host(url);
+  if (!pageHost) return false;
+  const squashedHost = squash(pageHost).replace(/[^a-z0-9]/g, "");
+  const words = squash(roaster ?? "")
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w && !NAME_FILLER.has(w));
+  return words.length > 0 && words.every((w) => squashedHost.includes(w));
+}
+
+/**
+ * The product page's own roaster-site check, applied to a validated guide.
+ *
+ * A product page that fails is cleared, and so is everything read on its site,
+ * because `validateGuide` accepted those only for being on the same site as
+ * it. The values are refused beside their reason, never discarded, and the
+ * refusal comes back so the run can say it beside the answer. Clearing the
+ * page also means its gallery is never read (`shouldReadImages`).
+ */
+export function anchorOnRoaster(guide: Guide, roaster: string): { guide: Guide; refusal: string | null } {
+  if (!guide.product_url || bearsRoasterName(guide.product_url, roaster)) return { guide, refusal: null };
+
+  const refusal = `the product page named was on ${host(guide.product_url)}, which does not carry the roaster's name (${roaster.trim() || "none given"})`;
+  const kept: Guide["dropped"] = [];
+  if (guide.method) kept.push({ field: "method", value: guide.method, reason: refusal });
+  for (const field of GUIDE_FIELDS) {
+    if (field === "method") continue;
+    const value = guide.params[field];
+    if (value) kept.push({ field, value, reason: refusal });
+  }
+  return {
+    guide: { status: "none", product_url: null, guide_url: null, method: null, params: {}, quotes: [], dropped: [...guide.dropped, ...kept] },
+    refusal,
+  };
+}
+
+/**
  * Reduce a model response to only what it can back, and decide which tier
  * actually answered. Never throws: a malformed response is a guide with
  * status "none", which is a legitimate outcome rather than an error.

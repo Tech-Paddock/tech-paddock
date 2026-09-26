@@ -10,6 +10,7 @@ import {
   type ResultBlock,
   type ToolFailure,
 } from "@/lib/searchRun";
+import { shouldReadImages } from "@/lib/recipeImage";
 
 describe("toolErrorsIn", () => {
   it("reads an error out of a web_search result block", () => {
@@ -163,6 +164,9 @@ describe("readTurn", () => {
 describe("concludeSearch", () => {
   const PRODUCT = "https://roaster.example/products/example-lot";
   const GUIDE = "https://roaster.example/pages/brew";
+  /** The name on the bag, which the product page's host has to carry (TEC-68). */
+  const ROASTER = "Example Coffee Roasters";
+  const conclude = (text: string, blocks: ResultBlock[]) => concludeSearch(text, blocks, ROASTER);
 
   const answer = (over: Record<string, unknown> = {}) =>
     JSON.stringify({
@@ -185,20 +189,20 @@ describe("concludeSearch", () => {
   ];
 
   it("keeps a guide read on a page the run fetched", () => {
-    const { guide, warning } = concludeSearch(answer(), fetched(GUIDE));
+    const { guide, warning } = conclude(answer(), fetched(GUIDE));
     expect(guide.status).toBe("roaster_generic");
     expect(guide.params.ratio).toBe("1:16");
     expect(warning).toBeNull();
   });
 
   it("refuses a guide on a site the run never reached, however confidently it is cited", () => {
-    const { guide } = concludeSearch(answer(), []);
+    const { guide } = conclude(answer(), []);
     expect(guide.status).toBe("none");
     expect(guide.dropped[0].reason).toMatch(/never reached/);
   });
 
   it("records none with a warning when the model's own fetch failed", () => {
-    const { guide, warning } = concludeSearch(
+    const { guide, warning } = conclude(
       JSON.stringify({ status: "none", product_url: null }),
       failedFetch("https://roaster.example/x", "url_not_in_prior_context")
     );
@@ -208,7 +212,7 @@ describe("concludeSearch", () => {
   });
 
   it("throws, recording nothing, when the service failed under a none", () => {
-    expect(() => concludeSearch(JSON.stringify({ status: "none" }), [{ type: "web_search_tool_result", content: { error_code: "unavailable" } }])).toThrow(
+    expect(() => conclude(JSON.stringify({ status: "none" }), [{ type: "web_search_tool_result", content: { error_code: "unavailable" } }])).toThrow(
       /could not complete/
     );
   });
@@ -216,7 +220,7 @@ describe("concludeSearch", () => {
   it("clears a product link whose page no longer loads", () => {
     // The roaster moved or removed the page. Keeping the link would hand the
     // next search a dead page as a known one, and leave it under "Beans ↗".
-    const { guide, warning } = concludeSearch(
+    const { guide, warning } = conclude(
       JSON.stringify({ status: "none", product_url: PRODUCT }),
       failedFetch(PRODUCT, "url_not_accessible")
     );
@@ -226,7 +230,7 @@ describe("concludeSearch", () => {
   });
 
   it("keeps a product link that did load, even when another fetch failed", () => {
-    const { guide } = concludeSearch(JSON.stringify({ status: "none", product_url: PRODUCT }), [
+    const { guide } = conclude(JSON.stringify({ status: "none", product_url: PRODUCT }), [
       ...fetched(PRODUCT),
       ...failedFetch("https://roaster.example/other", "url_not_accessible"),
     ]);
@@ -243,7 +247,38 @@ describe("concludeSearch", () => {
         { type: "text", text: whole.slice(cut + 2) },
       ],
     });
-    const { guide } = concludeSearch((turn as { text: string }).text, fetched(GUIDE));
+    const { guide } = conclude((turn as { text: string }).text, fetched(GUIDE));
     expect(guide.status).toBe("roaster_generic");
+  });
+
+  describe("a retailer's page named as the product page (TEC-68)", () => {
+    // A host that does not carry "example", the roaster's one distinctive word.
+    const RETAIL = "https://shop.retailer.test/p/lot";
+
+    it("clears it and refuses the guide read on it, though the run reached it", () => {
+      const { guide, warning } = conclude(
+        answer({ product_url: RETAIL, guide_url: RETAIL, quotes: [{ field: "ratio", text: "We brew at 1:16.", url: RETAIL }] }),
+        fetched(RETAIL)
+      );
+      expect(guide).toMatchObject({ status: "none", product_url: null, guide_url: null, params: {} });
+      expect(guide.dropped).toEqual([{ field: "ratio", value: "1:16", reason: expect.stringMatching(/retailer\.test/) }]);
+      expect(warning).toMatch(/retailer\.test/);
+      // No product page left, so the image read has nothing to read.
+      expect(shouldReadImages(guide)).toBe(false);
+    });
+
+    it("clears it when nothing was found on it, and says why beside the none", () => {
+      const { guide, warning } = conclude(JSON.stringify({ status: "none", product_url: RETAIL }), fetched(RETAIL));
+      expect(guide.product_url).toBeNull();
+      expect(warning).toMatch(/not kept/);
+      expect(shouldReadImages(guide)).toBe(false);
+    });
+
+    it("keeps the roaster's own product page, so its images are still read", () => {
+      const { guide, warning } = conclude(JSON.stringify({ status: "none", product_url: PRODUCT }), fetched(PRODUCT));
+      expect(guide.product_url).toBe(PRODUCT);
+      expect(warning).toBeNull();
+      expect(shouldReadImages(guide)).toBe(true);
+    });
   });
 });

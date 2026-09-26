@@ -1,28 +1,30 @@
 # Coffee — handoff
 
-State as of 2026-09-25. Read `RULES.md` first; this file is only what is true right now and its traps.
+State as of 2026-09-26. Read `RULES.md` first; this file is only what is true right now and its traps.
 Open work is in Linear, team TEC, under `agent:Coffee`.
 
 ---
 
 ## What is true now
 
-**It is live at `coffee.techpaddock.io`**, behind the password gate, installed to the iPhone home
-screen. The whole flow has run end to end against a real bag.
+**Live at `coffee.techpaddock.io`**, behind the gate, on the iPhone home screen; run end to end.
 
 **Save comes before the search**, and the page polls the row rather than waiting: the search takes
 minutes with nothing on the connection, so a phone calls it dead. **Search again** re-runs it from the
-shelf and refreshes the link. **Nothing is pinned up front** (#176); `validateGuide` is the whole
-constraint on where a guide may come from.
+shelf and refreshes the link. **Nothing is pinned up front** (#176); where a guide may come from is
+checked after the run, in `lib/guide.ts` — `validateGuide`, then `anchorOnRoaster`.
 
 ### What TEC-28 made true (2026-09-25)
 
 - **Only the search writes `guide_*`.** `POST /api/bags` takes no guide; a bag is saved at
   `not_searched` through `guideColumns(null)`.
 - **"The roaster's own site" is anchored on evidence.** A guide needs a product page on an http(s)
-  host, and must be on that same site **and** on a host the run reached — taken from the tool result
-  blocks by `reachedUrlsIn` in `lib/searchRun.ts`, never from the answer. `javascript:` and friends are
-  not URLs anywhere (`webHost` in `lib/guide.ts`, which `hostOf` now shares).
+  host, and must be on that same site **and** on a host the run reached (`reachedUrlsIn`, off the tool
+  result blocks, never the answer). `javascript:` and friends are not URLs anywhere (`webHost`).
+- **The product page itself carries the roaster's name (TEC-68).** `anchorOnRoaster`, run inside
+  `concludeSearch`: its host must hold every word of the bag's roaster name less `NAME_FILLER`.
+  Failing, the page is cleared, every value on its site is `dropped` with the reason, a warning says
+  so, and with no product page left the gallery is never read.
 - **The whole step from API response to stored outcome is pure and tested** in `lib/searchRun.ts`:
   `readTurn` (only `end_turn` answers; `max_tokens`, `refusal` and anything else throw; split text
   blocks rejoin with nothing between them), `concludeSearch` (validation, tool failures, stale link).
@@ -70,9 +72,8 @@ constraint on where a guide may come from.
 - **TDS, extraction, beverage yield and grinder have no `guide_*` column.** The card shows them; the
   copy-out is told not to put a yield in `water`.
 - **`parseRatio` reads larger over smaller**: "16:1" and "1:16" are both 16, and "2:1" is 2.
-- **`product_url` is still never quote-backed.** It is cleared when its fetch fails in a run, but a
-  page the model names and nobody fetched is stored as named, and `Beans ↗` links it straight out.
-- **Two brewer vocabularies; `myBrewerFor` crosses only on an exact match.** A bare "V60" does not map.
+- **The name check has false negatives.** A domain that drops a word of the name (49thcoffee.com) or
+  a misread roaster records `none`, reason beside it. `product_url` is still never required *reached*.
 - **A date input on iOS sets its own minimum width**, turned off in `globals.css`.
 - **The icon is a pour-over in the JPS livery**, every colour a token, **no alpha**, **a static
   import** from `/_next/static` — the one prefix middleware excludes.

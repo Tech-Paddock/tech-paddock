@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateGuide, webHost, type RawGuide } from "@/lib/guide";
+import { anchorOnRoaster, bearsRoasterName, validateGuide, webHost, type RawGuide } from "@/lib/guide";
 
 const PRODUCT = "https://sweetbloomcoffee.com/products/example-lot";
 const BREW = "https://sweetbloomcoffee.com/pages/brew-guides";
@@ -283,5 +283,104 @@ describe("validateGuide, for values read off an image", () => {
     );
     expect(guide.params.ratio).toBe("1:16");
     expect(guide.quotes[0]).not.toHaveProperty("image");
+  });
+});
+
+// TEC-68: the product page is the anchor every other site check is made
+// against, so it needs a check of its own. A retailer's page named as the
+// product page used to pass, and since TEC-47 its gallery would be read too.
+describe("bearsRoasterName", () => {
+  it("accepts the roaster's own site under the usual naming", () => {
+    const cases: [string, string][] = [
+      ["Sweet Bloom Coffee Roasters", "https://sweetbloomcoffee.com/products/x"],
+      ["Middlestate Coffee", "https://www.middlestatecoffee.com/shop/jos-ramirez-guatemala"],
+      ["Onyx Coffee Lab", "https://onyxcoffeelab.com/products/x"],
+      ["The Barn", "https://thebarn.de/products/x"],
+      ["Black & White Coffee Roasters", "https://www.blackwhiteroasters.com/products/x"],
+      ["La Cabra", "https://lacabra.dk/products/x"],
+      ["Hydrangea", "https://hydrangea.coffee/products/x"],
+      ["Heart Coffee Roasters", "https://www.heartroasters.com/products/x"],
+      ["SWEETBLOOM", "https://shop.sweetbloomcoffee.com/x"],
+      ["Joe's Coffee", "https://joescoffee.example/x"],
+      ["Café Grumpy", "https://cafegrumpy.com/x"],
+    ];
+    for (const [roaster, url] of cases) expect(bearsRoasterName(url, roaster), `${roaster} @ ${url}`).toBe(true);
+  });
+
+  it("refuses a retailer's page, however it is described", () => {
+    expect(bearsRoasterName("https://www.drinktrade.com/sweet-bloom-hometown", "Sweet Bloom Coffee Roasters")).toBe(false);
+    expect(bearsRoasterName("https://www.amazon.com/Sweet-Bloom-Coffee/dp/B0", "Sweet Bloom")).toBe(false);
+  });
+
+  it("needs every word of the name, not one of them", () => {
+    // "Sweet" alone is in a green-coffee retailer's host.
+    expect(bearsRoasterName("https://www.sweetmarias.com/x", "Sweet Bloom")).toBe(false);
+  });
+
+  it("refuses when the name has nothing left to match once the filler is gone", () => {
+    expect(bearsRoasterName("https://coffee.example/x", "Coffee Roasters Co.")).toBe(false);
+    expect(bearsRoasterName("https://coffee.example/x", "")).toBe(false);
+  });
+
+  it("refuses what is not a web page", () => {
+    expect(bearsRoasterName("javascript:alert('sweetbloom')", "Sweet Bloom")).toBe(false);
+    expect(bearsRoasterName(null, "Sweet Bloom")).toBe(false);
+  });
+});
+
+describe("anchorOnRoaster", () => {
+  const RETAIL = "https://www.drinktrade.com/sweet-bloom-hometown";
+
+  it("leaves a guide whose product page is on the roaster's site untouched", () => {
+    const guide = validateGuide(raw(), REACHED);
+    expect(anchorOnRoaster(guide, "Sweet Bloom Coffee Roasters")).toEqual({ guide, refusal: null });
+  });
+
+  it("leaves a guide with no product page alone", () => {
+    const guide = validateGuide(raw({ product_url: null }), REACHED);
+    expect(anchorOnRoaster(guide, "Sweet Bloom")).toEqual({ guide, refusal: null });
+  });
+
+  it("clears a retailer's product page, and refuses every value read on its site", () => {
+    const guide = validateGuide(
+      raw({
+        product_url: RETAIL,
+        guide_url: RETAIL,
+        params: { method: "V60", ratio: "1:16" },
+        quotes: [
+          { field: "method", text: "Brew on a V60.", url: RETAIL },
+          { field: "ratio", text: "We brew this at 1:16.", url: RETAIL },
+        ],
+      }),
+      ["drinktrade.com"]
+    );
+    // What validateGuide alone let through: a retailer, reached and quoted.
+    expect(guide.status).toBe("coffee_specific");
+
+    const { guide: anchored, refusal } = anchorOnRoaster(guide, "Sweet Bloom Coffee Roasters");
+    expect(refusal).toMatch(/drinktrade\.com/);
+    expect(anchored).toMatchObject({ status: "none", product_url: null, guide_url: null, method: null, params: {}, quotes: [] });
+    // Surfaced beside the answer, never silently discarded.
+    expect(anchored.dropped).toEqual([
+      { field: "method", value: "v60", reason: refusal },
+      { field: "ratio", value: "1:16", reason: refusal },
+    ]);
+  });
+
+  it("keeps what was already dropped", () => {
+    const guide = validateGuide(
+      raw({ product_url: RETAIL, guide_url: RETAIL, params: { ratio: "1:16", time: "3:00" }, quotes: [{ field: "ratio", text: "1:16", url: RETAIL }] }),
+      ["drinktrade.com"]
+    );
+    const { guide: anchored } = anchorOnRoaster(guide, "Sweet Bloom");
+    expect(anchored.dropped.map((d) => d.field)).toEqual(["time", "ratio"]);
+  });
+
+  it("clears a retailer's product page even when nothing was found on it", () => {
+    const guide = validateGuide({ status: "none", product_url: RETAIL }, ["drinktrade.com"]);
+    const { guide: anchored, refusal } = anchorOnRoaster(guide, "Sweet Bloom");
+    expect(anchored.product_url).toBeNull();
+    expect(anchored.dropped).toEqual([]);
+    expect(refusal).not.toBeNull();
   });
 });

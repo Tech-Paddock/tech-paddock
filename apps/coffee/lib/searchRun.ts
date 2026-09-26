@@ -10,7 +10,7 @@
  * what the search returned.
  */
 
-import { validateGuide, webHost, type Guide, type RawGuide } from "./guide";
+import { anchorOnRoaster, validateGuide, webHost, type Guide, type RawGuide } from "./guide";
 
 /** A response content block, narrowed to what this module reads. */
 export type ResultBlock = {
@@ -238,12 +238,16 @@ export type SearchOutcome = {
  * From the final answer and every block the run produced, to what the bag
  * records. Throws `SearchFailed` when the run cannot answer.
  */
-export function concludeSearch(text: string, blocks: ResultBlock[]): SearchOutcome {
+export function concludeSearch(text: string, blocks: ResultBlock[], roaster: string): SearchOutcome {
   const failures = toolFailuresIn(blocks);
   const reached = reachedUrlsIn(blocks);
   const reachedHosts = reached.map(webHost).filter((h): h is string => !!h);
 
-  let guide = validateGuide(parseGuideJson(text), reachedHosts);
+  // The product page gets its own roaster-site check (TEC-68): it is what
+  // every other check is anchored on, so a retailer's page named here would
+  // otherwise pass as the roaster's site, and its gallery would be read.
+  const anchored = anchorOnRoaster(validateGuide(parseGuideJson(text), reachedHosts), roaster);
+  let guide = anchored.guide;
 
   const unearned = unearnedNone(guide.status, failures);
   if (unearned) throw new SearchFailed(unearned);
@@ -260,11 +264,17 @@ export function concludeSearch(text: string, blocks: ResultBlock[]): SearchOutco
     failures.some((f) => f.tool === "web_fetch" && f.url?.trim() === guide.product_url);
   if (stale) guide = { ...guide, product_url: null };
 
-  const warning =
+  const trouble =
     guide.status === "none" && failures.length > 0
       ? `Recorded as no recipe, though the search hit trouble on the way — ${describe(failures)}.` +
         (stale ? " The product page no longer loads, so its link was cleared." : "")
       : null;
+  // Said even when nothing was found on it: a retailer's link that vanished
+  // without a word would read as a bag that never had one.
+  const offSite = anchored.refusal
+    ? `The product page was not kept and its images were not read: ${anchored.refusal}.`
+    : null;
+  const warning = [trouble, offSite].filter(Boolean).join(" ") || null;
 
   return { guide, warning };
 }
