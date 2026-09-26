@@ -36,6 +36,15 @@ export interface SourceContent {
    * source text that does not reach the output.
    */
   unplacedSections?: UnplacedSection[];
+  /**
+   * Career Highlights the source has but that could not be read into pairs — a
+   * pipe table whose rows do not line up, say — as the text of each cell.
+   * Absent when there are none. **Not the same as `careerHighlights: null`**,
+   * which means the input had none: reading these as absent once passed the
+   * verdict while their text reached the document nowhere (TEC-79). Reported
+   * as `input-dropped`, and counted by `linesTaken`, so coverage names them.
+   */
+  unreadableHighlights?: string[];
 }
 
 export interface UnplacedSection {

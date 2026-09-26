@@ -22,6 +22,9 @@ export function linesTaken(content: SourceContent): string[] {
   const lines: string[] = [];
   if (content.summary) lines.push(content.summary);
   for (const h of content.careerHighlights ?? []) lines.push(h.stat, h.desc);
+  // Not placed anywhere, and that is the point: they are source text, so the
+  // check must look for them and name them when they are missing (TEC-79).
+  lines.push(...(content.unreadableHighlights ?? []));
   for (const c of content.competencies ?? []) lines.push(c.label, c.items);
   for (const e of content.experience) {
     lines.push(e.company, e.title, e.date, ...e.bullets);

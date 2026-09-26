@@ -110,6 +110,17 @@ export function renderIntoTemplate(
     });
   }
 
+  // Never "the input had none". It had some, and they could not be paired
+  // without guessing, so none of that text reaches the document (TEC-79).
+  const unreadable = content.unreadableHighlights ?? [];
+  if (unreadable.length > 0) {
+    changeLog.push({
+      section: "Career Highlights",
+      action: "input-dropped",
+      detail: `The source's Career Highlights (${unreadable.length} ${unreadable.length === 1 ? "cell" : "cells"}) could not be read into metric and description pairs, so none of them were carried over and the template's were kept. Fix the source's table so its rows line up.`,
+    });
+  }
+
   return { blocks: [...output, ...tailBlocks], changeLog };
 }
 
@@ -238,6 +249,12 @@ function renderCareerHighlights(
       continue;
     }
     const highlights = content.careerHighlights;
+    if (content.unreadableHighlights) {
+      // The input had highlights this could not read. The template's stay, and
+      // the drop is logged once, below, whatever shape the template has.
+      out.push(block);
+      continue;
+    }
     if (!highlights || highlights.length === 0) {
       out.push(block);
       log.push({

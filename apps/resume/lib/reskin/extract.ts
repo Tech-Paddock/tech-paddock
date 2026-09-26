@@ -103,8 +103,13 @@ export function extractSourceContent(blocks: Block[]): SourceContent {
     }
   }
 
+  // Neither reader could pair the lines up. Refusing to guess is right, but the
+  // text is still the source's: it is kept here so the renderer can say it was
+  // dropped, rather than reading null as "the input had no highlights".
+  let unreadableHighlights: string[] = [];
   if (careerHighlights === null && careerHighlightLines.length > 0) {
     careerHighlights = parsePipeTable(careerHighlightLines) ?? parseColonPairs(careerHighlightLines);
+    if (careerHighlights === null) unreadableHighlights = highlightText(careerHighlightLines);
   }
   if (competencies === null && competencyPlainRows.length > 0) {
     competencies = competencyPlainRows;
@@ -116,6 +121,7 @@ export function extractSourceContent(blocks: Block[]): SourceContent {
     experience: groupExperienceEntries(expLines),
     competencies,
     ...(unplaced.length > 0 ? { unplacedSections: unplaced } : {}),
+    ...(unreadableHighlights.length > 0 ? { unreadableHighlights } : {}),
   };
 }
 
@@ -185,18 +191,12 @@ function statCellsFromTable(tableRaw: string): StatCell[] {
  * Returns null unless the shape is unambiguous and nothing is lost: one row of
  * metrics, one of descriptions, equal cell counts. Null means the template's own
  * Career Highlights stays untouched, which is the right answer when the input
- * cannot be read confidently — a guess here costs keyword coverage.
+ * cannot be read confidently — a guess here costs keyword coverage. The caller
+ * keeps the text as `unreadableHighlights`, so the refusal is reported as a
+ * drop rather than passing for an input with no highlights.
  */
 function parsePipeTable(lines: string[]): StatCell[] | null {
-  const rows = lines
-    .filter((l) => l.includes("|"))
-    .map((l) => {
-      const cells = l.split("|").map((c) => c.trim());
-      if (cells[0] === "") cells.shift();
-      if (cells[cells.length - 1] === "") cells.pop();
-      return cells;
-    })
-    .filter((cells) => cells.length > 0 && !cells.every((c) => /^:?-{2,}:?$/.test(c)));
+  const rows = pipeRows(lines);
 
   if (rows.length < 2) return null;
   const [stats, descs] = rows;
@@ -206,6 +206,32 @@ function parsePipeTable(lines: string[]): StatCell[] | null {
   if (stats.length === 0 || stats.length !== descs.length) return null;
   if (stats.some((s) => !s) || descs.some((d) => !d)) return null;
   return stats.map((stat, i) => ({ stat, desc: descs[i] }));
+}
+
+/** The rows of a markdown pipe table, as cells, without its alignment row. */
+function pipeRows(lines: string[]): string[][] {
+  return lines
+    .filter((l) => l.includes("|"))
+    .map((l) => {
+      const cells = l.split("|").map((c) => c.trim());
+      if (cells[0] === "") cells.shift();
+      if (cells[cells.length - 1] === "") cells.pop();
+      return cells;
+    })
+    .filter((cells) => cells.length > 0 && !cells.every((c) => /^:?-{2,}:?$/.test(c)));
+}
+
+/**
+ * The text of highlights neither reader could pair: each pipe-table cell on its
+ * own, and any other line whole. Cells rather than raw lines because a raw line
+ * carries pipes the document never will, so coverage could not find it even
+ * where every word arrived. The alignment row is scaffolding and is left out, as
+ * it is on both sides of the coverage fraction.
+ */
+function highlightText(lines: string[]): string[] {
+  const cells = pipeRows(lines).flat();
+  const plain = lines.filter((l) => !l.includes("|"));
+  return [...cells, ...plain].filter((t) => t !== "");
 }
 
 /**

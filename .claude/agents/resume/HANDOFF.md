@@ -1,6 +1,6 @@
 # Resume Formatter — handoff
 
-State as of 2026-09-25.
+State as of 2026-09-26.
 
 Read `RULES.md` first. This file is only what is true right now, and its traps. Open work is in
 Linear, team TEC, labelled `agent:Resume Formatter`.
@@ -18,6 +18,8 @@ section the source did not fill (`not-found-in-input`), or source text with nowh
 note, never a vote.** The two drops shared one action until TEC-31 and the verdict failed the
 repo's own fixture pair at full coverage — so log each drop as what it is, or the verdict either
 cries wolf or overstates. An end-to-end test runs that pair through the route's pipeline.
+**Highlights the source has but cannot pair up are a drop too** (`unreadableHighlights`, TEC-79),
+counted by `linesTaken`; `careerHighlights: null` alone means the source had none.
 
 **Diagnostics checks the lines a reformat takes** (`linesTaken`, as the reformat route does), not
 the whole source, which it leaves partly behind by design. A source it takes nothing from is
