@@ -123,7 +123,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
   return NextResponse.json({ deleted: params.id });
 }
 
-const SELECT = "id, version, name, spec, is_active, archived_at, created_at";
+const SELECT = "id, version, name, is_active, archived_at, created_at";
 
 function fail(status: number, code: string, error: string) {
   return NextResponse.json({ code, error }, { status });
