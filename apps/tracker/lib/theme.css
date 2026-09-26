@@ -972,6 +972,42 @@
   outline-offset: -2px;
 }
 
+/* Log out (TEC-73). The same pill as the switch, so the two controls on a bar
+   read as one set: the --ink-soft boundary for the same 3:1 reason, the bar's
+   ink on an inverted bar. It is a single action, so it never shows a pressed
+   state. Failure takes --sev-urgent, because "you are still signed in" is the
+   one thing on the bar that has to be noticed; on an inverted bar only the
+   border does, since red ink on a livery's bar colour is not reliably legible. */
+.pd-logout {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--ink-soft);
+  border-radius: 999px;
+  cursor: pointer;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--ink-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.pd-logout svg { width: 14px; height: 14px; display: block; }
+.pd-logout:hover { color: var(--ink); }
+.pd-logout:disabled { opacity: 0.6; cursor: default; }
+.pd-logout[data-state="failed"] { color: var(--sev-urgent); border-color: var(--sev-urgent); }
+.pd-logout:focus-visible { outline: 2px solid var(--pinstripe); outline-offset: 2px; }
+
+.pd-logout.pd-on-bar { color: rgb(var(--bar-ink-rgb) / 0.75); border-color: rgb(var(--bar-ink-rgb) / 0.4); }
+.pd-logout.pd-on-bar:hover { color: var(--bar-ink); }
+.pd-logout.pd-on-bar[data-state="failed"] { color: var(--bar-ink); border-color: var(--sev-urgent); }
+
+/* Framed by the hub, the hub's own Log out governs — see LogoutControl. */
+[data-embedded] .pd-logout { display: none; }
+
 /* On a phone the bar has room for one line of identity beside the switch, and
    the inspiration is the half that gives way — the livery name still says what
    you are looking at, which is the part that stops meaning anything if it
@@ -983,5 +1019,11 @@
 
   .pd-theme {
     gap: 10px;
+  }
+
+  /* The door alone while idle; the aria-label still names it. Working and
+     failed keep their words, because those are the states worth reading. */
+  .pd-logout[data-state="idle"] .pd-logout-label {
+    display: none;
   }
 }

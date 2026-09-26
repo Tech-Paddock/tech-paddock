@@ -1,4 +1,5 @@
 import ThemeControl, { LiveryBadge } from "./ThemeControl";
+import LogoutControl from "./LogoutControl";
 import Cookbook, { type Tab } from "./Cookbook";
 import { LIVERY } from "@/lib/livery";
 
@@ -26,6 +27,7 @@ export default function Shell({ tab }: { tab: Tab }) {
       <header className="flex items-center gap-2 border-b-4 border-accent bg-bar px-4 py-3 text-bar-ink">
         <h1 className="text-lg font-semibold tracking-tight">Cookbook</h1>
         <ThemeControl onBar />
+        <LogoutControl onBar />
         <div className="ml-auto flex items-center gap-2">
           <LiveryBadge livery={LIVERY} onBar />
         </div>

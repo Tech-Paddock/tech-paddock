@@ -6,6 +6,7 @@ import { LIVERY } from "@/lib/livery";
 import { KIND_LABEL, type ResumeFile, type ResumeKind } from "@/lib/resumes";
 import { verdictFor } from "@/lib/verdict";
 import ThemeControl, { LiveryBadge } from "./ThemeControl";
+import LogoutControl from "./LogoutControl";
 
 /**
  * Three tabs, not four.
@@ -555,6 +556,7 @@ function ReformatShell() {
             ))}
           </nav>
           <ThemeControl onBar />
+          <LogoutControl onBar />
         </div>
       </header>
 

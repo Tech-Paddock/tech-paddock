@@ -19,11 +19,13 @@ rather than in production.
 | `lib/auth.ts` | `apps/<app>/lib/auth.ts` | The session cookie, the advisory attempts counter and `safeEqual`. A mismatch does not throw — it silently rejects valid sessions on every other app. |
 | `lib/password.ts` | `apps/<app>/lib/password.ts` | The bcrypt wrapper. Node-only; never import it from `middleware.ts`. |
 | `lib/login.ts` | `apps/<app>/lib/login.ts` | The handler behind every app's `POST /api/login`, which each `app/api/login/route.ts` re-exports. Node-only, like `password.ts`. |
+| `lib/logout.ts` | `apps/<app>/lib/logout.ts` | The handler behind every app's `POST /api/logout`, which each `app/api/logout/route.ts` re-exports. It clears the domain-wide session cookie, so logging out of one app logs out of all of them. |
 | `lib/safe-redirect.ts` | `apps/<app>/lib/safe-redirect.ts` | Where a successful login may send you. Pure; the login pages are client components and import it in the browser. |
 | `lib/theme.css` | `apps/<app>/lib/theme.css` | The token system. Drift here is loud — one app looking wrong beside another in an iframe. |
 | `lib/theme.ts` | `apps/<app>/lib/theme.ts` | The other half of the theme, and **the file that could drift silently** until this landed. |
 | `next.config.mjs` | `apps/<app>/next.config.mjs` | The security headers, including `frame-ancestors`. A missing header changes nothing anybody can see. |
 | `app/ThemeControl.tsx` | `apps/<app>/app/ThemeControl.tsx` | The light/dark switch, and the message that carries it into the hub's frames. |
+| `app/LogoutControl.tsx` | `apps/<app>/app/LogoutControl.tsx` | The header's Log out: it calls `/api/logout` and says so when that fails. Stamped into the parked apps too, where nothing mounts it. |
 
 ### Why the login path is stamped too
 
