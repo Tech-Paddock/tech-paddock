@@ -10,14 +10,14 @@
  * Two axes, and they are deliberately different kinds of thing.
  *
  * **Livery is per app and fixed at build time.** Coffee is John Player
- * Special, the hub is Martini, and neither can become the other. That is why
+ * Special, home is Martini, and neither can become the other. That is why
  * there is no livery cookie and no picker: the app names its own livery in its
  * layout, the layout stays statically renderable, and the tokens arrive from
- * lib/theme.css. The hub embedding a tool whose livery differs is the design
+ * lib/theme.css. Home embedding a tool whose livery differs is the design
  * rather than a defect — you are looking at two cars.
  *
  * **Polarity is per person and shared across every subdomain.** One cookie on
- * .techpaddock.io, so switching to light in Coffee switches the hub too.
+ * .techpaddock.io, so switching to light in Coffee switches home too.
  */
 
 export type Mode = "light" | "dark";
@@ -106,14 +106,14 @@ export function themeCookieString(hostname: string, protocol: string, mode: Mode
 /**
  * Whether a postMessage origin is one of ours.
  *
- * The hub embeds each tool in a cross-origin iframe, so writing the cookie and
- * stamping <html> in the hub's document does not reach a frame that has already
- * loaded. The hub posts `{ type: "paddock-mode", mode }` to each frame instead
+ * Home embeds each tool in a cross-origin iframe, so writing the cookie and
+ * stamping <html> in home's document does not reach a frame that has already
+ * loaded. Home posts `{ type: "paddock-mode", mode }` to each frame instead
  * and the tool restamps itself; this is the guard on the receiving end.
  *
  * **It is defence in depth, not the control.** Posting into a frame requires
  * framing it first, and every tool already sends `frame-ancestors 'self'
- * https://techpaddock.io https://*.techpaddock.io` — so the hub is the only
+ * https://techpaddock.io https://*.techpaddock.io` — so home is the only
  * page that can be the sender. What travels is a display preference: no
  * credential, no data read, and the worst a forged message could do is flip the
  * colours of a page whoever sent it had already embedded.
