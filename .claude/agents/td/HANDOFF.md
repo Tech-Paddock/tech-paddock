@@ -33,9 +33,9 @@ is on hold** (Joel, 2026-09-25); the parking lot is the `Parked` label.
   and the editor have none set: Resume makes no model calls, and the editor is parked.
 - **`VERCEL_TOKEN` is gone from `tp-home`**, live build included; only `GITHUB_TOKEN` remains there.
 - **`tp-tracker` and `tp-message-editor` are paused**: their production deployments read `BLOCKED`.
-- **Every session's Linear writes prompt Joel, yours included** (TEC-59, tested 2026-09-26), so no
-  repo setting is the cause: the connector's own permissions on claude.ai are (TEC-67). Until he sets
-  them, helpers make no Linear writes and list them for you. Deletes and diff tools ask by design.
+- **Linear writes no longer prompt Joel, from this session or a helper** (TEC-59, tested with him
+  watching on 2026-09-26, after he set the connector's tools to allowed on claude.ai). Helpers make
+  their own Linear writes again. Deletes, label retirement and diff tools still ask, by design.
 - **The weekly Routine "Weekly rules-drift audit"** (Mondays 08:00 UTC) names Deployment as the gate
   since 2026-09-25 (TEC-42). It is report-only.
 - **This container cannot reach `*.techpaddock.io`** — the network policy refuses it — so nothing
