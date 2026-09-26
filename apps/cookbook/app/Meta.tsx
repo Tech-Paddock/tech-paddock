@@ -76,6 +76,20 @@ export const EMPTY_FORM: MetaForm = {
   rating: null,
 };
 
+/** A stored recipe's metadata as the form holds it — what the editor opens with. */
+export function formFromMeta(meta: RecipeMeta): MetaForm {
+  return {
+    total_minutes: meta.total_minutes ? String(meta.total_minutes) : "",
+    meal: meta.meal ?? "",
+    mains: meta.mains.join(", "),
+    cuisine: meta.cuisine ?? "",
+    equipment: meta.equipment.join(", "),
+    diet: [...meta.diet],
+    tags: meta.tags.join(", "),
+    rating: meta.rating,
+  };
+}
+
 const input = "min-w-0 rounded-lg border border-line bg-surface px-3 py-2 text-sm";
 
 /**
@@ -84,10 +98,19 @@ const input = "min-w-0 rounded-lg border border-line bg-surface px-3 py-2 text-s
  * agreed not to exist (see `lib/metadata.ts`), and the server drops either if
  * one is typed into Tags.
  */
-export function MetaFields({ value, onChange }: { value: MetaForm; onChange: (next: MetaForm) => void }) {
+export function MetaFields({
+  value,
+  onChange,
+  open = false,
+}: {
+  value: MetaForm;
+  onChange: (next: MetaForm) => void;
+  /** Open to begin with — the editor, where the details are half of what you came to change. */
+  open?: boolean;
+}) {
   const set = <K extends keyof MetaForm>(key: K, v: MetaForm[K]) => onChange({ ...value, [key]: v });
   return (
-    <details className="rounded-lg border border-line bg-surface">
+    <details open={open} className="rounded-lg border border-line bg-surface">
       <summary className="cursor-pointer px-3 py-2 text-sm text-ink-soft">Details (optional)</summary>
       <div className="grid grid-cols-2 gap-2 p-3 pt-1">
         <input

@@ -12,6 +12,7 @@ import { MAX_STEER, pileForAsk, turnDown, type TurnedDown } from "@/lib/reroll";
 import { downscale } from "@/lib/image";
 import { formatMinutes, pillFacts } from "@/lib/metadata";
 import { EMPTY_FORM, MetaFields, MetaSummary, Stars, type MetaForm } from "./Meta";
+import EditRecipe from "./EditRecipe";
 
 /**
  * The book, and the four ways into it. The fourth, a file, arrived 2026-09-22.
@@ -299,9 +300,9 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   }
 
   /**
-   * Rate a recipe in the book, or clear it (TEC-52). **The only edit the book
-   * makes to a kept recipe** — see `setRating`. The row comes back and replaces
-   * the one on screen; a failure leaves the old rating showing and says so.
+   * Rate a recipe in the book, or clear it (TEC-52) — the one-tap edit, without
+   * opening the editor. The row comes back and replaces the one on screen; a
+   * failure leaves the old rating showing and says so.
    */
   async function rate(recipe: Recipe, value: number | null) {
     if (rating) return;
@@ -321,6 +322,12 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     } finally {
       setRatingBusy(null);
     }
+  }
+
+  /** An edit saved (`EditRecipe`): the row that came back replaces the one on screen. */
+  function edited(updated: Recipe, repriced: boolean) {
+    setRecipes((all) => (all ? all.map((r) => (r.id === updated.id ? updated : r)) : all));
+    toast.notice(repriced ? `"${updated.name}" is saved and re-priced.` : `"${updated.name}" is saved.`);
   }
 
   async function remove(recipe: Recipe) {
@@ -718,6 +725,9 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
                 rating={rating === recipe.id}
                 onRate={(value) => rate(recipe, value)}
                 onRemove={() => remove(recipe)}
+                model={model}
+                onModel={setModel}
+                onEdited={edited}
               />
             ))}
           </ul>
@@ -737,6 +747,9 @@ function RecipeCard({
   onList,
   onRate,
   onRemove,
+  model,
+  onModel,
+  onEdited,
 }: {
   recipe: Recipe;
   open: boolean;
@@ -746,8 +759,13 @@ function RecipeCard({
   onList: () => void;
   onRate: (value: number | null) => void;
   onRemove: () => void;
+  model: ModelId;
+  onModel: (model: ModelId) => void;
+  onEdited: (recipe: Recipe, repriced: boolean) => void;
 }) {
   const [count, setCount] = useState("1");
+  // Every field is editable (Joel, 2026-09-26), in place on the open card.
+  const [editing, setEditing] = useState(false);
   // **Remove asks first** (TEC-29 item 8): it is permanent, and it sat one tap
   // from Add to list.
   const [confirmingRemove, setConfirmingRemove] = useState(false);
@@ -785,7 +803,20 @@ function RecipeCard({
         </span>
       </button>
 
-      {open ? (
+      {open && editing ? (
+        <div className="border-t border-line p-3">
+          <EditRecipe
+            recipe={recipe}
+            model={model}
+            onModel={onModel}
+            onCancel={() => setEditing(false)}
+            onSaved={(updated, repriced) => {
+              setEditing(false);
+              onEdited(updated, repriced);
+            }}
+          />
+        </div>
+      ) : open ? (
         <div className="flex flex-col gap-3 border-t border-line p-3">
           <MacroRow macros={serving} per="one serving" />
           <Provenance source={recipe.source} model={recipe.model} url={recipe.source_url} />
@@ -850,6 +881,13 @@ function RecipeCard({
             >
               {listing ? "Adding…" : "Add to list"}
             </button>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded border border-line px-3 py-1.5 text-sm"
+            >
+              Edit
+            </button>
             {confirmingRemove ? (
               <>
                 <button
@@ -881,8 +919,9 @@ function RecipeCard({
             )}
           </div>
           <p className="text-[11px] text-ink-soft">
-            Pricing helpings reads the numbers above and calls nothing. Removing takes the recipe out
-            of the book and leaves your shopping list alone.
+            Pricing helpings reads the numbers above and calls nothing. Editing re-prices only when the
+            ingredients change. Removing takes the recipe out of the book and leaves your shopping list
+            alone.
           </p>
         </div>
       ) : null}
