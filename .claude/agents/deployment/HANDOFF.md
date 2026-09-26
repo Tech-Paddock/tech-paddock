@@ -1,6 +1,6 @@
 # Deployment — handoff
 
-State as of 2026-09-25. `RULES.md` has the job and the gate; this is only the state of deployment
+State as of 2026-09-26. `RULES.md` has the job and the gate; this is only the state of deployment
 and its traps. Open work is in Linear, team TEC, labelled `agent:Deployment`. Branch and pull request
 state is never written here — read it live.
 
@@ -17,18 +17,20 @@ second — seventeen branches, three migrations — under Joel's one gate. The m
   review still ask, and a merge that is not a squash is refused. **Nothing enforces the brief's
   scope**, so a branch outside it is not yours to merge. No merge of either train asked a click,
   even before the guard change landed; a click that does come and is denied is still a stop.
-- **As a helper you make no Linear writes**: a helper's still prompt Joel (TEC-59), so list every
-  status and Next-steps change in your report and the TD applies them. `delete_*`, `retire_*` and
+- **As a helper you make no Linear writes**: every session's Linear writes prompt Joel (TEC-59;
+  the cause is the connector's permissions, TEC-67), so list every status and Next-steps change in
+  your report and the TD applies them. `delete_*`, `retire_*` and
   the Linear diff tools ask in any session, since `merge_diff` would merge outside the guard.
 - **Linear statuses and assignees follow the table in `CLAUDE.md`.** In Review means the branch is
   with Deployment; once it merges, the issue is In Progress while steps remain, Done when none do.
   Joel's ⭐ steps are dashboard work and decisions, never a merge click.
 - **GitHub's *Automatically delete head branches* is on** in effect. Check with
   `git ls-remote --heads`, not a local `git branch -r`, which keeps stale refs until a prune.
-- **`INTERNAL_API_SECRET` is not yet one value.** Rotating it to one value on `tp-home`,
-  `tp-tracker` and `tp-message-editor` is TEC-33 step 1, Joel's, and has not happened; that step
-  also adds it to `tp-home`, which may not hold it at all. Until it is done, a 401 from the hub's
-  glance or the editor's draft button means the rotation is pending, not that three values disagree.
+- **`INTERNAL_API_SECRET` is one team-shared variable** linked to `tp-home`, `tp-tracker` and
+  `tp-message-editor` since 2026-09-25 (Vercel's audit log). The hub's live build carries it; the
+  paused tracker and editor stay on 2026-09-24 builds from before it (Joel's call). **Until they
+  rebuild, a 401 or no answer from the tracker means its build predates the value**, not that
+  values disagree.
 - **The migration history is clean**: the repo and `list_migrations` differ by exactly
   `20260908235234`, withheld because it seeds personal data.
 

@@ -331,13 +331,13 @@ it; git keeps it.
   yet TEC-14 once rested on "unreachable while paused". `framework: null` does not mean a broken Root
   Directory — `tp-health` read null, skipped previews from its own `vercel.json`, built `READY`, and
   served a `verified` `health.techpaddock.io` while being called unreachable for a day on that field.
-- **2026-09-20 — Vercel's Redeploy button is a no-op for every app with a diff in its
-  `ignoreCommand`.** The Ignored Build Step is a pure function of `HEAD^..HEAD`, so re-running it on
-  the same commit returns the same answer every time, and an empty commit produces the same empty
-  diff. **That makes an environment variable impossible to pick up from the dashboard** — a
-  deployment's env snapshot is taken when it is *created*, so editing a variable changes nothing
-  until a new build exists. It cost the Cookbook its bring-up: three redeploys carrying
-  `ANTHROPIC_API_KEY` were cancelled in turn while the old build served, correct and live.
+- **2026-09-20 — Vercel's Redeploy re-runs the Ignored Build Step, and it answers the same every
+  time.** The step is a pure function of `HEAD^..HEAD`, so redeploying a deployment it skipped is
+  skipped again, and an empty commit produces the same empty diff. **Redeploy the live one** to pick
+  up a variable: a deployment's env snapshot is taken when it is *created*, and the live build built
+  because its commit touched the app, so its redeploy builds too (2026-09-26: Coffee, Cookbook and
+  Health took new keys that way). It cost the Cookbook its bring-up: three redeploys of skipped
+  builds carrying `ANTHROPIC_API_KEY` were cancelled while the old build served, correct and live.
   **The fix, landed the same day: every such `ignoreCommand` reads `FORCE_BUILD`.** Set it to
   anything on the Vercel project, redeploy, remove it. It sits **after the preview check and before
   the diff**, so it forces production only and previews stay ruled out — a separate settled call it
