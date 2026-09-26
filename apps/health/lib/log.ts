@@ -295,7 +295,12 @@ type RawLine = SnapshotColumns & {
   resolved_source: MacroSource; resolved_model: string | null;
 };
 
-/** The numbers a line was logged with, or null for a line written before snapshots. */
+/**
+ * The numbers a line was logged with. The columns are NOT NULL since the
+ * `health_entry_items_snapshot_not_null` migration, so null here means the row
+ * could not have been written by this schema; the caller refuses it rather
+ * than summing it as zero.
+ */
 export function snapshotOf(line: SnapshotColumns): Macros | null {
   if (line.item_version_id === null || line.kcal === null || line.protein_g === null ||
       line.carbs_g === null || line.fat_g === null) return null;
@@ -309,13 +314,12 @@ export function snapshotOf(line: SnapshotColumns): Macros | null {
 
 /**
  * A day, as it was logged: **a plain sum of each line's snapshot** (TEC-21). A
- * correction made since does not move it.
+ * correction made since does not move it, and nothing here reads a version.
  *
- * A line with no snapshot can only have been written by the code before
- * snapshots, in the minutes between the migration and this code going live. It
- * is resolved the old way rather than summed as zero, because a silently
- * missing total is the failure this app is least allowed to have. The fallback
- * goes when the columns become NOT NULL.
+ * The snapshot columns are NOT NULL, so every line carries its numbers. A line
+ * without them is refused as a `LookupError` rather than summed as zero,
+ * because a silently missing total is the failure this app is least allowed to
+ * have.
  */
 export async function readDay(date: string): Promise<Day> {
   const supabase = getServiceClient();
@@ -338,28 +342,12 @@ export async function readDay(date: string): Promise<Day> {
   if (itemError) throw new LookupError(`Couldn't read the foods for ${date}: ${itemError.message}`);
   const names = new Map((itemRows ?? []).map((i) => [i.id as string, i.name as string]));
 
-  const unsnapshotted = [...new Set(raw.flatMap((e) =>
-    e.entry_items.filter((l) => snapshotOf(l) === null).map((l) => l.item_id)))];
-  const byItem = new Map<string, ItemVersion[]>();
-  if (unsnapshotted.length > 0) {
-    const { data: versionRows, error: versionError } = await supabase
-      .from("item_versions").select("*").in("item_id", unsnapshotted);
-    if (versionError) throw new LookupError(`Couldn't read the numbers for ${date}: ${versionError.message}`);
-    for (const v of (versionRows ?? []) as ItemVersion[]) {
-      byItem.set(v.item_id, [...(byItem.get(v.item_id) ?? []), v]);
-    }
-  }
-
   const entries: LoggedEntry[] = raw.map((e) => {
     const items: LoggedItem[] = [...e.entry_items]
       .sort((a, b) => a.position - b.position)
       .map((line) => {
-        let macros = snapshotOf(line);
-        if (!macros) {
-          const version = resolveVersion(byItem.get(line.item_id) ?? [], date);
-          if (!version) throw new LookupError(`A line on ${date} has no numbers recorded.`);
-          macros = macrosOf(version);
-        }
+        const macros = snapshotOf(line);
+        if (!macros) throw new LookupError(`A line on ${date} has no numbers recorded.`);
         return {
           id: line.id,
           item_id: line.item_id,
