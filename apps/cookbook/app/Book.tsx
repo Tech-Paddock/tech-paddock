@@ -10,6 +10,20 @@ import { methodSteps, perServing, type Recipe, type RecipeDraft, type RecipeOrig
 import { MAX_FILE_BYTES, isFileMediaType, type RecipeFile } from "@/lib/upload";
 import { MAX_STEER, pileForAsk, turnDown, type TurnedDown } from "@/lib/reroll";
 import { downscale } from "@/lib/image";
+import { formatMinutes, pillFacts } from "@/lib/metadata";
+import { EMPTY_FORM, MetaFields, MetaSummary, Stars, type MetaForm } from "./Meta";
+import EditRecipe from "./EditRecipe";
+import { BookFilters, PickFields } from "./Tuning";
+import {
+  NO_FILTER,
+  NO_PICKS,
+  cuisinesIn,
+  filterActive,
+  hasPicks,
+  matchesFilter,
+  type BookFilter,
+  type Picks,
+} from "@/lib/tuning";
 
 /**
  * The book, and the four ways into it. The fourth, a file, arrived 2026-09-22.
@@ -101,8 +115,12 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   // "Something else": the drafts turned down since this ask began, and why.
   const [turnedDown, setTurnedDown] = useState<TurnedDown[]>([]);
   const [steer, setSteer] = useState("");
-  // The brief the pile was built against; a different brief is a fresh ask.
+  // The ask the pile was built against — brief and picks; a different ask is a fresh one.
   const [pileBrief, setPileBrief] = useState("");
+  // The tuning pickers on Ask Claude, and the same options as filters on the book
+  // (Joel, 2026-09-26, "Both"). `lib/tuning.ts` has the rules.
+  const [picks, setPicks] = useState<Picks>(NO_PICKS);
+  const [filter, setFilter] = useState<BookFilter>(NO_FILTER);
 
   /** Bin it — a turn-down, the same as "Something else" (Joel, 2026-09-25). */
   function binIt() {
@@ -116,6 +134,8 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   const [servings, setServings] = useState("4");
   const [ingredients, setIngredients] = useState("");
   const [method, setMethod] = useState("");
+  // Time, meal, main and the rest, typed (TEC-52). Optional, collapsed.
+  const [metaForm, setMetaForm] = useState<MetaForm>(EMPTY_FORM);
   const [brief, setBrief] = useState("");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<(RecipeFile & { name: string }) | null>(null);
@@ -127,6 +147,8 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   const [query, setQuery] = useState("");
   // The recipe whose ingredients are on their way to the list, if any.
   const [listing, setListing] = useState<string | null>(null);
+  // The recipe whose rating is being saved, if any.
+  const [rating, setRatingBusy] = useState<string | null>(null);
   // Bumped whenever the menu may have changed: a recipe added to the list, or
   // one removed from the book (which takes it off the menu too).
   const [menuVersion, setMenuVersion] = useState(0);
@@ -172,11 +194,13 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     if (busy) return;
     setBusy(reroll ? "rerolling" : "drafting");
 
+    // Changing a pick is a new ask, the same as changing the brief.
+    const ask = `${brief}\n${JSON.stringify(picks)}`;
     const pile: TurnedDown[] =
       reroll && draft
         ? turnDown(turnedDown, draft)
         : mode === "generate"
-          ? pileForAsk(turnedDown, pileBrief, brief)
+          ? pileForAsk(turnedDown, pileBrief, ask)
           : [];
 
     try {
@@ -189,9 +213,10 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               servings: Number(servings),
               ingredients: ingredients.split("\n").map((l) => l.trim()).filter(Boolean),
               method,
+              meta: metaForm,
             }
           : mode === "generate"
-            ? { mode, model, brief, turned_down: pile, steer: reroll ? steer : "" }
+            ? { mode, model, brief, picks, turned_down: pile, steer: reroll ? steer : "" }
             : mode === "import"
               ? { mode, model, url }
               : { mode, model, file: file && { mediaType: file.mediaType, data: file.data } };
@@ -213,7 +238,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       // Only once the new draft is here: a reroll that failed leaves the draft
       // you had on screen, and it has not been turned down yet.
       setTurnedDown(pile);
-      setPileBrief(brief);
+      setPileBrief(ask);
       setSteer("");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't draft that.");
@@ -244,7 +269,9 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     setServings("4");
     setIngredients("");
     setMethod("");
+    setMetaForm(EMPTY_FORM);
     setBrief("");
+    setPicks(NO_PICKS);
     setUrl("");
     setFile(null);
     toast.notice(`"${(body.recipe as Recipe).name}" is in the book.`);
@@ -290,6 +317,37 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     }
   }
 
+  /**
+   * Rate a recipe in the book, or clear it (TEC-52) — the one-tap edit, without
+   * opening the editor. The row comes back and replaces the one on screen; a
+   * failure leaves the old rating showing and says so.
+   */
+  async function rate(recipe: Recipe, value: number | null) {
+    if (rating) return;
+    setRatingBusy(recipe.id);
+    try {
+      const response = await fetch("/api/recipes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: recipe.id, rating: value }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Couldn't rate that.");
+      const updated = body.recipe as Recipe;
+      setRecipes((all) => (all ? all.map((r) => (r.id === updated.id ? updated : r)) : all));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't rate that.");
+    } finally {
+      setRatingBusy(null);
+    }
+  }
+
+  /** An edit saved (`EditRecipe`): the row that came back replaces the one on screen. */
+  function edited(updated: Recipe, repriced: boolean) {
+    setRecipes((all) => (all ? all.map((r) => (r.id === updated.id ? updated : r)) : all));
+    toast.notice(repriced ? `"${updated.name}" is saved and re-priced.` : `"${updated.name}" is saved.`);
+  }
+
   async function remove(recipe: Recipe) {
     try {
       const response = await fetch("/api/recipes", {
@@ -315,6 +373,8 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
    * being, this moves to the query — the shape of the answer does not change.
    */
   const shown = (recipes ?? []).filter((recipe) => {
+    // The filters first (`matchesFilter`): every one set must hold.
+    if (!matchesFilter(recipe, filter)) return false;
     const q = query.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -340,7 +400,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     mode === "manual"
       ? name.trim() !== "" && ingredients.trim() !== "" && Number(servings) >= 1
       : mode === "generate"
-        ? brief.trim() !== ""
+        ? brief.trim() !== "" || hasPicks(picks)
         : mode === "import"
           ? /^https?:\/\/\S+$/i.test(url.trim())
           : file !== null && !preparing;
@@ -443,6 +503,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               aria-label="Method"
               className="rounded-lg border border-line bg-surface p-3 text-base"
             />
+            <MetaFields value={metaForm} onChange={setMetaForm} />
           </div>
         ) : mode === "generate" ? (
           <div className="flex flex-col gap-2">
@@ -454,6 +515,9 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               aria-label="What you feel like"
               className="rounded-lg border border-line bg-surface p-3 text-base"
             />
+            {/* Each pick is a requirement, and the draft comes back tagged with
+                it — diet only where Claude agrees, with a note where it does not. */}
+            <PickFields value={picks} onChange={setPicks} cuisines={cuisinesIn(recipes ?? [])} />
           </div>
         ) : mode === "import" ? (
           <div className="flex flex-col gap-2">
@@ -546,6 +610,16 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
                 />
               </div>
               {draft.note ? <p className="text-xs text-ink-soft">{draft.note}</p> : null}
+              {/* What the model said about the dish, to check before keeping it.
+                  The rating is yours: the model is never asked for one. */}
+              <MetaSummary meta={draft.meta} />
+              <div className="flex items-center gap-2 text-xs text-ink-soft">
+                <span>Your rating (optional)</span>
+                <Stars
+                  rating={draft.meta.rating}
+                  onRate={(r) => setDraft({ ...draft, meta: { ...draft.meta, rating: r } })}
+                />
+              </div>
               <details>
                 <summary className="cursor-pointer text-xs text-ink-soft">
                   {draft.ingredients.length} ingredients{draft.method ? " and the method" : ""}
@@ -642,6 +716,9 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
             />
           ) : null}
         </div>
+        {recipes !== null && recipes.length > 0 ? (
+          <BookFilters value={filter} onChange={setFilter} cuisines={cuisinesIn(recipes)} />
+        ) : null}
 
         {recipes === null ? (
           readError ? (
@@ -659,7 +736,8 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
           // Deliberately not the same sentence as an empty book. "Nothing here"
           // and "nothing matched" send you to different next actions.
           <p className="rounded-lg border border-dashed border-line p-4 text-sm text-ink-soft">
-            Nothing matches “{query.trim()}”.
+            {query.trim() ? `Nothing matches “${query.trim()}”` : "Nothing matches"}
+            {filterActive(filter) ? " with these filters. A recipe with that detail not set never matches it." : "."}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -671,7 +749,12 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
                 onToggle={() => setOpenId(openId === recipe.id ? null : recipe.id)}
                 listing={listing === recipe.id}
                 onList={() => toList(recipe)}
+                rating={rating === recipe.id}
+                onRate={(value) => rate(recipe, value)}
                 onRemove={() => remove(recipe)}
+                model={model}
+                onModel={setModel}
+                onEdited={edited}
               />
             ))}
           </ul>
@@ -686,24 +769,38 @@ function RecipeCard({
   recipe,
   open,
   listing,
+  rating,
   onToggle,
   onList,
+  onRate,
   onRemove,
+  model,
+  onModel,
+  onEdited,
 }: {
   recipe: Recipe;
   open: boolean;
   listing: boolean;
+  rating: boolean;
   onToggle: () => void;
   onList: () => void;
+  onRate: (value: number | null) => void;
   onRemove: () => void;
+  model: ModelId;
+  onModel: (model: ModelId) => void;
+  onEdited: (recipe: Recipe, repriced: boolean) => void;
 }) {
   const [count, setCount] = useState("1");
+  // Every field is editable (Joel, 2026-09-26), in place on the open card.
+  const [editing, setEditing] = useState(false);
   // **Remove asks first** (TEC-29 item 8): it is permanent, and it sat one tap
   // from Add to list.
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const serving = perServing(recipe);
   const helpings = Number(count);
   const priced = Number.isFinite(helpings) && helpings > 0 ? scale(serving, helpings) : null;
+  const minutes = formatMinutes(recipe.total_minutes);
+  const facts = pillFacts(recipe);
 
   return (
     // The id is what "On the menu" scrolls to.
@@ -713,11 +810,19 @@ function RecipeCard({
           and this is mostly a phone object. `min-w-0` is what lets the name
           shrink at all inside a flex row, and `shrink-0` on the rest is what
           stops the kcal being the thing that disappears.
-          Rating, time, meal, main and cuisine belong in this row too and are not
-          here yet: they are columns that do not exist until the metadata change. */}
+          **Rating and time stay on a phone; meal, main and cuisine give way**
+          (TEC-52), as the origin already did. Each is simply absent when unset,
+          which is every recipe until the backfill. */}
       <button type="button" onClick={onToggle} className="flex w-full items-baseline gap-2 p-3 text-left">
         <span className="min-w-0 truncate text-sm font-medium">{recipe.name}</span>
+        {recipe.rating ? (
+          <span className="shrink-0 text-[11px]">
+            <Stars rating={recipe.rating} />
+          </span>
+        ) : null}
+        {minutes ? <span className="shrink-0 text-[11px] tabular-nums text-ink-soft">{minutes}</span> : null}
         <span className="hidden shrink-0 text-[11px] text-ink-soft sm:inline">
+          {facts.length ? `${facts.join(" · ")} · ` : ""}
           {ORIGIN_LABELS[recipe.origin]} · makes {recipe.servings}
         </span>
         <span className="ml-auto shrink-0 text-xs tabular-nums text-ink-soft">
@@ -725,10 +830,28 @@ function RecipeCard({
         </span>
       </button>
 
-      {open ? (
+      {open && editing ? (
+        <div className="border-t border-line p-3">
+          <EditRecipe
+            recipe={recipe}
+            model={model}
+            onModel={onModel}
+            onCancel={() => setEditing(false)}
+            onSaved={(updated, repriced) => {
+              setEditing(false);
+              onEdited(updated, repriced);
+            }}
+          />
+        </div>
+      ) : open ? (
         <div className="flex flex-col gap-3 border-t border-line p-3">
           <MacroRow macros={serving} per="one serving" />
           <Provenance source={recipe.source} model={recipe.model} url={recipe.source_url} />
+          <MetaSummary meta={recipe} />
+          <div className="flex items-center gap-2 text-xs text-ink-soft">
+            <span>Your rating</span>
+            <Stars rating={recipe.rating} onRate={onRate} busy={rating} />
+          </div>
 
           {/* **`recipe.note` is stored and deliberately not shown here.** It is the
               estimate's own caveat — "assumed a tablespoon of oil" — which is what
@@ -785,6 +908,13 @@ function RecipeCard({
             >
               {listing ? "Adding…" : "Add to list"}
             </button>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded border border-line px-3 py-1.5 text-sm"
+            >
+              Edit
+            </button>
             {confirmingRemove ? (
               <>
                 <button
@@ -816,8 +946,9 @@ function RecipeCard({
             )}
           </div>
           <p className="text-[11px] text-ink-soft">
-            Pricing helpings reads the numbers above and calls nothing. Removing takes the recipe out
-            of the book and leaves your shopping list alone.
+            Pricing helpings reads the numbers above and calls nothing. Editing re-prices only when the
+            ingredients change. Removing takes the recipe out of the book and leaves your shopping list
+            alone.
           </p>
         </div>
       ) : null}
