@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { branchArea, classifyBranches, deployRow, ownerOf, type LatestDeploy, type PitItem } from "@/lib/pitwall";
 import { filterItems } from "@/lib/pitfilter";
-import { HUB, PARKED } from "@/lib/platform";
+import { HOME, PARKED } from "@/lib/platform";
 
 const AGENTS = new Set(["td", "deployment", "techpad-gen", "resume", "coffee", "health", "cookbook"]);
 
@@ -87,7 +87,7 @@ describe("classifyBranches", () => {
   });
 });
 
-const deploy = (state: string, project: LatestDeploy["project"] = HUB, description: string | null = "Deployment has completed"): LatestDeploy => ({
+const deploy = (state: string, project: LatestDeploy["project"] = HOME, description: string | null = "Deployment has completed"): LatestDeploy => ({
   project,
   deployment: { sha: "861d85491439e0314354e594d5b664f6f9153dfe", createdAt: "2026-09-25T00:51:32Z" },
   status: { state, description, at: "2026-09-25T00:52:10Z" },
@@ -100,7 +100,7 @@ describe("deployRow reads only the latest production deployment", () => {
   });
 
   it("boxes a failure and quotes Vercel", () => {
-    const row = deployRow(deploy("failure", HUB, "Deployment has failed"), AGENTS);
+    const row = deployRow(deploy("failure", HOME, "Deployment has failed"), AGENTS);
     expect(row).toMatchObject({ live: false, item: { state: "box" } });
     if ("item" in row) expect(row.item.detail).toContain('"Deployment has failed"');
   });
@@ -119,7 +119,7 @@ describe("deployRow reads only the latest production deployment", () => {
     expect(deployRow(deploy("mystery"), AGENTS)).toEqual({
       why: 'tp-home: its latest production deployment reads "mystery", which this page does not interpret',
     });
-    expect(deployRow({ project: HUB, deployment: null, status: null }, AGENTS)).toHaveProperty("why");
+    expect(deployRow({ project: HOME, deployment: null, status: null }, AGENTS)).toHaveProperty("why");
     expect(deployRow({ ...deploy("success"), status: null }, AGENTS)).toHaveProperty("why");
   });
 });

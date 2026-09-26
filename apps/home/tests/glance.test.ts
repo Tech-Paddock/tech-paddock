@@ -38,16 +38,16 @@ afterEach(() => {
 });
 
 describe("fetchSummary classifies every way of not getting an answer", () => {
-  it("makes no request when the hub's secret is unset", async () => {
+  it("makes no request when home's secret is unset", async () => {
     const spy = vi.fn();
     vi.stubGlobal("fetch", spy);
     expect(await fetchSummary("https://t.test/api/summary", undefined)).toEqual({
       ok: false,
-      why: "hub secret unset — no request made",
+      why: "home's secret unset — no request made",
     });
     expect(await fetchSummary("https://t.test/api/summary", "")).toEqual({
       ok: false,
-      why: "hub secret unset — no request made",
+      why: "home's secret unset — no request made",
     });
     expect(spy).not.toHaveBeenCalled();
   });

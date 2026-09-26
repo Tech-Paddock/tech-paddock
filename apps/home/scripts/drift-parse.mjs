@@ -3,7 +3,7 @@
  * renders, or into the reason it cannot. Its own module so it is tested without
  * spawning the check; `collect-drift.mjs` does the spawning.
  *
- * The JSON shape is the technical director's — `{checks:[{name,state,detail}]}`.
+ * The JSON shape is the technical director's — `{checks:[{name,state,detail,explain?}]}`.
  */
 
 const STATES = new Set(["ok", "warn", "fail"]);
@@ -37,7 +37,11 @@ export function parseDrift(stdout) {
     if (!c || typeof c.name !== "string" || !STATES.has(c.state)) {
       return unmeasured("The drift check returned a check this page cannot read — its contract has changed.");
     }
-    checks.push({ name: c.name, state: c.state, detail: typeof c.detail === "string" ? c.detail : "" });
+    const check = { name: c.name, state: c.state, detail: typeof c.detail === "string" ? c.detail : "" };
+    // Optional: a plain sentence on what the check means. The Garage has its own
+    // fallback, so a check without one still renders.
+    if (typeof c.explain === "string" && c.explain.trim()) check.explain = c.explain.trim();
+    checks.push(check);
   }
 
   /**

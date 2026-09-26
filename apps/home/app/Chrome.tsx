@@ -8,7 +8,7 @@ import ThemeControl, { LiveryBadge } from "./ThemeControl";
 import { APPS, selectedIndexFrom } from "./apps";
 
 /**
- * The hub's chrome — topbar, sidebar, and the box everything else renders into.
+ * Home's chrome — topbar, sidebar, and the box everything else renders into.
  *
  * It takes `children` rather than the data any particular page needs, which is
  * what lets `/admin` sit inside it: that page is an async server component
@@ -52,7 +52,7 @@ function Bar({ children }: { children: React.ReactNode }) {
             <span className="topbar-title">Paddock</span>
             <span className="topbar-subtitle">
               {onAdmin
-                ? "The garage — declared against reported"
+                ? "The Garage — what is wrong right now"
                 : selected === null
                   ? "What needs you, with several agents out"
                   : `Working in ${APPS[selected].name}`}

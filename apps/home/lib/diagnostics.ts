@@ -1,101 +1,164 @@
 /**
  * What is actually live, asked rather than assumed.
  *
- * Server-side only. Every probe runs from the hub's own server, so no secret
- * and no result reaches the browser except as the narrow shapes below.
+ * Server-side only. Every probe runs from home's own server, so no secret and
+ * no result reaches the browser except as the narrow shapes below.
  *
- * The hub holds no database credential: it proves nothing *about* a tool's
+ * Home holds no database credential: it proves nothing *about* a tool's
  * internals, it only asks each tool a question the tool answers for itself.
  * Adding an app is a line in `platform.ts`, not new knowledge here.
  *
- * Two things this deliberately does NOT do:
+ * Three things this deliberately does:
  *  - It never reports an environment variable's value, only whether it is set.
  *  - It never guesses. Anything it cannot reach is "unknown", with the reason,
  *    because a dashboard that fills gaps with optimism is worse than no
  *    dashboard.
+ *  - **It says what failed, in words.** A bare "404" sends you to look it up;
+ *    "Vercel has no deployment at this address" tells you where to go. The raw
+ *    code rides along after the sentence, so nothing is lost in translation.
  */
 import {
-  HUB,
-  HUB_ENV,
-  HUB_ENV_RETIRED,
+  HOME,
+  HOME_ENV,
+  HOME_ENV_RETIRED,
   PROBED,
   type DeclaredApp,
   type Project,
 } from "./platform";
 import { DECLARED } from "./declared.generated";
 
-export type Status = "up" | "down" | "unknown";
+/** `parked` is a probe that did not come back up for an app paused on purpose. */
+export type Status = "up" | "down" | "unknown" | "parked";
 
 export type Probe = {
   target: string;
   status: Status;
+  /** What happened, as a sentence. */
   detail: string;
+  /** The code or message it was read from — a status, a Vercel error, a socket error. Null when there is none. */
+  raw: string | null;
   /** Round-trip in milliseconds, when the probe actually completed a request. */
   ms: number | null;
 };
 
-export type EnvCheck = { name: string; set: boolean; optional: boolean; why: string };
+/** An environment problem on this deployment, tagged with what it breaks. */
+export type EnvError = { name: string; affects: string; problem: string };
 
 export type Diagnostics = {
   checkedAt: string;
   liveness: Probe[];
   internal: Probe[];
-  hubEnv: EnvCheck[];
-  /** Retired names that are still set. Empty is the healthy state. */
-  retiredSet: { name: string; why: string }[];
+  /** Empty is the healthy state, and The Garage then shows nothing at all. */
+  envErrors: EnvError[];
 };
+
+type Outcome = Omit<Probe, "ms" | "target">;
 
 /** A slow or dead host must not hold the page hostage. Matches lib/glance.ts. */
 const TIMEOUT_MS = 4000;
 
-async function timed(run: () => Promise<Omit<Probe, "ms" | "target">>, target: string): Promise<Probe> {
+/**
+ * Vercel names its own refusals in an `x-vercel-error` header. It is the most
+ * precise thing a failed probe can say, so it is read before the status code.
+ * A name not listed here is still shown, verbatim, rather than dropped.
+ */
+const VERCEL_ERRORS: Record<string, string> = {
+  DEPLOYMENT_PAUSED: "the Vercel project is paused",
+  DEPLOYMENT_DISABLED: "Vercel has disabled this deployment",
+  DEPLOYMENT_BLOCKED: "Vercel has blocked this deployment",
+  DEPLOYMENT_DELETED: "the deployment at this address was deleted",
+  DEPLOYMENT_NOT_FOUND: "Vercel has no deployment at this address",
+  NOT_FOUND: "Vercel found nothing at this path",
+  DNS_HOSTNAME_NOT_FOUND: "Vercel could not resolve the address it routes to",
+  FUNCTION_INVOCATION_FAILED: "the app crashed answering",
+  FUNCTION_INVOCATION_TIMEOUT: "the app took too long to answer",
+  MIDDLEWARE_INVOCATION_FAILED: "the app's middleware crashed",
+  MIDDLEWARE_INVOCATION_TIMEOUT: "the app's middleware took too long",
+  NO_RESPONSE_FROM_FUNCTION: "the app sent no response",
+};
+
+/** What a status code means, when Vercel did not name the error itself. */
+function statusMeans(status: number): string {
+  if (status === 401 || status === 403) return "the app refused the request";
+  if (status === 404) return "nothing is served at this path";
+  if (status === 429) return "rate-limited";
+  if (status >= 300 && status < 400) return "redirected instead of answering";
+  if (status >= 500) return "the app failed answering";
+  return "an answer this page does not expect";
+}
+
+/**
+ * A response that was not 2xx, as a sentence plus the code it came from.
+ * Exported for the tests.
+ */
+export function explainResponse(status: number, vercelError: string | null): { detail: string; raw: string } {
+  const code = vercelError?.trim() || null;
+  const raw = code ? `${status} ${code}` : String(status);
+  if (code) return { detail: VERCEL_ERRORS[code] ?? `Vercel refused it (${code})`, raw };
+  return { detail: statusMeans(status), raw };
+}
+
+/**
+ * Node's fetch reports a DNS failure, a TLS failure and a refused connection as
+ * the same "fetch failed", and puts the real cause underneath. Which one it was
+ * is the most useful thing on the page, so unwrap it and say it.
+ * Exported for the tests.
+ */
+export function explainError(error: unknown): { detail: string; raw: string | null } {
+  if (!(error instanceof Error)) return { detail: "the request failed without saying why", raw: null };
+  if (error.name === "TimeoutError" || error.name === "AbortError") {
+    return { detail: `no answer within ${TIMEOUT_MS / 1000} seconds`, raw: error.name };
+  }
+  const cause = (error as { cause?: unknown }).cause;
+  const code = cause instanceof Error ? (cause as { code?: string }).code : undefined;
+  const raw = code ?? (cause instanceof Error ? cause.message : error.message);
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") return { detail: "the address did not resolve — DNS", raw };
+  if (code === "ECONNREFUSED") return { detail: "the connection was refused", raw };
+  if (code === "ECONNRESET" || code === "UND_ERR_SOCKET") return { detail: "the connection was dropped", raw };
+  if (code && /CERT|TLS|SSL|SIGNATURE/.test(code)) return { detail: "the certificate was not accepted — TLS", raw };
+  return { detail: "the request failed before an answer came back", raw };
+}
+
+async function timed(run: () => Promise<Outcome>, target: string): Promise<Probe> {
   const started = Date.now();
   try {
     const result = await run();
     return { target, ...result, ms: Date.now() - started };
   } catch (error) {
-    // A DNS failure, a TLS failure and a refused connection are all "did not
-    // answer" from here, and which one it was is the single most useful thing
-    // on the page. Node's fetch reports every one of them as the same
-    // "fetch failed", and puts the real cause underneath — so unwrap it.
-    return { target, status: "down", detail: describe(error), ms: Date.now() - started };
+    return { target, status: "down", ...explainError(error), ms: Date.now() - started };
   }
 }
 
-function describe(error: unknown): string {
-  if (!(error instanceof Error)) return "threw a non-error";
-  if (error.name === "TimeoutError") return `no answer within ${TIMEOUT_MS}ms`;
-  const cause = (error as { cause?: unknown }).cause;
-  if (cause instanceof Error) {
-    const code = (cause as { code?: string }).code;
-    return code ? `${code} — ${cause.message}` : cause.message;
-  }
-  return error.message;
+/**
+ * A parked app is paused on purpose, so its not answering is expected rather
+ * than a fault. The reason is kept — "paused" is worth confirming, and anything
+ * else is worth knowing — but the row is grey, never red.
+ * Exported for the tests.
+ */
+export function forParked(probe: Probe, parked: boolean): Probe {
+  if (!parked || probe.status === "up") return probe;
+  return { ...probe, status: "parked", detail: `parked, so expected: ${probe.detail}` };
 }
-
-const parkedNote = (project: Project & { parked?: true }) => (project.parked ? " (parked)" : "");
 
 /**
  * Liveness, without needing anything from the app being probed.
  *
  * `/login` is unauthenticated on every app by design, so a 200 proves the whole
- * chain the hub cares about: DNS resolved, TLS terminated, Vercel routed to a
+ * chain home cares about: DNS resolved, TLS terminated, Vercel routed to a
  * project, Next.js booted, and middleware ran. It proves nothing about that
  * app's database or keys.
  */
-function livenessProbe(project: Project & { parked?: true }) {
-  return timed(async () => {
+async function livenessProbe(project: Project & { parked?: true }) {
+  const probe = await timed(async () => {
     const res = await fetch(`${project.url}/login`, {
       cache: "no-store",
       redirect: "manual",
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (res.ok) return { status: "up" as const, detail: `${res.status} from ${project.url}/login` };
-    return {
-      status: "down" as const,
-      detail: `${res.status} ${res.statusText || ""}`.trim() + ` from ${project.url}/login`,
-    };
-  }, `${project.name}${parkedNote(project)}`);
+    if (res.ok) return { status: "up" as const, detail: "answering", raw: null };
+    return { status: "down" as const, ...explainResponse(res.status, res.headers.get("x-vercel-error")) };
+  }, project.name);
+  return forParked(probe, !!project.parked);
 }
 
 /**
@@ -103,75 +166,85 @@ function livenessProbe(project: Project & { parked?: true }) {
  *
  * 401 and 403 are the middleware refusing the header — the two projects hold
  * different values. Anything else that is not 2xx says nothing about the secret
- * either way, so it is "unknown" with the code, never "up".
+ * either way, so it is "unknown" with what did happen, never "up".
  */
-export function classifySecretStatus(status: number, path: string): Omit<Probe, "ms" | "target"> {
+export function classifySecretStatus(status: number, path: string, vercelError: string | null = null): Outcome {
   if (status >= 200 && status < 300) {
-    return { status: "up", detail: `${path} accepted the hub's secret` };
+    return { status: "up", detail: `the two projects hold the same secret`, raw: null };
   }
   if (status === 401 || status === 403) {
     return {
       status: "down",
-      detail: `${path} rejected the hub's secret — the two projects hold different values`,
+      detail: `${path} rejected home's secret — the two projects hold different values`,
+      raw: String(status),
     };
   }
-  return { status: "unknown", detail: `${path} answered ${status}` };
+  const { detail, raw } = explainResponse(status, vercelError);
+  return { status: "unknown", detail: `could not test it — ${detail}`, raw };
 }
 
 /**
- * Proves the hub and a tool hold the *same* INTERNAL_API_SECRET.
+ * Proves home and a tool hold the *same* INTERNAL_API_SECRET.
  *
  * A tool's middleware carves its `/api/summary` out of the password gate for
  * exactly this header, so a mismatch — otherwise silent, and the same class of
  * failure as a SESSION_SECRET mismatch — shows here as a rejection.
  */
-function sharedSecretProbe(project: Project & { parked?: true }, path: string) {
-  const label = `${project.name}${parkedNote(project)} · shared secret`;
+async function sharedSecretProbe(project: Project & { parked?: true }, path: string) {
   const secret = process.env.INTERNAL_API_SECRET;
-  if (!secret) {
-    return Promise.resolve<Probe>({
-      target: label,
-      status: "unknown",
-      detail: "INTERNAL_API_SECRET is not set on the hub, so this cannot be tested",
-      ms: null,
-    });
-  }
-  return timed(async () => {
-    const res = await fetch(`${project.url}${path}`, {
-      headers: { "x-internal-secret": secret },
-      cache: "no-store",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    return classifySecretStatus(res.status, path);
-  }, label);
+  const probe: Probe = !secret
+    ? {
+        target: project.name,
+        status: "unknown",
+        detail: "could not test it — INTERNAL_API_SECRET is not set on home",
+        raw: null,
+        ms: null,
+      }
+    : await timed(async () => {
+        const res = await fetch(`${project.url}${path}`, {
+          headers: { "x-internal-secret": secret },
+          cache: "no-store",
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        });
+        return classifySecretStatus(res.status, path, res.headers.get("x-vercel-error"));
+      }, project.name);
+  return forParked(probe, !!project.parked);
 }
 
 /**
- * Presence only. No value is read into a variable that could be rendered.
+ * Only what is wrong. Presence only: no value is read into a variable that
+ * could be rendered.
  *
  * Reports what *this deployment* was built with, not what the Vercel dashboard
- * currently says: the environment is baked into the serverless function at
- * deploy time, so a setting changed since the last deploy reads as it was until
- * a redeploy. The page says so rather than letting the number imply otherwise.
+ * currently says: the environment is baked into the function at deploy time,
+ * so a fix made in the dashboard clears here only after a redeploy.
+ * Exported for the tests, with the environment passed in.
  */
-function hubEnv(): EnvCheck[] {
-  return HUB_ENV.map((e) => ({ ...e, set: !!process.env[e.name] }));
-}
-
-function retiredSet() {
-  return HUB_ENV_RETIRED.filter((e) => !!process.env[e.name]);
+export function envErrors(env: Record<string, string | undefined> = process.env): EnvError[] {
+  const missing = HOME_ENV.filter((e) => e.unsetMeans !== null && !env[e.name]).map((e) => ({
+    name: e.name,
+    affects: e.affects,
+    problem: `not set — ${e.unsetMeans}`,
+  }));
+  const retired = HOME_ENV_RETIRED.filter((e) => !!env[e.name]).map((e) => ({
+    name: e.name,
+    affects: e.affects,
+    problem: e.why,
+  }));
+  return [...missing, ...retired];
 }
 
 /**
- * The hub is not probed over the public internet.
+ * Home is not probed over the public internet.
  *
- * If this code is running, the hub booted and is serving — fetching its own
+ * If this code is running, home booted and is serving — fetching its own
  * public URL to rediscover that adds a failure mode rather than a signal.
  */
-const hubProbe: Probe = {
-  target: HUB.name,
+const homeProbe: Probe = {
+  target: HOME.name,
   status: "up",
-  detail: "serving this page — not probed over the network",
+  detail: "serving this page",
+  raw: null,
   ms: null,
 };
 
@@ -187,7 +260,7 @@ export function secretSubjects<P extends Project>(probed: P[], declared: Declare
 }
 
 export async function runDiagnostics(): Promise<Diagnostics> {
-  const others = PROBED.filter((p) => p.slug !== HUB.slug);
+  const others = PROBED.filter((p) => p.slug !== HOME.slug);
   const [liveness, internal] = await Promise.all([
     Promise.all(others.map(livenessProbe)),
     Promise.all(secretSubjects(others, DECLARED.apps).map((p) => sharedSecretProbe(p, "/api/summary"))),
@@ -195,22 +268,8 @@ export async function runDiagnostics(): Promise<Diagnostics> {
 
   return {
     checkedAt: new Date().toISOString(),
-    liveness: [hubProbe, ...liveness],
+    liveness: [homeProbe, ...liveness],
     internal,
-    hubEnv: hubEnv(),
-    retiredSet: retiredSet(),
+    envErrors: envErrors(),
   };
-}
-
-export function countByStatus(probes: Probe[]) {
-  return {
-    up: probes.filter((p) => p.status === "up").length,
-    down: probes.filter((p) => p.status === "down").length,
-    unknown: probes.filter((p) => p.status === "unknown").length,
-  };
-}
-
-/** Severity classes already exist in globals.css; this maps a probe onto them. */
-export function severityFor(status: Status) {
-  return status === "down" ? "urgent" : status === "unknown" ? "warn" : "info";
 }

@@ -4,7 +4,7 @@
  * The pit wall's whole claim is that it does not invent anything, so the rows
  * that come from the repo have to come from the files themselves rather than a
  * list somebody typed. This reads them at build time and emits a module the app
- * can import, for the same reason `collect-declared.mjs` does: the hub deploys
+ * can import, for the same reason `collect-declared.mjs` does: home deploys
  * with `apps/home` as its Vercel Root Directory, so files above that directory
  * exist during the build and are not reliably readable at runtime.
  *
@@ -18,7 +18,7 @@
  *
  * It used to read `.claude/OPEN-ITEMS.md` for the Waiting on Joel and Parked
  * rows. That file was deleted on 2026-09-23 when open items moved to Linear, and
- * the hub stays keyless, so those rows went with it rather than reading an
+ * home stays keyless, so those rows went with it rather than reading an
  * absent file as an empty one.
  *
  * Degrades to an empty manifest rather than failing the build.

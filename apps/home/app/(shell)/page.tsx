@@ -8,7 +8,7 @@ import Paper from "../Paper";
 import PitWall from "../PitWall";
 
 /**
- * The hub is a top-level dashboard rather than a launcher.
+ * Home is a top-level dashboard rather than a launcher.
  *
  * Data is fetched on the server so it arrives with the page, but **only what the
  * current view shows, and never before the view itself**: a framed tool needs

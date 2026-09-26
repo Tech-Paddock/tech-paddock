@@ -1,346 +1,250 @@
+import type { ReactNode } from "react";
 import { DECLARED } from "@/lib/declared.generated";
 import { DRIFT } from "@/lib/drift.generated";
-import { PROBED, type DriftCheck, type DriftState } from "@/lib/platform";
-import { countByStatus, runDiagnostics, severityFor, type Probe } from "@/lib/diagnostics";
+import type { DriftCheck, DriftState } from "@/lib/platform";
+import { runDiagnostics, type Probe, type Status } from "@/lib/diagnostics";
+import { budgetDistance, explainDrift } from "@/lib/drift-explain";
 
 /**
- * Declared versus reported.
+ * The Garage: what is wrong right now.
  *
- * The left-hand truth is the repo — committed, reviewable, and generated at
- * build time rather than typed. The right-hand truth is whatever the platform
- * says about itself right now. The gap between them is the only thing on this
- * page worth looking at, which is why nothing here is allowed to guess: an
- * unreachable check reads "unknown" and says why.
+ * One row per thing, each with a stoplight — green answering, amber could not
+ * be tested, red broken, grey parked on purpose. No pills and no tallies: a
+ * count above a list repeats the list, and a pill is a second word for the
+ * colour the light already shows.
  *
- * Sits behind the hub's password gate like every other route here. It reports
- * no environment value, only whether a name is set.
+ * **A failure says what failed.** Every red or amber row carries the sentence
+ * `lib/diagnostics.ts` wrote for it, with the raw code after it.
+ *
+ * **Environment errors are the only section that can be absent.** Nothing is
+ * listed while every variable is as it should be; a name appears only when it
+ * is wrong, tagged with what it breaks.
+ *
+ * Sits behind the password gate like every other route here. It reports no
+ * environment value, only whether a name is set.
  */
 export const dynamic = "force-dynamic";
 
-function ProbeRow({ probe }: { probe: Probe }) {
+type Light = "go" | "caution" | "stop" | "off";
+
+const PROBE_LIGHT: Record<Status, Light> = { up: "go", unknown: "caution", down: "stop", parked: "off" };
+const DRIFT_LIGHT: Record<DriftState, Light> = { ok: "go", warn: "caution", fail: "stop" };
+const LIGHT_SAYS: Record<Light, string> = { go: "working", caution: "needs a look", stop: "broken", off: "parked" };
+
+function Row({
+  light,
+  title,
+  detail,
+  raw,
+  aside,
+}: {
+  light: Light;
+  title: ReactNode;
+  detail?: ReactNode;
+  raw?: string | null;
+  aside?: string;
+}) {
   return (
-    <div className={`slot slot-static sev-${severityFor(probe.status)}`}>
-      <span className="slot-label">{probe.status}</span>
-      <span className="slot-body">
-        <span className="slot-title">{probe.target}</span>
-        <span className="slot-detail">{probe.detail}</span>
+    <li className="gr">
+      <span className={`light light-${light}`} role="img" aria-label={LIGHT_SAYS[light]} />
+      <span className="gr-body">
+        <span className="gr-title">{title}</span>
+        {detail && <span className="gr-detail">{detail}</span>}
+        {raw && <span className="gr-raw">{raw}</span>}
       </span>
-      <span className="slot-count">{probe.ms === null ? "" : `${probe.ms} ms`}</span>
-    </div>
+      {aside && <span className="gr-aside">{aside}</span>}
+    </li>
   );
 }
 
-/**
- * A drift check reads like a probe, so it renders like one — same row, same
- * severity grammar. `warn` covers two different things and is deliberately not
- * split: a budget being approached, and a check that could not measure its own
- * subject. Both mean "look at this", and the detail says which it was.
- */
-const DRIFT_SEVERITY: Record<DriftState, string> = {
-  fail: "urgent",
-  warn: "warn",
-  ok: "info",
-};
-
-function DriftRow({ check }: { check: DriftCheck }) {
+function ProbeRow({ probe }: { probe: Probe }) {
   return (
-    <div className={`slot slot-static sev-${DRIFT_SEVERITY[check.state]}`}>
-      <span className="slot-label">{check.state}</span>
-      <span className="slot-body">
-        <span className="slot-title">{check.name}</span>
-        <span className="slot-detail">{check.detail}</span>
-      </span>
-    </div>
+    <Row
+      light={PROBE_LIGHT[probe.status]}
+      title={probe.target}
+      detail={probe.detail}
+      raw={probe.raw}
+      aside={probe.ms === null ? undefined : `${probe.ms} ms`}
+    />
   );
+}
+
+/** The explanation is said once for its group, above the rows, not on each. */
+function DriftRow({ check }: { check: DriftCheck }) {
+  return <Row light={DRIFT_LIGHT[check.state]} title={check.name} raw={budgetDistance(check) ?? (check.detail || null)} />;
+}
+
+/**
+ * Checks sharing an explanation, in first-seen order — seven budgets say what a
+ * budget is once rather than seven times. A check with no explanation stands in
+ * a group of its own.
+ */
+function byExplanation(checks: DriftCheck[]) {
+  const groups: { why: string | null; checks: DriftCheck[] }[] = [];
+  for (const check of checks) {
+    const why = explainDrift(check);
+    const group = why === null ? undefined : groups.find((g) => g.why === why);
+    if (group) group.checks.push(check);
+    else groups.push({ why, checks: [check] });
+  }
+  return groups;
 }
 
 export default async function AdminPage() {
   const diag = await runDiagnostics();
-  const live = countByStatus(diag.liveness);
-  const required = diag.hubEnv.filter((e) => !e.optional);
-  const missingEnv = required.filter((e) => !e.set);
-  const optionalUnset = diag.hubEnv.filter((e) => e.optional && !e.set);
   const withHealth = DECLARED.apps.filter((a) => a.hasHealthRoute).map((a) => a.slug);
-  const declaredFor = (slug: string) => DECLARED.apps.find((a) => a.slug === slug);
 
-  // Worst first, and the passing ones are listed by name below rather than
-  // dropped — a panel showing only problems reads as the whole set of checks.
-  const notable = DRIFT.checks.filter((c) => c.state !== "ok");
-  notable.sort((a, b) => (a.state === b.state ? 0 : a.state === "fail" ? -1 : 1));
-  const passing = DRIFT.checks.filter((c) => c.state === "ok");
+  // Broken first, then drifting. Holding checks fold away below them.
+  const drifting = DRIFT.checks
+    .filter((c) => c.state !== "ok")
+    .sort((a, b) => (a.state === b.state ? 0 : a.state === "fail" ? -1 : 1));
+  const holding = DRIFT.checks.filter((c) => c.state === "ok");
 
   return (
     <div className="admin">
       <header>
         <p className="eyebrow">Admin</p>
-        <h1>Platform</h1>
+        <h1>The Garage</h1>
       </header>
 
-      <p className="description">
-        What the repo declares, against what the platform reports right now. Nothing here is
-        remembered or hand-typed — anything that cannot be reached says so rather than guessing.
+      <p className="description">What is wrong right now.</p>
+      <p className="legend-row">
+        <span className="legend"><span className="light light-go" aria-hidden="true" /> working</span>
+        <span className="legend"><span className="light light-caution" aria-hidden="true" /> could not be tested</span>
+        <span className="legend"><span className="light light-stop" aria-hidden="true" /> broken</span>
+        <span className="legend"><span className="light light-off" aria-hidden="true" /> parked on purpose</span>
       </p>
 
-      <div className="stat-strip">
-        <div className="stat">
-          <span className="slot-label">Reachable</span>
-          <span className="stat-value">
-            {live.up} of {diag.liveness.length}
-          </span>
-          <span className="stat-sub">{live.down} down · {live.unknown} unknown</span>
-        </div>
-        <div className="stat">
-          <span className="slot-label">Hub config</span>
-          <span className="stat-value">
-            {required.length - missingEnv.length} of {required.length}
-          </span>
-          <span className="stat-sub">
-            {missingEnv.length === 0 ? "required: all set" : `${missingEnv.map((e) => e.name).join(", ")} missing`}
-            {optionalUnset.length > 0 && ` · optional unset: ${optionalUnset.map((e) => e.name).join(", ")}`}
-          </span>
-        </div>
-        <div className="stat">
-          <span className="slot-label">Migrations</span>
-          <span className="stat-value">{DECLARED.migrationCount ?? "—"}</span>
-          <span className="stat-sub">committed in supabase/</span>
-        </div>
-      </div>
-
-      <p className="admin-note">
-        Hub config is what <em>this deployment</em> was built with. Vercel bakes the environment into
-        the function at deploy time, so a variable changed in the dashboard since the last deploy
-        will still read as it was — a redeploy is what makes a change real, not saving the setting.
-      </p>
-
-      {diag.retiredSet.length > 0 && (
-        <div className="slots">
-          {diag.retiredSet.map((e) => (
-            <div key={e.name} className="slot slot-static sev-warn">
-              <span className="slot-label">retired</span>
-              <span className="slot-body">
-                <span className="slot-title">{e.name} is still set on this deployment</span>
-                <span className="slot-detail">{e.why}</span>
-              </span>
-            </div>
-          ))}
-        </div>
+      {diag.envErrors.length > 0 && (
+        <>
+          <h2 className="admin-section">
+            Environment errors <span className="admin-qualifier">home&apos;s own variables</span>
+          </h2>
+          <p className="admin-note">
+            As this deployment was built. A fix made in the Vercel dashboard clears here only once home
+            redeploys.
+          </p>
+          <ul className="garage-rows">
+            {diag.envErrors.map((e) => (
+              <Row
+                key={e.name}
+                light="stop"
+                title={
+                  <>
+                    {e.affects} <code>{e.name}</code>
+                  </>
+                }
+                detail={e.problem}
+              />
+            ))}
+          </ul>
+        </>
       )}
 
       <h2 className="admin-section">
-        Environment <span className="admin-qualifier">what this deployment reads, set or not</span>
-      </h2>
-      <div className="slots">
-        {diag.hubEnv.map((e) => (
-          <div key={e.name} className={`slot slot-static sev-${e.set ? "info" : e.optional ? "warn" : "urgent"}`}>
-            <span className="slot-label">{e.set ? "set" : e.optional ? "unset" : "missing"}</span>
-            <span className="slot-body">
-              <span className="slot-title">
-                <code>{e.name}</code>
-                {e.optional ? " · optional" : ""}
-              </span>
-              <span className="slot-detail">{e.why}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <h2 className="admin-section">
-        Live connections <span className="admin-qualifier">public /login on each project</span>
+        Live connections <span className="admin-qualifier">each app&apos;s public /login</span>
       </h2>
       <p className="admin-note">
-        Proves DNS, TLS, Vercel routing and that the app booted. It proves nothing about a tool&apos;s
-        database or keys — that needs its own health endpoint, which most do not have yet.
+        Proves the app is reachable and booted — not that its database or keys work.
       </p>
-      <div className="slots">
+      <ul className="garage-rows">
         {diag.liveness.map((p) => (
           <ProbeRow key={p.target} probe={p} />
         ))}
-      </div>
+      </ul>
 
       {diag.internal.length > 0 && (
         <>
           <h2 className="admin-section">
-            Shared secrets <span className="admin-qualifier">hub ↔ tool</span>
+            Shared secrets <span className="admin-qualifier">home ↔ tool</span>
           </h2>
           <p className="admin-note">
-            A mismatched <code>INTERNAL_API_SECRET</code> fails silently, so it is asserted here
-            rather than assumed. Probed on every project whose repo folder has an{" "}
-            <code>/api/summary</code> route — read at build time, not listed by hand.
+            Whether home and each tool hold the same <code>INTERNAL_API_SECRET</code>. A mismatch is
+            otherwise silent. Every app with an <code>/api/summary</code> route is tested.
           </p>
-          <div className="slots">
+          <ul className="garage-rows">
             {diag.internal.map((p) => (
               <ProbeRow key={p.target} probe={p} />
             ))}
-          </div>
+          </ul>
         </>
       )}
 
       <h2 className="admin-section">
-        Declared <span className="admin-qualifier">generated from the repo</span>
-      </h2>
-      {DECLARED.complete ? (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>App</th>
-                <th>Vercel project</th>
-                <th>Env vars</th>
-                <th>Health</th>
-                <th>Summary</th>
-                <th>Tests</th>
-                <th>In CI</th>
-              </tr>
-            </thead>
-            <tbody>
-              {PROBED.map((project) => {
-                const d = declaredFor(project.slug);
-                const inCi = DECLARED.ciMatrix.includes(project.slug);
-                return (
-                  <tr key={project.slug}>
-                    <td>
-                      {project.slug}
-                      {project.parked ? " (parked)" : ""}
-                    </td>
-                    <td>
-                      <code>{project.vercelProject}</code>
-                    </td>
-                    <td>{d ? d.envNames.length : "—"}</td>
-                    <td className={d?.hasHealthRoute ? "" : "admin-absent"}>
-                      {d?.hasHealthRoute ? "yes" : "no"}
-                    </td>
-                    <td className={d?.hasSummaryRoute ? "" : "admin-absent"}>
-                      {d?.hasSummaryRoute ? "yes" : "no"}
-                    </td>
-                    <td className={d?.hasTestScript ? "" : "admin-absent"}>
-                      {d?.hasTestScript ? "yes" : "no"}
-                    </td>
-                    <td className={inCi ? "" : "admin-absent"}>{inCi ? "yes" : "NO"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="admin-note">
-          The declared manifest could not be generated from this checkout, so nothing is shown here
-          rather than an empty table that would read as fact.
-        </p>
-      )}
-
-      <h2 className="admin-section">
-        Rules drift <span className="admin-qualifier">measured from the repo at build time</span>
+        Rules drift <span className="admin-qualifier">the repo when home was last built</span>
       </h2>
       <p className="admin-note">
-        Every rule in <code>CLAUDE.md</code> that can be measured, measured — checksums, the
-        deliberate <code>middleware.ts</code> variants, the file budgets, whether each handoff has
-        been updated since its own area last changed. <code>scripts/drift-check.mjs</code> answers each one by
-        looking rather than by reading a document that claims to know, and{" "}
-        <strong>never reports a pass for something it could not look at</strong>: a check that cannot
-        measure its own subject warns and says so.
-      </p>
-      <p className="admin-note">
-        <strong>This is the one thing on this page that is neither committed nor live.</strong> It is
-        the repo as it stood when this deployment was built, so after a merge that changes a rule it
-        is stale until <code>tp-home</code> next deploys. The timestamp at the foot of the page is
-        what says how old it is. CI runs the same check on every push, and that is what fails a
-        pull request.
+        Every rule in <code>CLAUDE.md</code> that can be measured, measured by{" "}
+        <code>scripts/drift-check.mjs</code>. It can be one merge behind; CI runs the same check on
+        every push.
       </p>
 
       {DRIFT.complete ? (
         <>
-          <div className="stat-strip">
-            <div className="stat">
-              <span className="slot-label">Holding</span>
-              <span className="stat-value">{DRIFT.counts.ok}</span>
-              <span className="stat-sub">measured, and matching the rule</span>
-            </div>
-            <div className="stat">
-              <span className="slot-label">Drifting</span>
-              <span className="stat-value">{DRIFT.counts.warn}</span>
-              <span className="stat-sub">near a budget, going stale, or not measurable here</span>
-            </div>
-            <div className="stat">
-              <span className="slot-label">False</span>
-              <span className="stat-value">{DRIFT.counts.fail}</span>
-              <span className="stat-sub">
-                {DRIFT.counts.fail === 0
-                  ? "no rule is currently untrue"
-                  : "a rule in CLAUDE.md is no longer true"}
-              </span>
-            </div>
-          </div>
-
-          {notable.length > 0 && (
-            <div className="slots">
-              {notable.map((check) => (
-                <DriftRow key={check.name} check={check} />
-              ))}
-            </div>
+          {drifting.length > 0 ? (
+            byExplanation(drifting).map((group) => (
+              <div key={group.checks[0].name} className="garage-group">
+                {group.why && <p className="garage-why">{group.why}</p>}
+                <ul className="garage-rows">
+                  {group.checks.map((check) => (
+                    <DriftRow key={check.name} check={check} />
+                  ))}
+                </ul>
+              </div>
+            ))
+          ) : (
+            <p className="admin-note">Nothing is drifting.</p>
           )}
 
-          {passing.length > 0 && (
-            <p className="slot-note">
-              Also measured and holding: {passing.map((c) => c.name).join(" · ")}.
-            </p>
+          {holding.length > 0 && (
+            <details className="garage-holding">
+              <summary>
+                {holding.length} {holding.length === 1 ? "check is" : "checks are"} holding
+              </summary>
+              <ul className="garage-rows">
+                {holding.map((check) => (
+                  <DriftRow key={check.name} check={check} />
+                ))}
+              </ul>
+            </details>
           )}
         </>
       ) : (
-        <p className="admin-note">{DRIFT.reason}</p>
+        <ul className="garage-rows">
+          <Row light="caution" title="Drift could not be measured" detail={DRIFT.reason} />
+        </ul>
       )}
 
       <h2 className="admin-section">
         Blind spots <span className="admin-qualifier">what this page cannot see</span>
       </h2>
-      <div className="slots">
-        <div className="slot slot-static sev-warn">
-          <span className="slot-label">unknown</span>
-          <span className="slot-body">
-            <span className="slot-title">Whether each tool&apos;s database and keys are healthy</span>
-            <span className="slot-detail">
-              {withHealth.length === 0 ? (
-                <>No app has a <code>/api/health</code> route.</>
-              ) : (
-                <>
-                  {withHealth.join(", ")} {withHealth.length === 1 ? "has" : "have"} a{" "}
-                  <code>/api/health</code> route (read from the repo at build time), but each sits
-                  behind the password gate with no internal-secret carve-out, so the hub gets 401.
-                </>
-              )}{" "}
-              Fixing it needs a middleware carve-out per app, which is shared auth plumbing and not
-              this app&apos;s to change.
-            </span>
-          </span>
-        </div>
-        <div className="slot slot-static sev-warn">
-          <span className="slot-label">unknown</span>
-          <span className="slot-body">
-            <span className="slot-title">Which commit each project is serving</span>
-            <span className="slot-detail">
-              The Pit Wall reads the commit of each project&apos;s latest production deployment from
-              the statuses Vercel posts to GitHub — but a rollback or a redeploy started from the
-              Vercel dashboard posts none, so what is serving can differ. Vercel exposes the serving
-              SHA to the app itself, not to a sibling; a one-line public endpoint per project would
-              close this.
-            </span>
-          </span>
-        </div>
-        <div className="slot slot-static sev-info">
-          <span className="slot-label">by design</span>
-          <span className="slot-body">
-            <span className="slot-title">Whether SESSION_SECRET matches across every project</span>
-            <span className="slot-detail">
-              Nothing may echo it, so no page can ever check it. The only safe signal is
-              behavioural: log in here, then open a tool and see whether it asks again.
-            </span>
-          </span>
-        </div>
-      </div>
+      <ul className="garage-blind">
+        <li>
+          <strong>Whether each tool&apos;s database and keys are healthy.</strong>{" "}
+          {withHealth.length === 0 ? (
+            <>No app has a <code>/api/health</code> route.</>
+          ) : (
+            <>
+              {withHealth.join(", ")} {withHealth.length === 1 ? "has" : "have"} a{" "}
+              <code>/api/health</code> route, but each sits behind the password gate, so home gets
+              401. Opening it up is a middleware change — shared auth plumbing, not this app&apos;s.
+            </>
+          )}
+        </li>
+        <li>
+          <strong>Which commit each project is serving.</strong> The Pit Wall reads each project&apos;s
+          latest production deployment from GitHub, but a rollback or redeploy started in the Vercel
+          dashboard posts nothing there, so what is serving can differ.
+        </li>
+        <li>
+          <strong>Whether SESSION_SECRET matches across every project.</strong> Nothing may echo it,
+          so no page can check it. The test is behavioural: sign in here, open a tool, and see
+          whether it asks again.
+        </li>
+      </ul>
 
       <p className="admin-foot">
-        Probed {new Date(diag.checkedAt).toUTCString()} · declared manifest generated{" "}
-        {new Date(DECLARED.generatedAt).toUTCString()} · drift measured{" "}
+        Probed {new Date(diag.checkedAt).toUTCString()} · drift measured{" "}
         {new Date(DRIFT.generatedAt).toUTCString()}
       </p>
     </div>

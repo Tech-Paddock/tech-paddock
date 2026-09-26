@@ -1,14 +1,14 @@
 /**
- * The hub's landing glance.
+ * Home's landing glance.
  *
- * The hub holds no database credentials and talks to no schema — it asks each
+ * Home holds no database credentials and talks to no schema — it asks each
  * tool for its own roll-up and merges the answers. Adding a tool to the glance
  * is then a matter of that tool exposing `/api/summary` in this shape and
- * getting a line in SOURCES, not of teaching the hub anything new.
+ * getting a line in SOURCES, not of teaching home anything new.
  *
- * What comes back is deliberately narrow: counts and singles, never rows. The
- * hub is the three seconds before you click into a tool; the tools are where
- * the work happens. A hub handed thread arrays slowly becomes a worse copy of
+ * What comes back is deliberately narrow: counts and singles, never rows. Home
+ * is the three seconds before you click into a tool; the tools are where the
+ * work happens. A home page handed thread arrays slowly becomes a worse copy of
  * the tracker, so it is never handed any.
  *
  * **A source that did not answer says why, and never reads as zero.** Every
@@ -77,7 +77,7 @@ export type Glance = {
  *
  * One value for every source today because no tool declares its own cadence.
  * When one does, this moves next to that source rather than growing a table
- * here — the hub is not supposed to know a tool's habits.
+ * here — home is not supposed to know a tool's habits.
  */
 export const SOURCE_CADENCE_MS = 15 * 60 * 1000;
 
@@ -188,14 +188,14 @@ function describe(error: unknown): string {
  * Asks one tool for its roll-up, and says why when it gets none.
  *
  * Returns a reason rather than null for the same reason `lib/pitwall.ts` does:
- * the page has to tell "the hub never asked" from "the tool said no" from "the
+ * the page has to tell "home never asked" from "the tool said no" from "the
  * tool said something this page cannot read".
  */
 export async function fetchSummary(
   url: string,
   secret: string | undefined = process.env.INTERNAL_API_SECRET,
 ): Promise<Fetched> {
-  if (!secret) return { ok: false, why: "hub secret unset — no request made" };
+  if (!secret) return { ok: false, why: "home's secret unset — no request made" };
 
   let res: Response;
   try {

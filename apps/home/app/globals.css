@@ -1,4 +1,4 @@
-/* The hub's own rules. Every colour token they read — --paper, --ink, --accent,
+/* Home's own rules. Every colour token they read — --paper, --ink, --accent,
    the severity set, the tile ramp — is declared in lib/theme.css and selected
    by the data-livery and data-mode attributes this app's layout puts on <html>.
    Nothing below names a colour directly, which is what lets the same stylesheet
@@ -7,7 +7,7 @@
    This file used to open with a :root block holding the John Player Special
    hexes. It was deleted rather than moved: :root and [data-livery] have equal
    specificity, so leaving it here would have silently beaten the theme on
-   source order and pinned the hub to one livery forever. */
+   source order and pinned home to one livery forever. */
 
 html {
   background: var(--paper);
@@ -468,40 +468,6 @@ a.slot:hover {
   max-width: 60ch;
 }
 
-/* Three cells, hairline dividers. Collapses to one column on a phone. */
-.stat-strip {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  margin: 24px 0 8px;
-  overflow: hidden;
-}
-
-.stat {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
-  border-left: 1px solid var(--line);
-}
-
-.stat:first-child {
-  border-left: none;
-}
-
-.stat-value {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.stat-sub {
-  font-size: 11px;
-  color: var(--ink-soft);
-  line-height: 1.35;
-}
-
 .admin-section {
   font-size: 15px;
   font-weight: 700;
@@ -536,64 +502,145 @@ a.slot:hover {
   font-size: 0.92em;
 }
 
-.admin-table-wrap {
-  overflow-x: auto;
+/* One row per thing, led by a stoplight. No pill and no severity bar: the
+   light is the one mark saying how it is, and the sentence says why. */
+.garage-rows {
+  list-style: none;
+  margin: 12px 0 4px;
+  padding: 0;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.gr {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.gr:first-child {
+  border-top: none;
+}
+
+.gr .light {
+  margin-top: 4px;
+}
+
+.gr-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gr-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.gr-detail {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.gr-raw {
+  font-size: 11px;
+  color: var(--ink-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
+
+.gr-aside {
+  font-size: 11px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* The stoplight. --go and --caution are the shared status lights in
+   lib/theme.css; red and off are the livery's own severities. */
+.light {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.light-go { background: var(--go); }
+.light-caution { background: var(--caution); }
+.light-stop { background: var(--sev-urgent); }
+.light-off { background: var(--sev-info); }
+
+.legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 10px;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 0;
+  margin: 8px 0 0;
+}
+
+.garage-group {
+  margin-top: 16px;
+}
+
+.garage-why {
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+  max-width: 70ch;
+}
+
+.garage-why + .garage-rows {
   margin-top: 8px;
 }
 
-.admin-table {
-  width: 100%;
-  border-collapse: collapse;
+.garage-holding {
+  margin-top: 10px;
+}
+
+.garage-holding summary {
+  cursor: pointer;
   font-size: 12px;
-}
-
-.admin-table th {
-  text-align: left;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--ink-soft);
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-  white-space: nowrap;
 }
 
-.admin-table td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-  white-space: nowrap;
-}
-
-.admin-table tr:last-child td {
-  border-bottom: none;
-}
-
-.admin-absent {
+.garage-blind {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--ink-soft);
+  max-width: 70ch;
+}
+
+.garage-blind li + li {
+  margin-top: 6px;
+}
+
+.garage-blind strong {
+  color: var(--ink);
 }
 
 .admin-foot {
   font-size: 11px;
   color: var(--ink-soft);
   margin-top: 32px;
-}
-
-@media (max-width: 640px) {
-  .stat-strip {
-    grid-template-columns: 1fr;
-  }
-
-  .stat {
-    border-left: none;
-    border-top: 1px solid var(--line);
-  }
-
-  .stat:first-child {
-    border-top: none;
-  }
 }
 
 /* ---------------------------------------------------------------- pit wall
