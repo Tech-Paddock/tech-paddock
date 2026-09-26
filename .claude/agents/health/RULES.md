@@ -94,6 +94,11 @@ exists to prevent. Coffee's `LookupError` class solves exactly this; take it who
 
 ## The order of lookup, which is the product
 
+**A line naming a Cookbook recipe asks the Cookbook first** (Joel, 2026-09-26, TEC-25), through the
+`GET /api/servings` contract in Cookbook's charter, so a Cookbook edit reaches the next log. Its
+numbers are not typed over here, on a draft, a day's correction or `/debug`: the fix belongs in the
+Cookbook. Everything else runs this order:
+
 1. **Exact match** in your own table — free, instant, no model call.
 2. **Near match** on the normalised item name, so it matches parsed names rather than raw dictation.
 3. **Miss → outside.** Web search for branded items that publish real numbers; a model estimate for
@@ -132,7 +137,7 @@ is a Haiku job at any setting. Coffee puts its toggle on `/api/search`, not `/ap
 parse is pinned and the estimate is what varies.
 
 **Every number carries its provenance** — your log, the web, or an estimate, and which model produced
-it. That is not decoration: it says which line to scrutinise, and the debug harness in the plan
+it; a Cookbook recipe's numbers carry `cookbook` and name no model, because they are the Cookbook's own. That is not decoration: it says which line to scrutinise, and the debug harness in the plan
 depends on it.
 
 ---
