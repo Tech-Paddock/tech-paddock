@@ -39,8 +39,9 @@ has no `web`**, so a lifted number is not storable; **a duplicate name is refuse
 a request or a row alike. `meal` and `diet` are check-constrained lists its tests hold to `MEALS` and
 `DIETS`; the rest is open lowercased text. **No free-of or allergen claim and no macro tag is
 storable** — `readMeta` drops them; a macro filter is computed from the numbers. **The rating is
-Joel's**: read only off this app's form (typed, a draft before Keep it, or `PATCH /api/recipes`, the
-one edit a kept recipe takes); a model's is discarded. Older rows read "not set" until a backfill
+Joel's**: read only off this app's forms (typed, a draft before Keep it, the stars, the editor); a
+model's is discarded. **Every field of a kept recipe is editable** (`lib/edit.ts`): only changed
+ingredients re-price (one call, before the one write; a failure writes nothing); servings re-divides. Older rows read "not set" until a backfill
 Joel approves. The pill always shows rating and time; meal · main · cuisine only when wide.
 
 **The list is the cheap version and that is a decision, not a gap** — reconfirmed by Joel 2026-09-21:

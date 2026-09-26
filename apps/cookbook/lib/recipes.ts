@@ -3,6 +3,7 @@ import { ConflictError, InputError, LookupError } from "./errors";
 import { round, type Macros, type MacroSource } from "./macros";
 import { addItems } from "./grocery";
 import { readMeta, readRating, type RecipeMeta } from "./metadata";
+import type { RecipeEdit, Reprice } from "./edit";
 
 /**
  * The book: what a recipe is, and the one path that writes one.
@@ -288,10 +289,88 @@ export async function saveRecipe(draft: RecipeDraft): Promise<Recipe> {
 }
 
 /**
- * Rate a recipe already in the book, or clear its rating. **The only update this
- * app makes to a recipe** — every other field is written once, at Keep it, and
- * re-costing is a deliberate re-estimate. A rating is Joel's opinion, and it
- * arrives after cooking, which is after the recipe was kept.
+ * The same question as `nameTaken`, for an edit: is this name held by a recipe
+ * *other than* the one being edited? Renaming "Chilli" to "chilli" is not a
+ * collision with itself.
+ */
+export async function nameTakenByOther(name: string, exceptId: string): Promise<boolean> {
+  const { data, error } = await getServiceClient().from("recipes").select("id, name");
+  if (error) throw new LookupError(`Couldn't read the book: ${error.message}`);
+  const wanted = normalizeName(name);
+  return (data ?? []).some((r) => {
+    const row = r as { id: unknown; name: unknown };
+    return row.id !== exceptId && normalizeName(String(row.name)) === wanted;
+  });
+}
+
+/**
+ * Write an edit (`lib/edit.ts` decides what it is and whether it re-prices).
+ * **One statement**, so an edit lands whole or not at all.
+ *
+ * With a `reprice`, the pot's macros, `source: estimate`, the model and the
+ * estimate's caveat replace the old ones — a hand-set number whose ingredients
+ * changed is no longer the hand's. Without one, none of those four is sent, and
+ * a field not sent is not overwritten. `origin` and `source_url` are never sent:
+ * where a recipe came from does not change because it was edited.
+ */
+export async function updateRecipe(id: string, edit: RecipeEdit, reprice: Reprice | null): Promise<Recipe> {
+  const priced = reprice
+    ? {
+        kcal: reprice.macros.kcal,
+        protein_g: reprice.macros.protein_g,
+        carbs_g: reprice.macros.carbs_g,
+        fat_g: reprice.macros.fat_g,
+        source: "estimate" as const,
+        model: reprice.model,
+        note: reprice.note,
+      }
+    : {};
+  if (reprice) {
+    const problem = validateDraft({
+      name: edit.name,
+      servings: edit.servings,
+      macros: reprice.macros,
+      origin: "manual",
+      source: "estimate",
+      model: reprice.model,
+      source_url: null,
+      ingredients: edit.ingredients,
+      method: edit.method,
+      note: reprice.note,
+      meta: edit.meta,
+    });
+    if (problem) throw new InputError(problem);
+  }
+
+  const { data, error } = await getServiceClient()
+    .from("recipes")
+    .update({
+      name: edit.name.trim(),
+      servings: edit.servings,
+      ingredients: edit.ingredients.map((i) => i.trim()).filter(Boolean),
+      method: edit.method?.trim() || null,
+      ...edit.meta,
+      ...priced,
+    })
+    .eq("id", id)
+    .select(COLUMNS)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) {
+      throw new ConflictError(`"${edit.name.trim()}" is already in the book. Pick another name.`);
+    }
+    throw new LookupError(`Couldn't save that edit: ${error.message}`);
+  }
+  if (!data) throw new InputError("That recipe is not in the book any more.");
+  return hydrate(data as Record<string, unknown>);
+}
+
+/**
+ * Rate a recipe already in the book, or clear its rating. **The one-tap edit**:
+ * the stars on an open card save on their own, without opening the editor. A
+ * rating is Joel's opinion, and it arrives after cooking, which is after the
+ * recipe was kept. Every other field changes through `updateRecipe`.
  */
 export async function setRating(id: string, rating: unknown): Promise<Recipe> {
   const value = rating === null ? null : readRating(rating);
