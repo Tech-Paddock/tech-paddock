@@ -17,10 +17,9 @@ second — seventeen branches, three migrations — under Joel's one gate. The m
   review still ask, and a merge that is not a squash is refused. **Nothing enforces the brief's
   scope**, so a branch outside it is not yours to merge. No merge of either train asked a click,
   even before the guard change landed; a click that does come and is denied is still a stop.
-- **As a helper you make no Linear writes**: every session's Linear writes prompt Joel (TEC-59;
-  the cause is the connector's permissions, TEC-67), so list every status and Next-steps change in
-  your report and the TD applies them. `delete_*`, `retire_*` and
-  the Linear diff tools ask in any session, since `merge_diff` would merge outside the guard.
+- **As a helper you make your own Linear writes**: statuses and Next steps as you merge, without a
+  prompt since Joel allowed the connector's tools on 2026-09-26 (TEC-59, TEC-67). `delete_*`,
+  `retire_*` and the Linear diff tools still ask, since `merge_diff` would merge outside the guard.
 - **Linear statuses and assignees follow the table in `CLAUDE.md`.** In Review means the branch is
   with Deployment; once it merges, the issue is In Progress while steps remain, Done when none do.
   Joel's ⭐ steps are dashboard work and decisions, never a merge click.
