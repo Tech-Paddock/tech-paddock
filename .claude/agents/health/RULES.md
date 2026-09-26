@@ -96,7 +96,8 @@ exists to prevent. Coffee's `LookupError` class solves exactly this; take it who
 
 **A line naming a Cookbook recipe asks the Cookbook first** (Joel, 2026-09-26, TEC-25), through the
 `GET /api/servings` contract in Cookbook's charter, so a Cookbook edit reaches the next log. Its
-numbers are not typed over here: the fix belongs in the Cookbook. Everything else runs this order:
+numbers are not typed over here, on a draft, a day's correction or `/debug`: the fix belongs in the
+Cookbook. Everything else runs this order:
 
 1. **Exact match** in your own table — free, instant, no model call.
 2. **Near match** on the normalised item name, so it matches parsed names rather than raw dictation.
