@@ -64,6 +64,7 @@ is on hold** (Joel, 2026-09-25); the parking lot is the `Parked` label.
 - **A helper can be refused an action this session is allowed.** Take it to Joel; never re-run the
   refused action yourself.
 - **You cannot delete a remote branch.** The proxy refuses it, disguised as a network blip
-  (`DECISIONS.md`, traps): stop after the first try. Joel deletes merged branches by hand.
+  (`DECISIONS.md`, traps): stop after the first try. A merged branch goes by GitHub's auto-delete on merge; Joel deletes
+  only stale, unmerged ones.
 - **Cost is context × turns.** A helper's report lands in your context: brief tightly, end the
   session once the branches are pushed.
