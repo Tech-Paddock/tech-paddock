@@ -5,6 +5,7 @@ import { extractParagraphs } from "@/lib/docx/paragraphs";
 import { extractSpec } from "@/lib/docx/spec";
 import { auditAts } from "@/lib/docx/ats";
 import { StorageError, uploadDocx } from "@/lib/storage";
+import { activateTemplate } from "@/lib/templates";
 
 export const dynamic = "force-dynamic";
 
@@ -76,17 +77,11 @@ export async function POST(request: NextRequest) {
       .single();
     if (error) return fail(500, "db_error", error.message);
 
-    // Only one row may be active, enforced by a partial unique index.
-    const { error: clearError } = await supabase.from("templates").update({ is_active: false }).eq("is_active", true);
-    if (clearError) return fail(500, "db_error", clearError.message);
-
-    const { data, error: activateError } = await supabase
-      .from("templates")
-      .update({ is_active: true })
-      .eq("id", inserted.id)
-      .select(SELECT)
-      .single();
+    // One call, one transaction: the previous active is cleared and this one set
+    // together, so a failure leaves the previous template active rather than none.
+    const { data, error: activateError } = await activateTemplate(supabase, inserted.id, SELECT);
     if (activateError) return fail(500, "db_error", activateError.message);
+    if (!data) return fail(500, "db_error", "The template was saved but could not be made active.");
 
     // Findings describe the uploaded template, not the output. Worth seeing:
     // formatting is copied from this file, but its structural problems are not.
