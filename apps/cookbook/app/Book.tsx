@@ -13,6 +13,17 @@ import { downscale } from "@/lib/image";
 import { formatMinutes, pillFacts } from "@/lib/metadata";
 import { EMPTY_FORM, MetaFields, MetaSummary, Stars, type MetaForm } from "./Meta";
 import EditRecipe from "./EditRecipe";
+import { BookFilters, PickFields } from "./Tuning";
+import {
+  NO_FILTER,
+  NO_PICKS,
+  cuisinesIn,
+  filterActive,
+  hasPicks,
+  matchesFilter,
+  type BookFilter,
+  type Picks,
+} from "@/lib/tuning";
 
 /**
  * The book, and the four ways into it. The fourth, a file, arrived 2026-09-22.
@@ -104,8 +115,12 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
   // "Something else": the drafts turned down since this ask began, and why.
   const [turnedDown, setTurnedDown] = useState<TurnedDown[]>([]);
   const [steer, setSteer] = useState("");
-  // The brief the pile was built against; a different brief is a fresh ask.
+  // The ask the pile was built against — brief and picks; a different ask is a fresh one.
   const [pileBrief, setPileBrief] = useState("");
+  // The tuning pickers on Ask Claude, and the same options as filters on the book
+  // (Joel, 2026-09-26, "Both"). `lib/tuning.ts` has the rules.
+  const [picks, setPicks] = useState<Picks>(NO_PICKS);
+  const [filter, setFilter] = useState<BookFilter>(NO_FILTER);
 
   /** Bin it — a turn-down, the same as "Something else" (Joel, 2026-09-25). */
   function binIt() {
@@ -179,11 +194,13 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     if (busy) return;
     setBusy(reroll ? "rerolling" : "drafting");
 
+    // Changing a pick is a new ask, the same as changing the brief.
+    const ask = `${brief}\n${JSON.stringify(picks)}`;
     const pile: TurnedDown[] =
       reroll && draft
         ? turnDown(turnedDown, draft)
         : mode === "generate"
-          ? pileForAsk(turnedDown, pileBrief, brief)
+          ? pileForAsk(turnedDown, pileBrief, ask)
           : [];
 
     try {
@@ -199,7 +216,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               meta: metaForm,
             }
           : mode === "generate"
-            ? { mode, model, brief, turned_down: pile, steer: reroll ? steer : "" }
+            ? { mode, model, brief, picks, turned_down: pile, steer: reroll ? steer : "" }
             : mode === "import"
               ? { mode, model, url }
               : { mode, model, file: file && { mediaType: file.mediaType, data: file.data } };
@@ -221,7 +238,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       // Only once the new draft is here: a reroll that failed leaves the draft
       // you had on screen, and it has not been turned down yet.
       setTurnedDown(pile);
-      setPileBrief(brief);
+      setPileBrief(ask);
       setSteer("");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't draft that.");
@@ -254,6 +271,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     setMethod("");
     setMetaForm(EMPTY_FORM);
     setBrief("");
+    setPicks(NO_PICKS);
     setUrl("");
     setFile(null);
     toast.notice(`"${(body.recipe as Recipe).name}" is in the book.`);
@@ -355,6 +373,8 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
    * being, this moves to the query — the shape of the answer does not change.
    */
   const shown = (recipes ?? []).filter((recipe) => {
+    // The filters first (`matchesFilter`): every one set must hold.
+    if (!matchesFilter(recipe, filter)) return false;
     const q = query.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -380,7 +400,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     mode === "manual"
       ? name.trim() !== "" && ingredients.trim() !== "" && Number(servings) >= 1
       : mode === "generate"
-        ? brief.trim() !== ""
+        ? brief.trim() !== "" || hasPicks(picks)
         : mode === "import"
           ? /^https?:\/\/\S+$/i.test(url.trim())
           : file !== null && !preparing;
@@ -495,6 +515,9 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
               aria-label="What you feel like"
               className="rounded-lg border border-line bg-surface p-3 text-base"
             />
+            {/* Each pick is a requirement, and the draft comes back tagged with
+                it — diet only where Claude agrees, with a note where it does not. */}
+            <PickFields value={picks} onChange={setPicks} cuisines={cuisinesIn(recipes ?? [])} />
           </div>
         ) : mode === "import" ? (
           <div className="flex flex-col gap-2">
@@ -693,6 +716,9 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
             />
           ) : null}
         </div>
+        {recipes !== null && recipes.length > 0 ? (
+          <BookFilters value={filter} onChange={setFilter} cuisines={cuisinesIn(recipes)} />
+        ) : null}
 
         {recipes === null ? (
           readError ? (
@@ -710,7 +736,8 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
           // Deliberately not the same sentence as an empty book. "Nothing here"
           // and "nothing matched" send you to different next actions.
           <p className="rounded-lg border border-dashed border-line p-4 text-sm text-ink-soft">
-            Nothing matches “{query.trim()}”.
+            {query.trim() ? `Nothing matches “${query.trim()}”` : "Nothing matches"}
+            {filterActive(filter) ? " with these filters. A recipe with that detail not set never matches it." : "."}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
