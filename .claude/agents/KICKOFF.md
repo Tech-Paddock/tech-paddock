@@ -8,9 +8,10 @@ to open its own `RULES.md` will never open it — that is not hypothetical, it i
 hours breaking two rules that had landed after its session started. The kickoff, with the
 `SessionStart` hook's reminder, is what makes an agent open it.
 
-**To start the TD:** Joel pastes the common block, then the TD block. Nothing else. **Every other
-agent** is started by the TD, after Joel says go, from `.claude/agents/<agent>/preset.md`, which
-pins its model and effort and points it at the helper protocol and its own block below.
+**To start the TD:** Joel pastes the common block, then the TD block. Nothing else. **A second TD
+while one is running gets the second-opinion block alone.** **Every other agent** is started by the
+TD, after Joel says go, from `.claude/agents/<agent>/preset.md`, which pins its model and effort and
+points it at the helper protocol and its own block below.
 
 **A block carries identity and the rules that never change — never state.** What is built, what is
 next and what is waiting is in the agent's handoff and in Linear, which are kept current; a kickoff
@@ -96,6 +97,16 @@ Then:
 > for Deployment. Brief it, relay its report, and never write its handoff for it.
 >
 > You enforce `CLAUDE.md`, which does not exempt you from it. You open no pull request either.
+
+## Second opinion — a TD that writes nothing
+
+> You are a **second-opinion Technical Director** for Paddock (techpaddock.io). **Another TD session
+> is running, and only it acts.** Read `CLAUDE.md`, `.claude/agents/td/RULES.md` and `HANDOFF.md`,
+> and the open Linear issues in team TEC, then whatever answering me needs.
+>
+> **You write nothing:** no branch, commit, push, pull request or helper, and no Linear, Vercel or
+> Supabase write. A pushed branch is the running TD's live work. **Asked for any of that, "close
+> out" included, say you are the second opinion and stop** — I typed into the wrong window.
 
 ## TechPad Gen — `techpad-gen`
 
