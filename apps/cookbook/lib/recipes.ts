@@ -2,6 +2,7 @@ import { getServiceClient } from "./supabase";
 import { ConflictError, InputError, LookupError } from "./errors";
 import { round, type Macros, type MacroSource } from "./macros";
 import { addItems } from "./grocery";
+import { readMeta, readRating, type RecipeMeta } from "./metadata";
 
 /**
  * The book: what a recipe is, and the one path that writes one.
@@ -22,7 +23,11 @@ import { addItems } from "./grocery";
 
 export type RecipeOrigin = "manual" | "generated" | "imported";
 
-export type Recipe = Macros & {
+/**
+ * **The metadata sits flat on the row** (TEC-52, the `cookbook_recipe_metadata`
+ * migration) and is never part of the servings contract.
+ */
+export type Recipe = Macros & RecipeMeta & {
   id: string;
   name: string;
   servings: number;
@@ -54,10 +59,19 @@ export type RecipeDraft = {
   ingredients: string[];
   method: string | null;
   note: string | null;
+  /**
+   * Time, meal, main, cuisine, equipment, diet, tags — and the rating, which
+   * only a person sets. A model's path arrives here with `rating: null`, and
+   * `POST /api/recipes` reads a rating only because Joel may set one on the
+   * draft before Keep it.
+   */
+  meta: RecipeMeta;
 };
 
+// One literal, not a concatenation: supabase-js parses the select string's type,
+// and a `+` turns every row into an error type.
 const COLUMNS =
-  "id, name, servings, kcal, protein_g, carbs_g, fat_g, origin, source, model, source_url, ingredients, method, note, created_at";
+  "id, name, servings, kcal, protein_g, carbs_g, fat_g, origin, source, model, source_url, ingredients, method, note, created_at, total_minutes, meal, mains, cuisine, equipment, diet, tags, rating";
 
 /**
  * How two names are compared for collision.
@@ -150,6 +164,10 @@ function hydrate(row: Record<string, unknown>): Recipe {
     carbs_g: Number(row.carbs_g),
     fat_g: Number(row.fat_g),
     ingredients: Array.isArray(row.ingredients) ? (row.ingredients as string[]) : [],
+    // Through the same reader as a request body, so a row and a draft cannot
+    // disagree about what a field may hold. The rating is read: it is stored,
+    // so a person set it.
+    ...readMeta(row, { rating: true }),
   };
 }
 
@@ -253,6 +271,7 @@ export async function saveRecipe(draft: RecipeDraft): Promise<Recipe> {
       ingredients: draft.ingredients.map((i) => i.trim()).filter(Boolean),
       method: draft.method?.trim() || null,
       note: draft.note?.trim() || null,
+      ...draft.meta,
     })
     .select(COLUMNS)
     .single();
@@ -265,6 +284,28 @@ export async function saveRecipe(draft: RecipeDraft): Promise<Recipe> {
     }
     throw new LookupError(`Couldn't save that recipe: ${error.message}`);
   }
+  return hydrate(data as Record<string, unknown>);
+}
+
+/**
+ * Rate a recipe already in the book, or clear its rating. **The only update this
+ * app makes to a recipe** — every other field is written once, at Keep it, and
+ * re-costing is a deliberate re-estimate. A rating is Joel's opinion, and it
+ * arrives after cooking, which is after the recipe was kept.
+ */
+export async function setRating(id: string, rating: unknown): Promise<Recipe> {
+  const value = rating === null ? null : readRating(rating);
+  if (rating !== null && value === null) throw new InputError("A rating is a whole number from 1 to 5.");
+
+  const { data, error } = await getServiceClient()
+    .from("recipes")
+    .update({ rating: value })
+    .eq("id", id)
+    .select(COLUMNS)
+    .maybeSingle();
+
+  if (error) throw new LookupError(`Couldn't rate that recipe: ${error.message}`);
+  if (!data) throw new InputError("That recipe is not in the book.");
   return hydrate(data as Record<string, unknown>);
 }
 

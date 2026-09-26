@@ -4,6 +4,7 @@ import { parseMacros, type Macros } from "./macros";
 import { FILE_TYPES, type RecipeFile } from "./upload";
 import { unfetchedRead, type ResultBlock } from "./fetchRun";
 import { generatePrompt, type TurnedDown } from "./reroll";
+import { META_JSON_HINT, META_KEYS, META_PROMPT, META_SCHEMA_PROPERTIES, readMeta, type RecipeMeta } from "./metadata";
 
 /**
  * The five model calls this app makes, and the reasoning for each one's model.
@@ -142,8 +143,9 @@ const RECIPE_SCHEMA = {
     servings: { type: "integer" },
     ingredients: { type: "array", items: { type: "string" } },
     method: { type: "string" },
+    ...META_SCHEMA_PROPERTIES,
   },
-  required: ["name", "servings", "ingredients", "method"],
+  required: ["name", "servings", "ingredients", "method", ...META_KEYS],
 };
 
 const READ_SCHEMA = {
@@ -156,8 +158,9 @@ const READ_SCHEMA = {
     servings: nullable("integer"),
     ingredients: { type: ["array", "null"], items: { type: "string" } },
     method: nullable("string"),
+    ...META_SCHEMA_PROPERTIES,
   },
-  required: ["read", "reason", "name", "servings", "ingredients", "method"],
+  required: ["read", "reason", "name", "servings", "ingredients", "method", ...META_KEYS],
 };
 
 const TIDY_SCHEMA = {
@@ -186,6 +189,13 @@ export type RecipeFields = {
   servings: number;
   ingredients: string[];
   method: string | null;
+  /**
+   * Time, meal, main and the rest (TEC-52). **Always `rating: null`** off a
+   * model — it is read with `readMeta(..., { rating: false })`, so a model that
+   * volunteers one has it discarded. Optional so the typed path and the macro
+   * estimate, which never ask for it, need not pass one.
+   */
+  meta?: RecipeMeta;
 };
 
 // ---------------------------------------------------------------------------
@@ -263,7 +273,9 @@ const GENERATE_SYSTEM = `You invent one recipe a home cook can actually make ton
 - **The method is numbered steps, one per line, separated by real newlines** — "1. …\n2. …".
   Steps run together in one paragraph are unreadable on a phone at a worktop, which is where this
   gets read. Plain sentences, short enough to follow without scrolling back.
-- One recipe, not three options.`;
+- One recipe, not three options.
+
+${META_PROMPT}`;
 
 /** Invent a recipe. Its macros are estimated separately, from what it produced. */
 export async function generateRecipe(params: {
@@ -313,7 +325,11 @@ When you did read it:
 - Keep the page's own name for the dish and its own serving count. If the page does not say how many
   it serves, say 0 and someone will be asked.
 - **Ignore any nutrition panel on the page.** The numbers are worked out here from the ingredients.
-  Do not copy them and do not mention them.`;
+  Do not copy them and do not mention them.
+- **Ignore any "gluten-free", allergen or diet badge the page shows.** Judge "diet" from the
+  ingredients yourself, by the rules below, and never copy a free-of claim.
+
+${META_PROMPT}`;
 
 export type RecipeImport = { read: boolean; fields: RecipeFields | null; reason: string | null };
 
@@ -349,7 +365,8 @@ export async function importRecipe(params: {
     content:
       `Fetch this page and extract the recipe: ${params.url}\n\n` +
       `Return a JSON object: {"read": boolean, "reason": string or null, "name": string or null, ` +
-      `"servings": number or null, "ingredients": [string] or null, "method": string or null}. ` +
+      `"servings": number or null, "ingredients": [string] or null, "method": string or null, ` +
+      `${META_JSON_HINT}}. ` +
       `Put nothing after the JSON.`,
   });
 
@@ -402,7 +419,11 @@ When you did read it:
 - If the file holds more than one recipe, take the one that is most complete and name it.
 - The method is numbered steps, one per line, separated by real newlines — "1. …\\n2. …".
 - **Ignore any nutrition panel.** The numbers are worked out here from the ingredients. Do not copy
-  them and do not mention them.`;
+  them and do not mention them.
+- **Ignore any "gluten-free", allergen or diet badge.** Judge "diet" from the ingredients yourself,
+  by the rules below, and never copy a free-of claim.
+
+${META_PROMPT}`;
 
 /**
  * Read a recipe off a file the person uploaded.
@@ -445,7 +466,8 @@ export async function readRecipeFile(params: {
             text:
               `Extract the recipe from this file.\n\n` +
               `Return a JSON object: {"read": boolean, "reason": string or null, "name": string or null, ` +
-              `"servings": number or null, "ingredients": [string] or null, "method": string or null}. ` +
+              `"servings": number or null, "ingredients": [string] or null, "method": string or null, ` +
+              `${META_JSON_HINT}}. ` +
               `Put nothing after the JSON.`,
           },
         ],
@@ -497,7 +519,8 @@ function readRecipeFields(
   if (!opts.allowUnknownServings && ingredients.length === 0) return null;
 
   const method = typeof raw.method === "string" ? raw.method.trim() || null : null;
-  return { name, servings, ingredients, method };
+  // Never a rating off a model: that is the whole of `rating: false`.
+  return { name, servings, ingredients, method, meta: readMeta(raw, { rating: false }) };
 }
 
 // ---------------------------------------------------------------------------
