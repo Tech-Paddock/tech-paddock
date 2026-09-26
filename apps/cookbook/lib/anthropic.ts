@@ -4,6 +4,7 @@ import { parseMacros, type Macros } from "./macros";
 import { FILE_TYPES, type RecipeFile } from "./upload";
 import { unfetchedRead, type ResultBlock } from "./fetchRun";
 import { generatePrompt, type TurnedDown } from "./reroll";
+import type { Picks } from "./tuning";
 import { META_JSON_HINT, META_KEYS, META_PROMPT, META_SCHEMA_PROPERTIES, readMeta, type RecipeMeta } from "./metadata";
 
 /**
@@ -284,6 +285,8 @@ export async function generateRecipe(params: {
   /** "Something else": drafts already turned down this session, and why (TEC-39 D). */
   turnedDown?: TurnedDown[];
   steer?: string;
+  /** The tuning pickers (`lib/tuning.ts`): requirements, said in the prompt. */
+  picks?: Picks;
 }): Promise<RecipeFields> {
   const model = params.model ?? DEFAULT_MODEL;
 
@@ -294,7 +297,7 @@ export async function generateRecipe(params: {
     messages: [
       {
         role: "user",
-        content: generatePrompt(params.brief, params.turnedDown, params.steer),
+        content: generatePrompt(params.brief, params.turnedDown, params.steer, params.picks),
       },
     ],
   } as never)) as ModelResponse;

@@ -19,21 +19,22 @@ box** — "Add a recipe" collapsed, "Add items" open. Results are toasts; a fail
 until Keep it; the typed path saves straight away**, after a name check that spares it a pricing
 call it could not keep. A file is **never stored**. **An import is refused three times**: `read:
 false`, no ingredients, or **no fetch that returned a page** (`lib/fetchRun.ts`). **"Something else"**
-on a Claude draft re-asks with every draft turned down, plus an optional reason (`lib/reroll.ts`).
-**Bin it is a turn-down too** (Joel, 2026-09-25). The pile is browser state: Keep it clears it,
-and so does "Work it out" on a new brief; the same brief keeps it.
+re-asks with every draft turned down plus a reason (`lib/reroll.ts`); **Bin it is a turn-down too**.
+The pile is browser state: Keep it or a new ask (brief or picks) clears it. **Ask Claude's pickers**
+(meal, diet, cuisine, time — `lib/tuning.ts`) are requirements, tagged on the draft; **diet only
+where the model agrees**, else a note. **The book filters on the same four plus High protein,
+computed** (≥30% of kcal), never stored; a detail left unset never matches a filter on it.
 
-**Model requests come from `requestShape` in `lib/models.ts`**: Sonnet 5 gets an explicit effort and
-thinking headroom, Haiku 4.5 gets no effort (it 400s). The four calls without a tool send a JSON
-schema; every call checks `stop_reason`. Tidy sends line numbers, not UUIDs.
+**Model requests come from `requestShape` in `lib/models.ts`** (Haiku 4.5 gets no effort — it 400s).
+The four calls without a tool send a JSON schema; every call checks `stop_reason`.
 
 **Four tables in `cookbook`**, reasoning in the migration headers. `recipes` stores **the whole pot**;
 `grocery_items` is this app's list; `brand_preferences` is unseeded (TEC-51); `menu` is **On the
-menu** — left of the book on a wide screen, above it on a phone: one row per recipe, put there only
-by *Add to list*, shown for seven rolling days and never deleted by time; ✕ removes the row only, and
-removing the recipe cascades. **A list line carries the names of the recipes it came from**
-(`grocery_items.recipes`, a snapshot; Tidy unions them); older lines say "from a recipe". **`macro_source`
-has no `web`**, so a lifted number is not storable; **a duplicate name is refused by a unique index.**
+menu**: one row per recipe, put there only by *Add to list*, shown for seven rolling days and never
+deleted by time; ✕ removes the row only, and removing the recipe cascades. **A list line carries the
+names of the recipes it came from** (`grocery_items.recipes`, a snapshot; Tidy unions them), so an
+edit or rename never reaches it. **`macro_source` has no `web`**; **a duplicate name is refused by a
+unique index.**
 
 **Recipe metadata (TEC-52) sits flat on `recipes`**; **`lib/metadata.ts` reads it** off a model, a
 request or a row alike. `meal` and `diet` are check-constrained to `MEALS` and `DIETS`; the rest is
@@ -57,9 +58,8 @@ Cookbook dividing, unrounded, behind the ordinary session. `tests/servings.test.
 fields; metadata never enters it. **Logging what you ate is Health's**, by design.
 
 **Every failure has one status, in `lib/errors.ts`**: `LookupError` 503 means only that the database
-did not answer; `InputError` 400; `ConflictError` 409; anything else 500, via `lib/respond.ts`.
-**Health reads a 503 as "couldn't reach the Cookbook"**, so a `LookupError` for bad input looks
-like an outage there.
+did not answer — **Health reads a 503 as "couldn't reach the Cookbook"**; `InputError` 400;
+`ConflictError` 409; anything else 500, via `lib/respond.ts`.
 
 **`methodSteps` splits only on the next number in a run** — gas mark 4 stays put (its tests hold the
 edges). **`lib/models.ts` is the third copy of Coffee's model registry**, flagged rather than shared.
