@@ -1,21 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { PitSource, PitState, PitWall as PitWallData } from "@/lib/pitwall";
-import { filterItems } from "@/lib/pitfilter";
+import { useState } from "react";
+import type { PitIssue, PitWallData } from "@/lib/linear";
+import { byAgent, byStatus, needsJoel, type Grouping } from "@/lib/pitgroups";
 
 /**
- * The board.
+ * The Pit Wall: every open issue in Linear, team TEC, and who acts next.
  *
- * Ordered by *who is blocked*, never by recency or by source — an old blocker
- * deserves more prominence than a new one, not less. Filtering is client-side
- * because the whole set is already on the page: the server sent everything it
- * could reach, so narrowing it must never mean another round trip.
+ * Two arrangements behind one toggle — by status, with what waits on Joel in a
+ * band above the board, or by agent. The toggle regroups what is already on the
+ * page, so it never asks Linear again; the choice rides in `?group=` so a
+ * reload or a shared link keeps it.
+ *
+ * Each card leads with the issue's first Next step not yet done, because that
+ * is the line that says who is holding it. Everything links to Linear, where the
+ * work is edited — this page only reads.
  */
 
-const LABEL: Record<PitState, string> = { box: "BOX", agent: "AGENT", clear: "CLEAR" };
-
-function age(iso: string) {
+function ago(iso: string) {
   const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
@@ -24,98 +26,148 @@ function age(iso: string) {
   return `${Math.round(h / 24)}d ago`;
 }
 
-export default function PitWall({ data }: { data: PitWallData }) {
-  const [state, setState] = useState<"" | PitState>("");
-  const [source, setSource] = useState<"" | PitSource>("");
-  const [agent, setAgent] = useState("");
-
-  const rows = useMemo(() => filterItems(data.items, { state, source, agent }), [data.items, state, source, agent]);
-
-  const count = (s: PitState) => rows.filter((r) => r.state === s).length;
-  const sources = Array.from(new Set(data.items.map((i) => i.source))).sort();
-
+function Card({ issue, show }: { issue: PitIssue; show: "agent" | "status" }) {
+  const joel = needsJoel(issue);
+  const where = show === "agent" ? issue.agent ?? "No agent" : issue.status;
   return (
-    <section className="pitwall">
-      <div className="pit-head">
-        <h2>Pit wall</h2>
-        <p className="pit-asof">
-          Live sources read {age(data.readAt)} · repo prose baked at the last deploy,{" "}
-          {age(data.bakedAt)}
-        </p>
+    <article className={`pw-card${joel ? " pw-joel" : ""}${issue.parked ? " pw-parked" : ""}`}>
+      <div className="pw-card-top">
+        <a className="pw-id" href={issue.url} target="_blank" rel="noopener noreferrer">
+          {issue.id}
+        </a>
+        <span className="pw-meta">
+          {where}
+          {issue.priority > 0 ? ` · ${issue.priorityLabel}` : ""}
+          {issue.parked ? " · Parked" : ""}
+        </span>
       </div>
+      <a className="pw-title" href={issue.url} target="_blank" rel="noopener noreferrer">
+        {issue.title}
+      </a>
+      {issue.next ? (
+        <p className="pw-next">
+          {issue.next.star && <span className="pw-star" aria-label="waiting on Joel">⭐ </span>}
+          {issue.next.actor && <b>{issue.next.actor}: </b>}
+          {issue.next.text}
+        </p>
+      ) : (
+        <p className="pw-next pw-quiet">No open Next step.</p>
+      )}
+      <p className="pw-foot" suppressHydrationWarning>
+        {issue.owner ? `owner ${issue.owner} · ` : ""}updated {ago(issue.updatedAt)}
+      </p>
+    </article>
+  );
+}
 
-      <div className="pit-strip">
-        {data.agents.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            className="pit-car"
-            aria-pressed={agent === a.id}
-            onClick={() => setAgent(agent === a.id ? "" : a.id)}
-          >
-            <span className="pit-car-name">{a.name}</span>
-            <span className="pit-car-seen" title="The State as of line of this agent's handoff">
-              {a.asOf ? `handoff ${a.asOf}` : "—"}
-            </span>
-          </button>
+function Count({ n }: { n: number }) {
+  return <span className="pw-count">{n}</span>;
+}
+
+function ByStatus({ issues }: { issues: PitIssue[] }) {
+  const board = byStatus(issues);
+  return (
+    <>
+      {board.joel.length > 0 && (
+        <section className="pw-band">
+          <h3>
+            Waiting on you <Count n={board.joel.length} />
+          </h3>
+          <div className="pw-grid">
+            {board.joel.map((i) => (
+              <Card key={i.id} issue={i} show="agent" />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="pw-board">
+        {board.columns.map((c) => (
+          <section key={c.id} className="pw-col">
+            <h3>
+              {c.name} <Count n={c.issues.length} />
+            </h3>
+            {c.issues.length === 0 ? (
+              <p className="pw-empty">Nothing here.</p>
+            ) : (
+              c.issues.map((i) => <Card key={i.id} issue={i} show="agent" />)
+            )}
+          </section>
         ))}
       </div>
 
-      <div className="pit-filters">
-        <label className="pit-f" htmlFor="pit-state">
-          State
-          <select id="pit-state" value={state} onChange={(e) => setState(e.target.value as PitState | "")}>
-            <option value="">all</option>
-            <option value="box">box</option>
-            <option value="agent">agent</option>
-            <option value="clear">clear</option>
-          </select>
-        </label>
-        <label className="pit-f" htmlFor="pit-source">
-          Source
-          <select id="pit-source" value={source} onChange={(e) => setSource(e.target.value as PitSource | "")}>
-            <option value="">all</option>
-            {sources.map((s) => (
-              <option key={s} value={s}>{s}</option>
+      {board.later.length > 0 && (
+        <details className="pw-later">
+          <summary>
+            Backlog and parked <Count n={board.later.length} />
+          </summary>
+          <div className="pw-grid">
+            {board.later.map((i) => (
+              <Card key={i.id} issue={i} show="agent" />
             ))}
-          </select>
-        </label>
-        <span className="pit-tally">
-          {count("box")} box · {count("agent")} agent · {count("clear")} clear
-        </span>
-      </div>
+          </div>
+        </details>
+      )}
+    </>
+  );
+}
 
-      <div className="pit-rows">
-        {rows.length === 0 ? (
-          <p className="pit-empty">Nothing matches that filter.</p>
-        ) : (
-          rows.map((i, n) => (
-            <div className={`pit-row pit-${i.state}`} key={`${i.source}-${i.ref}-${n}`}>
-              <span className="pit-pill">{LABEL[i.state]}</span>
-              <span className="pit-what">
-                <b>{i.title}</b>
-                {i.detail ? <span>{i.detail}</span> : null}
-                <span className="pit-meta">
-                  <span className="pit-tag pit-src">{i.source}</span>
-                  <span className="pit-tag">{i.ref}</span>
-                </span>
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-
-      {data.unavailable.length > 0 && (
-        <div className="pit-unavailable">
-          <p className="pit-unavailable-title">Not reported</p>
-          <ul>
-            {data.unavailable.map((u, n) => (
-              <li key={`${u.source}-${n}`}>
-                <span className="pit-tag pit-src">{u.source}</span> {u.why}
-              </li>
+function ByAgent({ issues }: { issues: PitIssue[] }) {
+  return (
+    <>
+      {byAgent(issues).map((g) => (
+        <section key={g.agent} className="pw-agent">
+          <h3>
+            {g.agent} <Count n={g.issues.length} />
+          </h3>
+          <div className="pw-grid">
+            {g.issues.map((i) => (
+              <Card key={i.id} issue={i} show="status" />
             ))}
-          </ul>
+          </div>
+        </section>
+      ))}
+    </>
+  );
+}
+
+export default function PitWall({ data, group }: { data: PitWallData; group: Grouping }) {
+  const [grouping, setGrouping] = useState<Grouping>(group);
+
+  function choose(next: Grouping) {
+    setGrouping(next);
+    // The URL follows without a navigation, so Linear is not asked again.
+    const url = new URL(window.location.href);
+    if (next === "agent") url.searchParams.set("group", "agent");
+    else url.searchParams.delete("group");
+    window.history.replaceState(null, "", url);
+  }
+
+  return (
+    <section className="pitwall">
+      <div className="pw-head">
+        <p className="pw-asof" suppressHydrationWarning>
+          Open issues in Linear, team TEC · read {ago(data.readAt)}
+        </p>
+        <div className="pw-toggle" role="group" aria-label="Group by">
+          {(["status", "agent"] as const).map((g) => (
+            <button key={g} type="button" aria-pressed={grouping === g} onClick={() => choose(g)}>
+              {g === "status" ? "By status" : "By agent"}
+            </button>
+          ))}
         </div>
+      </div>
+
+      {!data.ok ? (
+        <p className="pw-error">
+          <span className="light light-caution" aria-hidden="true" /> <b>No issues to show.</b> {data.why}.
+        </p>
+      ) : data.issues.length === 0 ? (
+        <p className="pw-empty">No open issues in team TEC.</p>
+      ) : grouping === "status" ? (
+        <ByStatus issues={data.issues} />
+      ) : (
+        <ByAgent issues={data.issues} />
       )}
     </section>
   );

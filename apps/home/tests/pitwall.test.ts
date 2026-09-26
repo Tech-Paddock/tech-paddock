@@ -1,144 +1,160 @@
-import { describe, expect, it } from "vitest";
-import { branchArea, classifyBranches, deployRow, ownerOf, type LatestDeploy, type PitItem } from "@/lib/pitwall";
-import { filterItems } from "@/lib/pitfilter";
-import { HOME, PARKED } from "@/lib/platform";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { columnOf, loadPitWall, nextStep, toIssue, type LinearNode, type PitIssue } from "@/lib/linear";
+import { byAgent, byStatus, groupingFrom } from "@/lib/pitgroups";
 
-const AGENTS = new Set(["td", "deployment", "techpad-gen", "resume", "coffee", "health", "cookbook"]);
-
-describe("which agent a branch belongs to", () => {
-  it("reads the area from claude/<area>-<change>", () => {
-    expect(branchArea("claude/home-review-fixes")).toBe("home");
-    expect(branchArea("claude/td-onboarding-0lrnq9")).toBe("td");
-    expect(branchArea("feature")).toBe("feature");
+describe("the next step on a card", () => {
+  it("is the first numbered step, with its actor and star", () => {
+    const body = "What and why.\n\n## Next steps\n\n1. **Joel:** ⭐ say go.\n2. **TD:** build it.\n";
+    expect(nextStep(body)).toEqual({ actor: "Joel", text: "say go.", star: true });
   });
 
-  it("maps app folders and layers to their owners, and leaves the rest unattributed", () => {
-    expect(ownerOf("home", AGENTS)).toBe("techpad-gen");
-    expect(ownerOf("cookbook", AGENTS)).toBe("cookbook");
-    expect(ownerOf("ci", AGENTS)).toBe("deployment");
-    expect(ownerOf("td", AGENTS)).toBe("td");
-    expect(ownerOf("docs", AGENTS)).toBeNull();
-    expect(ownerOf("whatever", AGENTS)).toBeNull();
+  it("skips steps marked done, struck through, or ticked", () => {
+    const body = [
+      "## Next steps",
+      "",
+      "1. **TechPad Gen:** done 2026-09-26. Built and pushed.",
+      "2. **TD:** ~~draft the line~~",
+      "3. **Health:** ✅ reconciled.",
+      "4. **Deployment:** open the pull request, gate it and merge it.",
+    ].join("\n");
+    expect(nextStep(body)).toEqual({ actor: "Deployment", text: "open the pull request, gate it and merge it.", star: false });
   });
 
-  it("attributes nobody who is not on the roster", () => {
-    expect(ownerOf("home", new Set(["td"]))).toBeNull();
-  });
-});
-
-const pr = (n: number, ref: string, sha: string, merged: string | null = null) => ({
-  number: n,
-  title: `PR ${n}`,
-  head: { ref, sha },
-  merged_at: merged,
-});
-const branch = (name: string, sha: string) => ({ name, commit: { sha } });
-
-describe("classifyBranches", () => {
-  it("does not call a squash-merged branch unpushed, even though it is ahead of main", () => {
-    const items = classifyBranches(
-      [],
-      [branch("main", "m"), branch("claude/home-old", "tip")],
-      [pr(1, "claude/home-old", "tip", "2026-09-24T00:00:00Z")],
-      new Map(),
-      AGENTS,
-    );
-    expect(items).toHaveLength(1);
-    expect(items[0].state).toBe("clear");
-    expect(items[0].title).toMatch(/1 merged branch is not yet deleted/);
+  it("reads the formats real issues use: ⭐ before the actor, done or skipped in the bold lead", () => {
+    const body = [
+      "## Next steps",
+      "",
+      "1. **Done, 2026-09-25, Joel:** step 1. The variable is linked.",
+      "2. **TD — done 2026-09-26:** approved the two-PR shape.",
+      '3. **Skipped, 2026-09-25, Joel: "skip it".** Was: a live test.',
+      "4. ⭐ **Joel:** add the rule to all seven projects.",
+    ].join("\n");
+    expect(nextStep(body)).toEqual({ actor: "Joel", text: "add the rule to all seven projects.", star: true });
   });
 
-  it("drops a branch with nothing ahead of main, and lists one that is", () => {
-    const items = classifyBranches(
-      [],
-      [branch("claude/coffee-empty", "a"), branch("claude/coffee-work", "b")],
-      [],
-      new Map([
-        ["claude/coffee-empty", 0],
-        ["claude/coffee-work", 3],
-      ]),
-      AGENTS,
-    );
-    expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ state: "agent", agent: "coffee", ref: "claude/coffee-work" });
-    expect(items[0].detail).toMatch(/^3 commits ahead/);
+  it("shortens a Linear issue link to its identifier", () => {
+    const body = "## Next steps\n\n1. **TD:** see https://linear.app/tech-paddock/issue/TEC-7/login-rate-limit first.\n";
+    expect(nextStep(body)?.text).toBe("see TEC-7 first.");
   });
 
-  it("lists a branch it could not compare rather than dropping it", () => {
-    const items = classifyBranches([], [branch("claude/x-y", "a")], [], new Map([["claude/x-y", null]]), AGENTS);
-    expect(items[0].detail).toMatch(/Could not compare/);
+  it("strips markdown down to the words", () => {
+    const body = "## Next steps\n\n1. **TD:** read `supabase/README.md` and [the plan](https://example.com).\n";
+    expect(nextStep(body)?.text).toBe("read supabase/README.md and the plan.");
   });
 
-  it("puts open pull requests in the box, attributed, and skips their branches", () => {
-    const items = classifyBranches(
-      [pr(7, "claude/health-thing", "h")],
-      [branch("claude/health-thing", "h")],
-      [],
-      new Map(),
-      AGENTS,
-    );
-    expect(items).toEqual([
-      expect.objectContaining({ state: "box", agent: "health", title: "#7 is open and waiting on you" }),
-    ]);
+  it("stops at the next heading and ignores sub-bullets", () => {
+    const body = "## Next steps\n\n1. **TD:** one.\n   * a detail\n\n## Notes\n\n1. not a step\n";
+    expect(nextStep(body)?.text).toBe("one.");
   });
 
-  it("says clear when there is nothing at all", () => {
-    expect(classifyBranches([], [branch("main", "m")], [], new Map(), AGENTS)[0].state).toBe("clear");
+  it("is null with no Next steps, or when every step is done", () => {
+    expect(nextStep(null)).toBeNull();
+    expect(nextStep("Just a note.")).toBeNull();
+    expect(nextStep("## Next steps\n\n1. **TD:** done.\n")).toBeNull();
   });
 });
 
-const deploy = (state: string, project: LatestDeploy["project"] = HOME, description: string | null = "Deployment has completed"): LatestDeploy => ({
-  project,
-  deployment: { sha: "861d85491439e0314354e594d5b664f6f9153dfe", createdAt: "2026-09-25T00:51:32Z" },
-  status: { state, description, at: "2026-09-25T00:52:10Z" },
+const node = (over: Partial<LinearNode> = {}): LinearNode => ({
+  identifier: "TEC-1",
+  title: "A thing",
+  url: "https://linear.app/x/issue/TEC-1",
+  priority: 3,
+  priorityLabel: "Medium",
+  updatedAt: "2026-09-26T00:00:00Z",
+  description: null,
+  state: { name: "Todo", type: "unstarted" },
+  labels: { nodes: [{ name: "agent:TechPad Gen" }, { name: "owner:TD" }] },
+  assignee: null,
+  ...over,
 });
 
-describe("deployRow reads only the latest production deployment", () => {
-  it("is live on success", () => {
-    const row = deployRow(deploy("success"), AGENTS);
-    expect(row).toMatchObject({ live: true, item: { state: "clear", agent: "techpad-gen", ref: "tp-home" } });
+describe("a Linear issue on the board", () => {
+  it("reads agent and owner from their labels", () => {
+    const i = toIssue(node());
+    expect(i.agent).toBe("TechPad Gen");
+    expect(i.owner).toBe("TD");
   });
 
-  it("boxes a failure and quotes Vercel", () => {
-    const row = deployRow(deploy("failure", HOME, "Deployment has failed"), AGENTS);
-    expect(row).toMatchObject({ live: false, item: { state: "box" } });
-    if ("item" in row) expect(row.item.detail).toContain('"Deployment has failed"');
+  it("is waiting on Joel when it has an assignee, and carries nothing of the user", () => {
+    const i = toIssue(node({ assignee: { id: "u1" } }));
+    expect(i.waitingOnJoel).toBe(true);
+    expect(JSON.stringify(i)).not.toContain("u1");
   });
 
-  it("does not box a parked project's failure", () => {
-    const row = deployRow(deploy("error", PARKED[0]), AGENTS);
-    expect(row).toMatchObject({ item: { state: "clear" } });
-    if ("item" in row) expect(row.item.title).toMatch(/parked/);
-  });
-
-  it("shows a build in progress without alarm", () => {
-    expect(deployRow(deploy("in_progress"), AGENTS)).toMatchObject({ live: false, item: { state: "clear" } });
-  });
-
-  it("reports what it cannot read rather than guessing", () => {
-    expect(deployRow(deploy("mystery"), AGENTS)).toEqual({
-      why: 'tp-home: its latest production deployment reads "mystery", which this page does not interpret',
-    });
-    expect(deployRow({ project: HOME, deployment: null, status: null }, AGENTS)).toHaveProperty("why");
-    expect(deployRow({ ...deploy("success"), status: null }, AGENTS)).toHaveProperty("why");
+  it("puts each state in its column, and anything parked last", () => {
+    expect(columnOf({ name: "In Progress", type: "started" }, false)).toBe("progress");
+    expect(columnOf({ name: "In Review", type: "started" }, false)).toBe("review");
+    expect(columnOf({ name: "Todo", type: "unstarted" }, false)).toBe("todo");
+    expect(columnOf({ name: "Backlog", type: "backlog" }, false)).toBe("later");
+    expect(columnOf({ name: "Todo", type: "unstarted" }, true)).toBe("later");
+    expect(toIssue(node({ labels: { nodes: [{ name: "Parked" }] } })).parked).toBe(true);
   });
 });
 
-describe("the Pit Wall filter", () => {
-  const items: PitItem[] = [
-    { state: "box", source: "github", agent: "coffee", title: "a", detail: "", ref: "a" },
-    { state: "agent", source: "github", agent: "health", title: "b", detail: "", ref: "b" },
-    { state: "clear", source: "deployments", agent: null, title: "c", detail: "", ref: "c" },
+const issue = (over: Partial<PitIssue>): PitIssue => ({
+  ...toIssue(node()),
+  ...over,
+});
+
+describe("the two groupings", () => {
+  const issues = [
+    issue({ id: "TEC-1", column: "progress", agent: "Health" }),
+    issue({ id: "TEC-2", column: "todo", agent: "TD", waitingOnJoel: true }),
+    issue({ id: "TEC-3", column: "later", agent: "TD", parked: true, waitingOnJoel: true }),
+    issue({ id: "TEC-4", column: "review", agent: null, priority: 1 }),
+    issue({ id: "TEC-5", column: "review", agent: "Someone New", priority: 4 }),
   ];
 
-  it("passes everything with no filter", () => {
-    expect(filterItems(items, { state: "", source: "", agent: "" })).toHaveLength(3);
+  it("by status: Joel's band, three columns, and the rest folded", () => {
+    const b = byStatus(issues);
+    expect(b.joel.map((i) => i.id)).toEqual(["TEC-2"]);
+    expect(b.columns.map((c) => c.issues.map((i) => i.id))).toEqual([["TEC-1"], ["TEC-4", "TEC-5"], []]);
+    expect(b.later.map((i) => i.id)).toEqual(["TEC-3"]);
   });
 
-  it("narrows by state, source and agent together", () => {
-    expect(filterItems(items, { state: "box", source: "", agent: "" }).map((i) => i.ref)).toEqual(["a"]);
-    expect(filterItems(items, { state: "", source: "deployments", agent: "" }).map((i) => i.ref)).toEqual(["c"]);
-    expect(filterItems(items, { state: "", source: "", agent: "health" }).map((i) => i.ref)).toEqual(["b"]);
-    expect(filterItems(items, { state: "box", source: "", agent: "health" })).toEqual([]);
+  it("by agent: roster order, a new name kept, no agent last", () => {
+    expect(byAgent(issues).map((g) => g.agent)).toEqual(["TD", "Health", "Someone New", "No agent"]);
+    expect(byAgent(issues)[0].issues.map((i) => i.id)).toEqual(["TEC-2", "TEC-3"]);
+  });
+
+  it("defaults to status", () => {
+    expect(groupingFrom(undefined)).toBe("status");
+    expect(groupingFrom("agent")).toBe("agent");
+    expect(groupingFrom("nonsense")).toBe("status");
+  });
+});
+
+describe("asking Linear", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("makes no request without a key, and says so", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const d = await loadPitWall(undefined);
+    expect(d.ok).toBe(false);
+    expect(!d.ok && d.why).toContain("LINEAR_API_KEY");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("says the key was refused on a 401", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 401 })));
+    const d = await loadPitWall("k");
+    expect(!d.ok && d.why).toMatch(/refused the key/);
+  });
+
+  it("says why when the query itself is refused", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ errors: [{ message: "Cannot query field" }] })));
+    const d = await loadPitWall("k");
+    expect(!d.ok && d.why).toMatch(/Cannot query field/);
+  });
+
+  it("follows pages until there are none left", async () => {
+    const page = (id: string, hasNextPage: boolean) =>
+      Response.json({ data: { issues: { nodes: [node({ identifier: id })], pageInfo: { hasNextPage, endCursor: hasNextPage ? "c" : null } } } });
+    const fetch = vi.fn().mockResolvedValueOnce(page("TEC-1", true)).mockResolvedValueOnce(page("TEC-2", false));
+    vi.stubGlobal("fetch", fetch);
+    const d = await loadPitWall("k");
+    expect(d.ok && d.issues.map((i) => i.id)).toEqual(["TEC-1", "TEC-2"]);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });

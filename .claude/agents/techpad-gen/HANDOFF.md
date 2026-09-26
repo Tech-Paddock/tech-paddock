@@ -8,28 +8,26 @@ Read `RULES.md` first. Open work is in Linear, label `agent:TechPad Gen` — nev
 
 ## What is live
 
-**The Morning Paper** — `/` lands on it; **Pit Wall** is the only other tab (id still `board`, so
-`/?tab=board` lives). Each tab loads its own data in its own Suspense boundary, and `?app=` renders
-the frame without loading anything (`app/(shell)/page.tsx`). No privacy fold: Joel lifted it.
+**Home is two tabs: the Pit Wall, the landing, and The Garage** (`/?tab=garage`; `/admin`
+redirects there). The id `board` stays, so `/?tab=board` lives. Each tab loads its own data in its
+own Suspense boundary, and `?app=` renders a tool's frame without loading either. **The Morning
+Paper and the glance are gone** (Joel, 2026-09-26), so home asks no tool for `/api/summary`.
 
-**The glance says why it has no answer.** `fetchSummary` returns `{ok:false, why}` and the summary
-is shape-checked before it is merged; a silent source renders "—" with the reason, never 0, and
-`isQuiet` stays false. `SOURCES` is the tracker alone, and it **does not answer in production**:
-`INTERNAL_API_SECRET` is unset on `tp-home` (TEC-8, blocked on TEC-33's rotation).
+**The Pit Wall is Linear's open issues, team TEC** (TEC-83), read server-side through
+`LINEAR_API_KEY` (`lib/linear.ts`). A card shows the id, title, agent, priority and **the first
+Next step not yet done**, parsed from the body. A toggle regroups the same issues, with no refetch:
+**by status** — a *Waiting on you* band for anything assigned and not parked, then In Progress, In
+Review and Todo, with Backlog and Parked folded — or **by agent**, in roster order
+(`lib/pitgroups.ts`); `?group=agent` keeps the choice. With no key, or Linear refusing, the page says
+why.
 
-**The Pit Wall reads only GitHub.** Open pull requests; branches with none (a squash-merged branch
-is recognised by its merged PR's head sha — `ahead_by` alone counts it ahead forever); and each
-probed project's **latest** production deployment, from the statuses Vercel posts to GitHub under
-`Production – <project>`. Rows carry the owning agent from the branch's `claude/<area>-`
-(`AREA_OWNER` in `lib/pitwall.ts`); the strip shows each handoff's `State as of`, baked at build.
-
-**The Garage** — `/admin`, errors first (TEC-84). One row per thing with a stoplight — green, amber
-(could not test), red, grey (parked on purpose) — and no pills, tallies or Declared table. **Every
-failure is a sentence plus its raw code**: `x-vercel-error` first, then the status, then the socket
-cause (`lib/diagnostics.ts`). **Environment errors** renders only when a `HOME_ENV` name with an
-`unsetMeans` is unset or a retired one is set, tagged with what it breaks. **Rules drift** is baked
-at build: drifting checks grouped under one sentence each (`lib/drift-explain.ts`, keyed on name
-prefix until the check emits its own `explain`), budgets with lines to spare, holding ones folded.
+**The Garage**, errors first (TEC-84). One row per thing with a stoplight — green, amber (could not
+test), red, grey (parked on purpose) — and no pills or tallies. **Every failure is a sentence plus
+its raw code**: `x-vercel-error` first, then the status, then the socket cause (`lib/diagnostics.ts`).
+**Environment errors** and **Deploy errors** (`lib/deploys.ts`: each project's latest production
+deployment, from the statuses Vercel posts to GitHub; parked ones left out) render only when there
+is one. **Rules drift** is baked at build: drifting checks grouped under one sentence each
+(`lib/drift-explain.ts`, keyed on name prefix until the check emits `explain`), holding ones folded.
 
 **The theme system** — palettes, liveries, both polarities, one `--go`/`--caution` status-light pair
 for every livery, and **two controls per header**: `LiveryBadge` hard right on every bar, and
@@ -38,7 +36,7 @@ stamped from `packages/shared`; `lib/livery.ts` is the one file that differs per
 `tailwind.config.ts` holds a colour: `rgb(var(--token-rgb) / <alpha-value>)` is all alpha can read.
 
 **The tracker is parked** (Joel, 2026-09-24). Its state and findings are on TEC-36; do no tracker
-work. It stays in `PARKED`, so it is still probed; a red deploy of it shows as expected, not BOX.
+work. It stays in `PARKED`, probed and grey. Its `/api/summary` has no reader since the glance went.
 
 ## Traps specific to this app
 
@@ -46,24 +44,24 @@ work. It stays in `PARKED`, so it is still probed; a red deploy of it shows as e
   (`npm run generate`). A bare `npx tsc --noEmit` on a fresh checkout fails until one of those has
   run. They read files above `apps/home`, which exist at build time and not at runtime.
 - **`vercel.json`'s `ignoreCommand` skips previews and always builds production** — home diffs
-  nothing since #191, so every production merge rebuilds it, which is what keeps its baked panels
-  and agent rows current. **Do not narrow it**: `.claude` changes alone must still rebuild home.
-- **GitHub sees only git-triggered deploys**, so a dashboard rollback or redeploy leaves the Pit
-  Wall showing an older state than is serving. TEC-57 would close it.
-- **`GITHUB_TOKEN` must read deployments.** The repository is public, but a fine-grained token scoped
-  without *Deployments: read* may be refused; the Pit Wall then names the 403 per project.
+  nothing since #191, so every production merge rebuilds it, which is what keeps Rules drift
+  current. **Do not narrow it**: `.claude` changes alone must still rebuild home.
+- **Linear's user records carry a real name and email.** The query asks for `assignee { id }` and
+  nothing more; Joel is the only assignee, so "assigned" is all *Waiting on you* needs. Keep it so.
+- **Next steps are free text.** `nextStep` reads ⭐ before or after the actor and treats "done",
+  "skipped", ✅ or a strikethrough as finished; a new convention shows as the step it is.
+- **GitHub sees only git-triggered deploys**, so a dashboard rollback or redeploy is invisible to
+  Deploy errors. `GITHUB_TOKEN` needs *Deployments: read*; a 401 or 403 is named as the token.
 - **A function exported from a `"use client"` file cannot be called on the server** — that is why
-  `APPS` lives in `app/apps.ts`, `DENSITIES` in `Landing.tsx` and the filter in `lib/pitfilter.ts`.
-- **The shell was built around an iframe at `height: 100%`**; a document-length route scrolls only
+  `APPS` lives in `app/apps.ts` and the grouping in `lib/pitgroups.ts`.
+- **The shell was built around an iframe at `height: 100%`**; a document-length tab scrolls only
   because `.content` sets `overflow-y` and `min-height: 0`.
 - **One switch per page is two halves that must stay together.** Framed, a tool hides its own
   Light/Dark (`[data-embedded] .pd-modes`) and keeps its badge — safe only because home posts
   `{type:"paddock-mode", mode}` into every frame and `ThemeControl` listens behind
   `isPaddockOrigin()`. **A tool that drops `ThemeControl.tsx` silently ignores home's switch.**
 - **`TOOLS` in `lib/platform.ts` is the only list of embedded tools, and its order is Joel's** — it
-  drives the sidebar and the `?app=` frame. `PROBED` adds what home depends on without embedding.
-  **Never key anything off a slug literal**; which projects get the secret probe is derived from
-  which repo folders have `/api/summary`.
-- **The glance gets counts and singles, never rows**; `parseSummary` enforces the shape.
+  drives the sidebar and the `?app=` frame. `PROBED` adds the parked ones. **Never key anything off
+  a slug literal.**
 - **Drift's JSON shape is the TD's**; `scripts/drift-parse.mjs` renders no partial read, and a
   renamed check family loses its sentence silently until the check emits `explain` itself.

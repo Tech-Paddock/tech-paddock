@@ -1,36 +1,9 @@
 import { describe, expect, it } from "vitest";
-import {
-  classifySecretStatus,
-  envErrors,
-  explainError,
-  explainResponse,
-  forParked,
-  secretSubjects,
-  type Probe,
-} from "@/lib/diagnostics";
+import { deployError, whyGitHub, type LatestDeploy } from "@/lib/deploys";
+import { envErrors, explainError, explainResponse, forParked, type Probe } from "@/lib/diagnostics";
 import { budgetDistance, explainDrift } from "@/lib/drift-explain";
-import { HOME_ENV, PROBED, TOOLS, type DeclaredApp } from "@/lib/platform";
+import { HOME, HOME_ENV, PARKED } from "@/lib/platform";
 import { parseDrift } from "../scripts/drift-parse.mjs";
-
-describe("the shared-secret probe maps status codes", () => {
-  it("2xx is a match", () => {
-    expect(classifySecretStatus(200, "/api/summary").status).toBe("up");
-  });
-
-  it("401 and 403 are a mismatch", () => {
-    expect(classifySecretStatus(401, "/api/summary").status).toBe("down");
-    expect(classifySecretStatus(403, "/api/summary").status).toBe("down");
-  });
-
-  it("anything else says nothing about the secret, and says what did happen", () => {
-    for (const code of [302, 404, 500, 503]) {
-      const r = classifySecretStatus(code, "/api/summary");
-      expect(r.status).toBe("unknown");
-      expect(r.raw).toContain(String(code));
-      expect(r.detail).toMatch(/^could not test it — /);
-    }
-  });
-});
 
 describe("a failure says what failed", () => {
   it("names Vercel's own error before the status code", () => {
@@ -81,18 +54,19 @@ describe("environment errors", () => {
     expect(envErrors(allSet)).toEqual([]);
   });
 
-  it("never reports an override left unset", () => {
-    expect(envErrors({ ...allSet, TRACKER_BASE_URL: undefined })).toEqual([]);
-  });
-
   it("tags a missing variable with what it breaks", () => {
     const errors = envErrors({ ...allSet, GITHUB_TOKEN: undefined });
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatchObject({ name: "GITHUB_TOKEN", affects: "Pit Wall" });
+    expect(errors[0]).toMatchObject({ name: "GITHUB_TOKEN", affects: "The Garage" });
+  });
+
+  it("tags a missing Linear key with the Pit Wall", () => {
+    expect(envErrors({ ...allSet, LINEAR_API_KEY: undefined })[0]).toMatchObject({ affects: "Pit Wall" });
   });
 
   it("reports a retired credential still set", () => {
     expect(envErrors({ ...allSet, VERCEL_TOKEN: "x" }).map((e) => e.name)).toEqual(["VERCEL_TOKEN"]);
+    expect(envErrors({ ...allSet, INTERNAL_API_SECRET: "x" }).map((e) => e.name)).toEqual(["INTERNAL_API_SECRET"]);
   });
 });
 
@@ -117,17 +91,38 @@ describe("drift explained", () => {
   });
 });
 
-describe("which projects get the secret probe", () => {
-  const declared = (slug: string, hasSummaryRoute: boolean): DeclaredApp => ({
-    slug,
-    hasHealthRoute: false,
-    hasSummaryRoute,
+describe("deploy errors", () => {
+  const deploy = (state: string | null, project: LatestDeploy["project"] = HOME, description: string | null = null): LatestDeploy => ({
+    project,
+    deployment: { sha: "abcdef1234567", createdAt: "2026-09-26T00:00:00Z" },
+    status: state === null ? null : { state, description, at: "2026-09-26T00:01:00Z" },
   });
 
-  it("includes the parked tracker, which TOOLS alone never did", () => {
-    const apps = [declared("tracker", true), declared("coffee", false)];
-    expect(secretSubjects(PROBED, apps).map((p) => p.slug)).toEqual(["tracker"]);
-    expect(secretSubjects(TOOLS, apps)).toEqual([]);
+  it("says nothing about a deploy that is live or on its way", () => {
+    for (const state of ["success", "pending", "queued", "in_progress"]) expect(deployError(deploy(state))).toBeNull();
+  });
+
+  it("reports a failed deploy as broken, with the commit and what Vercel said", () => {
+    const row = deployError(deploy("failure", HOME, "Deployment has failed"));
+    expect(row?.status).toBe("down");
+    expect(row?.raw).toContain("abcdef1");
+    expect(row?.raw).toContain("Deployment has failed");
+  });
+
+  it("leaves a parked project out, whose red deploy is expected", () => {
+    expect(deployError(deploy("failure", PARKED[0]))).toBeNull();
+  });
+
+  it("tells a refused token from a GitHub that did not answer", () => {
+    expect(whyGitHub("HTTP 401")).toMatch(/refused GITHUB_TOKEN; it may be expired/);
+    expect(whyGitHub("HTTP 403")).toMatch(/Deployments: read/);
+    expect(whyGitHub("HTTP 502")).toMatch(/did not answer$/);
+  });
+
+  it("says it could not tell, rather than nothing, when there is no deploy or no status", () => {
+    expect(deployError({ project: HOME, deployment: null, status: null })?.status).toBe("unknown");
+    expect(deployError(deploy(null))?.status).toBe("unknown");
+    expect(deployError(deploy("something-new"))?.status).toBe("unknown");
   });
 });
 

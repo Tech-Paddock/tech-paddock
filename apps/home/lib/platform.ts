@@ -10,9 +10,8 @@
  *    no other home in the repo. It is hand-written, but it is the *contract*,
  *    which is exactly the kind of thing that should be hand-written and
  *    reviewed.
- *  - `DECLARED` in ./declared.generated.ts: which apps expose `/api/summary`
- *    and `/api/health`, read out of the repo at build time by
- *    scripts/collect-declared.mjs.
+ *  - `DECLARED` in ./declared.generated.ts: which apps expose `/api/health`,
+ *    read out of the repo at build time by scripts/collect-declared.mjs.
  *
  * This file holds no secret and reads no environment value. It is imported by
  * a client component, so it must never learn how to.
@@ -30,7 +29,6 @@ export type Project = {
 export type DeclaredApp = {
   slug: string;
   hasHealthRoute: boolean;
-  hasSummaryRoute: boolean;
 };
 
 export type Declared = {
@@ -90,10 +88,9 @@ export type Drift = {
  * serves — it is simply not one of the tools home lists or embeds.
  *
  * **The Pipeline Tracker is deliberately absent from the tools.** It is parked
- * (Joel, 2026-09-24), so it has no sidebar row and no frame. It is still the
- * glance's only source, though, so it is in `PARKED` below and The Garage and
- * the Pit Wall still probe it — embedding a tool and depending on one are
- * different questions. Un-parking it means moving its entry from there to here.
+ * (Joel, 2026-09-24), so it has no sidebar row and no frame. It still deploys,
+ * though, so it is in `PARKED` below and The Garage still probes it, grey.
+ * Un-parking it means moving its entry from there to here.
  * `apps/tracker` is untouched and still builds in CI — the roster CI derives
  * comes from the folders on disk, never from this file.
  *
@@ -123,13 +120,10 @@ export const HOME: Project = {
 };
 
 /**
- * Projects home depends on but does not embed — the glance calls the tracker's
- * `/api/summary`, so whether it answers and whether it holds the same secret
- * are home's business even while it has no sidebar row.
- *
- * **Parked means paused on purpose.** Joel pauses a parked app's Vercel
- * project, so it not answering is expected: The Garage shows it grey, never
- * red.
+ * Projects that still deploy but are not embedded, so The Garage keeps them in
+ * sight. **Parked means paused on purpose**: Joel pauses a parked app's Vercel
+ * project, so it not answering is expected, and The Garage shows it grey,
+ * never red, and leaves its red deploys out.
  */
 export const PARKED: (Project & { parked: true })[] = [
   {
@@ -145,9 +139,9 @@ export const PARKED: (Project & { parked: true })[] = [
 export const PROJECTS: Project[] = [HOME, ...TOOLS];
 
 /**
- * What home probes: everything it embeds, plus what it depends on without
- * embedding. Liveness, the shared-secret check and the Pit Wall's deployment
- * rows all read this, never `TOOLS` — that was how the tracker went unprobed.
+ * What home probes: everything it embeds, plus what is parked. The Garage's
+ * live connections and deploy errors both read this, never `TOOLS` — that was
+ * how the tracker once went unprobed.
  */
 export const PROBED: (Project & { parked?: true })[] = [...PROJECTS, ...PARKED];
 
@@ -167,25 +161,26 @@ export type HomeEnv = { name: string; affects: string; unsetMeans: string | null
 export const HOME_ENV: HomeEnv[] = [
   { name: "SESSION_SECRET", affects: "Login", unsetMeans: "home cannot sign anyone in" },
   { name: "APP_PASSWORD_HASH", affects: "Login", unsetMeans: "the password gate has nothing to check against" },
-  {
-    name: "INTERNAL_API_SECRET",
-    affects: "Morning Paper",
-    unsetMeans: "the glance asks no tool anything, and no shared secret can be tested",
-  },
-  { name: "GITHUB_TOKEN", affects: "Pit Wall", unsetMeans: "the Pit Wall has no pull requests, branches or deployments" },
-  { name: "TRACKER_BASE_URL", affects: "Morning Paper", unsetMeans: null },
+  { name: "LINEAR_API_KEY", affects: "Pit Wall", unsetMeans: "the Pit Wall cannot ask Linear for open issues" },
+  { name: "GITHUB_TOKEN", affects: "The Garage", unsetMeans: "a failed production deploy cannot be seen" },
 ];
 
 /**
  * Names this app used to read and no longer does. An error only while still
  * set, because a credential nothing reads is a credential that can only leak.
- * `VERCEL_TOKEN` was a full-power team token held for one read, and the Pit Wall
- * now reads deployment state from GitHub's deployment statuses instead.
+ * `VERCEL_TOKEN` was a full-power team token held for one read; deploy state
+ * comes from GitHub's deployment statuses instead. `INTERNAL_API_SECRET` was
+ * the Morning Paper's, for asking each tool for its summary; the Paper is gone.
  */
 export const HOME_ENV_RETIRED: { name: string; affects: string; why: string }[] = [
   {
     name: "VERCEL_TOKEN",
     affects: "Home",
-    why: "still set, and nothing reads it — the Pit Wall reads deployments from GitHub. Delete it from tp-home.",
+    why: "still set, and nothing reads it — deploy state comes from GitHub. Delete it from tp-home.",
+  },
+  {
+    name: "INTERNAL_API_SECRET",
+    affects: "Home",
+    why: "still set, and nothing on home reads it since the Morning Paper went. Unlink the shared variable from tp-home only — the tracker and editor still use it.",
   },
 ];

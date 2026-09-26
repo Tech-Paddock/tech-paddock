@@ -1,10 +1,9 @@
 /**
  * Regenerates lib/declared.generated.ts from the repo itself.
  *
- * Which apps expose which routes, read off the folders rather than typed. The
- * Garage probes the shared secret on every app with an `/api/summary` and names
- * every app with an `/api/health` among its blind spots, so both lists come
- * from the repo. This reads it at build time and emits a module the app can
+ * Which apps expose `/api/health`, read off the folders rather than typed. The
+ * Garage names every one among its blind spots, so the list comes from the
+ * repo. This reads it at build time and emits a module the app can
  * import — because the app is deployed with `apps/home` as its Vercel Root
  * Directory, and files outside that directory are present during the build but
  * not reliably readable at runtime.
@@ -37,7 +36,6 @@ try {
       return {
         slug: e.name,
         hasHealthRoute: hasRoute(dir, "health"),
-        hasSummaryRoute: hasRoute(dir, "summary"),
       };
     })
     .sort((a, b) => a.slug.localeCompare(b.slug));

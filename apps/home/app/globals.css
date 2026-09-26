@@ -187,135 +187,23 @@ body {
   overflow-y: auto;
 }
 
-.placeholder {
-  margin: auto;
-  padding: 24px;
-  max-width: 480px;
-  text-align: center;
-}
-
-/* Landing glance — counts and singles, never lists. */
-.landing {
+/* The shell's error page: centred in the content box. */
+.shell-error {
   margin: auto;
   padding: 24px;
   width: 100%;
   max-width: 560px;
 }
 
-.glance h1 {
+.shell-error h1 {
   font-size: 24px;
   margin: 4px 0 12px;
-}
-
-.slots {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 16px 0 4px;
-}
-
-.slot {
-  display: grid;
-  grid-template-columns: 84px 1fr auto auto;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-left-width: 4px;
-  border-radius: 10px;
-  background: var(--surface);
-  color: inherit;
-  text-decoration: none;
-  text-align: left;
-}
-
-a.slot:hover {
-  border-color: var(--accent);
-}
-
-.slot-static {
-  cursor: default;
-}
-
-.slot-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-
-.slot-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.slot-title {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.slot-detail {
-  font-size: 11px;
-  color: var(--ink-soft);
-  line-height: 1.35;
-}
-
-.slot-count {
-  font-size: 11px;
-  color: var(--ink-soft);
-  white-space: nowrap;
-}
-
-.slot-go {
-  color: var(--ink-soft);
-  font-size: 13px;
-}
-
-.slot-static .slot-go {
-  display: none;
-}
-
-.sev-urgent {
-  border-left-color: var(--sev-urgent);
-}
-
-.sev-warn {
-  border-left-color: var(--sev-warn);
-}
-
-/* Not --line: at hairline weight that is ~1.2:1 on the slot, which reads as
-   no border at all and loses the grammar that every slot has a severity. */
-.sev-info {
-  border-left-color: var(--sev-info);
 }
 
 .slot-note {
   font-size: 11px;
   color: var(--ink-soft);
   margin: 6px 2px 0;
-}
-
-@media (max-width: 640px) {
-  .slot {
-    grid-template-columns: 1fr auto;
-  }
-
-  .slot-label {
-    grid-column: 1 / -1;
-  }
-
-  .slot-count {
-    grid-column: 1 / -1;
-  }
-}
-
-.placeholder h1 {
-  font-size: 24px;
-  margin: 4px 0 8px;
 }
 
 .description {
@@ -435,12 +323,6 @@ a.slot:hover {
     align-items: center;
   }
 
-  /* Scoped to the glance. Unscoped, this also hid the admin page's own "Admin"
-     label, leaving that page with no eyebrow on a phone. */
-  .landing .eyebrow {
-    display: none;
-  }
-
   .nav-item {
     flex-shrink: 0;
   }
@@ -448,24 +330,11 @@ a.slot:hover {
 
 /* ---- Admin / diagnostics ------------------------------------------------ */
 
+/* The Garage, inside the tabbed area — which already carries the gutter. */
 .admin {
   width: 100%;
   max-width: 820px;
-  /* margin-inline only: vertical auto margins on an overflowing flex item put
-     its top out of reach, which is the trap .landing is centred with and this
-     page is too tall for. */
-  margin-inline: auto;
-  padding: 32px 24px 64px;
-}
-
-.admin h1 {
-  font-size: 26px;
-  margin: 2px 0 0;
-}
-
-.admin .description {
-  margin: 10px 0 0;
-  max-width: 60ch;
+  padding: 4px 0 32px;
 }
 
 .admin-section {
@@ -643,72 +512,6 @@ a.slot:hover {
   margin-top: 32px;
 }
 
-/* ---------------------------------------------------------------- pit wall
-   The board: what needs you, ordered by who is blocked.
-
-   Every colour here comes from a token already in this file. Nothing new is
-   introduced, because the theme belongs to TechPad Gen — severity reads through
-   --sev-urgent and --accent, which were already picked against this ground.
-   -------------------------------------------------------------------------- */
-.pitwall { display: flex; flex-direction: column; gap: 14px; }
-
-.pit-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
-.pit-head h2 { margin: 0; font-size: 1.15rem; letter-spacing: 0.01em; }
-.pit-asof { margin: 0; font-size: 0.78rem; color: var(--ink-soft); }
-
-.pit-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
-  gap: 1px;
-  background: var(--line);
-  border: 1px solid var(--line);
-}
-.pit-car {
-  background: var(--surface); border: none; color: inherit; font: inherit;
-  padding: 8px 10px; text-align: left; cursor: pointer;
-  display: flex; flex-direction: column; gap: 2px;
-}
-.pit-car:hover { background: var(--surface-raised); }
-.pit-car[aria-pressed="true"] { background: var(--surface-raised); box-shadow: inset 3px 0 0 var(--accent); }
-.pit-car-name { font-size: 0.8rem; font-weight: 600; line-height: 1.2; }
-.pit-car-seen { font-size: 0.72rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-
-.pit-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.pit-f { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); display: flex; align-items: center; gap: 5px; }
-.pit-f select { font: inherit; font-size: 0.78rem; text-transform: none; letter-spacing: 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line); padding: 3px 6px; }
-.pit-tally { margin-left: auto; font-size: 0.74rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-
-.pit-rows { border: 1px solid var(--line); background: var(--surface); }
-.pit-row { display: grid; grid-template-columns: 62px 1fr; gap: 12px; padding: 10px 13px; border-bottom: 1px solid var(--line); align-items: start; }
-.pit-row:last-child { border-bottom: none; }
-.pit-box { background: linear-gradient(90deg, color-mix(in srgb, var(--sev-urgent) 13%, transparent), transparent 60%); }
-
-.pit-pill { font-size: 0.64rem; letter-spacing: 0.09em; text-align: center; padding: 2px 0; border: 1px solid; margin-top: 2px; }
-.pit-box .pit-pill { color: var(--sev-urgent); border-color: var(--sev-urgent); }
-.pit-agent .pit-pill { color: var(--accent); border-color: var(--accent); }
-.pit-clear .pit-pill { color: var(--ink-soft); border-color: var(--line); }
-
-.pit-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.pit-what b { font-weight: 600; font-size: 0.92rem; }
-.pit-what > span { color: var(--ink-soft); font-size: 0.83rem; }
-.pit-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
-.pit-tag { font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); border: 1px solid var(--line); padding: 1px 5px; }
-.pit-src { color: var(--accent); }
-
-.pit-empty { padding: 20px 13px; margin: 0; text-align: center; color: var(--ink-soft); font-size: 0.82rem; }
-
-/* Sources that could not be reached are rendered, never swallowed. An empty
-   board and a broken board must not look alike. */
-.pit-unavailable { border: 1px dashed var(--line); padding: 10px 13px; }
-.pit-unavailable-title { margin: 0 0 6px; font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
-.pit-unavailable ul { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
-.pit-unavailable li { font-size: 0.8rem; color: var(--ink-soft); }
-
-@media (max-width: 560px) {
-  .pit-row { grid-template-columns: 56px 1fr; }
-  .pit-tally { margin-left: 0; width: 100%; }
-}
-
 /* The livery control sits at the far end of the topbar, opposite the brand.
    An auto margin rather than space-between, because the badge and the text
    beside it are a single group and must stay tight to each other. */
@@ -731,24 +534,13 @@ a.slot:hover {
   }
 }
 
-/* ------------------------------------------------------------ the Morning Paper
-   PROTOTYPE. Every colour here is an existing token — no new hue is introduced,
-   because the palette is one decision and this page is not the place to reopen
-   it.
-
-   The two densities are the same markup with a different class on the root, so
-   nothing below may depend on an element existing in one and not the other.
-   Dispatch sets the type and spacing; Timing only overrides what has to shrink.
+/* ------------------------------------------------------------------- tabs
+   Home's two tabs, the Pit Wall and The Garage.
    -------------------------------------------------------------------------- */
 /* The gutter lives here, and it did not used to need to.
    `.content` carries no padding of its own — it was built around an iframe that
-   fills it edge to edge, and the only other thing that ever lived here was
-   `.landing`, which brought its own 24px. Putting tabs above that broke the
-   assumption: `.tabbed` had none, so the Paper ran flush into the sidebar's
-   border with no gap at all.
-   24px rather than the topbar's 16px because it matches `.landing`, which keeps
-   the Board pixel-identical to what it was before the tabs arrived. `.landing`
-   drops its own below, so nothing pays the gutter twice. */
+   fills it edge to edge — so a tab's content would run flush into the
+   sidebar's border without it. */
 .tabbed {
   display: flex;
   flex-direction: column;
@@ -757,8 +549,6 @@ a.slot:hover {
   min-width: 0;
   padding: 24px;
 }
-
-.tabbed .landing { padding: 0; }
 
 .tabstrip {
   display: flex;
@@ -787,126 +577,227 @@ a.slot:hover {
   border-color: var(--ink-soft);
 }
 
-/* Pushed to the far end, the way the theme control is in the topbar. */
-.tab-densities { margin-left: auto; display: flex; gap: 4px; }
+/* ---------------------------------------------------------------- pit wall
+   Open Linear issues, as cards. Every colour is an existing token. What waits
+   on Joel sits in a band above the board, tinted with the accent; parked work
+   is dimmed rather than hidden.
+   -------------------------------------------------------------------------- */
+.pitwall {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  padding-bottom: 32px;
+}
 
-.tab-density {
-  padding: 5px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+.pitwall h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-soft);
-  text-decoration: none;
-  border: 1px solid var(--ink-soft);
-  border-radius: 999px;
 }
 
-.tab-density.active { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+.pw-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
 
+.pw-asof {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
 
-.paper { display: flex; flex-direction: column; gap: 18px; max-width: 80ch; }
+.pw-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
 
-.paper-masthead { border-bottom: 2px solid var(--ink); padding-bottom: 10px; }
-.paper-masthead h1 { margin: 2px 0 0; font-size: 34px; line-height: 1.05; letter-spacing: -0.02em; }
-.paper-date { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+.pw-toggle button {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border: none;
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
 
-.paper-slot {
-  border: 1px dashed var(--ink-soft);
+.pw-toggle button + button {
+  border-left: 1px solid var(--line);
+}
+
+.pw-toggle button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.pw-toggle button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.pw-count {
+  margin-left: 4px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.pw-band {
+  padding: 14px;
+  border: 1px solid var(--accent);
   border-radius: 12px;
-  padding: 18px 20px;
+  background: rgb(var(--accent-rgb) / 0.06);
+}
+
+.pw-band h3 {
+  color: var(--accent);
+}
+
+.pw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.pw-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.pw-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pw-col h3 {
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pw-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
   background: var(--surface);
 }
 
-.paper-slot-label { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
-.paper-slot-body { margin: 0; font-size: 14px; line-height: 1.5; max-width: 62ch; }
-.paper-slot-ask { margin: 10px 0 0; font-size: 12px; font-weight: 600; color: var(--accent); }
+.pw-joel {
+  border-left: 3px solid var(--accent);
+}
 
-/* The fold is gone: Joel manages privacy himself rather than having the layout
-   do it, so what is owed leads and nothing is held back to a second screen.
-   `.paper-deferred` is what used to be the lead, now sitting after the day. */
-.paper-deferred { margin-top: 6px; }
+.pw-parked {
+  opacity: 0.72;
+}
 
-.paper-below { display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; }
-.paper-column { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pw-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
 
-.paper-head {
-  margin: 0;
+.pw-id {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: var(--accent);
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 4px;
-}
-
-.paper-owed-list { display: flex; flex-direction: column; gap: 8px; }
-
-.paper-owed {
-  display: grid;
-  grid-template-columns: 70px 1fr;
-  gap: 10px;
-  align-items: baseline;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-left-width: 4px;
-  border-radius: 10px;
-  background: var(--surface);
-  color: inherit;
   text-decoration: none;
+  white-space: nowrap;
 }
 
-.paper-owed:hover { border-color: var(--accent); }
-.paper-owed-label { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-soft); }
-.paper-owed-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.paper-owed-title { font-size: 14px; font-weight: 600; line-height: 1.3; }
-.paper-owed-detail { font-size: 11px; color: var(--ink-soft); line-height: 1.35; }
+.pw-meta {
+  font-size: 11px;
+  color: var(--ink-soft);
+  text-align: right;
+}
 
-.paper-figure { display: flex; flex-direction: column; gap: 1px; padding: 8px 0; border-top: 1px solid var(--line); }
-.paper-figure-count { font-size: 26px; font-weight: 700; line-height: 1; }
-.paper-figure-name { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); }
-.paper-figure-top { font-size: 12px; color: var(--ink-soft); line-height: 1.35; }
-
-.paper-note { margin: 0; font-size: 12px; color: var(--ink-soft); line-height: 1.5; max-width: 60ch; }
-
-.paper-source { margin: 0; display: flex; flex-direction: column; gap: 1px; padding: 6px 0; }
-.paper-source-name { font-size: 12px; font-weight: 600; }
-.paper-source-when { font-size: 11px; color: var(--ink-soft); }
-
-/* Loud, per the decision: struck through rather than quietly timestamped. */
-.paper-stale .paper-source-name { text-decoration: line-through; }
-.paper-stale .paper-source-when { color: var(--sev-urgent); font-weight: 600; }
-.paper-degraded .paper-source-when { color: var(--sev-warn); }
-
-.paper-banner {
-  margin: 0;
-  padding: 10px 14px;
-  border: 1px solid var(--sev-urgent);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 13px;
+.pw-title {
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+  text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
-/* --- Timing: the same tree, tightened. Nothing appears or disappears. ------ */
-.paper-timing { gap: 10px; max-width: none; }
-.paper-timing .paper-masthead { padding-bottom: 6px; }
-.paper-timing .paper-masthead h1 { font-size: 22px; }
-.paper-timing .paper-slot { padding: 12px 14px; }
-.paper-timing .paper-slot-body { font-size: 13px; }
-.paper-timing .paper-below { grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
-.paper-timing .paper-owed { padding: 6px 10px; border-radius: 8px; }
-.paper-timing .paper-owed-title { font-size: 12.5px; }
-.paper-timing .paper-owed-list { gap: 5px; }
-.paper-timing .paper-figure { padding: 5px 0; }
-.paper-timing .paper-figure-count { font-size: 19px; }
-.paper-timing .paper-deferred { margin-top: 2px; }
+.pw-id:hover,
+.pw-title:hover {
+  text-decoration: underline;
+}
 
-@media (max-width: 760px) {
-  .paper-below, .paper-timing .paper-below { grid-template-columns: 1fr; gap: 18px; }
-  .paper-masthead h1 { font-size: 26px; }
-  .tabstrip { flex-wrap: wrap; }
-  .tab-densities { margin-left: 0; }
+.pw-next {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pw-quiet,
+.pw-foot,
+.pw-empty {
+  color: var(--ink-soft);
+}
+
+.pw-foot {
+  margin: 0;
+  font-size: 11px;
+}
+
+.pw-empty {
+  margin: 0;
+  font-size: 12px;
+}
+
+.pw-later summary {
+  cursor: pointer;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.pw-agent + .pw-agent {
+  margin-top: 6px;
+}
+
+.pw-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .pw-board {
+    grid-template-columns: 1fr;
+  }
 }

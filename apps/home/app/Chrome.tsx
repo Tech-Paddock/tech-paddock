@@ -11,7 +11,7 @@ import { APPS, selectedIndexFrom } from "./apps";
  * Home's chrome — topbar, sidebar, and the box everything else renders into.
  *
  * It takes `children` rather than the data any particular page needs, which is
- * what lets `/admin` sit inside it: that page is an async server component
+ * what lets The Garage sit inside it: that tab is an async server component
  * running live probes, so it can never be rendered *by* a client component, but
  * it can be passed *through* one.
  *
@@ -32,10 +32,10 @@ function Bar({ children }: { children: React.ReactNode }) {
   const params = useSearchParams();
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const onAdmin = pathname === "/admin";
-  // A tool is only ever selected on the landing route; /admin has no ?app=.
-  const selected = onAdmin ? null : selectedIndexFrom(params.get("app"));
-  const onLanding = !onAdmin && selected === null;
+  // A tool is only ever selected on the landing route.
+  const selected = pathname === "/" ? selectedIndexFrom(params.get("app")) : null;
+  const onLanding = selected === null;
+  const onGarage = onLanding && params.get("tab") === "garage";
 
   async function logout() {
     setLoggingOut(true);
@@ -51,11 +51,11 @@ function Bar({ children }: { children: React.ReactNode }) {
           <div className="topbar-text">
             <span className="topbar-title">Paddock</span>
             <span className="topbar-subtitle">
-              {onAdmin
-                ? "The Garage — what is wrong right now"
-                : selected === null
-                  ? "What needs you, with several agents out"
-                  : `Working in ${APPS[selected].name}`}
+              {selected !== null
+                ? `Working in ${APPS[selected].name}`
+                : onGarage
+                  ? "The Garage — what is wrong right now"
+                  : "Pit Wall — open work, and who acts next"}
             </span>
           </div>
           {/* Switch with the brand, livery hard right — Joel's arrangement,
@@ -73,25 +73,22 @@ function Bar({ children }: { children: React.ReactNode }) {
         <nav className="sidebar">
           <p className="sidebar-label">Navigate</p>
           {/* Links rather than buttons, so they work from any route in the
-              group. On the landing this is a same-route query change; from
-              /admin it is a route change. Both are client-side. */}
+              group. Each is a same-route query change, client-side. Home
+              holds both tabs, the Pit Wall and The Garage. */}
           <Link className={`nav-item ${onLanding ? "active" : ""}`} href="/">
-            <span className="icon">🏁</span> Pit Wall
+            <span className="icon">🏁</span> Home
           </Link>
           {APPS.map((a, i) => (
             <Link
               key={a.slug}
               className={`nav-item ${i === selected ? "active" : ""}`}
               href={`/?app=${a.slug}`}
-              replace={!onAdmin}
+              replace
             >
               <span className="icon">{a.icon}</span> {a.name}
             </Link>
           ))}
           <p className="sidebar-label">Account</p>
-          <Link className={`nav-item ${onAdmin ? "active" : ""}`} href="/admin">
-            <span className="icon">🔧</span> The Garage
-          </Link>
           <button className="nav-item logout-item" onClick={logout} disabled={loggingOut}>
             <span className="icon">🚪</span> {loggingOut ? "Logging out…" : "Log out"}
           </button>

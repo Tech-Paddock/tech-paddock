@@ -9,7 +9,7 @@
  */
 export default function ShellError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <div className="glance">
+    <div className="shell-error">
       <p className="eyebrow">Something broke</p>
       <h1>This page could not be rendered</h1>
       <p className="description">
