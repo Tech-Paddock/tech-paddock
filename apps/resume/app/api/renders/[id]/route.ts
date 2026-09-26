@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient, getTrackerClient } from "@/lib/supabase";
-import { StorageError, removeDocx } from "@/lib/storage";
+import { StorageError, downloadDocx, removeDocx } from "@/lib/storage";
+import { DocxReadError, readDocxParts } from "@/lib/docx/read";
+import { extractParagraphs } from "@/lib/docx/paragraphs";
+import { auditAts } from "@/lib/docx/ats";
+import { storedRenderView, type StoredRenderRow } from "@/lib/storedRender";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +16,65 @@ type Body = {
   submittedAt?: string | null;
   threadId?: string | null;
 };
+
+/**
+ * Reopen a stored render: its verdict, coverage and change log, as written.
+ *
+ * Coverage and the change log are read back from the row — never recomputed —
+ * because they are the record of what this render did. The ATS findings were
+ * never stored, so they are read off the stored output bytes: the document that
+ * went out, audited by today's lint. Whether a verdict can be given at all is
+ * decided in `lib/storedRender.ts`.
+ */
+export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
+  const supabase = getServiceClient();
+
+  const { data: render, error } = await supabase
+    .from("renders")
+    .select("id, template_id, template_snapshot, parsed_content, coverage, output_file_path, thread_id, submitted_at")
+    .eq("id", params.id)
+    .maybeSingle();
+  if (error) return fail(500, "db_error", error.message);
+  if (!render) return fail(404, "not_found", "No render with that id.");
+  if (typeof render.output_file_path !== "string" || !render.output_file_path) {
+    return fail(409, "no_output", "This render has no stored output, so there is nothing to reopen.");
+  }
+
+  let template: { name: string; version: number } | null = null;
+  if (render.template_id) {
+    const { data, error: templateError } = await supabase
+      .from("templates")
+      .select("name, version")
+      .eq("id", render.template_id)
+      .maybeSingle();
+    if (templateError) return fail(500, "db_error", templateError.message);
+    if (data) template = { name: data.name as string, version: data.version as number };
+  }
+
+  // Where it went lives on the tracker thread. A failed read is said, not
+  // swallowed: silently showing the job form again invites logging the same
+  // application twice.
+  let loggedTo: string | null = null;
+  if (render.thread_id) {
+    const { data, error: threadError } = await getTrackerClient()
+      .from("pipeline_threads")
+      .select("company")
+      .eq("id", render.thread_id)
+      .maybeSingle();
+    if (threadError) return fail(502, "tracker_error", `Couldn't read the tracker thread: ${threadError.message}`);
+    loggedTo = (data?.company as string | undefined) ?? null;
+  }
+
+  try {
+    const parts = await readDocxParts(Buffer.from(await downloadDocx(render.output_file_path)));
+    const findings = auditAts(parts, extractParagraphs(parts.document));
+    return NextResponse.json(storedRenderView({ render: render as StoredRenderRow, template, findings, loggedTo }));
+  } catch (err) {
+    if (err instanceof StorageError) return fail(502, "storage_error", err.message);
+    if (err instanceof DocxReadError) return fail(422, err.code, err.message);
+    throw err;
+  }
+}
 
 /**
  * Record where a render went.

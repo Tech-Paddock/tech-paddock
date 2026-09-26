@@ -50,20 +50,30 @@ type Finding = { code: string; severity: "blocking" | "warning"; message: string
  *  the template on purpose — so this is not a percentage of the whole source. */
 type Coverage = { totalLines: number; present: number; missing: string[]; percent: number };
 type ChangeLogEntry = { section: string; detail: string; action: string };
+/**
+ * A reformat, just run (`POST /api/reformat`) or reopened from storage
+ * (`GET /api/renders/[id]`). A reopened one carries no bytes — its download is
+ * the stored file — and may carry no coverage or change log if it predates
+ * them, in which case `unread` says why and the screen gives no verdict rather
+ * than a PASS it never checked (`lib/storedRender.ts`).
+ */
 type Reformatted = {
   filename: string;
   renderId: string | null;
   templateLabel: string;
-  coverage: Coverage;
+  coverage: Coverage | null;
   findings: Finding[];
-  changeLog: ChangeLogEntry[];
+  changeLog: ChangeLogEntry[] | null;
   summary: {
     experience: { company: string; title: string; date: string; bullets: number }[];
     highlights: number;
     competencies: number;
     hasSummary: boolean;
-  };
-  docxBase64: string;
+  } | null;
+  docxBase64?: string;
+  downloadHref?: string;
+  unread?: string[];
+  loggedTo?: string | null;
 };
 
 type ContentCheck = { totalLines: number; present: number; missing: string[]; percent: number };
@@ -407,8 +417,37 @@ function ReformatShell() {
     }
   }
 
+  /**
+   * Reopen a stored render on the Reformat tab, with its verdict as it was
+   * recorded. The coverage and change log come back from the row, never from a
+   * re-render — re-rendering would answer a different question.
+   */
+  async function openRender(id: string) {
+    setError(null);
+    setNote(null);
+    setBusy("Opening render…");
+    try {
+      const res = await fetch(`/api/renders/${id}`, { cache: "no-store" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? `Couldn't open that render (${res.status}).`);
+      const opened = data as Reformatted;
+      setResult(opened);
+      setSaved(opened.loggedTo ? `Logged against ${opened.loggedTo}.` : null);
+      setTab("reformat");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't open that render.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   function download() {
     if (!result) return;
+    if (!result.docxBase64) {
+      // Reopened: the stored bytes, exactly as they went out.
+      if (result.downloadHref) window.location.href = result.downloadHref;
+      return;
+    }
     const bytes = Uint8Array.from(atob(result.docxBase64), (c) => c.charCodeAt(0));
     const url = URL.createObjectURL(
       new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })
@@ -623,7 +662,27 @@ function ReformatShell() {
                     should fail and give reason." The reasoning about what may vote on
                     it — and what may not — is in lib/verdict.ts, with its tests. */}
                 {(() => {
-                  const v = verdictFor(result);
+                  // A reopened render whose record cannot be read gets no verdict
+                  // at all. An empty list here would say PASS about a reformat
+                  // nobody checked — an unread result must not look like a clean one.
+                  if ((result.unread?.length ?? 0) > 0 || !result.coverage || !result.changeLog) {
+                    return (
+                      <div className="rounded-xl border-2 border-warn overflow-hidden">
+                        <div className="px-4 py-3 flex items-baseline gap-3 flex-wrap bg-surface">
+                          <span className="text-lg font-semibold tracking-wide text-warn">NO VERDICT</span>
+                          <span className="text-sm opacity-90">This render&apos;s record can&apos;t be read in full.</span>
+                        </div>
+                        <ul className="divide-y divide-line">
+                          {(result.unread ?? []).map((reason, i) => (
+                            <li key={i} className="px-4 py-2.5 text-sm">
+                              {reason}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  }
+                  const v = verdictFor({ ...result, coverage: result.coverage, changeLog: result.changeLog });
                   return (
                     <div
                       className={`rounded-xl border-2 overflow-hidden ${v.pass ? "border-bar" : "border-urgent"}`}
@@ -823,6 +882,17 @@ function ReformatShell() {
                         <a href={f.downloadHref} className="underline opacity-80">
                           Download
                         </a>
+                        {/* Either row of a render opens the render: its verdict and
+                            change log as recorded, on Reformat and Diagnostics. */}
+                        {f.kind !== "template" && (
+                          <button
+                            onClick={() => void openRender(f.id)}
+                            disabled={busy !== null}
+                            className="underline opacity-80 disabled:opacity-40"
+                          >
+                            Open
+                          </button>
+                        )}
                         {f.kind === "template" && !f.active && !f.archived && (
                           <button
                             onClick={() => void patchTemplate(f.id, { is_active: true })}
@@ -891,20 +961,30 @@ function ReformatShell() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <Stat
-                    value={`${result.coverage.percent}%`}
+                    value={result.coverage ? `${result.coverage.percent}%` : "—"}
                     label="Lines carried"
-                    tone={result.coverage.percent === 100 ? "good" : "warn"}
+                    tone={!result.coverage ? "plain" : result.coverage.percent === 100 ? "good" : "warn"}
                   />
                   <Stat
                     value={`${result.findings.length}`}
                     label="ATS findings"
                     tone={result.findings.length === 0 ? "good" : "warn"}
                   />
-                  <Stat value={`${result.summary.experience.length}`} label="Roles" />
-                  <Stat value={`${result.summary.highlights}`} label="Highlights" />
+                  <Stat value={result.summary ? `${result.summary.experience.length}` : "—"} label="Roles" />
+                  <Stat value={result.summary ? `${result.summary.highlights}` : "—"} label="Highlights" />
                 </div>
 
-                {result.coverage.missing.length > 0 && (
+                {(result.unread?.length ?? 0) > 0 && (
+                  <Panel title="Not recorded" aside={<span className="text-xs text-warn">no verdict</span>}>
+                    <ul className="list-disc pl-5 text-sm flex flex-col gap-1">
+                      {result.unread?.map((reason, i) => (
+                        <li key={i}>{reason}</li>
+                      ))}
+                    </ul>
+                  </Panel>
+                )}
+
+                {result.coverage && result.coverage.missing.length > 0 && (
                   <Panel title="Not carried across" aside={<span className="text-xs text-warn">check before sending</span>}>
                     <ul className="list-disc pl-5 text-sm flex flex-col gap-1">
                       {result.coverage.missing.map((d, i) => (
@@ -922,10 +1002,12 @@ function ReformatShell() {
                     <p className="text-xs opacity-60">
                       The output is your template with the text swapped, so a finding here is almost always about the
                       template. Fix it there and every future render inherits the fix.
+                      {!result.docxBase64 && " Reopened: this is today's check, read off the stored file."}
                     </p>
                   </div>
                 </Panel>
 
+                {result.summary && (
                 <details className="bg-surface border border-line rounded-xl overflow-hidden">
                   <summary className="px-4 py-2.5 text-sm font-semibold cursor-pointer">
                     What went in · {result.summary.hasSummary ? "summary" : "no summary"}, {result.summary.competencies}{" "}
@@ -945,7 +1027,9 @@ function ReformatShell() {
                     ))}
                   </ul>
                 </details>
+                )}
 
+                {result.changeLog && (
                 <details className="bg-surface border border-line rounded-xl overflow-hidden">
                   <summary className="px-4 py-2.5 text-sm font-semibold cursor-pointer">
                     What it did to the template · {result.changeLog.length} change
@@ -962,6 +1046,7 @@ function ReformatShell() {
                     ))}
                   </ul>
                 </details>
+                )}
 
                 <div className="border-t border-line pt-3">
                   <h2 className="text-sm font-semibold">Any other document</h2>
