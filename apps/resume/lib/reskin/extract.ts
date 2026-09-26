@@ -30,6 +30,7 @@ export function extractSourceContent(blocks: Block[]): SourceContent {
   const expLines: RawExpLine[] = [];
   let careerHighlights: StatCell[] | null = null;
   const careerHighlightLines: string[] = [];
+  const careerHighlightCells: string[][] = [];
   let competencies: CompetencyRow[] | null = null;
   const competencyPlainRows: CompetencyRow[] = [];
 
@@ -97,7 +98,7 @@ export function extractSourceContent(blocks: Block[]): SourceContent {
           break;
       }
     } else if (block.type === "tbl") {
-      if (currentSection === "careerHighlights") careerHighlights = statCellsFromTable(block.raw);
+      if (currentSection === "careerHighlights") careerHighlightCells.push(...tableCellTexts(block.raw));
       else if (currentSection === "competencies") competencies = competencyRowsFromTable(block.raw);
       else if (currentSection === "unplaced") unplaced[unplaced.length - 1].lines += 1;
     }
@@ -106,10 +107,18 @@ export function extractSourceContent(blocks: Block[]): SourceContent {
   // Neither reader could pair the lines up. Refusing to guess is right, but the
   // text is still the source's: it is kept here so the renderer can say it was
   // dropped, rather than reading null as "the input had no highlights".
+  //
+  // A Word table is read only when it is the section's whole content: a table
+  // beside paragraphs of text is two shapes at once, and reading either one
+  // would leave the other behind with nothing saying so (TEC-87).
   let unreadableHighlights: string[] = [];
-  if (careerHighlights === null && careerHighlightLines.length > 0) {
+  if (careerHighlightCells.length > 0 && careerHighlightLines.length === 0) {
+    careerHighlights = pairTableCells(careerHighlightCells);
+  } else if (careerHighlightCells.length === 0 && careerHighlightLines.length > 0) {
     careerHighlights = parsePipeTable(careerHighlightLines) ?? parseColonPairs(careerHighlightLines);
-    if (careerHighlights === null) unreadableHighlights = highlightText(careerHighlightLines);
+  }
+  if (careerHighlights === null && (careerHighlightCells.length > 0 || careerHighlightLines.length > 0)) {
+    unreadableHighlights = [...careerHighlightCells.flat(), ...highlightText(careerHighlightLines)];
   }
   if (competencies === null && competencyPlainRows.length > 0) {
     competencies = competencyPlainRows;
@@ -173,15 +182,38 @@ function groupExperienceEntries(lines: RawExpLine[]): ExperienceEntry[] {
   return entries.map((e) => ({ ...splitCompanyAndTitleDate(e.headerLines), bullets: e.bullets }));
 }
 
-function statCellsFromTable(tableRaw: string): StatCell[] {
-  const cells: StatCell[] = [];
+/**
+ * The text of every cell in a table, one entry per cell, blank paragraphs left
+ * out. A cell with no text at all is spacing, not content, and is skipped.
+ */
+function tableCellTexts(tableRaw: string): string[][] {
+  const cells: string[][] = [];
   for (const row of splitRows(tableRaw)) {
     for (const cell of splitCells(row)) {
-      const paras = cellParagraphs(cell).map((p) => extractText(p).trim());
-      if (paras.length >= 2) cells.push({ stat: paras[0], desc: paras[1] });
+      const paras = cellParagraphs(cell)
+        .map((p) => extractText(p).trim())
+        .filter((t) => t !== "");
+      if (paras.length > 0) cells.push(paras);
     }
   }
   return cells;
+}
+
+/**
+ * Highlights from a Word table: one cell per highlight, its metric then its
+ * description. Null unless **every** cell is exactly that pair, on the same
+ * terms as `parsePipeTable`.
+ *
+ * It once kept any cell of two paragraphs or more and skipped the rest: a
+ * one-line cell vanished, a third paragraph vanished, and a table of nothing but
+ * one-line cells read as "the input had no highlights" — kept-unchanged and a
+ * pass, over text that reached the document nowhere (TEC-87). Blank paragraphs
+ * are dropped before counting, which also stops a leading spacer paragraph from
+ * being read as an empty metric.
+ */
+function pairTableCells(cells: string[][]): StatCell[] | null {
+  if (cells.some((c) => c.length !== 2)) return null;
+  return cells.map(([stat, desc]) => ({ stat, desc }));
 }
 
 /**

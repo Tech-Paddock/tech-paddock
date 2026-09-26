@@ -18,8 +18,9 @@ section the source did not fill (`not-found-in-input`), or source text with nowh
 note, never a vote.** The two drops shared one action until TEC-31 and the verdict failed the
 repo's own fixture pair at full coverage — so log each drop as what it is, or the verdict either
 cries wolf or overstates. An end-to-end test runs that pair through the route's pipeline.
-**Highlights the source has but cannot pair up are a drop too** (`unreadableHighlights`, TEC-79),
-counted by `linesTaken`; `careerHighlights: null` alone means the source had none.
+**Highlights the source has but cannot pair up are a drop too** (`unreadableHighlights`), counted
+by `linesTaken`; `careerHighlights: null` alone means none. Pipe table or Word table, every cell
+must pair or none is read, and a table beside text is refused (TEC-79, TEC-87).
 
 **Diagnostics checks the lines a reformat takes** (`linesTaken`, as the reformat route does), not
 the whole source, which it leaves partly behind by design. A source it takes nothing from is

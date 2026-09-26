@@ -117,7 +117,7 @@ export function renderIntoTemplate(
     changeLog.push({
       section: "Career Highlights",
       action: "input-dropped",
-      detail: `The source's Career Highlights (${unreadable.length} ${unreadable.length === 1 ? "cell" : "cells"}) could not be read into metric and description pairs, so none of them were carried over and the template's were kept. Fix the source's table so its rows line up.`,
+      detail: `The source's Career Highlights could not be read into metric and description pairs, so none of their ${unreadable.length} ${unreadable.length === 1 ? "line was" : "lines were"} carried over and the template's were kept. Fix the source so each highlight is one metric and one description.`,
     });
   }
 
