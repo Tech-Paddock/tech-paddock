@@ -13,8 +13,9 @@ fully snapshotted; the harness has not been run.
 
 ## How it works, in the order it matters
 
-**The lookup order is the product**, in `lib/log.ts:resolveItem`. Exact match on the normalised name;
-a miss goes outside to one model call; approval writes it back, so outside runs once per food ever.
+**The lookup order is the product**, in `lib/log.ts:resolveItem`. A Cookbook recipe first (below),
+then exact match on the normalised name; a miss goes outside to one model call; approval writes it
+back, so outside runs once per food ever.
 
 **Item numbers are append-only.** `health.items` is identity, `health.item_versions` is what it
 weighed over time, nothing updated in place. `lib/items.ts:resolveVersion` picks the version for a
@@ -47,18 +48,30 @@ and nothing is written. **A renamed draft line is cleared and looked up again** 
 `/api/resolve` when the field loses focus; approve waits until every line has numbers. Same-name
 lines from one dictation merge, quantities added, before anything is estimated.
 
-## Cookbook: the list has moved, recipes are not read yet
+## Cookbook: the list has moved, recipes are read from it
 
 **`/list` only redirects** to `https://cookbook.techpaddock.io/list` (TEC-23). No code here touches
-`health.grocery_items`; the table stays until TEC-15's part 2 drops it. **Nothing reads Cookbook's
-`GET /api/servings` yet**: TEC-25 waits on where a recipe sits in the lookup order, its provenance
-(`macro_source` has no recipe value) and how its line is stored — the questions are on the issue.
+`health.grocery_items`; the table stays until TEC-15's part 2 drops it.
+
+**A food whose normalised name equals a Cookbook recipe's is the Cookbook's** (TEC-25, Joel
+2026-09-26). `lib/cookbook.ts` reads `GET /api/servings` once per request, forwarding **only**
+`paddock_session` to the origin of `COOKBOOK_BASE_URL`; the numbers carry `source = cookbook` and no
+model. The recipe is an ordinary `health.items` row; approving re-reads the Cookbook, refuses a
+draft whose numbers moved, and appends a `cookbook` version (kind `change`) only when they differ
+from the current one. **A typed-over recipe number is refused** — on the draft, in a day-log
+correction and in a `/debug` pick — "Fix it in the Cookbook", because the next log bypasses it.
+Recipes that share a normalised name are refused on the line, never guessed between.
 
 ## Traps specific to this seat
 
+- **An unreadable Cookbook fails only lines that could be a recipe** (Joel, 2026-09-26): a name
+  stored with a `cookbook` version gets "Couldn't reach the Cookbook"; others resolve as normal, so
+  **a recipe never yet logged here falls through** (the accepted gap). A `SESSION_SECRET` mismatch
+  looks exactly like an outage.
 - **`normalizeName` is the item key.** It folds accents, apostrophes and simple plurals ("Large
   Fries" meets "Large Fry"). Changing it once `health.items` has rows splits one food into two
-  keys, so a change then needs a migration that re-keys the table, not only a code edit.
+  keys, so a change then needs a migration that re-keys the table, not only a code edit. It is
+  also what decides a name is a Cookbook recipe.
 - **`lib/models.ts` is Coffee's registry duplicated and flagged, not a verbatim copy** — the two
   have diverged. Do not let a third copy happen quietly.
 - **The livery is borrowed and has a collision.** `senna`, which the parked tracker also wears, maps
