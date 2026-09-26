@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ThemeControl, { LiveryBadge } from "../ThemeControl";
+import LogoutControl from "../LogoutControl";
 import List from "./List";
 import { LIVERY } from "@/lib/livery";
 
@@ -25,6 +26,7 @@ export default function Page() {
           List
         </h1>
         <ThemeControl onBar />
+        <LogoutControl onBar />
         <div className="ml-auto flex items-center gap-2">
           <LiveryBadge livery={LIVERY} onBar />
         </div>

@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LIVERY } from "@/lib/livery";
 import ThemeControl, { LiveryBadge } from "./ThemeControl";
+import LogoutControl from "./LogoutControl";
 import { APPS, selectedIndexFrom } from "./apps";
 
 /**
@@ -30,18 +31,11 @@ function Bar({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const [loggingOut, setLoggingOut] = useState(false);
 
   const onAdmin = pathname === "/admin";
   // A tool is only ever selected on the landing route; /admin has no ?app=.
   const selected = onAdmin ? null : selectedIndexFrom(params.get("app"));
   const onLanding = !onAdmin && selected === null;
-
-  async function logout() {
-    setLoggingOut(true);
-    await fetch("/api/logout", { method: "POST" }).catch(() => {});
-    window.location.href = "/login";
-  }
 
   return (
     <main className="page">
@@ -64,8 +58,12 @@ function Bar({ children }: { children: React.ReactNode }) {
               below it, and the two want to line up; the switch comes left
               because it is a control and belongs with the thing it controls.
               The livery is fixed for this app, so only the switch does
-              anything, and what it does is shared with every subdomain. */}
+              anything, and what it does is shared with every subdomain.
+              Log out sits with the switch since TEC-73: the same stamped
+              control every tool's bar carries, where the sidebar's own button
+              used to be — and it hides in a framed tool, so this one governs. */}
           <ThemeControl />
+          <LogoutControl />
           <LiveryBadge livery={LIVERY} />
         </div>
       </header>
@@ -92,9 +90,6 @@ function Bar({ children }: { children: React.ReactNode }) {
           <Link className={`nav-item ${onAdmin ? "active" : ""}`} href="/admin">
             <span className="icon">🔧</span> The Garage
           </Link>
-          <button className="nav-item logout-item" onClick={logout} disabled={loggingOut}>
-            <span className="icon">🚪</span> {loggingOut ? "Logging out…" : "Log out"}
-          </button>
         </nav>
         <section className="content">{children}</section>
       </div>
