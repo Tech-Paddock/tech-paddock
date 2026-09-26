@@ -7,9 +7,8 @@ import { permanentRedirect } from "next/navigation";
  *
  * **The target is Cookbook's `/list` (TEC-22), exactly** — Cookbook's route
  * says Health depends on it and it is not renamed quietly. It is a fixed
- * origin, never one read from the request. Health no longer reads or writes
- * `health.grocery_items`; the table is dropped by a separate migration once
- * this is live.
+ * origin, never one read from the request. Health keeps no grocery table: the
+ * list's rows live in the Cookbook's own schema.
  */
 const COOKBOOK_LIST_URL = "https://cookbook.techpaddock.io/list";
 

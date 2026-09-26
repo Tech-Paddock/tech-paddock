@@ -50,8 +50,8 @@ lines from one dictation merge, quantities added, before anything is estimated.
 
 ## Cookbook: the list has moved, recipes are read from it
 
-**`/list` only redirects** to `https://cookbook.techpaddock.io/list` (TEC-23). No code here touches
-`health.grocery_items`; the table stays until TEC-15's part 2 drops it.
+**`/list` only redirects** to `https://cookbook.techpaddock.io/list` (TEC-23). `health` has no grocery
+table: `health_drop_grocery_items` dropped it and its enum (TEC-91, 0 rows); the list is Cookbook's.
 
 **A food whose normalised name equals a Cookbook recipe's is the Cookbook's** (TEC-25, Joel
 2026-09-26). `lib/cookbook.ts` reads `GET /api/servings` once per request, forwarding **only**
