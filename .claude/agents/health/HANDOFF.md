@@ -64,9 +64,10 @@ Recipes that share a normalised name are refused on the line, never guessed betw
 
 ## Traps specific to this seat
 
-- **An unreadable Cookbook blocks logging anything** — a 503, on purpose: without the book no name
-  is known not to be a recipe, and falling through is guardrail 2's drift. A `SESSION_SECRET`
-  mismatch with the Cookbook's project looks exactly like this.
+- **An unreadable Cookbook fails only lines that could be a recipe** (Joel, 2026-09-26): a name
+  stored with a `cookbook` version gets "Couldn't reach the Cookbook"; others resolve as normal.
+  **Accepted gap:** a recipe never yet logged here falls through during an outage. A
+  `SESSION_SECRET` mismatch with the Cookbook's project looks exactly like an outage.
 - **`normalizeName` is the item key.** It folds accents, apostrophes and simple plurals ("Large
   Fries" meets "Large Fry"). Changing it once `health.items` has rows splits one food into two
   keys, so a change then needs a migration that re-keys the table, not only a code edit. It is

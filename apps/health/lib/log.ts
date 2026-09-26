@@ -5,7 +5,9 @@ import {
 } from "./items";
 import { decideLine, decideRecipeLine, duplicateFoods, type LineDecision } from "./approve";
 import { estimateMacros } from "./anthropic";
-import { AmbiguousRecipe, type Recipe, type RecipeBook } from "./cookbook";
+import {
+  AmbiguousRecipe, CookbookUnreachable, findRecipe, fromCookbook, type Recipe, type RecipeBook,
+} from "./cookbook";
 import { total, round, namesNoModel, type Macros, type MacroSource } from "./macros";
 import type { Meal } from "./meals";
 import { DEFAULT_MODEL, type ModelId } from "./models";
@@ -50,9 +52,10 @@ export type Draft = {
  * internet-first with nothing on screen changing.
  *
  * **A Cookbook recipe is asked before the table** (Joel, 2026-09-26, TEC-25),
- * so a Cookbook edit reaches the next log. A Cookbook that cannot be read throws
- * `CookbookUnreachable`, a `LookupError`, for the same reason: falling through
- * to the table or a model would log a recipe with numbers that are not its own.
+ * so a Cookbook edit reaches the next log. When the Cookbook cannot be read,
+ * only a line that could be a recipe fails, with "Couldn't reach the Cookbook"
+ * (Joel, 2026-09-26): falling through would log a recipe with numbers that are
+ * not its own. Every other line resolves as normal. See `findRecipe`.
  */
 export async function resolveItem(params: {
   name: string;
@@ -69,18 +72,24 @@ export async function resolveItem(params: {
     error: null as string | null,
   };
 
-  // Tier 0: the Cookbook. A throw here is an unreachable Cookbook and must
-  // reach the caller; two recipes of one name are this line's problem.
+  // Tier 1 and 2 read first, because an outage needs them. A throw here is a
+  // broken database and must reach the caller.
+  const remembered = await findItem(params.name);
+
+  // Tier 0: the Cookbook, which answers before the table. During an outage a
+  // name stored from the Cookbook is a known recipe and fails on this line;
+  // any other resolves as an ordinary food (`findRecipe`). Two recipes of one
+  // name are this line's problem too.
   let recipe: Recipe | null;
   try {
-    recipe = await params.recipes.find(params.name);
+    recipe = await findRecipe(params.recipes, params.name, async () => fromCookbook(remembered?.versions));
   } catch (e) {
-    if (!(e instanceof AmbiguousRecipe)) throw e;
-    return { ...base, macros: { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 }, source: "cookbook", model: null, known: false, item_id: null, error: e.message };
+    if (!(e instanceof AmbiguousRecipe) && !(e instanceof CookbookUnreachable)) throw e;
+    return {
+      ...base, macros: { kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 }, source: "cookbook", model: null,
+      known: remembered !== null, item_id: remembered?.item.id ?? null, error: e.message,
+    };
   }
-
-  // Tier 1 and 2. A throw here is a broken database and must reach the caller.
-  const remembered = await findItem(params.name);
 
   if (recipe) {
     return {
@@ -212,15 +221,18 @@ export async function saveEntry(draft: Draft, recipes: RecipeBook): Promise<{ id
     decision: Exclude<LineDecision, { action: "reject" }>;
   }[] = [];
   for (const [index, line] of draft.items.entries()) {
+    const remembered = await findItem(line.name);
+    const versions = remembered?.versions ?? [];
+    // During an outage a line that could be a recipe — a known one, or one
+    // drafted as one — cannot be checked, so it throws; any other line is
+    // decided as an ordinary food.
     let recipe: Recipe | null;
     try {
-      recipe = await recipes.find(line.name);
+      recipe = await findRecipe(recipes, line.name, async () => line.source === "cookbook" || fromCookbook(versions));
     } catch (e) {
       if (e instanceof AmbiguousRecipe) throw new DraftError(e.message);
       throw e;
     }
-    const remembered = await findItem(line.name);
-    const versions = remembered?.versions ?? [];
     const current = resolveVersion(versions, draft.eaten_on);
     const decision = recipe
       ? decideRecipeLine(line, remembered?.item.id ?? null, current, recipe.per_serving)

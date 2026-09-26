@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { upsertItem, versionsOf, addVersion, eraFor, LookupError } from "@/lib/items";
+import { upsertItem, findItem, versionsOf, addVersion, eraFor, LookupError } from "@/lib/items";
 import { parseMacros } from "@/lib/macros";
 import { DEFAULT_MODEL, COMPARISON_MODEL } from "@/lib/models";
 import { getServiceClient } from "@/lib/supabase";
-import { recipeBookFor, isRecipe, fixItInTheCookbook } from "@/lib/cookbook";
+import { recipeBookFor, isRecipe, fromCookbook, fixItInTheCookbook } from "@/lib/cookbook";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +71,10 @@ export async function POST(request: NextRequest) {
     // A Cookbook recipe's numbers are the Cookbook's (TEC-25): a model's pick
     // stored against one would be bypassed by the next log. Refused before the
     // claim, so the run stays pickable if the recipe leaves the Cookbook.
-    if (picked !== "baseline" && await isRecipe(recipeBookFor(request.cookies), row.item_name as string)) {
+    const itemName = row.item_name as string;
+    if (picked !== "baseline" && await isRecipe(
+      recipeBookFor(request.cookies), itemName, async () => fromCookbook((await findItem(itemName))?.versions)
+    )) {
       return NextResponse.json({ error: fixItInTheCookbook(row.item_name as string) }, { status: 409 });
     }
 

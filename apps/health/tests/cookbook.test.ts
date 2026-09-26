@@ -16,7 +16,7 @@ vi.mock("@/lib/items", async (importOriginal) => {
 vi.mock("@/lib/anthropic", () => ({ estimateMacros: (...a: unknown[]) => estimateMacros(...a) }));
 
 import {
-  fetchServings, recipeBook, recipeBookFor, matchRecipe, parseServings, cookbookOrigin, isRecipe,
+  fetchServings, recipeBook, recipeBookFor, matchRecipe, parseServings, cookbookOrigin, isRecipe, findRecipe,
   CookbookUnreachable, AmbiguousRecipe, DEFAULT_COOKBOOK_BASE_URL, type Recipe,
 } from "@/lib/cookbook";
 import { LookupError, type ItemVersion } from "@/lib/items";
@@ -132,9 +132,9 @@ describe("down is never 'not found'", () => {
     await expect(book.find("turkey chili")).resolves.toBeNull();
   });
 
-  it("an unreachable Cookbook is not 'not a recipe' to the refusal check either", async () => {
+  it("an unreachable Cookbook is not 'not a recipe' for a name stored from it", async () => {
     const book = recipeBook(async () => { throw new CookbookUnreachable("test"); });
-    await expect(isRecipe(book, "Turkey chili")).rejects.toThrow(CookbookUnreachable);
+    await expect(findRecipe(book, "Turkey chili", async () => true)).rejects.toThrow(CookbookUnreachable);
   });
 });
 
@@ -185,14 +185,38 @@ describe("the lookup order", () => {
     expect(estimateMacros).not.toHaveBeenCalled();
   });
 
-  it("an unreachable Cookbook reaches the caller rather than falling through", async () => {
-    findItem.mockResolvedValue({ item: { id: "item-chili" }, versions: [stored] });
-    await expect(resolveItem({
-      name: "Turkey chili", quantity: 1, onDate: "2026-09-26",
-      recipes: recipeBook(async () => { throw new CookbookUnreachable("test"); }),
-    })).rejects.toThrow(CookbookUnreachable);
-    expect(findItem).not.toHaveBeenCalled();
+  const outage = () => recipeBook(async () => { throw new CookbookUnreachable("test"); });
+
+  it("an outage refuses a known recipe on its line, never falling through", async () => {
+    findItem.mockResolvedValue({
+      item: { id: "item-chili" },
+      versions: [stored, { ...stored, id: "v2", source: "cookbook", created_at: "2026-09-20T12:00:00Z" }],
+    });
+    const line = await resolveItem({ name: "Turkey chili", quantity: 1, onDate: "2026-09-26", recipes: outage() });
+    expect(line.error).toMatch(/^Couldn't reach the Cookbook/);
+    expect(line.source).toBe("cookbook");
+    expect(line.macros).toEqual({ kcal: 0, protein_g: 0, carbs_g: 0, fat_g: 0 });
     expect(estimateMacros).not.toHaveBeenCalled();
+  });
+
+  it("an outage lets an ordinary food resolve as normal", async () => {
+    findItem.mockResolvedValue({ item: { id: "item-eggs" }, versions: [{ ...stored, item_id: "item-eggs" }] });
+    const line = await resolveItem({ name: "Two eggs", quantity: 1, onDate: "2026-09-26", recipes: outage() });
+    expect(line.error).toBeNull();
+    expect(line.source).toBe("hand");
+  });
+
+  it("an outage lets a never-seen food go outside as normal", async () => {
+    findItem.mockResolvedValue(null);
+    estimateMacros.mockResolvedValue({ macros: CHILI, source_url: null, note: null });
+    const line = await resolveItem({ name: "Oat bar", quantity: 1, onDate: "2026-09-26", recipes: outage() });
+    expect(line.error).toBeNull();
+    expect(line.source).toBe("estimate");
+  });
+
+  it("the refusal checks follow the same rule during an outage", async () => {
+    await expect(isRecipe(outage(), "Turkey chili", async () => true)).rejects.toThrow(CookbookUnreachable);
+    await expect(isRecipe(outage(), "Two eggs", async () => false)).resolves.toBe(false);
   });
 
   it("a name that is not a recipe goes on to the table as before", async () => {

@@ -17,9 +17,9 @@ import { parseMacros, type Macros } from "./macros";
  *   a caller sends can point this at another host.
  * - **Down is never "not found"** — guardrail 2. A timeout, a redirect, a 401,
  *   a 5xx, or a body that is not the contract's shape is `CookbookUnreachable`,
- *   a `LookupError`, so every route already surfaces it as a 503 and nothing
- *   falls through to Health's table or to a model. Only a 200 with the
- *   contract's shape can say a name is not a recipe.
+ *   a `LookupError`. Only a 200 with the contract's shape can say a name is not
+ *   a recipe. During an outage only lines that could be a recipe fail —
+ *   `findRecipe` says which, and what that leaves open.
  * - **One read per request.** `recipeBook` memoises, so a draft of five foods
  *   is one call, not five.
  */
@@ -35,7 +35,7 @@ const UNREACHABLE = "Couldn't reach the Cookbook";
 
 export class CookbookUnreachable extends LookupError {
   constructor(detail: string) {
-    super(`${UNREACHABLE} (${detail}), so nothing was looked up. Try again in a moment.`);
+    super(`${UNREACHABLE} (${detail}). Try again in a moment.`);
     this.name = "CookbookUnreachable";
   }
 }
@@ -167,17 +167,54 @@ export function recipeBook(read: () => Promise<Recipe[]>): RecipeBook {
 }
 
 /**
+ * The recipe a name names, **surviving an outage only where that is safe**
+ * (Joel, 2026-09-26: "Only recipe lines fail").
+ *
+ * When the Cookbook cannot be read, a name Health has already stored with a
+ * `cookbook` version is a known recipe: it rethrows `CookbookUnreachable`, so
+ * it never falls through to Health's table or a model (guardrail 2). Any other
+ * name answers null and resolves as an ordinary food. **The accepted gap:** a
+ * recipe never yet logged in Health is indistinguishable from a food during an
+ * outage, and does fall through.
+ *
+ * @param storedFromCookbook asked only during an outage
+ */
+export async function findRecipe(
+  book: RecipeBook,
+  name: string,
+  storedFromCookbook: () => Promise<boolean>
+): Promise<Recipe | null> {
+  try {
+    return await book.find(name);
+  } catch (e) {
+    if (!(e instanceof CookbookUnreachable)) throw e;
+    if (await storedFromCookbook()) throw e;
+    return null;
+  }
+}
+
+/**
  * Whether a name is the Cookbook's to answer — two recipes of one name
  * included. Used to refuse a Health-side number for a recipe, which the next
- * log would bypass; an unreachable Cookbook still throws.
+ * log would bypass. During an outage, a name stored from the Cookbook still
+ * throws; any other is not a recipe, per `findRecipe`.
  */
-export async function isRecipe(book: RecipeBook, name: string): Promise<boolean> {
+export async function isRecipe(
+  book: RecipeBook,
+  name: string,
+  storedFromCookbook: () => Promise<boolean>
+): Promise<boolean> {
   try {
-    return (await book.find(name)) !== null;
+    return (await findRecipe(book, name, storedFromCookbook)) !== null;
   } catch (e) {
     if (e instanceof AmbiguousRecipe) return true;
     throw e;
   }
+}
+
+/** True when any of an item's versions came from the Cookbook: it is a known recipe. */
+export function fromCookbook(versions: { source: string }[] | null | undefined): boolean {
+  return (versions ?? []).some((v) => v.source === "cookbook");
 }
 
 export function fixItInTheCookbook(name: string): string {

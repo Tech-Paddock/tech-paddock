@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addVersion, versionsOf, eraFor, itemById, LookupError } from "@/lib/items";
-import { recipeBookFor, isRecipe, fixItInTheCookbook } from "@/lib/cookbook";
+import { recipeBookFor, isRecipe, fromCookbook, fixItInTheCookbook } from "@/lib/cookbook";
 import { parseMacros } from "@/lib/macros";
 
 export const dynamic = "force-dynamic";
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     // is a 503 like a broken database, never "not a recipe".
     const item = await itemById(itemId);
     if (!item) return NextResponse.json({ error: "That food isn't in your log." }, { status: 404 });
-    if (await isRecipe(recipeBookFor(request.cookies), item.name)) {
+    if (await isRecipe(recipeBookFor(request.cookies), item.name, async () => fromCookbook(await versionsOf(itemId)))) {
       return NextResponse.json({ error: fixItInTheCookbook(item.name) }, { status: 409 });
     }
 
