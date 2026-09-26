@@ -44,6 +44,10 @@ describe("template upload", () => {
     // The new version follows the highest existing one.
     // Inserted inactive, then activated — see the ordering test below.
     expect(calls.find((c) => c.op === "insert")?.payload).toMatchObject({ version: 3, is_active: false });
+    // TEC-63: nothing renders from an extracted spec, so none is written. The
+    // column is nullable (the resume_templates_spec_nullable migration) and is
+    // dropped in a second pull request once this one is live.
+    expect(calls.find((c) => c.op === "insert")?.payload).not.toHaveProperty("spec");
   });
 
   it("inserts nothing when the upload fails", async () => {
