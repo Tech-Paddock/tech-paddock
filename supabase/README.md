@@ -166,7 +166,8 @@ delete works only on a contact nothing points at.
 would leave it stale unless it set it itself.
 
 **The tracker never writes this table**; it stores a `contact_id` on its threads and nothing more.
-The Resume Formatter's `getSharedClient` is exported and never called (TEC-26).
+Nor does the Resume Formatter: it holds no client for this schema (TEC-26) and only passes a
+`contact_id` through to the tracker thread it writes.
 
 **The only create path is in the paused editor.** `tp-message-editor` deploys `BLOCKED`, so what
 creates contacts in production is its last good build, not necessarily this code.

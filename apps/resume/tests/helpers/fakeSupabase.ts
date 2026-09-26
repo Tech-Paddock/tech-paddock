@@ -88,7 +88,6 @@ export const mockModules = (overrides: {
   vi.doMock("@/lib/supabase", () => ({
     getServiceClient: () => overrides.resume,
     getTrackerClient: () => overrides.tracker,
-    getSharedClient: () => overrides.tracker,
   }));
   vi.doMock("@/lib/storage", async () => {
     const actual = await vi.importActual<typeof import("@/lib/storage")>("@/lib/storage");
