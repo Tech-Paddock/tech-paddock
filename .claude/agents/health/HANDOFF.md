@@ -74,7 +74,7 @@ Recipes that share a normalised name are refused on the line, never guessed betw
   also what decides a name is a Cookbook recipe.
 - **`lib/models.ts` is Coffee's registry duplicated and flagged, not a verbatim copy** — the two
   have diverged. Do not let a third copy happen quietly.
-- **The livery is borrowed and has a collision.** `senna`, which the parked tracker also wears, maps
-  `--sev-warn` onto the accent, so "over target" and "on track" are one colour. TechPad Gen's.
+- **The livery is borrowed** (`senna`, shared with the parked tracker). Separately, **every** livery
+  maps `--sev-warn` onto the accent, so "over" and "on track" match; `--danger` differs. TechPad Gen's.
 - **`eaten_at` is not the time you ate.** The app never sets it, so it duplicates `created_at`;
   `eaten_on` is what a day's total reads. Both carry column comments.
