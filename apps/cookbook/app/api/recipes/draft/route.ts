@@ -6,6 +6,7 @@ import { nameTaken, type RecipeDraft } from "@/lib/recipes";
 import { statusOf } from "@/lib/errors";
 import { errorResponse } from "@/lib/respond";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
+import { EMPTY_META, readMeta } from "@/lib/metadata";
 
 export const dynamic = "force-dynamic";
 // Reading a page and then pricing it is two model calls, one of them with a
@@ -77,6 +78,8 @@ export async function POST(request: NextRequest) {
         servings,
         ingredients,
         method: typeof body.method === "string" ? body.method.trim() || null : null,
+        // You typed these, rating included: the typed path is yours end to end.
+        meta: readMeta(body.meta, { rating: true }),
       };
       origin = "manual";
     } else if (mode === "generate") {
@@ -155,6 +158,9 @@ export async function POST(request: NextRequest) {
       source_url: sourceUrl,
       ingredients: fields.ingredients,
       method: fields.method,
+      // Off a model, `readRecipeFields` already read these with no rating. The
+      // spread makes that explicit here too: only the typed path keeps one.
+      meta: { ...(fields.meta ?? EMPTY_META), ...(mode === "manual" ? {} : { rating: null }) },
       note:
         [
           assumedServings ? `${mode === "file" ? "The file" : "The page"} did not say how many it serves; 4 assumed — change it.` : null,

@@ -1,3 +1,5 @@
+import { META_JSON_HINT } from "./metadata";
+
 /**
  * "Something else" — asking Claude again, with what was already turned down
  * (TEC-39 D, agreed with Joel 2026-09-24).
@@ -89,7 +91,8 @@ export function generatePrompt(brief: string, turnedDown: TurnedDown[] = [], ste
   if (why) parts.push(`Why they turned the last one down: ${why}`);
 
   parts.push(
-    `Return a JSON object: {"name": string, "servings": number, "ingredients": [string], "method": string}. ` +
+    `Return a JSON object: {"name": string, "servings": number, "ingredients": [string], "method": string, ` +
+      `${META_JSON_HINT}}. ` +
       `Put nothing after the JSON.`
   );
   return parts.join("\n\n");
