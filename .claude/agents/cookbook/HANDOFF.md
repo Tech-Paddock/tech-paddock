@@ -35,14 +35,13 @@ removing the recipe cascades. **A list line carries the names of the recipes it 
 (`grocery_items.recipes`, a snapshot; Tidy unions them); older lines say "from a recipe". **`macro_source`
 has no `web`**, so a lifted number is not storable; **a duplicate name is refused by a unique index.**
 
-**Recipe metadata (TEC-52) sits flat on `recipes`**, and **`lib/metadata.ts` reads it** off a model,
-a request or a row alike. `meal` and `diet` are check-constrained lists its tests hold to `MEALS` and
-`DIETS`; the rest is open lowercased text. **No free-of or allergen claim and no macro tag is
-storable** — `readMeta` drops them; a macro filter is computed from the numbers. **The rating is
-Joel's**: read only off this app's forms (typed, a draft before Keep it, the stars, the editor); a
-model's is discarded. **Every field of a kept recipe is editable** (`lib/edit.ts`): only changed
-ingredients re-price (one call, before the one write; a failure writes nothing); servings re-divides. Older rows read "not set" until a backfill
-Joel approves. The pill always shows rating and time; meal · main · cuisine only when wide.
+**Recipe metadata (TEC-52) sits flat on `recipes`**; **`lib/metadata.ts` reads it** off a model, a
+request or a row alike. `meal` and `diet` are check-constrained to `MEALS` and `DIETS`; the rest is
+open lowercased text. **No free-of claim or macro tag is storable** (`readMeta` drops them). **The
+rating is Joel's**, read only off this app's forms; a model's is discarded. Older rows read "not set"
+until Joel sends their values (TEC-52). **Every field of a kept recipe is editable** (`lib/edit.ts`):
+only changed ingredients re-price — one call before the one write, so a failure writes nothing;
+servings alone re-divides the same pot. Pill: rating and time always; meal · main · cuisine when wide.
 
 **The list is the cheap version and that is a decision, not a gap** — reconfirmed by Joel 2026-09-21:
 copied text or a King Soopers link, no credential, no OAuth. **A line's name is its link**; the
