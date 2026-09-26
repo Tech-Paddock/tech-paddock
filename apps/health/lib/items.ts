@@ -1,5 +1,5 @@
 import { getServiceClient } from "./supabase";
-import type { Macros, MacroSource } from "./macros";
+import { namesNoModel, type Macros, type MacroSource } from "./macros";
 
 /**
  * The remembered vocabulary: what a food is called, what it weighed, and how to
@@ -184,6 +184,17 @@ export async function findItem(name: string): Promise<RememberedItem | null> {
   return { item: item as Item, versions: await versionsOf(item.id) };
 }
 
+/** An item by id, or null when there is none. A failed read throws. */
+export async function itemById(itemId: string): Promise<Item | null> {
+  const { data, error } = await getServiceClient()
+    .from("items")
+    .select("id, name, normalized_name, created_at")
+    .eq("id", itemId)
+    .maybeSingle();
+  if (error) throw new LookupError(`Couldn't read that food: ${error.message}`);
+  return (data as Item | null) ?? null;
+}
+
 export async function versionsOf(itemId: string): Promise<ItemVersion[]> {
   const { data, error } = await getServiceClient()
     .from("item_versions")
@@ -245,7 +256,7 @@ export async function addVersion(params: {
       source: params.source,
       // The database enforces this pairing too; sending null explicitly keeps
       // a `hand` row from carrying a stale model name from the caller.
-      model: params.source === "hand" ? null : (params.model ?? null),
+      model: namesNoModel(params.source) ? null : (params.model ?? null),
       source_url: params.sourceUrl ?? null,
       note: params.note ?? null,
     })
