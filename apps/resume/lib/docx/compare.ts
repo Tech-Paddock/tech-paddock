@@ -1,5 +1,5 @@
 import type { Para } from "./paragraphs";
-import { isAlignmentRow } from "./label";
+import { isAlignmentRow } from "./lines";
 
 /**
  * How much of the source document's text survived into the finished one.

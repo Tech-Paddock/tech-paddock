@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { readDocxParts } from "../lib/docx/read";
 import { extractParagraphs } from "../lib/docx/paragraphs";
-import { labelParagraphs } from "../lib/docx/label";
-import { extractSpec, firstTableLayout } from "../lib/docx/spec";
 import { auditAts, headerFooterText } from "../lib/docx/ats";
+import { getBodyInner, loadDocx } from "../lib/reskin/container";
+import { splitBody } from "../lib/reskin/blocks";
+import { extractSourceContent } from "../lib/reskin/extract";
+import { linesTaken } from "../lib/reskin/generate";
 import { makeDocx, para, table } from "./helpers/docx";
 
 /**
  * Jobright renders Career Highlights as a markdown table and pastes it in as
  * three ordinary paragraphs. Verbatim from a real export, with the numbers and
  * wording replaced.
+ *
+ * These ran against the old paragraph labeller until TEC-63 retired it, which
+ * left the live engine's pipe-table reader with no test of its own. They now
+ * run against `extractSourceContent`, the reader a reformat actually uses.
  */
 const MARKDOWN_HIGHLIGHTS = [
   para("| $250,000 | 30% | 230 | 15% Under Budget |", 20),
@@ -34,79 +40,52 @@ const jobrightish = (highlights: string[]) =>
     ].join(""),
   });
 
-async function label(buffer: Buffer) {
-  const parts = await readDocxParts(buffer);
-  return labelParagraphs(extractParagraphs(parts.document));
+async function extract(buffer: Buffer) {
+  const { documentXml } = await loadDocx(buffer);
+  return extractSourceContent(splitBody(getBodyInner(documentXml).bodyInner));
 }
 
 describe("Career Highlights arriving as a markdown table", () => {
   it("transposes the pipe rows into metric and description pairs", async () => {
-    const { content } = await label(await jobrightish(MARKDOWN_HIGHLIGHTS));
-    const section = content.sections.find((s) => s.label === "Career Highlights");
-
-    expect(section?.kind).toBe("highlights");
-    const items = section?.kind === "highlights" ? section.items : [];
-    expect(items).toHaveLength(4);
-    expect(items[0]).toEqual({ metric: "$250,000", description: "Annual savings through automation" });
-    expect(items[3]).toEqual({ metric: "15% Under Budget", description: "Engagement delivered on schedule" });
+    const content = await extract(await jobrightish(MARKDOWN_HIGHLIGHTS));
+    expect(content.careerHighlights).toHaveLength(4);
+    expect(content.careerHighlights?.[0]).toEqual({ stat: "$250,000", desc: "Annual savings through automation" });
+    expect(content.careerHighlights?.[3]).toEqual({ stat: "15% Under Budget", desc: "Engagement delivered on schedule" });
   });
 
-  it("never lets the pipe syntax reach the output", async () => {
-    const { content } = await label(await jobrightish(MARKDOWN_HIGHLIGHTS));
-    const rendered = JSON.stringify(content);
-    expect(rendered).not.toContain(":---");
-    expect(rendered).not.toContain("| $250,000");
+  it("never lets the pipe syntax into what the engine takes", async () => {
+    const content = await extract(await jobrightish(MARKDOWN_HIGHLIGHTS));
+    const taken = linesTaken(content).join("\n");
+    expect(taken).not.toContain(":---");
+    expect(taken).not.toContain("|");
   });
 
-  // The alignment row carries no words and the output cannot contain it.
-  // Counting it as placed would be the coverage report claiming text the
-  // document does not have; counting it as dropped would put a false miss on
-  // every Jobright file. It leaves both sides of the fraction.
-  it("keeps coverage honest about the alignment row", async () => {
-    const { coverage } = await label(await jobrightish(MARKDOWN_HIGHLIGHTS));
-    expect(coverage.percent).toBe(100);
-    expect(coverage.dropped).toEqual([]);
-    expect(coverage.placed).toBe(coverage.totalParagraphs);
-    // Ten paragraphs carry text; the alignment row is one of them and is not
-    // counted on either side, so nine is both the total and the placed count.
-    expect(coverage.totalParagraphs).toBe(9);
-  });
-
-  // Ugly and visible beats parsed wrong and silent: whatever is lost here is
-  // keyword coverage, which is the entire value of the Jobright wording.
-  it("falls back to verbatim paragraphs when the table does not line up", async () => {
+  // A guess here costs keyword coverage, so when the rows do not pair up the
+  // reader returns null rather than a wrong pairing. **What happens after that
+  // is a known defect, TEC-79:** the renderer reads null as "no highlights in
+  // the input", logs `kept-unchanged`, and the verdict passes while these lines
+  // reach the document nowhere. This test pins only the reader's refusal.
+  it("reads nothing rather than guessing when the table does not line up", async () => {
     const rows = ["| $250,000 | 30% | 230 |", "| :--- | :--- | :--- |", "| Only one description |"];
-    const { content, coverage } = await label(await jobrightish(rows.map((r) => para(r, 20))));
-    const section = content.sections.find((s) => s.label === "Career Highlights");
-    const items = section?.kind === "highlights" ? section.items : [];
-
-    // How the paragraph rules happen to group these is not the point — the
-    // point is that not one character of them is lost. Three metrics that never
-    // paired with a description is exactly the case where guessing costs
-    // keyword coverage, so nothing is guessed.
-    const rendered = JSON.stringify(items);
-    for (const row of rows) expect(rendered).toContain(row);
-    expect(coverage.percent).toBe(100);
-    expect(coverage.dropped).toEqual([]);
+    const content = await extract(await jobrightish(rows.map((r) => para(r, 20))));
+    expect(content.careerHighlights).toBeNull();
   });
 
-  it("leaves the plain metric-and-description shapes alone", async () => {
-    const plain = [para("$250,000: Annual savings through automation", 20), para("30%", 20), para("Lift in revenue capture", 20)];
-    const { content, coverage } = await label(await jobrightish(plain));
-    const section = content.sections.find((s) => s.label === "Career Highlights");
-    const items = section?.kind === "highlights" ? section.items : [];
-
-    expect(items[0]).toEqual({ metric: "$250,000", description: "Annual savings through automation" });
-    expect(items[1]).toEqual({ metric: "30%", description: "Lift in revenue capture" });
-    expect(coverage.percent).toBe(100);
+  it("reads one metric:description paragraph per highlight", async () => {
+    const plain = [
+      para("$250,000: Annual savings through automation", 20),
+      para("30%: Lift in revenue capture", 20),
+    ];
+    const content = await extract(await jobrightish(plain));
+    expect(content.careerHighlights).toEqual([
+      { stat: "$250,000", desc: "Annual savings through automation" },
+      { stat: "30%", desc: "Lift in revenue capture" },
+    ]);
   });
 });
 
 describe("a template that keeps name and contact in a page header", () => {
-  const HEADER = [
-    para("Alex Placeholder", 40),
-    para("alex@example.invalid · 555-0100", 20),
-  ].join("");
+  const HEADER = [para("Alex Placeholder", 40), para("alex@example.invalid · 555-0100", 20)].join("");
 
   const templateish = () =>
     makeDocx({
@@ -123,30 +102,7 @@ describe("a template that keeps name and contact in a page header", () => {
       ].join(""),
     });
 
-  // Without this the body's only distinct prose size is the heading size, every
-  // rank collapses onto it, and the render comes out with the name set in body
-  // text — no hierarchy at all.
-  it("takes the name and contact sizes from the header", async () => {
-    const parts = await readDocxParts(await templateish());
-    const spec = extractSpec(parts, extractParagraphs(parts.document));
-
-    expect(spec.nameSize).toBe(20);
-    expect(spec.contactSize).toBe(10);
-    expect(spec.nameSize).toBeGreaterThan(spec.headingSize);
-  });
-
-  // The ranking assumes largest-is-the-name. With the name in the header that
-  // assumption is off by one, and the heading takes the rank below it — which
-  // came out smaller than body text on Joel's real template.
-  it("keeps headings from ranking below body text", async () => {
-    const parts = await readDocxParts(await templateish());
-    const spec = extractSpec(parts, extractParagraphs(parts.document));
-
-    expect(spec.headingSize).toBeGreaterThanOrEqual(spec.bodySize);
-    expect(spec.nameSize).toBeGreaterThan(spec.headingSize);
-  });
-
-  it("still reports the header as a blocking ATS finding", async () => {
+  it("reports the header as a blocking ATS finding", async () => {
     const parts = await readDocxParts(await templateish());
     const findings = auditAts(parts, extractParagraphs(parts.document));
     expect(findings.find((f) => f.code === "header_footer_content")?.severity).toBe("blocking");
@@ -163,18 +119,5 @@ describe("a template that keeps name and contact in a page header", () => {
     expect(auditAts(parts, extractParagraphs(parts.document)).map((f) => f.code)).not.toContain(
       "header_footer_content"
     );
-  });
-
-  it("reads the highlights table as columns when the template draws one row", async () => {
-    const parts = await readDocxParts(await templateish());
-    expect(extractSpec(parts, extractParagraphs(parts.document)).highlightsLayout).toBe("columns");
-  });
-
-  it("reads a row-per-highlight table as rows", () => {
-    const rows = `<w:tbl><w:tblPr/><w:tr><w:tc>${para("a")}</w:tc><w:tc>${para("b")}</w:tc></w:tr><w:tr><w:tc>${para(
-      "c"
-    )}</w:tc><w:tc>${para("d")}</w:tc></w:tr></w:tbl>`;
-    expect(firstTableLayout(rows)).toBe("rows");
-    expect(firstTableLayout("<w:body/>")).toBe("rows");
   });
 });

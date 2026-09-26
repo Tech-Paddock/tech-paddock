@@ -6,11 +6,9 @@ export type DocxParts = {
   numbering: string | null;
   /** Header/footer part names. */
   headerFooterParts: string[];
-  /** Header/footer XML, keyed by part name. Two things need the content rather
-   *  than the name: the ATS audit, which must report a header that actually
-   *  carries text and stay quiet about the empty part Word leaves behind, and
-   *  spec extraction, which finds the name and contact sizes here when a
-   *  template keeps that block in its header. */
+  /** Header/footer XML, keyed by part name. The ATS audit needs the content
+   *  rather than the name: it must report a header that actually carries text
+   *  and stay quiet about the empty part Word leaves behind. */
   headerFooterXml: Record<string, string>;
   partNames: string[];
 };

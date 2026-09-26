@@ -1,40 +1,18 @@
-import Link from "next/link";
-import ThemeControl, { LiveryBadge } from "../ThemeControl";
-import LogoutControl from "../LogoutControl";
-import List from "./List";
-import { LIVERY } from "@/lib/livery";
-
-export const dynamic = "force-dynamic";
+import { permanentRedirect } from "next/navigation";
 
 /**
- * The grocery list.
+ * The grocery list moved to the Cookbook (TEC-15): you shop from recipes, not
+ * from what you ate. This path stays only so an old bookmark lands on the list
+ * rather than a 404.
  *
- * A second product screen, which the charter did not allow when it was written.
- * Joel approved the amendment that makes one legitimate on 2026-09-19 — a
- * screen is earned by being a different *moment*, never a different noun — and
- * that, rather than the fact this exists, is what licenses it. Like `/debug`,
- * it needs no `middleware.ts` edit: the matcher is a catch-all negative, so it
- * is behind the password gate already.
+ * **The target is Cookbook's `/list` (TEC-22), exactly** — Cookbook's route
+ * says Health depends on it and it is not renamed quietly. It is a fixed
+ * origin, never one read from the request. Health no longer reads or writes
+ * `health.grocery_items`; the table is dropped by a separate migration once
+ * this is live.
  */
-export default function Page() {
-  return (
-    <main className="min-h-screen">
-      <header className="flex items-center gap-2 border-b-4 border-accent bg-bar px-4 py-3 text-bar-ink">
-        <h1 className="text-lg font-semibold tracking-tight">
-          <Link href="/" className="opacity-70">Health</Link>
-          <span className="opacity-50"> / </span>
-          List
-        </h1>
-        <ThemeControl onBar />
-        <LogoutControl onBar />
-        <div className="ml-auto flex items-center gap-2">
-          <LiveryBadge livery={LIVERY} onBar />
-        </div>
-      </header>
+const COOKBOOK_LIST_URL = "https://cookbook.techpaddock.io/list";
 
-      <div className="mx-auto flex max-w-2xl flex-col gap-5 px-4 py-5">
-        <List />
-      </div>
-    </main>
-  );
+export default function Page(): never {
+  permanentRedirect(COOKBOOK_LIST_URL);
 }

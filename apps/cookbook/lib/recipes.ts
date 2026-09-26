@@ -2,6 +2,8 @@ import { getServiceClient } from "./supabase";
 import { ConflictError, InputError, LookupError } from "./errors";
 import { round, type Macros, type MacroSource } from "./macros";
 import { addItems } from "./grocery";
+import { readMeta, readRating, type RecipeMeta } from "./metadata";
+import type { RecipeEdit, Reprice } from "./edit";
 
 /**
  * The book: what a recipe is, and the one path that writes one.
@@ -22,7 +24,11 @@ import { addItems } from "./grocery";
 
 export type RecipeOrigin = "manual" | "generated" | "imported";
 
-export type Recipe = Macros & {
+/**
+ * **The metadata sits flat on the row** (TEC-52, the `cookbook_recipe_metadata`
+ * migration) and is never part of the servings contract.
+ */
+export type Recipe = Macros & RecipeMeta & {
   id: string;
   name: string;
   servings: number;
@@ -54,10 +60,19 @@ export type RecipeDraft = {
   ingredients: string[];
   method: string | null;
   note: string | null;
+  /**
+   * Time, meal, main, cuisine, equipment, diet, tags — and the rating, which
+   * only a person sets. A model's path arrives here with `rating: null`, and
+   * `POST /api/recipes` reads a rating only because Joel may set one on the
+   * draft before Keep it.
+   */
+  meta: RecipeMeta;
 };
 
+// One literal, not a concatenation: supabase-js parses the select string's type,
+// and a `+` turns every row into an error type.
 const COLUMNS =
-  "id, name, servings, kcal, protein_g, carbs_g, fat_g, origin, source, model, source_url, ingredients, method, note, created_at";
+  "id, name, servings, kcal, protein_g, carbs_g, fat_g, origin, source, model, source_url, ingredients, method, note, created_at, total_minutes, meal, mains, cuisine, equipment, diet, tags, rating";
 
 /**
  * How two names are compared for collision.
@@ -150,6 +165,10 @@ function hydrate(row: Record<string, unknown>): Recipe {
     carbs_g: Number(row.carbs_g),
     fat_g: Number(row.fat_g),
     ingredients: Array.isArray(row.ingredients) ? (row.ingredients as string[]) : [],
+    // Through the same reader as a request body, so a row and a draft cannot
+    // disagree about what a field may hold. The rating is read: it is stored,
+    // so a person set it.
+    ...readMeta(row, { rating: true }),
   };
 }
 
@@ -253,6 +272,7 @@ export async function saveRecipe(draft: RecipeDraft): Promise<Recipe> {
       ingredients: draft.ingredients.map((i) => i.trim()).filter(Boolean),
       method: draft.method?.trim() || null,
       note: draft.note?.trim() || null,
+      ...draft.meta,
     })
     .select(COLUMNS)
     .single();
@@ -265,6 +285,106 @@ export async function saveRecipe(draft: RecipeDraft): Promise<Recipe> {
     }
     throw new LookupError(`Couldn't save that recipe: ${error.message}`);
   }
+  return hydrate(data as Record<string, unknown>);
+}
+
+/**
+ * The same question as `nameTaken`, for an edit: is this name held by a recipe
+ * *other than* the one being edited? Renaming "Chilli" to "chilli" is not a
+ * collision with itself.
+ */
+export async function nameTakenByOther(name: string, exceptId: string): Promise<boolean> {
+  const { data, error } = await getServiceClient().from("recipes").select("id, name");
+  if (error) throw new LookupError(`Couldn't read the book: ${error.message}`);
+  const wanted = normalizeName(name);
+  return (data ?? []).some((r) => {
+    const row = r as { id: unknown; name: unknown };
+    return row.id !== exceptId && normalizeName(String(row.name)) === wanted;
+  });
+}
+
+/**
+ * Write an edit (`lib/edit.ts` decides what it is and whether it re-prices).
+ * **One statement**, so an edit lands whole or not at all.
+ *
+ * With a `reprice`, the pot's macros, `source: estimate`, the model and the
+ * estimate's caveat replace the old ones — a hand-set number whose ingredients
+ * changed is no longer the hand's. Without one, none of those four is sent, and
+ * a field not sent is not overwritten. `origin` and `source_url` are never sent:
+ * where a recipe came from does not change because it was edited.
+ */
+export async function updateRecipe(id: string, edit: RecipeEdit, reprice: Reprice | null): Promise<Recipe> {
+  const priced = reprice
+    ? {
+        kcal: reprice.macros.kcal,
+        protein_g: reprice.macros.protein_g,
+        carbs_g: reprice.macros.carbs_g,
+        fat_g: reprice.macros.fat_g,
+        source: "estimate" as const,
+        model: reprice.model,
+        note: reprice.note,
+      }
+    : {};
+  if (reprice) {
+    const problem = validateDraft({
+      name: edit.name,
+      servings: edit.servings,
+      macros: reprice.macros,
+      origin: "manual",
+      source: "estimate",
+      model: reprice.model,
+      source_url: null,
+      ingredients: edit.ingredients,
+      method: edit.method,
+      note: reprice.note,
+      meta: edit.meta,
+    });
+    if (problem) throw new InputError(problem);
+  }
+
+  const { data, error } = await getServiceClient()
+    .from("recipes")
+    .update({
+      name: edit.name.trim(),
+      servings: edit.servings,
+      ingredients: edit.ingredients.map((i) => i.trim()).filter(Boolean),
+      method: edit.method?.trim() || null,
+      ...edit.meta,
+      ...priced,
+    })
+    .eq("id", id)
+    .select(COLUMNS)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) {
+      throw new ConflictError(`"${edit.name.trim()}" is already in the book. Pick another name.`);
+    }
+    throw new LookupError(`Couldn't save that edit: ${error.message}`);
+  }
+  if (!data) throw new InputError("That recipe is not in the book any more.");
+  return hydrate(data as Record<string, unknown>);
+}
+
+/**
+ * Rate a recipe already in the book, or clear its rating. **The one-tap edit**:
+ * the stars on an open card save on their own, without opening the editor. A
+ * rating is Joel's opinion, and it arrives after cooking, which is after the
+ * recipe was kept. Every other field changes through `updateRecipe`.
+ */
+export async function setRating(id: string, rating: unknown): Promise<Recipe> {
+  const value = rating === null ? null : readRating(rating);
+  if (rating !== null && value === null) throw new InputError("A rating is a whole number from 1 to 5.");
+
+  const { data, error } = await getServiceClient()
+    .from("recipes")
+    .update({ rating: value })
+    .eq("id", id)
+    .select(COLUMNS)
+    .maybeSingle();
+
+  if (error) throw new LookupError(`Couldn't rate that recipe: ${error.message}`);
+  if (!data) throw new InputError("That recipe is not in the book.");
   return hydrate(data as Record<string, unknown>);
 }
 
