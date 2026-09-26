@@ -1,5 +1,6 @@
 import { normalizeName, type ItemVersion } from "./items";
 import type { Macros, MacroSource } from "./macros";
+import { fixItInTheCookbook } from "./cookbook";
 
 /**
  * What approving one draft line writes, decided before anything is written.
@@ -35,7 +36,9 @@ export type LineDecision =
   /** Typed over by hand: append a hand correction and snapshot it. */
   | { action: "correct" }
   /** The table's current version, unchanged: snapshot it as it stands. */
-  | { action: "reuse"; version: ItemVersion };
+  | { action: "reuse"; version: ItemVersion }
+  /** A Cookbook recipe whose numbers differ from the item's current version: append them as a `cookbook` version. */
+  | { action: "cookbook" };
 
 export function sameMacros(a: Macros, b: Macros): boolean {
   return (
@@ -59,6 +62,16 @@ export function decideLine(line: ApprovedLine, itemId: string | null, current: I
     };
   }
 
+  // A Cookbook number reaches here only when the name no longer matches a
+  // recipe — renamed or removed in the Cookbook since the draft was made.
+  // Its numbers belong to a recipe that is not there, so look it up again.
+  if (line.source === "cookbook") {
+    return {
+      action: "reject",
+      reason: `"${line.name}" isn't a Cookbook recipe any more. Look it up again before logging it.`,
+    };
+  }
+
   if (!itemId || !current) {
     if (line.source === "hand") {
       return { action: "first", source: "hand", model: null, source_url: null, note: line.note };
@@ -79,6 +92,56 @@ export function decideLine(line: ApprovedLine, itemId: string | null, current: I
     action: "reject",
     reason: `The numbers for "${line.name}" don't match your log and weren't typed in. Look it up again.`,
   };
+}
+
+/**
+ * What approving a line that names a Cookbook recipe writes (TEC-25).
+ *
+ * **The recipe's numbers have one owner, the Cookbook** (Joel, 2026-09-26), so
+ * the line must carry exactly what the Cookbook says now, read again at approve
+ * time rather than trusted from the browser. A number typed over here is
+ * refused: stored as a Health correction it would be bypassed by the next log,
+ * which asks the Cookbook first. The fix belongs in the Cookbook.
+ *
+ * The recipe is stored as an ordinary item, keyed on its name, with a
+ * `cookbook` version appended whenever the Cookbook's numbers differ from the
+ * item's current one — so the snapshot and a backfill work unchanged.
+ *
+ * @param itemId     the item the line's name resolves to now, or null
+ * @param current    that item's version in effect on the entry's date
+ * @param perServing what the Cookbook returned for this recipe just now
+ */
+export function decideRecipeLine(
+  line: ApprovedLine,
+  itemId: string | null,
+  current: ItemVersion | null,
+  perServing: Macros
+): LineDecision {
+  if ((line.item_id ?? null) !== (itemId ?? null)) {
+    return {
+      action: "reject",
+      reason: `"${line.name}" has changed since it was looked up. Look it up again before logging it.`,
+    };
+  }
+  if (line.source === "hand") {
+    return {
+      action: "reject",
+      reason: fixItInTheCookbook(line.name),
+    };
+  }
+  // Not looked up as a recipe (it became one after the draft), or the Cookbook's
+  // numbers moved since the lookup. Either way the draft is stale.
+  if (line.source !== "cookbook" || !sameMacros(line.macros, perServing)) {
+    return {
+      action: "reject",
+      reason: `The Cookbook's numbers for "${line.name}" changed since it was looked up. Look it up again.`,
+    };
+  }
+  if (!itemId) return { action: "first", source: "cookbook", model: null, source_url: null, note: line.note };
+  if (current && current.source === "cookbook" && sameMacros(current, perServing)) {
+    return { action: "reuse", version: current };
+  }
+  return { action: "cookbook" };
 }
 
 /**

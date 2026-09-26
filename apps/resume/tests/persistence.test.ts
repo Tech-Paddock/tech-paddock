@@ -22,7 +22,7 @@ describe("template upload", () => {
     const order: string[] = [];
     const { client, calls } = fakeSupabase({
       "templates.select": { data: { version: 2 }, error: null },
-      "templates.update": { data: { id: "t1", version: 3, is_active: true }, error: null },
+      "rpc.activate_template": { data: { id: "t1", version: 3, is_active: true }, error: null },
       "templates.insert": () => {
         order.push("row");
         return { data: { id: "t1", version: 3, is_active: false }, error: null };
@@ -63,28 +63,41 @@ describe("template upload", () => {
     expect(calls.some((c) => c.op === "insert")).toBe(false);
   });
 
-  it("inserts before deactivating, so a failed insert never leaves nothing active", async () => {
+  it("inserts inactive, then activates in one database call", async () => {
     const { client, calls } = fakeSupabase({
       "templates.select": { data: { version: 1 }, error: null },
-      "templates.update": { data: { id: "t2", is_active: true }, error: null },
       "templates.insert": { data: { id: "t2" }, error: null },
+      "rpc.activate_template": { data: { id: "t2", is_active: true }, error: null },
     });
     mockModules({ resume: client });
 
     const { POST } = await import("../app/api/templates/route");
-    await POST(upload("template.docx", fixture("template-sample.docx")));
+    const res = await POST(upload("template.docx", fixture("template-sample.docx")));
 
+    expect(res.status).toBe(201);
     const insert = calls.findIndex((c) => c.op === "insert");
-    const updates = calls.map((c, i) => [c, i] as const).filter(([c]) => c.op === "update");
+    const activate = calls.findIndex((c) => c.op === "activate_template");
     expect(insert).toBeGreaterThanOrEqual(0);
-    expect(updates).toHaveLength(2);
+    expect(insert).toBeLessThan(activate);
+    expect(calls[activate].payload).toEqual({ template_id: "t2" });
+    // TEC-61: clearing and setting were two updates, and a failure between them
+    // left nothing active. Neither may come back as a separate write.
+    expect(calls.some((c) => c.op === "update")).toBe(false);
+  });
 
-    const [[clearCall, clearIndex], [activateCall, activateIndex]] = updates;
-    expect(insert).toBeLessThan(clearIndex);
-    expect(clearCall.payload).toEqual({ is_active: false });
-    expect(activateCall.payload).toEqual({ is_active: true });
-    expect(activateCall.filters).toContainEqual(["id", "t2"]);
-    expect(clearIndex).toBeLessThan(activateIndex);
+  it("reports a failed activation, leaving the new template inactive and the old one active", async () => {
+    const { client, calls } = fakeSupabase({
+      "templates.select": { data: { version: 1 }, error: null },
+      "templates.insert": { data: { id: "t2" }, error: null },
+      "rpc.activate_template": { data: null, error: { message: "connection reset" } },
+    });
+    mockModules({ resume: client });
+
+    const { POST } = await import("../app/api/templates/route");
+    const res = await POST(upload("template.docx", fixture("template-sample.docx")));
+
+    expect(res.status).toBe(500);
+    expect(calls.some((c) => c.op === "update")).toBe(false);
   });
 
   it("deactivates nothing when activating an id that does not exist", async () => {
@@ -102,7 +115,7 @@ describe("template upload", () => {
     );
 
     expect(res.status).toBe(404);
-    expect(calls.some((c) => c.op === "update")).toBe(false);
+    expect(calls.some((c) => c.op === "update" || c.op === "activate_template")).toBe(false);
   });
 });
 

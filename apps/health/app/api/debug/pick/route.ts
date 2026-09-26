@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { upsertItem, versionsOf, addVersion, eraFor, LookupError } from "@/lib/items";
+import { upsertItem, findItem, versionsOf, addVersion, eraFor, LookupError } from "@/lib/items";
 import { parseMacros } from "@/lib/macros";
 import { DEFAULT_MODEL, COMPARISON_MODEL } from "@/lib/models";
 import { getServiceClient } from "@/lib/supabase";
+import { recipeBookFor, isRecipe, fromCookbook, fixItInTheCookbook } from "@/lib/cookbook";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,16 @@ export async function POST(request: NextRequest) {
     const macros = side ? parseMacros(side) : null;
     if (side && !macros) {
       return NextResponse.json({ error: `${picked === "haiku" ? "Haiku" : "Sonnet"} failed on this run; there is nothing to keep.` }, { status: 400 });
+    }
+
+    // A Cookbook recipe's numbers are the Cookbook's (TEC-25): a model's pick
+    // stored against one would be bypassed by the next log. Refused before the
+    // claim, so the run stays pickable if the recipe leaves the Cookbook.
+    const itemName = row.item_name as string;
+    if (picked !== "baseline" && await isRecipe(
+      recipeBookFor(request.cookies), itemName, async () => fromCookbook((await findItem(itemName))?.versions)
+    )) {
+      return NextResponse.json({ error: fixItInTheCookbook(row.item_name as string) }, { status: 409 });
     }
 
     // Claim it. Only one request can move `picked` off null.

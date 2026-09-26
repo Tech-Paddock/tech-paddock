@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { StorageError, removeDocx } from "@/lib/storage";
+import { activateTemplate } from "@/lib/templates";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +26,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const supabase = getServiceClient();
 
-  // Confirm the target exists first. Clearing the current active for an id that
-  // turns out not to exist would leave nothing active and break rendering.
+  // Confirm the target exists first, so an unknown id and an archived one each
+  // get their own answer. The database function checks existence again itself
+  // and clears nothing for an id that is not there.
   const { data: target, error: findError } = await supabase
     .from("templates")
     .select("id, is_active, archived_at")
@@ -41,15 +43,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return fail(409, "archived", "That template is archived. Restore it before making it active.");
   }
 
-  const { error: clearError } = await supabase.from("templates").update({ is_active: false }).eq("is_active", true);
-  if (clearError) return fail(500, "db_error", clearError.message);
-
-  const { data, error } = await supabase
-    .from("templates")
-    .update({ is_active: true })
-    .eq("id", params.id)
-    .select(SELECT)
-    .maybeSingle();
+  const { data, error } = await activateTemplate(supabase, params.id, SELECT);
 
   if (error) return fail(500, "db_error", error.message);
   if (!data) return fail(404, "not_found", "No template with that id.");

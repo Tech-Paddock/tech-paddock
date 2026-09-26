@@ -134,8 +134,9 @@ Every serious incident here lives in the gap between them, and you now own both 
 nobody downstream of the merge catches what you did not check.
 
 - **Environment variables bake in at build time.** Setting one changes nothing until that project
-  redeploys, and a plain redeploy of the same commit is cancelled by the ignore step: set
-  `FORCE_BUILD`, redeploy, remove it.
+  redeploys. **Redeploy the live build**: it built because its commit touched the app, so it builds
+  again, with the variables as they are now. Only a deployment the ignore step skipped is skipped
+  again; for that one, set `FORCE_BUILD`, redeploy, remove it.
 - **`SESSION_SECRET` must be byte-identical across every project** or the others silently reject
   valid sessions — which reads as a login bug, not a config one. **It cannot be read back out of
   the dashboard**, so parity is only knowable by setting one fresh value everywhere and redeploying.
