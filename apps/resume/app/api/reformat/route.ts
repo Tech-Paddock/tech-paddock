@@ -4,8 +4,7 @@ import { getServiceClient } from "@/lib/supabase";
 import { DocxReadError, readDocxParts } from "@/lib/docx/read";
 import { extractParagraphs } from "@/lib/docx/paragraphs";
 import { auditAts } from "@/lib/docx/ats";
-import { compareLines } from "@/lib/docx/compare";
-import { linesTaken, reskin } from "@/lib/reskin/generate";
+import { checkContent, reskin } from "@/lib/reskin/generate";
 import { StorageError, downloadDocx, uploadDocx } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -76,7 +75,7 @@ export async function POST(request: NextRequest) {
     const rendered = await readDocxParts(docx);
     const renderedParas = extractParagraphs(rendered.document);
     const findings = auditAts(rendered, renderedParas);
-    const coverage = compareLines(linesTaken(content), renderedParas);
+    const coverage = checkContent(content, renderedParas);
     const contentHash = createHash("sha256").update(docx).digest("hex");
 
     const sourcePath = await uploadDocx("sources", source.name, sourceBytes);

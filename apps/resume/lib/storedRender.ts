@@ -28,6 +28,7 @@ const KNOWN_ACTIONS: readonly ChangeAction[] = [
   "cloned-overflow",
   "template-trimmed",
   "input-dropped",
+  "input-not-read",
   "not-found-in-input",
   "passthrough",
 ];
@@ -72,7 +73,12 @@ function readCoverage(raw: unknown): ContentCheck | null {
   const { totalLines, present, missing, percent } = raw;
   if (typeof totalLines !== "number" || typeof present !== "number" || typeof percent !== "number") return null;
   if (!Array.isArray(missing) || !missing.every((m) => typeof m === "string")) return null;
-  return { totalLines, present, missing, percent };
+  // Absent on a render with nothing unread. Present but malformed is a record
+  // this cannot read, and an unread record never reads as a clean one.
+  const { notRead } = raw;
+  if (notRead === undefined) return { totalLines, present, missing, percent };
+  if (!Array.isArray(notRead) || !notRead.every((m) => typeof m === "string")) return null;
+  return { totalLines, present, missing, percent, notRead };
 }
 
 function readChangeLog(snapshot: unknown): { log: ChangeLogEntry[] | null; unknown: string[] } {
