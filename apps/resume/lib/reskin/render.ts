@@ -110,6 +110,24 @@ export function renderIntoTemplate(
     });
   }
 
+  // Never "the input had none". It had some, and they could not be paired
+  // without guessing, so none of that text reaches the document (TEC-79). Said
+  // as not read and not placed, and named — but a note, not a drop: Career
+  // Highlights repeat body items, so the verdict does not fail on it alone
+  // (Joel, 2026-09-29, TEC-87 option 3).
+  const unreadable = content.unreadableHighlights ?? [];
+  if (unreadable.length > 0) {
+    const n = unreadable.length;
+    changeLog.push({
+      section: "Career Highlights",
+      action: "input-not-read",
+      detail:
+        `The source's Career Highlights could not be read into metric and description pairs, so they were not read ` +
+        `and not placed, and the template's were kept. ${n === 1 ? "The line refused was" : `The ${n} lines refused were`}: ` +
+        `${unreadable.map((l) => `"${l}"`).join("; ")}. To carry them over, make each highlight one metric and one description.`,
+    });
+  }
+
   return { blocks: [...output, ...tailBlocks], changeLog };
 }
 
@@ -238,6 +256,12 @@ function renderCareerHighlights(
       continue;
     }
     const highlights = content.careerHighlights;
+    if (content.unreadableHighlights) {
+      // The input had highlights this could not read. The template's stay, and
+      // that is logged once, below, whatever shape the template has.
+      out.push(block);
+      continue;
+    }
     if (!highlights || highlights.length === 0) {
       out.push(block);
       log.push({

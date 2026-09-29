@@ -3,12 +3,12 @@ import { DocxReadError, readDocxParts } from "@/lib/docx/read";
 import { extractParagraphs } from "@/lib/docx/paragraphs";
 import { auditAts } from "@/lib/docx/ats";
 import { outlineOf } from "@/lib/docx/outline";
-import { compareContent, compareLines, type ContentCheck } from "@/lib/docx/compare";
+import { compareContent, type ContentCheck } from "@/lib/docx/compare";
 import type { Para } from "@/lib/docx/paragraphs";
 import { getBodyInner } from "@/lib/reskin/container";
 import { splitBody } from "@/lib/reskin/blocks";
 import { extractSourceContent } from "@/lib/reskin/extract";
-import { linesTaken } from "@/lib/reskin/generate";
+import { checkContent, linesTaken } from "@/lib/reskin/generate";
 
 export const dynamic = "force-dynamic";
 
@@ -112,8 +112,8 @@ export async function POST(request: NextRequest) {
  * verified.
  */
 function compareAgainstSource(sourceXml: string, finished: Para[]): ContentCheck {
-  const taken = linesTaken(extractSourceContent(splitBody(getBodyInner(sourceXml).bodyInner)));
-  return taken.length > 0 ? compareLines(taken, finished) : compareContent(extractParagraphs(sourceXml), finished);
+  const content = extractSourceContent(splitBody(getBodyInner(sourceXml).bodyInner));
+  return linesTaken(content).length > 0 ? checkContent(content, finished) : compareContent(extractParagraphs(sourceXml), finished);
 }
 
 function fail(status: number, code: string, error: string) {

@@ -61,10 +61,9 @@ describe("Career Highlights arriving as a markdown table", () => {
   });
 
   // A guess here costs keyword coverage, so when the rows do not pair up the
-  // reader returns null rather than a wrong pairing. **What happens after that
-  // is a known defect, TEC-79:** the renderer reads null as "no highlights in
-  // the input", logs `kept-unchanged`, and the verdict passes while these lines
-  // reach the document nowhere. This test pins only the reader's refusal.
+  // reader returns null rather than a wrong pairing. What the report says
+  // about the refused text is pinned in `unreadable-highlights.test.ts`
+  // (TEC-79, TEC-87); this test pins only the reader's refusal.
   it("reads nothing rather than guessing when the table does not line up", async () => {
     const rows = ["| $250,000 | 30% | 230 |", "| :--- | :--- | :--- |", "| Only one description |"];
     const content = await extract(await jobrightish(rows.map((r) => para(r, 20))));

@@ -36,6 +36,19 @@ export interface SourceContent {
    * source text that does not reach the output.
    */
   unplacedSections?: UnplacedSection[];
+  /**
+   * Career Highlights the source has but that could not be read into pairs — a
+   * pipe table whose rows do not line up, or a Word table cell that is not one
+   * metric and one description — as the text of each cell or paragraph.
+   * Absent when there are none. **Not the same as `careerHighlights: null`**,
+   * which means the input had none: reading these as absent once passed the
+   * verdict while their text reached the document nowhere (TEC-79). Logged as
+   * `input-not-read` and named in coverage's `notRead`, never in `missing`:
+   * the report says they were not read and not placed, and the verdict does
+   * not fail on it, because Career Highlights repeat items from the body
+   * (Joel, 2026-09-29, TEC-87 option 3).
+   */
+  unreadableHighlights?: string[];
 }
 
 export interface UnplacedSection {
@@ -54,6 +67,12 @@ export interface UnplacedSection {
  * *source* that had nowhere to go in the template — a loss. They were once one
  * action, `trimmed-surplus`, and the verdict read every template-side drop as an
  * input loss: the repo's own fixture pair reported FAIL over 100% coverage.
+ *
+ * `input-not-read` is source text this reformat refused to read rather than
+ * guess at — today only Career Highlights that do not pair up — and so did not
+ * place. It is said, never silent, and it is a note rather than a vote: the
+ * highlights repeat body items, so no unique content is lost (Joel, 2026-09-29,
+ * TEC-87). **It is not `input-dropped`**, which still fails the verdict.
  */
 export type ChangeAction =
   | "replaced"
@@ -61,6 +80,7 @@ export type ChangeAction =
   | "cloned-overflow"
   | "template-trimmed"
   | "input-dropped"
+  | "input-not-read"
   | "not-found-in-input"
   | "passthrough";
 

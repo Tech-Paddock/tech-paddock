@@ -97,5 +97,17 @@ export function verdictFor(r: VerdictInput): Verdict {
     );
   }
 
+  // Source text refused rather than guessed at, so not placed. Said every time,
+  // because a report silent about it reads as a source that had none (TEC-79).
+  // A note, not a vote: today it is only Career Highlights, which repeat items
+  // from the body, so no unique content is lost (Joel, 2026-09-29, TEC-87).
+  const notRead = r.changeLog.filter((c) => c.action === "input-not-read");
+  if (notRead.length > 0) {
+    notes.push(
+      `Part of the source could not be read, so it was not placed and the template's own text was kept — ` +
+        `${sections(notRead)}. It repeats items from the body, so this does not fail the reformat.`
+    );
+  }
+
   return { pass: reasons.length === 0, reasons, notes };
 }
