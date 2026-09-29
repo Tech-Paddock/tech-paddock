@@ -110,12 +110,9 @@ Joel, 2026-09-25: *"Update rule 1 of charter."* Some roasters publish their reci
 reaches `guide_*` on the same terms as a sentence: its quote is the text read off the image, its URL
 is **the page the image was on**, which gets the usual roaster-site check, and the image's own URL
 is stored beside it. The image's host is not checked, since roasters' images routinely sit on a CDN.
-The copy-out copies only what is printed and never fills in or infers. **The image travels with
-the values it backs**: it sits in the guide's status disclosure under the text quotes, one tap from
-the recipe (Joel, 2026-09-29), because a copy-out is a reading, not a quotation, so it is only as
-checkable as the picture beside it, and that is what keeps it inside this rule. A value with no
-stored image to show is dropped. Tier 1 is still earned by place: an image in this coffee's own
-gallery can be `coffee_specific`; one anywhere else on the site is `roaster_generic`.
+The copy-out copies only what is printed and never fills in or infers. A value with no stored image
+to show is dropped. Tier 1 is still earned by place: an image in this coffee's own gallery can be
+`coffee_specific`; one anywhere else on the site is `roaster_generic`.
 
 ### 2. Three tiers, and which one answered is stored
 
