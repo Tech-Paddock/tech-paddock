@@ -1,6 +1,6 @@
 # TechPad Gen — handoff
 
-State as of 2026-09-25.
+State as of 2026-09-26.
 
 Read `RULES.md` first. Open work is in Linear, label `agent:TechPad Gen` — never here.
 
@@ -8,49 +8,46 @@ Read `RULES.md` first. Open work is in Linear, label `agent:TechPad Gen` — nev
 
 ## What is live
 
-**The Morning Paper** — `/` lands on it; **Pit Wall** is the only other tab (id still `board`, so
-`/?tab=board` lives). Each tab loads its own data in its own Suspense boundary, and `?app=` renders
-the frame without loading anything (`app/(shell)/page.tsx`). No privacy fold: Joel lifted it.
+**The Morning Paper** at `/`, and **Pit Wall** (id `board`, so `/?tab=board` lives): each loads in
+its own Suspense boundary; `?app=` renders the frame and loads nothing. No privacy fold (Joel).
 
-**The glance says why it has no answer.** `fetchSummary` returns `{ok:false, why}` — secret unset,
-401, HTTP code, timeout, unreachable, wrong shape — and the summary is shape-checked before it is
-merged. With no source answering, every count renders "—" with the reason; never 0. `isQuiet` is
-false while a source is silent or degraded. `SOURCES` is the tracker alone, and it **does not answer
-in production**: `INTERNAL_API_SECRET` is unset on `tp-home` (TEC-8, blocked on TEC-33's rotation).
-The Paper now says exactly that instead of "nothing outstanding".
+**The glance says why it has no answer.** `fetchSummary` returns `{ok:false, why}` (secret unset,
+401, HTTP code, timeout, unreachable, wrong shape); with no source answering every count renders "—"
+with the reason, never 0, and `isQuiet` is false. `SOURCES` is the tracker alone, and it **does not
+answer in production**: `INTERNAL_API_SECRET` is unset on `tp-home` (TEC-8, blocked on TEC-33).
 
-**The Pit Wall reads only GitHub.** Open pull requests; branches with none (a squash-merged branch
-is recognised by its merged PR's head sha — `ahead_by` alone counts it ahead forever); and each
-probed project's **latest** production deployment, from the statuses Vercel posts to GitHub under
-`Production – <project>`. **The hub no longer reads `VERCEL_TOKEN`.** Rows carry the owning agent
-from the branch's `claude/<area>-` (`AREA_OWNER` in `lib/pitwall.ts`); the strip shows each
-handoff's `State as of`, baked at build.
+**The Pit Wall reads only GitHub** — never `VERCEL_TOKEN`. Open pull requests; branches with none (a
+squash-merged branch is recognised by its merged PR's head sha — `ahead_by` counts it ahead forever);
+each probed project's **latest** production deployment from Vercel's `Production – <project>`
+statuses. Rows carry the owner from `claude/<area>-` (`AREA_OWNER`); handoff dates are baked.
 
-**The Garage** — `/admin`. Live: liveness and shared-secret probes over `PROBED` (tools plus the
-parked tracker), the hub's environment with required and optional marked, and a warning while a
-retired name (`VERCEL_TOKEN`) is still set. Baked at build: *Declared* and *Rules drift*. **None of
-it guesses** — unreachable reads "unknown", with the reason.
+**The Garage** — `/admin`. Live: probes over `PROBED`, the hub's environment, and a warning while the
+retired `VERCEL_TOKEN` is set. Baked at build: *Declared* and *Rules drift*. Unreachable reads
+"unknown", with the reason — **none of it guesses**.
 
-**The theme system** — palettes, liveries, both polarities, and **two controls per header**:
-`LiveryBadge` hard right on every bar including a framed tool's, and `ThemeControl` beside the
-brand, which a frame hides (below). `lib/theme.css` holds every token, stamped from
-`packages/shared`; `lib/livery.ts` is the one file that differs per app. No `tailwind.config.ts`
-holds a colour: `rgb(var(--token-rgb) / <alpha-value>)` is all alpha can read.
+**The theme system** — palettes, liveries, both polarities, and **three stamped controls per bar**:
+`LiveryBadge` hard right on every bar including a framed tool's; `ThemeControl` and `LogoutControl`
+beside the brand, both hidden in a frame (below). `lib/theme.css` holds every token; `lib/livery.ts`
+differs per app. No `tailwind.config.ts` holds a colour: `rgb(var(--token-rgb) / <alpha-value>)` is
+all alpha can read.
 
-**The tracker is parked** (Joel, 2026-09-24). Its state and findings are on TEC-36; do no tracker
-work. It stays in `PARKED`, so it is still probed; a red deploy of it shows as expected, not BOX.
+**Log out is everywhere at once** (TEC-73). Every app's `/api/logout` re-exports the stamped
+`lib/logout.ts`, which clears the `.techpaddock.io` session cookie at max-age 0 (pinned by
+`tests/logout.test.ts`). The control is on every live app's bar, the hub's topbar included — its
+sidebar button is gone. Tracker and editor carry the route, inert while paused, and mount no control.
+
+**The tracker is parked** (Joel, 2026-09-24; state on TEC-36). Still in `PARKED`, so probed, and a
+red deploy of it shows as expected, not BOX.
 
 ## Traps specific to this app
 
-- **`lib/*.generated.ts` are gitignored and regenerated by `predev`, `prebuild` and `pretest`**
-  (`npm run generate`). A bare `npx tsc --noEmit` on a fresh checkout fails until one of those has
-  run. They read files above `apps/home`, which exist at build time and not at runtime.
+- **`lib/*.generated.ts` are gitignored, written by `predev`/`prebuild`/`pretest`** from files above
+  `apps/home` (build time only). A bare `npx tsc --noEmit` on a fresh checkout fails until one runs.
 - **`vercel.json`'s `ignoreCommand` skips previews and always builds production** — the hub diffs
   nothing since #191, so every production merge rebuilds it, which is what keeps its baked panels
   and agent rows current. **Do not narrow it**: `.claude` changes alone must still rebuild the hub.
-- **GitHub sees only git-triggered deploys.** A rollback or a redeploy started from the Vercel
-  dashboard posts no GitHub deployment, so the Pit Wall can show an older state than is serving.
-  TEC-57 would close it.
+- **GitHub sees only git-triggered deploys.** A dashboard rollback or redeploy posts nothing, so the
+  Pit Wall can show an older state than is serving (TEC-57).
 - **`GITHUB_TOKEN` must read deployments.** The repository is public, but a fine-grained token scoped
   without *Deployments: read* may be refused; the Pit Wall then names the 403 per project.
 - **A function exported from a `"use client"` file cannot be called on the server** — that is why
@@ -61,10 +58,12 @@ work. It stays in `PARKED`, so it is still probed; a red deploy of it shows as e
   Light/Dark (`[data-embedded] .pd-modes`) and keeps its badge — safe only because the hub posts
   `{type:"paddock-mode", mode}` into every frame and `ThemeControl` listens behind
   `isPaddockOrigin()`. **A tool that drops `ThemeControl.tsx` silently ignores the hub's switch.**
+  `LogoutControl` hides framed too (`.pd-logout`), so only the hub's logs out of a hub page.
+- **`LogoutControl` goes to `/login` only on a 2xx or a 401** (the middleware's answer without a
+  valid session); anything else shows as a failure, never `/login` while still signed in.
 - **`TOOLS` in `lib/platform.ts` is the only list of embedded tools, and its order is Joel's** — it
   drives the sidebar and the `?app=` frame. `PROBED` adds what the hub depends on without embedding.
   **Never key anything off a slug literal**; which projects get the secret probe is derived from
   which repo folders have `/api/summary`.
-- **The glance gets counts and singles, never rows**; `parseSummary` enforces the shape.
 - **Rules drift is the repo as of this deployment**, and says so. Its JSON shape is the TD's;
   `scripts/drift-parse.mjs` renders no partial read.

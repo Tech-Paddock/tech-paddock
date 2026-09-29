@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { downscale } from "@/lib/image";
 import { LIVERY } from "@/lib/livery";
 import ThemeControl, { LiveryBadge } from "./ThemeControl";
+import LogoutControl from "./LogoutControl";
 import { METHOD_LABELS, type BrewMethod } from "@/lib/methods";
 import {
   percentToPpm,
@@ -155,6 +156,7 @@ export default function CoffeePage() {
         <span aria-hidden>☕</span>
         <h1 className="font-semibold">Coffee</h1>
         <ThemeControl onBar />
+        <LogoutControl onBar />
         <div className="ml-auto">
           <LiveryBadge livery={LIVERY} onBar />
         </div>

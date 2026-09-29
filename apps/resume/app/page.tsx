@@ -6,6 +6,7 @@ import { LIVERY } from "@/lib/livery";
 import { KIND_LABEL, type ResumeFile, type ResumeKind } from "@/lib/resumes";
 import { verdictFor } from "@/lib/verdict";
 import ThemeControl, { LiveryBadge } from "./ThemeControl";
+import LogoutControl from "./LogoutControl";
 
 /**
  * Three tabs, not four.
@@ -555,6 +556,7 @@ function ReformatShell() {
             ))}
           </nav>
           <ThemeControl onBar />
+          <LogoutControl onBar />
         </div>
       </header>
 
@@ -863,10 +865,13 @@ function ReformatShell() {
                         row put Download and Delete on different lines. */}
                     <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                       <span className="opacity-60 min-w-0">
+                        {/* No font or size summary for a template: renders are built
+                            from the file itself, so a summary of it described
+                            nothing that is used (TEC-63). */}
                         {f.kind === "template"
-                          ? f.spec
-                            ? `${f.spec.font} ${f.spec.bodySize}pt · headings ${f.spec.headingSize}pt · margins ${f.spec.margins.left}" as uploaded`
-                            : "No spec recorded"
+                          ? f.active
+                            ? "The house style — every render is built on this file"
+                            : "Kept as uploaded"
                           : [
                               f.company ?? "No job recorded",
                               f.stage,

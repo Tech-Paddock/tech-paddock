@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServiceClient, getTrackerClient } from "@/lib/supabase";
-import { fileLabel, sortResumeFiles, type ResumeFile, type TemplateSpec } from "@/lib/resumes";
+import { fileLabel, sortResumeFiles, type ResumeFile } from "@/lib/resumes";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ export async function GET() {
   const [templates, renders] = await Promise.all([
     supabase
       .from("templates")
-      .select("id, version, name, spec, is_active, archived_at, created_at")
+      .select("id, version, name, is_active, archived_at, created_at")
       .order("version", { ascending: false }),
     supabase
       .from("renders")
@@ -71,7 +71,6 @@ export async function GET() {
       version: t.version as number,
       active: t.is_active === true,
       archived: t.archived_at !== null,
-      spec: (t.spec as TemplateSpec | null) ?? null,
       company: null,
       stage: null,
       coverage: null,
@@ -87,7 +86,6 @@ export async function GET() {
       version: null,
       active: false,
       archived: false,
-      spec: null,
       company: thread?.company ?? null,
       stage: thread?.stage ?? null,
       coverage: (r.coverage as { percent?: number } | null)?.percent ?? null,

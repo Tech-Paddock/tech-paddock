@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { DocxReadError, readDocxParts } from "@/lib/docx/read";
 import { extractParagraphs } from "@/lib/docx/paragraphs";
-import { extractSpec } from "@/lib/docx/spec";
 import { auditAts } from "@/lib/docx/ats";
 import { StorageError, uploadDocx } from "@/lib/storage";
 import { activateTemplate } from "@/lib/templates";
@@ -48,7 +47,6 @@ export async function POST(request: NextRequest) {
     const bytes = Buffer.from(await file.arrayBuffer());
     const parts = await readDocxParts(bytes);
     const paragraphs = extractParagraphs(parts.document);
-    const spec = extractSpec(parts, paragraphs);
     const findings = auditAts(parts, paragraphs);
 
     // Across every row including archived ones: version is unique, and skipping
@@ -72,7 +70,7 @@ export async function POST(request: NextRequest) {
     // refuses to run without an active template.
     const { data: inserted, error } = await supabase
       .from("templates")
-      .insert({ version, name: file.name, file_path: path, spec, is_active: false })
+      .insert({ version, name: file.name, file_path: path, is_active: false })
       .select(SELECT)
       .single();
     if (error) return fail(500, "db_error", error.message);
@@ -94,7 +92,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-const SELECT = "id, version, name, spec, is_active, archived_at, created_at";
+const SELECT = "id, version, name, is_active, archived_at, created_at";
 
 function fail(status: number, code: string, error: string) {
   return NextResponse.json({ code, error }, { status });

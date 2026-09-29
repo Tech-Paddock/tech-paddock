@@ -279,7 +279,7 @@ function highlightText(lines: string[]): string[] {
  *
  * The metric is short by construction — a figure, not a sentence — so a colon
  * far into the line is prose punctuation rather than a separator. 24 characters
- * is the same bound `lib/docx/label.ts` already uses for this.
+ * is the bound the old paragraph labeller used for this.
  */
 function parseColonPairs(lines: string[]): StatCell[] | null {
   const pairs: StatCell[] = [];

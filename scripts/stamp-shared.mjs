@@ -63,6 +63,11 @@ export const MANIFEST = [
   // until 2026-09-24, so a fix to either was one edit per app.
   { from: "lib/login.ts", to: "lib/login.ts" },
   { from: "lib/safe-redirect.ts", to: "lib/safe-redirect.ts" },
+  // The logout path (TEC-73, 2026-09-26): the handler behind every app's
+  // /api/logout and the header control that calls it. Only the hub could log
+  // out before; the cookie is domain-wide, so one handler serves every app.
+  { from: "lib/logout.ts", to: "lib/logout.ts" },
+  { from: "app/LogoutControl.tsx", to: "app/LogoutControl.tsx" },
 ];
 
 export const SHARED_DIR = "packages/shared";

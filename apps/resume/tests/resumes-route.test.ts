@@ -11,13 +11,10 @@ import { fileLabel, sortResumeFiles, type ResumeFile } from "@/lib/resumes";
  * on every screen the tab has.
  */
 
-const SPEC = { font: "Calibri", bodySize: 11, headingSize: 11, margins: { left: 1, top: 1 } };
-
 const TEMPLATE = {
   id: "t1",
   version: 4,
   name: "house-style.docx",
-  spec: SPEC,
   is_active: true,
   archived_at: null,
   created_at: "2026-09-10T00:00:00Z",
@@ -108,7 +105,6 @@ describe("the merged list", () => {
       version: 4,
       active: true,
       archived: false,
-      spec: SPEC,
       downloadHref: "/api/templates/t1/file",
       // A template has no job and no coverage, and says so rather than borrowing
       // a render's shape.
@@ -116,6 +112,9 @@ describe("the merged list", () => {
       coverage: null,
       submittedAt: null,
     });
+    // TEC-63: renders are built from the template's file, never from a summary
+    // of it, so the list no longer carries one.
+    expect(body.files![0]).not.toHaveProperty("spec");
   });
 
   /**
@@ -213,7 +212,6 @@ describe("the order files are listed in", () => {
       version: null,
       active: false,
       archived: false,
-      spec: null,
       company: null,
       stage: null,
       coverage: null,

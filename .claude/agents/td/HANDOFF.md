@@ -38,6 +38,12 @@ is on hold** (Joel, 2026-09-25); the parking lot is the `Parked` label.
   their own Linear writes again. Deletes, label retirement and diff tools still ask, by design.
 - **The weekly Routine "Weekly rules-drift audit"** (Mondays 08:00 UTC) names Deployment as the gate
   since 2026-09-25 (TEC-42). It is report-only.
+- **Health prices a recipe line from Cookbook's `GET /api/servings`** (TEC-25, live 2026-09-26),
+  forwarding only `paddock_session`. So `SESSION_SECRET` parity between `tp-health` and `tp-cookbook`
+  now gates logging too: a mismatch reads as "Couldn't reach the Cookbook", not as a login bug.
+- **`lib/logout.ts` is stamped into every app beside the login handler** (TEC-73). It is shared auth
+  plumbing and yours to review, though `CLAUDE.md`'s list of stamped auth files does not name it yet.
+- **Joel runs TechPad Gen in his own session** (2026-09-26); its branches join a list only by him.
 - **This container cannot reach `*.techpaddock.io`** — the network policy refuses it — so nothing
   served there can be checked from here. Vercel's runtime logs are the substitute.
 
@@ -65,5 +71,8 @@ is on hold** (Joel, 2026-09-25); the parking lot is the `Parked` label.
   refused action yourself.
 - **You cannot delete a remote branch.** The proxy refuses it, disguised as a network blip
   (`DECISIONS.md`, traps): stop after one try. Merged branches auto-delete; Joel deletes stale ones.
+- **A container restart kills every helper.** Pushed branches survive; unpushed work survives in
+  `.claude/worktrees/agent-*` until the container goes. Brief a fresh helper to carry it over.
+- **Parallel helpers can pick the same migration timestamp.** Check before the list goes to Joel.
 - **Cost is context × turns.** A helper's report lands in your context: brief tightly, end the
   session once the branches are pushed.

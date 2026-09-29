@@ -168,11 +168,6 @@ body {
   font-weight: 700;
 }
 
-.logout-item:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
 /* The shell was built around an iframe at height:100%, so nothing ever needed
    to scroll and no overflow-y existed anywhere in this file. A document-length
    page dropped in here does not get clipped — it escapes into document scroll,
