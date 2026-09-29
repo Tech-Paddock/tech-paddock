@@ -6,6 +6,8 @@ import { nameTaken, type RecipeDraft } from "@/lib/recipes";
 import { statusOf } from "@/lib/errors";
 import { errorResponse } from "@/lib/respond";
 import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
+import { EMPTY_META, readMeta } from "@/lib/metadata";
+import { hasPicks, readPicks, tagWithPicks } from "@/lib/tuning";
 
 export const dynamic = "force-dynamic";
 // Reading a page and then pricing it is two model calls, one of them with a
@@ -43,6 +45,8 @@ export async function POST(request: NextRequest) {
     let fields: RecipeFields;
     let origin: RecipeDraft["origin"];
     let sourceUrl: string | null = null;
+    // What the tuning pickers asked for, and anything the draft fell short of.
+    let pickNotes: string[] = [];
 
     if (mode === "manual") {
       const name = typeof body.name === "string" ? body.name.trim() : "";
@@ -77,11 +81,18 @@ export async function POST(request: NextRequest) {
         servings,
         ingredients,
         method: typeof body.method === "string" ? body.method.trim() || null : null,
+        // You typed these, rating included: the typed path is yours end to end.
+        meta: readMeta(body.meta, { rating: true }),
       };
       origin = "manual";
     } else if (mode === "generate") {
       const brief = typeof body.brief === "string" ? body.brief.trim() : "";
-      if (!brief) return NextResponse.json({ error: "Say what you feel like." }, { status: 400 });
+      // The pickers (Joel, 2026-09-26): meal, diet, cuisine, time. With any
+      // picked, the brief may be empty — the picks are the ask.
+      const picks = readPicks(body.picks);
+      if (!brief && !hasPicks(picks)) {
+        return NextResponse.json({ error: "Say what you feel like, or pick something." }, { status: 400 });
+      }
       if (brief.length > 2000) return NextResponse.json({ error: "That is a long brief." }, { status: 413 });
 
       // "Something else" (TEC-39 D): the same brief, plus every draft turned
@@ -92,7 +103,12 @@ export async function POST(request: NextRequest) {
       const steer = typeof body.steer === "string" ? body.steer.trim() : "";
       if (steer.length > MAX_STEER) return NextResponse.json({ error: "That reason is long." }, { status: 413 });
 
-      fields = await generateRecipe({ brief, model, turnedDown: avoid.turnedDown, steer });
+      fields = await generateRecipe({ brief, model, turnedDown: avoid.turnedDown, steer, picks });
+      // Tagged with what was picked — diet only where the model agrees
+      // (`tagWithPicks` says why), and any shortfall said in the note.
+      const tagged = tagWithPicks(fields.meta ?? EMPTY_META, picks);
+      fields = { ...fields, meta: tagged.meta };
+      pickNotes = tagged.notes;
       origin = "generated";
     } else if (mode === "import") {
       const url = typeof body.url === "string" ? body.url.trim() : "";
@@ -155,9 +171,13 @@ export async function POST(request: NextRequest) {
       source_url: sourceUrl,
       ingredients: fields.ingredients,
       method: fields.method,
+      // Off a model, `readRecipeFields` already read these with no rating. The
+      // spread makes that explicit here too: only the typed path keeps one.
+      meta: { ...(fields.meta ?? EMPTY_META), ...(mode === "manual" ? {} : { rating: null }) },
       note:
         [
           assumedServings ? `${mode === "file" ? "The file" : "The page"} did not say how many it serves; 4 assumed — change it.` : null,
+          ...pickNotes,
           estimate.note,
         ]
           .filter(Boolean)

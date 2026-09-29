@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { saveEntry, DraftError, type Draft, type DraftItem } from "@/lib/log";
 import { LookupError, normalizeName } from "@/lib/items";
 import { isMeal } from "@/lib/meals";
-import { parseMacros } from "@/lib/macros";
+import { parseMacros, isMacroSource, namesNoModel } from "@/lib/macros";
+import { recipeBookFor } from "@/lib/cookbook";
 
 export const dynamic = "force-dynamic";
-
-const SOURCES = ["hand", "web", "estimate"];
 
 /**
  * Approve a draft. **The only route in this app that writes to the log.**
@@ -48,13 +47,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `"${name}" needs a quantity above zero.` }, { status: 400 });
     }
 
-    const source = typeof l.source === "string" && SOURCES.includes(l.source) ? l.source : "estimate";
+    const source = isMacroSource(l.source) ? l.source : "estimate";
     items.push({
       name,
       quantity,
       macros,
-      source: source as DraftItem["source"],
-      model: source === "hand" ? null : (typeof l.model === "string" ? l.model : null),
+      source,
+      model: namesNoModel(source) ? null : (typeof l.model === "string" ? l.model : null),
       source_url: typeof l.source_url === "string" ? l.source_url : null,
       note: typeof l.note === "string" ? l.note : null,
       known: l.known === true,
@@ -70,7 +69,7 @@ export async function POST(request: NextRequest) {
       meal: raw.meal,
       eaten_on: raw.eaten_on,
       items,
-    });
+    }, recipeBookFor(request.cookies));
     return NextResponse.json(saved, { status: 201 });
   } catch (e) {
     if (e instanceof DraftError) return NextResponse.json({ error: e.message }, { status: 409 });

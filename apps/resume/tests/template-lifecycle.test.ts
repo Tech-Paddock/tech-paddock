@@ -176,6 +176,50 @@ describe("archiving a template", () => {
     expect((await res.json()).code).toBe("archived");
     // Nothing was cleared: the current active template is untouched.
     expect(calls.map((c) => c.op)).not.toContain("update");
+    expect(calls.map((c) => c.op)).not.toContain("activate_template");
+  });
+
+  it("activates through the one database function, never two updates", async () => {
+    const { client, calls } = fakeSupabase({
+      "templates.select": { data: TEMPLATE, error: null },
+      "rpc.activate_template": { data: { ...TEMPLATE, is_active: true }, error: null },
+    });
+    mockModules({ resume: client });
+
+    const { PATCH } = await import("@/app/api/templates/[id]/route");
+    const res = await PATCH(req({ is_active: true }), { params: { id: "t1" } });
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).template.is_active).toBe(true);
+    expect(calls.find((c) => c.op === "activate_template")?.payload).toEqual({ template_id: "t1" });
+    expect(calls.some((c) => c.op === "update")).toBe(false);
+  });
+
+  it("reports a failed activation as a database error", async () => {
+    const { client } = fakeSupabase({
+      "templates.select": { data: TEMPLATE, error: null },
+      "rpc.activate_template": { data: null, error: { message: "connection reset" } },
+    });
+    mockModules({ resume: client });
+
+    const { PATCH } = await import("@/app/api/templates/[id]/route");
+    const res = await PATCH(req({ is_active: true }), { params: { id: "t1" } });
+
+    expect(res.status).toBe(500);
+    expect((await res.json()).code).toBe("db_error");
+  });
+
+  // The row went between the lookup and the call: the function returns no rows
+  // and has changed nothing.
+  it("404s when the function finds no such template", async () => {
+    const { client } = fakeSupabase({
+      "templates.select": { data: TEMPLATE, error: null },
+      "rpc.activate_template": { data: null, error: null },
+    });
+    mockModules({ resume: client });
+
+    const { PATCH } = await import("@/app/api/templates/[id]/route");
+    expect((await PATCH(req({ is_active: true }), { params: { id: "t1" } })).status).toBe(404);
   });
 
   it("rejects a body asking for neither", async () => {

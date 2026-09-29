@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ThemeControl, { LiveryBadge } from "../ThemeControl";
+import LogoutControl from "../LogoutControl";
 import Harness from "./Harness";
 import { LIVERY } from "@/lib/livery";
 
@@ -24,6 +25,7 @@ export default function Page() {
           Model comparison
         </h1>
         <ThemeControl onBar />
+        <LogoutControl onBar />
         <div className="ml-auto flex items-center gap-2">
           <LiveryBadge livery={LIVERY} onBar />
         </div>

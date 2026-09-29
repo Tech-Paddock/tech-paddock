@@ -67,6 +67,9 @@ export function fakeSupabase(tables: Record<string, Result | ((call: Call) => Re
       update: (payload: Row) => builder(table, "update", payload),
       delete: () => builder(table, "delete"),
     }),
+    // A database function. Recorded as table `rpc`, op = the function's name,
+    // so `"rpc.activate_template"` configures its result.
+    rpc: (fn: string, args: Row) => builder("rpc", fn, args),
   };
 
   return { client, calls };
@@ -88,7 +91,6 @@ export const mockModules = (overrides: {
   vi.doMock("@/lib/supabase", () => ({
     getServiceClient: () => overrides.resume,
     getTrackerClient: () => overrides.tracker,
-    getSharedClient: () => overrides.tracker,
   }));
   vi.doMock("@/lib/storage", async () => {
     const actual = await vi.importActual<typeof import("@/lib/storage")>("@/lib/storage");

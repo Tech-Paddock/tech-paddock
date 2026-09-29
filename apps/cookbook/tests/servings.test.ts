@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { toServingRows, type Recipe } from "@/lib/recipes";
+import { EMPTY_META } from "@/lib/metadata";
 import { ConflictError, InputError, LookupError, errorBody, statusOf } from "@/lib/errors";
 
 /**
@@ -25,6 +26,12 @@ function recipe(over: Partial<Recipe> = {}): Recipe {
     method: null,
     note: null,
     created_at: "2026-09-25T00:00:00Z",
+    // Metadata set, so the test below proves it does not leak into the contract.
+    ...EMPTY_META,
+    total_minutes: 45,
+    meal: "dinner",
+    mains: ["beef"],
+    rating: 4,
     ...over,
   };
 }

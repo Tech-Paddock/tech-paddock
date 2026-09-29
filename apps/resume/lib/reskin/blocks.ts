@@ -102,8 +102,27 @@ export function isItalic(raw: string): boolean {
 }
 
 /** A paragraph's ordered `<w:r>` runs. */
+const RUN_RE = /<w:r(?:\s[^>]*)?>[\s\S]*?<\/w:r>/g;
+
 export function splitRuns(paragraphRaw: string): string[] {
-  return paragraphRaw.match(/<w:r(?:\s[^>]*)?>[\s\S]*?<\/w:r>/g) ?? [];
+  return paragraphRaw.match(RUN_RE) ?? [];
+}
+
+/**
+ * Rewrite each run of a paragraph **where it sits**, leaving everything between
+ * the runs exactly as it was.
+ *
+ * The run-granular rewrites used to rebuild a paragraph as its `pPr` followed by
+ * its rewritten runs, which kept the runs and dropped whatever wrapped them — so
+ * a `<w:hyperlink>` on a rewritten line lost its link while its text survived
+ * (TEC-66), and a bookmark or a content control around a run went the same way.
+ * A link is the template's, like the line's tab stops and its fonts: it is
+ * carried through, not modelled. The `pPr` holds no runs, so it is never touched.
+ */
+function mapRunsInPlace(paragraphRaw: string, rewrite: (run: string) => string): string {
+  // A replacer function, never a replacement string: `$&` in résumé text would
+  // otherwise be interpreted (see `spliceFirst`).
+  return paragraphRaw.replace(RUN_RE, (run) => rewrite(run));
 }
 
 export function decodeXmlEntities(s: string): string {
@@ -212,15 +231,12 @@ export function replaceInlineHeaderLine(
   title: string,
   date: string
 ): { raw: string; unplaced: string[] } {
-  const pPrMatch = paragraphRaw.match(/^<w:p\b[^>]*>(?:\s*<w:pPr>[\s\S]*?<\/w:pPr>)?/);
-  const head = pPrMatch ? pPrMatch[0] : paragraphRaw.slice(0, paragraphRaw.indexOf(">") + 1);
-
   let seenTab = false;
   let companyDone = false;
   let titleDone = false;
   let dateDone = false;
 
-  const newRuns = splitRuns(paragraphRaw).map((run) => {
+  const raw = mapRunsInPlace(paragraphRaw, (run) => {
     if (/<w:tab\s*\/>/.test(run)) {
       seenTab = true;
       return run;
@@ -255,7 +271,7 @@ export function replaceInlineHeaderLine(
   if (title && !titleDone) unplaced.push("title");
   if (date && !dateDone) unplaced.push("date");
 
-  return { raw: `${head}${newRuns.join("")}</w:p>`, unplaced };
+  return { raw, unplaced };
 }
 
 /** Does this paragraph carry company, title and date on one line? */
@@ -280,13 +296,10 @@ export function replaceLabelledLine(
   label: string,
   items: string
 ): { raw: string; unplaced: string[] } {
-  const pPrMatch = paragraphRaw.match(/^<w:p\b[^>]*>(?:\s*<w:pPr>[\s\S]*?<\/w:pPr>)?/);
-  const head = pPrMatch ? pPrMatch[0] : paragraphRaw.slice(0, paragraphRaw.indexOf(">") + 1);
-
   let labelDone = false;
   let itemsDone = false;
 
-  const newRuns = splitRuns(paragraphRaw).map((run) => {
+  const raw = mapRunsInPlace(paragraphRaw, (run) => {
     if (/<w:tab\s*\/>/.test(run)) return run;
     if (extractText(run).trim() === "") return run; // spacer run — untouched
     if (!labelDone) {
@@ -302,7 +315,7 @@ export function replaceLabelledLine(
   if (label && !labelDone) unplaced.push("label");
   if (items && !itemsDone) unplaced.push("items");
 
-  return { raw: `${head}${newRuns.join("")}</w:p>`, unplaced };
+  return { raw, unplaced };
 }
 
 /**

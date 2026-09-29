@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
 import { getBodyInner, loadDocx } from "../lib/reskin/container";
-import { extractText, joinBody, replaceInlineHeaderLine, splitBody, type Block } from "../lib/reskin/blocks";
+import { extractText, joinBody, replaceInlineHeaderLine, replaceLabelledLine, splitBody, type Block } from "../lib/reskin/blocks";
 import { extractSourceContent } from "../lib/reskin/extract";
 import { renderIntoTemplate } from "../lib/reskin/render";
 import { reskin } from "../lib/reskin/generate";
@@ -246,6 +246,67 @@ describe("the gap a template writes into a run", () => {
     const concatenated = [...raw.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map((m) => m[1]).join("");
     expect(concatenated).toBe("Harbor Point   Consultant Aug 2021 - Present");
     expect(concatenated).not.toContain("ConsultantOct");
+  });
+});
+
+/**
+ * TEC-66. Both run-granular rewrites rebuilt the paragraph as `pPr` + runs, so
+ * a `<w:hyperlink>` around a run was dropped while its text survived: the line
+ * read the same and the link was simply gone. The runs are now rewritten where
+ * they sit, so the wrapper — and its relationship id — comes through intact.
+ */
+describe("a hyperlink on a line rewritten run by run", () => {
+  const LINK_OPEN = '<w:hyperlink r:id="rId9" w:history="1">';
+
+  it("keeps the link around the company on an experience header line", () => {
+    const headerLine =
+      '<w:p><w:pPr><w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs></w:pPr>' +
+      `${LINK_OPEN}<w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t>Lakeside Systems</w:t></w:r></w:hyperlink>` +
+      '<w:r><w:t xml:space="preserve">   </w:t></w:r>' +
+      '<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">Senior Administrator </w:t></w:r>' +
+      "<w:r><w:tab/></w:r>" +
+      "<w:r><w:t>Nov 2022 - Present</w:t></w:r></w:p>";
+
+    const { raw, unplaced } = replaceInlineHeaderLine(headerLine, "Harbor Point", "Consultant", "Aug 2021 - Present");
+
+    expect(unplaced).toEqual([]);
+    expect(raw).toBe(
+      '<w:p><w:pPr><w:tabs><w:tab w:val="right" w:pos="9360"/></w:tabs></w:pPr>' +
+        `${LINK_OPEN}<w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">Harbor Point</w:t></w:r></w:hyperlink>` +
+        '<w:r><w:t xml:space="preserve">   </w:t></w:r>' +
+        '<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">Consultant </w:t></w:r>' +
+        "<w:r><w:tab/></w:r>" +
+        '<w:r><w:t xml:space="preserve">Aug 2021 - Present</w:t></w:r></w:p>'
+    );
+  });
+
+  it("keeps the link around the items on a Label:⇥items line", () => {
+    const labelled =
+      "<w:p><w:pPr><w:tabs><w:tab w:val=\"left\" w:pos=\"2160\"/></w:tabs></w:pPr>" +
+      '<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Platforms: </w:t></w:r>' +
+      "<w:r><w:tab/></w:r>" +
+      `${LINK_OPEN}<w:r><w:t>Alpha Suite</w:t></w:r></w:hyperlink></w:p>`;
+
+    const { raw, unplaced } = replaceLabelledLine(labelled, "Systems:", "Beta Cloud, Gamma CRM");
+
+    expect(unplaced).toEqual([]);
+    expect(raw).toContain(`${LINK_OPEN}<w:r><w:t xml:space="preserve">Beta Cloud, Gamma CRM</w:t></w:r></w:hyperlink></w:p>`);
+    expect(raw).toContain('<w:t xml:space="preserve">Systems: </w:t>');
+    expect(extractText(raw)).toBe("Systems: \tBeta Cloud, Gamma CRM");
+  });
+
+  it("clears a surplus run inside the link rather than moving it out", () => {
+    const split =
+      "<w:p>" +
+      `${LINK_OPEN}<w:r><w:t>Lake</w:t></w:r><w:r><w:t>side</w:t></w:r></w:hyperlink>` +
+      '<w:r><w:rPr><w:i/></w:rPr><w:t>Administrator</w:t></w:r>' +
+      "<w:r><w:tab/></w:r><w:r><w:t>2022</w:t></w:r></w:p>";
+
+    const { raw } = replaceInlineHeaderLine(split, "Harbor Point", "Consultant", "2021");
+
+    expect(raw).toContain(
+      `${LINK_OPEN}<w:r><w:t xml:space="preserve">Harbor Point</w:t></w:r><w:r><w:t xml:space="preserve"></w:t></w:r></w:hyperlink>`
+    );
   });
 });
 

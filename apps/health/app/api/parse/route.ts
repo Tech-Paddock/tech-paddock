@@ -4,6 +4,7 @@ import { resolveItem, type Draft } from "@/lib/log";
 import { LookupError, normalizeName } from "@/lib/items";
 import { isMeal } from "@/lib/meals";
 import { mergeSameFood } from "@/lib/approve";
+import { recipeBookFor } from "@/lib/cookbook";
 
 export const dynamic = "force-dynamic";
 // The estimate may search and read pages, and the page waits on this response
@@ -52,9 +53,11 @@ export async function POST(request: NextRequest) {
     // A food said twice is one line with the quantities added, merged before
     // anything is estimated: two estimates of one food can disagree, and the
     // second would otherwise land as a version of the first.
+    // One read of the Cookbook for the whole draft, forwarding only your session.
+    const recipes = recipeBookFor(request.cookies);
     const items = [];
     for (const item of mergeSameFood(parsed.items.filter((i) => normalizeName(i.name)))) {
-      items.push(await resolveItem({ name: item.name, quantity: item.quantity, onDate: eatenOn }));
+      items.push(await resolveItem({ name: item.name, quantity: item.quantity, onDate: eatenOn, recipes }));
     }
 
     const draft: Draft = { dictated_text: text, meal: isMeal(parsed.meal) ? parsed.meal : "snack", eaten_on: eatenOn, items };
