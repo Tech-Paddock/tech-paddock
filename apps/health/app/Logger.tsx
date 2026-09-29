@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Provenance from "./Provenance";
 import Correction from "./Correction";
+import LeftToday, { type TargetState } from "./LeftToday";
 import { MACRO_KEYS, MACRO_LABELS, round, total, type Macros, type MacroSource } from "@/lib/macros";
 import { MEALS, MEAL_LABELS, localDate, type Meal } from "@/lib/meals";
 
@@ -51,6 +52,10 @@ export default function Logger() {
   // Which logged line is open for correction. One at a time: two open sheets on
   // the same food could disagree about what the current numbers are.
   const [fixing, setFixing] = useState<string | null>(null);
+  const [target, setTarget] = useState<TargetState>({ status: "loading" });
+  // The meal whose delete is waiting on a confirm, and the one being deleted.
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   // The phone's day, never the server's, and **never fixed at mount**: the
   // home-screen app is resumed from memory the next morning, and a date set
@@ -80,9 +85,44 @@ export default function Logger() {
     }
   }, []);
 
+  // Read apart from the day, so a target that cannot be read never hides the
+  // log, and a log that cannot be read never reads as "no target".
+  const loadTarget = useCallback(async (on: string) => {
+    try {
+      const response = await fetch(`/api/targets?date=${on}`, { cache: "no-store" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "The server didn't answer.");
+      setTarget(body.target ? { status: "set", target: body.target } : { status: "none" });
+    } catch (e) {
+      setTarget({ status: "failed", message: e instanceof Error ? e.message : "The server didn't answer." });
+    }
+  }, []);
+
   useEffect(() => {
-    if (date) void loadDay(date);
-  }, [date, loadDay]);
+    if (date) {
+      void loadDay(date);
+      void loadTarget(date);
+    }
+  }, [date, loadDay, loadTarget]);
+
+  /** Deletes the meal and its lines. The foods and their numbers stay remembered. */
+  async function deleteMeal(id: string) {
+    if (deleting) return;
+    setDeleting(id);
+    setError(null);
+    try {
+      const response = await fetch(`/api/entries/${id}`, { method: "DELETE" });
+      const body = await response.json().catch(() => ({}));
+      // Already gone is the outcome asked for; anything else is a real failure.
+      if (!response.ok && response.status !== 404) throw new Error(body.error ?? "Couldn't delete that meal.");
+      setConfirming(null);
+      if (day) await loadDay(day.date);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't delete that meal.");
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   async function parse() {
     if (!text.trim() || busy) return;
@@ -376,6 +416,18 @@ export default function Logger() {
       ) : null}
 
       {/* ---------------------------------------------------------------- */}
+      {/* What is left of the target */}
+      {/* ---------------------------------------------------------------- */}
+      <LeftToday
+        target={target}
+        eaten={day ? day.total : null}
+        onRetry={() => {
+          setTarget({ status: "loading" });
+          void loadTarget(date);
+        }}
+      />
+
+      {/* ---------------------------------------------------------------- */}
       {/* The day */}
       {/* ---------------------------------------------------------------- */}
       <section className="flex flex-col gap-3">
@@ -409,7 +461,46 @@ export default function Logger() {
                     {MEAL_LABELS[entry.meal]}
                   </h3>
                   <p className="ml-auto text-sm font-semibold">{entry.macros.kcal} kcal</p>
+                  <button
+                    type="button"
+                    aria-label={`Delete this ${MEAL_LABELS[entry.meal].toLowerCase()}`}
+                    aria-expanded={confirming === entry.id}
+                    onClick={() => setConfirming(confirming === entry.id ? null : entry.id)}
+                    className="rounded border border-line px-2 py-0.5 text-xs text-ink-soft"
+                  >
+                    Delete
+                  </button>
                 </div>
+
+                {/* Deleting takes the meal and its lines off the day. It never
+                    takes the food: the items and their numbers stay, so the
+                    next log of it still finds them. */}
+                {confirming === entry.id ? (
+                  <div role="alertdialog" aria-label="Delete this meal?" className="mt-2 flex flex-col gap-2 rounded border border-danger/60 bg-paper p-2">
+                    <p className="text-sm">
+                      Delete this {MEAL_LABELS[entry.meal].toLowerCase()}? Its{" "}
+                      {entry.items.length === 1 ? "line comes" : `${entry.items.length} lines come`} off today.
+                      The foods and their numbers stay remembered.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirming(null)}
+                        className="rounded-lg border border-line px-3 py-1.5 text-sm"
+                      >
+                        Keep it
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteMeal(entry.id)}
+                        disabled={deleting !== null}
+                        className="rounded-lg border border-danger px-3 py-1.5 text-sm font-semibold text-danger disabled:opacity-50"
+                      >
+                        {deleting === entry.id ? "Deleting…" : "Delete meal"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <ul className="mt-2 flex flex-col gap-2">
                   {entry.items.map((item) => (
                     <li key={item.id} className="flex flex-col gap-1">
