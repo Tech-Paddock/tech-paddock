@@ -16,7 +16,9 @@ retrieve the one the roaster actually published, and to say plainly when there i
 
 Photograph the bag → downscale in the browser → Claude reads roaster and coffee name off the label
 → **you confirm** → **save** → Claude searches for brewing instructions → the guide lands on the
-saved bag, and where there is no guide to land, a recipe of Claude's own lands beside it instead.
+saved bag. Every bag shows the roaster's recipe and Claude's as two sections, one above the other;
+the search fills Claude's by itself only where there is no guide, and **Suggest a recipe** fills it
+on request on any bag.
 
 The confirm step is not ceremony. A misread roaster name sends the search somewhere useless, and
 it doubles as the manual-entry path when a photo cannot be read at all.
@@ -72,7 +74,11 @@ not an agent reading around it.
 It does not breach §1 because §1 is a rule about `guide_*`, and `guide_*` is untouched.
 `validateGuide` still drops every parameter without a backing quote, a bag with no guide still reads
 **No Recipe Found**, and no path writes a generated value into a `guide_*` column. What changed is
-that `none` is no longer the end of the screen.
+that `none` is no longer the end of the screen. **Since 2026-09-29 Claude's section is on every
+bag**, beside the roaster's (Joel: *"There should be a brewer and Claude recipe section (vertical
+sections) regardless of presence of brewer instructions"*). The separations below hold on every bag:
+the prompt never sees the roaster's guide, the search still suggests on its own only on `none`, and
+nothing prefills.
 
 Four things keep the two apart, and none of them is a preference:
 
@@ -104,11 +110,12 @@ Joel, 2026-09-25: *"Update rule 1 of charter."* Some roasters publish their reci
 reaches `guide_*` on the same terms as a sentence: its quote is the text read off the image, its URL
 is **the page the image was on**, which gets the usual roaster-site check, and the image's own URL
 is stored beside it. The image's host is not checked, since roasters' images routinely sit on a CDN.
-The copy-out copies only what is printed and never fills in or infers. **The image renders beside
-the values it backs, always**: a copy-out is a reading, not a quotation, so it is only as checkable
-as the picture next to it, and that is what keeps it inside this rule. A value with no stored image
-to show is dropped. Tier 1 is still earned by place: an image in this coffee's own gallery can be
-`coffee_specific`; one anywhere else on the site is `roaster_generic`.
+The copy-out copies only what is printed and never fills in or infers. **The image travels with
+the values it backs**: it sits in the guide's status disclosure under the text quotes, one tap from
+the recipe (Joel, 2026-09-29), because a copy-out is a reading, not a quotation, so it is only as
+checkable as the picture beside it, and that is what keeps it inside this rule. A value with no
+stored image to show is dropped. Tier 1 is still earned by place: an image in this coffee's own
+gallery can be `coffee_specific`; one anywhere else on the site is `roaster_generic`.
 
 ### 2. Three tiers, and which one answered is stored
 
