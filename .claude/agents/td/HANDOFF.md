@@ -31,11 +31,11 @@ Joel** (2026-09-29): ask him before starting either.
 - **`ANTHROPIC_API_KEY` has new values on Coffee, Cookbook and Health** (Joel, 2026-09-25). Real
   calls in production proved Coffee's and Cookbook's on 2026-09-29; Health's has not been used yet
   (TEC-75). Resume and the editor have none: Resume makes no model calls, and the editor is parked.
-- **`tp-tracker` and `tp-message-editor` are paused**: their production deployments read `BLOCKED`.
+- **`apps/showcase` is yours to build, and public** (TEC-99): the rules are in your charter and
+  drift's `public app holds nothing` fails the folder the moment it holds a gate, secret or cookie.
+  Its next step is the scaffold with the uploader demo on fake data; TEC-99 has the order.
 - **Linear writes don't prompt Joel, from this session or a helper** (TEC-59, since 2026-09-26).
   Deletes, label retirement and diff tools still ask, by design.
-- **The weekly Routine "Weekly rules-drift audit"** (Mondays 08:00 UTC) names Deployment as the gate
-  since 2026-09-25 (TEC-42). It is report-only.
 - **Health prices a recipe line from Cookbook's `GET /api/servings`** (TEC-25, live 2026-09-26),
   forwarding only `paddock_session`. So `SESSION_SECRET` parity between `tp-health` and `tp-cookbook`
   now gates logging too: a mismatch reads as "Couldn't reach the Cookbook", not as a login bug.

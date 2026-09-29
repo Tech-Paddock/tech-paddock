@@ -96,6 +96,7 @@ doing more work than it should.
 | Cookbook | **Site** | A collection: you arrive to see what you could cook, which is question 2 answering *site* plainly. Its tabs are the verb index. The King Soopers hand-off is a phone-in-a-shop moment that reads *app*; it was weighed and did not win (TD ruling, 2026-09-24). |
 | Pipeline Tracker | **Site** | Reviewing a pipeline is surveying, not doing one decided thing. Parked, so a record rather than a plan. |
 | Message Editor | **Site** | Composing is unhurried and desk-bound. Parked and frozen, so a record rather than a plan. |
+| Showcase | **Site** | Opened by someone else, once, arriving to look at what Joel built. Public; the rules are in the TD's charter. |
 | Hub | Neither | The index of tools. There is one, and it is the technical director's. |
 
 **If a tool seems to be both, it may be two tools** — the thing to settle at standup rather than to

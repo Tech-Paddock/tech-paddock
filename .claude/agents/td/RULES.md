@@ -21,6 +21,7 @@ them.
 
 Touch-up means finishing: a doc that is wrong, a config line that is missing, a rename an agent
 left half-done. If you find yourself designing a component, you have crossed the line.
+**`apps/showcase` is the one exception** — below.
 
 **App surface is yours, as of 2026-09-18.** Site or app — the shell, the navigation, whether there
 is an index. It reads as look-and-feel and is not: `CLAUDE.md` enumerates the theme as palette,
@@ -51,6 +52,44 @@ agent who assumes otherwise.
 `pathname === "/api/draft"` as an exact path, authenticated by `INTERNAL_API_SECRET`. TechPad Gen's
 tracker — itself parked — calls it. **Owning the host does not loosen the carve-out** — if anything
 it removes the last excuse, because there is no longer another agent to argue it with.
+
+## `apps/showcase` is yours to design and build — 2026-09-29
+
+Joel: *"Td to solution and build micro sites. I will potentially be sending this to interviewers to
+interact with my builds."* One app, a page per demo, at `showcase.techpaddock.io` (TEC-99). It is
+the only app with no password, and **the only one you build** — the tools stay with their agents.
+
+**Why `.io` is safe, and exactly how far.** The session cookie is `HttpOnly`, `Secure`,
+`SameSite=Lax` and scoped to `.techpaddock.io`, so the browser sends it here too. A visitor without
+it gains nothing: there is no password, secret or key to reach. What the shared parent adds is
+reachable only through **script an attacker controls, running here while Joel is logged in**:
+requests into the tools that `Lax` does not stop, because this is the same site; cookies tossed
+over the whole domain; and the tools framed, since they allow `*.techpaddock.io`. So the rule is
+that no such script can exist, and every demo holds to it:
+
+- **A static export** (`output: "export"`): no server, so no API route, no cookie read, nothing
+  logged. Security headers go in `vercel.json`, because a static export ignores `headers()`.
+- **Nothing a visitor supplies leaves their browser**, and it is never rendered as HTML — text and
+  table cells only. An uploader is the demo most likely to break this: a crafted file shown to the
+  next visitor is the whole attack.
+- **A CSP that holds even if the code does not**: `connect-src` and `form-action` keep an upload in
+  the browser, `frame-src 'none'` stops this page framing a tool, and `script-src` names no host.
+- **No secrets, database or model calls**, and nothing stamped but the theme tokens.
+- **Fake data and neutral names only.** The repo is public and the page is sent to strangers: no
+  employer, real record or real person, in the code or on the screen.
+
+**`drift` enforces what a script can see** — the export, the missing auth and database files, the
+dependencies, `process.env`, `next/headers`, `dangerouslySetInnerHTML`, `document.cookie` and the
+CSP. **The rest is convention, and this paragraph is its only guard**: where an upload goes and how
+a demo renders it are yours to hold at the build.
+
+**A demo that needs state — saved uploads, a login, a model call — does not bend these rules.** It
+goes to `techpaddock.com`, where the cookie cannot reach, as its own project. That split was Joel's
+call when he chose `.io`; relaxing the rules instead is a `CLAUDE.md` change, not a build decision.
+
+The surface is a **site**: occasional, opened by someone arriving to look. Build with TechPad Gen's
+tokens as they are, which is free; a pattern the showcase needs that does not exist is flagged in
+the pull request, the same as any app.
 
 ## Starting agents — 2026-09-24
 
