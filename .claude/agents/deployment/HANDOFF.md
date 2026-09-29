@@ -29,9 +29,7 @@ state is never written here — read it live.
   rebuild, a 401 or no answer from the tracker means its build predates the value**, not that
   values disagree.
 - **The migration history is clean**: the repo and `list_migrations` differ by exactly
-  `20260908235234`, withheld because it seeds personal data — plus, until TEC-53 merges,
-  `health_targets`, applied at its gate on 2026-09-29 before its branch could be pushed. **Never
-  apply it again**; TEC-53's Next steps carry it.
+  `20260908235234`, withheld because it seeds personal data.
 
 ## Traps only here
 
@@ -43,7 +41,8 @@ state is never written here — read it live.
   branch you need**: check it out under a local alias and push `alias:claude/<branch>` — and only
   once the TD says that agent has finished with it.
 - **A push to another agent's branch can be refused** by the session's permission check, even
-  within the brief (TEC-53, 2026-09-29). Do not route around it. **Apply a migration only once the
+  within the brief (TEC-53, 2026-09-29). Do not route around it; the owner pushes, and once the
+  pull request is open, `update_pull_request_branch` (a full head SHA) brings it up to date. **Apply a migration only once the
   branch is pushable** — that refusal came after the apply, leaving the database ahead of `main`.
 - **You cannot rename a remote branch to `stale_`:** it takes deleting the old name, which agents
   cannot do. Say which branch is stale; Joel removes it.
