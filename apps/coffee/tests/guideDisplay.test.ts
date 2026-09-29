@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guidePresentation, IMAGE_SOURCE_PRESENTATION, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
+import { guidePresentation, IMAGE_SOURCE_PRESENTATION, RECIPE_SECTIONS, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
 import { GUIDE_FIELDS } from "@/lib/guide";
 import type { GuideStatus } from "@/lib/guide";
 
@@ -95,5 +95,21 @@ describe("IMAGE_SOURCE_PRESENTATION", () => {
     expect(IMAGE_SOURCE_PRESENTATION.caption).not.toMatch(forbidden);
     expect(IMAGE_SOURCE_PRESENTATION.alt).not.toMatch(forbidden);
     expect(IMAGE_SOURCE_PRESENTATION.quoteNote).not.toMatch(forbidden);
+  });
+});
+
+describe("RECIPE_SECTIONS", () => {
+  it("names whose each section is, and never Claude on the roaster's", () => {
+    // Both sections are on every bag now, one above the other, so the
+    // heading is the only thing telling them apart — even when collapsed.
+    expect(RECIPE_SECTIONS.roaster).toMatch(/roaster/i);
+    expect(RECIPE_SECTIONS.roaster).not.toMatch(/claude/i);
+    expect(RECIPE_SECTIONS.claude).toMatch(/claude/i);
+  });
+
+  it("does not let the suggestion's note say the roaster published nothing", () => {
+    // The suggestion now sits beside found guides too; a note claiming there
+    // was nothing to find would be false on those bags.
+    expect(SUGGESTION_PRESENTATION.note).not.toMatch(/published nothing|no (recipe|guide|instructions)/i);
   });
 });

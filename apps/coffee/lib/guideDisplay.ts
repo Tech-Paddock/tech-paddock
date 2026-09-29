@@ -61,35 +61,50 @@ export function guidePresentation(status: GuideStatus): GuidePresentation {
 }
 
 /**
+ * A recipe the roaster printed as a picture (TEC-46), and the picture it came off.
+ *
+ * The values were copied off an image rather than quoted from the page's
+ * text, so they are a reading — only as checkable as the picture. The image
+ * sits with the quotes, under the status disclosure, as the evidence for the
+ * values (Joel, 2026-09-29), and the caption asks for the check
+ * rather than vouching.
+ */
+export const IMAGE_SOURCE_PRESENTATION = {
+  caption: "Copied off this image on the roaster's page — check the numbers against it.",
+  alt: "The roaster's recipe image the values were copied from",
+  quoteNote: "read off the image",
+} as const;
+
+/**
+ * The two sections of a bag's recipe, one above the other (Joel, 2026-09-29).
+ *
+ * The roaster's section holds whatever the search found — including nothing —
+ * and Claude's holds its own suggestion. Both are always there, so the
+ * headings are what keep them apart: each names whose it is.
+ */
+export const RECIPE_SECTIONS = {
+  roaster: "Roaster's Recipe",
+  claude: "Claude's Suggested Recipe",
+} as const;
+
+/**
  * The one thing on this screen that nobody published.
  *
  * It sits in the same card as the three tiers and must never read as a fourth
- * one. So it carries no tier colour — the light stays on **No Recipe Found**,
- * which is still the true answer to "what did the roaster say" — and the
- * wording names Claude in the label itself rather than in small print
- * underneath, because the label is the part that gets read.
+ * one. So it carries no tier colour — the light above it still answers "what
+ * did the roaster say", whatever that answer is — and the wording names Claude
+ * in the label itself rather than in small print underneath, because the
+ * label is the part that gets read.
  *
  * The test beside this file checks that. A suggestion that quietly starts
  * reading like a found recipe is the single way this feature could damage the
  * thing the app is for, and it would happen through wording, here.
  */
-/**
- * A recipe the roaster printed as a picture (TEC-46), and the picture beside it.
- *
- * The values were copied off an image rather than quoted from the page's
- * text, so they are a reading — only as checkable as the picture next to
- * them. That is why the image is always rendered beside the values and never
- * behind a tap, and why the caption asks for the check rather than vouching.
- */
-export const IMAGE_SOURCE_PRESENTATION = {
-  caption: "Copied off this image on the roaster's page — check the numbers against it.",
-  alt: "The roaster's recipe image the values above were copied from",
-  quoteNote: "read off the image",
-} as const;
-
 export const SUGGESTION_PRESENTATION = {
-  label: "Suggested by Claude",
-  note: "The roaster published nothing for this coffee. Claude suggested a starting point — it is not theirs, and nothing on a page says it.",
+  label: RECIPE_SECTIONS.claude,
+  // Offered on every bag now, beside a found guide too, so the note cannot
+  // say the roaster published nothing — on most bags that would be false.
+  note: "Claude's own starting point. It is not the roaster's, and nothing on a page says it.",
   /** Deliberately not a tier colour. This is not a fourth light. */
   dot: "bg-ink/40",
 } as const;

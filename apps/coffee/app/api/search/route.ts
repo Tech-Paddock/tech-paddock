@@ -121,8 +121,9 @@ export async function POST(request: NextRequest) {
       // Nothing published anywhere on the roaster's own site is a correct and
       // recorded answer, and since 2026-09-19 it is no longer the end of it:
       // Claude suggests a starting point of its own, into its own column.
-      // `none` only — a tier-2 house guide is a recipe that was found, and
-      // suggesting over it would bury the thing this app exists to retrieve.
+      // Automatically on `none` only: beside a found guide it is one press of
+      // Suggest a recipe away, and spending a model call on every search to
+      // fill a section you may never open is waste.
       //
       // It runs here rather than on the page for the same reason the search
       // does: the answer belongs on the row, where closing the tab cannot

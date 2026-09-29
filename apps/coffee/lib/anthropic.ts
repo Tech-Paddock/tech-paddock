@@ -460,9 +460,9 @@ const SUGGESTION_SCHEMA = {
   required: ["method", "params", "rationale"],
 };
 
-const SUGGEST_SYSTEM = `You are suggesting a starting point for brewing a coffee whose roaster
-published no brewing instructions anywhere on their own site. A search has already been run and
-found nothing; you are not being asked to find anything.
+const SUGGEST_SYSTEM = `You are suggesting your own starting point for brewing a coffee. You are
+not being asked to find anything, and you have read nothing about this coffee beyond what is on
+its bag. Whether or not its roaster published instructions, this is not them.
 
 This is explicitly your own recommendation, and it will be shown as yours. Do not claim, imply or
 invent that a roaster, a retailer or any page says any of it. Do not cite a source. Do not name a
@@ -480,7 +480,10 @@ Give a one-sentence rationale that says what about this coffee moved the numbers
 it did, say that plainly instead of inventing a reason.`;
 
 /**
- * A recipe of Claude's own, for a bag whose roaster published none.
+ * A recipe of Claude's own, for any bag — beside the roaster's or in place of it.
+ *
+ * It is never shown the roaster's guide, even when one was found: a suggestion
+ * that read it would be a paraphrase of theirs presented as Claude's own.
  *
  * Deliberately has no web tools. Giving it search would make the result a
  * blend of remembered practice and something half-read on a page, and the
@@ -518,8 +521,7 @@ export async function suggestRecipe(bag: {
         role: "user",
         content:
           `${known.join("\n")}\n\n` +
-          `No brewing instructions were found for this coffee on the roaster's own site. ` +
-          `Suggest a starting point for brewing it.`,
+          `Suggest your own starting point for brewing it.`,
       },
     ],
   }, { signal });

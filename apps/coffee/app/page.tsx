@@ -25,7 +25,7 @@ import {
 } from "@/lib/brews";
 import { MY_BREWERS, MY_BREWER_LABELS, GRINDERS, type MyBrewer } from "@/lib/brewers";
 import type { Guide, GuideStatus } from "@/lib/guide";
-import { guidePresentation, IMAGE_SOURCE_PRESENTATION, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
+import { guidePresentation, IMAGE_SOURCE_PRESENTATION, RECIPE_SECTIONS, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
 import type { Suggestion } from "@/lib/suggestion";
 import { roastDateFromLabel } from "@/lib/dates";
 import { searchIsRunning, searchIsStale, SEARCH_START_GRACE_MS, STALE_SEARCH_MESSAGE } from "@/lib/searchClock";
@@ -708,8 +708,6 @@ function GuideCard({ guide }: { guide: Guide }) {
         </dl>
       )}
 
-      <RecipeImages quotes={guide.quotes} />
-
       {guide.dropped.length > 0 && (
         <p className="text-xs text-ink-soft">
           {guide.dropped.length} value{guide.dropped.length === 1 ? "" : "s"} discarded for having no source on the
@@ -941,11 +939,12 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
             </label>
           </section>
 
-          <section className="flex flex-col gap-3 border-t border-line pt-4">
-            <div className="flex items-start justify-between gap-3">
-              <SectionHead>Recipe</SectionHead>
-              <Research bag={bag} onChanged={onChanged} />
-            </div>
+          {/* Two sections, one above the other, each collapsible on its own
+              (Joel, 2026-09-29): what the roaster published, then what Claude
+              suggests. Both are always there, whatever the search found, so
+              the headings carry whose each one is. */}
+          <RecipeSection title={RECIPE_SECTIONS.roaster}>
+            <Research bag={bag} onChanged={onChanged} />
 
             <GuideStatusHeader
               status={bag.guide_status}
@@ -971,14 +970,12 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
               ) : (
                 <p className="text-sm text-ink/60">Nothing recorded from the roaster.</p>
               )}
-              <RecipeImages quotes={bag.guide_quotes ?? []} />
             </div>
+          </RecipeSection>
 
-            {/* Only where the roaster published nothing. A tier-2 house guide
-                is a recipe that was found, and suggesting over it would bury
-                the thing this app exists to retrieve. */}
-            {bag.guide_status === "none" && <SuggestedRecipe bag={bag} onChanged={onChanged} />}
-          </section>
+          <RecipeSection title={RECIPE_SECTIONS.claude} dot={SUGGESTION_PRESENTATION.dot}>
+            <SuggestedRecipe bag={bag} onChanged={onChanged} />
+          </RecipeSection>
 
           {error && (
             <p className="text-sm text-urgent bg-surface border border-urgent rounded-lg px-3 py-2">{error}</p>
@@ -1620,21 +1617,17 @@ function Research({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
   }, [searching, bag.id]);
 
   return (
-    <div className="flex flex-col items-end gap-1 shrink-0">
+    <div className="flex flex-col items-start gap-1">
       <button
         onClick={start}
         disabled={searching}
-        className="text-sm text-accent underline disabled:opacity-60 disabled:no-underline"
+        className="border border-line rounded-lg px-3 py-1.5 text-sm disabled:opacity-60"
       >
         {searching ? "Searching…" : "Search again"}
       </button>
-      {searching && (
-        <span className="text-xs text-ink-soft text-right">
-          Minutes, not seconds. You can close this.
-        </span>
-      )}
-      {error && <span className="text-xs text-urgent text-right">{error}</span>}
-      {warning && !error && <span className="text-xs text-ink-soft text-right">{warning}</span>}
+      {searching && <span className="text-xs text-ink-soft">Minutes, not seconds. You can close this.</span>}
+      {error && <span className="text-xs text-urgent">{error}</span>}
+      {warning && !error && <span className="text-xs text-ink-soft">{warning}</span>}
     </div>
   );
 }
@@ -1673,11 +1666,6 @@ function SuggestedRecipe({ bag, onChanged }: { bag: Bag; onChanged: () => void }
 
   return (
     <div className="border border-dashed border-line rounded-xl p-3 flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <span aria-hidden className={`w-2.5 h-2.5 rounded-full ${SUGGESTION_PRESENTATION.dot}`} />
-        <h4 className="text-sm font-semibold">{SUGGESTION_PRESENTATION.label}</h4>
-      </div>
-
       {suggestion ? (
         <>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
@@ -1712,7 +1700,7 @@ function SuggestedRecipe({ bag, onChanged }: { bag: Bag; onChanged: () => void }
         disabled={asking}
         className="self-start border border-line rounded-lg px-3 py-1.5 text-sm disabled:opacity-60"
       >
-        {asking ? "Asking Claude…" : suggestion ? "Ask again" : "Ask Claude for a starting point"}
+        {asking ? "Asking Claude…" : suggestion ? "Suggest again" : "Suggest a recipe"}
       </button>
     </div>
   );
@@ -1721,6 +1709,28 @@ function SuggestedRecipe({ bag, onChanged }: { bag: Bag; onChanged: () => void }
 function SectionHead({ children }: { children: React.ReactNode }) {
   return (
     <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-soft">{children}</h3>
+  );
+}
+
+/**
+ * One of the bag's two recipe sections, collapsible on its own.
+ *
+ * A real `<details>`, open to begin with, for the same reason the status
+ * disclosure is one: it is focusable, keyboard-operable and announced as a
+ * disclosure without any of that written here. The heading sits in the
+ * summary, so a closed section still says whose recipe it is.
+ */
+function RecipeSection({ title, dot, children }: { title: string; dot?: string; children: React.ReactNode }) {
+  return (
+    <details open className="group/section border-t border-line pt-4">
+      <summary className="flex items-center gap-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        {dot && <span aria-hidden className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />}
+        <SectionHead>{title}</SectionHead>
+        <span aria-hidden className="ml-auto text-accent text-xl leading-none group-open/section:hidden">+</span>
+        <span aria-hidden className="ml-auto text-accent text-xl leading-none hidden group-open/section:inline">−</span>
+      </summary>
+      <div className="flex flex-col gap-3 pt-3">{children}</div>
+    </details>
   );
 }
 
@@ -1773,7 +1783,10 @@ function GuideStatusHeader({
       </summary>
       <div className="pt-1 pb-2 flex flex-col gap-3">
         {hasQuotes ? (
-          <Quotes quotes={quotes} />
+          <>
+            <Quotes quotes={quotes} />
+            <RecipeImages quotes={quotes} />
+          </>
         ) : (
           <p className="text-sm text-ink/60">
             {status === "not_searched"
@@ -1823,14 +1836,13 @@ function Quotes({ quotes }: { quotes: { text: string; image?: string }[] }) {
 }
 
 /**
- * The picture a recipe was copied off, directly under the values it backs
- * (TEC-46).
+ * The picture a recipe was copied off (TEC-46), under the quotes in the status
+ * disclosure.
  *
- * **Always shown, never behind the disclosure** the text quotes sit in. A
- * sentence quoted from a page is checkable from the words alone; a copy-out
- * of an image is a reading, and it is only as checkable as the picture beside
- * it. That is the condition that lets it into `guide_*` at all, so the image
- * is on screen wherever the values are.
+ * It used to be always on screen beside the values; Joel moved it behind the
+ * disclosure with the text quotes on 2026-09-29. It is still the evidence: a
+ * copy-out of an image is a reading, only as checkable as the picture, and a
+ * value with no stored image to show is still dropped by `validateGuide`.
  *
  * The image is served from the roaster's CDN, not stored here. It is linked
  * full size, and requested with no referrer, so the roaster's host sees an
@@ -1840,7 +1852,7 @@ function RecipeImages({ quotes }: { quotes: { image?: string }[] }) {
   const images = Array.from(new Set((quotes ?? []).map((q) => q.image).filter((u): u is string => !!u)));
   if (images.length === 0) return null;
   return (
-    <figure className="flex flex-col gap-2 mt-3">
+    <figure className="flex flex-col gap-2">
       {images.map((src) => (
         <a key={src} href={src} target="_blank" rel="noreferrer" className="block">
           <img
