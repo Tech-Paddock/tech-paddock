@@ -182,6 +182,33 @@ describe("storedRenderView — an unread record never reads as a clean one", () 
     expect(v.unread.join(" ")).toMatch(/trimmed-surplus/);
   });
 
+  /**
+   * TEC-87 option 3: unread Career Highlights pass the verdict, so the note and
+   * the named lines are all that says they did not arrive. A reopened render
+   * must carry both, or it reads as a source that had no highlights.
+   */
+  it("keeps not-read highlights on reopen: named in coverage, a note on a passing verdict", () => {
+    const v = view(
+      row({
+        coverage: { totalLines: 3, present: 3, missing: [], percent: 100, notRead: ["Zorblatt 250"] },
+        template_snapshot: {
+          version: 4,
+          changeLog: [{ section: "Career Highlights", detail: "x", action: "input-not-read" }],
+        },
+      })
+    );
+    expect(v.unread).toEqual([]);
+    expect(v.coverage?.notRead).toEqual(["Zorblatt 250"]);
+    const verdict = verdictFor({ coverage: v.coverage!, findings: [], changeLog: v.changeLog! });
+    expect(verdict.pass).toBe(true);
+    expect(verdict.notes.join(" ")).toMatch(/Career Highlights/);
+  });
+
+  it("nulls a coverage whose not-read list it cannot read", () => {
+    const v = view(row({ coverage: { totalLines: 3, present: 3, missing: [], percent: 100, notRead: "Zorblatt" } }));
+    expect(v.coverage).toBeNull();
+  });
+
   it("names the template from the render's own snapshot once the template is deleted", () => {
     expect(view(row()).templateLabel).toBe("a deleted template (v4)");
   });

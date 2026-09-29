@@ -1,6 +1,6 @@
 # Resume Formatter — handoff
 
-State as of 2026-09-26.
+State as of 2026-09-29.
 
 Read `RULES.md` first. This file is only what is true right now, and its traps. Open work is in
 Linear, team TEC, labelled `agent:Resume Formatter`.
@@ -17,6 +17,11 @@ section the source did not fill (`not-found-in-input`), or source text with nowh
 (`input-dropped`). **A template line the source had no counterpart for is `template-trimmed`: a
 note, never a vote.** Log each drop as what it is, or the verdict either cries wolf or overstates.
 
+**Unpairable Career Highlights are `input-not-read`: named, never a vote** (Joel, 2026-09-29,
+TEC-87 option 3 — they repeat body items). The log names each refused line, coverage lists them in
+`notRead`, outside the fraction, and the verdict passes with a note. Pipe or Word table, every cell
+is one metric and one description or none is read; a table beside paragraphs is refused whole.
+
 **A stored render reopens with its own record.** Either of its rows on the Resume tab has *Open*,
 which calls `GET /api/renders/[id]` and shows it on Reformat and Diagnostics: coverage from
 `renders.coverage`, the change log from `renders.template_snapshot`, read as written and never
@@ -24,7 +29,7 @@ re-rendered; the download is the stored file. **An unread record is NO VERDICT, 
 (`lib/storedRender.ts`): no stored log or coverage, or a log using the retired `trimmed-surplus`.
 A render already logged to a tracker thread says so instead of offering the job form again.
 
-**Diagnostics checks the lines a reformat takes** (`linesTaken`), not the whole source. A source it
+**Diagnostics checks what Reformat checks** (`checkContent`), not the whole source. A source it
 takes nothing from is compared whole, so zero lines checked never reads as 100%.
 
 **The Resume tab is one list**, `/api/resumes`, uncapped, filtered Template / Input / Output. A
@@ -54,8 +59,8 @@ rolls back whole on the check constraint.
 
 ## Traps specific to this app
 
-- **Unreadable Career Highlights pass the verdict (TEC-79).** A pipe table whose rows do not pair
-  up extracts as null, the renderer logs `kept-unchanged`, and those lines count nowhere.
+- **`input-not-read` passes, so the log line, `notRead` and the note are all that say so** —
+  `tests/unreadable-highlights.test.ts` pins each. Text that is not a body duplicate is `input-dropped`.
 - **A reopened render's ATS findings are today's lint** on the stored bytes — they were never
   stored. Coverage and the change log are the record; the findings are not.
 - **A new database function needs its grants.** Postgres grants EXECUTE to PUBLIC, which means

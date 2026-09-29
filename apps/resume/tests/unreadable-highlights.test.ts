@@ -5,16 +5,22 @@ import { verdictFor } from "@/lib/verdict";
 import { readDocxParts } from "@/lib/docx/read";
 import { extractParagraphs } from "@/lib/docx/paragraphs";
 import { auditAts } from "@/lib/docx/ats";
-import { compareLines } from "@/lib/docx/compare";
-import { linesTaken, reskin } from "@/lib/reskin/generate";
+import { checkContent, reskin } from "@/lib/reskin/generate";
 import { makeDocx, para, table } from "./helpers/docx";
 
 /**
  * TEC-79. A Career Highlights pipe table whose rows do not pair up is refused
  * rather than guessed at — and that refusal used to read as "the input had no
- * highlights": `kept-unchanged`, nothing counted as missing, verdict PASS, while
- * the source's highlight text reached the document nowhere. The charter's rule
- * is that coverage must not be able to lie; this is the case where it did.
+ * highlights": `kept-unchanged`, nothing named anywhere, while the source's
+ * highlight text reached the document nowhere. The charter's rule is that
+ * coverage must not be able to lie; this is the case where it did.
+ *
+ * **What the verdict does about it is Joel's call, 2026-09-29 (TEC-87, option
+ * 3): keep the truth, drop the failure.** The report says the highlights were
+ * not read and not placed, and names each refused line; the verdict passes,
+ * because Career Highlights repeat items from the body and nothing unique is
+ * lost. These tests assert both halves, so a report that goes silent fails
+ * here exactly as it did before.
  */
 
 const template = () => readFileSync(join(__dirname, "fixtures", "template-flat-sample.docx"));
@@ -25,7 +31,13 @@ const source = (blocks: string[]) =>
     body: [
       para("Alex Placeholder", 50),
       para("alex@example.invalid | 555-0100", 18),
+      // Every other section the template has is filled, so a passing verdict
+      // is about the highlights and nothing else.
+      para("Summary", 22),
+      para("Analyst who does measurable things.", 20),
       ...(blocks.length > 0 ? [para("Career Highlights", 22), ...blocks] : []),
+      para("Core Competencies", 22),
+      para("Platform: Alpha, Beta", 20),
       para("Professional Experience", 22),
       para("Example Corp Jan 2024 - Present", 21),
       para("Analyst", 21),
@@ -38,7 +50,7 @@ async function run(blocks: string[]) {
   const { docx, changeLog, content } = await reskin(template(), await source(blocks));
   const rendered = await readDocxParts(docx);
   const paras = extractParagraphs(rendered.document);
-  const coverage = compareLines(linesTaken(content), paras);
+  const coverage = checkContent(content, paras);
   const verdict = verdictFor({ coverage, findings: auditAts(rendered, paras), changeLog });
   const highlightLog = changeLog.filter((c) => c.section === "Career Highlights");
   return { content, coverage, verdict, highlightLog };
@@ -64,27 +76,50 @@ describe("Career Highlights the source has but cannot be read", () => {
     ]);
   });
 
-  it("logs them as input-dropped, never as kept-unchanged", async () => {
+  it("logs them as not read and not placed, naming each line — never as kept-unchanged", async () => {
     const { highlightLog } = await run(MISALIGNED);
-    expect(highlightLog.map((c) => c.action)).toEqual(["input-dropped"]);
-    expect(highlightLog[0].detail).toMatch(/could not be read/);
+    expect(highlightLog.map((c) => c.action)).toEqual(["input-not-read"]);
+    expect(highlightLog[0].detail).toMatch(/not read and not placed/);
+    for (const line of ["Zorblatt 250", "Quintessa 30", "Vexmoor 230", "Frobnicated the widget pipeline"]) {
+      expect(highlightLog[0].detail).toContain(`"${line}"`);
+    }
   });
 
-  it("names every lost cell in coverage", async () => {
+  it("names every refused cell in coverage, as not read rather than as missing", async () => {
     const { coverage } = await run(MISALIGNED);
-    expect(coverage.missing).toEqual(expect.arrayContaining(["Zorblatt 250", "Frobnicated the widget pipeline"]));
+    expect(coverage.notRead).toEqual(["Zorblatt 250", "Quintessa 30", "Vexmoor 230", "Frobnicated the widget pipeline"]);
+    expect(coverage.missing).toEqual([]);
   });
 
-  it("fails the verdict, saying which section", async () => {
+  // Behaviour change, Joel 2026-09-29 (TEC-87 option 3): this failed the
+  // verdict until then. The note is what keeps it from passing silently.
+  it("passes the verdict, and says in a note that Career Highlights were not read", async () => {
     const { verdict } = await run(MISALIGNED);
-    expect(verdict.pass).toBe(false);
-    expect(verdict.reasons.join(" ")).toMatch(/dropped — Career Highlights/);
+    expect(verdict.pass).toBe(true);
+    expect(verdict.notes.join(" ")).toMatch(/could not be read, so it was not placed.* — Career Highlights/);
   });
 
   it("does the same for plain lines that are neither a table nor metric: description", async () => {
-    const { content, verdict } = await run(lines(["Frobnicated the widget pipeline across the whole estate"]));
+    const { content, coverage, verdict, highlightLog } = await run(
+      lines(["Frobnicated the widget pipeline across the whole estate"])
+    );
     expect(content.unreadableHighlights).toEqual(["Frobnicated the widget pipeline across the whole estate"]);
-    expect(verdict.pass).toBe(false);
+    expect(coverage.notRead).toEqual(["Frobnicated the widget pipeline across the whole estate"]);
+    expect(highlightLog.map((c) => c.action)).toEqual(["input-not-read"]);
+    expect(verdict.pass).toBe(true);
+    expect(verdict.notes.join(" ")).toMatch(/Career Highlights/);
+  });
+
+  it("does not turn a real loss elsewhere into a pass", async () => {
+    // The pass is for refused highlights alone. A body line that reached the
+    // document nowhere still fails, with the highlights note beside it.
+    const failed = verdictFor({
+      coverage: { missing: ["Did a measurable thing."] },
+      findings: [],
+      changeLog: [{ section: "Career Highlights", action: "input-not-read" }],
+    });
+    expect(failed.pass).toBe(false);
+    expect(failed.notes.join(" ")).toMatch(/Career Highlights/);
   });
 });
 
@@ -105,7 +140,7 @@ describe("the cases either side, which must not change", () => {
     );
     expect(content.unreadableHighlights).toBeUndefined();
     expect(content.careerHighlights).toHaveLength(2);
-    expect(highlightLog.some((c) => c.action === "input-dropped" && /could not be read/.test(c.detail))).toBe(false);
+    expect(highlightLog.map((c) => c.action)).not.toContain("input-not-read");
   });
 });
 
@@ -137,30 +172,32 @@ describe("Career Highlights given as a Word table", () => {
     expect(content.careerHighlights).toEqual([{ stat: "Zorblatt 250", desc: "Frobnicated the widget pipeline" }]);
   });
 
-  it("refuses the whole table when one cell is a single line, and fails the verdict", async () => {
+  it("refuses the whole table when one cell is a single line, and names every cell as not read", async () => {
     const { content, coverage, verdict, highlightLog } = await run([
       table([cell("Zorblatt 250", "Frobnicated the widget pipeline"), cell("Quintessa 30 lone figure")]),
     ]);
     expect(content.careerHighlights).toBeNull();
     expect(content.unreadableHighlights).toEqual(["Zorblatt 250", "Frobnicated the widget pipeline", "Quintessa 30 lone figure"]);
-    expect(highlightLog.map((c) => c.action)).toEqual(["input-dropped"]);
-    expect(coverage.missing).toContain("Quintessa 30 lone figure");
-    expect(verdict.pass).toBe(false);
+    expect(highlightLog.map((c) => c.action)).toEqual(["input-not-read"]);
+    expect(highlightLog[0].detail).toContain('"Quintessa 30 lone figure"');
+    expect(coverage.notRead).toEqual(["Zorblatt 250", "Frobnicated the widget pipeline", "Quintessa 30 lone figure"]);
+    expect(verdict.pass).toBe(true);
+    expect(verdict.notes.join(" ")).toMatch(/Career Highlights/);
   });
 
   it("refuses a cell with a third paragraph rather than dropping it", async () => {
-    const { content, verdict } = await run([
+    const { content, coverage } = await run([
       table([cell("Zorblatt 250", "Frobnicated the widget pipeline", "Across the whole estate")]),
     ]);
     expect(content.unreadableHighlights).toContain("Across the whole estate");
-    expect(verdict.pass).toBe(false);
+    expect(coverage.notRead).toContain("Across the whole estate");
   });
 
   it("no longer reads a table of one-line cells as an input with no highlights", async () => {
-    const { content, highlightLog, verdict } = await run([table([cell("Zorblatt 250"), cell("Quintessa 30")])]);
+    const { content, coverage, highlightLog } = await run([table([cell("Zorblatt 250"), cell("Quintessa 30")])]);
     expect(content.unreadableHighlights).toEqual(["Zorblatt 250", "Quintessa 30"]);
-    expect(highlightLog.map((c) => c.action)).not.toContain("kept-unchanged");
-    expect(verdict.pass).toBe(false);
+    expect(highlightLog.map((c) => c.action)).toEqual(["input-not-read"]);
+    expect(coverage.notRead).toEqual(["Zorblatt 250", "Quintessa 30"]);
   });
 
   it("keeps every table's cells when the section has two, rather than only the last", async () => {
@@ -172,7 +209,7 @@ describe("Career Highlights given as a Word table", () => {
   });
 
   it("refuses a table beside paragraphs of text rather than reading one and losing the other", async () => {
-    const { content, verdict } = await run([
+    const { content, coverage } = await run([
       table([cell("Zorblatt 250", "Frobnicated the widget pipeline")]),
       para("Quintessa 30: Reticulated the splines", 20),
     ]);
@@ -182,7 +219,7 @@ describe("Career Highlights given as a Word table", () => {
       "Frobnicated the widget pipeline",
       "Quintessa 30: Reticulated the splines",
     ]);
-    expect(verdict.pass).toBe(false);
+    expect(coverage.notRead).toContain("Quintessa 30: Reticulated the splines");
   });
 
   it("reads the template itself as a source with every highlight and nothing unreadable", async () => {
