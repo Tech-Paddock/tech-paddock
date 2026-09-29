@@ -17,13 +17,6 @@
 
 export type ResumeKind = "template" | "input" | "output";
 
-export type TemplateSpec = {
-  font: string;
-  bodySize: number;
-  headingSize: number;
-  margins: { left: number; top: number };
-};
-
 export type ResumeFile = {
   /** Unique per row. A render's two rows share `id`, so `id` cannot be the key. */
   key: string;
@@ -38,7 +31,6 @@ export type ResumeFile = {
   version: number | null;
   active: boolean;
   archived: boolean;
-  spec: TemplateSpec | null;
 
   /** Renders only; null on templates. */
   company: string | null;

@@ -33,6 +33,11 @@ function clientFor(schema: string) {
 // applications and networking threads that never involve a resume.
 export const getTrackerClient = () => clientFor("tracker");
 
-// Shared contacts, so the person you sent a resume to exists once rather than
-// as a duplicate of the record the Message Editor already knows.
-export const getSharedClient = () => clientFor("shared");
+// There is deliberately no client for `shared` here (TEC-26). One used to be
+// exported with a comment claiming it kept contacts deduplicated; nothing ever
+// called it, so the claim described a guarantee nobody provided. Under the
+// `shared.contacts` contract in supabase/README.md the Message Editor is its
+// only writer, and this app only passes a `contact_id` through to the tracker
+// thread. A contact picker would be a read from the editor's list, never a
+// write — and a new write path is a contract change that goes to Joel through
+// the technical director.

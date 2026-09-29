@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeName,
   perServing,
+  setRating,
   validateDraft,
   wholeRecipe,
   type RecipeDraft,
 } from "@/lib/recipes";
+import { EMPTY_META } from "@/lib/metadata";
+import { InputError } from "@/lib/errors";
 
 /**
  * The pure half of the book: the arithmetic, and what a draft has to be before it
@@ -27,6 +30,7 @@ function draft(over: Partial<RecipeDraft> = {}): RecipeDraft {
     ingredients: ["500g beef mince"],
     method: null,
     note: null,
+    meta: EMPTY_META,
     ...over,
   };
 }
@@ -115,5 +119,15 @@ describe("the name a recipe claims", () => {
     // the property that keeps the two in step rather than a coincidence.
     expect(normalizeName("Weeknight\tchilli")).toBe("weeknight chilli");
     expect(normalizeName("Weeknight\nchilli")).toBe("weeknight chilli");
+  });
+});
+
+describe("rating a recipe already in the book", () => {
+  it("refuses anything but a whole 1–5 before it reaches the database", async () => {
+    // Thrown before the client is built, so no Supabase is needed to prove it —
+    // and an InputError is a 400, never the 503 Health reads as an outage.
+    for (const bad of [0, 6, 2.5, "great"]) {
+      await expect(setRating("r1", bad)).rejects.toBeInstanceOf(InputError);
+    }
   });
 });

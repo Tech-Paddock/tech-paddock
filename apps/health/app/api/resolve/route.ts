@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveItem } from "@/lib/log";
 import { LookupError, normalizeName } from "@/lib/items";
+import { recipeBookFor } from "@/lib/cookbook";
 
 export const dynamic = "force-dynamic";
 // A miss goes outside, which may search and read a page.
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
       name,
       quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
       onDate: date,
+      recipes: recipeBookFor(request.cookies),
     });
     return NextResponse.json({ item });
   } catch (e) {

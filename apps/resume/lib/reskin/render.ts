@@ -14,7 +14,7 @@ import {
   spliceCell,
 } from "./blocks";
 import { matchSectionKey, normalizeForCompare, type SectionKey } from "./sections";
-import { looksLikeContact } from "../docx/label";
+import { looksLikeContact } from "../docx/lines";
 import type { SourceContent, ChangeLogEntry, ExperienceEntry, CompetencyRow } from "./types";
 
 interface TemplateSection {

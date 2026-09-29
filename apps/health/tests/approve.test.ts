@@ -111,7 +111,7 @@ describe("snapshotOf", () => {
       .toEqual({ kcal: 490, protein_g: 6, carbs_g: 66, fat_g: 23 });
   });
 
-  it("is null for a line written before snapshots, never zero", () => {
+  it("is null, never zero, for a line missing its numbers, which readDay refuses", () => {
     expect(snapshotOf({ item_version_id: null, kcal: null, protein_g: null, carbs_g: null, fat_g: null })).toBeNull();
   });
 });

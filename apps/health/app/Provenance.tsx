@@ -10,8 +10,9 @@ import { MODELS, isModelId } from "@/lib/models";
  * hand-entered figure is evidence, a match against the same model's estimate
  * from three weeks ago is not, and those must not look the same.
  *
- * Three states, deliberately different weights: your own log is the quiet one
- * because it is the trustworthy one, and an estimate is the loud one because it
+ * Four states, deliberately different weights: your own log and the Cookbook
+ * are the quiet ones because they are the trustworthy ones, and an estimate is
+ * the loud one because it
  * is the guess.
  */
 export default function Provenance({
@@ -25,15 +26,23 @@ export default function Provenance({
 }) {
   const modelLabel = model && isModelId(model) ? MODELS[model].label : model;
 
+  // A Cookbook recipe is quiet like your own log: its numbers are the ones you
+  // wrote down there (TEC-25), and they name no model.
   const style =
-    source === "hand"
+    source === "hand" || source === "cookbook"
       ? "border-line/70 text-ink-soft"
       : source === "web"
         ? "border-info/50 text-info"
         : "border-warn/60 text-warn";
 
   const label =
-    source === "hand" ? "Your log" : source === "web" ? "From the web" : "Estimated";
+    source === "hand"
+      ? "Your log"
+      : source === "cookbook"
+        ? "Cookbook"
+        : source === "web"
+          ? "From the web"
+          : "Estimated";
 
   return (
     <span className="inline-flex items-center gap-1.5 text-[11px] leading-none">
@@ -42,7 +51,7 @@ export default function Provenance({
       </span>
       {/* The model is part of the provenance, not a footnote to it. A number is
           only comparable against another number if you know what produced it. */}
-      {source !== "hand" && modelLabel ? (
+      {source !== "hand" && source !== "cookbook" && modelLabel ? (
         <span className="text-ink-soft/80">{modelLabel}</span>
       ) : null}
       {url ? (

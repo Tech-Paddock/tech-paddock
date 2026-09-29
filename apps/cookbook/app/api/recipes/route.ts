@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listRecipes, saveRecipe, deleteRecipe, type RecipeDraft, type RecipeOrigin } from "@/lib/recipes";
+import { listRecipes, saveRecipe, deleteRecipe, setRating, type RecipeDraft, type RecipeOrigin } from "@/lib/recipes";
+import { readMeta } from "@/lib/metadata";
 import { errorResponse } from "@/lib/respond";
 import { parseMacros } from "@/lib/macros";
 import { MODELS, type ModelId } from "@/lib/models";
@@ -68,6 +69,10 @@ export async function POST(request: NextRequest) {
       : [],
     method: typeof raw.method === "string" ? raw.method : null,
     note: typeof raw.note === "string" ? raw.note : null,
+    // Re-read, never trusted as sent: a free-of claim or a macro tag the browser
+    // somehow carries is dropped here too. The rating is read because Joel may
+    // set one on the draft before Keep it; no model path produces one.
+    meta: readMeta(raw.meta, { rating: true }),
   };
 
   if (draft.source !== "hand" && !draft.model) {
@@ -81,6 +86,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ recipe: await saveRecipe(draft) }, { status: 201 });
   } catch (e) {
     return errorResponse(e, "Couldn't save that recipe.");
+  }
+}
+
+/**
+ * Rate a recipe, or clear its rating with `null` (TEC-52). **The only field this
+ * route changes** — see `setRating`. Anything else in the body is ignored.
+ */
+export async function PATCH(request: NextRequest) {
+  const body = await request.json().catch(() => ({}));
+  const id = typeof body.id === "string" ? body.id : "";
+  if (!id) return NextResponse.json({ error: "Which recipe?" }, { status: 400 });
+  if (!("rating" in body)) return NextResponse.json({ error: "Nothing to change." }, { status: 400 });
+
+  try {
+    return NextResponse.json({ recipe: await setRating(id, body.rating) });
+  } catch (e) {
+    return errorResponse(e, "Couldn't rate that recipe.");
   }
 }
 

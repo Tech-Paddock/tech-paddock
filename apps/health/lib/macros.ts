@@ -12,8 +12,24 @@ export type Macros = {
   fat_g: number;
 };
 
-/** Where a number came from. Null model is only valid for `hand`. */
-export type MacroSource = "hand" | "web" | "estimate";
+/**
+ * Where a number came from. `hand` and `cookbook` name no model; `web` and
+ * `estimate` always do, and the database's `model_matches_source` says the
+ * same. `cookbook` is a recipe's per-serving numbers as the Cookbook returned
+ * them (TEC-25) — the Cookbook's own, so the fix for one belongs there.
+ */
+export type MacroSource = "hand" | "web" | "estimate" | "cookbook";
+
+export const MACRO_SOURCES: readonly MacroSource[] = ["hand", "web", "estimate", "cookbook"];
+
+export function isMacroSource(value: unknown): value is MacroSource {
+  return typeof value === "string" && (MACRO_SOURCES as readonly string[]).includes(value);
+}
+
+/** The sources whose numbers name no model. */
+export function namesNoModel(source: MacroSource): boolean {
+  return source === "hand" || source === "cookbook";
+}
 
 export const MACRO_KEYS = ["kcal", "protein_g", "carbs_g", "fat_g"] as const;
 

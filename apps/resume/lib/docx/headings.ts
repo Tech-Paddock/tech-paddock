@@ -90,8 +90,8 @@ export function sectionKeyOf(text: string): SectionKey | null {
 /**
  * A date range, in the shapes a resume writes one.
  *
- * Moved here from `label.ts`, which is a consumer of this idea rather than its
- * owner: it is the single strongest signal that a line is a job entry and not a
+ * Moved here from the old labeller, `label.ts` (retired in TEC-63), which was a
+ * consumer of this idea rather than its owner: it is the single strongest signal that a line is a job entry and not a
  * section heading, so it belongs with the rule that uses it.
  */
 export const DATE_RANGE =

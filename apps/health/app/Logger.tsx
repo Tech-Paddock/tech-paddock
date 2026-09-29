@@ -316,6 +316,9 @@ export default function Logger() {
                             type="number"
                             inputMode="decimal"
                             min="0"
+                            // A recipe's numbers are the Cookbook's: typing
+                            // over one here is refused, so it is not offered.
+                            readOnly={line.source === "cookbook"}
                             value={line.macros[key]}
                             onChange={(e) =>
                               editLine(index, { macros: { ...line.macros, [key]: Number(e.target.value) || 0 } })
@@ -431,7 +434,11 @@ export default function Logger() {
                       {/* The numbers shown are for one of the item; quantity is
                           a property of this line, not of the food, so it is not
                           part of what a correction changes. */}
-                      {fixing === item.id ? (
+                      {fixing === item.id && item.source === "cookbook" ? (
+                        <p className="text-xs text-ink-soft">
+                          This is a Cookbook recipe. Fix its numbers in the Cookbook and the next log picks them up.
+                        </p>
+                      ) : fixing === item.id ? (
                         <Correction
                           itemId={item.item_id}
                           name={item.name}
