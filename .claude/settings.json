@@ -35,13 +35,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "input=$(cat); case \"$input\" in *push*|*repair*|*schema_migrations*) ;; *) exit 0 ;; esac; g=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard.mjs\"; if ! command -v node >/dev/null 2>&1 || [ ! -f \"$g\" ]; then echo \"The repo's guard needs node and $g, and one is missing, so this command is refused rather than run unchecked.\" >&2; exit 2; fi; printf '%s' \"$input\" | node \"$g\" || exit 2",
+            "command": "input=$(cat); case \"$input\" in *push*|*repair*|*schema_migrations*|*\"pr \"*|*pull-request*) ;; *) exit 0 ;; esac; g=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard.mjs\"; if ! command -v node >/dev/null 2>&1 || [ ! -f \"$g\" ]; then echo \"The repo's guard needs node and $g, and one is missing, so this command is refused rather than run unchecked.\" >&2; exit 2; fi; printf '%s' \"$input\" | node \"$g\" || exit 2",
             "timeout": 20
           }
         ]
       },
       {
-        "matcher": "^mcp__.*[Gg]it[Hh]ub.*__.*(pull_request|merge|push_files|create_or_update_file|delete_file).*$",
+        "matcher": "^mcp__.*[Gg]it[Hh]ub.*__.*(pull_request|merge|push_files|create_or_update_file|delete_file|review|_pr_|copilot|thread).*$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "g=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard.mjs\"; if ! command -v node >/dev/null 2>&1 || [ ! -f \"$g\" ]; then echo \"The repo's guard needs node and $g, and one is missing, so this call is refused rather than run unchecked.\" >&2; exit 2; fi; node \"$g\" || exit 2",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "^(Agent|Task)$",
         "hooks": [
           {
             "type": "command",
@@ -61,7 +71,7 @@
         ]
       },
       {
-        "matcher": "^mcp__.*[Ll]inear.*__(save_issue|create_issue|update_issue)$",
+        "matcher": "^mcp__.*[Ll]inear.*__(save_issue|create_issue|update_issue|merge_diff|update_diff|submit_diff_review|save_diff_comment|resolve_diff_thread)$",
         "hooks": [
           {
             "type": "command",

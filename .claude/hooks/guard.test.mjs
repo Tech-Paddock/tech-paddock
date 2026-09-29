@@ -200,14 +200,56 @@ test("the migration history cannot be rewritten from a shell", () => {
   );
 });
 
-test("GitHub: after Joel's one gate, merging and updating go through; auto-merge, reviews and API commits wait; nothing commits to main", () => {
+/* Joel, 2026-09-26: "No agents outside of the deployment agent are allowed to
+   create PR's or merge", and "The only agent that can open a deployment agent
+   is the technical Director." A helper's call carries agent_id and agent_type;
+   a main session's carries neither. */
+const DEPLOY = { agent_id: "a1", agent_type: "deployment" };
+const HELPER = { agent_id: "a2", agent_type: "health" };
+
+test("GitHub: every write to a pull request is Deployment's, and reading is anyone's", () => {
+  const writes = [
+    ["create_pull_request", { title: "x", body: "b", head: "claude/x", base: "main" }],
+    ["update_pull_request", { pullNumber: 1, title: "y" }],
+    ["update_pull_request", { pullNumber: 1, state: "closed" }],
+    ["update_pull_request_branch", { pullNumber: 1 }],
+    ["merge_pull_request", { pullNumber: 1, merge_method: "squash" }],
+    ["pull_request_review_write", { method: "create" }],
+    ["add_comment_to_pending_review", { pullNumber: 1, body: "x" }],
+    ["add_reply_to_pull_request_comment", { pullNumber: 1, body: "x" }],
+    ["enable_pr_auto_merge", { pullNumber: 1 }],
+    ["disable_pr_auto_merge", { pullNumber: 1 }],
+    ["request_copilot_review", { pullNumber: 1 }],
+    ["resolve_review_thread", { threadId: "t" }],
+    ["unresolve_review_thread", { threadId: "t" }],
+    ["some_future_pull_request_tool", {}], // unknown counts as a write
+  ];
+  for (const who of [{}, HELPER, { agent_type: "deployment" }, { agent_id: "a3" }]) {
+    expectAll(
+      writes.map((w) => [w, "deny"]),
+      ([name, input]) => decide({ tool_name: `mcp__github__${name}`, tool_input: input, ...who }),
+    );
+  }
+  for (const who of [{}, HELPER, DEPLOY]) {
+    expectAll(
+      [
+        [["pull_request_read", { method: "get", pullNumber: 1 }], "allow"],
+        [["list_pull_requests", {}], "allow"],
+        [["search_pull_requests", { query: "x" }], "allow"],
+        [["subscribe_pr_activity", { pullNumber: 1 }], "allow"], // watching is the TD's
+        [["add_issue_comment", { issue_number: 1, body: "x" }], "allow"],
+      ],
+      ([name, input]) => decide({ tool_name: `mcp__github__${name}`, tool_input: input, ...who }),
+    );
+  }
+});
+
+test("GitHub, for Deployment: after Joel's one gate, merging and updating go through; auto-merge, reviews and API commits wait; nothing commits to main", () => {
   const body = 'Requested by Joel on 2026-09-24 — "close out"\n\n## Deployment\nNothing.';
   expectAll(
     [
-      // Opening is Deployment's and is neither held nor checked (Joel, 2026-09-24).
       [["create_pull_request", { title: "x", body, head: "claude/x", base: "main" }], "allow"],
-      [["create_pull_request", { title: "x", body: "no request line", head: "claude/x" }], "allow"],
-      // Joel, 2026-09-25: "only one gate" — his go before Deployment starts, not a click per merge.
+      // Joel, 2026-09-25: "only one gate" — his click when Deployment starts, not one per merge.
       [["merge_pull_request", { pullNumber: 1, merge_method: "squash" }], "allow"],
       [["merge_pull_request", { pullNumber: 1 }], "deny"],
       [["merge_pull_request", { pullNumber: 1, merge_method: "merge" }], "deny"],
@@ -221,11 +263,46 @@ test("GitHub: after Joel's one gate, merging and updating go through; auto-merge
       [["create_or_update_file", { branch: "refs/heads/main", path: "x" }], "deny"], // got through
       [["delete_file", { path: "x" }], "deny"],
       [["push_files", { branch: "claude/x", files: [] }], "ask"],
-      [["pull_request_read", { pullNumber: 1 }], "allow"],
-      [["add_issue_comment", { issue_number: 1, body: "x" }], "allow"],
     ],
-    ([name, input]) => decide({ tool_name: `mcp__github__${name}`, tool_input: input }),
+    ([name, input]) => decide({ tool_name: `mcp__github__${name}`, tool_input: input, ...DEPLOY }),
   );
+  // The API commit tools write past the push guard whoever calls them.
+  assert.equal(mcp("mcp__github__push_files", { branch: "main", files: [] }), "deny");
+  assert.equal(mcp("mcp__github__push_files", { branch: "claude/x", files: [] }), "ask");
+});
+
+test("starting Deployment: never from a helper, and from a main session only with Joel's click", () => {
+  const start = (subagent_type, who = {}) => verdict(decide({ tool_name: "Agent", tool_input: { subagent_type, prompt: "x" }, ...who }));
+  assert.equal(start("deployment"), "ask");
+  assert.equal(start("Deployment"), "ask");
+  assert.equal(start("deployment", HELPER), "deny");
+  assert.equal(start("deployment", DEPLOY), "deny"); // Deployment cannot start another
+  assert.equal(verdict(decide({ tool_name: "Task", tool_input: { subagent_type: "deployment" } })), "ask");
+  for (const other of ["health", "cookbook", "techpad-gen", "Explore", undefined]) {
+    assert.equal(start(other), "allow", String(other));
+    assert.equal(start(other, HELPER), "allow", String(other));
+  }
+});
+
+test("a pull request from a shell is Deployment's too", () => {
+  const sh = (command, who = {}) => verdict(decide({ tool_name: "Bash", tool_input: { command }, cwd: FEATURE, ...who }));
+  for (const c of ["gh pr create --fill", "gh -R o/r pr merge 3 --squash", "gh pr edit 3 --body x", "gh pr close 3", "gh pr comment 3 -b x", "gh pr review 3 --approve", "gh pr ready 3", "hub pull-request -m x", "cd /tmp && gh pr create", "bash -c 'gh pr merge 1'"]) {
+    assert.equal(sh(c), "deny", c);
+    assert.equal(sh(c, HELPER), "deny", c);
+    assert.equal(sh(c, DEPLOY), "allow", c);
+  }
+  for (const c of ["gh pr view 3", "gh pr list", "gh pr diff 3", "gh pr checks 3", "gh issue create -t x", "echo 'gh pr create'"]) {
+    assert.equal(sh(c), "allow", c);
+  }
+});
+
+test("Linear's diff tools act on the pull request, so they are Deployment's", () => {
+  for (const t of ["merge_diff", "update_diff", "submit_diff_review", "save_diff_comment", "resolve_diff_thread"]) {
+    assert.equal(mcp(`mcp__Linear__${t}`, {}), "deny", t);
+    assert.equal(verdict(decide({ tool_name: `mcp__Linear__${t}`, tool_input: {}, ...HELPER })), "deny", t);
+    assert.equal(verdict(decide({ tool_name: `mcp__Linear__${t}`, tool_input: {}, ...DEPLOY })), "allow", t);
+  }
+  for (const t of ["get_diff", "list_diffs", "get_diff_threads"]) assert.equal(mcp(`mcp__Linear__${t}`, {}), "allow", t);
 });
 
 test("Supabase: reads and apply_migration go ahead; the rest waits for Joel", () => {
@@ -337,7 +414,7 @@ function run(command, input, { env = {}, shell = "/bin/sh" } = {}) {
 }
 
 test("settings.json sends each tool to the guard it needs, and no other", () => {
-  for (const t of ["Bash", "mcp__github__create_pull_request", "mcp__github__merge_pull_request", "mcp__github__enable_pr_auto_merge", "mcp__github__pull_request_review_write", "mcp__github__push_files", "mcp__github__create_or_update_file", "mcp__github__delete_file", "mcp__github__update_pull_request_branch", "mcp__Supabase__execute_sql", "mcp__Supabase__create_project", "mcp__Vercel__create_project_env", "mcp__Linear__save_issue"]) {
+  for (const t of ["Bash", "Agent", "Task", "mcp__github__create_pull_request", "mcp__github__merge_pull_request", "mcp__github__enable_pr_auto_merge", "mcp__github__disable_pr_auto_merge", "mcp__github__pull_request_review_write", "mcp__github__add_comment_to_pending_review", "mcp__github__add_reply_to_pull_request_comment", "mcp__github__request_copilot_review", "mcp__github__resolve_review_thread", "mcp__github__unresolve_review_thread", "mcp__github__push_files", "mcp__github__create_or_update_file", "mcp__github__delete_file", "mcp__github__update_pull_request_branch", "mcp__Supabase__execute_sql", "mcp__Supabase__create_project", "mcp__Vercel__create_project_env", "mcp__Linear__save_issue", "mcp__Linear__merge_diff", "mcp__Linear__update_diff", "mcp__Linear__submit_diff_review", "mcp__Linear__save_diff_comment", "mcp__Linear__resolve_diff_thread"]) {
     assert.ok(hookFor(t), `${t} has no hook`);
   }
   for (const t of ["Read", "Edit", "mcp__github__get_me", "mcp__github__list_branches", "mcp__Linear__list_issues", "mcp__Linear__save_comment", "mcp__Notion__notion-search"]) {
@@ -370,8 +447,14 @@ test("end to end: the real commands deny, ask and allow", () => {
     assert.equal(push("ls -la").status, 0, shell);
     const pr = run(hookFor("mcp__github__merge_pull_request"), { tool_name: "mcp__github__merge_pull_request", tool_input: { merge_method: "rebase" } }, { shell });
     assert.equal(pr.decision, "deny", shell);
-    const auto = run(hookFor("mcp__github__enable_pr_auto_merge"), { tool_name: "mcp__github__enable_pr_auto_merge", tool_input: {} }, { shell });
+    const auto = run(hookFor("mcp__github__enable_pr_auto_merge"), { tool_name: "mcp__github__enable_pr_auto_merge", tool_input: {}, ...DEPLOY }, { shell });
     assert.equal(auto.decision, "ask", shell);
+    const open = run(hookFor("mcp__github__create_pull_request"), { tool_name: "mcp__github__create_pull_request", tool_input: {}, ...HELPER }, { shell });
+    assert.equal(open.decision, "deny", shell);
+    const start = run(hookFor("Agent"), { tool_name: "Agent", tool_input: { subagent_type: "deployment" } }, { shell });
+    assert.equal(start.decision, "ask", shell);
+    const ghpr = run(hookFor("Bash"), { tool_name: "Bash", tool_input: { command: "gh pr merge 1" }, cwd: FEATURE }, { shell });
+    assert.equal(ghpr.decision, "deny", shell);
     const env = run(hookFor("mcp__Vercel__create_project_env"), { tool_name: "mcp__Vercel__create_project_env", tool_input: {} }, { shell });
     assert.equal(env.decision, "ask", shell);
   }

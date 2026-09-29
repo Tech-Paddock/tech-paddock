@@ -105,13 +105,10 @@ it; git keeps it.
   name and the schema, because it fixes things that are expensive to change afterwards. **Joel can
   overrule it** (2026-09-24, when `STANDUP.md` was found listing surface among the things only he
   decides).
-- **2026-09-18 → 09-22 — Debrief boards: every agent's, then the TD's alone, then none.** 09-18 gave
-  every agent a published page; 09-20 cut it to the TD's; 09-22 deleted the sign-off, the board and
-  `BOARD.html` outright (below). **Two things survive.** An agent writes only its own artifacts —
-  Joel, 2026-09-20: *"Don't push updates to other agents artifacts."* And the reason he gave for
-  cutting the boards: agents are archived and restarted often, so a persistent page outlives the
-  agent that curated it and goes stale with nobody left who would notice. A table in the message he
-  is already reading cannot outlive anything.
+- **2026-09-22 — No published status pages, no sign-off, no status spec; Linear holds the work.** A
+  page outlives the agent that curated it and goes stale with nobody left to notice. The last debrief
+  pages were deleted on 2026-09-29 (Joel: "get rid of the pages"). An agent writes only its own
+  artifacts (Joel, 2026-09-20: *"Don't push updates to other agents artifacts."*).
 - **2026-09-19 — a `drift` check is not finished until it has failed the case it exists to catch AND
   passed the next legitimate edit.** Two checks shipped wrong in two days. A permanent-numbers check
   passed a clean 1..N renumber, which is ascending and unique; its fix then failed the very first
@@ -172,10 +169,6 @@ it; git keeps it.
   that was deliberately rejected, in the other direction. The second: the gate's value is the
   second-order pass, and **a narrow charter is by construction the agent least able to run it**;
   widen it and the cheap checkout that motivated the seat is gone.
-- **2026-09-22 — The sign-off is deleted, not computed.** The spec was **27.9% of `CLAUDE.md`**, and
-  a script was the only replacement that recovered the cost. **Joel stopped the debrief outright
-  instead**, and then removed the status rule too — no board, no footer, no status spec of any kind.
-  `BOARD.html` went with it.
 - **2026-09-23 — Health reads recipes through a Cookbook API, authenticated by forwarding the
   session** (TEC-11). Reading `cookbook` tables directly was rejected: a second shared table, and
   Health tied to Cookbook's layout. A secret-based carve-out was unnecessary — the middleware already
@@ -229,10 +222,13 @@ it; git keeps it.
   then asked whether Opus 5 would do for agents working from a brief. Opus 5.5 is the newer model and
   the cheaper per token, so effort was the lever, not the model. **Opening a pull request is not
   held by the hook** ("they will be spun up with intention, so there's no need for a check").
-  *Superseded 2026-09-25: merging is not held either — Joel wants "only one gate", his go before the
-  TD starts Deployment, not a click per merge. Auto-merge, reviews and API commits still ask.* **Every agent edits Linear without asking Joel.** **"Close out" now also means
-  the session is ready to archive**: nothing left only in the conversation — every open item is a
-  commit or a Linear issue.
+  *Superseded 2026-09-26: every write to a pull request is Deployment's and the hook refuses anyone
+  else; only the TD starts Deployment, and the hook holds that for Joel's click — the "only one gate"
+  of 2026-09-25, now mechanical. Auto-merge, reviews and API commits still ask.* **Every agent edits
+  Linear without asking Joel**, in whatever order makes sense (the TD's "Linear last" rule of
+  2026-09-25 was dropped on 09-26, once writes stopped prompting him). *"Close out", "park it" and
+  "pick up" retired 2026-09-26:* an agent branches only when told, commits, pushes and hands over,
+  so no phrase is needed; **"Backlog" means a Linear issue in Backlog, not built.**
 
 ## Mistakes — do not repeat
 

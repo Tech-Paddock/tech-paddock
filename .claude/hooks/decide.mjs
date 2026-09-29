@@ -49,16 +49,52 @@ const PUSH_OWN_BRANCH =
 export function decide(input) {
   const tool = String(input?.tool_name ?? "");
   const args = input?.tool_input ?? {};
-  if (tool === "Bash") return bash(String(args.command ?? ""), input?.cwd || process.cwd());
+  const deploy = isDeployment(input);
+  if (tool === "Agent" || tool === "Task") return startAgent(args, input);
+  if (tool === "Bash") return bash(String(args.command ?? ""), input?.cwd || process.cwd(), 0, deploy);
   if (!tool.startsWith("mcp__")) return null;
   const cut = tool.lastIndexOf("__");
   const server = tool.slice(5, cut).toLowerCase();
   const name = tool.slice(cut + 2);
-  if (server.includes("github")) return github(name, args);
+  if (server.includes("github")) return github(name, args, deploy);
   if (server.includes("supabase")) return supabase(name, args);
   if (server.includes("vercel")) return vercel(name, args);
-  if (server.includes("linear")) return linear(name, args);
+  if (server.includes("linear")) return linear(name, args, deploy);
   return null;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Who is calling: only Deployment writes to a pull request                  */
+/* ------------------------------------------------------------------------- */
+
+/* Joel, 2026-09-26: "The only agent allowed to open a PR or merge a PR is the
+   deployment agent. The only agent that can open a deployment agent is the
+   technical Director. I want a hook prior to spinning up a deployment agent."
+   Updating and closing went with them the same day: a pull request exists only
+   after a push, and everything after a push is Deployment's.
+
+   Claude Code puts `agent_id` and `agent_type` on the hook input of a call made
+   inside a helper, `agent_type` being the preset's `name`, and leaves `agent_id`
+   off a call from a main session. So Deployment is a helper whose type is
+   `deployment`, and nothing else is. If Claude Code ever stops sending the
+   fields, Deployment is refused too: loud, never open. Branch protection is
+   still the backstop, and Joel can always merge from GitHub himself. */
+const DEPLOYMENT = "deployment";
+export const isDeployment = (input) =>
+  String(input?.agent_type ?? "").toLowerCase() === DEPLOYMENT && Boolean(input?.agent_id);
+
+const DEPLOYMENT_ONLY =
+  'Every write to a pull request is Deployment\'s (Joel, 2026-09-26: "No agents outside of the deployment agent are allowed to create PR\'s or merge"). Push your branch, say it is finished, and stop; the technical director starts Deployment.';
+
+/* Starting Deployment: never from a helper, and from a main session only with
+   Joel's click. A hook cannot tell the technical director's session from any
+   other main session, so the click is what makes it his go. */
+function startAgent(a, input) {
+  if (String(a.subagent_type ?? "").toLowerCase() !== DEPLOYMENT) return null;
+  if (input?.agent_id) {
+    return deny("Only the technical director starts Deployment, from its own session (Joel, 2026-09-26). A helper cannot start it. Put what is ready in your report and stop.");
+  }
+  return ask('Starting the Deployment agent waits for Joel\'s click (Joel, 2026-09-26: "I want a hook prior to spinning up a deployment agent"). Approve it only if you told the technical director to take these branches to merge.');
 }
 
 /* ------------------------------------------------------------------------- */
@@ -291,9 +327,10 @@ function under(dir, p) {
 const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
 const RUNNERS = new Set(["npx", "bunx", "pnpx", "pnpm", "yarn", "npm"]);
 const SQL_CLIENTS = new Set(["psql", "pgcli", "usql"]);
+const GH_PR_WRITES = new Set(["create", "new", "merge", "edit", "close", "reopen", "review", "comment", "ready", "lock", "unlock", "update-branch"]);
 const isSupabase = (w) => /^supabase(@[^/\s]*)?$/.test(base(w));
 
-function bash(command, cwd, depth = 0) {
+function bash(command, cwd, depth = 0, deploy = false) {
   if (depth > 5) return null;
   const dirs = new Map([["0", cwd]]);
   const dirOf = (scope) => {
@@ -319,13 +356,13 @@ function bash(command, cwd, depth = 0) {
     if (SHELLS.has(cmd)) {
       const k = args.findIndex((a, i) => i > 0 && /^-[a-z]*c[a-z]*$/.test(a));
       if (k > 0 && args[k + 1] !== undefined) {
-        const d = bash(args[k + 1], dir, depth + 1);
+        const d = bash(args[k + 1], dir, depth + 1, deploy);
         if (d) return d;
       }
       continue;
     }
     if (cmd === "eval") {
-      const d = bash(args.slice(1).join(" "), dir, depth + 1);
+      const d = bash(args.slice(1).join(" "), dir, depth + 1, deploy);
       if (d) return d;
       continue;
     }
@@ -335,6 +372,15 @@ function bash(command, cwd, depth = 0) {
       if (d) return d;
       continue;
     }
+
+    // `gh pr create`, `gh pr merge`, `hub pull-request`: the same writes as the
+    // GitHub tools, from a shell. Reading (`gh pr view`, `list`, `diff`) is anyone's.
+    if (!deploy && cmd === "gh") {
+      const at = args.indexOf("pr");
+      if (at > 0 && GH_PR_WRITES.has(args[at + 1])) return deny(`\`gh pr ${args[at + 1]}\` writes to a pull request. ${DEPLOYMENT_ONLY}`);
+      continue;
+    }
+    if (!deploy && cmd === "hub" && args.includes("pull-request")) return deny(`\`hub pull-request\` opens a pull request. ${DEPLOYMENT_ONLY}`);
 
     const supabaseAt = isSupabase(args[0]) ? 0 : RUNNERS.has(cmd) ? args.findIndex(isSupabase) : -1;
     if (supabaseAt >= 0) {
@@ -569,18 +615,15 @@ export function stripSql(sql) {
 
 const HELD =
   "It waits for Joel's click. Joel settled this on 2026-09-23 after an instruction to prepare was read as permission to act.";
-/* Opening a pull request is not held, and not checked: Deployment opens every
-   one, and it is only started after Joel says go (Joel, 2026-09-24: "they will
-   be spun up with intention, so there's no need for a check"). requested-by-joel
-   in CI still reads the body for the record of who asked.
-
-   Merging and updating are not held either, since 2026-09-25: Joel asked for
-   "only one gate" — his go before the TD starts Deployment on a set of branches
-   — and not a click on every merge after it. So a squash merge, a body edit
-   that keeps the request line, and bringing a branch up to date go through.
-   What still asks is what no gate covers: auto-merge merges on a timer, not in
-   the train Joel approved; a review can approve, which is a human's act; and
-   the API commit tools below write past the local push guard. */
+/* Every write to a pull request is Deployment's, and refused to anyone else
+   (above). For Deployment itself nothing is held but what no gate covers: Joel's
+   one gate is his click when the technical director starts it (Joel, 2026-09-25:
+   "only one gate"), so a squash merge, a body edit that keeps the request line,
+   and bringing a branch up to date go through. Auto-merge still asks, because it
+   merges on a timer rather than in the set Joel approved; so does a review, which
+   can approve, a human's act; and so do the API commit tools below, which write
+   past the local push guard whoever calls them. requested-by-joel in CI still
+   reads the body for the record of who asked. */
 const PR_ASK = {
   enable_pr_auto_merge: "Turning on auto-merge, which merges with no click once checks pass,",
   pull_request_review_write: "Writing a pull request review, which can approve it,",
@@ -588,7 +631,28 @@ const PR_ASK = {
 const API_COMMITS = new Set(["push_files", "create_or_update_file", "delete_file"]);
 const REQUESTED = /Requested by Joel on \d{4}-\d{2}-\d{2}/;
 
-function github(name, a) {
+/* Reading a pull request is anyone's; the technical director watches them. A
+   pull request tool added later that is not one of these reads counts as a
+   write until someone says otherwise. */
+const PR_READS = new Set(["pull_request_read", "list_pull_requests", "search_pull_requests"]);
+const PR_WRITES = new Set([
+  "create_pull_request",
+  "update_pull_request",
+  "update_pull_request_branch",
+  "merge_pull_request",
+  "pull_request_review_write",
+  "add_comment_to_pending_review",
+  "add_reply_to_pull_request_comment",
+  "enable_pr_auto_merge",
+  "disable_pr_auto_merge",
+  "request_copilot_review",
+  "resolve_review_thread",
+  "unresolve_review_thread",
+]);
+export const isPrWrite = (name) => PR_WRITES.has(name) || (/pull_request/.test(name) && !PR_READS.has(name));
+
+function github(name, a, deploy = false) {
+  if (isPrWrite(name) && !deploy) return deny(`\`${name}\` writes to a pull request. ${DEPLOYMENT_ONLY}`);
   if (API_COMMITS.has(name)) {
     const branch = String(a.branch ?? "");
     if (!branch || targetsMain(branch)) {
@@ -666,7 +730,13 @@ const RULE =
 
 const listOf = (v) => (Array.isArray(v) ? v.map(String) : typeof v === "string" ? [v] : []);
 
-function linear(name, a) {
+/* Linear's diff tools act on the GitHub pull request behind a diff: merging one
+   merges the pull request. They are Deployment's like every other pull request
+   write, and settings.json still asks Joel for them on top. */
+const LINEAR_PR_WRITES = new Set(["merge_diff", "update_diff", "submit_diff_review", "save_diff_comment", "resolve_diff_thread"]);
+
+function linear(name, a, deploy = false) {
+  if (LINEAR_PR_WRITES.has(name)) return deploy ? null : deny(`\`${name}\` acts on the GitHub pull request behind a Linear diff. ${DEPLOYMENT_ONLY}`);
   if (!["save_issue", "create_issue", "update_issue"].includes(name)) return null;
   const creating = name === "create_issue" || (name === "save_issue" && !a.id);
   const problems = [];

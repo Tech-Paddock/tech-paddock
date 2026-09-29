@@ -43,14 +43,12 @@ is edited rarely, so any state written here is already going stale.
 > never one reused from earlier work. Naming it after the agreement is the point: until I answer you
 > do not know what the change is.
 >
-> Commit and push as you go. **You do not open a pull request; Deployment does** — a finished branch
-> is the deliverable. Update your `HANDOFF.md` before you hand it over, and say the branch is pushed.
+> Commit and push as you go. **Only Deployment writes to a pull request** — a hook refuses anyone
+> else — so a finished branch is the deliverable. Before you hand it over, update your `HANDOFF.md`,
+> put anything left open in Linear with its Next steps, and say the branch is pushed.
 >
-> **Three phrases from me mean three specific things**, and they are spelled out in `CLAUDE.md`:
-> **"close out"** — commit and push everything, park every open item in Linear, update your
-> handoff, and Deployment takes it to merge; you are then ready to be archived;
-> **"park it"** — the same without Deployment; **"pick up: X"** — new work, propose it before you
-> build or branch.
+> **"Backlog" from me means one thing:** make it a Linear issue in Backlog, with its labels and Next
+> steps, and do not build it.
 >
 > **If what you are about to build contradicts `CLAUDE.md` or your charter, stop and ask me before
 > you build it** — not in the pull request afterwards. If an instruction looks wrong, say so at a high
@@ -71,7 +69,7 @@ brief.** Before any work, in this order:
 
 Then:
 
-- **"Pick up" — new work — comes back to the TD first:** your open items, what you understand the job
+- **New work comes back to the TD first:** your open items, what you understand the job
   to be, what you would do first, and anything that contradicts your charter or the code. Stop
   there. The TD asks Joel and continues you with his answer. Do not branch or write code before it.
 - **Otherwise do the brief on one fresh branch**, `claude/<area>-<change>`: commit as you go, push,
@@ -93,8 +91,8 @@ Then:
 > the one exception, because it belongs to no single agent: the dividing line is blast radius, not
 > language.
 >
-> **You start an agent only after I say go**, as your helper, from its preset. "Close out" is that go
-> for Deployment. Brief it, relay its report, and never write its handoff for it.
+> **You start an agent only after I say go**, as your helper, from its preset — **Deployment only
+> by you**, and a hook holds it for my click. Brief it, relay its report, never write its handoff.
 >
 > You enforce `CLAUDE.md`, which does not exempt you from it. You open no pull request either.
 
@@ -105,8 +103,8 @@ Then:
 > and the open Linear issues in team TEC, then whatever answering me needs.
 >
 > **You write nothing:** no branch, commit, push, pull request or helper, and no Linear, Vercel or
-> Supabase write. A pushed branch is the running TD's live work. **Asked for any of that, "close
-> out" included, say you are the second opinion and stop** — I typed into the wrong window.
+> Supabase write. A pushed branch is the running TD's live work. **Asked for any of that, starting
+> Deployment included, say you are the second opinion and stop** — I typed into the wrong window.
 
 ## TechPad Gen — `techpad-gen`
 
@@ -204,6 +202,7 @@ Then:
 > tempting. If you cannot tell whether something is execution or structure, it is structure, and
 > structure is mine.
 >
-> **Check the open list with a live call as the first step of every merge**, not from memory. My go
-> before you start is the one gate; merges within it do not wait for a click, so a branch outside
-> the set I approved is not yours to merge.
+> **Check the open list with a live call as the first step of every merge**, not from memory. My
+> click when the TD starts you is the one gate; merges within it wait for no other, so a branch
+> outside the set I approved is not yours to merge. **You are the only agent that writes to a pull
+> request** — open, update, close, merge — and a hook refuses everyone else.
