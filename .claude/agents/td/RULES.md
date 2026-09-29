@@ -56,8 +56,9 @@ it removes the last excuse, because there is no longer another agent to argue it
 
 **Every agent runs as your helper**, started with the `Agent` tool from
 `.claude/agents/<agent>/preset.md`, **and only after Joel says go** — *"You don't spin up agents
-without checking in."* "Close out" is that go for Deployment on the branch it names. Separate
-sessions are not used: a helper takes a preset that pins its model and effort, and a separate
+without checking in."* **Only you start Deployment**, and a hook holds it for Joel's click — his go
+for the branches your brief names; a helper is refused (Joel, 2026-09-26). Separate sessions are not
+used: a helper takes a preset that pins its model and effort, and a separate
 session cannot set effort (*"Subagents is the way to go"*).
 
 - **The preset pins the model and effort** — Opus 5.5 at medium for every agent, Joel's call on
@@ -140,13 +141,6 @@ pop up a multiple choice question with any relevant options"). Use `AskUserQuest
 like "I need one word from you". Two to four options, your recommendation first and marked, each
 saying what happens if he picks it. Prose carries the context; the pick is a question. A helper
 cannot ask him, so its question reaches him this way too.
-
-**Write to Linear last** (Joel, 2026-09-25: "TD does not write any issues to Linear until all other
-work is completed"). Land your Linear writes — new issues, status changes, comments — once every
-other change in the session's queue is committed and pushed, not as you go. A write made mid-session
-can be overtaken by work still to come; batching to the end means the record reflects where things
-actually landed rather than where they stood partway through. A read-only check (a Vercel read, a
-git fetch) is not a Linear write and isn't held by this.
 
 ---
 

@@ -1,25 +1,23 @@
 # Deployment — handoff
 
-State as of 2026-09-26. `RULES.md` has the job and the gate; this is only the state of deployment
+State as of 2026-09-29. `RULES.md` has the job and the gate; this is only the state of deployment
 and its traps. Open work is in Linear, team TEC, labelled `agent:Deployment`. Branch and pull request
 state is never written here — read it live.
 
 ---
 
-**The seat has run two trains, both on 2026-09-25**: the first through a click per merge, the
-second — seventeen branches, three migrations — under Joel's one gate. The merge commits are in
-`git log`.
-
 ## What is true now
 
-- **Joel's go before the TD starts you is the one gate** (Joel, 2026-09-25: "only one gate";
-  TEC-43). The guard no longer asks on a squash merge or a pull request update; auto-merge and a
-  review still ask, and a merge that is not a squash is refused. **Nothing enforces the brief's
-  scope**, so a branch outside it is not yours to merge. No merge of either train asked a click,
-  even before the guard change landed; a click that does come and is denied is still a stop.
+- **Joel's click when the TD starts you is the one gate** (Joel, 2026-09-26). The guard holds that
+  start, refuses it from inside a helper, and **refuses every pull request write to anyone but
+  you**. It knows you by `agent_type: deployment` and an `agent_id` on the hook input — documented,
+  **not yet seen live**: if your first pull request write after that change is refused as "not
+  Deployment", the field is missing, and only Joel can merge the fix, from GitHub. Squash merges and
+  body edits keeping the request line pass; auto-merge and reviews ask; a non-squash is refused.
+  **Nothing enforces the brief's scope**, so a branch outside it is not yours to merge.
 - **As a helper you make your own Linear writes**: statuses and Next steps as you merge, without a
-  prompt since Joel allowed the connector's tools on 2026-09-26 (TEC-59, TEC-67). `delete_*`,
-  `retire_*` and the Linear diff tools still ask, since `merge_diff` would merge outside the guard.
+  prompt (TEC-59, TEC-67). `delete_*` and `retire_*` still ask; the Linear diff tools are yours
+  alone and still ask, since `merge_diff` would merge outside the guard.
 - **Linear statuses and assignees follow the table in `CLAUDE.md`.** In Review means the branch is
   with Deployment; once it merges, the issue is In Progress while steps remain, Done when none do.
   Joel's ⭐ steps are dashboard work and decisions, never a merge click.
@@ -42,6 +40,12 @@ second — seventeen branches, three migrations — under Joel's one gate. The m
   **Never commit that folder**, whatever the Stop hook asks. **Another helper's worktree may hold a
   branch you need**: check it out under a local alias and push `alias:claude/<branch>` — and only
   once the TD says that agent has finished with it.
+- **A push to another agent's branch can be refused** by the session's permission check, even
+  within the brief (TEC-53, 2026-09-29). Do not route around it; the owner pushes, and once the
+  pull request is open, `update_pull_request_branch` (a full head SHA) brings it up to date. **Apply a migration only once the
+  branch is pushable** — that refusal came after the apply, leaving the database ahead of `main`.
+- **You cannot rename a remote branch to `stale_`:** it takes deleting the old name, which agents
+  cannot do. Say which branch is stale; Joel removes it.
 - **A helper worktree refuses git inside a loop, a variable or a `git -C`.** Run each git command
   plainly; write a file first (`git show … > file`) when another tool needs a branch's content.
 - **`gh` is not installed.** Read check runs with `curl` on

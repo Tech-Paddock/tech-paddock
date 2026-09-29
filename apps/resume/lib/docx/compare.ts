@@ -15,6 +15,14 @@ export type ContentCheck = {
   /** Source lines the finished document does not wholly account for. */
   missing: string[];
   percent: number;
+  /**
+   * Source text the reformat refused to read rather than guess at, and so did
+   * not place — today, Career Highlights that do not pair up. Named here and
+   * outside the fraction, never in `missing`: it was not taken, so it cannot be
+   * lost in copying, but the report must still say it did not arrive rather
+   * than read as a source that had none. Absent when there is none.
+   */
+  notRead?: string[];
 };
 
 /**
