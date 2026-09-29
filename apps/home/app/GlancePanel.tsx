@@ -4,7 +4,7 @@ import { isQuiet, nothingAnswered } from "@/lib/glance";
 /**
  * Counts and singles, never lists.
  *
- * Every row is a link into the tool that owns the work, so the hub routes you
+ * Every row is a link into the tool that owns the work, so home routes you
  * somewhere you can act rather than describing a situation you then have to go
  * find. The one number with no link is the rhythm line, because there is
  * nothing to do about it except the doing.

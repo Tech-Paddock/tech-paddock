@@ -17,7 +17,7 @@
  * The script is SPAWNED rather than imported: it has top-level side effects and
  * ends in `process.exit`, so importing it would take this process with it.
  *
- * It never fails the build. The hub must still deploy if it is ever built
+ * It never fails the build. Home must still deploy if it is ever built
  * outside the monorepo, and a drift that matters is CI's job to fail, not this
  * one's. Anything that goes wrong is emitted as `complete: false` with the
  * reason, which the page prints instead of rendering a confident empty panel.

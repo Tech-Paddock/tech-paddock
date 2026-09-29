@@ -324,7 +324,7 @@ async function latestDeploy(project: Project & { parked?: true }, token: string)
 }
 
 /**
- * The latest production deployment of every project the hub probes. Rows that
+ * The latest production deployment of every project home probes. Rows that
  * are all "live" fold into one, so a healthy platform is one line, not seven.
  */
 async function deployments(token: string, agentIds: Set<string>): Promise<{ items: PitItem[]; why: string[] } | { why: string }> {

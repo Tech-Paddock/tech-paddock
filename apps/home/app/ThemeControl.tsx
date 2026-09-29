@@ -13,17 +13,17 @@ import { LIVERIES, isPaddockOrigin, type Livery, type Mode, themeCookieString } 
  * Byte-identical in all seven apps — stamped from packages/shared, not copied
  * by hand. It styles itself from plain classes in
  * lib/theme.css rather than utility classes, which is what lets the same file
- * drop into the hub (hand-written CSS) and the six tools (Tailwind) without
+ * drop into home (hand-written CSS) and the six tools (Tailwind) without
  * either one growing a second copy.
  *
- * **One switch per page, which takes both halves below.** The hub embeds the
- * tools, so without this a hub page showing a tool carried two switches inches
+ * **One switch per page, which takes both halves below.** Home embeds the
+ * tools, so without this a home page showing a tool carried two switches inches
  * apart. The pair hides when framed — `[data-embedded] .pd-modes` in
  * lib/theme.css, off an attribute the layout stamps before paint — and the
  * livery badge stays, because it names which car that panel is wearing.
- * Hiding it is only safe because of the other half: the hub posts the new mode
+ * Hiding it is only safe because of the other half: home posts the new mode
  * into each frame, so the one remaining switch still governs the whole page.
- * **A tool added later that drops this file will ignore the hub's switch.**
+ * **A tool added later that drops this file will ignore home's switch.**
  *
  * The pressed state resolves after mount rather than during render, and that is
  * not laziness. The headers that host it are mostly client components, so the
@@ -107,7 +107,7 @@ export default function ThemeControl({ onBar = false }: { onBar?: boolean }) {
   // shared across .techpaddock.io, but a frame that has already loaded read it
   // once and will not read it again — so the parent says so directly.
   //
-  // The hub listens too, and nothing ever posts to the hub. That is the cost of
+  // Home listens too, and nothing ever posts to home. That is the cost of
   // this file being one file rather than seven, and it is a dormant listener.
   useEffect(() => {
     function onMessage(event: MessageEvent) {
@@ -129,7 +129,7 @@ export default function ThemeControl({ onBar = false }: { onBar?: boolean }) {
     document.documentElement.setAttribute("data-mode", next);
     document.cookie = themeCookieString(location.hostname, location.protocol, next);
 
-    // Everything above changed *this* document. The hub embeds its tools
+    // Everything above changed *this* document. Home embeds its tools
     // cross-origin, and none of it crosses that boundary: the frames are
     // already loaded, so they will not re-read the cookie until something
     // reloads them. Tell each one instead.

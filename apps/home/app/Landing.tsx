@@ -59,7 +59,7 @@ export function densityFrom(value: string | null | undefined): Density {
  * A framed tool. `allow="clipboard-write"` is what lets a tool's "Copy list"
  * work in here: Chrome refuses clipboard writes from a cross-origin frame unless
  * the parent delegates the permission, so without it the button fails inside
- * the hub and works on the tool's own subdomain.
+ * home and works on the tool's own subdomain.
  */
 export function Frame({ app }: { app: { href: string; name: string } }) {
   return (

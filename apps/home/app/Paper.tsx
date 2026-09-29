@@ -12,7 +12,7 @@ import type { Density } from "./Landing";
  * job search included, leads the page. Do not reintroduce a fold as a safety
  * feature.
  *
- * **A count the hub never received is "—", never 0.** Zero is an answer; the
+ * **A count home never received is "—", never 0.** Zero is an answer; the
  * page used to print "0 gone quiet — nothing outstanding" for a request it had
  * not made, next to a small line admitting the source did not answer.
  *
@@ -181,7 +181,7 @@ export default function Paper({
             partial={partial}
           />
 
-          {/* A tool telling the hub it is not set up — a missing key, an
+          {/* A tool telling home it is not set up — a missing key, an
               integration never connected. Owed in its own way, so it sits here
               rather than among the statistics. */}
           {glance.health.length > 0 && (

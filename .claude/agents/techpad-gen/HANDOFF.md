@@ -1,6 +1,6 @@
 # TechPad Gen — handoff
 
-State as of 2026-09-26.
+State as of 2026-09-29.
 
 Read `RULES.md` first. Open work is in Linear, label `agent:TechPad Gen` — never here.
 
@@ -21,31 +21,36 @@ squash-merged branch is recognised by its merged PR's head sha — `ahead_by` co
 each probed project's **latest** production deployment from Vercel's `Production – <project>`
 statuses. Rows carry the owner from `claude/<area>-` (`AREA_OWNER`); handoff dates are baked.
 
-**The Garage** — `/admin`. Live: probes over `PROBED`, the hub's environment, and a warning while the
-retired `VERCEL_TOKEN` is set. Baked at build: *Declared* and *Rules drift*. Unreachable reads
-"unknown", with the reason — **none of it guesses**.
+**The Garage** — `/admin`, errors first (TEC-84). One row per thing with a stoplight — green, amber
+(could not test), red, grey (parked on purpose) — and no pills, tallies or Declared table. **Every
+failure is a sentence plus its raw code**: `x-vercel-error` first, then the status, then the socket
+cause (`lib/diagnostics.ts`). **Environment errors** renders only when a `HOME_ENV` name with an
+`unsetMeans` is unset or a retired one is set, tagged with what it breaks. **Rules drift** is baked
+at build: drifting checks grouped under one sentence each (`lib/drift-explain.ts`, keyed on name
+prefix until the check emits its own `explain`), budgets with lines to spare, holding ones folded.
 
-**The theme system** — palettes, liveries, both polarities, and **three stamped controls per bar**:
-`LiveryBadge` hard right on every bar including a framed tool's; `ThemeControl` and `LogoutControl`
-beside the brand, both hidden in a frame (below). `lib/theme.css` holds every token; `lib/livery.ts`
-differs per app. No `tailwind.config.ts` holds a colour: `rgb(var(--token-rgb) / <alpha-value>)` is
-all alpha can read.
+**The theme system** — palettes, liveries, both polarities, one `--go`/`--caution` status-light pair
+for every livery, and **three stamped controls per bar**: `LiveryBadge` hard right on every bar
+including a framed tool's; `ThemeControl` and `LogoutControl` beside the brand, both hidden in a
+frame (below). `lib/theme.css` holds every token; `lib/livery.ts` differs per app. No
+`tailwind.config.ts` holds a colour: `rgb(var(--token-rgb) / <alpha-value>)` is all alpha can read.
 
 **Log out is everywhere at once** (TEC-73). Every app's `/api/logout` re-exports the stamped
 `lib/logout.ts`, which clears the `.techpaddock.io` session cookie at max-age 0 (pinned by
-`tests/logout.test.ts`). The control is on every live app's bar, the hub's topbar included — its
+`tests/logout.test.ts`). The control is on every live app's bar, home's topbar included — its
 sidebar button is gone. Tracker and editor carry the route, inert while paused, and mount no control.
+`lib/logout.ts` clears the shared cookie, so it is auth plumbing: the TD's, not the theme's.
 
-**The tracker is parked** (Joel, 2026-09-24; state on TEC-36). Still in `PARKED`, so probed, and a
-red deploy of it shows as expected, not BOX.
+**The tracker is parked** (Joel, 2026-09-24; state on TEC-36). Still in `PARKED`, so probed; a failed
+probe of it is grey and says so, not red.
 
 ## Traps specific to this app
 
 - **`lib/*.generated.ts` are gitignored, written by `predev`/`prebuild`/`pretest`** from files above
   `apps/home` (build time only). A bare `npx tsc --noEmit` on a fresh checkout fails until one runs.
-- **`vercel.json`'s `ignoreCommand` skips previews and always builds production** — the hub diffs
+- **`vercel.json`'s `ignoreCommand` skips previews and always builds production** — home diffs
   nothing since #191, so every production merge rebuilds it, which is what keeps its baked panels
-  and agent rows current. **Do not narrow it**: `.claude` changes alone must still rebuild the hub.
+  and agent rows current. **Do not narrow it**: `.claude` changes alone must still rebuild home.
 - **GitHub sees only git-triggered deploys.** A dashboard rollback or redeploy posts nothing, so the
   Pit Wall can show an older state than is serving (TEC-57).
 - **`GITHUB_TOKEN` must read deployments.** The repository is public, but a fine-grained token scoped
@@ -55,15 +60,18 @@ red deploy of it shows as expected, not BOX.
 - **The shell was built around an iframe at `height: 100%`**; a document-length route scrolls only
   because `.content` sets `overflow-y` and `min-height: 0`.
 - **One switch per page is two halves that must stay together.** Framed, a tool hides its own
-  Light/Dark (`[data-embedded] .pd-modes`) and keeps its badge — safe only because the hub posts
+  Light/Dark (`[data-embedded] .pd-modes`) and keeps its badge — safe only because home posts
   `{type:"paddock-mode", mode}` into every frame and `ThemeControl` listens behind
-  `isPaddockOrigin()`. **A tool that drops `ThemeControl.tsx` silently ignores the hub's switch.**
-  `LogoutControl` hides framed too (`.pd-logout`), so only the hub's logs out of a hub page.
+  `isPaddockOrigin()`. **A tool that drops `ThemeControl.tsx` silently ignores home's switch.**
+  `LogoutControl` hides framed too (`.pd-logout`), so only home's logs out of a home page.
 - **`LogoutControl` goes to `/login` only on a 2xx or a 401** (the middleware's answer without a
   valid session); anything else shows as a failure, never `/login` while still signed in.
 - **`TOOLS` in `lib/platform.ts` is the only list of embedded tools, and its order is Joel's** — it
-  drives the sidebar and the `?app=` frame. `PROBED` adds what the hub depends on without embedding.
+  drives the sidebar and the `?app=` frame. `PROBED` adds what home depends on without embedding.
   **Never key anything off a slug literal**; which projects get the secret probe is derived from
   which repo folders have `/api/summary`.
-- **Rules drift is the repo as of this deployment**, and says so. Its JSON shape is the TD's;
-  `scripts/drift-parse.mjs` renders no partial read.
+- **The glance gets counts and singles, never rows**; `parseSummary` enforces the shape.
+- **Drift's JSON shape is the TD's**; `scripts/drift-parse.mjs` renders no partial read, and a
+  renamed check family loses its sentence silently until the check emits `explain` itself.
+- **"Hub" still appears in comments TEC-73 added** — the stamped `LogoutControl.tsx`, `logout.ts` and
+  one line of `theme.css` — beside `next.config.mjs` and `middleware.ts`. TEC-85 tracks them.

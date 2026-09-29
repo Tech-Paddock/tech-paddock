@@ -1,18 +1,18 @@
 /**
  * What the platform is *supposed* to be.
  *
- * The admin page's job is to show the gap between this and what is actually
- * live. So everything here is either committed in the repo or generated from
- * it — nothing is a number somebody remembered.
+ * The Garage's job is to show where what is live has fallen away from this. So
+ * everything here is either committed in the repo or generated from it —
+ * nothing is a number somebody remembered.
  *
  * Two halves:
  *  - `PROJECTS` below: the app-to-subdomain-to-Vercel-project mapping. It has
  *    no other home in the repo. It is hand-written, but it is the *contract*,
  *    which is exactly the kind of thing that should be hand-written and
- *    reviewed; the page's purpose is to catch reality drifting away from it.
- *  - `DECLARED` in ./declared.generated.ts: environment variable names, CI
- *    matrix, migration count and which apps expose which routes, all read out
- *    of the repo at build time by scripts/collect-declared.mjs.
+ *    reviewed.
+ *  - `DECLARED` in ./declared.generated.ts: which apps expose `/api/summary`
+ *    and `/api/health`, read out of the repo at build time by
+ *    scripts/collect-declared.mjs.
  *
  * This file holds no secret and reads no environment value. It is imported by
  * a client component, so it must never learn how to.
@@ -29,18 +29,14 @@ export type Project = {
 
 export type DeclaredApp = {
   slug: string;
-  envNames: string[];
   hasHealthRoute: boolean;
   hasSummaryRoute: boolean;
-  hasTestScript: boolean;
 };
 
 export type Declared = {
   generatedAt: string;
-  /** False when the generator could not see the monorepo, so the page can say so instead of showing an empty table as fact. */
+  /** False when the generator could not see the monorepo. */
   complete: boolean;
-  ciMatrix: string[];
-  migrationCount: number | null;
   apps: DeclaredApp[];
 };
 
@@ -61,6 +57,11 @@ export type DriftCheck = {
   name: string;
   state: DriftState;
   detail: string;
+  /**
+   * One plain sentence on what the check means, when the drift check supplies
+   * one. Absent today; The Garage falls back to its own per-family sentence.
+   */
+  explain?: string;
 };
 
 export type Drift = {
@@ -76,7 +77,7 @@ export type Drift = {
 
 /**
  * The embeddable tools, as a closed set. Keeping the slugs a union rather than
- * plain strings is what lets the hub's presentation table be checked for
+ * plain strings is what lets home's presentation table be checked for
  * completeness at compile time — add a tool here and the shell stops building
  * until it has been given an icon.
  *
@@ -86,7 +87,7 @@ export type Drift = {
  * **The Message Editor is deliberately absent**, removed 2026-09-19 on the same
  * terms as the tracker below: out of the roster entirely rather than out of the
  * sidebar alone. `apps/editor` is untouched and `editor.techpaddock.io` still
- * serves — it is simply not one of the tools the hub lists or embeds.
+ * serves — it is simply not one of the tools home lists or embeds.
  *
  * **The Pipeline Tracker is deliberately absent from the tools.** It is parked
  * (Joel, 2026-09-24), so it has no sidebar row and no frame. It is still the
@@ -106,7 +107,7 @@ export type ToolSlug = "resume" | "coffee" | "health" | "cookbook";
 
 export type Tool = Project & { slug: ToolSlug };
 
-/** The tools the hub embeds — everything except the hub itself. */
+/** The tools home embeds — everything except home itself. */
 export const TOOLS: Tool[] = [
   { slug: "resume", name: "Resume Formatter", url: "https://resume.techpaddock.io", vercelProject: "tp-resume" },
   { slug: "coffee", name: "Coffee", url: "https://coffee.techpaddock.io", vercelProject: "tp-coffee-app" },
@@ -114,17 +115,21 @@ export const TOOLS: Tool[] = [
   { slug: "cookbook", name: "Cookbook", url: "https://cookbook.techpaddock.io", vercelProject: "tp-cookbook" },
 ];
 
-export const HUB: Project = {
+export const HOME: Project = {
   slug: "home",
-  name: "Paddock hub",
+  name: "Home",
   url: "https://techpaddock.io",
   vercelProject: "tp-home",
 };
 
 /**
- * Projects the hub depends on but does not embed — the glance calls the
- * tracker's `/api/summary`, so whether it answers and whether it holds the same
- * secret are the hub's business even while it has no sidebar row.
+ * Projects home depends on but does not embed — the glance calls the tracker's
+ * `/api/summary`, so whether it answers and whether it holds the same secret
+ * are home's business even while it has no sidebar row.
+ *
+ * **Parked means paused on purpose.** Joel pauses a parked app's Vercel
+ * project, so it not answering is expected: The Garage shows it grey, never
+ * red.
  */
 export const PARKED: (Project & { parked: true })[] = [
   {
@@ -136,38 +141,51 @@ export const PARKED: (Project & { parked: true })[] = [
   },
 ];
 
-/** What the hub embeds and deploys, hub first. The Garage's Declared table. */
-export const PROJECTS: Project[] = [HUB, ...TOOLS];
+/** What home embeds and deploys, home first. */
+export const PROJECTS: Project[] = [HOME, ...TOOLS];
 
 /**
- * What the hub probes: everything it embeds, plus what it depends on without
+ * What home probes: everything it embeds, plus what it depends on without
  * embedding. Liveness, the shared-secret check and the Pit Wall's deployment
  * rows all read this, never `TOOLS` — that was how the tracker went unprobed.
  */
 export const PROBED: (Project & { parked?: true })[] = [...PROJECTS, ...PARKED];
 
-export type HubEnv = { name: string; optional: boolean; why: string };
-
 /**
- * The environment variables this app reads. Presence is reported; a value is
- * never read for display, only tested for existence. `.env.example` declares
- * the same names — the Garage's Declared panel reads that file, this list is
- * what the running deployment is asked about.
+ * An environment variable home reads, and what breaks without it.
+ *
+ * The Garage lists none of these by default. A name appears only when it is an
+ * error, tagged with `affects` — the app, or the part of home, that stops
+ * working. `unsetMeans` is null where leaving the name unset is normal, which is
+ * what keeps an override from ever reading as an error.
+ *
+ * Presence is reported; a value is never read for display, only tested for
+ * existence.
  */
-export const HUB_ENV: HubEnv[] = [
-  { name: "SESSION_SECRET", optional: false, why: "the shared login cookie" },
-  { name: "APP_PASSWORD_HASH", optional: false, why: "the password gate" },
-  { name: "INTERNAL_API_SECRET", optional: false, why: "the glance's request to each tool" },
-  { name: "GITHUB_TOKEN", optional: true, why: "the Pit Wall: pull requests, branches, deployments" },
-  { name: "TRACKER_BASE_URL", optional: true, why: "overrides https://tracker.techpaddock.io" },
+export type HomeEnv = { name: string; affects: string; unsetMeans: string | null };
+
+export const HOME_ENV: HomeEnv[] = [
+  { name: "SESSION_SECRET", affects: "Login", unsetMeans: "home cannot sign anyone in" },
+  { name: "APP_PASSWORD_HASH", affects: "Login", unsetMeans: "the password gate has nothing to check against" },
+  {
+    name: "INTERNAL_API_SECRET",
+    affects: "Morning Paper",
+    unsetMeans: "the glance asks no tool anything, and no shared secret can be tested",
+  },
+  { name: "GITHUB_TOKEN", affects: "Pit Wall", unsetMeans: "the Pit Wall has no pull requests, branches or deployments" },
+  { name: "TRACKER_BASE_URL", affects: "Morning Paper", unsetMeans: null },
 ];
 
 /**
- * Names this app used to read and no longer does. Reported only if still set,
- * because a credential nothing reads is a credential that can only leak.
+ * Names this app used to read and no longer does. An error only while still
+ * set, because a credential nothing reads is a credential that can only leak.
  * `VERCEL_TOKEN` was a full-power team token held for one read, and the Pit Wall
  * now reads deployment state from GitHub's deployment statuses instead.
  */
-export const HUB_ENV_RETIRED: { name: string; why: string }[] = [
-  { name: "VERCEL_TOKEN", why: "no longer read — the Pit Wall reads deployments from GitHub. Delete it from tp-home." },
+export const HOME_ENV_RETIRED: { name: string; affects: string; why: string }[] = [
+  {
+    name: "VERCEL_TOKEN",
+    affects: "Home",
+    why: "still set, and nothing reads it — the Pit Wall reads deployments from GitHub. Delete it from tp-home.",
+  },
 ];

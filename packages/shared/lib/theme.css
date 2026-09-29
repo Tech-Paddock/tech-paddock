@@ -10,7 +10,7 @@
  *
  * How a theme is chosen
  *   data-livery  set by the app's own layout. A build-time constant. Coffee is
- *                always JPS; the hub is always Martini. There is no picker.
+ *                always JPS; home is always Martini. There is no picker.
  *   data-mode    "light" or "dark", stamped server-side from the shared
  *                .techpaddock.io cookie. Absent means follow the system, which
  *                the media query below handles with no script and no flash.
@@ -857,9 +857,38 @@
 }
 
 /* ====================================================================
+   Status lights — green and amber, for a stoplight dot. Red is --sev-urgent
+   and off is --sev-info, both per livery above.
+
+   Deliberately one pair for every livery rather than one per car: a green
+   light means the same thing whatever the page is wearing. Checked for 3:1
+   non-text contrast against every livery's surface and paper in that
+   polarity — green clears 4.5:1, amber does not, so neither carries text.
+   ==================================================================== */
+
+[data-livery] {
+  --go-rgb: 46 125 50;
+  --go: rgb(var(--go-rgb));
+  --caution-rgb: 178 106 0;
+  --caution: rgb(var(--caution-rgb));
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-livery]:not([data-mode="light"]) {
+    --go-rgb: 102 187 106;
+    --caution-rgb: 255 183 77;
+  }
+}
+
+[data-livery][data-mode="dark"] {
+  --go-rgb: 102 187 106;
+  --caution-rgb: 255 183 77;
+}
+
+/* ====================================================================
    The header control — the livery's name, what it is drawn from, and the
    light/dark switch. Plain CSS rather than utility classes so the markup is
-   identical in the hub (hand-written CSS) and in the four tools (Tailwind).
+   identical in home (hand-written CSS) and in the four tools (Tailwind).
    ==================================================================== */
 
 .pd-theme {
@@ -916,7 +945,7 @@
 
 .pd-on-bar .pd-modes { border-color: rgb(var(--bar-ink-rgb) / 0.4); }
 
-/* One switch per page. The hub embeds the tools, so without this a hub page
+/* One switch per page. Home embeds the tools, so without this a home page
    showing a tool carried two of these inches apart — its own and the tool's.
    [data-embedded] is stamped on <html> before paint by a line in each app's
    layout, so nothing renders and then vanishes.
@@ -925,7 +954,7 @@
    label naming which car that panel is wearing, and with two liveries on one
    screen it is doing more work than usual.
 
-   Safe only because the hub posts the mode into each frame — see ThemeControl.
+   Safe only because home posts the mode into each frame — see ThemeControl.
    Hide this without that half and the one remaining switch stops governing
    most of the page. */
 [data-embedded] .pd-modes { display: none; }

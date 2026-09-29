@@ -30,7 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // with no blocking script and nothing to flash.
   //
   // The script below is not an exception to that. It answers a different
-  // question — am I inside the hub's iframe — which no cookie can, because the
+  // question — am I inside home's iframe — which no cookie can, because the
   // same cookie is set whether a tool is framed or opened in its own tab. It is
   // synchronous so the switch it hides never renders and then vanishes.
   const mode = readMode(cookies().get(THEME_COOKIE)?.value);
@@ -41,8 +41,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" data-livery={LIVERY} {...(mode ? { "data-mode": mode } : {})}>
       <body>
         {/* One switch per page. lib/theme.css hides .pd-modes under
-            [data-embedded], so a tool's own switch disappears when the hub
-            frames it and the hub's own remains — see ThemeControl.tsx for the
+            [data-embedded], so a tool's own switch disappears when home
+            frames it and home's own remains — see ThemeControl.tsx for the
             other half, which is what makes hiding it safe.
 
             `self !== top` is a reference comparison, which is allowed
