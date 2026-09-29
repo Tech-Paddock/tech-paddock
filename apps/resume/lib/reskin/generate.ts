@@ -3,6 +3,8 @@ import { joinBody, splitBody } from "./blocks";
 import { extractSourceContent } from "./extract";
 import { renderIntoTemplate } from "./render";
 import type { ChangeLogEntry, SourceContent } from "./types";
+import { compareLines, type ContentCheck } from "../docx/compare";
+import type { Para } from "../docx/paragraphs";
 
 export type ReskinResult = {
   docx: Buffer;
@@ -27,6 +29,22 @@ export function linesTaken(content: SourceContent): string[] {
     lines.push(e.company, e.title, e.date, ...e.bullets);
   }
   return lines.filter((l) => l.trim() !== "");
+}
+
+/**
+ * The content check for one reformat: the lines it took, looked for in the
+ * finished document, plus the source text it refused to read, named.
+ *
+ * Refused text is not in `linesTaken` — it was never taken, so it is not lost in
+ * copying and does not fail the verdict (Joel, 2026-09-29, TEC-87). But it did
+ * not arrive either, and a report silent about it would read as a source with
+ * no highlights: the overstatement TEC-79 fixed. So it rides in `notRead`.
+ * Both routes call this, so Reformat and Diagnostics cannot disagree.
+ */
+export function checkContent(content: SourceContent, finished: Para[]): ContentCheck {
+  const check = compareLines(linesTaken(content), finished);
+  const notRead = content.unreadableHighlights ?? [];
+  return notRead.length > 0 ? { ...check, notRead } : check;
 }
 
 /**

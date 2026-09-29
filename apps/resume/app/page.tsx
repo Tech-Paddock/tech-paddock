@@ -49,7 +49,7 @@ type Finding = { code: string; severity: "blocking" | "warning"; message: string
 /** How much of what the renderer took from the source reached the document. The
  *  name, contact block and static sections are not in that set — they come from
  *  the template on purpose — so this is not a percentage of the whole source. */
-type Coverage = { totalLines: number; present: number; missing: string[]; percent: number };
+type Coverage = { totalLines: number; present: number; missing: string[]; percent: number; notRead?: string[] };
 type ChangeLogEntry = { section: string; detail: string; action: string };
 /**
  * A reformat, just run (`POST /api/reformat`) or reopened from storage
@@ -77,7 +77,7 @@ type Reformatted = {
   loggedTo?: string | null;
 };
 
-type ContentCheck = { totalLines: number; present: number; missing: string[]; percent: number };
+type ContentCheck = { totalLines: number; present: number; missing: string[]; percent: number; notRead?: string[] };
 
 type Inspection = {
   filename: string;
@@ -1001,6 +1001,24 @@ function ReformatShell() {
                   </Panel>
                 )}
 
+                {(result.coverage?.notRead?.length ?? 0) > 0 && (
+                  <Panel title="Not read, not placed" aside={<span className="text-xs opacity-60">does not fail it</span>}>
+                    <div className="flex flex-col gap-2">
+                      <p className="text-sm">
+                        The source had this text and it could not be read without guessing, so the template&apos;s own
+                        was kept. It repeats items from the body.
+                      </p>
+                      <ul className="list-disc pl-5 text-sm flex flex-col gap-1">
+                        {result.coverage?.notRead?.map((d, i) => (
+                          <li key={i} className="break-words">
+                            {d}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </Panel>
+                )}
+
                 <Panel title="ATS check on the output">
                   <div className="flex flex-col gap-2">
                     <Findings findings={result.findings} />
@@ -1117,6 +1135,20 @@ function ReformatShell() {
                       </p>
                       <ul className="flex flex-col divide-y divide-line">
                         {inspection.content.missing.map((line) => (
+                          <li key={line} className="py-1.5 text-sm">
+                            {line}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {(inspection.content?.notRead?.length ?? 0) > 0 && (
+                    <div className="flex flex-col gap-2 mt-3">
+                      <p className="text-sm font-medium">
+                        Not read, and so not placed — the template&apos;s own was kept. Not counted above:
+                      </p>
+                      <ul className="flex flex-col divide-y divide-line">
+                        {inspection.content?.notRead?.map((line) => (
                           <li key={line} className="py-1.5 text-sm">
                             {line}
                           </li>
