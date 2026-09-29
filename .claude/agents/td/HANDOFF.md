@@ -24,10 +24,10 @@ Joel** (2026-09-29): ask him before starting either.
 
 ## What is true now
 
-- **`INTERNAL_API_SECRET` is one team-shared variable** on `tp-home`, `tp-tracker` and
-  `tp-message-editor` (2026-09-25). **The paused tracker and editor still run builds from before
-  it** (Joel: "I already added the linked var"), so until their next build the glance gets no
-  answer from the tracker (TEC-8).
+- **Home no longer reads `INTERNAL_API_SECRET`** (TEC-83, live 2026-09-29): the glance and the Paper
+  are gone, and the Pit Wall reads Linear once Joel sets `LINEAR_API_KEY`. The secret stays linked to
+  `tp-tracker` and `tp-message-editor`, both paused on builds from before it; Joel unlinks it from
+  `tp-home` (TEC-83).
 - **`ANTHROPIC_API_KEY` has new values on Coffee, Cookbook and Health** (Joel, 2026-09-25). Real
   calls in production proved Coffee's and Cookbook's on 2026-09-29; Health's has not been used yet
   (TEC-75). Resume and the editor have none: Resume makes no model calls, and the editor is parked.
@@ -41,7 +41,7 @@ Joel** (2026-09-29): ask him before starting either.
   now gates logging too: a mismatch reads as "Couldn't reach the Cookbook", not as a login bug.
 - **`lib/logout.ts` is stamped into every app beside the login handler** (TEC-73): shared auth
   plumbing, yours to review, and named in `CLAUDE.md`'s list of gated auth files (TEC-92).
-- **Joel runs TechPad Gen in his own session** (2026-09-26); its branches join a list only by him.
+- **TechPad Gen runs as your helper again** (2026-09-29, Joel: "spin up whatever agents you need").
 - **This container cannot reach `*.techpaddock.io`** — the network policy refuses it — so nothing
   served there can be checked from here. Vercel's runtime logs are the substitute.
 - **The guard knows Deployment by the `agent_type` on a helper's hook input** (Claude Code's docs);
