@@ -154,8 +154,9 @@ wrong or the rule is, and that is a conversation before any code exists.
   (Joel, 2026-09-23: "follow charter"). The connector exposes write tools anyway, so **a hook holds
   every Vercel call that is not a read for Joel's click**: a backstop, not the route.
 - **Joel: starting an agent.** The technical director starts each one as a helper in the TD's
-  session, from its preset, and only after Joel says go — **"close out" is that go for Deployment**
-  on the branch it names (Joel, 2026-09-24: "You don't spin up agents without checking in").
+  session, from its preset, and only after Joel says go (Joel, 2026-09-24: "You don't spin up agents
+  without checking in"). **Deployment is started by the technical director alone, and a hook holds
+  that start for Joel's click** — his one gate (Joel, 2026-09-26).
 - **Joel: edit this file.** It is approved before it changes. **If what you are about to build
   contradicts it, stop and ask before you build it.** Raising it in the pull request is the backstop
   for something discovered late, not the normal path — code already written applies pressure to
@@ -194,8 +195,9 @@ wrong or the rule is, and that is a conversation before any code exists.
   delete a remote branch (see *Merging*), so marking is how a dead branch stops reading as open work
   in a plain branch list or the Pit Wall. Any agent may rename its own; **only the technical director
   and Deployment may rename another agent's.**
-- **Commit and push your work; Deployment opens the pull request.** No agent opens its own, the
-  technical director included (Joel, 2026-09-24). Work on your branch, commit as you go, push it, and
+- **Commit and push your work; only Deployment writes to a pull request.** Opening, updating,
+  closing and merging are all Deployment's, and a hook refuses anyone else, the technical director
+  included (Joel, 2026-09-26). Work on your branch, commit as you go, push it, and
   when it is finished say so and stop. **A finished branch is the deliverable.** CI runs on every
   branch push, so nothing is unverified while it waits — and nothing is live either.
   **Deployment opens it normally — not as a draft — and records Joel's go in the body:**
@@ -207,22 +209,14 @@ wrong or the rule is, and that is a conversation before any code exists.
   **No other agent can see the conversation where he said it**, so the request lands in the repo or
   it did not happen. `requested-by-joel` fails a body without that line. What no check can see is
   whether the quote is real, so **this rule rests further on honesty than the ones around it.**
-- **Three phrases from Joel mean three specific things.** They exist so he can move work without
-  spelling out the steps each time, and so the steps are the same for every agent.
-
-  **"Close out."** Leave nothing that lives only in the conversation, so the session can be
-  archived: every change committed and pushed, `HANDOFF.md` updated, and every open item — a
-  question, a follow-up, a step for Joel — parked in Linear with its Next steps. Then hand the branch
-  over with its blast radius and Deployment section, and stop. **It is also Joel's go for
-  Deployment**, which opens the pull request quoting him, gates it and merges it.
-
-  **"Park it."** The same, without Deployment. Stop at the pushed branch. He uses this when he
-  wants the work safe but not in the queue.
-
-  **"Pick up: <thing>."** New work. Come back with what you understand the job to be, what you would
-  do first, and anything it contradicts. **Do not cut a branch or write code until he answers** —
+- **When your work is done, leave nothing only in the conversation:** every change committed and
+  pushed, `HANDOFF.md` updated, and every open item — a question, a follow-up, a step for Joel — in
+  Linear with its Next steps. Then hand the branch over with its blast radius and Deployment section,
+  and stop. **New work is proposed before it is branched:** what you understand the job to be, what
+  you would do first, and anything it contradicts. **No branch and no code until Joel answers** —
   until then you do not know what the change is, and the branch would be named after a guess.
-
+  **"Backlog" from Joel means one thing:** make it a Linear issue in Backlog, with its labels and
+  Next steps, and do not build it.
 - **State your blast radius when you hand a branch over:** which apps, which shared files.
   Deployment carries it into the pull request.
 - **Only the technical director's session watches a pull request**, and Deployment acts on what
@@ -401,9 +395,10 @@ Most rules here are convention: they hold because an agent chooses to comply. Th
 2. **The `.claude/settings.json` hooks** run whether or not anyone wants them to, through one guard,
    `.claude/hooks/guard.mjs`, which **fails closed**. It refuses a push that would land on `main` in
    any spelling or that it cannot read, a merge that is not a squash, and rewriting the migration
-   history by CLI or SQL; holds auto-merge, a pull request review and the API commit tools for
-   Joel's click — opening, updating and merging are not held, because **Joel's one gate is his go
-   before Deployment starts** (Joel, 2026-09-25: "only one gate"); holds every Vercel and Supabase
+   history by CLI or SQL; **refuses every write to a pull request to anyone but Deployment**, by
+   tool or by `gh`, and starting Deployment from inside a helper; holds starting Deployment for
+   Joel's click — **his one gate** (Joel, 2026-09-26) — and still holds auto-merge, a pull request
+   review and the API commit tools; holds every Vercel and Supabase
    call that is not a read; refuses a Linear issue without its labels or Next steps; and points
    every session at Linear. CI tests what it refuses. It stops mistakes, not a determined agent —
    branch protection stays the backstop for `main`.
