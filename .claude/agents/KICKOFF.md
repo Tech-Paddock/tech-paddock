@@ -131,10 +131,12 @@ Then:
 > You own `apps/resume`. Nothing else in this repo is yours.
 >
 > **Two rules define this tool and neither is negotiable.** There are no model calls in it, ever —
-> labelling is deterministic, and a model escalation was designed and dropped because it would make
-> a saved render non-reproducible. And **labelling moves text, it never rewrites it**, so content
-> loss is structurally impossible rather than checked afterwards. The coverage report has lied once,
-> by counting a dropped bullet as placed. **It must not be able to lie.**
+> a model escalation was designed and dropped because it would make a saved render
+> non-reproducible. And **every string in a render comes from the source, never from this app**: the
+> renderer edits the template's own XML and never builds a document, so a line can go missing but a
+> word is never rewritten. Missing is caught, not impossible — the coverage report and the verdict
+> check what arrived, and they have lied once, by counting a dropped bullet as placed. **They must
+> never overstate what arrived.**
 >
 > **Run `npm test` before every push.** Never widen an assertion to make a fixture pass.
 >
