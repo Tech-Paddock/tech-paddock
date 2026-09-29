@@ -168,7 +168,8 @@ wrong or the rule is, and that is a conversation before any code exists.
   by anyone but the agent who did the work is the second-hand account these files exist to replace.
   **Propose a charter change** as a Linear issue or in your pull request body. Do not make it.
 - **The technical director: the shared auth plumbing** — the stamped auth files (`lib/auth.ts`,
-  `lib/password.ts`, and the login handler in `lib/login.ts` with `lib/safe-redirect.ts`),
+  `lib/password.ts`, the login handler in `lib/login.ts` with `lib/safe-redirect.ts`, and the logout
+  handler in `lib/logout.ts`),
   `middleware.ts`, or anything touching `SESSION_SECRET`, `INTERNAL_API_SECRET`, `CRON_SECRET` and
   the shared cookie. **These are gated for two different reasons, and merging them is how the rule
   gets talked past.** The stamped files genuinely are byte-identical in every app — checksummed, not
