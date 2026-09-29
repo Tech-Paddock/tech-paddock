@@ -17,15 +17,8 @@
  *    "Vercel has no deployment at this address" tells you where to go. The raw
  *    code rides along after the sentence, so nothing is lost in translation.
  */
-import {
-  HOME,
-  HOME_ENV,
-  HOME_ENV_RETIRED,
-  PROBED,
-  type DeclaredApp,
-  type Project,
-} from "./platform";
-import { DECLARED } from "./declared.generated";
+import { HOME, HOME_ENV, HOME_ENV_RETIRED, PROBED, type Project } from "./platform";
+import { deployErrors } from "./deploys";
 
 /** `parked` is a probe that did not come back up for an app paused on purpose. */
 export type Status = "up" | "down" | "unknown" | "parked";
@@ -47,14 +40,15 @@ export type EnvError = { name: string; affects: string; problem: string };
 export type Diagnostics = {
   checkedAt: string;
   liveness: Probe[];
-  internal: Probe[];
+  /** Empty is the healthy state, and The Garage then shows nothing at all. */
+  deploys: Probe[];
   /** Empty is the healthy state, and The Garage then shows nothing at all. */
   envErrors: EnvError[];
 };
 
 type Outcome = Omit<Probe, "ms" | "target">;
 
-/** A slow or dead host must not hold the page hostage. Matches lib/glance.ts. */
+/** A slow or dead host must not hold the page hostage. */
 const TIMEOUT_MS = 4000;
 
 /**
@@ -162,56 +156,6 @@ async function livenessProbe(project: Project & { parked?: true }) {
 }
 
 /**
- * What a status code from a secret-guarded route means about the secret.
- *
- * 401 and 403 are the middleware refusing the header — the two projects hold
- * different values. Anything else that is not 2xx says nothing about the secret
- * either way, so it is "unknown" with what did happen, never "up".
- */
-export function classifySecretStatus(status: number, path: string, vercelError: string | null = null): Outcome {
-  if (status >= 200 && status < 300) {
-    return { status: "up", detail: `the two projects hold the same secret`, raw: null };
-  }
-  if (status === 401 || status === 403) {
-    return {
-      status: "down",
-      detail: `${path} rejected home's secret — the two projects hold different values`,
-      raw: String(status),
-    };
-  }
-  const { detail, raw } = explainResponse(status, vercelError);
-  return { status: "unknown", detail: `could not test it — ${detail}`, raw };
-}
-
-/**
- * Proves home and a tool hold the *same* INTERNAL_API_SECRET.
- *
- * A tool's middleware carves its `/api/summary` out of the password gate for
- * exactly this header, so a mismatch — otherwise silent, and the same class of
- * failure as a SESSION_SECRET mismatch — shows here as a rejection.
- */
-async function sharedSecretProbe(project: Project & { parked?: true }, path: string) {
-  const secret = process.env.INTERNAL_API_SECRET;
-  const probe: Probe = !secret
-    ? {
-        target: project.name,
-        status: "unknown",
-        detail: "could not test it — INTERNAL_API_SECRET is not set on home",
-        raw: null,
-        ms: null,
-      }
-    : await timed(async () => {
-        const res = await fetch(`${project.url}${path}`, {
-          headers: { "x-internal-secret": secret },
-          cache: "no-store",
-          signal: AbortSignal.timeout(TIMEOUT_MS),
-        });
-        return classifySecretStatus(res.status, path, res.headers.get("x-vercel-error"));
-      }, project.name);
-  return forParked(probe, !!project.parked);
-}
-
-/**
  * Only what is wrong. Presence only: no value is read into a variable that
  * could be rendered.
  *
@@ -248,28 +192,14 @@ const homeProbe: Probe = {
   ms: null,
 };
 
-/**
- * Which projects get the shared-secret probe is *derived*, not named: whichever
- * probed project exposes `/api/summary`, read out of the repo at build time. It
- * used to filter `TOOLS`, which the tracker — the one app with that route — had
- * left, so the only secret the glance depends on was never checked.
- */
-export function secretSubjects<P extends Project>(probed: P[], declared: DeclaredApp[]): P[] {
-  const exposesSummary = new Set(declared.filter((app) => app.hasSummaryRoute).map((app) => app.slug));
-  return probed.filter((project) => exposesSummary.has(project.slug));
-}
-
 export async function runDiagnostics(): Promise<Diagnostics> {
   const others = PROBED.filter((p) => p.slug !== HOME.slug);
-  const [liveness, internal] = await Promise.all([
-    Promise.all(others.map(livenessProbe)),
-    Promise.all(secretSubjects(others, DECLARED.apps).map((p) => sharedSecretProbe(p, "/api/summary"))),
-  ]);
+  const [liveness, deploys] = await Promise.all([Promise.all(others.map(livenessProbe)), deployErrors()]);
 
   return {
     checkedAt: new Date().toISOString(),
     liveness: [homeProbe, ...liveness],
-    internal,
+    deploys,
     envErrors: envErrors(),
   };
 }

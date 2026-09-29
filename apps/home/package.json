@@ -6,7 +6,7 @@
   },
   "private": true,
   "scripts": {
-    "generate": "node scripts/collect-declared.mjs && node scripts/collect-paddock.mjs && node scripts/collect-drift.mjs",
+    "generate": "node scripts/collect-declared.mjs && node scripts/collect-drift.mjs",
     "predev": "npm run generate",
     "dev": "next dev",
     "prebuild": "npm run generate",
@@ -15,7 +15,6 @@
     "pretest": "npm run generate",
     "test": "vitest run",
     "declared": "node scripts/collect-declared.mjs",
-    "paddock": "node scripts/collect-paddock.mjs",
     "drift": "node scripts/collect-drift.mjs"
   },
   "dependencies": {
