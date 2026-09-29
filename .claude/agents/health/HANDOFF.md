@@ -50,8 +50,8 @@ lines from one dictation merge, quantities added, before anything is estimated.
 
 ## Cookbook: the list has moved, recipes are read from it
 
-**`/list` only redirects** to `https://cookbook.techpaddock.io/list` (TEC-23). No code here touches
-`health.grocery_items`; the table stays until TEC-15's part 2 drops it.
+**`/list` only redirects** to `https://cookbook.techpaddock.io/list` (TEC-23). `health` has no grocery
+table: `health_drop_grocery_items` dropped it and its enum (TEC-91, 0 rows); the list is Cookbook's.
 
 **A food whose normalised name equals a Cookbook recipe's is the Cookbook's** (TEC-25, Joel
 2026-09-26). `lib/cookbook.ts` reads `GET /api/servings` once per request, forwarding **only**
@@ -74,7 +74,7 @@ Recipes that share a normalised name are refused on the line, never guessed betw
   also what decides a name is a Cookbook recipe.
 - **`lib/models.ts` is Coffee's registry duplicated and flagged, not a verbatim copy** — the two
   have diverged. Do not let a third copy happen quietly.
-- **The livery is borrowed and has a collision.** `senna`, which the parked tracker also wears, maps
-  `--sev-warn` onto the accent, so "over target" and "on track" are one colour. TechPad Gen's.
+- **The livery is borrowed** (`senna`, shared with the parked tracker). Separately, **every** livery
+  maps `--sev-warn` onto the accent, so "over" and "on track" match; `--danger` differs. TechPad Gen's.
 - **`eaten_at` is not the time you ate.** The app never sets it, so it duplicates `created_at`;
   `eaten_on` is what a day's total reads. Both carry column comments.
