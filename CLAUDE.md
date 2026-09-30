@@ -112,7 +112,7 @@ if either comes back, and why is in `DECISIONS.md`.
 
 | Agent | Owns | Charter |
 |---|---|---|
-| Technical Director | the Linear queue, **starting agents**, **app surface**, **Postgres** design and contracts, the shared auth plumbing, **`apps/editor`** (parked and frozen) | `.claude/agents/td/` |
+| Technical Director | the Linear queue, **starting agents**, **app surface**, **Postgres** design and contracts, the shared auth plumbing, **`apps/editor`** (parked and frozen), **`apps/showcase`**, which it builds | `.claude/agents/td/` |
 | Deployment | everything after a pushed commit: **pull requests, the gate, merge order, merges, migrations at gate time, DevOps — Vercel, DNS, CI, deploys** | `.claude/agents/deployment/` |
 | TechPad Gen | `apps/home`, `apps/tracker` (parked), **the visual theme of every app**, shared components | `.claude/agents/techpad-gen/` |
 | Resume Formatter | `apps/resume` | `.claude/agents/resume/` |
@@ -339,6 +339,11 @@ Per-tool detail lives in that tool's charter.
   cookie, so a client that discards it is never locked out; the server-side limit is a per-IP rate
   limit on `POST /api/login` in each project's Vercel Firewall (TEC-7 — not a shared table, which
   would have handed the hub a database credential). **The password stays the real control.**
+  **One exception, `apps/showcase`: public by design**, so Joel can send interviewers his builds
+  (2026-09-29). It is safe only because it holds nothing — a static export with no server, secret,
+  database, model call or cookie read, fake data only — and `drift` fails it the moment it holds
+  any. The rules and the reasoning are in the technical director's charter. **A demo that needs
+  state does not go here**; it goes to `techpaddock.com`, where this cookie cannot reach it.
 - **`/admin` — The Garage, on the hub — is computed, not live throughout.** Its probes of each
   project run live. Its *Declared* and *Rules drift* panels are baked at the hub's last build (the hub
   builds on every production merge). Which projects it probes is `PROBED` in
@@ -405,10 +410,11 @@ Most rules here are convention: they hold because an agent chooses to comply. Th
 3. **CI's `gate`** needs every app to typecheck, test and build, and `drift` to pass.
    **`requested-by-joel`** fails a pull request whose body does not record who asked for it.
    **`drift`** measures the repo instead of trusting a document: the stamped copies, the middleware
-   shape and that every app has one, the CI matrix and the gate's shape, each `ignoreCommand` against
-   what its build reads, the file budgets, and retired structures staying retired — and it warns on
-   computable facts written into any `.md` except `DECISIONS.md`. **It does not read this file's
-   sentences**, which is why this file points at what drift measures rather than restating it.
+   shape and that every app has one — the showcase excepted, which must instead hold nothing — the CI
+   matrix and the gate's shape, each `ignoreCommand` against what its build reads, the file budgets,
+   and retired structures staying retired — and it warns on computable facts written into any `.md`
+   except `DECISIONS.md`. **It does not read this file's sentences**, which is why this file points
+   at what drift measures rather than restating it.
    `node scripts/drift-check.mjs` runs it locally; `--json` is what The Garage renders.
 
 Every rule in this file was written after something went wrong: three branches editing it at once,

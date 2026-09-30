@@ -54,7 +54,7 @@ const R = (...p) => join(repoRoot, ...p);
 export const MANIFEST = [
   { from: "lib/auth.ts", to: "lib/auth.ts" },
   { from: "lib/password.ts", to: "lib/password.ts" },
-  { from: "lib/theme.css", to: "lib/theme.css" },
+  { from: "lib/theme.css", to: "lib/theme.css", public: true },
   { from: "lib/theme.ts", to: "lib/theme.ts" },
   { from: "next.config.mjs", to: "next.config.mjs" },
   { from: "app/ThemeControl.tsx", to: "app/ThemeControl.tsx" },
@@ -71,6 +71,19 @@ export const MANIFEST = [
 ];
 
 export const SHARED_DIR = "packages/shared";
+
+/* The one app with no password (Joel, 2026-09-29; TEC-99). It is safe only
+   because it holds nothing, so it takes only the entries marked `public` — the
+   theme tokens — and never the auth files or the gated next.config.mjs, whose
+   frame-ancestors and missing CSP are written for a tool behind the login.
+   drift's "public app holds nothing" check measures the rest, and reads this
+   list rather than restating it. The rules are in the TD's charter. */
+export const PUBLIC_APPS = ["showcase"];
+
+/* What apps/<app> is stamped with: everything, or for a public app only the
+   entries marked `public`. */
+export const manifestFor = (app) =>
+  PUBLIC_APPS.includes(app) ? MANIFEST.filter((m) => m.public) : MANIFEST;
 
 /* Derived from disk, never hardcoded — the same rule the CI matrix and the
    drift roster follow. A seventh app gets stamped by existing, which is the
@@ -108,7 +121,7 @@ export const stamped = (root, from) =>
 export function expected(root = repoRoot) {
   const out = [];
   for (const app of appsOnDisk(root)) {
-    for (const { from, to } of MANIFEST) {
+    for (const { from, to } of manifestFor(app)) {
       out.push({ app, from, to, rel: `apps/${app}/${to}`, want: stamped(root, from) });
     }
   }
@@ -132,8 +145,9 @@ function main() {
 
   const drifted = [];
   const written = [];
+  const rows = expected();
 
-  for (const { rel, want } of expected()) {
+  for (const { rel, want } of rows) {
     const abs = R(rel);
     const have = existsSync(abs) ? readFileSync(abs, "utf8") : null;
     if (have === want) continue;
@@ -147,7 +161,7 @@ function main() {
     written.push(rel);
   }
 
-  const total = apps.length * MANIFEST.length;
+  const total = rows.length;
 
   if (check) {
     if (drifted.length) {

@@ -33,7 +33,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expected as stampExpected, MANIFEST, SHARED_DIR } from "./stamp-shared.mjs";
+import { expected as stampExpected, MANIFEST, PUBLIC_APPS, SHARED_DIR } from "./stamp-shared.mjs";
 import { watchedBy, buildReads, covers } from "./build-scope.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -49,6 +49,9 @@ const md5 = (p) => (existsSync(p) ? createHash("md5").update(readFileSync(p)).di
 const APPS = existsSync(R("apps"))
   ? readdirSync(R("apps")).filter((d) => statSync(R("apps", d)).isDirectory()).sort()
   : [];
+// Every app behind the password — all of them but the public one, which check
+// 2c measures instead, because it must hold none of what these checks compare.
+const GATED = APPS.filter((a) => !PUBLIC_APPS.includes(a));
 
 const git = (...args) => {
   try { return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8" }).trim(); }
@@ -105,7 +108,10 @@ function yamlJob(yml, name) {
    an empty config and no frame-ancestors for as long as the file existed, and
    nothing said so until somebody read every copy side by side. */
 for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme.ts", "next.config.mjs"]) {
-  const present = APPS.map((a) => [a, md5(R("apps", a, rel))]).filter(([, h]) => h);
+  // The public app shares the theme tokens and nothing else: its next.config.mjs
+  // is its own on purpose, and it must have no auth file to compare (check 2c).
+  const present = (rel === "lib/theme.css" ? APPS : GATED)
+    .map((a) => [a, md5(R("apps", a, rel))]).filter(([, h]) => h);
   if (present.length === 0) { add(`identical: ${rel}`, "warn", "not present in any app — cannot measure"); continue; }
   const distinct = new Set(present.map(([, h]) => h));
   add(
@@ -210,7 +216,7 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
    bypass the reviewed file, so each one fails here rather than passing quietly. */
 {
   const name = "password gate: every app has middleware.ts";
-  const apps = APPS.filter((a) => existsSync(R("apps", a, "package.json")));
+  const apps = GATED.filter((a) => existsSync(R("apps", a, "package.json")));
   const bad = [];
   for (const a of apps) {
     const has = (rel) => existsSync(R("apps", a, rel));
@@ -226,7 +232,106 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
   }
   if (apps.length === 0) add(name, "warn", "no app folder with a package.json — cannot measure");
   else add(name, bad.length ? "fail" : "ok",
-    bad.length ? bad.join("; ") : `${apps.length} apps, each behind apps/<app>/middleware.ts and nothing else`);
+    bad.length ? bad.join("; ") : `${apps.length} apps, each behind apps/<app>/middleware.ts and nothing else` +
+      (APPS.length > apps.length ? `; ${APPS.filter((a) => !apps.includes(a)).join(", ")} public by design (check 2c)` : ""));
+}
+
+/* 2c ── The public app holds nothing a password would have protected.
+   apps/showcase has no password (Joel, 2026-09-29; TEC-99), and it sits on
+   .techpaddock.io, so the browser sends it the session cookie. That is safe
+   only while no script there can act on it: no server, no secret, nothing a
+   visitor supplies rendered as HTML or sent anywhere, and no frame around a
+   tool. The TD's charter has the reasoning; this measures every part of it a
+   script can see, and the charter says which parts are left to judgement.
+
+   Each finding is a way the page could stop being inert. None of them has a
+   compensating control, because the password that would have been one is
+   exactly what this app does without — so every finding fails. */
+function publicAppFindings(app) {
+  const dir = R("apps", app);
+  const has = (rel) => existsSync(join(dir, rel));
+  const bad = [];
+
+  // No server: a static export has no API route, no middleware and no request
+  // to read a cookie from. A static export ignores headers(), so the security
+  // headers live in vercel.json — checked below.
+  const config = read(join(dir, "next.config.mjs"));
+  if (config === null) bad.push("no next.config.mjs — cannot see that it is a static export");
+  else if (!/\boutput\s*:\s*["']export["']/.test(config.replace(/\/\*[\s\S]*?\*\/|(^|\s)\/\/.*$/gm, "$1")))
+    bad.push('next.config.mjs is not `output: "export"` — a server could read the session cookie');
+  for (const f of ["middleware.ts", "middleware.js", "middleware.mjs", "middleware.cjs", "middleware.jsx", "middleware.tsx"])
+    for (const at of [f, `src/${f}`]) if (has(at)) bad.push(`${at} — a public app has no gate to run`);
+
+  // Nothing stamped but what is marked public, and no database client.
+  for (const { to, public: pub } of MANIFEST)
+    if (!pub && to !== "next.config.mjs" && has(to)) bad.push(`${to} — shared auth plumbing in a public app`);
+  if (has("lib/supabase.ts")) bad.push("lib/supabase.ts — a database client in a public app");
+
+  const pkg = read(join(dir, "package.json"));
+  if (pkg !== null) {
+    let deps = {};
+    try { const j = JSON.parse(pkg); deps = { ...j.dependencies, ...j.devDependencies }; }
+    catch { bad.push("package.json does not parse — cannot read its dependencies"); }
+    for (const d of Object.keys(deps))
+      if (/^@supabase\/|^@anthropic-ai\/|^(pg|postgres|bcryptjs)$/.test(d))
+        bad.push(`depends on ${d} — a database, model or password library in a public app`);
+  }
+
+  // The source, comments stripped, so a comment warning against a pattern
+  // does not trip it.
+  const { files } = trackedFiles(
+    (f) => /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(f) && !/\/(node_modules|\.next|out)\//.test(f) && !f.endsWith("next-env.d.ts"),
+    [`apps/${app}`]);
+  const RULES = [
+    [/process\.env\.(?!NODE_ENV\b)|process\.env\[/, "reads an environment variable — a public app has no secret to read"],
+    [/["']next\/headers["']/, "imports next/headers — the request's cookies and headers"],
+    [/dangerouslySetInnerHTML|\.(inner|outer)HTML\s*=|insertAdjacentHTML|document\.write\b/, "renders a string as HTML — the way in for a crafted upload"],
+    [/document\.cookie/, "touches document.cookie — tossing a cookie over every techpaddock.io app"],
+  ];
+  for (const f of files) {
+    const src = (read(R(f)) ?? "").replace(/\/\*[\s\S]*?\*\/|(^|\s)\/\/.*$/gm, "$1");
+    for (const [re, why] of RULES) if (re.test(src)) bad.push(`${f.replace(`apps/${app}/`, "")} ${why}`);
+  }
+
+  // The CSP, in vercel.json, on every path. connect-src and form-action are
+  // what keep an upload inside the visitor's browser even if the code tries;
+  // frame-src is what stops this page framing a tool, which allows
+  // *.techpaddock.io; script-src takes no host, so no third-party script runs.
+  const vj = read(join(dir, "vercel.json"));
+  let csp = null;
+  try {
+    for (const h of JSON.parse(vj ?? "{}").headers ?? [])
+      if (h.source === "/(.*)")
+        for (const { key, value } of h.headers ?? [])
+          if (String(key).toLowerCase() === "content-security-policy") csp = String(value);
+  } catch { bad.push("vercel.json does not parse — cannot read its CSP"); }
+  if (csp === null) bad.push('no Content-Security-Policy on source "/(.*)" in vercel.json');
+  else {
+    const dirs = new Map(csp.split(";").map((d) => d.trim().split(/\s+/)).filter((t) => t[0]).map(([k, ...v]) => [k.toLowerCase(), v]));
+    const only = (k, allowed) => {
+      const v = dirs.get(k);
+      if (!v || !v.length) bad.push(`CSP has no ${k}`);
+      else if (!v.every((t) => allowed.some((a) => (a instanceof RegExp ? a.test(t) : a === t))))
+        bad.push(`CSP ${k} ${v.join(" ")} — allowed: ${allowed.map(String).join(" ")}`);
+    };
+    only("frame-ancestors", ["'none'", "'self'"]);
+    only("frame-src", ["'none'"]);
+    only("connect-src", ["'none'", "'self'"]);
+    only("form-action", ["'none'", "'self'"]);
+    only("object-src", ["'none'"]);
+    // 'unsafe-inline' because a static Next.js export bootstraps with inline
+    // scripts and there is no server to mint a nonce. No host, so nothing
+    // third-party; rendering no HTML is what keeps inline script ours.
+    only("script-src", ["'self'", "'unsafe-inline'", /^'sha(256|384|512)-[A-Za-z0-9+/=]+'$/]);
+  }
+  return bad;
+}
+for (const app of PUBLIC_APPS) {
+  const name = `public app holds nothing: ${app}`;
+  if (!existsSync(R("apps", app))) { add(name, "ok", `apps/${app} is not on disk — nothing is public`); continue; }
+  const bad = publicAppFindings(app);
+  add(name, bad.length ? "fail" : "ok", bad.length ? bad.join("; ")
+    : "static export; no gate, secret, database or cookie; no HTML from strings; CSP keeps uploads in the browser");
 }
 
 /* 3 ── CI builds whatever is on disk, and one fixed name gates it.
@@ -569,14 +674,15 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
 
      The TD's list is more than `apps/editor` because that app is FROZEN: dated
      against it alone, the TD's handoff read `ok` forever while two merges went
-     by. `scripts` is the drift and stamping machinery this seat owns and
+     by. `apps/showcase` is the one app the TD builds (TEC-99), named before
+     its folder exists so it is never unowned for a commit. `scripts` is the drift and stamping machinery this seat owns and
      nobody else edits. `.github` — CI and the pull-request checks — went to
      Deployment with the gate on 2026-09-24, and Deployment owns no app, so
      without it here its handoff could never be dated. `supabase/` is
      deliberately left out — app agents author their own migrations. */
   const NAMED = {
     "techpad-gen": ["apps/home", "apps/tracker"],
-    "td": ["apps/editor", "scripts"],
+    "td": ["apps/editor", "apps/showcase", "scripts"],
     "deployment": [".github"],
   };
   // Which agent owns an app folder: a NAMED entry, or the agent of that name.
