@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
+import appleTouchIcon from "./apple-touch-icon.png";
 import { LIVERY } from "@/lib/livery";
 import { readMode, THEME_COOKIE } from "@/lib/theme";
 import "@/lib/theme.css";
@@ -12,18 +13,33 @@ export const metadata: Metadata = {
   title: "Paddock — Cookbook",
   description: "What you could cook, what it costs you, and what to buy for it.",
 
-  // **No `appleWebApp` and no apple-touch-icon, deliberately.** Health and
-  // Coffee both carry them because they are apps; this one is a *site*, settled
-  // at standup and argued in `.claude/SURFACE.md` — a cookbook is a collection,
-  // so the index is the product. A site has no home-screen install, so
-  // scaffolding the metadata for one would ship a decision nobody made, in the
-  // direction the surface call went against.
+  // **On the home screen, by Joel's word** (2026-10-05), overruling the site
+  // call that left it off: the No. 12 tab icon becomes the app icon. Same
+  // shape as Coffee and Health. The short name is what iOS prints under the
+  // icon; "Paddock — Cookbook" is too long for that and gets truncated.
+  applicationName: "Cookbook",
+  appleWebApp: {
+    capable: true,
+    title: "Cookbook",
+    statusBarStyle: "default",
+  },
+
+  // Imported rather than referenced by path, deliberately — Coffee's reasoning.
+  // A static import is served from /_next/static, which the middleware matcher
+  // excludes outright. Next's own app/apple-icon.png route sits behind the
+  // password gate, so iOS would get the login redirect and fall back to a
+  // screenshot. The PNG is `icon.svg` drawn full-bleed at 180px: iOS rounds the
+  // corners itself, and the SVG's own would show as white wedges.
+  icons: {
+    apple: [{ url: appleTouchIcon.src, sizes: "180x180", type: "image/png" }],
+  },
 };
 
 // You are sitting down with a laptop or standing with a phone, but either way
-// you arrive to browse rather than to do one known thing. No `viewportFit:
-// "cover"`, because that exists for a page launched from the home screen and
-// this one is not.
+// you arrive to browse rather than to do one known thing. **No `viewportFit:
+// "cover"`, even launched from the home screen**: with the default status bar
+// style iOS keeps the page below the bar, so nothing here needs safe-area
+// padding — Coffee and Health use "cover" and pay for it in their CSS.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,

@@ -4,7 +4,7 @@ import Cookbook, { type Tab } from "./Cookbook";
 import { LIVERY } from "@/lib/livery";
 
 /**
- * The page every route in this app renders: the bar, then the two tabs.
+ * The page every route in this app renders: the bar, then the three tabs.
  *
  * **Surface is settled: site**, at standup on 2026-09-20 — a cookbook is a
  * collection, and for a collection the index *is* the product. Its tabs are that
@@ -14,12 +14,12 @@ import { LIVERY } from "@/lib/livery";
  * **Each tab has an address** (TEC-22, 2026-09-25): `/` opens on the book and
  * `/list` opens on the King Soopers list. The list needed one because Health's
  * `/list` redirects onto it while the grocery list moves here (TEC-15), and a
- * redirect needs somewhere to land that is the list rather than the book. Both
- * routes render this one component, so they cannot drift into two pages.
+ * redirect needs somewhere to land that is the list rather than the book. `/add`
+ * is the Add tab (2026-10-05). Every route renders this one component, so they
+ * cannot drift into separate pages.
  *
- * **No home-screen install**, which is why `layout.tsx` carries no `appleWebApp`
- * metadata. A site you open when you are deciding what to cook does not earn an
- * icon.
+ * **On the home screen since 2026-10-05**, Joel's call over the site ruling's
+ * "no install": `layout.tsx` carries the icon and the `appleWebApp` metadata.
  */
 export default function Shell({ tab }: { tab: Tab }) {
   return (
