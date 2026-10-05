@@ -907,12 +907,13 @@ function RecipeCard({
             {/* The day picked here is the day it sits on the menu. A cleared
                 picker would send no day at all, so it disables the button
                 instead of quietly meaning "today". */}
+            <span className="ml-auto flex items-center gap-2">
             <input
               type="date"
               value={day}
               onChange={(e) => setDay(e.target.value)}
               aria-label={`Day to cook ${recipe.name}`}
-              className="ml-auto rounded border border-line bg-surface px-2 py-1 text-sm"
+              className="rounded border border-line bg-surface px-2 py-1 text-sm"
             />
             <button
               type="button"
@@ -925,6 +926,7 @@ function RecipeCard({
             >
               {listing ? "Adding…" : "Add to list"}
             </button>
+            </span>
             <button
               type="button"
               onClick={() => setEditing(true)}

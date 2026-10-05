@@ -17,8 +17,9 @@ import { useToast } from "./Toast";
  * **Clear all** empties the menu — nothing falls off by itself any more. None of
  * them touches the list or the book. `lib/menu.ts` has the rules.
  *
- * **Left of the book on a wide screen, above it on a phone.** The wide column is
- * narrow, so there the numbers drop under the name rather than squeezing it.
+ * **Left of the book on a wide screen, above it on a phone.** One line where
+ * there is room for it; on a phone and in the narrow wide-screen column the
+ * numbers drop under the name rather than squeezing it to two letters.
  *
  * **Names and numbers come from the book, not from the menu's rows.** The menu
  * stores only which recipe and which day; the book on this page is already the
@@ -153,12 +154,12 @@ export default function Menu({
             return (
               <li
                 key={m.recipe_id}
-                className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-baseline gap-x-2 text-sm lg:grid-cols-[auto_minmax(0,1fr)_auto]"
+                className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-baseline gap-x-2 text-sm sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] lg:grid-cols-[auto_minmax(0,1fr)_auto]"
               >
                 {/* The day, and the way to move it: a real date input laid over
                     the label, so a tap on a phone opens the native picker, and
                     `showPicker` opens it on a desktop click too. */}
-                <span className="relative w-16 shrink-0 text-[11px] tabular-nums text-ink-soft">
+                <span className="relative w-14 shrink-0 text-[11px] tabular-nums text-ink-soft">
                   {menuDayLabel(m.day)}
                   <input
                     type="date"
@@ -182,14 +183,14 @@ export default function Menu({
                 >
                   {recipe.name}
                 </button>
-                <span className="text-[11px] tabular-nums text-ink-soft lg:col-start-2 lg:row-start-2">
+                <span className="col-span-2 col-start-2 row-start-2 whitespace-nowrap text-[11px] tabular-nums text-ink-soft sm:col-span-1 sm:col-start-auto sm:row-start-auto lg:col-span-3 lg:col-start-1 lg:row-start-2">
                   {s.kcal} cal · {s.protein_g}g P · {s.fat_g}g F · {s.carbs_g}g C /serv
                 </span>
                 <button
                   type="button"
                   onClick={() => takeOff(m.recipe_id)}
                   aria-label={`Take ${recipe.name} off the menu`}
-                  className="shrink-0 px-1 text-ink-soft lg:col-start-3 lg:row-start-1"
+                  className="col-start-3 row-start-1 shrink-0 px-1 text-ink-soft sm:col-start-auto sm:row-start-auto lg:col-start-3 lg:row-start-1"
                 >
                   ✕
                 </button>
