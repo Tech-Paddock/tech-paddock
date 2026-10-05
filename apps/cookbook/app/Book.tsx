@@ -11,6 +11,7 @@ import { MAX_FILE_BYTES, isFileMediaType, type RecipeFile } from "@/lib/upload";
 import { MAX_STEER, pileForAsk, turnDown, type TurnedDown } from "@/lib/reroll";
 import { downscale } from "@/lib/image";
 import { formatMinutes, pillFacts } from "@/lib/metadata";
+import { localToday, menuDayLabel, parseDay } from "@/lib/menuDay";
 import { EMPTY_FORM, MetaFields, MetaSummary, Stars, type MetaForm } from "./Meta";
 import EditRecipe from "./EditRecipe";
 import { BookFilters, PickFields } from "./Tuning";
@@ -290,7 +291,8 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
     }
   }
 
-  async function toList(recipe: Recipe) {
+  /** Its ingredients onto the list, and it onto the menu for `day` (2026-10-05). */
+  async function toList(recipe: Recipe, day: string) {
     // One at a time. A second tap while the first is in flight used to put the
     // ingredients on the list twice (TEC-29 item 8).
     if (listing) return;
@@ -299,7 +301,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       const response = await fetch("/api/recipes/grocery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: recipe.id }),
+        body: JSON.stringify({ id: recipe.id, day }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't add those.");
@@ -307,7 +309,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
       // The lines landed either way; only the menu entry can have failed, and
       // it is said so rather than hidden behind a success.
       if (body.menu === false) toast.error(`${count} added to your list, but it couldn't go on the menu.`);
-      else toast.notice(`${count} added to your list, and "${recipe.name}" is on the menu.`);
+      else toast.notice(`${count} added to your list, and "${recipe.name}" is on the menu for ${menuDayLabel(day)}.`);
       onAddedToList?.();
       setMenuVersion((n) => n + 1);
     } catch (e) {
@@ -748,7 +750,7 @@ export default function Book({ onAddedToList }: { onAddedToList?: () => void }) 
                 open={openId === recipe.id}
                 onToggle={() => setOpenId(openId === recipe.id ? null : recipe.id)}
                 listing={listing === recipe.id}
-                onList={() => toList(recipe)}
+                onList={(day) => toList(recipe, day)}
                 rating={rating === recipe.id}
                 onRate={(value) => rate(recipe, value)}
                 onRemove={() => remove(recipe)}
@@ -783,7 +785,7 @@ function RecipeCard({
   listing: boolean;
   rating: boolean;
   onToggle: () => void;
-  onList: () => void;
+  onList: (day: string) => void;
   onRate: (value: number | null) => void;
   onRemove: () => void;
   model: ModelId;
@@ -791,6 +793,8 @@ function RecipeCard({
   onEdited: (recipe: Recipe, repriced: boolean) => void;
 }) {
   const [count, setCount] = useState("1");
+  // The day it goes on the menu (Joel, 2026-10-05). Today unless he picks another.
+  const [day, setDay] = useState(() => localToday());
   // Every field is editable (Joel, 2026-09-26), in place on the open card.
   const [editing, setEditing] = useState(false);
   // **Remove asks first** (TEC-29 item 8): it is permanent, and it sat one tap
@@ -900,11 +904,24 @@ function RecipeCard({
               <span className="text-sm text-ink-soft">—</span>
             )}
 
+            {/* The day picked here is the day it sits on the menu. A cleared
+                picker would send no day at all, so it disables the button
+                instead of quietly meaning "today". */}
+            <input
+              type="date"
+              value={day}
+              onChange={(e) => setDay(e.target.value)}
+              aria-label={`Day to cook ${recipe.name}`}
+              className="ml-auto rounded border border-line bg-surface px-2 py-1 text-sm"
+            />
             <button
               type="button"
-              onClick={onList}
-              disabled={recipe.ingredients.length === 0 || listing}
-              className="ml-auto rounded border border-line px-3 py-1.5 text-sm disabled:opacity-50"
+              onClick={() => {
+                const picked = parseDay(day);
+                if (picked) onList(picked);
+              }}
+              disabled={recipe.ingredients.length === 0 || listing || !parseDay(day)}
+              className="rounded border border-line px-3 py-1.5 text-sm disabled:opacity-50"
             >
               {listing ? "Adding…" : "Add to list"}
             </button>
