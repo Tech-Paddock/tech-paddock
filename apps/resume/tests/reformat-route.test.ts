@@ -47,7 +47,9 @@ afterEach(() => {
 
 describe("POST /api/reformat", () => {
   it("returns a document, full coverage, and a clean ATS result", async () => {
-    withStoredTemplate();
+    // The flat template audits clean. The older one carries two blocking
+    // findings, so its render FAILs and returns no document (pinned below).
+    withStoredTemplate("template-flat-sample.docx");
     const res = await reformat({ source: file("jobright.docx", fixture("jobright-sample.docx")) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -61,8 +63,41 @@ describe("POST /api/reformat", () => {
     expect(body.filename).toBe("jobright (reformatted).docx");
 
     // The payload really is a readable docx carrying the source's content.
+    expect(body.findings).toEqual([]);
+    expect(body.verdict.pass).toBe(true);
     const parts = await readDocxParts(Buffer.from(body.docxBase64, "base64"));
     expect(parts.document).toContain("Professional Experience");
+  });
+
+  /**
+   * TEC-105. Joel, 2026-10-14: "block the download but give the specific issue
+   * in diagnostic". A FAIL hands out no bytes — not in the response, and not in
+   * storage, where the Resumes list or `/api/renders/[id]/file` could offer them
+   * later. The record of the render is still kept, because it is what says why.
+   */
+  it("returns and stores no document when the verdict is FAIL, but records the render", async () => {
+    const uploads: string[] = [];
+    const { client, calls } = fakeSupabase(activeTemplate());
+    mockModules({
+      resume: client,
+      download: async () => fixture("template-sample.docx"),
+      upload: async (prefix) => {
+        uploads.push(String(prefix));
+        return `${prefix}/x.docx`;
+      },
+    });
+    const res = await reformat({ source: file("jobright.docx", fixture("jobright-sample.docx")) });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.verdict.pass).toBe(false);
+    expect(body.verdict.reasons.length).toBeGreaterThan(0);
+    expect(body).not.toHaveProperty("docxBase64");
+    expect(uploads).toEqual(["sources"]);
+    const payload = calls.find((c) => c.op === "insert")?.payload as Record<string, unknown>;
+    expect(payload.output_file_path).toBeNull();
+    expect(payload.source_file_path).toBe("sources/x.docx");
+    expect(body.renderId).toBe("r1");
   });
 
   /**

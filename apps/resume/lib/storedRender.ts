@@ -1,5 +1,5 @@
 import type { AtsFinding } from "@/lib/docx/ats";
-import type { ContentCheck } from "@/lib/docx/compare";
+import type { ContentCheck, MissingLine } from "@/lib/docx/compare";
 import type { ChangeAction, ChangeLogEntry } from "@/lib/reskin/types";
 import { fileLabel } from "@/lib/resumes";
 
@@ -31,6 +31,7 @@ const KNOWN_ACTIONS: readonly ChangeAction[] = [
   "input-not-read",
   "not-found-in-input",
   "passthrough",
+  "feathered",
 ];
 
 export type StoredRenderRow = {
@@ -59,8 +60,9 @@ export type StoredRenderView = {
   summary: StoredRenderSummary | null;
   /** Why no verdict can be given. Empty exactly when coverage and the change log were both read. */
   unread: string[];
-  /** The stored bytes, not a re-render. */
-  downloadHref: string;
+  /** The stored bytes, not a re-render. Null when none were stored: a render
+   *  whose verdict was FAIL keeps its record but not its file (TEC-105). */
+  downloadHref: string | null;
   /** Where it was logged, when it was: the tracker thread's company. */
   loggedTo: string | null;
   submittedAt: string | null;
@@ -75,11 +77,21 @@ function readCoverage(raw: unknown): ContentCheck | null {
   if (!Array.isArray(missing) || !missing.every((m) => typeof m === "string")) return null;
   // Absent on a render with nothing unread. Present but malformed is a record
   // this cannot read, and an unread record never reads as a clean one.
-  const { notRead } = raw;
-  if (notRead === undefined) return { totalLines, present, missing, percent };
-  if (!Array.isArray(notRead) || !notRead.every((m) => typeof m === "string")) return null;
-  return { totalLines, present, missing, percent, notRead };
+  const check: ContentCheck = { totalLines, present, missing, percent };
+  const { notRead, missingDetail } = raw;
+  if (notRead !== undefined) {
+    if (!Array.isArray(notRead) || !notRead.every((m) => typeof m === "string")) return null;
+    check.notRead = notRead;
+  }
+  // Renders stored before TEC-105 have none, and read as they always did. One
+  // that is present but malformed is dropped rather than shown half-read: the
+  // plain `missing` list still names every line.
+  if (Array.isArray(missingDetail) && missingDetail.every(isMissingLine)) check.missingDetail = missingDetail;
+  return check;
 }
+
+const isMissingLine = (m: unknown): m is MissingLine =>
+  isObject(m) && typeof m.line === "string" && typeof m.section === "string" && typeof m.reason === "string";
 
 function readChangeLog(snapshot: unknown): { log: ChangeLogEntry[] | null; unknown: string[] } {
   if (!isObject(snapshot) || !Array.isArray(snapshot.changeLog)) return { log: null, unknown: [] };
@@ -88,7 +100,13 @@ function readChangeLog(snapshot: unknown): { log: ChangeLogEntry[] | null; unkno
   for (const e of snapshot.changeLog) {
     if (!isObject(e) || typeof e.section !== "string" || typeof e.action !== "string") return { log: null, unknown: [] };
     if (!KNOWN_ACTIONS.includes(e.action as ChangeAction)) unknownActions.add(e.action);
-    log.push({ section: e.section, detail: typeof e.detail === "string" ? e.detail : "", action: e.action as ChangeAction });
+    const lines = Array.isArray(e.lines) && e.lines.every((l) => typeof l === "string") ? (e.lines as string[]) : null;
+    log.push({
+      section: e.section,
+      detail: typeof e.detail === "string" ? e.detail : "",
+      action: e.action as ChangeAction,
+      ...(lines ? { lines } : {}),
+    });
   }
   return { log, unknown: [...unknownActions] };
 }
@@ -152,7 +170,7 @@ export function storedRenderView(input: {
     changeLog: log,
     summary: readSummary(render.parsed_content),
     unread,
-    downloadHref: `/api/renders/${render.id}/file`,
+    downloadHref: render.output_file_path ? `/api/renders/${render.id}/file` : null,
     loggedTo,
     submittedAt: render.submitted_at,
   };

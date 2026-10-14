@@ -15,7 +15,8 @@ import {
 } from "./blocks";
 import { matchSectionKey, normalizeForCompare, type SectionKey } from "./sections";
 import { looksLikeContact } from "../docx/lines";
-import type { SourceContent, ChangeLogEntry, ExperienceEntry, CompetencyRow } from "./types";
+import { compareTexts } from "../docx/compare";
+import type { SourceContent, ChangeLogEntry, ExperienceEntry, CompetencyRow, SourceLine } from "./types";
 
 interface TemplateSection {
   key: SectionKey | "preamble";
@@ -107,6 +108,7 @@ export function renderIntoTemplate(
       section: u.heading,
       action: "input-dropped",
       detail: `The source's "${u.heading}" section (${u.lines} ${u.lines === 1 ? "line" : "lines"}) has no section in the template, so it was not carried over. Add one to the template to keep it.`,
+      ...(u.texts && u.texts.length > 0 ? { lines: u.texts } : {}),
     });
   }
 
@@ -207,6 +209,7 @@ function renderSummary(
       action: "not-found-in-input",
       detail:
         "The template has no summary paragraph above its first heading, so the input's summary was not placed. Add one to the template.",
+      lines: [content.summary],
     });
     return idxs.map((i) => blocks[i]);
   }
@@ -321,7 +324,8 @@ function renderCareerHighlights(
       log.push({
         section: "Career Highlights",
         action: "input-dropped",
-        detail: `Highlight ${i + 1} ("${highlights[i].stat}") has no cell in the template's table, so it was dropped — the template has ${templateCells.length}.`,
+        detail: `Highlight ${i + 1} ("${highlights[i].stat}") has no cell in the template's table, so it was dropped — the template has ${templateCells.length}. Career Highlights are not feathered: the template's table is their layout.`,
+        lines: [highlights[i].stat, highlights[i].desc],
       });
     }
   }
@@ -599,10 +603,14 @@ function renderExperience(
   if (entries.length === 0) {
     // Nothing in the template to map onto. Keep it verbatim rather than
     // emitting an empty section — silence here would read as "you have no jobs".
+    // Nothing to feather into either: there is no sibling to take formatting
+    // from. The input's jobs stay missing, coverage counts them, and this entry
+    // is what names why.
     log.push({
       section: "Professional Experience",
       action: "kept-unchanged",
-      detail: "No entry layout found in the template — kept as-is.",
+      detail: "No entry layout found in the template — kept as-is, so the input's jobs had nowhere to go.",
+      lines: content.experience.flatMap((e) => entryLines(e).map((l) => l.text)),
     });
     return idxs.map((i) => blocks[i]);
   }
@@ -630,10 +638,11 @@ function renderExperience(
   }
   for (const i of leading) out.push(blocks[i]);
 
+  const siblingsFor = (i: number) => nearestSiblings(blocks, entries, Math.min(i, entries.length - 1));
   for (let i = 0; i < Math.max(entries.length, content.experience.length); i += 1) {
     const input = content.experience[i];
     if (i < entries.length && input) {
-      out.push(...renderEntry(blocks, entries[i], input, log));
+      out.push(...renderEntry(blocks, entries[i], input, log, siblingsFor(i)));
     } else if (i < entries.length) {
       log.push({
         section: "Professional Experience",
@@ -646,7 +655,7 @@ function renderExperience(
         action: "cloned-overflow",
         detail: `${input.company}: extra job cloned from the template's last entry layout.`,
       });
-      out.push(...renderEntry(blocks, entries[entries.length - 1], input, log));
+      out.push(...renderEntry(blocks, entries[entries.length - 1], input, log, siblingsFor(i)));
     }
   }
   for (const i of trailing) out.push(blocks[i]);
@@ -655,11 +664,48 @@ function renderExperience(
   return out;
 }
 
+/** The template paragraphs a feathered line can take its formatting from. */
+interface Siblings {
+  header: string | null;
+  bullet: string | null;
+}
+
+/**
+ * The nearest template entry's last header line and last bullet, searching
+ * outward from entry `at` — itself first, then the closer neighbour, the earlier
+ * one on a tie. Nearest because a template's entries are usually uniform but
+ * need not be, and the one beside a line is the best guess at how it should
+ * look; deterministic because a render must be.
+ */
+function nearestSiblings(blocks: Block[], entries: TemplateExpEntry[], at: number): Siblings {
+  const found: Siblings = { header: null, bullet: null };
+  for (let d = 0; d < entries.length && (found.header === null || found.bullet === null); d += 1) {
+    for (const i of d === 0 ? [at] : [at - d, at + d]) {
+      const e = entries[i];
+      if (!e) continue;
+      if (found.header === null && e.headerIdxs.length > 0) found.header = blocks[e.headerIdxs[e.headerIdxs.length - 1]].raw;
+      if (found.bullet === null && e.bulletIdxs.length > 0) found.bullet = blocks[e.bulletIdxs[e.bulletIdxs.length - 1]].raw;
+    }
+  }
+  return found;
+}
+
+/** The input entry's lines in order — as extracted, or rebuilt from its fields
+ *  for a hand-built `SourceContent` that has none. */
+function entryLines(input: ExperienceEntry): SourceLine[] {
+  if (input.lines) return input.lines;
+  return [
+    ...[input.company, input.title, input.date].filter((t) => t.trim() !== "").map((text) => ({ text, bulleted: false })),
+    ...input.bullets.map((text) => ({ text, bulleted: true })),
+  ];
+}
+
 function renderEntry(
   blocks: Block[],
   entry: TemplateExpEntry,
   input: ExperienceEntry,
-  log: ChangeLogEntry[]
+  log: ChangeLogEntry[],
+  siblings: Siblings
 ): Block[] {
   const out: Block[] = [];
 
@@ -714,9 +760,14 @@ function renderEntry(
     }
   }
 
+  // Where each input bullet landed in `out`, so a feathered line can be put
+  // after the one that precedes it in the input.
+  const headerCount = out.length;
+  const bulletAt: (number | null)[] = [];
   const bulletTemplateRaw = blocks[entry.bulletIdxs[entry.bulletIdxs.length - 1]]?.raw;
   for (let i = 0; i < Math.max(entry.bulletIdxs.length, input.bullets.length); i += 1) {
     if (i < entry.bulletIdxs.length && i < input.bullets.length) {
+      bulletAt[i] = out.length;
       out.push({ type: "p", raw: replaceParagraphText(blocks[entry.bulletIdxs[i]].raw, input.bullets[i]) });
     } else if (i < entry.bulletIdxs.length) {
       log.push({
@@ -725,6 +776,7 @@ function renderEntry(
         detail: `${input.company}: template bullet ${i + 1} dropped — no matching input bullet.`,
       });
     } else if (bulletTemplateRaw) {
+      bulletAt[i] = out.length;
       out.push({ type: "p", raw: replaceParagraphText(bulletTemplateRaw, input.bullets[i]) });
       log.push({
         section: "Professional Experience",
@@ -732,15 +784,10 @@ function renderEntry(
         detail: `${input.company}: bullet ${i + 1} cloned from the template's last bullet.`,
       });
     } else {
-      // The template's entry has no bullet to clone, so this one has nowhere to
-      // go. It used to fall out of the loop with nothing said; the content check
-      // would still have counted it missing, but the change log is where the
-      // reason lives.
-      log.push({
-        section: "Professional Experience",
-        action: "input-dropped",
-        detail: `${input.company}: bullet ${i + 1} dropped — the template's entry has no bullet to clone.`,
-      });
+      // The template's entry has no bullet to clone. This used to be dropped
+      // here as `input-dropped`; it is feathered below instead, in the
+      // formatting of the nearest bullet the template does have.
+      bulletAt[i] = null;
     }
   }
   log.push({
@@ -749,8 +796,92 @@ function renderEntry(
     detail: `${input.company} — ${input.title} (${input.date || "no date found"}).`,
   });
 
+  const feathered = featherEntry(out, headerCount, bulletAt, input, siblings, log);
+
   // Keep the whole entry on one page: keepLines on every paragraph, keepNext on
   // all but the last. An entry taller than a page still breaks — Word relaxes
   // this rather than looping, and nothing can be done about that.
-  return out.map((b, i) => (b.type === "p" ? { type: "p", raw: withKeepTogether(b.raw, i < out.length - 1) } : b));
+  return feathered.map((b, i) =>
+    b.type === "p" ? { type: "p", raw: withKeepTogether(b.raw, i < feathered.length - 1) } : b
+  );
+}
+
+/**
+ * Feather in every line of the input entry that the entry did not place
+ * (Joel, 2026-10-14, TEC-107: *"rather than not including lines from the input
+ * file I want it to feather it in where ever the input file has it"*).
+ *
+ * **Placed means its text is in what was written**, by the same run-of-words
+ * test coverage applies to the finished document — never "the reader assigned
+ * it a field". A bullet is placed when it was written into a paragraph; a header
+ * line is placed when the entry's header paragraphs carry it. Anything else — a
+ * location line, a one-line description of the role, a bullet whose template
+ * entry has no bullet to clone, a whole header where the template's entry has
+ * none — goes in **after the line that precedes it in the input**, or at the
+ * head of the entry if nothing does, as a copy of the nearest template sibling
+ * of its own kind: a bullet takes a bullet's paragraph, any other line a header
+ * line's. Its text is the input's line, verbatim and whole.
+ *
+ * Whole, even where part of it was placed: a header line whose company was
+ * read but whose location was not is feathered entire, so a few words can
+ * appear twice. Splitting it would be rewriting the source's line, which this
+ * app never does; a repeated word is visible, a lost one is not.
+ */
+function featherEntry(
+  out: Block[],
+  headerCount: number,
+  bulletAt: (number | null)[],
+  input: ExperienceEntry,
+  siblings: Siblings,
+  log: ChangeLogEntry[]
+): Block[] {
+  const headerTexts = out.slice(0, headerCount).map((b) => extractText(b.raw));
+  const before: Block[] = [];
+  const after = new Map<number, Block[]>();
+  let anchor: number | null = null;
+  let previous: string | null = null;
+  let bullet = 0;
+
+  for (const line of entryLines(input)) {
+    let at: number | null = null;
+    if (line.bulleted) {
+      at = bulletAt[bullet] ?? null;
+      bullet += 1;
+    } else if (headerCount > 0 && compareTexts([line.text], headerTexts).missing.length === 0) {
+      at = headerCount - 1;
+    }
+
+    if (at !== null) {
+      anchor = at;
+      previous = line.text;
+      continue;
+    }
+
+    const own = line.bulleted ? siblings.bullet : siblings.header;
+    const sibling = own ?? (line.bulleted ? siblings.header : siblings.bullet);
+    // Unreachable while the template has an entry, which it must for this to
+    // run — and a line left out here is still counted missing by coverage.
+    if (sibling === null) continue;
+    const block: Block = { type: "p", raw: replaceParagraphText(sibling, line.text) };
+    if (anchor === null) before.push(block);
+    else after.set(anchor, [...(after.get(anchor) ?? []), block]);
+
+    const formattedLike = (own !== null) === line.bulleted ? "bullet" : "header line";
+    log.push({
+      section: "Professional Experience",
+      action: "feathered",
+      detail:
+        `${input.company || "An entry with no employer line"}: "${line.text}" had no slot in the template's entry, ` +
+        `so it was feathered in ${previous === null ? "at the head of the entry" : `after "${previous}"`}, where the ` +
+        `input has it, formatted like the template's ${formattedLike}.`,
+      lines: [line.text],
+    });
+    previous = line.text;
+  }
+
+  const result: Block[] = [...before];
+  out.forEach((b, i) => {
+    result.push(b, ...(after.get(i) ?? []));
+  });
+  return result;
 }

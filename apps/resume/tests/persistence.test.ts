@@ -134,10 +134,10 @@ describe("reformat against the stored template", () => {
     expect(res.status).toBe(409);
     const body = await res.json();
     expect(body.code).toBe("no_template");
-    // Points at where the upload now is. It said "Templates tab" until the
-    // upload moved to Reformat; a refusal that sends you to the wrong screen is
-    // worse than a terse one.
-    expect(body.error).toMatch(/Add one above/);
+    // Points at where the upload now is. It said "Templates tab", then "above"
+    // while the upload sat on Reformat; it moved to the Resumes tab (TEC-104),
+    // and a refusal that sends you to the wrong screen is worse than a terse one.
+    expect(body.error).toMatch(/Resumes tab/);
     expect(body.error).not.toMatch(/Templates tab/);
   });
 
@@ -157,7 +157,9 @@ describe("reformat against the stored template", () => {
       resume: client,
       // The render is built from the template's stored bytes, so the download is
       // load-bearing rather than incidental.
-      download: async () => fixture("template-sample.docx"),
+      // The flat template, which passes: a FAIL stores no output at all (TEC-105,
+      // pinned below), so only a passing render has an output to order.
+      download: async () => fixture("template-flat-sample.docx"),
       upload: async (prefix) => {
         order.push(`file:${prefix}`);
         return `${prefix}/x.docx`;

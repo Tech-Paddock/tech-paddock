@@ -3,7 +3,7 @@ import { extractText, isBold, isItalic, hasNumPr, splitRows, splitCells, cellPar
 import { matchSectionKey, splitCompanyAndTitleDate, type SectionKey } from "./sections";
 import { isHeadingCandidate, isKnownHeading, rankSizes } from "../docx/headings";
 import { extractParagraphs, type Para } from "../docx/paragraphs";
-import type { SourceContent, ExperienceEntry, CompetencyRow, StatCell, UnplacedSection } from "./types";
+import type { SourceContent, ExperienceEntry, CompetencyRow, StatCell, UnplacedSection, SourceLine } from "./types";
 
 interface RawExpLine {
   text: string;
@@ -51,7 +51,7 @@ export function extractSourceContent(blocks: Block[]): SourceContent {
         // and the name block is exactly where a large one-off line lives.
         if (currentSection !== null && (isKnownHeading(text) || isUnknownHeading(block))) {
           currentSection = "unplaced";
-          unplaced.push({ heading: text, lines: 0 });
+          unplaced.push({ heading: text, lines: 0, texts: [] });
           continue;
         }
       }
@@ -59,6 +59,7 @@ export function extractSourceContent(blocks: Block[]): SourceContent {
       switch (currentSection) {
         case "unplaced":
           unplaced[unplaced.length - 1].lines += 1;
+          unplaced[unplaced.length - 1].texts?.push(text);
           break;
         case null:
           // Front matter — the name and contact block. Deliberately dropped: the
@@ -100,7 +101,10 @@ export function extractSourceContent(blocks: Block[]): SourceContent {
     } else if (block.type === "tbl") {
       if (currentSection === "careerHighlights") careerHighlightCells.push(...tableCellTexts(block.raw));
       else if (currentSection === "competencies") competencies = competencyRowsFromTable(block.raw);
-      else if (currentSection === "unplaced") unplaced[unplaced.length - 1].lines += 1;
+      else if (currentSection === "unplaced") {
+        unplaced[unplaced.length - 1].lines += 1;
+        unplaced[unplaced.length - 1].texts?.push(...tableCellTexts(block.raw).flat());
+      }
     }
   }
 
@@ -159,7 +163,7 @@ function unknownHeadingTest(blocks: Block[]): (block: Block) => boolean {
 }
 
 function groupExperienceEntries(lines: RawExpLine[]): ExperienceEntry[] {
-  type Working = { headerLines: RawExpLine[]; bullets: string[]; bulletsStarted: boolean };
+  type Working = { headerLines: RawExpLine[]; bullets: string[]; bulletsStarted: boolean; lines: SourceLine[] };
   const entries: Working[] = [];
   let current: Working | null = null;
 
@@ -167,19 +171,24 @@ function groupExperienceEntries(lines: RawExpLine[]): ExperienceEntry[] {
     if (!line.bulleted) {
       if (current === null || current.bulletsStarted) {
         if (current) entries.push(current);
-        current = { headerLines: [line], bullets: [], bulletsStarted: false };
+        current = { headerLines: [line], bullets: [], bulletsStarted: false, lines: [] };
       } else {
         current.headerLines.push(line);
       }
     } else {
-      if (current === null) current = { headerLines: [], bullets: [], bulletsStarted: false };
+      if (current === null) current = { headerLines: [], bullets: [], bulletsStarted: false, lines: [] };
       current.bullets.push(line.text);
       current.bulletsStarted = true;
     }
+    current.lines.push({ text: line.text, bulleted: line.bulleted });
   }
   if (current) entries.push(current);
 
-  return entries.map((e) => ({ ...splitCompanyAndTitleDate(e.headerLines), bullets: e.bullets }));
+  return entries.map((e) => ({
+    ...splitCompanyAndTitleDate(e.headerLines),
+    bullets: e.bullets,
+    lines: e.lines,
+  }));
 }
 
 /**

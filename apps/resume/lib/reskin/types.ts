@@ -3,6 +3,24 @@ export interface ExperienceEntry {
   title: string;
   date: string;
   bullets: string[];
+  /**
+   * Every line of the entry as the input has it, in order — header lines and
+   * bullets alike. `company`, `title`, `date` and `bullets` are what the entry
+   * is *read as*; this is what it *is*. The difference is a line the reading
+   * did not use — a location line, a one-line description of the role — and
+   * that line used to reach the output nowhere while coverage, which checked
+   * only the fields, said 100% (TEC-107). The renderer feathers any of these it
+   * could not place, and coverage checks every one of them.
+   *
+   * Optional only so that a hand-built `SourceContent` in a test still reads;
+   * the extractor always writes it.
+   */
+  lines?: SourceLine[];
+}
+
+export interface SourceLine {
+  text: string;
+  bulleted: boolean;
 }
 
 export interface CompetencyRow {
@@ -54,6 +72,10 @@ export interface SourceContent {
 export interface UnplacedSection {
   heading: string;
   lines: number;
+  /** The text under it, so Diagnostics can name the lines that did not go
+   *  across rather than only count them (TEC-105). Optional for renders stored
+   *  before it was kept. */
+  texts?: string[];
 }
 
 /**
@@ -82,10 +104,27 @@ export type ChangeAction =
   | "input-dropped"
   | "input-not-read"
   | "not-found-in-input"
-  | "passthrough";
+  | "passthrough"
+  | "feathered";
+
+/**
+ * `feathered` is a Professional Experience line of the input the template's
+ * entry had no slot for, inserted where the input has it — after the line that
+ * precedes it there — in the formatting of the template's nearest sibling
+ * paragraph (Joel, 2026-10-14, TEC-107). Said every time, never a vote: the text
+ * arrived, and coverage checks that it did. **Professional Experience only.**
+ * Every other section's template owns its shape, and a line with no slot there
+ * stays missing and fails the render.
+ */
 
 export interface ChangeLogEntry {
   section: string;
   detail: string;
   action: ChangeAction;
+  /**
+   * The input lines this entry is about, verbatim, where it is about specific
+   * ones. It is what lets coverage name *why* a missing line is missing without
+   * re-deriving it from prose (TEC-105).
+   */
+  lines?: string[];
 }

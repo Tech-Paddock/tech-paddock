@@ -109,5 +109,17 @@ export function verdictFor(r: VerdictInput): Verdict {
     );
   }
 
+  // Professional Experience lines the template had no slot for, inserted where
+  // the input has them (TEC-107). The text arrived, so it never votes — but the
+  // formatting is a sibling's guess, so it is worth a look before sending.
+  const feathered = r.changeLog.filter((c) => c.action === "feathered");
+  if (feathered.length > 0) {
+    notes.push(
+      `${feathered.length} ${plural(feathered.length, "line", "lines")} of Professional Experience had no slot in the ` +
+        `template and ${plural(feathered.length, "was", "were")} feathered in where the input has ${plural(feathered.length, "it", "them")}, ` +
+        `formatted like the nearest template line.`
+    );
+  }
+
   return { pass: reasons.length === 0, reasons, notes };
 }

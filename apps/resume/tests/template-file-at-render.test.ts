@@ -59,13 +59,15 @@ describe("the render is built from the template file", () => {
 
   it("carries that file's own parts into the output untouched", async () => {
     const { client } = fakeSupabase(activeRow());
-    mockModules({ resume: client, download: async () => fixture("template-sample.docx") });
+    // The flat template, because it passes: a FAIL hands back no bytes (TEC-105).
+    // The older template's parts are pinned byte-identical in reskin.test.ts.
+    mockModules({ resume: client, download: async () => fixture("template-flat-sample.docx") });
 
     const { POST } = await import("../app/api/reformat/route");
     const body = await (await POST(reformat())).json();
 
     const out = await JSZip.loadAsync(Buffer.from(body.docxBase64, "base64"));
-    const template = await JSZip.loadAsync(fixture("template-sample.docx"));
+    const template = await JSZip.loadAsync(fixture("template-flat-sample.docx"));
     for (const part of ["word/styles.xml", "word/numbering.xml", "word/theme/theme1.xml"]) {
       expect(await out.file(part)?.async("string"), part).toBe(await template.file(part)?.async("string"));
     }
