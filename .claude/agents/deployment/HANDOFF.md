@@ -48,9 +48,10 @@ state is never written here — read it live.
   cannot do. Say which branch is stale; Joel removes it.
 - **A helper worktree refuses git inside a loop, a variable or a `git -C`.** Run each git command
   plainly; write a file first (`git show … > file`) when another tool needs a branch's content.
-- **`gh` is not installed.** Read check runs with `curl` on
-  `api.github.com/repos/…/commits/<sha>/check-runs`. **With a pull request open, one push runs
-  `gate` twice**, and a merge is refused while the second is only queued: wait for both.
+- **Read check runs with the GitHub tool**: `pull_request_read` → `get_check_runs` on the pull
+  request, and `actions_list` for workflow runs. An unauthenticated `curl` wait loop on
+  `api.github.com` never finished (TEC-112). **With a pull request open, one push runs `gate`
+  twice**, and a merge is refused while the second is only queued: wait for both.
 - **A stacked branch conflicts once its base squash-merges**, on every file both touched. Test
   first (`DECISIONS.md`): `main`'s copy against the base tip the branch stacked on. Identical, take
   the branch side; that held for every conflict of the second train.
