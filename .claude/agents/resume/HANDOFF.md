@@ -33,18 +33,15 @@ uses — goes in after the line preceding it in the input, as a copy of the near
 Coverage checks every Experience line, not only the fields read out of it. Every other section
 is unchanged: a line with no slot stays missing and fails.
 
-**The template is added on the Resumes tab**, with its Save and activate step (TEC-104).
-
 **Unpairable Career Highlights are `input-not-read`: named, never a vote** (Joel, 2026-09-29,
 TEC-87 option 3). Pipe or Word table, every cell is one metric and one description or none is read.
-
 **A stored render reopens with its own record** via *Open* on either row: coverage and change log
 read as written, never re-rendered. **An unread record is NO VERDICT, never PASS**
 (`lib/storedRender.ts`). A FAIL with no output reopens from its recorded findings, no download.
 
 **Diagnostics checks what Reformat checks** (`checkContent`). The Resumes tab is one list,
 `/api/resumes`, filtered Template / Input / Output; a render is up to two rows sharing its id.
-
+The template is added there, with its Save and activate step (TEC-104).
 **The engine** rewrites only the body of `word/document.xml`; the output is byte-deterministic.
 Joel's template audits clean. **What a heading is lives in `lib/docx/headings.ts` alone**; a
 source heading with no section ends the section before it and is `input-dropped`, its text kept in
@@ -53,27 +50,30 @@ source heading with no section ends the section before it and is `input-dropped`
 **`templates.spec` is nullable, and nothing writes or reads it** (TEC-63's second pull request
 drops it). **Activating a template is one transaction**, `resume.activate_template`. **This app
 holds no client for `shared`** (TEC-26). **The fixtures carry no real timeline.**
+**Next.js 16 and React 19; the gate file is `proxy.ts`, on the Node runtime** (TEC-34 pilot).
+The other apps stay on 14 behind `middleware.ts` until each moves. Route handlers await
+`params`, so tests pass `Promise.resolve({ id })`. **No route opts into a cache** (TEC-114):
+Next 16 caches no `fetch` by default, and every GET reached the database on every call.
 
 ## Traps specific to this app
 
 - **A feathered role line carries the bullet glyph.** That is Joel's pick read literally; the
   header line is the fallback only when no template entry has a bullet at all.
-- **A reopened render's verdict is today's `verdictFor` over its stored log**, so an older render
-  that failed only on a wholly empty section now reads PASS with a note. Its record is unchanged.
-- **`input-not-read` passes, so the log line, `notRead` and the note are all that say so** —
-  `tests/unreadable-highlights.test.ts` pins each.
+- **A reopened render's verdict and ATS findings are today's** (`verdictFor` over its stored log,
+  the lint over its stored bytes): one that failed only on a wholly empty section now reads PASS
+  with a note. Coverage and the change log are the record, and stay unchanged.
+- **`input-not-read` passes**: only its log line, `notRead` and the note say so (a test pins each).
 - **`template-sample.docx` FAILs** on its two blocking findings, so it returns no bytes. A test
   that reads the output goes through `template-flat-sample.docx`.
-- **Renders that FAILed before the download block shipped keep their stored output** (Joel,
-  2026-10-18: history), downloadable from Resumes.
+- **Renders that FAILed before the download block keep their stored output** (Joel, 2026-10-18).
 - **`RULES.md` still describes `templates.spec` and `extractSpec`**, gone from code: TD's to redraft.
-- **A reopened render's ATS findings are today's lint** on the stored bytes when there are bytes;
-  coverage and the change log are the record.
 - **A new database function needs its grants.** `activate_template` revokes PUBLIC and grants
   `service_role` alone — copy that.
-- **Experience regroups paragraphs into entries.** Anything else in the section keeps its
-  original order, which keeps the XML well formed.
-- **Career Highlights never adds or removes a cell.** A count mismatch is logged per cell.
+- **Experience regroups paragraphs into entries**; the rest of the section keeps its order.
+  **Career Highlights never adds or removes a cell**; a mismatch is logged per cell.
+- **`proxy.ts` is the TD's plumbing, and Next 14 ignores it without a word.** drift ties the
+  name to the Next major: `package.json`, the lockfile and the gate file move together.
+- **`next build` rewrites `tsconfig.json`.** Commit what it writes, or every build changes it.
 - **The zip-bomb guard counts inflated bytes**, streaming, in `loadDocx` and `readDocxParts`.
 - **`String.replace` interprets `$&` even with a string pattern** — splice by index.
 - **The tracker write-through is a cross-app contract** (`supabase/README.md`): its faults — UTC
