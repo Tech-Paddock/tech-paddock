@@ -37,6 +37,9 @@ export type Verdict = {
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
+/** The change-log actions that put source text into a section. */
+const WROTE_SOURCE = new Set(["replaced", "cloned-overflow", "feathered"]);
+
 /** The sections named by a set of change-log entries, deduplicated, in order. */
 function sections(entries: { section: string }[]): string {
   return [...new Set(entries.map((e) => e.section))].join(", ");
@@ -73,19 +76,38 @@ export function verdictFor(r: VerdictInput): Verdict {
     );
   }
 
-  // A section of the template the source never filled. Not a loss, but the
-  // document goes out carrying the template's own words for it. Counted by
-  // section, because the sentence says sections.
+  const notes = r.findings.filter((f) => f.severity === "warning").map((f) => f.message);
+
+  // Template text the source did not replace (`not-found-in-input`), which
+  // ships the template's own words. Joel, 2026-10-18 (TEC-105): **whole
+  // sections only** warn. A section the source left entirely empty — a Summary
+  // the Jobright export lacks — is a note, and the render passes and downloads.
+  // A section the source filled **only in part** still fails, so the
+  // template's own figures never ship on a downloadable resume: today that is
+  // a Career Highlights cell the source had no highlight for.
+  //
+  // Partial is told apart by the log alone: the same section also carries an
+  // entry that wrote source text into it. That reads a stored render's log the
+  // same way, so older records reopen with the verdict this rule gives them.
+  // Source text that existed and had no slot is a third case, and fails above
+  // through `coverage.missing`.
   const unfilled = r.changeLog.filter((c) => c.action === "not-found-in-input");
-  if (unfilled.length > 0) {
-    const n = new Set(unfilled.map((c) => c.section)).size;
+  const written = new Set(r.changeLog.filter((c) => WROTE_SOURCE.has(c.action)).map((c) => c.section));
+  const partly = unfilled.filter((c) => written.has(c.section));
+  const wholly = unfilled.filter((c) => !written.has(c.section));
+  if (partly.length > 0) {
     reasons.push(
-      `The source did not fill ${n} ${plural(n, "section", "sections")} of the ` +
-        `template, which keeps its own text — ${sections(unfilled)}.`
+      `The source filled ${sections(partly)} only in part, so ${partly.length} ` +
+        `${plural(partly.length, "entry keeps", "entries keep")} the template's own text.`
     );
   }
-
-  const notes = r.findings.filter((f) => f.severity === "warning").map((f) => f.message);
+  if (wholly.length > 0) {
+    const n = new Set(wholly.map((c) => c.section)).size;
+    notes.push(
+      `The source did not fill ${n} ${plural(n, "section", "sections")} of the ` +
+        `template, which keeps its own text — ${sections(wholly)}.`
+    );
+  }
 
   // Template lines with no counterpart in the input were left out. Worth saying,
   // never worth failing over.
@@ -106,6 +128,18 @@ export function verdictFor(r: VerdictInput): Verdict {
     notes.push(
       `Part of the source could not be read, so it was not placed and the template's own text was kept — ` +
         `${sections(notRead)}. It repeats items from the body, so this does not fail the reformat.`
+    );
+  }
+
+  // Professional Experience lines the template had no slot for, inserted where
+  // the input has them (TEC-107). The text arrived, so it never votes — but the
+  // formatting is a sibling's guess, so it is worth a look before sending.
+  const feathered = r.changeLog.filter((c) => c.action === "feathered");
+  if (feathered.length > 0) {
+    notes.push(
+      `${feathered.length} ${plural(feathered.length, "line", "lines")} of Professional Experience had no slot in the ` +
+        `template and ${plural(feathered.length, "was", "were")} feathered in where the input has ${plural(feathered.length, "it", "them")}, ` +
+        `formatted like the nearest template line.`
     );
   }
 

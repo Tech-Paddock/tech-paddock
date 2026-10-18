@@ -99,6 +99,68 @@ describe("GET /api/renders/[id] — a stored render reopens with its own record"
     expect(back.downloadHref).toBe("/api/renders/r1/file");
   });
 
+  /**
+   * TEC-105. A FAIL stores no output, so there are no bytes to re-lint when it
+   * is reopened. It reopens from the findings it recorded — the older template's
+   * two blocking findings are what fail it here — and must still read FAIL,
+   * never a PASS with nothing found, and offer no download.
+   */
+  it("reopens a FAIL with no stored output from its recorded findings, still FAIL and with nothing to download", async () => {
+    let insertedRow: Record<string, unknown> | null = null;
+    const { client } = fakeSupabase({
+      "templates.select": {
+        data: { id: "t1", version: 4, name: "template.docx", file_path: "templates/4.docx" },
+        error: null,
+      },
+      "renders.insert": (call) => {
+        insertedRow = call.payload as Record<string, unknown>;
+        return { data: { id: "r1" }, error: null };
+      },
+    });
+    mockModules({ resume: client, download: async () => fixture("template-sample.docx") });
+    const body = new FormData();
+    body.append("source", new File([new Uint8Array(fixture("jobright-sample.docx"))], "jobright.docx"));
+    const { POST } = await import("../app/api/reformat/route");
+    const fresh = await (await POST(new NextRequest("http://localhost/api/reformat", { method: "POST", body }))).json();
+    expect(verdictFor(fresh).pass).toBe(false);
+    expect((insertedRow as unknown as Record<string, unknown>).output_file_path).toBeNull();
+
+    vi.resetModules();
+    const downloads: unknown[] = [];
+    const { client: reader } = fakeSupabase({
+      "renders.select": {
+        data: { id: "r1", thread_id: null, submitted_at: null, ...(insertedRow as unknown as Record<string, unknown>) },
+        error: null,
+      },
+      "templates.select": { data: { name: "template.docx", version: 4 }, error: null },
+    });
+    mockModules({
+      resume: reader,
+      download: async (path) => {
+        downloads.push(path);
+        return Buffer.from("x");
+      },
+    });
+
+    const res = await reopen();
+    expect(res.status).toBe(200);
+    const back = await res.json();
+    expect(back.findings).toEqual(fresh.findings);
+    expect(back.findings.some((f: { severity: string }) => f.severity === "blocking")).toBe(true);
+    expect(verdictFor(back)).toEqual(verdictFor(fresh));
+    expect(back.downloadHref).toBeNull();
+    expect(downloads).toEqual([]);
+  });
+
+  it("refuses a render with neither a stored output nor recorded findings", async () => {
+    const { client } = fakeSupabase({
+      "renders.select": { data: { ...row({ output_file_path: null }), template_id: "t1", thread_id: null }, error: null },
+    });
+    mockModules({ resume: client });
+    const res = await reopen();
+    expect(res.status).toBe(409);
+  });
+
   it("says where it was logged, so the screen does not offer to log it twice", async () => {
     const { client } = fakeSupabase({
       "renders.select": { data: { ...row(), template_id: "t1", thread_id: "th1" }, error: null },

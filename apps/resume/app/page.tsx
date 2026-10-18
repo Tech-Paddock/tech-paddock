@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { LIVERY } from "@/lib/livery";
 import { KIND_LABEL, type ResumeFile, type ResumeKind } from "@/lib/resumes";
@@ -19,8 +19,12 @@ import LogoutControl from "./LogoutControl";
  * **Reformat leads and is the landing tab.** Diagnostics led for a while on the
  * reasoning that formatting happens in Word and the last step before sending is
  * the one this app is for. That was wrong about how the app is actually opened:
- * it is opened to run a Jobright export through the house style, and Diagnostics
- * is where you go afterwards.
+ * it is opened to run a Jobright export through the Current Template, and
+ * Diagnostics is where you go afterwards.
+ *
+ * **The template is changed on Resumes, not here** (Joel, 2026-10-14, TEC-104).
+ * Reformat is the act you repeat; replacing the template is the rare one, and it
+ * sits beside the list of templates it adds to. The confirm step moved with it.
  *
  * **Reformat carries no readouts, and that is deliberate.** Joel, 2026-09-19:
  * *"Realistically I don't want any telemetry on the main tab. put it on the
@@ -34,12 +38,15 @@ import LogoutControl from "./LogoutControl";
 type Tab = "reformat" | "resume" | "diagnostics";
 const TABS: { id: Tab; label: string }[] = [
   { id: "reformat", label: "Reformat" },
-  { id: "resume", label: "Resume" },
+  // The id stays `resume` so `?tab=resume` and every older alias still land
+  // here; only the label changed (TEC-106).
+  { id: "resume", label: "Resumes" },
   { id: "diagnostics", label: "Diagnostics" },
 ];
 
 /** Retired tab names still resolve, so an old link lands somewhere sensible. */
 const TAB_ALIASES: Record<string, Tab> = {
+  resumes: "resume",
   templates: "resume",
   history: "resume",
   check: "diagnostics",
@@ -49,8 +56,18 @@ type Finding = { code: string; severity: "blocking" | "warning"; message: string
 /** How much of what the renderer took from the source reached the document. The
  *  name, contact block and static sections are not in that set — they come from
  *  the template on purpose — so this is not a percentage of the whole source. */
-type Coverage = { totalLines: number; present: number; missing: string[]; percent: number; notRead?: string[] };
-type ChangeLogEntry = { section: string; detail: string; action: string };
+type MissingLine = { line: string; section: string; reason: string };
+type Coverage = {
+  totalLines: number;
+  present: number;
+  missing: string[];
+  percent: number;
+  notRead?: string[];
+  /** Each missing line's section and the render's own reason (TEC-105). Absent
+   *  on renders stored before it was written. */
+  missingDetail?: MissingLine[];
+};
+type ChangeLogEntry = { section: string; detail: string; action: string; lines?: string[] };
 /**
  * A reformat, just run (`POST /api/reformat`) or reopened from storage
  * (`GET /api/renders/[id]`). A reopened one carries no bytes — its download is
@@ -71,8 +88,9 @@ type Reformatted = {
     competencies: number;
     hasSummary: boolean;
   } | null;
+  /** Present only when the verdict passed: a FAIL hands out no bytes (TEC-105). */
   docxBase64?: string;
-  downloadHref?: string;
+  downloadHref?: string | null;
   unread?: string[];
   loggedTo?: string | null;
 };
@@ -242,6 +260,48 @@ function Workbench({ rail, children }: { rail: React.ReactNode; children: React.
   );
 }
 
+/**
+ * The red error toast a blocked download raises (Joel, 2026-10-14, TEC-105:
+ * "Let's add a red error … toast message also").
+ *
+ * **A local copy of Cookbook's toast pattern** (`apps/cookbook/app/Toast.tsx`),
+ * flagged rather than shared: one kind, one at a time, pinned to the bottom,
+ * gone after Cookbook's error lifetime or by hand. Solid red rather than
+ * Cookbook's red outline because Joel asked for a red toast, and it is the only
+ * word on a click that produced no file. Whether it becomes a shared component
+ * is TechPad Gen's call.
+ */
+function ErrorToast({ text, onDismiss, onOpen }: { text: string; onDismiss: () => void; onOpen: () => void }) {
+  const dismissRef = useRef(onDismiss);
+  dismissRef.current = onDismiss;
+  useEffect(() => {
+    const timer = setTimeout(() => dismissRef.current(), 8000);
+    return () => clearTimeout(timer);
+  }, [text]);
+
+  return (
+    <div
+      className="pointer-events-none fixed inset-x-0 z-50 flex justify-center px-4"
+      style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
+    >
+      <div
+        role="alert"
+        className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-lg border border-urgent bg-urgent text-accent-ink px-4 py-3 text-sm shadow-lg"
+      >
+        <span className="min-w-0 flex-1">
+          {text}{" "}
+          <button type="button" onClick={onOpen} className="underline font-medium">
+            Open Diagnostics
+          </button>
+        </span>
+        <button type="button" onClick={onDismiss} aria-label="Dismiss" className="shrink-0 leading-none opacity-80 hover:opacity-100">
+          {"×"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const KIND_STYLE: Record<ResumeKind, string> = {
   template: "border-accent text-accent",
   output: "border-line",
@@ -275,6 +335,8 @@ function ReformatShell() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  /** The red toast a blocked download raises (TEC-105). */
+  const [toast, setToast] = useState<string | null>(null);
 
   /**
    * The list is a projection of the server, never a memory of it.
@@ -368,8 +430,9 @@ function ReformatShell() {
    *
    * Dropping a file used to upload it immediately, which made the gesture the
    * decision: there was no moment between "here is a file" and "this is now the
-   * house style every render is built on". Joel asked for the confirm, and a
-   * template is exactly the wrong thing to change by accident.
+   * Current Template every render is built on". Joel asked for the confirm, and a
+   * template is exactly the wrong thing to change by accident. It lives on the
+   * Resumes tab, beside the templates it adds to (TEC-104).
    */
   async function saveTemplate() {
     if (!template) return;
@@ -386,16 +449,33 @@ function ReformatShell() {
     }
   }
 
+  /**
+   * One click renders and downloads (Joel, 2026-10-14, TEC-105: "Reformat button
+   * should be reformat and download").
+   *
+   * **A FAIL downloads nothing.** The server returns no bytes for one — it is
+   * enforced there, not here — so this only has to notice and say so: a red
+   * toast, and the specific issue on Diagnostics, read from the render's own
+   * coverage report. The verdict stays on the page either way.
+   */
   async function reformat() {
     if (!source || !active) return;
     setResult(null);
+    setToast(null);
     // Without this the previous render's confirmation sticks around and hides
     // the job form for the new one.
     setSaved(null);
     const body = new FormData();
     body.append("source", source);
     try {
-      setResult(await post<Reformatted>("/api/reformat", body, "Reading both documents…"));
+      const rendered = await post<Reformatted>("/api/reformat", body, "Reading both documents…");
+      setResult(rendered);
+      if (rendered.docxBase64) download(rendered);
+      else {
+        setToast(
+          "This file was not processed and was not downloaded: the reformat failed. Diagnostics names the specific issue."
+        );
+      }
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reformatting failed.");
@@ -442,25 +522,33 @@ function ReformatShell() {
     }
   }
 
-  function download() {
-    if (!result) return;
-    if (!result.docxBase64) {
+  function download(r: Reformatted | null = result) {
+    if (!r) return;
+    if (!r.docxBase64) {
       // Reopened: the stored bytes, exactly as they went out.
-      if (result.downloadHref) window.location.href = result.downloadHref;
+      if (r.downloadHref) window.location.href = r.downloadHref;
       return;
     }
-    const bytes = Uint8Array.from(atob(result.docxBase64), (c) => c.charCodeAt(0));
+    const bytes = Uint8Array.from(atob(r.docxBase64), (c) => c.charCodeAt(0));
     const url = URL.createObjectURL(
       new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = result.filename;
+    a.download = r.filename;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   /* ── what the list says ─────────────────────────────────────────────── */
+
+  // The verdict on the render in hand, or null when its record cannot be read —
+  // an unread record gets no verdict rather than a PASS nobody checked.
+  const verdict =
+    result && result.coverage && result.changeLog && (result.unread?.length ?? 0) === 0
+      ? verdictFor({ ...result, coverage: result.coverage, changeLog: result.changeLog })
+      : null;
+  const failed = verdict !== null && !verdict.pass;
 
   const templates = files?.filter((f) => f.kind === "template") ?? null;
   const active = templates?.find((t) => t.active) ?? null;
@@ -561,6 +649,7 @@ function ReformatShell() {
       </header>
 
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-5 flex flex-col gap-4">
+        {toast && <ErrorToast text={toast} onDismiss={() => setToast(null)} onOpen={() => setTab("diagnostics")} />}
         {error && <p className="text-sm text-urgent bg-surface border border-urgent rounded-lg px-4 py-2.5">{error}</p>}
         {note && <p className="text-sm bg-surface border border-line rounded-lg px-4 py-2.5">{note}</p>}
         {listStale && (
@@ -575,14 +664,20 @@ function ReformatShell() {
               <>
                 {active ? (
                   <div className="bg-surface border border-line rounded-xl px-4 py-3">
-                    <p className="text-[0.7rem] uppercase tracking-wide opacity-60">House style</p>
+                    <p className="text-[0.7rem] uppercase tracking-wide opacity-60">Current Template</p>
                     <p className="text-sm font-medium break-all">
                       {active.name} <span className="opacity-60 font-normal">v{active.version}</span>
                     </p>
                   </div>
                 ) : (
+                  // The template is added on Resumes now (TEC-104), so the empty
+                  // state has to say where — a disabled button alone is a dead end.
                   <p className="text-sm bg-surface border border-warn text-warn rounded-xl px-4 py-3">
-                    No template saved yet. Add one below — it saves and becomes the house style.
+                    No template saved yet. Add one on the{" "}
+                    <button onClick={() => setTab("resume")} className="underline font-medium">
+                      Resumes
+                    </button>{" "}
+                    tab — it saves and becomes the Current Template.
                   </p>
                 )}
 
@@ -592,69 +687,48 @@ function ReformatShell() {
                   </p>
                 )}
 
-                <FilePick label="Tailored resume" hint="The Jobright export to reformat" file={source} onPick={setSource} />
-                <FilePick
-                  label={active ? "Replace the template" : "Template"}
-                  hint={active ? "A new version, which becomes the house style" : "Your resume, whose formatting to copy"}
-                  file={template}
-                  onPick={setTemplate}
-                />
-
-                {/* The confirm step. Dropping a file stages it; this commits it. */}
-                {template && (
-                  <div className="bg-surface border border-accent rounded-xl px-4 py-3 flex flex-col gap-3">
-                    <p className="text-sm">
-                      Save <span className="font-medium break-all">{template.name}</span> as the template? It becomes the
-                      new version, and every render from now on is built on it.
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setTemplate(null)}
-                        disabled={busy !== null}
-                        className="border border-line rounded-lg px-3 py-1.5 text-sm disabled:opacity-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={saveTemplate}
-                        disabled={busy !== null}
-                        className="bg-accent text-accent-ink rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-                      >
-                        Save and activate
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <FilePick label="Input Resume" hint="The Jobright export to reformat" file={source} onPick={setSource} />
 
                 <button
                   onClick={reformat}
                   disabled={!source || !active || busy !== null}
                   className="w-full bg-accent text-accent-ink rounded-xl px-5 py-3 font-medium disabled:opacity-50"
                 >
-                  {busy ?? "Reformat"}
+                  {busy ?? "Reformat and Download"}
                 </button>
 
-                {/* The download sits under the button that produced it, and its label
-                    does not change. Joel, 2026-09-19: "don't make this dynamic". A
-                    button whose text is the filename moves and re-wraps on every
-                    render, so the thing you reach for is never in the same place. */}
-                {result && (
-                  <button
-                    onClick={download}
-                    className="w-full border border-accent text-accent rounded-xl px-5 py-3 font-medium"
-                  >
-                    Download Resume
-                  </button>
-                )}
+                {/* Downloading again sits under the button that produced it, and
+                    its label does not change. Joel, 2026-09-19: "don't make this
+                    dynamic". A button whose text is the filename moves and
+                    re-wraps on every render, so the thing you reach for is never
+                    in the same place. A FAIL offers no file at all (TEC-105). */}
+                {result &&
+                  (failed ? (
+                    <p className="text-sm text-urgent border border-urgent rounded-xl px-4 py-3">
+                      Not downloaded — this reformat failed.{" "}
+                      <button onClick={() => setTab("diagnostics")} className="underline font-medium">
+                        Diagnostics
+                      </button>{" "}
+                      names the specific issue.
+                    </p>
+                  ) : result.docxBase64 || result.downloadHref ? (
+                    <button
+                      onClick={() => download()}
+                      className="w-full border border-accent text-accent rounded-xl px-5 py-3 font-medium"
+                    >
+                      Download Resume
+                    </button>
+                  ) : null)}
               </>
             }
           >
             {!result ? (
               <Panel title="What comes back">
                 <p className="text-sm opacity-70">
-                  Your template with this resume&apos;s text in it. Nothing is generated: every line is moved across word
-                  for word. The measurements — how much of the source reached the document, an ATS check on the output,
-                  and what the renderer changed — are on Diagnostics.
+                  Your Current Template with the Input Resume&apos;s text in it, downloaded as soon as it passes. Nothing
+                  is generated: every line is moved across word for word. A render that fails is not downloaded. The
+                  measurements — how much of the source reached the document, an ATS check on the output, and what the
+                  renderer changed — are on Diagnostics.
                 </p>
               </Panel>
             ) : (
@@ -684,7 +758,7 @@ function ReformatShell() {
                       </div>
                     );
                   }
-                  const v = verdictFor({ ...result, coverage: result.coverage, changeLog: result.changeLog });
+                  const v = verdict ?? verdictFor({ ...result, coverage: result.coverage, changeLog: result.changeLog });
                   return (
                     <div
                       className={`rounded-xl border-2 overflow-hidden ${v.pass ? "border-bar" : "border-urgent"}`}
@@ -740,7 +814,8 @@ function ReformatShell() {
                   );
                 })()}
 
-                {result.renderId && (
+                {/* A failed render produced no file to send, so there is nothing to log. */}
+                {result.renderId && !failed && (
                   <Panel title="Where did this go?">
                     {saved ? (
                       <p className="text-sm">{saved}</p>
@@ -748,7 +823,7 @@ function ReformatShell() {
                       <div className="flex flex-col gap-3">
                         <p className="text-xs opacity-60">
                           Naming a company creates the thread in Pipeline Tracker. Leave it blank if you have not sent
-                          this yet — it stays on the Resume tab either way.
+                          this yet — it stays on the Resumes tab either way.
                         </p>
                         <div className="grid gap-3 sm:grid-cols-3">
                           {(
@@ -787,6 +862,43 @@ function ReformatShell() {
 
         {tab === "resume" && (
           <>
+            {/* The template picker and its confirm step, moved here from Reformat
+                (Joel, 2026-10-14, TEC-104: "Replace the template should be on the
+                resume tab"). Dropping a file stages it; Save and activate commits it. */}
+            <div className="flex flex-col gap-3 sm:max-w-md">
+              <FilePick
+                label={active ? "Replace the template" : "Template"}
+                hint={active ? "A new version, which becomes the Current Template" : "Your resume, whose formatting to copy"}
+                file={template}
+                onPick={setTemplate}
+              />
+              {template && (
+                <div className="bg-surface border border-accent rounded-xl px-4 py-3 flex flex-col gap-3">
+                  <p className="text-sm">
+                    Save <span className="font-medium break-all">{template.name}</span> as the template? It becomes the
+                    new version, and every render from now on is built on it.
+                  </p>
+                  <div className="flex gap-2 items-center">
+                    <button
+                      onClick={() => setTemplate(null)}
+                      disabled={busy !== null}
+                      className="border border-line rounded-lg px-3 py-1.5 text-sm disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveTemplate}
+                      disabled={busy !== null}
+                      className="bg-accent text-accent-ink rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                    >
+                      Save and activate
+                    </button>
+                    {busy && <span className="text-xs opacity-60">{busy}</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex flex-wrap items-center gap-2">
               {(
                 [
@@ -815,9 +927,10 @@ function ReformatShell() {
             </div>
 
             <p className="text-xs opacity-60">
-              Every file this app is holding. A template is the house style; an input is what you uploaded and an output
-              is what came out, and those two belong to one render — deleting either deletes both. Archiving is the
-              gentle way to retire a template; deleting takes the file, and the renders built from it stay.
+              Every file this app is holding. The active template is the Current Template; an input is what you
+              uploaded and an output is what came out, and those two belong to one render — deleting either deletes
+              both. A render that failed keeps its input and its record but has no output. Archiving is the gentle way
+              to retire a template; deleting takes the file, and the renders built from it stay.
             </p>
 
             {files === null ? (
@@ -826,7 +939,7 @@ function ReformatShell() {
               <Panel>
                 <p className="text-sm">
                   {files.length === 0
-                    ? "Nothing here yet. Save a template on the Reformat tab, then run a resume through it."
+                    ? "Nothing here yet. Save a template above, then run a resume through it on Reformat."
                     : "Nothing of that type."}
                 </p>
               </Panel>
@@ -870,7 +983,7 @@ function ReformatShell() {
                             nothing that is used (TEC-63). */}
                         {f.kind === "template"
                           ? f.active
-                            ? "The house style — every render is built on this file"
+                            ? "The Current Template — every render is built on this file"
                             : "Kept as uploaded"
                           : [
                               f.company ?? "No job recorded",
@@ -989,17 +1102,81 @@ function ReformatShell() {
                   </Panel>
                 )}
 
-                {result.coverage && result.coverage.missing.length > 0 && (
-                  <Panel title="Not carried across" aside={<span className="text-xs text-warn">check before sending</span>}>
+                {/* Why a FAIL was not downloaded (TEC-105). The reasons are the
+                    verdict's; the lines below are the render's own coverage
+                    report and change log, as written when it ran — never
+                    re-derived here. */}
+                {failed && verdict && (
+                  <Panel title="Why it failed" aside={<span className="text-xs text-urgent">not downloaded</span>}>
                     <ul className="list-disc pl-5 text-sm flex flex-col gap-1">
-                      {result.coverage.missing.map((d, i) => (
-                        <li key={i} className="break-words">
-                          {d}
-                        </li>
+                      {verdict.reasons.map((reason, i) => (
+                        <li key={i}>{reason}</li>
                       ))}
                     </ul>
                   </Panel>
                 )}
+
+                {result.coverage && result.coverage.missing.length > 0 && (
+                  <Panel
+                    title="Not carried across"
+                    aside={<span className="text-xs text-urgent">{failed ? "why it failed" : "check before sending"}</span>}
+                  >
+                    {result.coverage.missingDetail ? (
+                      <ul className="flex flex-col divide-y divide-line">
+                        {result.coverage.missingDetail.map((m, i) => (
+                          <li key={i} className="py-2 flex flex-col gap-0.5">
+                            <span className="text-sm break-words">&ldquo;{m.line}&rdquo;</span>
+                            <span className="text-xs">
+                              <span className="font-medium">{m.section}</span>{" "}
+                              <span className="opacity-70">{m.reason}</span>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      // Stored before each line carried its section and reason.
+                      <ul className="list-disc pl-5 text-sm flex flex-col gap-1">
+                        {result.coverage.missing.map((d, i) => (
+                          <li key={i} className="break-words">
+                            {d}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Panel>
+                )}
+
+                {/* Source text that failed the render without being a missing
+                    line — a whole section the template has no place for. */}
+                {(() => {
+                  const named = new Set(result.coverage?.missing ?? []);
+                  const lost = (result.changeLog ?? []).filter(
+                    (c) => c.action === "input-dropped" && !(c.lines ?? []).some((l) => named.has(l.trim()))
+                  );
+                  if (lost.length === 0) return null;
+                  return (
+                    <Panel title="Had nowhere to go" aside={<span className="text-xs text-urgent">fails it</span>}>
+                      <ul className="flex flex-col divide-y divide-line">
+                        {lost.map((c, i) => (
+                          <li key={i} className="py-2 flex flex-col gap-1">
+                            <span className="text-xs">
+                              <span className="font-medium">{c.section}</span> <span className="opacity-70">{c.detail}</span>
+                            </span>
+                            {(c.lines ?? []).length > 0 && (
+                              <ul className="list-disc pl-5 text-sm flex flex-col gap-0.5">
+                                {c.lines?.map((l, j) => (
+                                  <li key={j} className="break-words">
+                                    {l}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </Panel>
+                  );
+                })()}
 
                 {(result.coverage?.notRead?.length ?? 0) > 0 && (
                   <Panel title="Not read, not placed" aside={<span className="text-xs opacity-60">does not fail it</span>}>

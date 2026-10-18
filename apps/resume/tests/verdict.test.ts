@@ -92,12 +92,41 @@ describe("the reformat verdict", () => {
     ]);
   });
 
-  it("fails when a template section went unfilled, because it ships the template's own words", () => {
+  /**
+   * Joel, 2026-10-18 (TEC-105): a template section the source does not fill
+   * "only warns". It used to fail, and so blocked the download of every render
+   * from an export with no Summary. It is still said, every time, because the
+   * document goes out carrying the template's own words for that section.
+   */
+  it("passes with a note when a template section went unfilled, because it ships the template's own words", () => {
     const v = verdictFor({ ...clean, changeLog: [{ section: "Summary", action: "not-found-in-input" }] });
+    expect(v.pass).toBe(true);
+    expect(v.reasons).toEqual([]);
+    expect(v.notes).toEqual(["The source did not fill 1 section of the template, which keeps its own text — Summary."]);
+  });
+
+  /**
+   * Joel, 2026-10-18 (TEC-105): "Whole sections only." A section the source
+   * filled only in part still fails, so the template's own figures never ship
+   * on a downloadable resume. Partial means the section also carries an entry
+   * that wrote source text into it.
+   */
+  it("fails when the source filled a section only in part, so template cells keep their own figures", () => {
+    const v = verdictFor({
+      ...clean,
+      changeLog: [
+        { section: "Career Highlights", action: "replaced" },
+        { section: "Career Highlights", action: "not-found-in-input" },
+        { section: "Career Highlights", action: "not-found-in-input" },
+        { section: "Summary", action: "not-found-in-input" },
+      ],
+    });
     expect(v.pass).toBe(false);
-    expect(v.reasons[0]).toBe(
-      "The source did not fill 1 section of the template, which keeps its own text — Summary."
-    );
+    expect(v.reasons).toEqual([
+      "The source filled Career Highlights only in part, so 2 entries keep the template's own text.",
+    ]);
+    // The wholly empty Summary is still only a note beside it.
+    expect(v.notes).toEqual(["The source did not fill 1 section of the template, which keeps its own text — Summary."]);
   });
 
   it("names each section once however many entries it has", () => {
@@ -109,8 +138,8 @@ describe("the reformat verdict", () => {
         { section: "Hobbies", action: "not-found-in-input" },
       ],
     });
-    expect(v.reasons[0]).toContain("Summary, Hobbies");
-    expect(v.reasons[0]).not.toContain("Summary, Summary");
+    expect(v.notes[0]).toContain("Summary, Hobbies");
+    expect(v.notes[0]).not.toContain("Summary, Summary");
   });
 
   it("ignores the ordinary actions — a clone or a passthrough is not an irregularity", () => {
@@ -139,8 +168,13 @@ describe("the reformat verdict", () => {
       ],
     });
     expect(v.pass).toBe(false);
-    expect(v.reasons).toHaveLength(4);
-    expect(v.notes).toEqual(["Warning thing."]);
+    // The lost line, the blocking finding and the dropped entry vote; the
+    // unfilled Summary is a note since 2026-10-18, and is still said.
+    expect(v.reasons).toHaveLength(3);
+    expect(v.notes).toEqual([
+      "Warning thing.",
+      "The source did not fill 1 section of the template, which keeps its own text — Summary.",
+    ]);
   });
 
   /**

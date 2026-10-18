@@ -23,7 +23,16 @@ export type ContentCheck = {
    * than read as a source that had none. Absent when there is none.
    */
   notRead?: string[];
+  /**
+   * Each missing line, with the section it was taken from and why it could not
+   * be placed — written by the render that missed it, from its own change log,
+   * so Diagnostics names the specific issue without re-deriving it (TEC-105).
+   * Absent on a check that is not a render's, and on renders stored before it.
+   */
+  missingDetail?: MissingLine[];
 };
+
+export type MissingLine = { line: string; section: string; reason: string };
 
 /**
  * Word rewrites typography as you type: straight quotes curl, a double hyphen
@@ -138,7 +147,21 @@ export function compareContent(source: Para[], final: Para[]): ContentCheck {
  * took arrive?
  */
 export function compareLines(sourceLines: string[], final: Para[]): ContentCheck {
-  const hay = tokens(final.map((p) => p.text).join("\n"));
+  return compareTexts(
+    sourceLines,
+    final.map((p) => p.text)
+  );
+}
+
+/**
+ * The same check against plain text rather than parsed paragraphs. The renderer
+ * asks it of one entry's freshly written paragraphs, to decide which of the
+ * input's lines that entry already carries and which must be feathered in
+ * (TEC-107) — the same test coverage applies afterwards, so the two cannot
+ * disagree about what "placed" means.
+ */
+export function compareTexts(sourceLines: string[], finalTexts: string[]): ContentCheck {
+  const hay = tokens(finalTexts.join("\n"));
   const starts = new Map<string, number[]>();
   hay.forEach((word, i) => {
     const at = starts.get(word);
