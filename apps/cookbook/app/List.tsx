@@ -27,7 +27,7 @@ type ShoppingLine = GroceryItem & ResolvedLink;
  * are Kroger account settings that a search link cannot carry; building them here
  * would be re-opening the cart push rather than adding a feature. The list leaves
  * as a block of text you copy or a King Soopers search you tap. No stored retailer credential, no OAuth, no
- * `middleware.ts` carve-out — the expensive version needs all three and the only
+ * `proxy.ts` carve-out — the expensive version needs all three and the only
  * thing it buys is who does the tapping.
  */
 export default function List({ refreshKey }: { refreshKey: number }) {
