@@ -66,7 +66,7 @@ holds no client for `shared`** (TEC-26). **The fixtures carry no real timeline.*
   that reads the output goes through `template-flat-sample.docx`.
 - **Renders that FAILed before the download block shipped keep their stored output** (Joel,
   2026-10-18: history), downloadable from Resumes.
-- **`RULES.md` does not yet mention feathering** and still describes `spec`: the TD's to redraft.
+- **`RULES.md` still describes `templates.spec` and `extractSpec`**, gone from code: TD's to redraft.
 - **A reopened render's ATS findings are today's lint** on the stored bytes when there are bytes;
   coverage and the change log are the record.
 - **A new database function needs its grants.** `activate_template` revokes PUBLIC and grants
