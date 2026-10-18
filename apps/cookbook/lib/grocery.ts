@@ -6,7 +6,7 @@ import { ConflictError, InputError, LookupError } from "./errors";
  *
  * **This is the cheap version, and it was chosen rather than settled for.** The
  * list goes to King Soopers as text you copy or a search link you tap — no
- * stored credential, no OAuth, no carve-out in `middleware.ts`. Pushing straight
+ * stored credential, no OAuth, no carve-out in `proxy.ts`. Pushing straight
  * into a Kroger cart needs all three and the only thing it buys is who does the
  * tapping. Joel picked this on 2026-09-19 and the constraint moved here with the
  * list rather than being reopened.
