@@ -56,8 +56,8 @@ issue, not an edit you make.
 1. **`.claude/agents/<agent>/RULES.md`, `HANDOFF.md` and `preset.md`.** The charter is the
    specification for the work, and **Joel approves it before the agent runs under it.** An empty
    handoff is correct before its first run. The preset copies another's, model and effort included.
-2. **A block in `.claude/agents/KICKOFF.md`**, after the helper protocol. Nothing loads a charter;
-   the preset and its block are what make the agent open it. Identity and rules, never state.
+2. **The preset's body** — the agent's identity and standing rules, never state — and `skills:`
+   loading `helper-start` and `closeout`. Nothing loads a charter; `helper-start` is what makes the agent open it.
 3. **Two rows in `CLAUDE.md`** — the *Who you are* table and the domain map. **That is a `CLAUDE.md`
    edit, so Joel approves it**, in the same pull request as the rest.
 4. **The app folder**, copied from the nearest existing app. **The shared files are stamped, not

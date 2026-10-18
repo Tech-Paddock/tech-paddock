@@ -621,7 +621,11 @@ for (const app of PUBLIC_APPS) {
     // Read on demand rather than auto-loaded. Budgeted against growth, deliberately
     // loose: this tier is where reasoning goes when it leaves CLAUDE.md, so squeezing
     // it would defeat the compaction it exists to receive.
-    [".claude/agents/KICKOFF.md", 220],
+    // Skills are procedures, loaded whole into every session that starts one, so each is kept
+    // short; a rule they point at lives in CLAUDE.md or a charter, not here.
+    ...(existsSync(R(".claude/skills")) ? readdirSync(R(".claude/skills")) : [])
+      .filter((d) => existsSync(R(".claude/skills", d, "SKILL.md")))
+      .map((d) => [`.claude/skills/${d}/SKILL.md`, 80]),
     [".claude/agents/STANDUP.md", 110],
     [".claude/SURFACE.md", 120],
     // Raised from 200 on 2026-09-23 (TEC-9), at Joel's call: the shared.contacts write
@@ -806,6 +810,8 @@ for (const app of PUBLIC_APPS) {
 /* 7 ── Structures that were retired, staying retired. */
 add("worklogs stay retired", existsSync(R(".claude/worklogs")) ? "fail" : "ok",
   existsSync(R(".claude/worklogs")) ? ".claude/worklogs/ is back — see the communication layer in CLAUDE.md" : "absent");
+add("KICKOFF.md stays retired", existsSync(R(".claude/agents/KICKOFF.md")) ? "fail" : "ok",
+  existsSync(R(".claude/agents/KICKOFF.md")) ? ".claude/agents/KICKOFF.md is back — an agent starts from a skill and its preset (TEC-108)" : "absent; kickoff, helper-start and closeout are skills");
 add("ledger stays retired", existsSync(R(".claude/OPEN-ITEMS.md")) ? "fail" : "ok",
   existsSync(R(".claude/OPEN-ITEMS.md")) ? ".claude/OPEN-ITEMS.md is back — open items live in Linear, team TEC" : "absent; open items are in Linear");
 
