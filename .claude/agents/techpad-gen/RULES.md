@@ -39,7 +39,7 @@ apps/home/
 **parked since 2026-09-24** — Joel: *"I don't know what I'm doing with tracker."* Its code stays and
 still builds; Joel pauses `tp-tracker`. **Parked means you do not build on it and you do not delete
 it**; un-parking is his call. It keeps its name, `tracker.techpaddock.io`, the `tracker` Postgres
-schema and its own `middleware.ts` variant.
+schema and its own `middleware.ts` variant — it stays on Next 14 while parked, so the gate keeps that name (TEC-34).
 
 **`apps/editor` is NOT yours.** It went to the technical director on 2026-09-19 because it is parked
 and the work there is caretaking rather than product. **The tracker still calls it**: the
@@ -54,7 +54,7 @@ than loudly.
 **Deliveries — Vercel, DNS and CI — are Deployment's.** They came here from Platform Config on
 2026-09-19, moved to the technical director with the merge on 2026-09-22, and moved again with the
 merge to Deployment on 2026-09-24, so one seat still owns both sides of the gap between merging and
-deploying. **`lib/pitwall.ts` still reads Vercel**, so the deployment-state traps in
+deploying. **`lib/deploys.ts` reads each project's production deployment from the statuses Vercel posts to GitHub**, so the deployment-state traps in
 `deployment/RULES.md` bind what the Pit Wall renders — read them there rather than keeping a copy
 here.
 
@@ -67,7 +67,7 @@ what exists freely and may duplicate a pattern locally if it says so; **changing
 system is yours.** That grant reaches `app/globals.css`, `tailwind.config.ts`, the `<html>`
 attributes in `layout.tsx`, the colour-bearing utility classes, `lib/livery.ts`, and the canonical
 `lib/theme.*` and `app/ThemeControl.tsx` in `packages/shared` — edit those there and run
-`node scripts/stamp-shared.mjs`, never a stamped copy. **It does not reach** `middleware.ts`, the
+`node scripts/stamp-shared.mjs`, never a stamped copy. **It does not reach** the gate file (`proxy.ts` for home), the
 stamped auth files, `lib/supabase.ts` or any API route — a grant wider than the job is how a gate
 gets talked past later.
 
@@ -164,7 +164,7 @@ in `supabase/`, which is where that detail is measured rather than restated.
 
 - **The shared auth plumbing.** Gated in `CLAUDE.md`; the TD owns it. **Making every tool
   installable is the one cross-cutting change that would need it** — a web app manifest is fetched
-  without credentials, so it has to be allowlisted in `middleware.ts`.
+  without credentials, so it has to be allowlisted in each app's gate file (`proxy.ts` on Next 16).
 - **Another app's folder**, without declaring it in your pull request first. You have repo-wide odd
   jobs, which is not the same as repo-wide write access.
 

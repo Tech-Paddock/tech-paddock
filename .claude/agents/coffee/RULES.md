@@ -291,7 +291,7 @@ phone in a kitchen, so the tool is installed rather than opened in a tab: `apple
 the `apple-mobile-web-app-*` tags, which is all iOS needs. There is deliberately no web app
 manifest. A manifest is fetched without credentials, so the password gate would return the login
 redirect and the install would silently never offer itself; allowing it through means editing
-`middleware.ts`, which is the password gate and is not Coffee's to change. If every tool
+`proxy.ts`, the gate file, which is the password gate and is not Coffee's to change. If every tool
 should be installable, that pattern belongs to TechPad Gen, not here.
 
 The icon is a static import so it is served from `/_next/static`, which the password gate always

@@ -158,8 +158,8 @@ depends on it.
 
 ## Traps this repo has already paid for
 
-- **A debug route needs no `middleware.ts` edit.** The matcher is a catch-all negative, so any extra
-  route is behind the password gate automatically. That matters because `middleware.ts` is gated on
-  the technical director and **the debug surface must never need it.**
+- **A debug route needs no edit to the gate file** (`proxy.ts` on Next 16). The matcher is a
+  catch-all negative, so any extra route is behind the password gate automatically. That matters
+  because the gate file is gated on the technical director and **the debug surface must never need it.**
 - **The exposed-schemas list in the Supabase dashboard is outside this repo.** A schema missing from
   it fails as a permissions error that reads like a bad key. `/api/health` probes for it and names it.

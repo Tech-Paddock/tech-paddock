@@ -232,6 +232,13 @@ it; git keeps it.
   "pick up" retired 2026-09-26:* an agent branches only when told, commits, pushes and hands over,
   so no phrase is needed; **"Backlog" means a Linear issue in Backlog, not built.**
 
+- **2026-10-18 — Agents test the live apps signed out only** (Joel). After each deploy, from
+  Paddock_td, an agent checks the login redirect, 401 on `/api/*`, a forged cookie, the headers. Signed-in behaviour is tested locally against a
+  fake database; Joel spot-checks by hand. One password opens every app's data, so agents never get
+  it; a separate test stack was weighed and not built — reopen only if local testing misses bugs.
+- **2026-10-18 — The parked editor and tracker stay on Next 14** while every live app is on 16
+  (TEC-34); they move when unparked or retired. The gate-file rule is `CLAUDE.md`'s, measured by `drift`.
+
 ## Mistakes — do not repeat
 
 - **Merging a second change on a gate result taken before the first.** #69 and #70 were merged past
