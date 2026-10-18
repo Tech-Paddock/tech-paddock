@@ -14,7 +14,8 @@ export const dynamic = "force-dynamic";
  * is the route that makes keeping them useful. An archived template still
  * downloads — archiving hides it from the list, it does not retire the file.
  */
-export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { data, error } = await getServiceClient()
     .from("templates")
     .select("file_path, name")

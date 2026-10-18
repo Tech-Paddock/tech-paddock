@@ -16,7 +16,7 @@ afterEach(() => {
 
 const reopen = async (id = "r1") => {
   const { GET } = await import("../app/api/renders/[id]/route");
-  return GET(new NextRequest(`http://localhost/api/renders/${id}`), { params: { id } });
+  return GET(new NextRequest(`http://localhost/api/renders/${id}`), { params: Promise.resolve({ id }) });
 };
 
 const row = (over: Partial<StoredRenderRow> = {}): StoredRenderRow => ({

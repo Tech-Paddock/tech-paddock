@@ -26,7 +26,8 @@ type Body = {
  * went out, audited by today's lint. Whether a verdict can be given at all is
  * decided in `lib/storedRender.ts`.
  */
-export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const supabase = getServiceClient();
 
   const { data: render, error } = await supabase
@@ -114,7 +115,8 @@ function recordedFindings(snapshot: unknown): AtsFinding[] | null {
  * Naming a company creates or updates the tracker thread, which is the canonical
  * record of the application; this route only stores the link to it.
  */
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const body = (await request.json().catch(() => ({}))) as Body;
   const supabase = getServiceClient();
 
@@ -212,7 +214,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
  * which breaks the download; this way a failure only strands an object nothing
  * references.
  */
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const supabase = getServiceClient();
 
   const { data: target, error: findError } = await supabase

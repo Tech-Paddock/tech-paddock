@@ -30,7 +30,7 @@ describe("deleting a template", () => {
     mockModules({ resume: client, remove: async (path) => void removed.push(path as string) });
 
     const { DELETE } = await import("@/app/api/templates/[id]/route");
-    const res = await DELETE(req(), { params: { id: "t1" } });
+    const res = await DELETE(req(), { params: Promise.resolve({ id: "t1" }) });
 
     expect(res.status).toBe(200);
     expect(removed).toEqual(["templates/3.docx"]);
@@ -63,7 +63,7 @@ describe("deleting a template", () => {
     mockModules({ resume: client });
 
     const { DELETE } = await import("@/app/api/templates/[id]/route");
-    const res = await DELETE(req(), { params: { id: "t1" } });
+    const res = await DELETE(req(), { params: Promise.resolve({ id: "t1" }) });
 
     expect(res.status).toBe(200);
     expect((await res.json()).deleted).toBe("t1");
@@ -82,7 +82,7 @@ describe("deleting a template", () => {
     mockModules({ resume: client });
 
     const { DELETE } = await import("@/app/api/templates/[id]/route");
-    const res = await DELETE(req(), { params: { id: "t1" } });
+    const res = await DELETE(req(), { params: Promise.resolve({ id: "t1" }) });
 
     expect(res.status).toBe(409);
     expect((await res.json()).code).toBe("active_template");
@@ -94,7 +94,7 @@ describe("deleting a template", () => {
     mockModules({ resume: client });
 
     const { DELETE } = await import("@/app/api/templates/[id]/route");
-    expect((await DELETE(req(), { params: { id: "nope" } })).status).toBe(404);
+    expect((await DELETE(req(), { params: Promise.resolve({ id: "nope" }) })).status).toBe(404);
   });
 
   // The template is gone as far as the app is concerned; a failure to tidy up
@@ -117,7 +117,7 @@ describe("deleting a template", () => {
     });
 
     const { DELETE } = await import("@/app/api/templates/[id]/route");
-    expect((await DELETE(req(), { params: { id: "t1" } })).status).toBe(200);
+    expect((await DELETE(req(), { params: Promise.resolve({ id: "t1" }) })).status).toBe(200);
   });
 });
 
@@ -130,7 +130,7 @@ describe("archiving a template", () => {
     mockModules({ resume: client });
 
     const { PATCH } = await import("@/app/api/templates/[id]/route");
-    const res = await PATCH(req({ archived: true }), { params: { id: "t1" } });
+    const res = await PATCH(req({ archived: true }), { params: Promise.resolve({ id: "t1" }) });
 
     expect(res.status).toBe(200);
     const update = calls.find((c) => c.op === "update")?.payload as { archived_at: string | null };
@@ -145,7 +145,7 @@ describe("archiving a template", () => {
     mockModules({ resume: client });
 
     const { PATCH } = await import("@/app/api/templates/[id]/route");
-    await PATCH(req({ archived: false }), { params: { id: "t1" } });
+    await PATCH(req({ archived: false }), { params: Promise.resolve({ id: "t1" }) });
 
     expect((calls.find((c) => c.op === "update")?.payload as { archived_at: null }).archived_at).toBeNull();
   });
@@ -157,7 +157,7 @@ describe("archiving a template", () => {
     mockModules({ resume: client });
 
     const { PATCH } = await import("@/app/api/templates/[id]/route");
-    const res = await PATCH(req({ archived: true }), { params: { id: "t1" } });
+    const res = await PATCH(req({ archived: true }), { params: Promise.resolve({ id: "t1" }) });
 
     expect(res.status).toBe(409);
     expect((await res.json()).code).toBe("active_template");
@@ -170,7 +170,7 @@ describe("archiving a template", () => {
     mockModules({ resume: client });
 
     const { PATCH } = await import("@/app/api/templates/[id]/route");
-    const res = await PATCH(req({ is_active: true }), { params: { id: "t1" } });
+    const res = await PATCH(req({ is_active: true }), { params: Promise.resolve({ id: "t1" }) });
 
     expect(res.status).toBe(409);
     expect((await res.json()).code).toBe("archived");
@@ -187,7 +187,7 @@ describe("archiving a template", () => {
     mockModules({ resume: client });
 
     const { PATCH } = await import("@/app/api/templates/[id]/route");
-    const res = await PATCH(req({ is_active: true }), { params: { id: "t1" } });
+    const res = await PATCH(req({ is_active: true }), { params: Promise.resolve({ id: "t1" }) });
 
     expect(res.status).toBe(200);
     expect((await res.json()).template.is_active).toBe(true);
@@ -203,7 +203,7 @@ describe("archiving a template", () => {
     mockModules({ resume: client });
 
     const { PATCH } = await import("@/app/api/templates/[id]/route");
-    const res = await PATCH(req({ is_active: true }), { params: { id: "t1" } });
+    const res = await PATCH(req({ is_active: true }), { params: Promise.resolve({ id: "t1" }) });
 
     expect(res.status).toBe(500);
     expect((await res.json()).code).toBe("db_error");
@@ -219,7 +219,7 @@ describe("archiving a template", () => {
     mockModules({ resume: client });
 
     const { PATCH } = await import("@/app/api/templates/[id]/route");
-    expect((await PATCH(req({ is_active: true }), { params: { id: "t1" } })).status).toBe(404);
+    expect((await PATCH(req({ is_active: true }), { params: Promise.resolve({ id: "t1" }) })).status).toBe(404);
   });
 
   it("rejects a body asking for neither", async () => {
@@ -227,7 +227,7 @@ describe("archiving a template", () => {
     mockModules({ resume: client });
 
     const { PATCH } = await import("@/app/api/templates/[id]/route");
-    expect((await PATCH(req({ nonsense: true }), { params: { id: "t1" } })).status).toBe(400);
+    expect((await PATCH(req({ nonsense: true }), { params: Promise.resolve({ id: "t1" }) })).status).toBe(400);
   });
 });
 
@@ -237,7 +237,7 @@ describe("downloading a template", () => {
     mockModules({ resume: client, download: async () => Buffer.from("PK-the-original") });
 
     const { GET } = await import("@/app/api/templates/[id]/file/route");
-    const res = await GET(req(), { params: { id: "t1" } });
+    const res = await GET(req(), { params: Promise.resolve({ id: "t1" }) });
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Disposition")).toContain("house-style.docx");
@@ -257,7 +257,7 @@ describe("downloading a template", () => {
     mockModules({ resume: client, download: async () => Buffer.from("PK-the-original") });
 
     const { GET } = await import("@/app/api/templates/[id]/file/route");
-    const res = await GET(req(), { params: { id: "t1" } });
+    const res = await GET(req(), { params: Promise.resolve({ id: "t1" }) });
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Disposition")).toBe(
@@ -278,6 +278,6 @@ describe("downloading a template", () => {
     mockModules({ resume: client });
 
     const { GET } = await import("@/app/api/templates/[id]/file/route");
-    expect((await GET(req(), { params: { id: "t1" } })).status).toBe(404);
+    expect((await GET(req(), { params: Promise.resolve({ id: "t1" }) })).status).toBe(404);
   });
 });

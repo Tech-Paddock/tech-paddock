@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
  * hidden from the list, so activating one would pin the renderer to something
  * you can no longer see. The database enforces that too.
  */
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const body = await request.json().catch(() => ({}));
   const wantsActive = body?.is_active === true;
   const wantsArchived = typeof body?.archived === "boolean";
@@ -88,7 +89,8 @@ async function setArchived(id: string, target: { is_active: boolean }, archived:
  * **Still refused for the active template** — that guard is untouched, because
  * deleting it leaves every future render with nothing to build on.
  */
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const supabase = getServiceClient();
 
   const { data: target, error: findError } = await supabase

@@ -5,7 +5,8 @@ import { serveDocx } from "@/lib/serveDocx";
 export const dynamic = "force-dynamic";
 
 /** The document that came out. Its sibling at `/source` is what went in. */
-export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { data, error } = await getServiceClient()
     .from("renders")
     .select("output_file_path")
