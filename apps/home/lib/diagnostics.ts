@@ -139,7 +139,7 @@ export function forParked(probe: Probe, parked: boolean): Probe {
  *
  * `/login` is unauthenticated on every app by design, so a 200 proves the whole
  * chain home cares about: DNS resolved, TLS terminated, Vercel routed to a
- * project, Next.js booted, and middleware ran. It proves nothing about that
+ * project, Next.js booted, and the gate file ran. It proves nothing about that
  * app's database or keys.
  */
 async function livenessProbe(project: Project & { parked?: true }) {
