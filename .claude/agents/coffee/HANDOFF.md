@@ -1,14 +1,14 @@
 # Coffee — handoff
 
-State as of 2026-09-25. Read `RULES.md` first; this file is only what is true right now and its traps.
+State as of 2026-10-18. Read `RULES.md` first; this file is only what is true right now and its traps.
 Open work is in Linear, team TEC, under `agent:Coffee`.
 
 ---
 
 ## What is true now
 
-**It is live at `coffee.techpaddock.io`**, behind the password gate, installed to the iPhone home
-screen. The whole flow has run end to end against a real bag.
+**It is live at `coffee.techpaddock.io` on Next 16 and React 19** (TEC-34), behind the password gate
+in `proxy.ts` on the Node runtime, installed to the iPhone home screen. The flow has run end to end.
 
 **Save comes before the search**, and the page polls the row rather than waiting: the search takes
 minutes with nothing on the connection, so a phone calls it dead. **Search again** re-runs it from the
@@ -19,13 +19,11 @@ constraint on where a guide may come from.
 
 - **Only the search writes `guide_*`.** `POST /api/bags` takes no guide; a bag is saved at
   `not_searched` through `guideColumns(null)`.
-- **"The roaster's own site" is anchored on evidence.** A guide needs a product page on an http(s)
-  host, and must be on that same site **and** on a host the run reached — taken from the tool result
-  blocks by `reachedUrlsIn` in `lib/searchRun.ts`, never from the answer. `javascript:` and friends are
-  not URLs anywhere (`webHost` in `lib/guide.ts`, which `hostOf` now shares).
-- **The whole step from API response to stored outcome is pure and tested** in `lib/searchRun.ts`:
-  `readTurn` (only `end_turn` answers; `max_tokens`, `refusal` and anything else throw; split text
-  blocks rejoin with nothing between them), `concludeSearch` (validation, tool failures, stale link).
+- **"The roaster's own site" is anchored on evidence.** A guide needs a product page on an http(s) host,
+  on that same site **and** on a host the run reached, read off the tool result blocks by `reachedUrlsIn`
+  (`lib/searchRun.ts`), never from the answer; it passed live (TEC-58). `webHost` refuses `javascript:`.
+- **Response to stored outcome is pure and tested** in `lib/searchRun.ts`: `readTurn` (only `end_turn`
+  answers; anything else throws; split text rejoins with nothing between) and `concludeSearch`.
 - **A `none` is refused only for service failures** — `too_many_requests`, `unavailable`, and any code
   not on the model-level list. A model-caused failure records `none` **with a warning** in
   `guide_search_error`, beside the answer; a product link whose fetch failed is cleared.
@@ -58,9 +56,6 @@ constraint on where a guide may come from.
   itself, the label date. **Adding a read path here? Check this first.**
 - **`guide_search_error` holds two things, told apart by `guide_status`/`guide_fetched_at`.** Beside
   a fresh answer it is a warning; with no new answer it is the failure. Read both before showing it.
-- **The reached-host anchor has never met a real response.** If the `_20260209` tools' results do not
-  arrive as `web_fetch_tool_result` / `web_search_tool_result` blocks, every guide becomes
-  "No Recipe Found", dropped for "never reached". TEC-58 is the check.
 - **`maxDuration = 300` in `app/api/search/route.ts` is a literal** (Next reads it statically) and must
   equal `SEARCH_STALE_MS`. Change one, change both.
 - **No model call can be exercised from a Claude Code sandbox** — roaster domains are blocked and the
@@ -75,5 +70,11 @@ constraint on where a guide may come from.
 - **Two brewer vocabularies; `myBrewerFor` crosses only on an exact match.** A bare "V60" does not map.
 - **A date input on iOS sets its own minimum width**, turned off in `globals.css`.
 - **The icon is a pour-over in the JPS livery**, every colour a token, **no alpha**, **a static
-  import** from `/_next/static` — the one prefix middleware excludes.
+  import** from `/_next/static` — the one prefix `proxy.ts` excludes.
+- **Next 16 renders `appleWebApp.capable` as `mobile-web-app-capable` only.** `metadata.other` in
+  `app/layout.tsx` writes back the Apple-prefixed tag the install was made with; keep both.
+- **Turbopack refuses an ICO whose PNG frames are not RGBA** ("Processing image failed"), so
+  `app/favicon.ico` is RGBA with opaque alpha. A replacement must be too, or `next build` fails.
+- **No GET route is cached** (TEC-114, measured under `next start`): Next 16 does not cache `fetch` and
+  nothing here opts back in. A `revalidate`, `force-cache` or `"use cache"` would bring back stale reads.
 - **"Beans ↗" is a *sibling* of the expand toggle** — an `<a>` in a `<button>` is invalid markup.
