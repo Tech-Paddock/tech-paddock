@@ -11,7 +11,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * and their versions stay, so logging it again later still finds your numbers.
  * Database only — no model.
  */
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // A malformed id would reach Postgres as a cast error and read as an outage.
   if (!UUID.test(params.id)) {
     return NextResponse.json({ error: "That meal isn't in your log." }, { status: 404 });

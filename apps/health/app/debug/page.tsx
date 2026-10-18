@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 /**
  * The debug harness, on its own route.
  *
- * **It needs no `middleware.ts` edit and must never need one.** The matcher is
+ * **It needs no `proxy.ts` edit and must never need one.** The matcher is
  * a catch-all negative — `/((?!_next/static|_next/image).*)` — so this route
  * sits behind the password gate automatically. That file is the password gate
  * and is the technical director's; a design that never has to touch it is worth
