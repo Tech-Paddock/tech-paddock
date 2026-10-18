@@ -11,7 +11,8 @@ const BREW_FIELDS = ["brewer", "brew_method", "grinder", "grind_setting", "notes
 // on the page, never sent and never stored.
 const NUMERIC_FIELDS = ["dose_g", "water_g", "beverage_g", "tds_percent"] as const;
 
-export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { data, error } = await getServiceClient()
     .from("brews")
     .select("*")
@@ -22,7 +23,8 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
   return NextResponse.json({ brews: data ?? [] });
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "Send a JSON object." }, { status: 400 });

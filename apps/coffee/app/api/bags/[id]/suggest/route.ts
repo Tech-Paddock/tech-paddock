@@ -20,7 +20,8 @@ export const maxDuration = 120;
  * this app asks, and offering to generate over it is how the two start
  * competing for the same space on the card.
  */
-export async function POST(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const supabase = getServiceClient();
 
   const { data: bag, error } = await supabase
