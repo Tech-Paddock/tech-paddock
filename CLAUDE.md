@@ -344,9 +344,8 @@ Per-tool detail lives in that tool's charter.
   database, model call or cookie read, fake data only — and `drift` fails it the moment it holds
   any. The rules and the reasoning are in the technical director's charter. **A demo that needs
   state does not go here**; it goes to `techpaddock.com`, where this cookie cannot reach it.
-- **`/admin` — The Garage, on the hub — is computed, not live throughout.** Its probes of each
-  project run live. Its *Declared* and *Rules drift* panels are baked at the hub's last build (the hub
-  builds on every production merge). Which projects it probes is `PROBED` in
+- **The Garage, on home, is computed, not live throughout.** Its probes run live; its *Rules drift*
+  panel is baked at home's last build (home builds on every production merge). Which projects it probes is `PROBED` in
   `apps/home/lib/platform.ts` — the embedded tools, `TOOLS`, plus the parked ones — a list typed by
   hand. It shows no versions and no test counts.
 - **Prefer append over rewrite for anything that accumulates.** When a feature involves growing

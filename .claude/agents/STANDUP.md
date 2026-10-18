@@ -45,7 +45,7 @@ of them has an undo.
 
 - **The CI matrix** derives the roster from `apps/` at run time. Create the folder and it builds.
 - **Branch protection** requires one fixed name, `gate`. Nothing to add per app, ever.
-- **The Garage** reads `apps/` at build time, so the new app appears in *Declared* on its own.
+- **The Garage** reads `apps/` at build time, so it knows the new app's `/api/health` on its own.
 
 Adding the folder is enough to be built and measured. **Reported** — the live probes, the sidebar
 and the frame — comes from `TOOLS` in `apps/home/lib/platform.ts`, TechPad Gen's file: a Linear
@@ -66,9 +66,8 @@ issue, not an edit you make.
    reviewed reason not to: a fourth variant fails `drift` deliberately, because that is a fourth
    version of the password gate.
 5. **`.env.example`** — variable names and how to generate them, never a value.
-6. **`/api/health`.** Add `/api/summary` only if the tool belongs on the hub's glance; then it needs
-   a line in `SOURCES` in `apps/home/lib/glance.ts`, which is **TechPad Gen's file** — a Linear issue,
-   not an edit you make, alongside the `TOOLS` entry above.
+6. **`/api/health`**, which The Garage probes. Home has no glance any more (TEC-83), so there is no
+   `/api/summary` to add; the `TOOLS` entry above is TechPad Gen's file — a Linear issue, not an edit.
 7. **Fix the roster counts in prose.**
    `grep -rniE '\b(four|five|six|seven|eight)\b' CLAUDE.md README.md .claude/ supabase/ packages/ scripts/`
    — every one of them is true right up until this day, and this is the day. Prefer removing the
@@ -99,7 +98,7 @@ merges, the TD starts it from its preset when Joel says go.
 
 - `node scripts/drift-check.mjs` — the new agent should appear under freshness, the new app should
   be owned, and the middleware check should still be `ok`.
-- `/admin` — the app shows in *Declared*, and in *Reported* once `TOOLS` has it and it is deployed.
+- The Garage tab on home — the app's probe shows once `TOOLS` has it and it is deployed.
 - Open the subdomain in a private window and confirm it asks for the password.
 
 Finish by filing a Linear issue for the new agent with whatever it is waiting for.
