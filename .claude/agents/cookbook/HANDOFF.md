@@ -1,6 +1,6 @@
 # Cookbook — handoff
 
-State as of 2026-10-18, after #257 (menu days, the Add tab, the icon) and #259 (the charter's Surface).
+State as of 2026-10-18, after #257 (menu days, the Add tab, the icon), #259 (Surface) and Next 16.
 
 `RULES.md` has the charter. This file is only what is true right now, and its traps. **Open work is
 in Linear under `agent:Cookbook`** — never here.
@@ -25,16 +25,21 @@ The pile is browser state: Keep it or a new ask (brief or picks) clears it. **As
 where the model agrees**, else a note. **The book filters on the same four plus High protein,
 computed** (≥30% of kcal), never stored; a detail left unset never matches a filter on it.
 
-**Model requests come from `requestShape` in `lib/models.ts`** (Haiku 4.5 gets no effort — it 400s).
-The four calls without a tool send a JSON schema; every call checks `stop_reason`.
+**On Next 16 and React 19; the gate is `proxy.ts`** (Node runtime, the base copy — drift fails a
+`middleware.ts` here). **No GET route is cached** (TEC-114, measured under `next start`): nothing
+opts back in, and a `revalidate`, `force-cache` or `"use cache"` would serve Health stale servings.
+**Model requests come from `requestShape` in `lib/models.ts`** (Haiku 4.5 gets no effort — it 400s;
+the third copy of Coffee's registry, flagged). The four calls without a tool send a JSON schema;
+every call checks `stop_reason`. **`methodSteps` splits only on the next number in a run** — gas
+mark 4 stays put (its tests hold the edges).
 
 **Four tables in `cookbook`**, reasoning in the migration headers. `recipes` stores **the whole pot**;
 `grocery_items` is this app's list; `brand_preferences` is unseeded (TEC-51); `menu` is **On the
 menu**: a row per recipe with a **`day`** (the `cookbook_menu_day` migration) picked beside *Add to
-list* — the only way on; re-adding moves it — shown per serving. **Nothing expires**: ✕ or Clear all. **A list line carries the
-names of the recipes it came from** (`grocery_items.recipes`, a snapshot; Tidy unions them), so an
-edit or rename never reaches it. **`macro_source` has no `web`**; **a duplicate name is refused by a
-unique index.**
+list* — the only way on; re-adding moves it — shown per serving. **Nothing expires**: ✕ or Clear
+all. **A list line carries its recipes' names** (`grocery_items.recipes`, a snapshot; Tidy unions
+them), so an edit or rename never reaches it. **`macro_source` has no `web`**; **a duplicate name is
+refused by a unique index.**
 
 **Recipe metadata (TEC-52) sits flat on `recipes`**; **`lib/metadata.ts` reads it** off a model, a
 request or a row alike. `meal` and `diet` are check-constrained to `MEALS` and `DIETS`; the rest is
@@ -61,9 +66,6 @@ fields; metadata never enters it. **Logging what you ate is Health's**, by desig
 did not answer — **Health reads a 503 as "couldn't reach the Cookbook"**; `InputError` 400;
 `ConflictError` 409; anything else 500, via `lib/respond.ts`.
 
-**`methodSteps` splits only on the next number in a run** — gas mark 4 stays put (its tests hold the
-edges). **`lib/models.ts` is the third copy of Coffee's model registry**, flagged rather than shared.
-
 ## Traps specific to this area
 
 **Durable traps are in `DECISIONS.md`** — empty-vs-unread, the Supabase key, unconfigured `lint`.
@@ -72,9 +74,7 @@ edges). **`lib/models.ts` is the third copy of Coffee's model registry**, flagge
   own `/list` stays live until then; `tests/tabs.test.ts` holds it. Renaming it is cross-app.
 - **The unread-page refusals and the re-estimate guardrail are settled** (`RULES.md`; the latter
   reconsidered and kept by Joel, 2026-09-22). Do not thin the checks or re-ask.
-- **A client component must not import a lib file that imports `supabase.ts`** — a pure helper the
-  browser needs gets its own file, as `lib/kingsoopers.ts` does.
-- **Read Vercel and Supabase live before writing a deployment step** — #159 said two things did
-  not exist that already did.
+- **A client component must not import a lib that imports `supabase.ts`** — split the helper out.
+- **Read Vercel and Supabase live before writing a deployment step** — #159 missed two that existed.
 - **`claude/health-recipes` is the design record, kept on purpose.** Never revive a merged
   `claude/cookbook-*` branch.
