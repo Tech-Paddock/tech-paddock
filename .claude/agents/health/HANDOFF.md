@@ -4,10 +4,11 @@ State as of 2026-10-18. Open work is the Linear issues labelled `agent:Health`, 
 
 ---
 
-## The macro log is live
+## The macro log is live, on Next.js 16
 
 Dictate what you ate, approve the draft, it is logged with the day's running total; `/debug` runs
-both models on one food and keeps every run. The harness has not been run.
+both models on one food and keeps every run. The harness has not been run. **The password gate is
+`proxy.ts`** (Node runtime), the base copy with the function renamed; drift ties it to the Next major.
 
 ## How it works, in the order it matters
 
@@ -53,28 +54,27 @@ is the `/targets` split's (`setCalories`, `setMacro`), not the remainder's.
 
 ## Cookbook: the list has moved, recipes are read from it
 
-**`/list` only redirects** to Cookbook's list (TEC-23); `health_drop_grocery_items` dropped the table.
-
-**A food whose normalised name equals a Cookbook recipe's is the Cookbook's** (TEC-25).
-`lib/cookbook.ts` reads `GET /api/servings` once per request, forwarding **only** `paddock_session`
-to `COOKBOOK_BASE_URL`; the numbers carry `source = cookbook` and no model. Approving re-reads the
-Cookbook, refuses a draft whose numbers moved, and appends a `cookbook` version (kind `change`) only
-when they differ. **A typed-over recipe number is refused** everywhere — "Fix it in the Cookbook".
-Recipes that share a normalised name are refused on the line, never guessed between.
+**`/list` only redirects** to Cookbook's list (TEC-23). **A food whose normalised name equals a
+Cookbook recipe's is the Cookbook's** (TEC-25). `lib/cookbook.ts` reads `GET /api/servings` once per
+request, forwarding **only** `paddock_session` to `COOKBOOK_BASE_URL`; the numbers carry `source =
+cookbook` and no model. Approving re-reads the Cookbook, refuses a draft whose numbers moved, and
+appends a `cookbook` version (kind `change`) only when they differ. **A typed-over recipe number is
+refused** everywhere — "Fix it in the Cookbook". Same-name recipes are refused, never guessed between.
 
 ## Traps specific to this seat
 
-- **`force-dynamic` doesn't stop Next 14 caching a GET-only route's reads** (TEC-113): `/api/day`
-  served each date's first read all day. `lib/supabase.ts` sends `cache: "no-store"`; keep it there.
+- **`lib/supabase.ts` sends `cache: "no-store"`; keep it** though Next 16 does not cache by default.
+  On 14 a GET-only route served its first read all day (TEC-113). **While Cookbook is on 14 its
+  `/api/servings` does the same** (TEC-114), so a Cookbook edit may not reach a log here.
+- **Turbopack refuses an ICO whose PNG frame is not RGBA**, and Next 16 drops
+  `apple-mobile-web-app-capable` unless `metadata.other` in `app/layout.tsx` writes it back.
 - **An unreadable Cookbook fails only lines that could be a recipe**: a name stored with a
   `cookbook` version gets "Couldn't reach the Cookbook"; a recipe never yet logged here falls
   through (the accepted gap). A `SESSION_SECRET` mismatch looks exactly like an outage.
 - **`normalizeName` is the item key**, folding accents, apostrophes and simple plurals. Changing it
   once `health.items` has rows splits one food into two keys and needs a re-keying migration.
-- **`lib/models.ts` is Coffee's registry duplicated and flagged, not a verbatim copy** — the two
-  have diverged. Do not let a third copy happen quietly.
-- **The livery is borrowed** (`senna`, shared with the parked tracker). Separately, **every** livery
-  maps `--sev-warn` onto the accent, so "over" and "on track" match; `--danger` differs. TechPad Gen's.
-  **Over target uses `--danger` locally** (`app/LeftToday.tsx`), flagged for TechPad Gen (TEC-12).
+- **`lib/models.ts` is Coffee's registry copied and flagged**; they diverged. No quiet third copy.
+- **The livery is borrowed** (`senna`, shared with the parked tracker), and every livery maps
+  `--sev-warn` onto the accent, so over target uses `--danger` locally (`app/LeftToday.tsx`, TEC-12).
 - **`eaten_at` is not the time you ate.** The app never sets it, so it duplicates `created_at`;
   `eaten_on` is what a day's total reads. Both carry column comments.
