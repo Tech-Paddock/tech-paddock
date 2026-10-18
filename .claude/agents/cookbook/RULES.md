@@ -131,7 +131,7 @@ building your side of it — `GET /api/servings`, TEC-24 — is yours.**
 - **Authentication is the session you already have.** Health's server forwards the caller's
   `paddock_session` cookie — that one cookie, not the whole header — to a fixed origin,
   `COOKBOOK_BASE_URL`, defaulting to `https://cookbook.techpaddock.io`, **never a URL taken from the
-  request**. Your `middleware.ts` already accepts any request bearing a valid session, so **there is
+  request**. Your gate file (`proxy.ts` since Next 16) already accepts any request bearing a valid session, so **there is
   no carve-out** and the password gate stays three variants. It rests on `SESSION_SECRET` parity,
   which `CLAUDE.md` already requires; a mismatch reads as the Cookbook being down.
 - **It works only inside a request you made.** A background job has no session to forward, and
