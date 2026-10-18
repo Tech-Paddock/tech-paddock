@@ -21,7 +21,8 @@ const EDITABLE = ["my_notes", "purchased_date", "roast_date"] as const;
 
 const DATES: readonly string[] = ["purchased_date", "roast_date"];
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { data, error } = await getServiceClient().from("bags").select("*").eq("id", params.id).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "No such bag." }, { status: 404 });
@@ -39,7 +40,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   });
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "Send a JSON object." }, { status: 400 });
@@ -87,7 +89,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   return NextResponse.json({ bag: data });
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   // Take the row away first and the photo after it. The save path writes the
   // file before the row that points at it, so a row never references an object
   // that was never created; deleting in the same order keeps that true. A
