@@ -14,7 +14,7 @@ export const metadata: Metadata = {
  * redirects to `https://cookbook.techpaddock.io/list` while the grocery list
  * moves here (TEC-15); moving this route breaks that redirect.
  *
- * Signed out, `middleware.ts` sends you to `/login?from=/list` and the login
+ * Signed out, `proxy.ts` sends you to `/login?from=/list` and the login
  * brings you back here, so the redirect survives a login in between.
  */
 export default function ListPage() {

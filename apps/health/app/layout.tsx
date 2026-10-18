@@ -21,9 +21,14 @@ export const metadata: Metadata = {
     title: "Health",
     statusBarStyle: "default",
   },
+  // Next 16 renders `appleWebApp.capable` as the unprefixed
+  // `mobile-web-app-capable` only; Next 14 rendered the prefixed tag, which is
+  // the one an iPhone home-screen install reads to open without Safari's chrome.
+  // Written out so both are in the head, as Coffee does.
+  other: { "apple-mobile-web-app-capable": "yes" },
 
   // Imported rather than referenced by path, deliberately. A static import is
-  // served from /_next/static, which is the one prefix this app's middleware
+  // served from /_next/static, which is the one prefix this app's proxy.ts
   // matcher excludes outright. Next's own metadata conventions (app/icon.png,
   // app/apple-icon.png) are served from routes that sit behind the password
   // gate, so iOS would fetch them, get the login redirect, and fall back to a
@@ -52,10 +57,10 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Reading a cookie opts this layout into dynamic rendering. That costs
   // nothing here: every route in this app already goes through the password
-  // gate in middleware.ts, so none of them was ever served from a static cache.
+  // gate in proxy.ts, so none of them was ever served from a static cache.
   // What it buys is the polarity being correct in the very first byte of HTML,
   // with no blocking script and nothing to flash.
   //
@@ -63,7 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // question — am I inside the hub's iframe — which no cookie can, because the
   // same cookie is set whether a tool is framed or opened in its own tab. It is
   // synchronous so the switch it hides never renders and then vanishes.
-  const mode = readMode(cookies().get(THEME_COOKIE)?.value);
+  const mode = readMode((await cookies()).get(THEME_COOKIE)?.value);
   return (
     // No data-mode at all means "follow the system", which the
     // prefers-color-scheme block in lib/theme.css answers. Absent is a third
