@@ -47,6 +47,7 @@ keeps things in one place. When you have something to say, find the reader first
 | `agents/<you>/HANDOFF.md` | **your area's state right now, and its traps** — never a to-do | every session | **overwrite · ≤80 lines** |
 | Linear, team TEC | **all open work, each request with an owner, and the parking lot** | every session, first | **one issue per request · `owner:` and `agent:` labels · body ends with Next steps · `Parked` label** |
 | Linear documents, team TEC | **a tool's design reasoning** — e.g. "Health — plan" | before designing a feature | **binds nothing: a rule goes in the charter** |
+| `.claude/skills/<name>/SKILL.md` | **procedures** — how, step by step | when started | **overwrite · a rule never lives only here; it stays in `CLAUDE.md` or the charter, and the skill points at it** |
 | `.claude/DECISIONS.md` | settled calls, mistakes, traps | before reopening something | **append in its section; supersede in place · ≤400 lines** |
 | `/admin` — The Garage | facts about the running system | when you need a fact | **computed, never written** — see *The shared foundation* for what it does and does not show |
 | commits and pull request bodies | what landed, why, blast radius, who asked | at the gate, and afterwards | the event log |
@@ -121,8 +122,11 @@ if either comes back, and why is in `DECISIONS.md`.
 | Cookbook | `apps/cookbook` | `.claude/agents/cookbook/` |
 
 Each folder holds `RULES.md`, `HANDOFF.md` and `preset.md`, which pins the model and effort the
-agent runs on (Joel, 2026-09-24: Opus 5.5 at medium, for every agent). How an agent starts, and the
-technical director's own kickoff, are in `.claude/agents/KICKOFF.md`.
+agent runs on (Joel, 2026-09-24: Opus 5.5 at medium, for every agent). **How an agent starts and
+finishes is a skill.** Joel starts the TD with `/kickoff` (`/kickoff second-opinion` for a second TD
+that writes nothing); every other agent's preset loads `helper-start` and `closeout`. `/closeout`
+leaves nothing only in the conversation and never assumes where work lands: it asks first. An
+agent's identity and standing rules are its `preset.md` body.
 
 ---
 
@@ -217,6 +221,7 @@ wrong or the rule is, and that is a conversation before any code exists.
   and stop. **New work is proposed before it is branched:** what you understand the job to be, what
   you would do first, and anything it contradicts. **No branch and no code until Joel answers** —
   until then you do not know what the change is, and the branch would be named after a guess.
+  The `closeout` skill is the checklist.
   **"Backlog" from Joel means one thing:** make it a Linear issue in Backlog, with its labels and
   Next steps, and do not build it.
 - **State your blast radius when you hand a branch over:** which apps, which shared files.

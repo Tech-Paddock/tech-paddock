@@ -21,7 +21,7 @@ built.** Linear writes go in whatever order makes sense. **Roll up only serious 
 calls in an app are yours, logged on the issue. **TEC-34 (Next.js 14 → 16) is running**: the spike
 proved Resume green on 16, and drift now ties each app's gate file to its Next major (step 2); the
 per-app upgrades come next, one branch each. The parking lot is the `Parked` label. **TEC-86 waits
-for Joel's go; TEC-108** (Backlog) is the skills plan that would retire `KICKOFF.md`.
+for Joel's go. TEC-108:** `kickoff`, `helper-start` and `closeout` are skills; `deploy-gate` is next.
 
 ## What is true now
 
@@ -49,7 +49,7 @@ for Joel's go; TEC-108** (Backlog) is the skills plan that would retire `KICKOFF
 - **Two TD sessions cannot see each other.** On 2026-09-25 a second TD, started for a question, got
   a prompt meant for the first. It took the first's live branch for abandoned, merged `main` into it,
   had Deployment merge it, and replaced this handoff with one built on a stale read. **A second TD
-  gets KICKOFF.md's second-opinion block and writes nothing.** Before calling a pushed branch
+  starts from `/kickoff second-opinion` and writes nothing.** Before calling a pushed branch
   abandoned, check its commit's `Claude-Session` with `get_session`: a live session still owns it.
 - **A project env read cannot see team-shared variables.** That read reported `INTERNAL_API_SECRET`
   missing an hour after Joel linked it. Vercel's audit log, `list_user_events`, records every change
