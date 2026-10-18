@@ -29,7 +29,8 @@ async function PitWallLoaded({ group }: { group: Grouping }) {
   return <PitWall data={await loadPitWall()} group={group} />;
 }
 
-export default function HomePage({ searchParams }: { searchParams: Params }) {
+export default async function HomePage(props: { searchParams: Promise<Params> }) {
+  const searchParams = await props.searchParams;
   const selected = selectedIndexFrom(one(searchParams, "app"));
   if (selected !== null) return <Frame app={APPS[selected]} />;
 

@@ -217,7 +217,7 @@ export default async function Garage() {
             <>
               {withHealth.join(", ")} {withHealth.length === 1 ? "has" : "have"} a{" "}
               <code>/api/health</code> route, but each sits behind the password gate, so home gets
-              401. Opening it up is a middleware change — shared auth plumbing, not this app&apos;s.
+              401. Opening it up is a gate-file change — shared auth plumbing, not this app401. Opening it up is a middleware change — shared auth plumbing, not this app&apos;s.apos;s.
             </>
           )}
         </li>
