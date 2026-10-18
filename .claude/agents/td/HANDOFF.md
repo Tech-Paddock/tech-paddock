@@ -18,19 +18,17 @@ you included. You start Deployment, and the guard holds that start for Joel's cl
 list with it (branches, order, blast radius, migrations, questions). **Nothing but your brief bounds
 the list's scope.** The three phrases are retired; **"Backlog" means a Linear issue in Backlog, not
 built.** Linear writes go in whatever order makes sense. **Roll up only serious questions**; small
-calls in an app are yours, logged on the issue. **TEC-34 (Next.js 14 → 16) is on hold** and is
-the next run Joel was advised to take; the parking lot is the `Parked` label. **TEC-85 and TEC-86
-wait for Joel's go.** **TEC-108** (Backlog) is the skills plan that would retire `KICKOFF.md`.
+calls in an app are yours, logged on the issue. **TEC-34 (Next.js 14 → 16) is running**: the spike
+proved Resume green on 16, and drift now ties each app's gate file to its Next major (step 2); the
+per-app upgrades come next, one branch each. The parking lot is the `Parked` label. **TEC-86 waits
+for Joel's go; TEC-108** (Backlog) is the skills plan that would retire `KICKOFF.md`.
 
 ## What is true now
 
-- **Home no longer reads `INTERNAL_API_SECRET`** (TEC-83, live 2026-09-29): the glance and the Paper
-  are gone, and the Pit Wall reads Linear once Joel sets `LINEAR_API_KEY`. The secret stays linked to
-  `tp-tracker` and `tp-message-editor`, both paused on builds from before it; Joel unlinks it from
-  `tp-home` (TEC-83).
-- **`ANTHROPIC_API_KEY` has new values on Coffee, Cookbook and Health** (Joel, 2026-09-25). Real
-  calls in production proved Coffee's and Cookbook's on 2026-09-29; Health's has not been used yet
-  (TEC-75). Resume and the editor have none: Resume makes no model calls, and the editor is parked.
+- **Home no longer reads `INTERNAL_API_SECRET`** (TEC-83): it stays linked to the paused tracker and
+  editor, on builds from before it. TechPad Gen's charter has home's keys now.
+- **Every `ANTHROPIC_API_KEY` is proven in production** (TEC-75, closed 2026-10-18). Resume and the
+  editor have none: Resume makes no model calls, and the editor is parked.
 - **`apps/showcase` is yours to build, and public** (TEC-99): rules in your charter, enforced by
   drift's `public app holds nothing`. The scaffold waits on Joel showing you the uploader.
 - **Linear writes don't prompt Joel, from this session or a helper** (TEC-59, since 2026-09-26).
@@ -57,8 +55,10 @@ wait for Joel's go.** **TEC-108** (Backlog) is the skills plan that would retire
   missing an hour after Joel linked it. Vercel's audit log, `list_user_events`, records every change
   with its time, shared variables included. Deployment's handoff has the other Vercel reading traps.
 - **To pick up a changed variable, redeploy the app's live build** (`DECISIONS.md`, 2026-09-20).
-- **A firewall can't be set up through the API on a project that never had one:** a PUT answers
-  `Seawall Config not found`, even a bare `firewallEnabled`. Firewall rules go in from the dashboard.
+- **The firewall can't be read or written through the API here:** every project answers `Seawall
+  Config not found`, even after Joel published its rule (TEC-7). The audit log is the only evidence.
+- **Runtime logs hold no request lines for these apps**, used or not. To see whether a feature ran,
+  count rows in its tables with `execute_sql` — counts and sources only, never content (TEC-113).
 - **The GitHub integration closes a Linear issue when a pull request naming it merges**, in its title
   or its body. After a merge, reopen any issue whose Next steps are not all done.
 - **The auto-mode classifier can refuse work under `.claude/` or another agent's charter** as
