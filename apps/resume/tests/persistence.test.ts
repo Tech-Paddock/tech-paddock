@@ -115,7 +115,7 @@ describe("template upload", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_active: true }),
       }),
-      { params: { id: "ghost" } }
+      { params: Promise.resolve({ id: "ghost" }) }
     );
 
     expect(res.status).toBe(404);
@@ -205,7 +205,7 @@ describe("recording where a render went", () => {
     mockModules({ resume, tracker });
 
     const { PATCH } = await import("../app/api/renders/[id]/route");
-    const res = await PATCH(patch({ company: "Northwind", role: "Product Analyst II" }), { params: { id: "r1" } });
+    const res = await PATCH(patch({ company: "Northwind", role: "Product Analyst II" }), { params: Promise.resolve({ id: "r1" }) });
 
     expect(res.status).toBe(200);
     const insert = trackerCalls.find((c) => c.op === "insert");
@@ -224,7 +224,7 @@ describe("recording where a render went", () => {
     mockModules({ resume, tracker });
 
     const { PATCH } = await import("../app/api/renders/[id]/route");
-    await PATCH(patch({ company: "Northwind" }), { params: { id: "r1" } });
+    await PATCH(patch({ company: "Northwind" }), { params: Promise.resolve({ id: "r1" }) });
 
     expect(trackerCalls.some((c) => c.op === "insert")).toBe(false);
     const update = trackerCalls.find((c) => c.op === "update");
@@ -243,7 +243,7 @@ describe("recording where a render went", () => {
     mockModules({ resume, tracker });
 
     const { PATCH } = await import("../app/api/renders/[id]/route");
-    await PATCH(patch({ company: "Northwind", role: "Product Analyst II" }), { params: { id: "r1" } });
+    await PATCH(patch({ company: "Northwind", role: "Product Analyst II" }), { params: Promise.resolve({ id: "r1" }) });
 
     const payload = trackerCalls.find((c) => c.op === "update")?.payload as {
       notes: string;
@@ -265,7 +265,7 @@ describe("recording where a render went", () => {
     mockModules({ resume, tracker });
 
     const { PATCH } = await import("../app/api/renders/[id]/route");
-    const res = await PATCH(patch({ submittedAt: null }), { params: { id: "r1" } });
+    const res = await PATCH(patch({ submittedAt: null }), { params: Promise.resolve({ id: "r1" }) });
 
     expect(res.status).toBe(200);
     expect(trackerCalls).toEqual([]);
@@ -276,7 +276,7 @@ describe("recording where a render went", () => {
     mockModules({ resume, tracker: resume });
 
     const { PATCH } = await import("../app/api/renders/[id]/route");
-    const res = await PATCH(patch({ company: "Northwind" }), { params: { id: "nope" } });
+    const res = await PATCH(patch({ company: "Northwind" }), { params: Promise.resolve({ id: "nope" }) });
     expect(res.status).toBe(404);
   });
 });
@@ -301,7 +301,7 @@ describe("deleting a render", () => {
     mockModules({ resume: client, remove: async (p) => void removed.push(p as string) });
 
     const { DELETE } = await import("../app/api/renders/[id]/route");
-    const res = await DELETE(del(), { params: { id: "r1" } });
+    const res = await DELETE(del(), { params: Promise.resolve({ id: "r1" }) });
 
     expect(res.status).toBe(200);
     expect((await res.json()).deleted).toBe("r1");
@@ -329,7 +329,7 @@ describe("deleting a render", () => {
     mockModules({ resume: client, tracker });
 
     const { DELETE } = await import("../app/api/renders/[id]/route");
-    expect((await DELETE(del(), { params: { id: "r1" } })).status).toBe(200);
+    expect((await DELETE(del(), { params: Promise.resolve({ id: "r1" }) })).status).toBe(200);
     expect(trackerCalls).toEqual([]);
   });
 
@@ -338,7 +338,7 @@ describe("deleting a render", () => {
     mockModules({ resume: client });
 
     const { DELETE } = await import("../app/api/renders/[id]/route");
-    const res = await DELETE(del(), { params: { id: "ghost" } });
+    const res = await DELETE(del(), { params: Promise.resolve({ id: "ghost" }) });
 
     expect(res.status).toBe(404);
     expect(calls.map((c) => `${c.table}.${c.op}`)).not.toContain("renders.delete");
@@ -361,7 +361,7 @@ describe("deleting a render", () => {
     });
 
     const { DELETE } = await import("../app/api/renders/[id]/route");
-    expect((await DELETE(del(), { params: { id: "r1" } })).status).toBe(200);
+    expect((await DELETE(del(), { params: Promise.resolve({ id: "r1" }) })).status).toBe(200);
   });
 });
 
@@ -371,7 +371,7 @@ describe("downloading a stored render", () => {
     mockModules({ resume: client });
 
     const { GET } = await import("../app/api/renders/[id]/file/route");
-    const res = await GET(new NextRequest("http://localhost/x"), { params: { id: "r1" } });
+    const res = await GET(new NextRequest("http://localhost/x"), { params: Promise.resolve({ id: "r1" }) });
     expect(res.status).toBe(404);
   });
 
@@ -382,7 +382,7 @@ describe("downloading a stored render", () => {
     mockModules({ resume: client, download: async () => Buffer.from("STORED-BYTES") });
 
     const { GET } = await import("../app/api/renders/[id]/file/route");
-    const res = await GET(new NextRequest("http://localhost/x"), { params: { id: "r1" } });
+    const res = await GET(new NextRequest("http://localhost/x"), { params: Promise.resolve({ id: "r1" }) });
 
     expect(res.status).toBe(200);
     expect(Buffer.from(await res.arrayBuffer()).toString()).toBe("STORED-BYTES");

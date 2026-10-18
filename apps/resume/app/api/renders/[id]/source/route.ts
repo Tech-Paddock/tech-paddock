@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
  * looks wrong: the output is the template with this file's text in it, so a
  * missing line is answered by reading what was actually uploaded.
  */
-export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { data, error } = await getServiceClient()
     .from("renders")
     .select("source_file_path")
