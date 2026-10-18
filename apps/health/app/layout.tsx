@@ -21,6 +21,11 @@ export const metadata: Metadata = {
     title: "Health",
     statusBarStyle: "default",
   },
+  // Next 16 renders `appleWebApp.capable` as the unprefixed
+  // `mobile-web-app-capable` only; Next 14 rendered the prefixed tag, which is
+  // the one an iPhone home-screen install reads to open without Safari's chrome.
+  // Written out so both are in the head, as Coffee does.
+  other: { "apple-mobile-web-app-capable": "yes" },
 
   // Imported rather than referenced by path, deliberately. A static import is
   // served from /_next/static, which is the one prefix this app's proxy.ts
