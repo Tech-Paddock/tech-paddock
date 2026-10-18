@@ -12,7 +12,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,7 +21,14 @@ import {
 } from "./gate-file.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const real = (app) => readFileSync(join(ROOT, "apps", app, "middleware.ts"), "utf8");
+// Each fixture source is in its middleware.ts form. An app already on Next 16
+// has only proxy.ts, so the codemod's one change is undone to get it back.
+const real = (app) => {
+  const dir = join(ROOT, "apps", app);
+  if (existsSync(join(dir, "middleware.ts"))) return readFileSync(join(dir, "middleware.ts"), "utf8");
+  return readFileSync(join(dir, "proxy.ts"), "utf8")
+    .replace(/export async function proxy\(/, "export async function middleware(");
+};
 const BASE = real("home");
 const EDITOR = real("editor");
 const TRACKER = real("tracker");
