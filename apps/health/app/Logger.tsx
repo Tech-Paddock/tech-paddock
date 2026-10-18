@@ -6,6 +6,7 @@ import Correction from "./Correction";
 import LeftToday, { type TargetState } from "./LeftToday";
 import { MACRO_KEYS, MACRO_LABELS, round, total, type Macros, type MacroSource } from "@/lib/macros";
 import { MEALS, MEAL_LABELS, localDate, type Meal } from "@/lib/meals";
+import { savedButNotShown } from "@/lib/saved";
 
 type DraftItem = {
   name: string;
@@ -74,14 +75,18 @@ export default function Logger() {
     };
   }, []);
 
-  const loadDay = useCallback(async (on: string) => {
+  // Returns what it read, so a save can check its own entry is on it.
+  const loadDay = useCallback(async (on: string): Promise<{ day: Day | null; error: string | null }> => {
     try {
       const response = await fetch(`/api/day?date=${on}`, { cache: "no-store" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't read today.");
       setDay(body as Day);
+      return { day: body as Day, error: null };
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't read today.");
+      const message = e instanceof Error ? e.message : "Couldn't read today.";
+      setError(message);
+      return { day: null, error: message };
     }
   }, []);
 
@@ -163,9 +168,14 @@ export default function Logger() {
       if (!response.ok) throw new Error(body.error ?? "Couldn't log that.");
       setDraft(null);
       setText("");
+      // Read today back now, whatever `date` says, and check the meal is on
+      // it: a save that does not show must say so, or it gets logged twice
+      // (TEC-113). Setting `date` afterwards re-reads once more; harmless.
       const today = localDate(new Date());
+      const read = await loadDay(today);
       if (today !== date) setDate(today);
-      else await loadDay(today);
+      const problem = savedButNotShown({ id: String(body.id), eaten_on: draft.eaten_on }, read.day, read.error);
+      if (problem) setError(problem);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't log that.");
     } finally {
