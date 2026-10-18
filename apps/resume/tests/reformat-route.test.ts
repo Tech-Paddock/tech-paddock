@@ -154,6 +154,66 @@ describe("POST /api/reformat", () => {
   });
 
   /**
+   * TEC-105, Joel 2026-10-18: "Whole sections only." A source with fewer Career
+   * Highlights than the template has cells fills the section only in part, so
+   * the remaining cells would ship the template's own figures. That FAILs: no
+   * file in the response and none in storage, though the render is recorded.
+   */
+  it("fails, and returns and stores no document, when the source has fewer Career Highlights than the template", async () => {
+    const uploads: string[] = [];
+    const { client, calls } = fakeSupabase(activeTemplate());
+    mockModules({
+      resume: client,
+      download: async () => fixture("template-flat-sample.docx"),
+      upload: async (prefix) => {
+        uploads.push(String(prefix));
+        return `${prefix}/x.docx`;
+      },
+    });
+    const H = '<w:rPr><w:b/><w:sz w:val="22"/></w:rPr>';
+    const p = (text: string, rPr = "", pPr = "") =>
+      `<w:p>${pPr ? `<w:pPr>${pPr}</w:pPr>` : ""}<w:r>${rPr}<w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+    const BULLET = '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>';
+    const oneHighlight = await makeDocx({
+      body: [
+        p("Avery Example", '<w:rPr><w:sz w:val="40"/></w:rPr>'),
+        p("Summary", H),
+        p("Operations lead with a representative record of invented outcomes across several sample teams."),
+        p("Career Highlights", H),
+        p("| 40% |"),
+        p("| :--- |"),
+        p("| Cut a representative invented cost. |"),
+        p("Professional Experience", H),
+        `<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Fabrikam Logistics</w:t></w:r><w:r><w:tab/></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>Jan 2021 - Present</w:t></w:r></w:p>`,
+        p("Operations Manager", "<w:rPr><w:i/></w:rPr>"),
+        p("Cut a representative cycle time by an invented margin.", "", BULLET),
+        p("Core Competencies", H),
+        p("Systems: Alpha, Beta, Gamma"),
+      ].join(""),
+    });
+
+    const res = await reformat({ source: file("jobright.docx", oneHighlight) });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    // The source's one highlight was read and placed; the template's other
+    // cells keep their own figures.
+    const kept = body.changeLog.filter(
+      (c: { section: string; action: string }) => c.section === "Career Highlights" && c.action === "not-found-in-input"
+    );
+    expect(kept.length).toBeGreaterThan(0);
+    expect(body.coverage.missing).toEqual([]);
+    expect(body.verdict.pass).toBe(false);
+    expect(body.verdict.reasons).toContainEqual(expect.stringMatching(/filled Career Highlights only in part/));
+
+    expect(body).not.toHaveProperty("docxBase64");
+    expect(uploads).toEqual(["sources"]);
+    const payload = calls.find((c) => c.op === "insert")?.payload as Record<string, unknown>;
+    expect(payload.output_file_path).toBeNull();
+    expect(body.renderId).toBe("r1");
+  });
+
+  /**
    * The renderer that came before this one rebuilt the document to the ATS rules
    * and so always passed its own lint — while getting the page size, the
    * alignment and the bullets wrong. This one keeps the template exactly,

@@ -37,6 +37,9 @@ export type Verdict = {
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
+/** The change-log actions that put source text into a section. */
+const WROTE_SOURCE = new Set(["replaced", "cloned-overflow", "feathered"]);
+
 /** The sections named by a set of change-log entries, deduplicated, in order. */
 function sections(entries: { section: string }[]): string {
   return [...new Set(entries.map((e) => e.section))].join(", ");
@@ -75,19 +78,34 @@ export function verdictFor(r: VerdictInput): Verdict {
 
   const notes = r.findings.filter((f) => f.severity === "warning").map((f) => f.message);
 
-  // A section of the template the source never filled — a Summary the Jobright
-  // export lacks. Not a loss, but the document goes out carrying the template's
-  // own words for it, so it is said every time. **A note, not a vote** (Joel,
-  // 2026-10-18, TEC-105: it "only warns"; it no longer fails or blocks the
-  // download). Source text that *did* exist and had no slot is a different
-  // case, and still fails above: it is in `coverage.missing`. Counted by
-  // section, because the sentence says sections.
+  // Template text the source did not replace (`not-found-in-input`), which
+  // ships the template's own words. Joel, 2026-10-18 (TEC-105): **whole
+  // sections only** warn. A section the source left entirely empty — a Summary
+  // the Jobright export lacks — is a note, and the render passes and downloads.
+  // A section the source filled **only in part** still fails, so the
+  // template's own figures never ship on a downloadable resume: today that is
+  // a Career Highlights cell the source had no highlight for.
+  //
+  // Partial is told apart by the log alone: the same section also carries an
+  // entry that wrote source text into it. That reads a stored render's log the
+  // same way, so older records reopen with the verdict this rule gives them.
+  // Source text that existed and had no slot is a third case, and fails above
+  // through `coverage.missing`.
   const unfilled = r.changeLog.filter((c) => c.action === "not-found-in-input");
-  if (unfilled.length > 0) {
-    const n = new Set(unfilled.map((c) => c.section)).size;
+  const written = new Set(r.changeLog.filter((c) => WROTE_SOURCE.has(c.action)).map((c) => c.section));
+  const partly = unfilled.filter((c) => written.has(c.section));
+  const wholly = unfilled.filter((c) => !written.has(c.section));
+  if (partly.length > 0) {
+    reasons.push(
+      `The source filled ${sections(partly)} only in part, so ${partly.length} ` +
+        `${plural(partly.length, "entry keeps", "entries keep")} the template's own text.`
+    );
+  }
+  if (wholly.length > 0) {
+    const n = new Set(wholly.map((c) => c.section)).size;
     notes.push(
       `The source did not fill ${n} ${plural(n, "section", "sections")} of the ` +
-        `template, which keeps its own text — ${sections(unfilled)}.`
+        `template, which keeps its own text — ${sections(wholly)}.`
     );
   }
 

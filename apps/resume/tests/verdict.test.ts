@@ -105,6 +105,30 @@ describe("the reformat verdict", () => {
     expect(v.notes).toEqual(["The source did not fill 1 section of the template, which keeps its own text — Summary."]);
   });
 
+  /**
+   * Joel, 2026-10-18 (TEC-105): "Whole sections only." A section the source
+   * filled only in part still fails, so the template's own figures never ship
+   * on a downloadable resume. Partial means the section also carries an entry
+   * that wrote source text into it.
+   */
+  it("fails when the source filled a section only in part, so template cells keep their own figures", () => {
+    const v = verdictFor({
+      ...clean,
+      changeLog: [
+        { section: "Career Highlights", action: "replaced" },
+        { section: "Career Highlights", action: "not-found-in-input" },
+        { section: "Career Highlights", action: "not-found-in-input" },
+        { section: "Summary", action: "not-found-in-input" },
+      ],
+    });
+    expect(v.pass).toBe(false);
+    expect(v.reasons).toEqual([
+      "The source filled Career Highlights only in part, so 2 entries keep the template's own text.",
+    ]);
+    // The wholly empty Summary is still only a note beside it.
+    expect(v.notes).toEqual(["The source did not fill 1 section of the template, which keeps its own text — Summary."]);
+  });
+
   it("names each section once however many entries it has", () => {
     const v = verdictFor({
       ...clean,
