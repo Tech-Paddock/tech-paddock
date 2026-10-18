@@ -18,18 +18,17 @@ needs me" in the three seconds before you click into a tool.
 ```
 apps/home/
   app/(shell)/          route group: layout.tsx renders Chrome, with each page as children
-    page.tsx            `/` — the Morning Paper and the Pit Wall, as tabs
-    admin/page.tsx      The Garage — declared against reported
+    page.tsx            `/` — the Pit Wall and The Garage, as tabs (TEC-83)
+    admin/page.tsx      redirects to `/?tab=garage`
   app/Chrome.tsx        topbar, sidebar, the content box
-  app/Landing.tsx       glance, tiles, iframe
-  app/GlancePanel.tsx   the glance, rendered
-  app/Paper.tsx         the Morning Paper tab
-  app/PitWall.tsx       the Pit Wall tab
+  app/Landing.tsx       tabs, tiles, iframe
+  app/PitWall.tsx       the Pit Wall tab — Linear's open issues, by status or by agent
+  app/Garage.tsx        The Garage tab — what is wrong right now
   app/ThemeControl.tsx  the light/dark control — a stamped copy; edit packages/shared
   app/login/            deliberately outside the route group — pre-auth
   app/api/logout/       clears the domain-wide cookie for every subdomain at once
-  lib/glance.ts         the server-side fan-out
-  lib/pitwall.ts        the data layer — GitHub, Vercel, the repo
+  lib/linear.ts         the Pit Wall's data — Linear's open issues
+  lib/deploys.ts        production deployment state, from the statuses Vercel posts to GitHub
   lib/platform.ts       TOOLS — the only list of tools; its order is Joel's
   lib/diagnostics.ts    The Garage's live probes
   lib/theme.*           the token system — stamped copies; edit packages/shared
@@ -76,20 +75,16 @@ gets talked past later.
 
 **The hub holds no database credential.** It reads no schema directly and is the only app with **no
 Supabase dependency**. Keep it that way unless there is a reason that survives scrutiny. The keys it
-does hold are `INTERNAL_API_SECRET`, for the glance, and `GITHUB_TOKEN`, for the Pit Wall, which
-reads each project's production deployment from the statuses Vercel posts to GitHub (TEC-32).
+does hold are `LINEAR_API_KEY`, for the Pit Wall, and `GITHUB_TOKEN`, which reads each project's
+production deployment from the statuses Vercel posts to GitHub (TEC-32). **`INTERNAL_API_SECRET` is
+no longer read here** (TEC-83): the glance that used it is gone.
 **`VERCEL_TOKEN` is retired** — a full-power team token for reads the hub no longer makes — and The
 Garage warns for as long as it is still set.
 
-**The hub knows nothing about any tool.** `lib/glance.ts` fans out server-side to each tool's
-`/api/summary` and renders whatever comes back. Adding a tool to the glance is a line in `SOURCES`,
-not new knowledge in the hub.
-
-What comes back is deliberately narrow — **counts and singles, never rows**. The hub is the three
-seconds before you click into a tool; the tools are where the work happens. A hub handed thread
-arrays slowly becomes a worse copy of the tracker, so it is never handed any. Hold that line even
-when a richer tile would look better. Which tools are wired into `SOURCES` is read from the file;
-the mechanism is general.
+**Home knows nothing about any tool** beyond `TOOLS` in `lib/platform.ts`, the one list. The glance
+that fanned out to each tool's `/api/summary` was removed with the Morning Paper (TEC-83, Joel,
+2026-09-26). If a summary ever returns, the old line still holds: **counts and singles, never rows**
+— a home handed rows slowly becomes a worse copy of the tool.
 
 ## Iframes and the cookie
 
@@ -122,11 +117,11 @@ editor's route, the TD's veto, and a blanket auth bypass is what the narrowness 
 The tracker reads contacts and stores a `contact_id` on its threads; it never writes the table.
 Writing to it from the tracker changes that contract, and it goes to Joel through the TD first.
 
-### `/api/summary` — the hub reads you
+### `/api/summary` — nothing reads it now
 
-The hub renders its landing glance by fanning out to each tool's `/api/summary` server-side. Yours
-follows the same carve-out shape as above: `pathname === "/api/summary"` exactly, read-only, failing
-closed without the secret, four-second timeout.
+The hub's glance fanned out to it; the glance is gone (TEC-83), so the route has no reader. Its
+carve-out stays as built — `pathname === "/api/summary"` exactly, read-only, failing closed without
+the secret — because the tracker is parked and its middleware is the TD's.
 
 **Keep the shape narrow.** Counts and singles, never rows. Rich lists stay behind `loadDashboard`.
 That discipline is what made the route reviewable, and it is why an objection to it was withdrawn
@@ -175,9 +170,8 @@ in `supabase/`, which is where that detail is measured rather than restated.
 
 **Never do:**
 
-- Give the hub a database credential or a direct schema read. If a tile needs data, the tool that
-  owns that data exposes it through `/api/summary`.
-- Hand the glance rows. Counts and singles.
+- Give home a database credential or a direct schema read. If a tile ever needs data, the tool that
+  owns it exposes counts and singles, never rows.
 - Reuse a branch across unrelated work. This app's old branch is the cautionary tale in `CLAUDE.md`.
 
 ## Guidelines
