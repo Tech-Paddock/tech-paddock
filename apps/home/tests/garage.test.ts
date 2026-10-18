@@ -83,6 +83,13 @@ describe("drift explained", () => {
     expect(explainDrift(check("a check nobody has seen"))).toBeNull();
   });
 
+  it("explains the gate-shape check under either gate file name (TEC-34)", () => {
+    const shape = /three deliberate versions/;
+    expect(explainDrift(check("middleware.ts / proxy.ts: a base copy plus the two scoped bypasses"))).toMatch(shape);
+    expect(explainDrift(check("proxy.ts: a base copy plus the two scoped bypasses"))).toMatch(shape);
+    expect(explainDrift(check("password gate: every app has the gate file its Next.js runs"))).toMatch(/is public/);
+  });
+
   it("says how far a budget is from its cap", () => {
     expect(budgetDistance(check("budget: CLAUDE.md", "79 / 80"))).toBe("79 of 80 lines — 1 to spare");
     expect(budgetDistance(check("budget: CLAUDE.md", "82 / 80"))).toBe("82 of 80 lines — 2 over");

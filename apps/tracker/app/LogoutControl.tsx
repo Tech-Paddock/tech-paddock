@@ -17,7 +17,7 @@ import { useState } from "react";
  * acts global is a surprise the first time.
  *
  * **It never pretends.** The browser only goes to /login once the server has
- * answered. A 401 counts as success: the middleware answers 401 to a request
+ * answered. A 401 counts as success: the password gate answers 401 to a request
  * with no valid session, so the cookie is already gone or already worthless.
  * Anything else — a 5xx, a network failure — leaves you where you are and says
  * the logout did not happen, because landing on /login while still signed in

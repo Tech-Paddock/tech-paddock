@@ -35,6 +35,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expected as stampExpected, MANIFEST, PUBLIC_APPS, SHARED_DIR } from "./stamp-shared.mjs";
 import { watchedBy, buildReads, covers } from "./build-scope.mjs";
+import { GATE_FILES, gateFileFindings, gateHash, gateShape } from "./gate-file.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const R = (...p) => join(repoRoot, ...p);
@@ -165,7 +166,7 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
   }
 }
 
-/* 2 ── middleware.ts is deliberately NOT uniform, and the shape is the rule:
+/* 2 ── The password gate is deliberately NOT uniform, and the shape is the rule:
    `editor` adds a scoped /api/draft bypass, `tracker` adds /api/summary and
    waves /api/cron/* through, and every other app shares one base copy. An agent
    who checks, finds three variants and concludes the rule is wrong has been
@@ -177,62 +178,45 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
    copies it is correct work and passes. A new app that brings its OWN variant
    fails here on purpose — that is a fourth version of the password gate, and
    it either belongs in CLAUDE.md in the same pull request or it should not
-   exist. Collapsing everything to one copy fails for the opposite reason. */
+   exist. Collapsing everything to one copy fails for the opposite reason.
+
+   The gate file is middleware.ts on Next 14/15 and proxy.ts on Next 16
+   (TEC-34), so each app is read under the name its own Next major runs, and the
+   exported function's name is normalised before hashing: the codemod's rename
+   is the only difference between a base copy and a migrated one, and a naive
+   hash would call that a fourth variant. An app whose gate file cannot be read
+   FAILS rather than leaving the comparison — on the Next 16 spike a migrated
+   app simply dropped out and this check went on reading `ok`. */
 {
-  const present = APPS.map((a) => [a, md5(R("apps", a, "middleware.ts"))]).filter(([, h]) => h);
-  const groups = new Map();
-  for (const [a, h] of present) groups.set(h, [...(groups.get(h) ?? []), a]);
-  const shape = [...groups.values()].map((g) => g.sort().join("+")).sort();
-  const name = "middleware.ts: a base copy plus the two scoped bypasses";
-
-  const owns = (app) => [...groups.values()].some((g) => g.length === 1 && g[0] === app);
-  const missing = ["editor", "tracker"].filter((a) => !present.some(([app]) => app === a));
-  const base = [...groups.values()].filter((g) => !(g.length === 1 && (g[0] === "editor" || g[0] === "tracker")));
-
-  if (present.length === 0) add(name, "warn", "no middleware.ts in any app — cannot measure");
-  else if (missing.length) add(name, "warn", `cannot measure: no middleware.ts in ${missing.join(", ")}`);
-  else if (!owns("editor") || !owns("tracker"))
-    add(name, "fail",
-      "editor and tracker must each have a variant of their own — measured " + shape.join(" | ") +
-      ". A shared one means a scoped bypass was copied into an app that was never reviewed for it.");
-  else if (base.length > 1)
-    add(name, "fail",
-      "a fourth version of the password gate — measured " + shape.join(" | ") +
-      ". Use the base copy, or document the new variant in CLAUDE.md in this same pull request.");
-  else if (base.length === 0)
-    add(name, "fail", "only editor and tracker have middleware.ts; nothing is running the base copy");
-  else
-    add(name, "ok", `${base[0].length} on the base copy, editor and tracker scoped — ${shape.join(" | ")}`);
+  const r = gateShape(GATED.map((a) => [a, gateHash(R("apps", a))]));
+  add("middleware.ts / proxy.ts: a base copy plus the two scoped bypasses", r.state, r.detail);
 }
 
-/* 2b ── The password gate EXISTS in every app, which check 2 cannot see.
-   Check 2 compares the middleware.ts files that are there; an app with none is
-   simply not in the comparison, so deleting one, or scaffolding a tool without
-   one, made the base group smaller and still read `ok`. An app with no
-   middleware serves every route in public, its service-role API routes
-   included — the "Vercel project serving an unprotected page" incident in
-   CLAUDE.md. Next.js also has other places it looks: a middleware.js, or
-   src/middleware.* once the app lives under src/. Any of those would replace or
-   bypass the reviewed file, so each one fails here rather than passing quietly. */
+/* 2b ── The password gate EXISTS in every app, which check 2 cannot see, and it
+   is the file the app's Next.js actually runs. An app with no gate serves every
+   route in public, its service-role API routes included — the "Vercel project
+   serving an unprotected page" incident in CLAUDE.md.
+
+   Exactly one gate file, chosen by the app's Next major (scripts/gate-file.mjs
+   has the reasoning): middleware.ts on 14/15, proxy.ts on 16. The silent case is
+   a proxy.ts in a 14 app — 14 ignores it and builds clean with no gate at all.
+   Next.js also looks elsewhere: a .js/.mjs/… alternate, or src/<gate>.* once
+   the app lives under src/. Any of those would replace or bypass the reviewed
+   file, so each one fails here rather than passing quietly. */
 {
-  const name = "password gate: every app has middleware.ts";
+  const name = "password gate: every app has the gate file its Next.js runs";
   const apps = GATED.filter((a) => existsSync(R("apps", a, "package.json")));
   const bad = [];
+  const by = new Map();
   for (const a of apps) {
-    const has = (rel) => existsSync(R("apps", a, rel));
-    if (!has("middleware.ts")) bad.push(`${a}: no middleware.ts — every route it serves is public`);
-    for (const alt of ["middleware.js", "middleware.mjs", "middleware.cjs", "middleware.jsx", "middleware.tsx"])
-      if (has(alt)) bad.push(`${a}: ${alt} — Next.js would run it instead of, or beside, the reviewed middleware.ts`);
-    if (has("src")) {
-      const srcAlt = readdirSync(R("apps", a, "src")).filter((f) => /^middleware\./.test(f));
-      for (const f of srcAlt) bad.push(`${a}: src/${f} — a second password gate nobody reviewed`);
-      for (const d of ["app", "pages"])
-        if (has(`src/${d}`)) bad.push(`${a}: src/${d}/ — with the app under src/, Next.js ignores the root middleware.ts`);
-    }
+    const f = gateFileFindings(R("apps", a));
+    for (const why of f.bad) bad.push(`${a}: ${why}`);
+    if (f.want) by.set(f.want, [...(by.get(f.want) ?? []), `${a} (Next ${f.major})`]);
   }
   if (apps.length === 0) add(name, "warn", "no app folder with a package.json — cannot measure");
   else add(name, bad.length ? "fail" : "ok",
-    bad.length ? bad.join("; ") : `${apps.length} apps, each behind apps/<app>/middleware.ts and nothing else` +
+    bad.length ? bad.join("; ") : `${apps.length} apps, each behind exactly one gate file — ` +
+      [...by].map(([f, as]) => `${f}: ${as.join(", ")}`).join("; ") +
       (APPS.length > apps.length ? `; ${APPS.filter((a) => !apps.includes(a)).join(", ")} public by design (check 2c)` : ""));
 }
 
@@ -252,14 +236,16 @@ function publicAppFindings(app) {
   const has = (rel) => existsSync(join(dir, rel));
   const bad = [];
 
-  // No server: a static export has no API route, no middleware and no request
+  // No server: a static export has no API route, no gate file and no request
   // to read a cookie from. A static export ignores headers(), so the security
   // headers live in vercel.json — checked below.
   const config = read(join(dir, "next.config.mjs"));
   if (config === null) bad.push("no next.config.mjs — cannot see that it is a static export");
   else if (!/\boutput\s*:\s*["']export["']/.test(config.replace(/\/\*[\s\S]*?\*\/|(^|\s)\/\/.*$/gm, "$1")))
     bad.push('next.config.mjs is not `output: "export"` — a server could read the session cookie');
-  for (const f of ["middleware.ts", "middleware.js", "middleware.mjs", "middleware.cjs", "middleware.jsx", "middleware.tsx"])
+  // Either name: proxy.* is the gate on Next 16 (TEC-34), and on 14 a stray one
+  // is no safer for being ignored today — the upgrade would switch it on.
+  for (const f of GATE_FILES)
     for (const at of [f, `src/${f}`]) if (has(at)) bad.push(`${at} — a public app has no gate to run`);
 
   // Nothing stamped but what is marked public, and no database client.

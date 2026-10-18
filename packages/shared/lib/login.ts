@@ -20,7 +20,7 @@ import { verifyPassword } from "./password";
  * packages/shared now, like the session code it calls.
  *
  * Node-only, because it imports lib/password.ts (bcryptjs). Never import it
- * from middleware.ts.
+ * from the gate file (middleware.ts, or proxy.ts on Next 16).
  *
  * The attempts counter is advisory — see lib/auth.ts. The password is the
  * control.

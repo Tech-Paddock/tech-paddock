@@ -17,7 +17,7 @@ rather than in production.
 | File | Lands at | Why it is shared |
 |---|---|---|
 | `lib/auth.ts` | `apps/<app>/lib/auth.ts` | The session cookie, the advisory attempts counter and `safeEqual`. A mismatch does not throw — it silently rejects valid sessions on every other app. |
-| `lib/password.ts` | `apps/<app>/lib/password.ts` | The bcrypt wrapper. Node-only; never import it from `middleware.ts`. |
+| `lib/password.ts` | `apps/<app>/lib/password.ts` | The bcrypt wrapper. Node-only; never import it from the gate file (`middleware.ts`, or `proxy.ts` on Next 16). |
 | `lib/login.ts` | `apps/<app>/lib/login.ts` | The handler behind every app's `POST /api/login`, which each `app/api/login/route.ts` re-exports. Node-only, like `password.ts`. |
 | `lib/logout.ts` | `apps/<app>/lib/logout.ts` | The handler behind every app's `POST /api/logout`, which each `app/api/logout/route.ts` re-exports. It clears the domain-wide session cookie, so logging out of one app logs out of all of them. |
 | `lib/safe-redirect.ts` | `apps/<app>/lib/safe-redirect.ts` | Where a successful login may send you. Pure; the login pages are client components and import it in the browser. |
@@ -45,7 +45,7 @@ runs its model check.
 has none at all — the hub holds no database credential, which is a property worth protecting rather
 than a gap to fill.
 
-**`middleware.ts` is not here and must not be.** It is three deliberate variants: a base copy, plus
+**The gate file — `middleware.ts`, or `proxy.ts` once an app is on Next 16 — is not here and must not be.** It is three deliberate variants: a base copy, plus
 `editor`'s scoped `/api/draft` bypass and `tracker`'s `/api/summary` bypass and its `/api/cron/*`
 bearer check. `drift`
 measures that shape directly, and a fourth variant fails it on purpose — that is a fourth version of
