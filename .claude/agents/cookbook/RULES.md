@@ -26,9 +26,14 @@ re-deriving those decisions from scratch will produce worse answers slowly.
   was renamed rather than the incumbent.
 - **Its own app, its own Postgres schema** (`cookbook`).
 - **Surface: site.** A cookbook is a collection; the index is the product — you arrive to see what
-  you could cook, which answers `SURFACE.md` question 2 plainly. Not thumb-first, no home-screen
-  install. **Its tabs — Recipes · King Soopers list — are that index**, one verb each, each tab one
-  long page: the technical director's ruling on 2026-09-24, after Joel asked for tabs on 2026-09-22.
+  you could cook, which answers `SURFACE.md` question 2 plainly. Not thumb-first. **Its tabs —
+  Recipes · Add · King Soopers list — are that index**, one verb each (browse, add, shop), each tab
+  one long page: the TD's ruling on 2026-09-24, after Joel asked for tabs on 2026-09-22, and Add made
+  its own tab at `/add` by Joel's override on 2026-10-05 (TEC-101).
+- **Installable, and still a site** (Joel's override, 2026-10-05; recorded 2026-10-18, TEC-102). The
+  No. 12 icon is the apple-touch-icon with `appleWebApp` metadata, so it goes on the home screen —
+  but that is a shortcut, not a change of shape: the layout stays tabs and long pages. Whether it
+  should become an app is TEC-109, parked until Joel has used it installed.
 - **The grocery list moves here.** You shop from recipes, not from what you ate, so a list built
   from Cookbook's own ingredients belongs beside the book rather than beside the log. How it moves
   is below.

@@ -66,12 +66,13 @@ So: **count how often it is opened and in what state of mind, never how many rou
 
 - **A thin index grouped by verb**, not by entity. The index answers *what am I here to do*, not
   *what objects exist*. **It may be a tab bar** when each tab is a verb and each is one long page —
-  the Cookbook's Recipes · King Soopers list.
+  the Cookbook's Recipes · Add · King Soopers list.
 - **One long page over many routes.** For a single-user tool with this much content, scrolling beats
   navigating: a route you have to find is worse than a section you scroll past.
 - **Not thumb-first**, and that is not a licence to ignore the phone. It still has to work there; it
   just is not designed around one-handed use at a worktop.
-- **No home-screen install.** A site you open occasionally does not earn an icon.
+- **No home-screen install by default.** A site you open occasionally does not earn an icon. Joel
+  can grant one — the Cookbook's (2026-10-05) — and it stays a shortcut: the site's shape does not move.
 
 ## Diagnostic routes are not surface
 
@@ -93,7 +94,7 @@ doing more work than it should.
 | Coffee | **App** | At the grinder, several times a day, one decided thing. Installed to the home screen. |
 | Health | **App** | Just ate, phone in hand, log it and close. Its grocery list is moving to the Cookbook (TEC-15). |
 | Resume Formatter | **Site** | Occasional, sitting down, arriving to look at what is there. |
-| Cookbook | **Site** | A collection: you arrive to see what you could cook, which is question 2 answering *site* plainly. Its tabs are the verb index. The King Soopers hand-off is a phone-in-a-shop moment that reads *app*; it was weighed and did not win (TD ruling, 2026-09-24). |
+| Cookbook | **Site** | A collection: you arrive to see what you could cook, which is question 2 answering *site* plainly. Its tabs are the verb index. The King Soopers hand-off is a phone-in-a-shop moment that reads *app*; it was weighed and did not win (TD ruling, 2026-09-24). Installable since Joel's override of 2026-10-05, still a site (TEC-102); app is TEC-109. |
 | Pipeline Tracker | **Site** | Reviewing a pipeline is surveying, not doing one decided thing. Parked, so a record rather than a plan. |
 | Message Editor | **Site** | Composing is unhurried and desk-bound. Parked and frozen, so a record rather than a plan. |
 | Showcase | **Site** | Opened by someone else, once, arriving to look at what Joel built. Public; the rules are in the TD's charter. |

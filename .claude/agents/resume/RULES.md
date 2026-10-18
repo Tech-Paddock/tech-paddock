@@ -60,6 +60,16 @@ way to guarantee a byte is unchanged is not to write it.
 formatting, for surplus input; unmatched template entries are dropped. Every one of those is a
 change-log line, never silent.
 
+**Professional Experience is the one section that feathers** (Joel, 2026-10-14, TEC-107). An input
+line the template's entry has no slot for is inserted after the line that precedes it in the input,
+formatted as a copy of the nearest **bullet** paragraph of that job — body size, never the bold
+header line, which reads as a new heading to Joel and to an ATS (Joel, 2026-10-18) — and logged
+`feathered`. It is a note, never a vote. Coverage checks every Experience line as the input has it,
+not just the fields read from it. **Every other content section owns its shape**: a line with no
+slot there stays missing and fails the render, and a FAIL hands out no file (TEC-105). **The
+reverse is only a warning**: a template section the input leaves empty, such as a Summary a
+Jobright export lacks, warns and still downloads (Joel, 2026-10-18).
+
 ## What you own
 
 Database: the `resume` schema.
