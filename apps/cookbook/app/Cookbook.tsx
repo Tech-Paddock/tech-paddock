@@ -1,19 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import AddRecipe from "./AddRecipe";
 import Book from "./Book";
 import List from "./List";
 import { ToastProvider } from "./Toast";
 import { TABS, pathFor, type Tab } from "@/lib/tabs";
+import { cuisinesIn } from "@/lib/tuning";
+import type { Recipe } from "@/lib/recipes";
 
 /**
- * The two tabs, and the one piece of state they share.
+ * The three tabs, and the little state they share.
  *
  * **Tabs are the verb index.** The surface is *site*, settled at standup on
  * 2026-09-20, and its tabs are that index, one verb each: the technical
  * director's ruling on 2026-09-24, after Joel asked for tabs on 2026-09-22.
  * Adding a recipe and shopping are different errands minutes apart, and scrolling
- * past the whole book to reach the list stopped being cheaper than a tap.
+ * past the whole book to reach the list stopped being cheaper than a tap. **Add
+ * became the third** on 2026-10-05, Joel overruling the two-tab ruling.
  *
  * **Each tab has an address** since TEC-22: `/` is the book and `/list` is the
  * list, which Health's `/list` redirects onto while the list moves here. Switching
@@ -26,7 +30,9 @@ import { TABS, pathFor, type Tab } from "@/lib/tabs";
  * Adding a recipe's ingredients to the list happens in the book and shows up in
  * the list, so something has to own the fact that the list is now stale. A counter
  * is the whole of it — the list refetches when it changes, which keeps both
- * components fetching their own data and neither one holding the other's.
+ * components fetching their own data and neither one holding the other's. A
+ * recipe kept on Add reaches the book the same way, and the book hands back its
+ * cuisines for Add's picker.
  */
 
 export type { Tab };
@@ -34,6 +40,9 @@ export type { Tab };
 export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [listVersion, setListVersion] = useState(0);
+  const [bookVersion, setBookVersion] = useState(0);
+  const [cuisines, setCuisines] = useState<string[]>([]);
+  const onRead = useCallback((recipes: Recipe[]) => setCuisines(cuisinesIn(recipes)), []);
 
   function choose(next: Tab) {
     setTab(next);
@@ -72,7 +81,12 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
             is unsaved work by definition. `hidden` keeps them off the accessibility
             tree without costing that. */}
         <div role="tabpanel" id="panel-recipes" aria-labelledby="tab-recipes" hidden={tab !== "recipes"}>
-          <Book onAddedToList={() => setListVersion((n) => n + 1)} />
+          <Book onAddedToList={() => setListVersion((n) => n + 1)} onRead={onRead} version={bookVersion} />
+        </div>
+        <div role="tabpanel" id="panel-add" aria-labelledby="tab-add" hidden={tab !== "add"}>
+          <div className="mx-auto w-full max-w-2xl">
+            <AddRecipe cuisines={cuisines} onKept={() => setBookVersion((n) => n + 1)} />
+          </div>
         </div>
         <div role="tabpanel" id="panel-shop" aria-labelledby="tab-shop" hidden={tab !== "shop"}>
           <div className="mx-auto w-full max-w-2xl">
