@@ -171,17 +171,19 @@ wrong or the rule is, and that is a conversation before any code exists.
 - **The technical director: the shared auth plumbing** — the stamped auth files (`lib/auth.ts`,
   `lib/password.ts`, the login handler in `lib/login.ts` with `lib/safe-redirect.ts`, and the logout
   handler in `lib/logout.ts`),
-  `middleware.ts`, or anything touching `SESSION_SECRET`, `INTERNAL_API_SECRET`, `CRON_SECRET` and
-  the shared cookie. **These are gated for two different reasons, and merging them is how the rule
+  the gate file — `middleware.ts`, or `proxy.ts` once an app is on Next 16 — or anything touching
+  `SESSION_SECRET`, `INTERNAL_API_SECRET`, `CRON_SECRET` and the shared cookie. **These are gated for two different reasons, and merging them is how the rule
   gets talked past.** The stamped files genuinely are byte-identical in every app — checksummed, not
   assumed — and a mismatch does not throw, it silently rejects valid sessions on every other app.
-  `middleware.ts` is **three distinct versions**: a base copy, `editor`'s scoped `/api/draft`
+  The gate file is **three distinct versions**: a base copy, `editor`'s scoped `/api/draft`
   exception, and `tracker`'s `/api/summary` and cron exceptions, each behind its own secret. Which
   app runs which is `drift`'s to measure, not this file's to list. That divergence is deliberate, so
   "they are all the same" is not the reason to leave it alone — and an agent who checks, finds
   three, and concludes the rule is wrong has been handed that conclusion by the rule itself. **It is
   gated because it *is* the password gate.** A bad edit does not break a login; it publishes an
-  endpoint.
+  endpoint. **So does its name.** Next 14 silently ignores `proxy.ts`, so an app whose gate file does
+  not match its Next major builds clean with no gate at all. Which file each app needs is `drift`'s
+  to measure, not this file's to list (TEC-34).
 
 ### Always
 
@@ -408,8 +410,8 @@ Most rules here are convention: they hold because an agent chooses to comply. Th
    branch protection stays the backstop for `main`.
 3. **CI's `gate`** needs every app to typecheck, test and build, and `drift` to pass.
    **`requested-by-joel`** fails a pull request whose body does not record who asked for it.
-   **`drift`** measures the repo instead of trusting a document: the stamped copies, the middleware
-   shape and that every app has one — the showcase excepted, which must instead hold nothing — the CI
+   **`drift`** measures the repo instead of trusting a document: the stamped copies, the password
+   gate's shape and that every app has exactly the gate file its Next major runs — the showcase excepted, which must instead hold nothing — the CI
    matrix and the gate's shape, each `ignoreCommand` against what its build reads, the file budgets,
    and retired structures staying retired — and it warns on computable facts written into any `.md`
    except `DECISIONS.md`. **It does not read this file's sentences**, which is why this file points

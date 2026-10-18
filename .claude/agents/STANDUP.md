@@ -62,7 +62,7 @@ issue, not an edit you make.
    edit, so Joel approves it**, in the same pull request as the rest.
 4. **The app folder**, copied from the nearest existing app. **The shared files are stamped, not
    copied**: run `node scripts/stamp-shared.mjs`, which writes every file in its `MANIFEST`, banner
-   included — a hand copy fails `drift`. `middleware.ts` takes the **base** copy unless there is a
+   included — a hand copy fails `drift`. The gate file its Next major runs (`middleware.ts` on ≤15, `proxy.ts` on ≥16) takes the **base** copy unless there is a
    reviewed reason not to: a fourth variant fails `drift` deliberately, because that is a fourth
    version of the password gate.
 5. **`.env.example`** — variable names and how to generate them, never a value.
@@ -97,7 +97,7 @@ merges, the TD starts it from its preset when Joel says go.
 ## Then verify, rather than assume
 
 - `node scripts/drift-check.mjs` — the new agent should appear under freshness, the new app should
-  be owned, and the middleware check should still be `ok`.
+  be owned, and the gate-file checks should still be `ok`.
 - The Garage tab on home — the app's probe shows once `TOOLS` has it and it is deployed.
 - Open the subdomain in a private window and confirm it asks for the password.
 

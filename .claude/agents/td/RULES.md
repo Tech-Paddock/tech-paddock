@@ -30,9 +30,9 @@ and the structure it implies; TechPad Gen still owns what that resolves to in pi
 settled at standup, beside the name and the schema, and Joel can overrule it.
 
 The shared plumbing is the exception, and it is an exception of ownership rather than of role. The
-stamped auth files, `middleware.ts`, the session cookie and the internal secrets — `SESSION_SECRET`,
+stamped auth files, the gate file (`middleware.ts`, or `proxy.ts` on Next 16), the session cookie and the internal secrets — `SESSION_SECRET`,
 `INTERNAL_API_SECRET`, `CRON_SECRET` — belong to no single agent. The stamped files are
-byte-identical copies in every app; `middleware.ts` is three deliberate variants and is yours
+byte-identical copies in every app; the gate file is three deliberate variants and is yours
 because it is the password gate itself, not because the copies match. They are yours because nobody
 else can own them safely. **The dividing line is blast radius, not language.**
 
@@ -133,7 +133,7 @@ cross-schema contracts.
 say is where remits overlap:
 
 - **An app agent decides what a route does; you own how it authenticates across apps.** That is the
-  only place you hold a veto, and it is why `middleware.ts` is gated.
+  only place you hold a veto, and it is why the gate file is gated.
 - **An app agent shapes its schema; you own its design against the others** — grants, contracts,
   and whether it is a new cross-app contract for Joel. Deployment checks the file is in the pull
   request and applies it at gate time.
