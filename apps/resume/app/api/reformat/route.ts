@@ -6,13 +6,15 @@ import { extractParagraphs } from "@/lib/docx/paragraphs";
 import { auditAts } from "@/lib/docx/ats";
 import { checkContent, reskin } from "@/lib/reskin/generate";
 import { StorageError, downloadDocx, uploadDocx } from "@/lib/storage";
+import { verdictFor } from "@/lib/verdict";
 
 export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 4 * 1024 * 1024;
 
 /**
- * Pour a tailored resume's text into the template's formatting.
+ * Pour the Input Resume's text into the template's formatting, and hand the
+ * file back only if it passed.
  *
  * **The template file is the substrate, not a description of one.** Its zip is
  * opened and only the body of `word/document.xml` is rewritten; every part that
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   const source = form.get("source");
-  if (!(source instanceof File)) return fail(400, "no_source", "Attach the tailored resume to reformat.");
+  if (!(source instanceof File)) return fail(400, "no_source", "Attach the Input Resume to reformat.");
   if (!source.name.toLowerCase().endsWith(".docx")) {
     return fail(415, "not_docx", `The resume (${source.name}) isn't a .docx.`);
   }
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
     if (error) return fail(500, "db_error", error.message);
     if (!active) {
-      return fail(409, "no_template", "No active template. Add one above — it saves and becomes active.");
+      return fail(409, "no_template", "No active template. Add one on the Resumes tab — it saves and becomes the Current Template.");
     }
     if (typeof active.file_path !== "string" || !active.file_path) {
       return fail(409, "no_template_file", "That template has no stored file, and the file is what the render is built from. Upload it again.");
@@ -75,11 +77,22 @@ export async function POST(request: NextRequest) {
     const rendered = await readDocxParts(docx);
     const renderedParas = extractParagraphs(rendered.document);
     const findings = auditAts(rendered, renderedParas);
-    const coverage = checkContent(content, renderedParas);
+    const coverage = checkContent(content, renderedParas, changeLog);
     const contentHash = createHash("sha256").update(docx).digest("hex");
 
+    // **A FAIL is not handed out** (Joel, 2026-10-14, TEC-105: "block the
+    // download but give the specific issue in diagnostic"). Enforced here, not
+    // only on the button: the bytes are neither returned nor stored, so no
+    // route can offer them later — `/api/renders/[id]/file` answers 404 for a
+    // render with no output, and the Resumes list shows no output row for it.
+    // The render itself *is* recorded — its source, coverage and change log —
+    // because that record is what names the specific issue, and it can be
+    // reopened. The same `verdictFor` the screen reads decides it, so the two
+    // cannot disagree.
+    const verdict = verdictFor({ coverage, findings, changeLog });
+
     const sourcePath = await uploadDocx("sources", source.name, sourceBytes);
-    const outputPath = await uploadDocx("renders", outputName(source.name), docx);
+    const outputPath = verdict.pass ? await uploadDocx("renders", outputName(source.name), docx) : null;
     const inserted = await getServiceClient()
       .from("renders")
       .insert({
@@ -99,6 +112,10 @@ export async function POST(request: NextRequest) {
           version: templateVersion,
           templateHash: createHash("sha256").update(templateBytes).digest("hex"),
           changeLog,
+          // The findings it was judged on. A FAIL stores no output to re-lint
+          // when it is reopened, so without these a render failed by a blocking
+          // finding would reopen as a PASS (TEC-105).
+          findings,
         },
         source_file_path: sourcePath,
         output_file_path: outputPath,
@@ -124,7 +141,8 @@ export async function POST(request: NextRequest) {
         competencies: content.competencies?.length ?? 0,
         hasSummary: content.summary !== null,
       },
-      docxBase64: docx.toString("base64"),
+      verdict,
+      ...(verdict.pass ? { docxBase64: docx.toString("base64") } : {}),
     });
   } catch (error) {
     if (error instanceof DocxReadError) return fail(422, error.code, error.message);

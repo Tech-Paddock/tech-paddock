@@ -3,7 +3,7 @@ import { joinBody, splitBody } from "./blocks";
 import { extractSourceContent } from "./extract";
 import { renderIntoTemplate } from "./render";
 import type { ChangeLogEntry, SourceContent } from "./types";
-import { compareLines, type ContentCheck } from "../docx/compare";
+import { compareLines, type ContentCheck, type MissingLine } from "../docx/compare";
 import type { Para } from "../docx/paragraphs";
 
 export type ReskinResult = {
@@ -21,14 +21,32 @@ export type ReskinResult = {
  * report the tool's own design as content loss.
  */
 export function linesTaken(content: SourceContent): string[] {
-  const lines: string[] = [];
-  if (content.summary) lines.push(content.summary);
-  for (const h of content.careerHighlights ?? []) lines.push(h.stat, h.desc);
-  for (const c of content.competencies ?? []) lines.push(c.label, c.items);
+  return sectionedLines(content).map((l) => l.text);
+}
+
+/**
+ * `linesTaken`, each with the section it was taken from.
+ *
+ * Professional Experience contributes **every line of each entry as the input
+ * has it**, not just the fields read out of them. Checking only company, title,
+ * date and bullets let a location line or a one-line role description vanish
+ * at 100% coverage — the overstatement this check exists to prevent (TEC-107).
+ * The fields are kept beside the lines: they are substrings of them, so they
+ * can only ever agree.
+ */
+export function sectionedLines(content: SourceContent): { text: string; section: string }[] {
+  const lines: { text: string; section: string }[] = [];
+  const add = (section: string, ...texts: string[]) => {
+    for (const text of texts) if (text.trim() !== "") lines.push({ text, section });
+  };
+  if (content.summary) add("Summary", content.summary);
+  for (const h of content.careerHighlights ?? []) add("Career Highlights", h.stat, h.desc);
+  for (const c of content.competencies ?? []) add("Core Competencies", c.label, c.items);
   for (const e of content.experience) {
-    lines.push(e.company, e.title, e.date, ...e.bullets);
+    add("Professional Experience", e.company, e.title, e.date, ...e.bullets);
+    add("Professional Experience", ...(e.lines ?? []).map((l) => l.text));
   }
-  return lines.filter((l) => l.trim() !== "");
+  return lines;
 }
 
 /**
@@ -41,10 +59,48 @@ export function linesTaken(content: SourceContent): string[] {
  * no highlights: the overstatement TEC-79 fixed. So it rides in `notRead`.
  * Both routes call this, so Reformat and Diagnostics cannot disagree.
  */
-export function checkContent(content: SourceContent, finished: Para[]): ContentCheck {
-  const check = compareLines(linesTaken(content), finished);
+export function checkContent(content: SourceContent, finished: Para[], changeLog?: ChangeLogEntry[]): ContentCheck {
+  const sectioned = sectionedLines(content);
+  const check = compareLines(
+    sectioned.map((l) => l.text),
+    finished
+  );
   const notRead = content.unreadableHighlights ?? [];
-  return notRead.length > 0 ? { ...check, notRead } : check;
+  const withDetail =
+    changeLog && check.missing.length > 0 ? { ...check, missingDetail: explainMissing(check.missing, sectioned, changeLog) } : check;
+  return notRead.length > 0 ? { ...withDetail, notRead } : withDetail;
+}
+
+/** The change-log actions that say a section lost or never received input. */
+const LOSS_ACTIONS = new Set(["input-dropped", "not-found-in-input"]);
+
+/**
+ * For each missing line: the section it was taken from, and the render's own
+ * reason it is not there (TEC-105).
+ *
+ * The reason is the change-log entry that names that line, where one does; then
+ * the section's own loss entry; and only then a plain statement that the text
+ * is not in the document. **Nothing here re-derives a placement** — it reads
+ * what the renderer wrote down while it worked.
+ */
+function explainMissing(
+  missing: string[],
+  sectioned: { text: string; section: string }[],
+  changeLog: ChangeLogEntry[]
+): MissingLine[] {
+  const sectionOf = new Map<string, string>();
+  for (const l of sectioned) if (!sectionOf.has(l.text.trim())) sectionOf.set(l.text.trim(), l.section);
+
+  return missing.map((line) => {
+    const section = sectionOf.get(line) ?? "Unknown section";
+    const named = changeLog.find((c) => c.lines?.some((l) => l.trim() === line));
+    const loss = changeLog.find((c) => c.section === section && LOSS_ACTIONS.has(c.action));
+    const reason =
+      named?.detail ||
+      loss?.detail ||
+      `Its text does not appear in the finished document, and the template's ${section} had no place the renderer could put it.`;
+    return { line, section, reason };
+  });
 }
 
 /**
@@ -62,7 +118,7 @@ export function checkContent(content: SourceContent, finished: Para[]): ContentC
  */
 export async function reskin(templateBytes: Buffer | Uint8Array, sourceBytes: Buffer | Uint8Array): Promise<ReskinResult> {
   const template = await loadDocx(templateBytes, "the template");
-  const source = await loadDocx(sourceBytes, "the tailored resume");
+  const source = await loadDocx(sourceBytes, "the Input Resume");
 
   const content = extractSourceContent(splitBody(getBodyInner(source.documentXml).bodyInner));
   const { blocks, changeLog } = renderIntoTemplate(

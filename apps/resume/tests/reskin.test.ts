@@ -213,6 +213,13 @@ describe("reading the source document", () => {
       title: "Operations Analyst",
       date: "Jan 2020 - Present",
       bullets: ["Did a representative thing."],
+      // Every line as the input has it, so a line the fields do not use can be
+      // feathered and coverage can check it (TEC-107).
+      lines: [
+        { text: "Acme Corp\tJan 2020 - Present", bulleted: false },
+        { text: "Operations Analyst", bulleted: false },
+        { text: "Did a representative thing.", bulleted: true },
+      ],
     });
   });
 
@@ -253,7 +260,10 @@ describe("reading the source document", () => {
       const content = extractSourceContent(splitBody(body(heading)));
       expect(content.experience.map((e) => e.company)).toEqual(["Acme Corp"]);
       expect(content.competencies).toEqual([{ label: "Systems", items: "Alpha, Beta" }]);
-      expect(content.unplacedSections).toEqual([{ heading, lines: 2 }]);
+      // The text is kept as well as counted, so Diagnostics can name it (TEC-105).
+      expect(content.unplacedSections).toEqual([
+        { heading, lines: 2, texts: ["Sample Project", "Built a representative prototype."] },
+      ]);
     });
 
     it("logs it as input with nowhere to go, which the verdict fails on", async () => {
@@ -262,7 +272,13 @@ describe("reading the source document", () => {
         splitBody(getBodyInner(template.documentXml).bodyInner),
         extractSourceContent(splitBody(body("Projects")))
       );
-      expect(changeLog).toContainEqual(expect.objectContaining({ section: "Projects", action: "input-dropped" }));
+      expect(changeLog).toContainEqual(
+        expect.objectContaining({
+          section: "Projects",
+          action: "input-dropped",
+          lines: ["Sample Project", "Built a representative prototype."],
+        })
+      );
     });
 
     it("reports nothing on the repo's own source, which has no such section", async () => {
@@ -350,6 +366,6 @@ describe("failing honestly", () => {
 
   it("rejects a zip with no document.xml", async () => {
     const notAWordFile = await new JSZip().file("hello.txt", "hi").generateAsync({ type: "nodebuffer" });
-    await expect(reskin(TEMPLATE(), notAWordFile)).rejects.toThrow(/tailored resume/i);
+    await expect(reskin(TEMPLATE(), notAWordFile)).rejects.toThrow(/Input Resume/);
   });
 });
