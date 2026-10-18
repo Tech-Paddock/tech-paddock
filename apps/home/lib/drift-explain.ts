@@ -20,7 +20,7 @@ const FAMILIES: [RegExp, string][] = [
     "Each app's shared files are copied from packages/shared. A copy that differs was edited by hand — fix the original and re-run the stamp script.",
   ],
   [
-    /^middleware\.ts/,
+    /^(middleware|proxy)\.ts/,
     "The password gate comes in three deliberate versions. Anything else means an app's gate has changed shape.",
   ],
   [/^password gate/, "Every app must sit behind the password gate. An app without one is public."],

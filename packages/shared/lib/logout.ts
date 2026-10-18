@@ -15,9 +15,9 @@ import { COOKIES, sessionCookieOptions } from "./auth";
  * Only the hub had this route until TEC-73 (2026-09-26); it is stamped from
  * packages/shared now so every app's header can offer it.
  *
- * It needs no middleware exception. A signed-in request reaches it like any
- * other route; a signed-out one is answered 401 by the middleware, which the
- * control reads as already logged out.
+ * It needs no gate exception. A signed-in request reaches it like any other
+ * route; a signed-out one is answered 401 by the gate (middleware.ts, or
+ * proxy.ts on Next 16), which the control reads as already logged out.
  */
 export async function handleLogout(request: NextRequest): Promise<NextResponse> {
   const res = NextResponse.json({ ok: true });

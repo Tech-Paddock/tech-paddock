@@ -28,8 +28,10 @@ function secret() {
   return s;
 }
 
-// Web Crypto (not node:crypto) so this also works in the Edge runtime, where
-// middleware.ts runs.
+// Web Crypto (not node:crypto) so this works wherever the password gate runs:
+// Edge for middleware.ts (Next 14), Node for proxy.ts (Next 16). crypto.subtle
+// and HMAC-SHA256 are the same on both, so a cookie signed on one verifies on
+// the other.
 //
 // The imported key is cached per instance, keyed by the secret string itself,
 // so a request pays for importKey once rather than on every sign and verify.
@@ -114,8 +116,9 @@ async function unpack<T>(value: string | undefined): Promise<T | null> {
 
 /**
  * Constant-time string equality, for comparing a presented secret against the
- * configured one. Pure JavaScript because middleware runs on the Edge runtime,
- * where node:crypto's timingSafeEqual does not exist.
+ * configured one. Pure JavaScript because the gate may run on the Edge runtime
+ * (middleware.ts, Next 14), where node:crypto's timingSafeEqual does not exist;
+ * proxy.ts (Next 16) runs on Node, where this works unchanged.
  *
  * Every byte of the longer input is visited whatever the contents, so the time
  * taken says nothing about where the first difference is. It does reveal the
