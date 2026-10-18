@@ -229,6 +229,12 @@ jobs:
       - name: Rules match the repo they describe
         run: node scripts/drift-check.mjs
 
+      # drift measures only the repo it is in, so the password-gate rules are
+      # also held to fixture apps — above all a Next 14 app with only proxy.ts,
+      # which builds clean with no gate at all (TEC-34).
+      - name: Gate-file checks catch what they say they catch
+        run: node --test scripts/gate-file.test.mjs
+
       # The hooks are the rules that hold whether or not an agent complies, so
       # what they refuse is tested like code: every push spelling that once got
       # past them, every harmless command they once refused, and the commands
