@@ -144,9 +144,8 @@ depends on it.
 
 ## What is settled and not yours to reopen
 
-- **It does not appear on the hub's glance.** Joel: *"leave it off for now."* No `/api/summary`, no
-  line in `SOURCES`, no request to TechPad Gen. Adding it later is one endpoint and one Linear issue,
-  so nothing forecloses it.
+- **No `/api/summary`.** Joel left Health off home's glance (*"leave it off for now"*), and the
+  glance itself is gone since TEC-83, so nothing reads one. Build none.
 - **The livery is borrowed and is TechPad Gen's to settle.** `lib/livery.ts` pins `senna` because
   every livery was taken when this app was scaffolded, and the tracker wears it too. The tracker is
   parked (Joel, 2026-09-24), not retired, so **two apps share a livery until TEC-12 resolves it** —

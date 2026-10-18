@@ -78,7 +78,8 @@ So: **count how often it is opened and in what state of mind, never how many rou
 
 `/admin` and `/debug` are escape hatches, not navigation. **They never appear in an index, a tab bar
 or a footer link**, they do not count toward the one-screen rule, and a tool does not become a site
-by having one.
+by having one. **One exception, Joel's (2026-09-26, TEC-83):** The Garage is a tab on home, beside the
+Pit Wall, and `/admin` redirects to it.
 
 ## The hub is neither, and there is exactly one
 

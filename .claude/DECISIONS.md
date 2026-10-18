@@ -43,6 +43,8 @@ it; git keeps it.
   Garage was proposed and rejected: it answers *what needs me now*, The Garage answers *declared
   versus reported*, and one label cannot carry both. **Superseded 2026-09-18 on the tab order** —
   `Pit Wall · Paper`. Feed is deleted, and the tab that was called Board is called Pit Wall.
+  **Superseded 2026-09-26 (Joel, TEC-83):** the Paper and the glance are gone; home's tabs are the
+  Pit Wall, now Linear's open issues, and The Garage, which moved off `/admin` into a tab.
 - **2026-09-16 — The Paper leads with what is owed, not what arrived.** Threads gone quiet are a
   task; replies received are a statistic. **The privacy fold was lifted the same day**, by Joel:
   *"drop above the fold below, ill manage privacy."* So what is owed leads the page, job search
