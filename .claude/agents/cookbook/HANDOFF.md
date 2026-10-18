@@ -1,6 +1,6 @@
 # Cookbook — handoff
 
-State as of 2026-10-05.
+State as of 2026-10-18, after #257 (menu days, the Add tab, the icon) and #259 (the charter's Surface).
 
 `RULES.md` has the charter. This file is only what is true right now, and its traps. **Open work is
 in Linear under `agent:Cookbook`** — never here.
@@ -9,11 +9,11 @@ in Linear under `agent:Cookbook`** — never here.
 
 ## What is true now
 
-**Surface.** A site with three verb tabs, each one long page: **`/` the book, `/add` Add (`AddRecipe.tsx`,
-always open), `/list` the King Soopers list** (TEC-22). All render `app/Shell.tsx`; switching tabs
-replaces the address. Signed out, `/list` goes through `/login?from=/list` and back. Results are toasts;
-a failed read stays inline. **Home-screen install, Joel's override of 2026-10-05**: No. 12 is the tab
-icon and, drawn full-bleed, `app/apple-touch-icon.png`; **its colours are fixed, dark mode included.**
+**Surface: installable, and still a site** (charter). Three tabs in `app/Shell.tsx`, each a long page:
+**`/` Recipes, `/add` Add (`AddRecipe.tsx`, always open), `/list` the King Soopers list** (TEC-22,
+signed out it round-trips `/login?from=/list`). Results are toasts; a failed read stays inline.
+**Install is a shortcut, not a change of shape**: No. 12, full-bleed, is `app/apple-touch-icon.png`
+with `appleWebApp` metadata; **its colours are fixed, dark mode included.** An app is TEC-109, parked.
 
 **Four ways in** — type it, ask Claude, from a link, from a file. **Nothing a model wrote is saved
 until Keep it; the typed path saves straight away**, after a name check that spares it a pricing
@@ -30,8 +30,8 @@ The four calls without a tool send a JSON schema; every call checks `stop_reason
 
 **Four tables in `cookbook`**, reasoning in the migration headers. `recipes` stores **the whole pot**;
 `grocery_items` is this app's list; `brand_preferences` is unseeded (TEC-51); `menu` is **On the
-menu**: a row per recipe with a **`day`** picked beside *Add to list* (the only way on; re-adding moves
-it), movable, shown per serving. **Nothing expires**: ✕ or Clear all only (Joel, 2026-10-05). **A list line carries the
+menu**: a row per recipe with a **`day`** (the `cookbook_menu_day` migration) picked beside *Add to
+list* — the only way on; re-adding moves it — shown per serving. **Nothing expires**: ✕ or Clear all. **A list line carries the
 names of the recipes it came from** (`grocery_items.recipes`, a snapshot; Tidy unions them), so an
 edit or rename never reaches it. **`macro_source` has no `web`**; **a duplicate name is refused by a
 unique index.**
