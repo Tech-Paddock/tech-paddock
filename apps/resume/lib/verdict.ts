@@ -73,19 +73,23 @@ export function verdictFor(r: VerdictInput): Verdict {
     );
   }
 
-  // A section of the template the source never filled. Not a loss, but the
-  // document goes out carrying the template's own words for it. Counted by
+  const notes = r.findings.filter((f) => f.severity === "warning").map((f) => f.message);
+
+  // A section of the template the source never filled — a Summary the Jobright
+  // export lacks. Not a loss, but the document goes out carrying the template's
+  // own words for it, so it is said every time. **A note, not a vote** (Joel,
+  // 2026-10-18, TEC-105: it "only warns"; it no longer fails or blocks the
+  // download). Source text that *did* exist and had no slot is a different
+  // case, and still fails above: it is in `coverage.missing`. Counted by
   // section, because the sentence says sections.
   const unfilled = r.changeLog.filter((c) => c.action === "not-found-in-input");
   if (unfilled.length > 0) {
     const n = new Set(unfilled.map((c) => c.section)).size;
-    reasons.push(
+    notes.push(
       `The source did not fill ${n} ${plural(n, "section", "sections")} of the ` +
         `template, which keeps its own text — ${sections(unfilled)}.`
     );
   }
-
-  const notes = r.findings.filter((f) => f.severity === "warning").map((f) => f.message);
 
   // Template lines with no counterpart in the input were left out. Worth saying,
   // never worth failing over.

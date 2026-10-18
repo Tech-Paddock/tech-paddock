@@ -818,9 +818,16 @@ function renderEntry(
  * location line, a one-line description of the role, a bullet whose template
  * entry has no bullet to clone, a whole header where the template's entry has
  * none — goes in **after the line that precedes it in the input**, or at the
- * head of the entry if nothing does, as a copy of the nearest template sibling
- * of its own kind: a bullet takes a bullet's paragraph, any other line a header
- * line's. Its text is the input's line, verbatim and whole.
+ * head of the entry if nothing does, as a copy of the nearest template bullet
+ * paragraph — glyph and all, whatever kind of line it is. Its text is the
+ * input's line, verbatim and whole.
+ *
+ * **A bullet's, never a header line's, even for a line that is not a bullet**
+ * (Joel, 2026-10-18, TEC-107: "Like a bullet line" — body size, not bold). The
+ * header line is the job's bold title line: copying it set a role description
+ * at heading weight, which read as a second job and which the lint flagged as
+ * an unrecognised section heading. The header line is the fallback only for an
+ * entry layout with no bullet anywhere, so the line still has somewhere to go.
  *
  * Whole, even where part of it was placed: a header line whose company was
  * read but whose location was not is feathered entire, so a few words can
@@ -857,8 +864,7 @@ function featherEntry(
       continue;
     }
 
-    const own = line.bulleted ? siblings.bullet : siblings.header;
-    const sibling = own ?? (line.bulleted ? siblings.header : siblings.bullet);
+    const sibling = siblings.bullet ?? siblings.header;
     // Unreachable while the template has an entry, which it must for this to
     // run — and a line left out here is still counted missing by coverage.
     if (sibling === null) continue;
@@ -866,7 +872,7 @@ function featherEntry(
     if (anchor === null) before.push(block);
     else after.set(anchor, [...(after.get(anchor) ?? []), block]);
 
-    const formattedLike = (own !== null) === line.bulleted ? "bullet" : "header line";
+    const formattedLike = siblings.bullet !== null ? "bullet" : "header line";
     log.push({
       section: "Professional Experience",
       action: "feathered",

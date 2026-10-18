@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { readDocxParts } from "../lib/docx/read";
 import { fakeSupabase, mockModules } from "./helpers/fakeSupabase";
+import { makeDocx } from "./helpers/docx";
 
 const fixture = (n: string) => readFileSync(join(__dirname, "fixtures", n));
 const file = (name: string, bytes: Buffer) => new File([new Uint8Array(bytes)], name);
@@ -98,6 +99,58 @@ describe("POST /api/reformat", () => {
     expect(payload.output_file_path).toBeNull();
     expect(payload.source_file_path).toBe("sources/x.docx");
     expect(body.renderId).toBe("r1");
+  });
+
+  /**
+   * TEC-105, Joel 2026-10-18: a template section the source does not fill — a
+   * Summary the Jobright export lacks — "only warns". The render PASSes, says
+   * so in a note, and hands out and stores its file like any other PASS. Source
+   * text with no slot is a different case and still blocks (pinned above and in
+   * `tests/feather.test.ts`).
+   */
+  it("passes with a warning and returns the file when the template has a Summary the source does not fill", async () => {
+    const uploads: string[] = [];
+    const { client, calls } = fakeSupabase(activeTemplate());
+    mockModules({
+      resume: client,
+      download: async () => fixture("template-flat-sample.docx"),
+      upload: async (prefix) => {
+        uploads.push(String(prefix));
+        return `${prefix}/x.docx`;
+      },
+    });
+    const H = '<w:rPr><w:b/><w:sz w:val="22"/></w:rPr>';
+    const p = (text: string, rPr = "", pPr = "") =>
+      `<w:p>${pPr ? `<w:pPr>${pPr}</w:pPr>` : ""}<w:r>${rPr}<w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+    const BULLET = '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>';
+    const noSummary = await makeDocx({
+      body: [
+        p("Avery Example", '<w:rPr><w:sz w:val="40"/></w:rPr>'),
+        p("Professional Experience", H),
+        `<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Fabrikam Logistics</w:t></w:r><w:r><w:tab/></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>Jan 2021 - Present</w:t></w:r></w:p>`,
+        p("Operations Manager", "<w:rPr><w:i/></w:rPr>"),
+        p("Cut a representative cycle time by an invented margin.", "", BULLET),
+        p("Core Competencies", H),
+        p("Systems: Alpha, Beta, Gamma"),
+      ].join(""),
+    });
+
+    const res = await reformat({ source: file("jobright.docx", noSummary) });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.changeLog).toContainEqual(expect.objectContaining({ section: "Summary", action: "not-found-in-input" }));
+    expect(body.coverage.missing).toEqual([]);
+    expect(body.verdict.pass).toBe(true);
+    expect(body.verdict.reasons).toEqual([]);
+    expect(body.verdict.notes).toContainEqual(expect.stringMatching(/did not fill .*Summary/));
+
+    // A file, in the response and in storage.
+    const parts = await readDocxParts(Buffer.from(body.docxBase64, "base64"));
+    expect(parts.document).toContain("Fabrikam Logistics");
+    expect(uploads).toEqual(["sources", "renders"]);
+    const payload = calls.find((c) => c.op === "insert")?.payload as Record<string, unknown>;
+    expect(payload.output_file_path).toBe("renders/x.docx");
   });
 
   /**

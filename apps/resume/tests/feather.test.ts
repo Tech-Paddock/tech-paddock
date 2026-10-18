@@ -85,22 +85,41 @@ describe("feathering a Professional Experience line the template has no slot for
     expect(feathered).toHaveLength(1);
     expect(feathered[0]).toMatchObject({ section: "Professional Experience", lines: [ROLE_LINE] });
     expect(feathered[0].detail).toContain('after "Operations Manager"');
+    expect(feathered[0].detail).toContain("formatted like the template's bullet");
   });
 
-  it("takes its formatting from a template paragraph, never one this app wrote", async () => {
-    const { parts, paras } = await renderFlat(await sourceWithRoleLine());
+  /**
+   * Joel, 2026-10-18 (TEC-107): a feathered line that is not a bullet looks
+   * "Like a bullet line" — body size, not bold. It used to copy the job's header
+   * line, which in the real template is bold at heading size, so a role
+   * description read as a second job and the lint called it an unrecognised
+   * section heading. It is now a copy of the nearest template bullet paragraph,
+   * glyph included.
+   */
+  it("takes the template's bullet paragraph, glyph and all, never the bold header line", async () => {
+    const { parts, paras, findings } = await renderFlat(await sourceWithRoleLine());
     const template = await loadDocx(fixture("template-flat-sample.docx"));
-    const headerLine = splitBody(getBodyInner(template.documentXml).bodyInner).find((b) =>
-      extractText(b.raw).startsWith("Lakeside Systems")
-    )!;
+    const tplBlocks = splitBody(getBodyInner(template.documentXml).bodyInner);
+    const headerLine = tplBlocks.find((b) => extractText(b.raw).startsWith("Lakeside Systems"))!;
+    // The nearest bullet of the first entry, which is the one the line is in.
+    const headerAt = tplBlocks.indexOf(headerLine);
+    const bullet = tplBlocks.slice(headerAt + 1).find((b) => hasNumPr(b.raw))!;
     const outLine = parts.document.match(new RegExp(`<w:p\\b(?:(?!<w:p\\b)[\\s\\S])*?${ROLE_LINE}[\\s\\S]*?</w:p>`))![0];
 
-    // The paragraph and run properties are the template header line's own; the
-    // keep-together flags are the entry's, applied to every paragraph in it.
-    const runProps = (raw: string) => raw.match(/<w:r(?:\s[^>]*)?>\s*<w:rPr>([\s\S]*?)<\/w:rPr>/)![1];
-    expect(runProps(outLine)).toBe(runProps(headerLine.raw));
-    expect(hasNumPr(outLine)).toBe(false);
-    expect(paras.find((p) => p.text.trim() === ROLE_LINE)?.listId ?? null).toBeNull();
+    const runProps = (raw: string) => raw.match(/<w:r(?:\s[^>]*)?>\s*<w:rPr>([\s\S]*?)<\/w:rPr>/)?.[1] ?? "";
+    const numPr = (raw: string) => raw.match(/<w:numPr>[\s\S]*?<\/w:numPr>/)?.[0];
+    // The bullet's own run properties and list membership — not the header's.
+    expect(runProps(outLine)).toBe(runProps(bullet.raw));
+    expect(runProps(outLine)).not.toBe(runProps(headerLine.raw));
+    expect(numPr(outLine)).toBe(numPr(bullet.raw));
+    const outPara = paras.find((p) => p.text.trim() === ROLE_LINE)!;
+    const bulletPara = paras.find((p) => p.text.trim() === "Cut a representative cycle time by an invented margin.")!;
+    expect(outPara.listId).not.toBeNull();
+    expect(outPara.listId).toBe(bulletPara.listId);
+
+    // So the lint does not take it for a section heading.
+    expect(findings.filter((f) => f.message.includes(ROLE_LINE))).toEqual([]);
+    expect(findings.some((f) => f.code === "unknown_heading")).toBe(false);
   });
 
   it("counts it in coverage, passes, and keeps styles, numbering and theme byte-identical", async () => {

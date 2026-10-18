@@ -110,8 +110,9 @@ export type ChangeAction =
 /**
  * `feathered` is a Professional Experience line of the input the template's
  * entry had no slot for, inserted where the input has it — after the line that
- * precedes it there — in the formatting of the template's nearest sibling
- * paragraph (Joel, 2026-10-14, TEC-107). Said every time, never a vote: the text
+ * precedes it there — as a copy of the template's nearest bullet paragraph,
+ * whether or not the line is a bullet (Joel, 2026-10-14 and 2026-10-18,
+ * TEC-107: "Like a bullet line"). Said every time, never a vote: the text
  * arrived, and coverage checks that it did. **Professional Experience only.**
  * Every other section's template owns its shape, and a line with no slot there
  * stays missing and fails the render.

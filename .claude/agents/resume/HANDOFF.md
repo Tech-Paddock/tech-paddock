@@ -1,6 +1,6 @@
 # Resume Formatter — handoff
 
-State as of 2026-10-14.
+State as of 2026-10-18.
 
 Read `RULES.md` first. This file is only what is true right now, and its traps. Open work is in
 Linear, team TEC, labelled `agent:Resume Formatter`.
@@ -13,9 +13,10 @@ Linear, team TEC, labelled `agent:Resume Formatter`.
 `resume`; `resumes`, `templates` and `history` alias it). Reformat is the landing tab and carries
 no readouts (Joel, 2026-09-19): the Current Template, the Input Resume, **Reformat and Download**,
 and one judgement, **the verdict** (`lib/verdict.ts`). It fails on what happened to *this*
-reformat: a source line that reached the output nowhere, a blocking ATS finding, a template
-section the source did not fill (`not-found-in-input`), or source text with nowhere to go
-(`input-dropped`). `template-trimmed`, `input-not-read` and `feathered` are notes, never votes.
+reformat: a source line that reached the output nowhere, a blocking ATS finding, or source text
+with nowhere to go (`input-dropped`). `template-trimmed`, `input-not-read`, `feathered` and a
+template section the source did not fill (`not-found-in-input`, Joel 2026-10-18: "only warns")
+are notes, never votes. A source line with no slot still fails: it is in `coverage.missing`.
 
 **A PASS downloads on the same click. A FAIL hands out no file** (Joel, 2026-10-14, TEC-105):
 `/api/reformat` returns no `docxBase64` and stores no output (`output_file_path` null), so nothing
@@ -27,7 +28,7 @@ missing line, its section and the render's own reason (`coverage.missingDetail`,
 **Feathering, Professional Experience only** (TEC-107). Each entry carries `lines`, the input's
 lines in order. A line the entry did not place — tested by the same run-of-words check coverage
 uses — goes in after the line preceding it in the input, as a copy of the nearest template
-sibling of its kind (bullet → bullet paragraph, other → header line), logged `feathered`.
+**bullet** paragraph, glyph included, bullet or not (Joel, 2026-10-18), logged `feathered`.
 Coverage checks every Experience line, not only the fields read out of it. Every other section
 is unchanged: a line with no slot stays missing and fails.
 
@@ -54,22 +55,21 @@ holds no client for `shared`** (TEC-26). **The fixtures carry no real timeline.*
 
 ## Traps specific to this app
 
-- **A feathered non-bullet line takes the header line's formatting.** In Joel's template that is
-  bold at heading size, so the lint warns it as an `unknown_heading` — a warning, not a vote. Put
-  to Joel in the TEC-107 hand-over; the code does what the brief said until he answers.
+- **A feathered role line carries the bullet glyph.** That is Joel's pick read literally; the
+  header line is the fallback only when no template entry has a bullet at all.
+- **A reopened render's verdict is today's `verdictFor` over its stored log**, so an older render
+  that failed only on an unfilled section now reads PASS with a note. Its record is unchanged.
 - **`input-not-read` passes, so the log line, `notRead` and the note are all that say so** —
   `tests/unreadable-highlights.test.ts` pins each.
 - **`template-sample.docx` FAILs** on its two blocking findings, so it returns no bytes. A test
   that reads the output goes through `template-flat-sample.docx`.
-- **Renders that FAILed before 2026-10-14 still have a stored output**, downloadable from Resumes.
-- **`RULES.md` does not yet mention feathering**, and still describes `spec`. Both are the TD's to
-  redraft; the code is the truth until then.
+- **Renders that FAILed before the download block shipped keep their stored output** (Joel,
+  2026-10-18: history), downloadable from Resumes.
+- **`RULES.md` does not yet mention feathering** and still describes `spec`: the TD's to redraft.
 - **A reopened render's ATS findings are today's lint** on the stored bytes when there are bytes;
   coverage and the change log are the record.
 - **A new database function needs its grants.** `activate_template` revokes PUBLIC and grants
   `service_role` alone — copy that.
-- **`extractText` reads run-level `<w:tab/>` as `\t`** and cuts `<w:pPr>` first, so a tab *stop*
-  is never text.
 - **Experience regroups paragraphs into entries.** Anything else in the section keeps its
   original order, which keeps the XML well formed.
 - **Career Highlights never adds or removes a cell.** A count mismatch is logged per cell.
