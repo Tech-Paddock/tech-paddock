@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * - **Cookbook does the division** (`toServingRows`); Health never learns that the
  *   table stores the whole pot.
  * - **Authentication is the session.** Health's server forwards the caller's
- *   `paddock_session` cookie; `middleware.ts` already admits any valid session, so
+ *   `paddock_session` cookie; `proxy.ts` already admits any valid session, so
  *   there is no carve-out here and none should be added.
  * - **Down is never "not found".** A failed read is a 503 — and since TEC-29 item 7,
  *   503 means only that — never a 200 with an empty list, which Health would read as

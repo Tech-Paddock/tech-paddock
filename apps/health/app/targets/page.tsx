@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * from logging a meal, which is the charter's test for a second screen; what is
  * left of it shows on the log screen, where it is read.
  *
- * Like `/debug`, it needs no `middleware.ts` edit: the matcher is a catch-all
+ * Like `/debug`, it needs no `proxy.ts` edit: the matcher is a catch-all
  * negative, so this route is behind the password gate already.
  */
 export default function Page() {
