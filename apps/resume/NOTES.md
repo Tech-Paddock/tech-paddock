@@ -1,9 +1,9 @@
-# Resume Formatter — handoff
+# Resume — notes
 
 State as of 2026-10-18.
 
 Read `RULES.md` first. This file is only what is true right now, and its traps. Open work is in
-Linear, team TEC, labelled `agent:Resume Formatter`.
+Linear, team TEC, labelled `app:resume`.
 
 ---
 

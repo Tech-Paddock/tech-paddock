@@ -9,7 +9,7 @@
  * technical director confirmed in #116 that the principle is not specific to the
  * theme. `packages/shared` landed in #152 and holds five files; whether a sixth
  * belongs there is the technical director's call, not this app's, so this copy is
- * **flagged in the branch handover and in `HANDOFF.md`** rather than made
+ * **flagged in the branch handover and in `NOTES.md`** rather than made
  * quietly. A copy that is flagged is a decision deferred; a copy that is quiet
  * is drift.
  *

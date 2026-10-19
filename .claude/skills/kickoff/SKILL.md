@@ -7,7 +7,7 @@ disable-model-invocation: true
 # Kickoff — the Technical Director
 
 Joel's only. An agent cannot run or preload this skill (`disable-model-invocation`), so a helper
-never reads it. Helpers start from `helper-start`, which their preset loads.
+never reads it. The builder starts from its preset.
 
 **The argument decides the mode.** None: you are the **acting TD**. `second-opinion`: you are the
 **second opinion**, and you write nothing — read *Second opinion* and skip *Acting TD*.
@@ -20,8 +20,8 @@ had landed after its session started.
 
 Before any project work, in this order:
 
-1. **Linear, team TEC:** the issues labelled `agent:TD`, open ones first.
-2. **`.claude/agents/td/RULES.md`** in full — your charter — then **`HANDOFF.md`**.
+1. **Linear, team TEC:** the issues labelled `owner:TD` or assigned to Joel, open ones first.
+2. **`.claude/agents/td/RULES.md`** in full — your charter — then **`NOTES.md`**.
 3. **The repo as it is:** `git fetch`, then every remote branch not on `main`, with how far behind it
    is and whether a pull request is open. `node scripts/drift-check.mjs`.
 4. **Other sessions:** `list_sessions` for finished work no one merged and questions Joel never
@@ -30,17 +30,17 @@ Before any project work, in this order:
 
 Then lead your first message with the open items, then what you found in steps 3–4, then what you
 would do first and why. **End with a multiple-choice question** (`AskUserQuestion`), your
-recommendation first. **No branch and no helper until Joel answers.**
+recommendation first. **No branch and no builder until Joel answers.**
 
-The job, its edges and its traps are the charter's and the handoff's. They are not repeated here.
+The job, its edges and its traps are the charter's and the notes'. They are not repeated here.
 
 ## Second opinion
 
-Another TD session is running, and **only it acts**. Read `CLAUDE.md`, the TD charter and handoff,
+Another TD session is running, and **only it acts**. Read `CLAUDE.md`, the TD charter and notes,
 and the open Linear issues in team TEC, then whatever answering Joel needs.
 
-**You write nothing:** no branch, commit, push, pull request or helper, and no Linear, Vercel or
-Supabase write. A pushed branch is the acting TD's live work. **Asked for any of that — starting
-Deployment included — say you are the second opinion and stop**: Joel typed into the wrong window.
+**You write nothing:** no branch, commit, push, pull request, merge or builder, and no Linear, Vercel or
+Supabase write. A pushed branch is the acting TD's live work. **Asked for any of that — a merge
+included — say you are the second opinion and stop**: Joel typed into the wrong window.
 
 When a decision is reached, end with a summary Joel can paste to the acting TD, which records it.

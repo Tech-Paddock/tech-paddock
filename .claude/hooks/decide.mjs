@@ -49,8 +49,7 @@ const PUSH_OWN_BRANCH =
 export function decide(input) {
   const tool = String(input?.tool_name ?? "");
   const args = input?.tool_input ?? {};
-  const deploy = isDeployment(input);
-  if (tool === "Agent" || tool === "Task") return startAgent(args, input);
+  const deploy = isMainSession(input);
   if (tool === "Bash") return bash(String(args.command ?? ""), input?.cwd || process.cwd(), 0, deploy);
   if (!tool.startsWith("mcp__")) return null;
   const cut = tool.lastIndexOf("__");
@@ -64,38 +63,22 @@ export function decide(input) {
 }
 
 /* ------------------------------------------------------------------------- */
-/* Who is calling: only Deployment writes to a pull request                  */
+/* Who is calling: only the main session writes to a pull request            */
 /* ------------------------------------------------------------------------- */
 
-/* Joel, 2026-09-26: "The only agent allowed to open a PR or merge a PR is the
-   deployment agent. The only agent that can open a deployment agent is the
-   technical Director. I want a hook prior to spinning up a deployment agent."
-   Updating and closing went with them the same day: a pull request exists only
-   after a push, and everything after a push is Deployment's.
+/* TEC-115 (Joel, 2026-10-19): the Deployment agent retired and the technical
+   director merges, through the `merge` skill. The builder is a helper, and a
+   helper pushes its branch and stops.
 
-   Claude Code puts `agent_id` and `agent_type` on the hook input of a call made
-   inside a helper, `agent_type` being the preset's `name`, and leaves `agent_id`
-   off a call from a main session. So Deployment is a helper whose type is
-   `deployment`, and nothing else is. If Claude Code ever stops sending the
-   fields, Deployment is refused too: loud, never open. Branch protection is
-   still the backstop, and Joel can always merge from GitHub himself. */
-const DEPLOYMENT = "deployment";
-export const isDeployment = (input) =>
-  String(input?.agent_type ?? "").toLowerCase() === DEPLOYMENT && Boolean(input?.agent_id);
+   Claude Code puts `agent_id` on the hook input of a call made inside a
+   helper and leaves it off a call from a main session, so a pull request
+   write goes through only without one. A hook cannot tell the technical
+   director's session from any other main session; branch protection and CI
+   stay the backstop, and the request line still records who asked. */
+export const isMainSession = (input) => !input?.agent_id;
 
-const DEPLOYMENT_ONLY =
-  'Every write to a pull request is Deployment\'s (Joel, 2026-09-26: "No agents outside of the deployment agent are allowed to create PR\'s or merge"). Push your branch, say it is finished, and stop; the technical director starts Deployment.';
-
-/* Starting Deployment: never from a helper, and from a main session only with
-   Joel's click. A hook cannot tell the technical director's session from any
-   other main session, so the click is what makes it his go. */
-function startAgent(a, input) {
-  if (String(a.subagent_type ?? "").toLowerCase() !== DEPLOYMENT) return null;
-  if (input?.agent_id) {
-    return deny("Only the technical director starts Deployment, from its own session (Joel, 2026-09-26). A helper cannot start it. Put what is ready in your report and stop.");
-  }
-  return ask('Starting the Deployment agent waits for Joel\'s click (Joel, 2026-09-26: "I want a hook prior to spinning up a deployment agent"). Approve it only if you told the technical director to take these branches to merge.');
-}
+const MAIN_ONLY =
+  "Every write to a pull request is the technical director's, from its own session, through the `merge` skill (TEC-115). A helper pushes its branch, says it is finished, and stops.";
 
 /* ------------------------------------------------------------------------- */
 /* Reading a shell command                                                   */
@@ -377,10 +360,10 @@ function bash(command, cwd, depth = 0, deploy = false) {
     // GitHub tools, from a shell. Reading (`gh pr view`, `list`, `diff`) is anyone's.
     if (!deploy && cmd === "gh") {
       const at = args.indexOf("pr");
-      if (at > 0 && GH_PR_WRITES.has(args[at + 1])) return deny(`\`gh pr ${args[at + 1]}\` writes to a pull request. ${DEPLOYMENT_ONLY}`);
+      if (at > 0 && GH_PR_WRITES.has(args[at + 1])) return deny(`\`gh pr ${args[at + 1]}\` writes to a pull request. ${MAIN_ONLY}`);
       continue;
     }
-    if (!deploy && cmd === "hub" && args.includes("pull-request")) return deny(`\`hub pull-request\` opens a pull request. ${DEPLOYMENT_ONLY}`);
+    if (!deploy && cmd === "hub" && args.includes("pull-request")) return deny(`\`hub pull-request\` opens a pull request. ${MAIN_ONLY}`);
 
     const supabaseAt = isSupabase(args[0]) ? 0 : RUNNERS.has(cmd) ? args.findIndex(isSupabase) : -1;
     if (supabaseAt >= 0) {
@@ -615,15 +598,14 @@ export function stripSql(sql) {
 
 const HELD =
   "It waits for Joel's click. Joel settled this on 2026-09-23 after an instruction to prepare was read as permission to act.";
-/* Every write to a pull request is Deployment's, and refused to anyone else
-   (above). For Deployment itself nothing is held but what no gate covers: Joel's
-   one gate is his click when the technical director starts it (Joel, 2026-09-25:
-   "only one gate"), so a squash merge, a body edit that keeps the request line,
-   and bringing a branch up to date go through. Auto-merge still asks, because it
-   merges on a timer rather than in the set Joel approved; so does a review, which
-   can approve, a human's act; and so do the API commit tools below, which write
-   past the local push guard whoever calls them. requested-by-joel in CI still
-   reads the body for the record of who asked. */
+/* Every write to a pull request is the main session's, and refused to a
+   helper (above). For the main session nothing is held but what no gate
+   covers: a squash merge, a body edit that keeps the request line, and
+   bringing a branch up to date go through. Auto-merge still asks, because it
+   merges on a timer with nobody reading the result; so does a review, which
+   can approve, a human's act; and so do the API commit tools below, which
+   write past the local push guard whoever calls them. requested-by-joel in CI
+   still reads the body for the record of who asked. */
 const PR_ASK = {
   enable_pr_auto_merge: "Turning on auto-merge, which merges with no click once checks pass,",
   pull_request_review_write: "Writing a pull request review, which can approve it,",
@@ -652,7 +634,7 @@ const PR_WRITES = new Set([
 export const isPrWrite = (name) => PR_WRITES.has(name) || (/pull_request/.test(name) && !PR_READS.has(name));
 
 function github(name, a, deploy = false) {
-  if (isPrWrite(name) && !deploy) return deny(`\`${name}\` writes to a pull request. ${DEPLOYMENT_ONLY}`);
+  if (isPrWrite(name) && !deploy) return deny(`\`${name}\` writes to a pull request. ${MAIN_ONLY}`);
   if (API_COMMITS.has(name)) {
     const branch = String(a.branch ?? "");
     if (!branch || targetsMain(branch)) {
@@ -675,7 +657,7 @@ function github(name, a, deploy = false) {
 /* ------------------------------------------------------------------------- */
 
 /* Reads go ahead. So does apply_migration: the technical director applies each
-   migration at the gate, from its file, before merging. Everything else —
+   migration at merge time, from its file, before merging. Everything else —
    creating, pausing or restoring the project, branches, edge functions, and any
    tool added later that is not a read — waits for Joel. */
 const SUPABASE_READ = /^(get|list|search|generate)_|^query_logs$/;
@@ -718,25 +700,27 @@ function vercel(name, a) {
 /* ------------------------------------------------------------------------- */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const KINDS = ["owner:", "agent:"];
+/* One `owner:` label, always; at most one `app:` label (TEC-115). */
+const KINDS = ["owner:"];
+const OPTIONAL_KINDS = ["app:"];
 /* Who can act on a step: the roster by name, and the words for everyone or
-   no one. Names are case-sensitive so `/api/health` does not count as Health. */
-const ACTOR = /\b(Joel|TD|Deployment|TechPad Gen|Resume Formatter|Resume|Coffee|Health|Cookbook)\b/;
+   no one. Names are case-sensitive so a path does not count as an actor. */
+const ACTOR = /\b(Joel|TD|Builder)\b/;
 const ACTOR_WORDS = /\b(technical director|every ?one|every ?body|no ?one|nobody|each agent|every agent|each owner|whoever)\b/i;
 // A finished step has nobody left to act.
 const DONE = /^(~~|\*\*Done\b|Done\b)/;
 const RULE =
-  "Every issue carries one `owner:` and one `agent:` label, passed by name, and its body ends with a `## Next steps` section of numbered steps, each naming who acts, such as `1. **Joel:** …` (CLAUDE.md).";
+  "Every issue carries one `owner:` label and at most one `app:` label, passed by name, and its body ends with a `## Next steps` section of numbered steps, each naming who acts, such as `1. **Joel:** …` (CLAUDE.md).";
 
 const listOf = (v) => (Array.isArray(v) ? v.map(String) : typeof v === "string" ? [v] : []);
 
 /* Linear's diff tools act on the GitHub pull request behind a diff: merging one
-   merges the pull request. They are Deployment's like every other pull request
-   write, and settings.json still asks Joel for them on top. */
+   merges the pull request. They are the main session's like every other pull
+   request write, and settings.json still asks Joel for them on top. */
 const LINEAR_PR_WRITES = new Set(["merge_diff", "update_diff", "submit_diff_review", "save_diff_comment", "resolve_diff_thread"]);
 
 function linear(name, a, deploy = false) {
-  if (LINEAR_PR_WRITES.has(name)) return deploy ? null : deny(`\`${name}\` acts on the GitHub pull request behind a Linear diff. ${DEPLOYMENT_ONLY}`);
+  if (LINEAR_PR_WRITES.has(name)) return deploy ? null : deny(`\`${name}\` acts on the GitHub pull request behind a Linear diff. ${MAIN_ONLY}`);
   if (!["save_issue", "create_issue", "update_issue"].includes(name)) return null;
   const creating = name === "create_issue" || (name === "save_issue" && !a.id);
   const problems = [];
@@ -745,6 +729,10 @@ function linear(name, a, deploy = false) {
     for (const k of KINDS) {
       const n = labels.filter((l) => l.toLowerCase().startsWith(k)).length;
       if (n !== 1) problems.push(`${where} ${n ? `${n} \`${k}\` labels` : `no \`${k}\` label`}`);
+    }
+    for (const k of OPTIONAL_KINDS) {
+      const n = labels.filter((l) => l.toLowerCase().startsWith(k)).length;
+      if (n > 1) problems.push(`${where} ${n} \`${k}\` labels`);
     }
   };
   const byName = (labels) => {
@@ -766,6 +754,9 @@ function linear(name, a, deploy = false) {
     const added = listOf(a.addLabels);
     const removed = listOf(a.removeLabels);
     byName([...added, ...removed]);
+    for (const k of OPTIONAL_KINDS) {
+      if (added.filter((l) => l.toLowerCase().startsWith(k)).length > 1) problems.push(`it adds more than one \`${k}\` label`);
+    }
     for (const k of KINDS) {
       const out = removed.filter((l) => l.toLowerCase().startsWith(k));
       const inn = added.filter((l) => l.toLowerCase().startsWith(k));
@@ -812,7 +803,7 @@ export function nextSteps(body) {
     .filter((it) => !DONE.test(it.text) && !ACTOR.test(it.text) && !ACTOR_WORDS.test(it.text))
     .map((it) => it.n);
   if (nameless.length) {
-    return [`step ${nameless.join(", ")} of Next steps does not name who acts (start it with the actor: Joel, TD, Deployment, TechPad Gen, Resume Formatter, Coffee, Health or Cookbook)`];
+    return [`step ${nameless.join(", ")} of Next steps does not name who acts (start it with the actor: Joel, TD or Builder)`];
   }
   return [];
 }

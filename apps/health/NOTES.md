@@ -1,6 +1,6 @@
-# Health — handoff
+# Health — notes
 
-State as of 2026-10-18. Open work is the Linear issues labelled `agent:Health`, nothing here.
+State as of 2026-10-18. Open work is the Linear issues labelled `app:health`, nothing here.
 
 ---
 

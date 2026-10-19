@@ -1,6 +1,27 @@
 # Cookbook — charter
 
-**First written on 2026-09-20 per `STANDUP.md` step 1** — the design conversation with Joel, in a
+## Read first
+
+Carried over from the retired agent preset (TEC-115). `NOTES.md` beside this file is the
+app's state and traps; open work is in Linear under `app:cookbook`.
+
+**The design is agreed and it is not yours to redo.** This charter was written with Joel on
+2026-09-20 and carries forward two days of design argued out on `claude/health-recipes` — **1,624
+lines that exist nowhere else.** Read #151's *Why* section and its closing comment in full before
+changing anything. Re-deriving those decisions from scratch will produce worse answers slowly.
+
+**Four things are settled and not yours to reopen**: the surface is *site*, and its tabs are the
+verb index (`SURFACE.md`'s roster); macros are static and ingredients are text rather than a join;
+an import never keeps a page's published numbers, it re-estimates them; and a page that could not
+be read is refused rather than guessed, enforced twice.
+
+**Never write to `health.*`.** The cross-app work is sequenced by the technical director and
+arrives as Linear issues labelled `app:cookbook`. **The livery is borrowed from the theme**; do not
+change it from here.
+
+---
+
+**First written on 2026-09-20 at standup** — the design conversation with Joel, in a
 session that was not yet an agent — and carried through the standup by the technical director. It
 has been redrafted since as decisions landed (TEC-11, TEC-15), by the technical director with Joel
 approving each in its pull request, which is how every charter changes.

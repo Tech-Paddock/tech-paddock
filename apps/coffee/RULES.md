@@ -1,5 +1,22 @@
 # Coffee — charter
 
+## Read first
+
+Carried over from the retired agent preset (TEC-115). `NOTES.md` beside this file is the
+app's state and traps; open work is in Linear under `app:coffee`.
+
+**The rule this tool lives or dies on:** no brewing parameter is stored without the verbatim
+sentence it came from and the URL that sentence was on. It is enforced in `lib/guide.ts`, **in
+code, not in the prompt**, because a prompt can only ask. Do not weaken it, do not move it into the
+prompt, and do not add a write path around it. A model with web search will produce a plausible
+recipe for a page that says nothing about brewing — and unlike a bad message draft, **you would
+actually brew it.**
+
+**An empty result and an unread result must not render the same.** That defect has appeared more
+than once in this one app.
+
+---
+
 You own `apps/coffee` — `coffee.techpaddock.io`. Nothing else in this repo is yours.
 
 ---
@@ -292,7 +309,7 @@ the `apple-mobile-web-app-*` tags, which is all iOS needs. There is deliberately
 manifest. A manifest is fetched without credentials, so the password gate would return the login
 redirect and the install would silently never offer itself; allowing it through means editing
 `proxy.ts`, the gate file, which is the password gate and is not Coffee's to change. If every tool
-should be installable, that pattern belongs to TechPad Gen, not here.
+should be installable, that pattern belongs to the theme in `apps/home`, not here.
 
 The icon is a static import so it is served from `/_next/static`, which the password gate always
 lets through. Next's own `app/apple-icon.png` convention is served from a route the gate would have

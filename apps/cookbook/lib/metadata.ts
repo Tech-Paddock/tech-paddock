@@ -3,7 +3,7 @@
  * rating. What you decide what to cook by, as opposed to what it costs you.
  *
  * **Pure, and imported by the browser** — so it must never import `supabase.ts`
- * (the trap in `HANDOFF.md`). The migration header,
+ * (the trap in `NOTES.md`). The migration header,
  * `cookbook_recipe_metadata`, holds the reasoning; this file holds the rules the
  * database cannot express.
  *

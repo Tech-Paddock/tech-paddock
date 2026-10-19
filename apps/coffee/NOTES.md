@@ -1,7 +1,7 @@
-# Coffee — handoff
+# Coffee — notes
 
 State as of 2026-10-18. Read `RULES.md` first; this file is only what is true right now and its traps.
-Open work is in Linear, team TEC, under `agent:Coffee`.
+Open work is in Linear, team TEC, under `app:coffee`.
 
 ---
 

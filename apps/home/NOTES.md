@@ -1,8 +1,8 @@
-# TechPad Gen — handoff
+# Home — notes
 
 State as of 2026-10-18.
 
-Read `RULES.md` first. Open work is in Linear, label `agent:TechPad Gen` — never here.
+Read `RULES.md` first. Open work is in Linear, label `app:home` — never here.
 
 ---
 

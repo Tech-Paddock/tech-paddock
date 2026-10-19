@@ -1,17 +1,17 @@
 import type { Column, PitIssue } from "./linear";
 
 /**
- * How the Pit Wall arranges its issues — by status, or by agent. Joel's toggle.
+ * How the Pit Wall arranges its issues — by status, or by app. Joel's toggle.
  *
  * Its own module, and free of anything that fetches, because the toggle runs in
  * the browser over issues already on the page: switching it must never mean
  * another round trip to Linear.
  */
 
-export type Grouping = "status" | "agent";
+export type Grouping = "status" | "app";
 
 export function groupingFrom(value: string | null | undefined): Grouping {
-  return value === "agent" ? "agent" : "status";
+  return value === "app" ? "app" : "status";
 }
 
 export const COLUMNS: { id: Exclude<Column, "later">; name: string }[] = [
@@ -21,11 +21,13 @@ export const COLUMNS: { id: Exclude<Column, "later">; name: string }[] = [
 ];
 
 /**
- * The agents in the order `CLAUDE.md`'s *Who you are* table lists them. A label
- * not in this list still gets its own group, after these, rather than being
- * dropped — the board must never hide an issue for carrying a new name.
+ * The apps in a fixed order — the live tools first, the parked ones last. A
+ * label not in this list still gets its own group, after these, rather than
+ * being dropped: the board must never hide an issue for carrying a new name.
+ * Issues with no `app:` label are platform work and come last (TEC-115).
  */
-const ROSTER = ["TD", "Deployment", "TechPad Gen", "Resume Formatter", "Coffee", "Health", "Cookbook"];
+const ROSTER = ["home", "resume", "coffee", "health", "cookbook", "showcase", "editor", "tracker"];
+const NONE = "Platform";
 
 const STAGE: Record<Column, number> = { progress: 1, review: 2, todo: 3, later: 4 };
 
@@ -56,19 +58,19 @@ export function byStatus(issues: PitIssue[]): StatusBoard {
   };
 }
 
-export type AgentGroup = { agent: string; issues: PitIssue[] };
+export type AppGroup = { app: string; issues: PitIssue[] };
 
-/** By agent: one group per `agent:` label, roster order, each ordered by how far along it is. */
-export function byAgent(issues: PitIssue[]): AgentGroup[] {
-  const names = new Set(issues.map((i) => i.agent ?? "No agent"));
+/** By app: one group per `app:` label, roster order, platform last, each ordered by how far along it is. */
+export function byApp(issues: PitIssue[]): AppGroup[] {
+  const names = new Set(issues.map((i) => i.app ?? NONE));
   const known = ROSTER.filter((a) => names.has(a));
-  const unknown = Array.from(names).filter((a) => !ROSTER.includes(a) && a !== "No agent").sort();
-  const order = [...known, ...unknown, ...(names.has("No agent") ? ["No agent"] : [])];
+  const unknown = Array.from(names).filter((a) => !ROSTER.includes(a) && a !== NONE).sort();
+  const order = [...known, ...unknown, ...(names.has(NONE) ? [NONE] : [])];
 
-  return order.map((agent) => ({
-    agent,
+  return order.map((app) => ({
+    app,
     issues: issues
-      .filter((i) => (i.agent ?? "No agent") === agent)
+      .filter((i) => (i.app ?? NONE) === app)
       .sort((a, b) => {
         // Waiting on Joel first, then by how far along, then by priority.
         const ja = needsJoel(a) ? 0 : STAGE[a.column];

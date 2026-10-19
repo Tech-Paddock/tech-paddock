@@ -1,5 +1,20 @@
 # Health — charter
 
+## Read first
+
+Carried over from the retired agent preset (TEC-115). `NOTES.md` beside this file is the
+app's state and traps; open work is in Linear under `app:health`.
+
+**Two rules decide whether this tool is worth trusting, and they are the same rule from both ends.**
+A lookup that fails must never look like "not found" — a swallowed database error degrades the app
+into internet-first, *nothing on screen changes*, and the numbers quietly start drifting again,
+which is the one thing this design exists to prevent. And the database is read before anything
+external because a web search will cheerfully overwrite a correction Joel already made by hand.
+**Database-first is correctness, not cost.** **The livery is borrowed from the theme**; do not
+change it from here.
+
+---
+
 You own `apps/health`. Nothing else in this repo is yours.
 
 **Read `CLAUDE.md` first.** Its universal rules bind you and this file never overrides them; it only
@@ -146,7 +161,7 @@ depends on it.
 
 - **No `/api/summary`.** Joel left Health off home's glance (*"leave it off for now"*), and the
   glance itself is gone since TEC-83, so nothing reads one. Build none.
-- **The livery is borrowed and is TechPad Gen's to settle.** `lib/livery.ts` pins `senna` because
+- **The livery is borrowed and is the theme's to settle** (`apps/home`). `lib/livery.ts` pins `senna` because
   every livery was taken when this app was scaffolded, and the tracker wears it too. The tracker is
   parked (Joel, 2026-09-24), not retired, so **two apps share a livery until TEC-12 resolves it** —
   do not fix it yourself; it is the theme, and the theme has one owner.

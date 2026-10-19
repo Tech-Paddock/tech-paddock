@@ -26,7 +26,7 @@ import { NO_PICKS, hasPicks, type Picks } from "@/lib/tuning";
  * typed path you wrote the recipe, so the only thing the draft adds is the macros
  * — an approval of your own words back. Joel called it ceremony and he is right.
  * **The charter still says all three land as a draft**; correcting it is the
- * technical director's, and the note is in this seat's `HANDOFF.md`.
+ * technical director's, and the note is in this app's `NOTES.md`.
  *
  * **It is a tab of its own now** (Joel, 2026-10-05, overruling the two-tab
  * index): Recipes · Add · King Soopers list. So it is always open — the collapse

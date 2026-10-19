@@ -594,172 +594,30 @@ for (const app of PUBLIC_APPS) {
       : `${APPS.length} apps; CI scopes from vercel.json` + (notes.length ? `; ${notes.join("; ")}` : ""));
 }
 
-/* 4 ── Budgets. CI fails the breach; this reports the approach, because a file
-   that arrives at its ceiling has already stopped being rewritten. */
+/* 4 ── Budget. Only CLAUDE.md has one since TEC-115 (2026-10-19): it is the one
+   file auto-loaded into every session, so every line is paid again forever.
+   The per-agent caps on charters and handoffs went with the agents — every
+   handoff had sat at its cap, so the band had stopped carrying information.
+   230 is the simplified file plus room for a rule or two; a new rule that does
+   not fit is a reason to cut, and a raise goes in its own change. */
 {
-  const budgets = [
-    ...APPS.length ? [] : [],
-    // ENUMERATED, not hardcoded — same reasoning as the staleness check below: a new
-    // agent must arrive already budgeted rather than silently unmeasured.
-    ...readdirSync(R(".claude/agents")).filter((d) => existsSync(R(".claude/agents", d, "HANDOFF.md")))
-      .map((d) => [`.claude/agents/${d}/HANDOFF.md`, 80]),
-    // Coffee's is 365, not 350: raised on 2026-09-25 at Joel's call ("add 15 lines to
-    // line count"). Its charter sat at 340 with every rule load-bearing, and TEC-46
-    // (a recipe printed as an image counts; filter beats espresso) needs about
-    // twenty lines that bind the build. Raised in its own change, not the one that fills it.
-    ...readdirSync(R(".claude/agents")).filter((d) => existsSync(R(".claude/agents", d, "RULES.md")))
-      .map((d) => [`.claude/agents/${d}/RULES.md`, d === "coffee" ? 365 : 350]),
-    [".claude/DECISIONS.md", 400],
-    // Tier 1 — auto-loaded into every session of every agent, so every line is paid
-    // again forever. 400 was the target the compaction set; the file landed well
-    // under it, so the ratchet came down to it with the ledger's retirement.
-    // Raised to 450 on 2026-09-25 at Joel's call ("expand cap to 450"): #206 left the
-    // file at 398, and the next rule (TEC-45, what a Linear status means and when
-    // Joel is assigned) binds every agent, so it belongs here rather than in a charter.
-    // Raised in its own change, not the one that fills it.
-    ["CLAUDE.md", 450],
-    // Read on demand rather than auto-loaded. Budgeted against growth, deliberately
-    // loose: this tier is where reasoning goes when it leaves CLAUDE.md, so squeezing
-    // it would defeat the compaction it exists to receive.
-    // Skills are procedures, loaded whole into every session that starts one, so each is kept
-    // short; a rule they point at lives in CLAUDE.md or a charter, not here.
-    ...(existsSync(R(".claude/skills")) ? readdirSync(R(".claude/skills")) : [])
-      .filter((d) => existsSync(R(".claude/skills", d, "SKILL.md")))
-      .map((d) => [`.claude/skills/${d}/SKILL.md`, 80]),
-    [".claude/agents/STANDUP.md", 110],
-    [".claude/SURFACE.md", 120],
-    // Raised from 200 on 2026-09-23 (TEC-9), at Joel's call: the shared.contacts write
-    // contract is ~35 lines of rules that each carry a caveat, the file sat at 191, and
-    // squeezing the contract into 9 lines would have cut the caveats. Raised in its own
-    // change, not the one that fills it.
-    ["supabase/README.md", 240],
-  ];
+  const budgets = [["CLAUDE.md", 230]];
   for (const [rel, ceiling] of budgets) {
     const n = lines(R(rel));
     if (n === null) { add(`budget: ${rel}`, "warn", "missing"); continue; }
-    // CLAUDE.md: "warns ten lines out and fails past the ceiling" — so a file
-    // exactly ten lines under its ceiling already warns.
+    // Warns ten lines out and fails past the ceiling.
     add(`budget: ${rel}`, n > ceiling ? "fail" : n >= ceiling - 10 ? "warn" : "ok", `${n} / ${ceiling}`);
   }
 }
 
-/* 5 ── Handoff staleness, measured rather than asserted. A handoff dated before
-   the newest commit in its own area is describing a repo that has moved.
-
-   The agent list is ENUMERATED, not hardcoded. The first version of this file
-   named five agents, which is the same bug it was written to catch: a new agent
-   would not have failed the check, it would simply never have been checked.
-   Most agents own the app that shares their name; the two that do not are named
-   below, and an agent matching neither is reported as unmapped rather than
-   skipped in silence. */
+/* 5 ── Every app carries its own RULES.md and NOTES.md. The builder is started
+   on an app and reads both before any work, so an app missing either is one it
+   would start blind on. A warn, not a fail: a folder freshly scaffolded by the
+   new-app skill gets its RULES.md approved before it is built in. */
 {
-  /* Agents whose folder name does not match the app folder they own, and the
-     reason this is a LIST rather than a string: on 2026-09-19 Joel retired the
-     Pipeline Tracker and Message Editor agents; `apps/tracker` went to TechPad
-     Gen, who already owned `apps/home`, and the frozen `apps/editor` went to
-     the TD. One agent owns two apps and the TD owns one for the first time. A
-     one-to-one map could not say that — it would have reported `apps/tracker` as an orphan while the
-     charter plainly named an owner, which is the documentation and the disk
-     disagreeing in the direction this file exists to catch.
-
-     The TD's list is more than `apps/editor` because that app is FROZEN: dated
-     against it alone, the TD's handoff read `ok` forever while two merges went
-     by. `apps/showcase` is the one app the TD builds (TEC-99), named before
-     its folder exists so it is never unowned for a commit. `scripts` is the drift and stamping machinery this seat owns and
-     nobody else edits. `.github` — CI and the pull-request checks — went to
-     Deployment with the gate on 2026-09-24, and Deployment owns no app, so
-     without it here its handoff could never be dated. `supabase/` is
-     deliberately left out — app agents author their own migrations. */
-  const NAMED = {
-    "techpad-gen": ["apps/home", "apps/tracker"],
-    "td": ["apps/editor", "apps/showcase", "scripts"],
-    "deployment": [".github"],
-  };
-  // Which agent owns an app folder: a NAMED entry, or the agent of that name.
-  const ownerOf = (app) =>
-    Object.entries(NAMED).find(([, ps]) => ps.includes(`apps/${app}`))?.[0] ?? app;
-  const agents = existsSync(R(".claude/agents"))
-    ? readdirSync(R(".claude/agents")).filter((d) => statSync(R(".claude/agents", d)).isDirectory()).sort()
-    : [];
-
-  for (const agent of agents) {
-    const f = R(".claude/agents", agent, "HANDOFF.md");
-    const body = read(f);
-    if (!body) { add(`fresh: ${agent}`, "warn", "no HANDOFF.md — the Pit Wall lists an agent by that file"); continue; }
-
-    const stated = body.match(/State as of (\d{4}-\d{2}-\d{2})/)?.[1];
-    if (!stated) { add(`fresh: ${agent}`, "warn", "no 'State as of <date>' line — the Pit Wall reads that field"); continue; }
-
-    const paths = NAMED[agent] ?? (APPS.includes(agent) ? [`apps/${agent}`] : []);
-    if (!paths.length) {
-      // An agent owning no folder has nothing to date it against. That is a
-      // warn, never an ok: ok means measured, and this was not.
-      add(`fresh: ${agent}`, "warn", `${stated}; owns no folder this check can date it against — not measured`);
-      continue;
-    }
-
-    // Deployment config and env templates are swept by cross-cutting changes
-    // that the owning agent did not write: #108 touched every vercel.json and
-    // flagged three agents stale for one line each. Freshness is meant to ask
-    // "has this handoff kept up with this app's code", so it measures the code.
-    //
-    // Every stamped copy is swept for the same reason, and the list is DERIVED
-    // from the manifest rather than restated: a stamped file is by definition
-    // one no app agent writes. Restating it as a literal is how this recurred
-    // — folding ThemeControl.tsx into packages/shared flagged health, resume
-    // and editor stale for a banner none of them wrote. Deriving it means the
-    // next manifest entry is swept by existing, with nobody having to remember.
-    const SWEPT = ["vercel.json", ".env.example", "package-lock.json",
-                   ...MANIFEST.map((m) => m.to)];
-    /* A commit that changes the apps of more than one agent is cross-cutting:
-       no app agent writes one, since each stays inside its own folder, so it is
-       never a reason for that agent's handoff to be stale. #201 rewrote the
-       login route, page and middleware in every app, and #202 every
-       package.json's engines line; together they flagged five agents stale for
-       work none of them did (TEC-44), and a warning that fires on everyone at
-       once teaches everyone to ignore it. Judged by the commit, not the path,
-       because a path rule cannot tell a TD's engines bump from an agent's new
-       dependency in the same package.json. `--full-diff` lists every file the
-       commit touched, not only the ones under this agent's path.
-       Only an app folder is judged this way: `scripts` and `.github` are
-       where the TD and Deployment make their cross-cutting changes, so there a
-       commit spanning every app is their own work and still dates them. */
-    const ownDate = (path) => {
-      const log = git("log", "--full-diff", "--format=@%ad", "--date=short", "--name-only", "--",
-        path, ...SWEPT.map((f) => `:(exclude)${path}/${f}`));
-      if (!log) return null;
-      for (const entry of log.split("@").filter(Boolean)) {
-        const [date, ...files] = entry.split("\n").map((l) => l.trim()).filter(Boolean);
-        const owners = new Set(files.map((f) => f.match(/^apps\/([^/]+)\//)?.[1])
-          .filter(Boolean).map(ownerOf));
-        if (!path.startsWith("apps/") || owners.size <= 1) return date;
-      }
-      return null;
-    };
-    /* An agent owning several apps is as stale as its most recently changed
-       one, so this takes the newest date across all of them and names which. */
-    const dated = paths
-      .map((path) => [path, ownDate(path)])
-      .filter(([, d]) => d)
-      .sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0));
-    const label = paths.join(" + ");
-    if (!dated.length) add(`fresh: ${agent}`, "warn", `stated ${stated}; no commits found under ${label}`);
-    else {
-      const [newestPath, newest] = dated[dated.length - 1];
-      add(`fresh: ${agent}`, stated >= newest ? "ok" : "warn",
-        stated >= newest ? `${stated}, current with ${label}`
-          : `says ${stated}; ${newestPath} last changed ${newest}`);
-    }
-  }
-
-  /* An app with no agent is nobody's, and an agent's app that has been
-     deprecated leaves a charter describing a folder that is gone. Both are the
-     roster changing underneath the documentation, which is the thing this file
-     exists to notice. */
-  const owned = new Set(Object.values(NAMED).flat().map((p) => p.replace("apps/", "")).concat(agents));
-  const orphans = APPS.filter((a) => !owned.has(a));
-  add("every app has an owning agent", orphans.length === 0 ? "ok" : "warn",
-    orphans.length === 0 ? `${APPS.length} apps, all owned` : `no agent owns: ${orphans.join(", ")}`);
+  const missing = APPS.flatMap((a) => ["RULES.md", "NOTES.md"].filter((f) => !existsSync(R("apps", a, f))).map((f) => `apps/${a}/${f}`));
+  add("every app has RULES.md and NOTES.md", missing.length ? "warn" : "ok",
+    missing.length ? `missing: ${missing.join(", ")}` : `${APPS.length} apps`);
 }
 
 /* 6 ── Migration filenames named in prose, against the directory. Four were
@@ -811,7 +669,22 @@ for (const app of PUBLIC_APPS) {
 add("worklogs stay retired", existsSync(R(".claude/worklogs")) ? "fail" : "ok",
   existsSync(R(".claude/worklogs")) ? ".claude/worklogs/ is back — see the communication layer in CLAUDE.md" : "absent");
 add("KICKOFF.md stays retired", existsSync(R(".claude/agents/KICKOFF.md")) ? "fail" : "ok",
-  existsSync(R(".claude/agents/KICKOFF.md")) ? ".claude/agents/KICKOFF.md is back — an agent starts from a skill and its preset (TEC-108)" : "absent; kickoff, helper-start and closeout are skills");
+  existsSync(R(".claude/agents/KICKOFF.md")) ? ".claude/agents/KICKOFF.md is back — the TD starts from the kickoff skill, the builder from its preset (TEC-108)" : "absent; kickoff and closeout are skills");
+/* TEC-115: one builder replaced the per-app agents, and the TD merges. A
+   Deployment folder or a HANDOFF.md coming back is the old shape returning by
+   copy-paste from an old branch. */
+{
+  const handoffs = [];
+  const walk = (d) => { for (const e of readdirSync(d)) {
+    if (e === "node_modules" || e === ".git" || e === ".next" || e === "worktrees") continue;
+    const p = join(d, e);
+    if (statSync(p).isDirectory()) walk(p); else if (e === "HANDOFF.md") handoffs.push(p.replace(repoRoot + "/", ""));
+  } };
+  walk(repoRoot);
+  const back = [...(existsSync(R(".claude/agents/deployment")) ? [".claude/agents/deployment/"] : []), ...handoffs];
+  add("per-agent handoffs and Deployment stay retired", back.length ? "fail" : "ok",
+    back.length ? `${back.join(", ")} is back — state lives in each app's NOTES.md and the TD merges (TEC-115)` : "absent; NOTES.md per app, the TD merges");
+}
 add("ledger stays retired", existsSync(R(".claude/OPEN-ITEMS.md")) ? "fail" : "ok",
   existsSync(R(".claude/OPEN-ITEMS.md")) ? ".claude/OPEN-ITEMS.md is back — open items live in Linear, team TEC" : "absent; open items are in Linear");
 
