@@ -25,8 +25,8 @@ export type PitIssue = {
   /** Linear's scale: 1 urgent … 4 low, 0 none. */
   priority: number;
   priorityLabel: string;
-  /** The `agent:` label, without its prefix. */
-  agent: string | null;
+  /** The `app:` label, without its prefix. Platform work carries none. */
+  app: string | null;
   /** The `owner:` label, without its prefix. */
   owner: string | null;
   parked: boolean;
@@ -164,7 +164,7 @@ export function toIssue(n: LinearNode): PitIssue {
     column: columnOf(n.state, parked),
     priority: typeof n.priority === "number" ? n.priority : 0,
     priorityLabel: n.priorityLabel || "No priority",
-    agent: labelValue(labels, "agent:"),
+    app: labelValue(labels, "app:"),
     owner: labelValue(labels, "owner:"),
     parked,
     waitingOnJoel: n.assignee !== null && n.assignee !== undefined,

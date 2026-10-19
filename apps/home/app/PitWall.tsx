@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import type { PitIssue, PitWallData } from "@/lib/linear";
-import { byAgent, byStatus, needsJoel, type Grouping } from "@/lib/pitgroups";
+import { byApp, byStatus, needsJoel, type Grouping } from "@/lib/pitgroups";
 
 /**
  * The Pit Wall: every open issue in Linear, team TEC, and who acts next.
  *
  * Two arrangements behind one toggle — by status, with what waits on Joel in a
- * band above the board, or by agent. The toggle regroups what is already on the
+ * band above the board, or by app. The toggle regroups what is already on the
  * page, so it never asks Linear again; the choice rides in `?group=` so a
  * reload or a shared link keeps it.
  *
@@ -26,9 +26,9 @@ function ago(iso: string) {
   return `${Math.round(h / 24)}d ago`;
 }
 
-function Card({ issue, show }: { issue: PitIssue; show: "agent" | "status" }) {
+function Card({ issue, show }: { issue: PitIssue; show: "app" | "status" }) {
   const joel = needsJoel(issue);
-  const where = show === "agent" ? issue.agent ?? "No agent" : issue.status;
+  const where = show === "app" ? issue.app ?? "Platform" : issue.status;
   return (
     <article className={`pw-card${joel ? " pw-joel" : ""}${issue.parked ? " pw-parked" : ""}`}>
       <div className="pw-card-top">
@@ -75,7 +75,7 @@ function ByStatus({ issues }: { issues: PitIssue[] }) {
           </h3>
           <div className="pw-grid">
             {board.joel.map((i) => (
-              <Card key={i.id} issue={i} show="agent" />
+              <Card key={i.id} issue={i} show="app" />
             ))}
           </div>
         </section>
@@ -90,7 +90,7 @@ function ByStatus({ issues }: { issues: PitIssue[] }) {
             {c.issues.length === 0 ? (
               <p className="pw-empty">Nothing here.</p>
             ) : (
-              c.issues.map((i) => <Card key={i.id} issue={i} show="agent" />)
+              c.issues.map((i) => <Card key={i.id} issue={i} show="app" />)
             )}
           </section>
         ))}
@@ -103,7 +103,7 @@ function ByStatus({ issues }: { issues: PitIssue[] }) {
           </summary>
           <div className="pw-grid">
             {board.later.map((i) => (
-              <Card key={i.id} issue={i} show="agent" />
+              <Card key={i.id} issue={i} show="app" />
             ))}
           </div>
         </details>
@@ -112,13 +112,13 @@ function ByStatus({ issues }: { issues: PitIssue[] }) {
   );
 }
 
-function ByAgent({ issues }: { issues: PitIssue[] }) {
+function ByApp({ issues }: { issues: PitIssue[] }) {
   return (
     <>
-      {byAgent(issues).map((g) => (
-        <section key={g.agent} className="pw-agent">
+      {byApp(issues).map((g) => (
+        <section key={g.app} className="pw-agent">
           <h3>
-            {g.agent} <Count n={g.issues.length} />
+            {g.app} <Count n={g.issues.length} />
           </h3>
           <div className="pw-grid">
             {g.issues.map((i) => (
@@ -138,7 +138,7 @@ export default function PitWall({ data, group }: { data: PitWallData; group: Gro
     setGrouping(next);
     // The URL follows without a navigation, so Linear is not asked again.
     const url = new URL(window.location.href);
-    if (next === "agent") url.searchParams.set("group", "agent");
+    if (next === "app") url.searchParams.set("group", "app");
     else url.searchParams.delete("group");
     window.history.replaceState(null, "", url);
   }
@@ -150,9 +150,9 @@ export default function PitWall({ data, group }: { data: PitWallData; group: Gro
           Open issues in Linear, team TEC · read {ago(data.readAt)}
         </p>
         <div className="pw-toggle" role="group" aria-label="Group by">
-          {(["status", "agent"] as const).map((g) => (
+          {(["status", "app"] as const).map((g) => (
             <button key={g} type="button" aria-pressed={grouping === g} onClick={() => choose(g)}>
-              {g === "status" ? "By status" : "By agent"}
+              {g === "status" ? "By status" : "By app"}
             </button>
           ))}
         </div>
@@ -167,7 +167,7 @@ export default function PitWall({ data, group }: { data: PitWallData; group: Gro
       ) : grouping === "status" ? (
         <ByStatus issues={data.issues} />
       ) : (
-        <ByAgent issues={data.issues} />
+        <ByApp issues={data.issues} />
       )}
     </section>
   );

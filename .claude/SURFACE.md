@@ -3,12 +3,12 @@
 **What shape a tool is.** Not what it looks like: whether it has an index, what its shell is, how you
 arrive at it, and whether it is worth an icon on a home screen.
 
-**Read this before designing a screen**, and before answering step 3 of `.claude/agents/STANDUP.md`.
+**Read this before designing a screen**, and before settling a new app's surface (the `new-app` skill).
 It was unwritten for long enough to be a ledger item (closed pre-Linear ledger item 7), and in that
 time Health had to invent the rule this would have supplied.
 
 **Surface is not the theme.** Palette, tokens, type, spacing and the shared component language are
-TechPad Gen's, in every app. Surface is shell, navigation and whether there is an index — that is
+the theme, which lives in `apps/home` and is one system across every app. Surface is shell, navigation and whether there is an index — that is
 architecture, and it is the technical director's, with Joel able to overrule. Settled 2026-09-18;
 the entry is in `.claude/DECISIONS.md` and this file does not restate the reasoning.
 

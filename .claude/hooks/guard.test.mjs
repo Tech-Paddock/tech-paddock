@@ -200,14 +200,13 @@ test("the migration history cannot be rewritten from a shell", () => {
   );
 });
 
-/* Joel, 2026-09-26: "No agents outside of the deployment agent are allowed to
-   create PR's or merge", and "The only agent that can open a deployment agent
-   is the technical Director." A helper's call carries agent_id and agent_type;
-   a main session's carries neither. */
-const DEPLOY = { agent_id: "a1", agent_type: "deployment" };
-const HELPER = { agent_id: "a2", agent_type: "health" };
+/* TEC-115 (Joel, 2026-10-19): the technical director merges, from its own
+   session. A helper's call carries agent_id and agent_type; a main session's
+   carries neither. */
+const MAIN = {};
+const HELPER = { agent_id: "a2", agent_type: "builder" };
 
-test("GitHub: every write to a pull request is Deployment's, and reading is anyone's", () => {
+test("GitHub: every write to a pull request is the main session's, and reading is anyone's", () => {
   const writes = [
     ["create_pull_request", { title: "x", body: "b", head: "claude/x", base: "main" }],
     ["update_pull_request", { pullNumber: 1, title: "y" }],
@@ -224,13 +223,14 @@ test("GitHub: every write to a pull request is Deployment's, and reading is anyo
     ["unresolve_review_thread", { threadId: "t" }],
     ["some_future_pull_request_tool", {}], // unknown counts as a write
   ];
-  for (const who of [{}, HELPER, { agent_type: "deployment" }, { agent_id: "a3" }]) {
+  // A helper of any type is refused, the retired Deployment preset included.
+  for (const who of [HELPER, { agent_id: "a1", agent_type: "deployment" }, { agent_id: "a3" }]) {
     expectAll(
       writes.map((w) => [w, "deny"]),
       ([name, input]) => decide({ tool_name: `mcp__github__${name}`, tool_input: input, ...who }),
     );
   }
-  for (const who of [{}, HELPER, DEPLOY]) {
+  for (const who of [MAIN, HELPER]) {
     expectAll(
       [
         [["pull_request_read", { method: "get", pullNumber: 1 }], "allow"],
@@ -244,12 +244,11 @@ test("GitHub: every write to a pull request is Deployment's, and reading is anyo
   }
 });
 
-test("GitHub, for Deployment: after Joel's one gate, merging and updating go through; auto-merge, reviews and API commits wait; nothing commits to main", () => {
+test("GitHub, for the main session: merging and updating go through; auto-merge, reviews and API commits wait; nothing commits to main", () => {
   const body = 'Requested by Joel on 2026-09-24 — "close out"\n\n## Deployment\nNothing.';
   expectAll(
     [
       [["create_pull_request", { title: "x", body, head: "claude/x", base: "main" }], "allow"],
-      // Joel, 2026-09-25: "only one gate" — his click when Deployment starts, not one per merge.
       [["merge_pull_request", { pullNumber: 1, merge_method: "squash" }], "allow"],
       [["merge_pull_request", { pullNumber: 1 }], "deny"],
       [["merge_pull_request", { pullNumber: 1, merge_method: "merge" }], "deny"],
@@ -264,43 +263,36 @@ test("GitHub, for Deployment: after Joel's one gate, merging and updating go thr
       [["delete_file", { path: "x" }], "deny"],
       [["push_files", { branch: "claude/x", files: [] }], "ask"],
     ],
-    ([name, input]) => decide({ tool_name: `mcp__github__${name}`, tool_input: input, ...DEPLOY }),
+    ([name, input]) => decide({ tool_name: `mcp__github__${name}`, tool_input: input, ...MAIN }),
   );
   // The API commit tools write past the push guard whoever calls them.
   assert.equal(mcp("mcp__github__push_files", { branch: "main", files: [] }), "deny");
   assert.equal(mcp("mcp__github__push_files", { branch: "claude/x", files: [] }), "ask");
 });
 
-test("starting Deployment: never from a helper, and from a main session only with Joel's click", () => {
+test("starting a helper is not the guard's: Joel's go on the work is the go (TEC-115)", () => {
   const start = (subagent_type, who = {}) => verdict(decide({ tool_name: "Agent", tool_input: { subagent_type, prompt: "x" }, ...who }));
-  assert.equal(start("deployment"), "ask");
-  assert.equal(start("Deployment"), "ask");
-  assert.equal(start("deployment", HELPER), "deny");
-  assert.equal(start("deployment", DEPLOY), "deny"); // Deployment cannot start another
-  assert.equal(verdict(decide({ tool_name: "Task", tool_input: { subagent_type: "deployment" } })), "ask");
-  for (const other of ["health", "cookbook", "techpad-gen", "Explore", undefined]) {
-    assert.equal(start(other), "allow", String(other));
-    assert.equal(start(other, HELPER), "allow", String(other));
+  for (const t of ["builder", "deployment", "Explore", undefined]) {
+    assert.equal(start(t), "allow", String(t));
+    assert.equal(start(t, HELPER), "allow", String(t));
   }
 });
 
-test("a pull request from a shell is Deployment's too", () => {
+test("a pull request from a shell is the main session's too", () => {
   const sh = (command, who = {}) => verdict(decide({ tool_name: "Bash", tool_input: { command }, cwd: FEATURE, ...who }));
   for (const c of ["gh pr create --fill", "gh -R o/r pr merge 3 --squash", "gh pr edit 3 --body x", "gh pr close 3", "gh pr comment 3 -b x", "gh pr review 3 --approve", "gh pr ready 3", "hub pull-request -m x", "cd /tmp && gh pr create", "bash -c 'gh pr merge 1'"]) {
-    assert.equal(sh(c), "deny", c);
     assert.equal(sh(c, HELPER), "deny", c);
-    assert.equal(sh(c, DEPLOY), "allow", c);
+    assert.equal(sh(c, MAIN), "allow", c);
   }
   for (const c of ["gh pr view 3", "gh pr list", "gh pr diff 3", "gh pr checks 3", "gh issue create -t x", "echo 'gh pr create'"]) {
     assert.equal(sh(c), "allow", c);
   }
 });
 
-test("Linear's diff tools act on the pull request, so they are Deployment's", () => {
+test("Linear's diff tools act on the pull request, so they are the main session's", () => {
   for (const t of ["merge_diff", "update_diff", "submit_diff_review", "save_diff_comment", "resolve_diff_thread"]) {
-    assert.equal(mcp(`mcp__Linear__${t}`, {}), "deny", t);
     assert.equal(verdict(decide({ tool_name: `mcp__Linear__${t}`, tool_input: {}, ...HELPER })), "deny", t);
-    assert.equal(verdict(decide({ tool_name: `mcp__Linear__${t}`, tool_input: {}, ...DEPLOY })), "allow", t);
+    assert.equal(mcp(`mcp__Linear__${t}`, {}), "allow", t); // settings.json still asks Joel
   }
   for (const t of ["get_diff", "list_diffs", "get_diff_threads"]) assert.equal(mcp(`mcp__Linear__${t}`, {}), "allow", t);
 });
@@ -339,23 +331,25 @@ test("Vercel: reads go ahead; changes and credentials wait for Joel", () => {
   assert.equal(mcp("mcp__Vercel__filter_project_envs", { decrypt: "true" }), "ask");
 });
 
-test("Linear: an issue has an owner, an agent, and ends with Next steps that name who acts", () => {
+test("Linear: an issue has an owner, at most one app, and ends with Next steps that name who acts", () => {
   const good = "What and why.\n\n## Next steps\n\n1. **Joel:** decide.\n2. **TD:** build it.\n   * a detail\n3. **Done:** checked.\n";
   const save = (input) => mcp("mcp__Linear__save_issue", input);
-  const create = (extra) => save({ team: "TEC", title: "t", labels: ["owner:TD", "agent:TD"], description: good, ...extra });
+  const create = (extra) => save({ team: "TEC", title: "t", labels: ["owner:TD", "app:coffee"], description: good, ...extra });
   assert.equal(create({}), "allow");
-  assert.equal(create({ labels: ["owner:Joel", "agent:Health", "Parked"] }), "allow");
-  assert.equal(create({ labels: ["agent:TD"] }), "deny");
-  assert.equal(create({ labels: ["owner:TD"] }), "deny");
-  assert.equal(create({ labels: ["owner:TD", "owner:Joel", "agent:TD"] }), "deny");
-  assert.equal(create({ labels: ["1f4adc9b-38dc-4f83-9c67-6cdfaae4d47a", "agent:TD"] }), "deny");
+  assert.equal(create({ labels: ["owner:Joel", "app:health", "Parked"] }), "allow");
+  assert.equal(create({ labels: ["owner:TD"] }), "allow"); // a platform issue has no app
+  assert.equal(create({ labels: ["app:coffee"] }), "deny");
+  assert.equal(create({ labels: ["owner:TD", "owner:Joel", "app:coffee"] }), "deny");
+  assert.equal(create({ labels: ["owner:TD", "app:coffee", "app:health"] }), "deny");
+  assert.equal(create({ labels: ["1f4adc9b-38dc-4f83-9c67-6cdfaae4d47a", "owner:TD"] }), "deny");
   assert.equal(create({ description: undefined }), "deny");
   assert.equal(create({ description: "No section at all." }), "deny");
   assert.equal(create({ description: "## Next steps\n\n1. **TD:** x\n\n## Notes\n\nlater" }), "deny");
   assert.equal(create({ description: "## Next steps\n\nJust prose, no steps." }), "deny");
   assert.equal(create({ description: "## Next steps\n\n1. **TD:** x\n2. Verify it in the logs." }), "deny");
   assert.equal(create({ description: "## Next steps\n\n1. The technical director builds it." }), "allow");
-  assert.equal(create({ description: "## Next steps\n\n1. **Deployment:** take it to merge." }), "allow");
+  assert.equal(create({ description: "## Next steps\n\n1. **Builder:** build it on a fresh branch." }), "allow");
+  assert.equal(create({ description: "## Next steps\n\n1. **Deployment:** take it to merge." }), "deny"); // retired
   assert.equal(create({ description: "## Next steps\n\n1. **Nobody:** nothing until it is un-parked." }), "allow");
   assert.equal(create({ description: "```\n## Next steps\n1. TD: x\n```\n" }), "deny");
   assert.equal(create({ description: "## Next steps\n\n1. Check /api/health answers." }), "deny");
@@ -364,8 +358,10 @@ test("Linear: an issue has an owner, an agent, and ends with Next steps that nam
   assert.equal(save({ id: "TEC-1", addLabels: ["Parked"] }), "allow");
   assert.equal(save({ id: "TEC-1", removeLabels: ["owner:TD"], addLabels: ["owner:Joel"] }), "allow");
   assert.equal(save({ id: "TEC-1", removeLabels: ["owner:TD"] }), "deny");
-  assert.equal(save({ id: "TEC-1", removeLabels: ["agent:TD"] }), "deny");
-  assert.equal(save({ id: "TEC-1", labels: ["owner:TD"] }), "deny");
+  assert.equal(save({ id: "TEC-1", removeLabels: ["agent:TD"], addLabels: ["app:coffee"] }), "allow"); // the relabel
+  assert.equal(save({ id: "TEC-1", addLabels: ["app:coffee", "app:health"] }), "deny");
+  assert.equal(save({ id: "TEC-1", labels: ["owner:TD"] }), "allow");
+  assert.equal(save({ id: "TEC-1", labels: ["app:coffee"] }), "deny");
   assert.equal(save({ id: "TEC-1", description: good }), "allow");
   assert.equal(save({ id: "TEC-1", description: "Rewritten, and the steps are gone." }), "deny");
   assert.equal(save({ id: "TEC-1", patch: [{ op: "replace", old_string: "old", new_string: "new" }] }), "allow");
@@ -414,10 +410,10 @@ function run(command, input, { env = {}, shell = "/bin/sh" } = {}) {
 }
 
 test("settings.json sends each tool to the guard it needs, and no other", () => {
-  for (const t of ["Bash", "Agent", "Task", "mcp__github__create_pull_request", "mcp__github__merge_pull_request", "mcp__github__enable_pr_auto_merge", "mcp__github__disable_pr_auto_merge", "mcp__github__pull_request_review_write", "mcp__github__add_comment_to_pending_review", "mcp__github__add_reply_to_pull_request_comment", "mcp__github__request_copilot_review", "mcp__github__resolve_review_thread", "mcp__github__unresolve_review_thread", "mcp__github__push_files", "mcp__github__create_or_update_file", "mcp__github__delete_file", "mcp__github__update_pull_request_branch", "mcp__Supabase__execute_sql", "mcp__Supabase__create_project", "mcp__Vercel__create_project_env", "mcp__Linear__save_issue", "mcp__Linear__merge_diff", "mcp__Linear__update_diff", "mcp__Linear__submit_diff_review", "mcp__Linear__save_diff_comment", "mcp__Linear__resolve_diff_thread"]) {
+  for (const t of ["Bash", "mcp__github__create_pull_request", "mcp__github__merge_pull_request", "mcp__github__enable_pr_auto_merge", "mcp__github__disable_pr_auto_merge", "mcp__github__pull_request_review_write", "mcp__github__add_comment_to_pending_review", "mcp__github__add_reply_to_pull_request_comment", "mcp__github__request_copilot_review", "mcp__github__resolve_review_thread", "mcp__github__unresolve_review_thread", "mcp__github__push_files", "mcp__github__create_or_update_file", "mcp__github__delete_file", "mcp__github__update_pull_request_branch", "mcp__Supabase__execute_sql", "mcp__Supabase__create_project", "mcp__Vercel__create_project_env", "mcp__Linear__save_issue", "mcp__Linear__merge_diff", "mcp__Linear__update_diff", "mcp__Linear__submit_diff_review", "mcp__Linear__save_diff_comment", "mcp__Linear__resolve_diff_thread"]) {
     assert.ok(hookFor(t), `${t} has no hook`);
   }
-  for (const t of ["Read", "Edit", "mcp__github__get_me", "mcp__github__list_branches", "mcp__Linear__list_issues", "mcp__Linear__save_comment", "mcp__Notion__notion-search"]) {
+  for (const t of ["Read", "Edit", "Agent", "Task", "mcp__github__get_me", "mcp__github__list_branches", "mcp__Linear__list_issues", "mcp__Linear__save_comment", "mcp__Notion__notion-search"]) {
     assert.equal(hookFor(t), undefined, `${t} should not be guarded`);
   }
 });
@@ -447,13 +443,11 @@ test("end to end: the real commands deny, ask and allow", () => {
     assert.equal(push("ls -la").status, 0, shell);
     const pr = run(hookFor("mcp__github__merge_pull_request"), { tool_name: "mcp__github__merge_pull_request", tool_input: { merge_method: "rebase" } }, { shell });
     assert.equal(pr.decision, "deny", shell);
-    const auto = run(hookFor("mcp__github__enable_pr_auto_merge"), { tool_name: "mcp__github__enable_pr_auto_merge", tool_input: {}, ...DEPLOY }, { shell });
+    const auto = run(hookFor("mcp__github__enable_pr_auto_merge"), { tool_name: "mcp__github__enable_pr_auto_merge", tool_input: {}, ...MAIN }, { shell });
     assert.equal(auto.decision, "ask", shell);
     const open = run(hookFor("mcp__github__create_pull_request"), { tool_name: "mcp__github__create_pull_request", tool_input: {}, ...HELPER }, { shell });
     assert.equal(open.decision, "deny", shell);
-    const start = run(hookFor("Agent"), { tool_name: "Agent", tool_input: { subagent_type: "deployment" } }, { shell });
-    assert.equal(start.decision, "ask", shell);
-    const ghpr = run(hookFor("Bash"), { tool_name: "Bash", tool_input: { command: "gh pr merge 1" }, cwd: FEATURE }, { shell });
+    const ghpr = run(hookFor("Bash"), { tool_name: "Bash", tool_input: { command: "gh pr merge 1" }, cwd: FEATURE, ...HELPER }, { shell });
     assert.equal(ghpr.decision, "deny", shell);
     const env = run(hookFor("mcp__Vercel__create_project_env"), { tool_name: "mcp__Vercel__create_project_env", tool_input: {} }, { shell });
     assert.equal(env.decision, "ask", shell);

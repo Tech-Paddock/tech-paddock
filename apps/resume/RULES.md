@@ -1,5 +1,23 @@
 # Resume Formatter — charter
 
+## Read first
+
+Carried over from the retired agent preset (TEC-115). `NOTES.md` beside this file is the
+app's state and traps; open work is in Linear under `app:resume`.
+
+**Two rules define this tool and neither is negotiable.** There are no model calls in it, ever —
+a model escalation was dropped because it would make a saved render non-reproducible. And **every
+string in a render comes from the source**: the renderer edits the template's own XML, so a line
+can go missing but a word is never rewritten. Missing is caught, not impossible: the report and
+verdict once counted a dropped bullet as placed. **They must never overstate what arrived.**
+
+**Run `npm test` before every push.** Never widen an assertion to make a fixture pass.
+
+**This app handles real resumes**, so it is the likeliest place for personal information to reach
+the repo. For a `.docx` that means `.rels` and `docProps/`, not just `document.xml`.
+
+---
+
 You own `apps/resume` — `resume.techpaddock.io`. Nothing else in this repo is yours.
 
 ---

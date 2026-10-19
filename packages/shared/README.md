@@ -37,7 +37,7 @@ are half of the password gate, so they get the same treatment as the other half:
 file, and `drift` failing a copy that disagrees.
 
 **The login pages themselves are not stamped** — each is styled for its own app, and the styling
-is TechPad Gen's. The logic they share is these two files; the pages only call them. The editor's
+is the theme's (`apps/home/RULES.md`). The logic they share is these two files; the pages only call them. The editor's
 route wraps the handler rather than re-exporting it, because a successful login is also when it
 runs its model check.
 

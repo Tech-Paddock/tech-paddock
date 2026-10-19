@@ -95,8 +95,8 @@ history holds a version the local directory lacks — *"Remote migration version
 migrations directory"* — and writes nothing. `20260908235234` is remote-only permanently and on
 purpose, so the one condition `db push` needs is the one this project chose never to satisfy.
 
-**So Deployment applies migrations through the hosted API** (the Supabase MCP's
-`apply_migration` is the same path) **at gate time, before merging.** Not by hand in the SQL
+**So the technical director applies migrations through the hosted API** (the Supabase MCP's
+`apply_migration` is the same path) **at merge time, before merging** (the `merge` skill). Not by hand in the SQL
 editor, not by an app agent, and not by Joel. `CLAUDE.md` makes it a rule, alongside the shape rule
 that makes applying before merging safe.
 
@@ -176,7 +176,7 @@ director as a new cross-app contract, and this section changes in the same pull 
 
 ## `tracker.pipeline_threads` — the write contract
 
-Owned by the Pipeline Tracker (`apps/tracker`, TechPad Gen's) and written by the Resume Formatter
+Owned by the Pipeline Tracker (`apps/tracker`, parked; its rules are in `apps/home/RULES.md`) and written by the Resume Formatter
 (`apps/resume`) as well, which makes it a cross-app contract like the one above rather than either
 agent's note — the second table written across a tool boundary, after `shared.contacts`. **The
 tracker was parked by Joel on 2026-09-24.**

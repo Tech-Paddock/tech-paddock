@@ -12,21 +12,21 @@ and this is the checklist.
 ## 1. Find what is not saved
 
 `git status`, `git stash list`, unpushed commits on every local branch (`git log --branches --not
---remotes`), and any `.claude/worktrees/agent-*` with changes. On the TD, **close out every running
-helper first** — a container restart kills them and takes their unpushed work.
+--remotes`), and any `.claude/worktrees/agent-*` with changes. On the TD, **close out a running
+builder first** — a container restart kills them and takes their unpushed work.
 
 ## 2. Never assume where work lands
 
 Joel's rule. If the work is **unfinished**, has **no agreed branch**, or the branch is **unclear**:
-stop and ask Joel a multiple-choice question before committing anything. A helper puts the question
+stop and ask Joel a multiple-choice question before committing anything. The builder puts the question
 in its report and the TD asks it. **Never `main`, and never the harness-named session branch.**
 
 ## 3. Finished work on its agreed branch
 
 - Commit and push.
-- **`HANDOFF.md` is the state after merge**, never the branch as in flight, within its 80-line cap.
+- **`NOTES.md` is the state after merge** — the app's, or the TD's — never the branch as in flight.
 - `node scripts/drift-check.mjs` has **0 failures**.
-- **Every open item is in Linear**: `owner:` and `agent:` labels, a Next steps section, a ⭐ on each
+- **Every open item is in Linear**: an `owner:` label (and `app:` where one applies), a Next steps section, a ⭐ on each
   step that waits on Joel, and Joel assigned while one does.
 
 ## 4. The report

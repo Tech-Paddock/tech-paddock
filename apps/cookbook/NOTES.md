@@ -1,9 +1,9 @@
-# Cookbook — handoff
+# Cookbook — notes
 
 State as of 2026-10-18, after #257 (menu days, the Add tab, the icon), #259 (Surface) and Next 16.
 
 `RULES.md` has the charter. This file is only what is true right now, and its traps. **Open work is
-in Linear under `agent:Cookbook`** — never here.
+in Linear under `app:cookbook`** — never here.
 
 ---
 

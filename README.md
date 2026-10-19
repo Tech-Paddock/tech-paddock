@@ -58,8 +58,6 @@ what it does not, is in CLAUDE.md's shared foundation.
 ## Working here as an agent
 
 List your open items in Linear, team TEC, first — a hook reminds you. Then the rules in
-[CLAUDE.md](./CLAUDE.md), loaded into every session automatically, and your own charter and handoff
-at `.claude/agents/<you>/`.
-
-Agents here never run at the same time and cannot see each other, so the repo is the only channel
-between them. How that works is the communication layer section of CLAUDE.md.
+[CLAUDE.md](./CLAUDE.md), loaded into every session automatically, and the `RULES.md` and
+`NOTES.md` for your area: `.claude/agents/td/` for the technical director, `apps/<app>/` for the
+builder. Sessions do not persist, so the repo and Linear are the only memory between them.

@@ -13,8 +13,8 @@ default section and the last one is not it.** Pick the heading, then append unde
 contradiction appended below the original is two answers to one question, and the first one found
 wins.
 
-**Ceiling: 400 lines**, raised from 260 on 2026-09-20 with Joel's word, and deliberately loose. This
-file is **not read at session start** — read it when you are about to reopen a decision, or when you
+**No ceiling since TEC-115 (2026-10-19)**: it is an archive, and a cap only made a settled call
+cheaper to relitigate than to look up. This file is **not read at session start** — read it when you are about to reopen a decision, or when you
 have just been bitten and want to know whether it is known. Rationing it only makes a settled call
 cheaper to relitigate than to look up, which is the failure it exists to prevent. **So do not trim
 to make room.** When an entry stops being something anyone would plausibly reopen or repeat, delete
@@ -159,14 +159,16 @@ it; git keeps it.
   merge order, the merge, migrations at gate time and DevOps: "Essentially it's the deployment layer
   we are stripping out of your job." What changed the answer: the TD now starts and briefs every
   agent, so a TD gate would check work it had directed. **One seat still owns both sides of the gap;
-  it moved seats.** The Vercel trap list moved with it, verbatim.
+  it moved seats.** The Vercel trap list moved with it, verbatim. *Superseded 2026-10-19 (TEC-115):
+  the layer is the TD's again, through the `merge` skill, which carries the trap list.*
 - **2026-09-22 — Linear holds open items. GitHub stays the repo.** The plan was a Routine
   regenerating `.claude/OPEN-ITEMS.md` from Linear so a hook kept printing it; **Joel dropped the file
   instead** ("Let's drop the open items"), so the hook only points at Linear and **every session
   calls Linear to read its items**. That is a convention, not a guarantee — the cost accepted for one
   copy instead of two. `drift` fails if the file returns. Ledger numbers became TEC ids; the old
   numbers in this file were converted on 2026-09-24, and items closed before Linear are named as such.
-- **2026-09-22 — No deployment agent.** Proposed and declined. The decisive objection: `CLAUDE.md`
+- **2026-09-22 — No deployment agent.** *Reversed 2026-09-24, and that reversal undone 2026-10-19
+  (TEC-115) — this entry's reasoning is why.* Proposed and declined. The decisive objection: `CLAUDE.md`
   puts migrations at the gate, so an agent that merges must also apply them — rebuilding the split
   that was deliberately rejected, in the other direction. The second: the gate's value is the
   second-order pass, and **a narrow charter is by construction the agent least able to run it**;
@@ -231,6 +233,18 @@ it; git keeps it.
   2026-09-25 was dropped on 09-26, once writes stopped prompting him). *"Close out", "park it" and
   "pick up" retired 2026-09-26:* an agent branches only when told, commits, pushes and hands over,
   so no phrase is needed; **"Backlog" means a Linear issue in Backlog, not built.**
+  *Superseded 2026-10-19 by the entry below: one builder, and the TD merges.*
+- **2026-10-19 — TD + one builder + CI; Joel approves only what has no undo** (TEC-115). Joel:
+  "This feels over engineered. Is it?" Seven personas shared one model, effort and process and
+  differed only by charter; Deployment mostly re-ran CI's checks; about 2,700 lines of rules
+  governed the rules, every handoff sat at its cap, and Joel clicked through byte-identical codemod
+  diffs. Now: **one builder preset**, started per task as "app: X", reading `apps/X/RULES.md` and
+  `NOTES.md`; **the TD merges** through the `merge` skill, and the guard refuses pull request writes
+  to any helper; Linear labels are `owner:` and `app:`. **Joel's approvals:** `CLAUDE.md`, any
+  Vercel or DNS write, non-mechanical shared-auth changes, destructive migrations and new schemas or
+  contracts, the guard, and an app's `RULES.md` (Joel kept that one, 2026-10-19). **The accepted
+  cost:** the TD now merges its own work, so the separate gate is gone; CI, `drift` and branch
+  protection remain, and the request line still records who asked.
 
 - **2026-10-18 — Agents test the live apps signed out only** (Joel). After each deploy, from
   Paddock_td, an agent checks the login redirect, 401 on `/api/*`, a forged cookie, the headers. Signed-in behaviour is tested locally against a
@@ -358,7 +372,8 @@ it; git keeps it.
   head branches* setting (recommended) or by Joel's hand.
 - **The TD's handoff-freshness check was structurally dead** — dated against the **frozen**
   `apps/editor`, it read `ok` forever while the handoff was two merges stale. *Fixed 2026-09-23*: it
-  now also dates against `scripts` and `.github`. **An inert folder is not an owned one.**
+  now also dates against `scripts` and `.github`. **An inert folder is not an owned one.** *The
+  check itself retired with the handoffs on 2026-10-19 (TEC-115).*
 - **A parser of prose must exit non-zero on an unparseable entry.** The ledger's did not: a wrapped
   title dropped an item with no error. The file is gone; the rule holds for whatever reads a
   document next.

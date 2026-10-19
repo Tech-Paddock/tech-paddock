@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { columnOf, loadPitWall, nextStep, toIssue, type LinearNode, type PitIssue } from "@/lib/linear";
-import { byAgent, byStatus, groupingFrom } from "@/lib/pitgroups";
+import { byApp, byStatus, groupingFrom } from "@/lib/pitgroups";
 
 describe("the next step on a card", () => {
   it("is the first numbered step, with its actor and star", () => {
@@ -63,15 +63,15 @@ const node = (over: Partial<LinearNode> = {}): LinearNode => ({
   updatedAt: "2026-09-26T00:00:00Z",
   description: null,
   state: { name: "Todo", type: "unstarted" },
-  labels: { nodes: [{ name: "agent:TechPad Gen" }, { name: "owner:TD" }] },
+  labels: { nodes: [{ name: "app:home" }, { name: "owner:TD" }] },
   assignee: null,
   ...over,
 });
 
 describe("a Linear issue on the board", () => {
-  it("reads agent and owner from their labels", () => {
+  it("reads app and owner from their labels", () => {
     const i = toIssue(node());
-    expect(i.agent).toBe("TechPad Gen");
+    expect(i.app).toBe("home");
     expect(i.owner).toBe("TD");
   });
 
@@ -98,11 +98,11 @@ const issue = (over: Partial<PitIssue>): PitIssue => ({
 
 describe("the two groupings", () => {
   const issues = [
-    issue({ id: "TEC-1", column: "progress", agent: "Health" }),
-    issue({ id: "TEC-2", column: "todo", agent: "TD", waitingOnJoel: true }),
-    issue({ id: "TEC-3", column: "later", agent: "TD", parked: true, waitingOnJoel: true }),
-    issue({ id: "TEC-4", column: "review", agent: null, priority: 1 }),
-    issue({ id: "TEC-5", column: "review", agent: "Someone New", priority: 4 }),
+    issue({ id: "TEC-1", column: "progress", app: "health" }),
+    issue({ id: "TEC-2", column: "todo", app: "coffee", waitingOnJoel: true }),
+    issue({ id: "TEC-3", column: "later", app: "coffee", parked: true, waitingOnJoel: true }),
+    issue({ id: "TEC-4", column: "review", app: null, priority: 1 }),
+    issue({ id: "TEC-5", column: "review", app: "someone-new", priority: 4 }),
   ];
 
   it("by status: Joel's band, three columns, and the rest folded", () => {
@@ -112,14 +112,15 @@ describe("the two groupings", () => {
     expect(b.later.map((i) => i.id)).toEqual(["TEC-3"]);
   });
 
-  it("by agent: roster order, a new name kept, no agent last", () => {
-    expect(byAgent(issues).map((g) => g.agent)).toEqual(["TD", "Health", "Someone New", "No agent"]);
-    expect(byAgent(issues)[0].issues.map((i) => i.id)).toEqual(["TEC-2", "TEC-3"]);
+  it("by app: roster order, a new name kept, platform last", () => {
+    expect(byApp(issues).map((g) => g.app)).toEqual(["coffee", "health", "someone-new", "Platform"]);
+    expect(byApp(issues)[0].issues.map((i) => i.id)).toEqual(["TEC-2", "TEC-3"]);
   });
 
   it("defaults to status", () => {
     expect(groupingFrom(undefined)).toBe("status");
-    expect(groupingFrom("agent")).toBe("agent");
+    expect(groupingFrom("app")).toBe("app");
+    expect(groupingFrom("agent")).toBe("status"); // the old link falls back
     expect(groupingFrom("nonsense")).toBe("status");
   });
 });

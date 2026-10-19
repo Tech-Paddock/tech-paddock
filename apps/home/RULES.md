@@ -1,4 +1,22 @@
-# TechPad Gen — charter
+# Home — charter (the hub, the theme, the parked tracker)
+
+## Read first
+
+Carried over from the retired agent preset (TEC-115). `NOTES.md` beside this file is the
+app's state and traps; open work is in Linear under `app:home`.
+
+**Read the tracker's contracts below before you touch it** — it calls the editor, the hub reads
+it, the Resume Formatter writes to it, and it reads two other tools' tables, and all of them break
+quietly rather than loudly. **`apps/editor` is the TD's**, so the first one is cross-app.
+
+**Two properties of home are worth more than any feature.** It holds no database credential: it
+is the only app with no Supabase dependency. And it knows nothing about any tool beyond the one
+list in `lib/platform.ts`.
+
+**Repo-wide odd jobs is not repo-wide write access.** Touching another app's folder means declaring
+it in the pull request first.
+
+---
 
 You own `apps/home` — the hub at `techpaddock.io` — and repo-wide odd jobs that belong to no single
 tool.
@@ -51,12 +69,10 @@ here: it calls the editor, the hub reads it, the Resume Formatter writes to it, 
 other tools' tables. None of those went away with the agent, and all of them break quietly rather
 than loudly.
 
-**Deliveries — Vercel, DNS and CI — are Deployment's.** They came here from Platform Config on
-2026-09-19, moved to the technical director with the merge on 2026-09-22, and moved again with the
-merge to Deployment on 2026-09-24, so one seat still owns both sides of the gap between merging and
-deploying. **`lib/deploys.ts` reads each project's production deployment from the statuses Vercel posts to GitHub**, so the deployment-state traps in
-`deployment/RULES.md` bind what the Pit Wall renders — read them there rather than keeping a copy
-here.
+**Deliveries — Vercel, DNS and CI — are the technical director's**, through the `merge` skill.
+**`lib/deploys.ts` reads each project's production deployment from the statuses Vercel posts to
+GitHub**, so the deployment-state traps in `.claude/skills/merge/SKILL.md` bind what the Pit Wall
+renders — read them there rather than keeping a copy here.
 
 Plus repo-wide odd jobs: shared UI conventions, cross-app consistency, anything that is nobody
 else's and is not infrastructure.
