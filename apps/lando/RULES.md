@@ -20,3 +20,5 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 - Login is the shared password until per-person logins ship (TEC-118).
 - Livery: McLaren '25 (`mcl39`), the theme's own; changed only in the theme.
+- The food catalogue is fixed in code; an item is retired (`retired: true`), never deleted or re-id'd,
+  because old entries are keyed by its id.
