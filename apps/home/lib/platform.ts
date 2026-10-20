@@ -82,18 +82,6 @@ export type Drift = {
  * **Array order is the sidebar's order**, and it is deliberate: not
  * alphabetical and not the order these were built in. Changing it is the owner's call.
  *
- * **The Message Editor is deliberately absent**, removed 2026-09-19 on the same
- * terms as the tracker below: out of the roster entirely rather than out of the
- * sidebar alone. `apps/editor` is untouched and `editor.techpaddock.io` still
- * serves — it is simply not one of the tools home lists or embeds.
- *
- * **The Pipeline Tracker is deliberately absent from the tools.** It is parked
- * (2026-09-24), so it has no sidebar row and no frame. It still deploys,
- * though, so it is in `PARKED` below and The Garage still probes it, grey.
- * Un-parking it means moving its entry from there to here.
- * `apps/tracker` is untouched and still builds in CI — the roster CI derives
- * comes from the folders on disk, never from this file.
- *
  * **A tool is listed here on the platform's word, not on hope**: its latest
  * production deployment is ready and its domain verified, both read off the
  * deployment state rather than a project field, which is the rule this app has
@@ -125,23 +113,15 @@ export const HOME: Project = {
  * paused, so it not answering is expected, and The Garage shows it grey,
  * never red, and leaves its red deploys out.
  */
-export const PARKED: (Project & { parked: true })[] = [
-  {
-    slug: "tracker",
-    name: "Pipeline Tracker",
-    url: "https://tracker.techpaddock.io",
-    vercelProject: "tp-tracker",
-    parked: true,
-  },
-];
+export const PARKED: (Project & { parked: true })[] = [];
 
 /** What home embeds and deploys, home first. */
 export const PROJECTS: Project[] = [HOME, ...TOOLS];
 
 /**
  * What home probes: everything it embeds, plus what is parked. The Garage's
- * live connections and deploy errors both read this, never `TOOLS` — that was
- * how the tracker once went unprobed.
+ * live connections and deploy errors both read this, never `TOOLS`, so a
+ * parked app is never left unprobed.
  */
 export const PROBED: (Project & { parked?: true })[] = [...PROJECTS, ...PARKED];
 
@@ -169,8 +149,8 @@ export const HOME_ENV: HomeEnv[] = [
  * Names this app used to read and no longer does. An error only while still
  * set, because a credential nothing reads is a credential that can only leak.
  * `VERCEL_TOKEN` was a full-power team token held for one read; deploy state
- * comes from GitHub's deployment statuses instead. `INTERNAL_API_SECRET` was
- * the Morning Paper's, for asking each tool for its summary; the Paper is gone.
+ * comes from GitHub's deployment statuses instead. `INTERNAL_API_SECRET` served
+ * apps that are now retired.
  */
 export const HOME_ENV_RETIRED: { name: string; affects: string; why: string }[] = [
   {
@@ -181,6 +161,6 @@ export const HOME_ENV_RETIRED: { name: string; affects: string; why: string }[] 
   {
     name: "INTERNAL_API_SECRET",
     affects: "Home",
-    why: "still set, and nothing on home reads it since the Morning Paper went. Unlink the shared variable from tp-home only — the tracker and editor still use it.",
+    why: "still set, and nothing reads it. Delete the shared variable.",
   },
 ];

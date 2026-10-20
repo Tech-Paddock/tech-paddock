@@ -30,8 +30,6 @@ const real = (app) => {
     .replace(/export async function proxy\(/, "export async function middleware(");
 };
 const BASE = real("home");
-const EDITOR = real("editor");
-const TRACKER = real("tracker");
 // Exactly what `npx @next/codemod middleware-to-proxy` did on the spike branch.
 const asProxy = (src) => src.replace(/export async function middleware\(/, "export async function proxy(");
 
@@ -149,24 +147,19 @@ test("the function rename is the only thing normalised", () => {
 const shape = (roster) => gateShape(roster.map(([a, dir]) => [a, gateHash(dir)]));
 const STANDARD = () => [
   ["coffee", app({ files: { "middleware.ts": BASE } })],
-  ["editor", app({ files: { "middleware.ts": EDITOR } })],
-  ["tracker", app({ files: { "middleware.ts": TRACKER } })],
+  ["home", app({ files: { "middleware.ts": BASE } })],
 ];
 
-test("today's shape passes: a base copy plus editor's and tracker's", () => {
-  const r = shape([...STANDARD(), ["home", app({ files: { "middleware.ts": BASE } })]]);
+test("today's shape passes: every app on the one gate", () => {
+  const r = shape(STANDARD());
   assert.equal(r.state, "ok", r.detail);
-  assert.match(r.detail, /2 on the base copy/);
+  assert.match(r.detail, /2 on the one gate/);
 });
 
-test("a migrated app stays in the base group, and a migrated editor keeps its own variant", () => {
-  const r = shape([
-    ...STANDARD().filter(([a]) => a !== "editor"),
-    ["resume", app({ ...NEXT16, files: { "proxy.ts": asProxy(BASE) } })],
-    ["editor", app({ ...NEXT16, files: { "proxy.ts": asProxy(EDITOR) } })],
-  ]);
+test("a migrated app stays in the same group", () => {
+  const r = shape([...STANDARD(), ["resume", app({ ...NEXT16, files: { "proxy.ts": asProxy(BASE) } })]]);
   assert.equal(r.state, "ok", r.detail);
-  assert.match(r.detail, /coffee\+resume \| editor \| tracker/);
+  assert.match(r.detail, /coffee\+home\+resume/);
 });
 
 test("an app whose gate file cannot be read fails instead of dropping out", () => {
@@ -184,16 +177,11 @@ test("an app whose gate file cannot be read fails instead of dropping out", () =
   }
 });
 
-test("a fourth variant, a shared bypass, and no base copy each fail", () => {
-  const fourth = shape([...STANDARD(), ["health", app({ files: { "middleware.ts": BASE + "\n// changed\n" } })]]);
-  assert.equal(fourth.state, "fail");
-  assert.match(fourth.detail, /a fourth version/);
+test("a second version of the gate fails, and no gated app warns", () => {
+  const second = shape([...STANDARD(), ["health", app({ files: { "middleware.ts": BASE + "\n// changed\n" } })]]);
+  assert.equal(second.state, "fail");
+  assert.match(second.detail, /more than one version/);
+  assert.match(second.detail, /health/);
 
-  const shared = shape([...STANDARD(), ["coffee2", app({ files: { "middleware.ts": EDITOR } })]]);
-  assert.equal(shared.state, "fail");
-  assert.match(shared.detail, /must each have a variant of their own/);
-
-  const none = shape(STANDARD().filter(([a]) => a !== "coffee"));
-  assert.equal(none.state, "fail");
-  assert.match(none.detail, /nothing is running the base copy/);
+  assert.equal(shape([]).state, "warn");
 });

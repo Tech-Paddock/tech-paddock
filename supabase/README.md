@@ -1,7 +1,7 @@
 # Supabase
 
 One project (`qyclakzsupyxgnqfgpiq`, `tech-paddock`) backs every app. Each tool has its own schema —
-`shared`, `editor`, `tracker`, `resume`, `coffee`, `health`, `cookbook` — never `public`. One
+`resume`, `coffee`, `health`, `cookbook` — never `public`. One
 migration history, here at the repo root.
 
 ## History
@@ -26,8 +26,7 @@ added.** It is real contacts, and the no-personal-information rule applies to mi
 - `supabase migration list` always shows it remote-only. **It must be the only difference**, apart
   from a migration awaiting merge. Anything else is drift; investigate it.
 - **Never run `supabase migration repair` on it.**
-- A rebuild from these files produces production's schema and table grants with an empty
-  `shared.contacts`. Replay as `postgres` (the default privileges are its). Seeding is off in
+- A rebuild from these files produces production's schema and table grants. Replay as `postgres` (the default privileges are its). Seeding is off in
   `config.toml`. A rebuild cannot restore the dashboard's exposed-schemas list (below).
 
 ## Working with it
@@ -77,54 +76,6 @@ after it, so existing tables also need `GRANT ... ON ALL TABLES`.
 
 **Checking exposure without the dashboard:** `postgrest_logs` reports the relation count on each
 reload; a 200 for the schema in `edge_logs`; or the app's `/api/health`, which probes a real table.
-
-## `shared.contacts` — write contract
-
-Shared by two apps, so these rules change only as a cross-schema contract.
-
-| | Who | What the code does |
-|---|---|---|
-| **Insert** | Message Editor only — `POST /api/contacts` | `name` required; `org`, `position`, `relationship_type`, `preferred_channel`, `notes` optional, null when absent |
-| **Update** | Message Editor only — `PATCH /api/contacts/[id]` | Writes the request body as sent, plus `updated_at`. No column allowlist. No UI calls it |
-| **Delete** | Message Editor only — `DELETE /api/contacts/[id]` | Hard delete. No UI calls it |
-| **Read** | Editor (`/api/contacts`, `/api/draft`); Tracker (`/api/contacts`, thread draft, `lib/followUpTask.ts`, `lib/dashboard.ts`) | Read-only |
-| **Reference** | `editor.message_history.contact_id`, `tracker.pipeline_threads.contact_id` | Foreign keys, `ON DELETE NO ACTION` |
-
-- **Nothing prevents duplicates.** Primary key only; no unique index or trigger. The editor inserts
-  without checking or trimming. Adding a unique key is a decision, not a fix.
-- **A referenced contact cannot be deleted:** both foreign keys are `NO ACTION`, so the route
-  returns 500.
-- **`updated_at` moves only through the editor's PATCH;** there is no trigger.
-- **The tracker and Resume Formatter never write this table;** they only store or pass `contact_id`.
-- **The only create path is in the parked editor;** production runs its last good build.
-- **A new write path anywhere changes this contract:** it goes to the owner through the TD, and this
-  section changes in the same pull request.
-
-## `tracker.pipeline_threads` — write contract
-
-Owned by the Pipeline Tracker (parked; rules in `apps/home/RULES.md`), also written by the Resume
-Formatter.
-
-| | Who | What the code does |
-|---|---|---|
-| **Insert** | Tracker — `POST /api/threads` | `company` unvalidated (a missing one is a 500); `stage` defaults to `Applied`, `last_touch_date` to today in UTC; `contact_id`, `next_action`, `notes` null when absent |
-| **Insert** | Resume — `PATCH /api/renders/[id]` with a company and no thread yet | `company`, `stage` `Applied`, `last_touch_date`, `next_action` `Follow up`, `notes` "*date* — resume sent" plus role and posting URL, `contact_id` (the UI never sends one) |
-| **Update** | Tracker — `PATCH /api/threads/[id]` | The request body as sent, plus `open_task_id = null` and `updated_at`. No column allowlist |
-| **Update** | Tracker — `lib/followUpTask.ts` | `open_task_id` only, after the To Do task exists |
-| **Update** | Resume — `PATCH /api/renders/[id]` on an existing thread (the render's, or one named in the body) | `company`, `last_touch_date`, `notes` (appended), `open_task_id = null`, `updated_at`, and `contact_id` only when sent |
-| **Delete** | Tracker — `DELETE /api/threads/[id]` | Hard delete; the renders that pointed at it keep their rows with `thread_id` null |
-| **Read** | Tracker (`/api/threads`, thread draft, dashboard, follow-up task); Resume (`/api/renders`, `/api/resumes`: `id, company, stage`) | Read-only |
-| **Reference** | `resume.renders.thread_id`, across schemas | Foreign key, `ON DELETE SET NULL`; `contact_id` → `shared.contacts`, `NO ACTION` |
-
-- **Resume's write-through is not atomic.** It writes the thread, then links the render; a failed
-  link plus a retry creates a second thread. The notes merge is read-then-write, so a concurrent
-  tracker edit is lost.
-- **`stage` has a check constraint and no default;** every writer sets it. **`updated_at` has no
-  trigger;** it moves on the two PATCH paths only, and nothing reads it.
-- **The tracker reads `editor.message_history`, `resume.renders` and `resume.templates`** for its
-  dashboard (`lib/dashboard.ts`). Changing those columns changes this contract.
-- **A new write path anywhere changes this contract:** it goes to the owner through the TD, and this
-  section changes in the same pull request.
 
 ## Grants and RLS
 

@@ -14,4 +14,3 @@
 - **A push with a pull request open runs `gate` twice;** merge is refused until the second passes.
 - **Vercel aliases the build that finishes last.** After two merges to one app, confirm the newest
   commit is live.
-- **Parked apps' Vercel checks are red on `main`.** Ignore them.
