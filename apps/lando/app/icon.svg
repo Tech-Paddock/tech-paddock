@@ -1,14 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Lando">
   <!-- Lando, a chocolate-dapple miniature dachshund puppy, in a racing helmet
-       with the visor up. Drawn by hand as vector shapes; no photo is traced
-       or embedded (RULES.md, Never 2). The helmet and tile are the mcl39
-       livery's, copied from lib/theme.css: anthracite #121316, papaya
-       #FF8000, burnt papaya #A84200. The dog keeps his own colours:
-       chocolate, white and tan, a liver nose and amber eyes. Inspired by the
-       livery; no real team mark, number or sponsor. favicon.ico,
-       apple-touch-icon.png and the manifest PNGs are drawn from this file;
-       apple-touch-icon.png is full-bleed (rx 0), since iOS rounds the corners
-       itself. -->
+       with the visor down: smoked anthracite, still see-through. Drawn by
+       hand as vector shapes; no photo is traced or embedded (RULES.md,
+       Never 2). The helmet and tile are the mcl39 livery's, copied from
+       lib/theme.css: anthracite #121316, papaya #FF8000, burnt papaya
+       #A84200. The dog keeps his own colours: chocolate, white and tan, a
+       liver nose and amber eyes. Inspired by the livery; no real team mark,
+       number or sponsor. favicon.ico, apple-touch-icon.png and the manifest
+       PNGs are drawn from this file; apple-touch-icon.png is full-bleed
+       (rx 0), since iOS rounds the corners itself. The 16px favicon frame is
+       this file with the visor tint at 0.22 and without the highlight streak
+       and papaya reflection, so the face still reads at that size. -->
   <defs>
     <clipPath id="face">
       <path d="M256 214 C334 214 366 270 366 330 C366 400 318 446 256 446 C194 446 146 400 146 330 C146 270 178 214 256 214 Z"/>
@@ -65,8 +67,15 @@
   </g>
   <!-- rim round the face opening -->
   <path d="M150 392 C146 372 144 352 144 330 C144 262 182 222 256 222 C330 222 368 262 368 330 C368 352 366 372 362 392" stroke="#A84200" stroke-width="8" fill="none"/>
-  <!-- raised visor across the crown, with its pivots -->
-  <path d="M100 196 C150 120 362 120 412 196 L398 230 C344 168 168 168 114 230 Z" fill="#121316"/>
+  <!-- visor down over the face: smoked anthracite, still see-through, so
+       his eyes, blaze, eyebrow dots and nose read through it -->
+  <path d="M112 262 C120 206 178 196 256 196 C334 196 392 206 400 262 L396 334 C390 384 340 410 256 410 C172 410 122 384 116 334 Z" fill="#121316" fill-opacity="0.35"/>
+  <path d="M112 262 C120 206 178 196 256 196 C334 196 392 206 400 262 L396 334 C390 384 340 410 256 410 C172 410 122 384 116 334 Z" fill="none" stroke="#121316" stroke-width="8"/>
+  <!-- highlight streak across the top of the visor -->
+  <path d="M146 236 C178 212 334 212 366 236 C334 224 178 224 146 236 Z" fill="#FFFFFF" fill-opacity="0.55"/>
+  <!-- faint papaya reflection at the right edge -->
+  <path d="M384 270 C386 306 382 340 368 368" stroke="#FF8000" stroke-opacity="0.6" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <!-- visor pivots -->
   <circle cx="104" cy="262" r="16" fill="#121316"/>
   <circle cx="408" cy="262" r="16" fill="#121316"/>
 </svg>

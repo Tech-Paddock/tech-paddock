@@ -9,14 +9,17 @@
   does not probe `/api/health`.
 - Livery `mcl39` (McLaren '25: papaya on anthracite), worn by Lando alone. The theme files carry
   it because this branch merged `claude/home-papaya-livery`.
-- The icon is Lando in a racing helmet, visor up (`app/icon.svg`, concept A, the owner's pick). It
-  is a hand-drawn vector of the real dog: a chocolate-dapple and white miniature dachshund with a
+- The icon is Lando in a racing helmet, visor down (`app/icon.svg`, concept A, the owner's pick).
+  The visor is smoked anthracite at 0.35 opacity with a highlight streak and a faint papaya
+  reflection, so his face reads through it. It is a hand-drawn vector of the real dog: a chocolate-dapple and white miniature dachshund with a
   white blaze, chocolate over both eyes, tan eyebrow dots and cheeks, amber eyes, a liver nose and
   long speckled ears hanging below the helmet. The helmet and tile are the mcl39 colours copied
   from `lib/theme.css`; the dog keeps his own. It is inspired by the livery: no team mark,
   wordmark, number or sponsor. `favicon.ico` (16, 32, 48, RGBA PNG frames),
   `apple-touch-icon.png` (180, full-bleed, opaque) and `manifest-192/512.png` (rounded, RGBA) are
-  rendered from it; re-render all four when it changes.
+  rendered from it; re-render all four when it changes. The favicon's 16px frame alone is drawn
+  from a variant: visor tint 0.22, no streak or reflection, since at 0.35 the face greys out at
+  16px. The SVG's header comment says so; keep that frame lighter on any redraw.
 - A web app manifest at `/app.webmanifest` (a route, `app/app.webmanifest/route.ts`) for Chrome's
   install. No other app has one.
 
