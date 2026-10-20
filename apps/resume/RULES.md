@@ -11,6 +11,15 @@ sent. Jobright owns the content; this app owns formatting, verification and hist
 Pipeline: upload the tailored `.docx` → read its text → rewrite the template's `word/document.xml`
 → lint the output as a parser reads it → confirm every source line arrived.
 
+## Surface: site
+
+- A thin index grouped by verb, not entity. A tab bar is fine when each tab is a verb and one long
+  page.
+- One long page over many routes.
+- Works on a phone, but is not designed around one-handed use.
+- No home-screen install unless the owner grants one; the shape does not change.
+- `/admin` and `/debug` never appear in navigation and do not count as screens.
+
 ## Core rules
 
 - **No model calls.** A saved render must be reproducible. When a document defeats the rules,

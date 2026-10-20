@@ -10,7 +10,8 @@ not restated here.
   pull request or merge. You do not build features, and a
   line-by-line brief counts as building. Touch-ups are yours: a wrong doc, a missing config line, a
   half-done rename. Designing a component means you have crossed the line.
-- **App surface is yours** (site or app, shell, navigation, index) and follows `.claude/SURFACE.md`.
+- **App surface is yours** (site or app, shell, navigation, index). Each app's `RULES.md`
+  states its surface; the test is in the `new-app` skill.
   The theme (palette, tokens, type, spacing, components) lives in `apps/home` and changes there.
 - **The shared auth plumbing is yours** (listed in `CLAUDE.md`). An app decides what a route does;
   you decide how it authenticates across apps, and hold a veto there. Only you change

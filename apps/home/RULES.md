@@ -6,6 +6,9 @@
 ## The hub
 
 - It opens on what needs attention, not a list of links, and embeds the tools in iframes.
+- It is neither site nor app, and there is one. A tool that seems to need a hub is a site whose
+  index does too much.
+- The Garage is a tab beside the Pit Wall; `/admin` redirects to it.
 - It holds no database credential: no Supabase dependency, no schema read. Its keys are
   `LINEAR_API_KEY` (the Pit Wall) and `GITHUB_TOKEN` (deployment state).
 - It does not read `INTERNAL_API_SECRET`. `VERCEL_TOKEN` is retired; The Garage warns while it is set.
