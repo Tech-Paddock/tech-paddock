@@ -36,7 +36,7 @@ type Status = {
 
 type Store = { locationId: string; name: string; address: string };
 
-/** What Joel has decided for one line in the review. */
+/** What the user has decided for one line in the review. */
 type Choice = { include: boolean; url: string };
 
 const CALLBACK_WORDS: Record<string, string> = {
@@ -213,7 +213,7 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
       if (!response.ok) throw new Error(body.error ?? "Couldn't get the list ready.");
       const lines = body.lines as ReviewLine[];
       setReview(lines);
-      // **Exact products start ticked; a match waits for Joel's tap** (RULES.md).
+      // **Exact products start ticked; a match waits for a tap** (RULES.md).
       // A line already sent starts unticked, whatever it is.
       setChoices(
         Object.fromEntries(

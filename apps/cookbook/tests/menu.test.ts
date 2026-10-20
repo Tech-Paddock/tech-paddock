@@ -5,7 +5,7 @@ import { localToday, menuDayLabel, parseDay } from "@/lib/menuDay";
 
 /**
  * On the menu (TEC-39 C), with a day each (2026-10-05): picked when the
- * ingredients go to the list, shown as "Tue 10/7", and cleared only by Joel.
+ * ingredients go to the list, shown as "Tue 10/7", and cleared only by hand.
  */
 describe("the menu's day", () => {
   it("reads a real calendar day and nothing else", () => {
@@ -19,7 +19,7 @@ describe("the menu's day", () => {
     expect(parseDay(20261007)).toBeNull();
   });
 
-  it("is labelled in Joel's format, on the day it names wherever the browser is", () => {
+  it("is labelled in the agreed format, on the day it names wherever the browser is", () => {
     // 2026-10-07 is a Wednesday. Built at UTC midnight it would read Tuesday the
     // 6th in Denver; the label must not move it.
     expect(menuDayLabel("2026-10-07")).toBe("Wed 10/7");

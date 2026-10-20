@@ -4,7 +4,7 @@
  * **No imports**, because the browser runs it: the list tab asks this once per
  * open and, when it says yes, starts a refresh in the background without
  * waiting on it. No cron, so this is the only thing that makes a refresh
- * happen on its own — and it only happens when Joel looks.
+ * happen on its own — and it only happens when the list is opened.
  */
 
 export const REFRESH_EVERY_MS = 7 * 24 * 60 * 60 * 1000;

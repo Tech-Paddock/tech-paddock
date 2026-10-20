@@ -73,7 +73,7 @@ describe("macro-derived filters are computed, never tagged", () => {
   });
 });
 
-describe("the rating is Joel's", () => {
+describe("the rating is the user's", () => {
   it("is thrown away off a model, whatever it says", () => {
     expect(readMeta({ rating: 5 }, { rating: false }).rating).toBeNull();
   });

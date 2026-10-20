@@ -23,10 +23,10 @@ export const dynamic = "force-dynamic";
 
 /**
  * Send to cart (TEC-90). **No model call on either verb**: Kroger's own search
- * picks the top match, and Joel confirms it.
+ * picks the top match, and the user confirms it.
  *
  * GET is the review — every open line with what it would become. POST is the
- * send — the lines Joel chose, each reported added, skipped or failed.
+ * send — the lines the user chose, each reported added, skipped or failed.
  * **No token in either body**; `tests/kroger.test.ts` reads both for one.
  */
 
