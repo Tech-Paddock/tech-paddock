@@ -1,7 +1,7 @@
 import type { Column, PitIssue } from "./linear";
 
 /**
- * How the Pit Wall arranges its issues — by status, or by app. Joel's toggle.
+ * How the Pit Wall arranges its issues — by status, or by app, behind one toggle.
  *
  * Its own module, and free of anything that fetches, because the toggle runs in
  * the browser over issues already on the page: switching it must never mean

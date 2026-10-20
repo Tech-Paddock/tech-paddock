@@ -1,6 +1,6 @@
 # Home — notes
 
-State as of 2026-10-18.
+State as of 2026-10-20.
 
 Read `RULES.md` first. Open work is in Linear, label `app:home` — never here.
 
@@ -15,7 +15,7 @@ Linear, GitHub and each probe afresh (TEC-114). `/` awaits `searchParams`, the l
 **Home is two tabs: the Pit Wall, the landing, and The Garage** (`/?tab=garage`; `/admin`
 redirects there). The id `board` stays, so `/?tab=board` lives. Each tab loads its own data in its
 own Suspense boundary, and `?app=` renders a tool's frame without loading either. **The Morning
-Paper and the glance are gone** (Joel, 2026-09-26), so home asks no tool for `/api/summary`.
+Paper and the glance are gone** (TEC-83, 2026-09-26), so home asks no tool for `/api/summary`.
 
 **The Pit Wall is Linear's open issues, team TEC** (TEC-83), read server-side through
 `LINEAR_API_KEY` (`lib/linear.ts`). A card shows the id, title, agent, priority and **the first
@@ -43,7 +43,7 @@ frame (below). `lib/theme.css` holds every token; `lib/livery.ts` differs per ap
 The control is on every live app's bar, home's topbar included; tracker and editor carry the route
 and mount none. `lib/logout.ts` clears the shared cookie, so it is the TD's, not the theme's.
 
-**The tracker is parked** (Joel, 2026-09-24). Its state and findings are on TEC-36; do no tracker
+**The tracker is parked** (2026-09-24). Its state and findings are on TEC-36; do no tracker
 work. It stays in `PARKED`, probed and grey. Its `/api/summary` has no reader since the glance went.
 
 ## Traps specific to this app
@@ -72,9 +72,9 @@ work. It stays in `PARKED`, probed and grey. Its `/api/summary` has no reader si
   `LogoutControl` hides framed too (`.pd-logout`), so only home's logs out of a home page.
 - **`LogoutControl` goes to `/login` only on a 2xx or a 401** (the gate file's answer without a
   valid session); anything else shows as a failure, never `/login` while still signed in.
-- **`TOOLS` in `lib/platform.ts` is the only list of embedded tools, and its order is Joel's** — it
-  drives the sidebar and the `?app=` frame. `PROBED` adds the parked ones. **Never key anything off
+- **`TOOLS` in `lib/platform.ts` is the only list of embedded tools, and its order is deliberate** —
+  changing it is Joel's call. It drives the sidebar and the `?app=` frame. `PROBED` adds the parked ones. **Never key anything off
   a slug literal.**
 - **Drift's JSON shape is the TD's**; `scripts/drift-parse.mjs` renders no partial read, and a
   renamed check family loses its sentence silently until the check emits `explain` itself.
-- **"Hub" stays in stamped comments and `proxy.ts`**: TEC-85 went docs only (Joel, 2026-10-18).
+- **"Hub" stays in stamped comments and `proxy.ts`**: TEC-85 went docs only (2026-10-18).

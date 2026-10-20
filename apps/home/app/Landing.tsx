@@ -15,7 +15,7 @@ import type { ReactNode } from "react";
  * page. A frame renders at once, and each tab's data loads inside its own
  * Suspense boundary (`(shell)/page.tsx`), so a tab only waits for what it shows.
  *
- * **The Pit Wall is the landing** (Joel, 2026-09-26), so an absent `?tab=`
+ * **The Pit Wall is the landing** (2026-09-26), so an absent `?tab=`
  * means the Pit Wall. The Garage is the other tab; it replaced the Morning
  * Paper, and `/admin` redirects to it.
  *
