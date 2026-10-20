@@ -138,8 +138,7 @@ export function blankBrew(): BrewDraft {
  * Ratio and water are two views of one decision, and the dose turns each into
  * the other: water = dose x ratio.
  *
- * **Both round to whole numbers**, on Joel's instruction of 2026-09-20:
- * *"Whole numbers only for recipe."* Water because that is what a kettle and
+ * **Both round to whole numbers** (2026-09-20). Water because that is what a kettle and
  * a scale resolve, and the ratio because 1:17 is what you brew to and
  * 1:16.9 is a description of what the scale happened to say. Editing one
  * field and then the other can therefore move the water by a few grams,

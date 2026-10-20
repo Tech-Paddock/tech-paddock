@@ -123,8 +123,8 @@ instructions came from a different page on the same site.`;
  *
  * **Nothing is pinned up front.** Until 2026-09-22 a roaster whose domain a
  * previous search had verified had `allowed_domains` set on the search from
- * the start. Joel ended it — *"we should not be prepining any roaster info"* —
- * and the measurement behind that is in the row history: the first Sweet Bloom
+ * the start. That ended because no roaster information is pinned ahead of a
+ * search, and the measurement behind it is in the row history: the first Sweet Bloom
  * bag searched unpinned and came back tier 1 with four quotes, the second
  * searched pinned and came back `none`, with no code change in between.
  *
@@ -136,14 +136,13 @@ instructions came from a different page on the same site.`;
  * is now the whole of the constraint**, which is what it was for every first
  * search this app has ever run — including the one that worked.
  *
- * **A product URL the bag already holds is handed over instead.** Joel,
- * 2026-09-22: *"Refresh should refer product url."* Naming it in the message is
- * what makes it fetchable, for the same reason above. It is read off the row by
- * the route rather than supplied by the caller, and there is one message either
- * way — *"Research is a trigger"*, not a second kind of search. If the page is
- * gone the model searches as it otherwise would — *"I'm fine if the url fails
- * because they've moved or removed their beans"* — so a stale link costs one
- * fetch and never becomes a dead end the bag cannot recover from.
+ * **A product URL the bag already holds is handed over instead** (2026-09-22).
+ * Naming it in the message is what makes it fetchable, for the same reason
+ * above. It is read off the row by the route rather than supplied by the
+ * caller, and there is one message either way — searching again is a trigger,
+ * not a second kind of search. If the page is gone, because the roaster moved
+ * or removed the coffee, the model searches as it otherwise would, so a stale
+ * link costs one fetch and never becomes a dead end the bag cannot recover from.
  */
 export async function searchBrewGuide(params: {
   roaster: string;
@@ -169,7 +168,7 @@ export async function searchBrewGuide(params: {
   // One message, whether or not a product page is known. The URL is a fact
   // about the bag that is present or absent, not a second mode of searching:
   // a prompt that branched would make a re-search a different process from the
-  // first search, which is the thing Joel ruled out on 2026-09-22.
+  // first search, which is the thing ruled out on 2026-09-22.
   const messages: Anthropic.MessageParam[] = [
     {
       role: "user",
@@ -424,9 +423,9 @@ export const METHOD_VOCABULARY = BREW_METHODS;
 
 /**
  * Reading a label is transcription; retrieving a guide is retrieval; this is
- * the only call in the app that is asked for a judgement. Sonnet 5 is Joel's
- * choice, made on 2026-09-19 when he asked for the feature, and it is fixed
- * rather than selectable: the search offers a model picker because which model
+ * the only call in the app that is asked for a judgement. It runs on Sonnet 5,
+ * set when the feature was added on 2026-09-19, and it is fixed rather than
+ * selectable: the search offers a model picker because which model
  * *retrieves* well enough is an open question with a right answer somewhere.
  * There is no comparable right answer here, so a dial would only produce
  * suggestions that are not comparable with each other.

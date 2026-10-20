@@ -16,8 +16,8 @@
  * - **what a copy-out becomes** — a `RawGuide` that goes through
  *   `validateGuide` like any other, with the text read off the image as the
  *   quote, the **page** as the quote's URL, and the image stored beside it;
- * - **which recipe is stored** — filter or batch over espresso (Joel,
- *   2026-09-25: *"Always prefer filter/batch over espresso."*). The one not
+ * - **which recipe is stored** — always filter or batch over espresso
+ *   (2026-09-25). The one not
  *   chosen is not a dropped value: it was not chosen, and it is not a failure;
  * - **which answer the bag keeps** — the image's or the text search's.
  *

@@ -8,9 +8,9 @@
  * `validateGuide` still drops every unbacked parameter, a bag with no guide
  * still reads **No Recipe Found**, and nothing here can write a guide column.
  *
- * What changed is that a `none` no longer has to be the end of it. Joel asked
- * for a suggestion in that case on 2026-09-19, having been asked twice what
- * should happen and where it should live. The answer this file encodes:
+ * What changed is that a `none` no longer has to be the end of it: since
+ * 2026-09-19 that case gets a suggestion. Where it lives and how it is kept
+ * apart is what this file encodes:
  *
  * - **Its own column.** `suggested_recipe`, never `guide_*`. "What did the
  *   roaster say" stays answerable by reading `guide_*` alone, which is the

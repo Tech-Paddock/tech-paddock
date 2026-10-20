@@ -56,11 +56,11 @@ export async function POST(request: NextRequest) {
   // "still working" from "never started" — and read the product page off the
   // row in the same round trip.
   //
-  // **Off the row, never off the request.** Joel, 2026-09-22: *"Research
-  // should just kick off the original search not be a unique process.
-  // Research is a trigger."* A caller that could hand in a product URL is a
-  // caller that can make its search different from the scan screen's, which is
-  // exactly the divergence that wording rules out. What the search does now
+  // **Off the row, never off the request.** Searching again is a trigger for
+  // the original search, not a separate process (2026-09-22). A caller that
+  // could hand in a product URL is a caller that can make its search different
+  // from the scan screen's, which is exactly the divergence that rules out.
+  // What the search does now
   // depends on what the bag knows, not on which button started it — a fresh
   // bag has no product URL because nothing has found one yet, and a bag that
   // has been searched before does.
@@ -103,8 +103,8 @@ export async function POST(request: NextRequest) {
     // The result lands in the row, not in this response. That is the whole
     // point: by now the page that asked for it may be long gone.
     //
-    // Written whatever else happened meanwhile — Joel, 2026-09-24: searching
-    // again keeps only the freshest result, even when it finds less. A `none`
+    // Written whatever else happened meanwhile: searching again keeps only
+    // the freshest result, even when it finds less (2026-09-24). A `none`
     // recorded despite a tool failure carries that failure as its warning in
     // `guide_search_error`, beside the answer rather than instead of it; a
     // clean run clears whatever an earlier run left there.

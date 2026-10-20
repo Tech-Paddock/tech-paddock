@@ -14,8 +14,7 @@
  * Three things follow, and all three are the point:
  *
  * **An empty purchase date is an error, and the error says which field.**
- * Joel's call on 2026-09-19, after seeing the first fix: *"Error should say
- * purchase date required."* The first fix treated an untouched form as
+ * Settled on 2026-09-19, after the first fix. The first fix treated an untouched form as
  * nothing to do, which is true of the request and useless to the person —
  * **a bag is a purchase, and a purchase without a date is not one.** Saying
  * so beats silently closing the panel, and it beats "Couldn't save that bag"
