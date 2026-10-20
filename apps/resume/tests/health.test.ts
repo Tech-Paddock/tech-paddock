@@ -16,10 +16,9 @@ describe("GET /api/health", () => {
   it("reports healthy when every dependency answers", async () => {
     const { client } = fakeSupabase({
       "templates.select": { data: { name: "template.docx", version: 3 }, error: null },
-      "pipeline_threads.select": { data: [], error: null },
     });
     const withBucket = withStorage(client, null);
-    mockModules({ resume: withBucket, tracker: withBucket });
+    mockModules({ resume: withBucket });
 
     const { GET } = await import("../app/api/health/route");
     const res = await GET();
@@ -33,10 +32,9 @@ describe("GET /api/health", () => {
   it("names the failing dependency instead of a generic error", async () => {
     const { client } = fakeSupabase({
       "templates.select": { data: null, error: { message: "permission denied for schema resume" } },
-      "pipeline_threads.select": { data: [], error: null },
     });
     const withBucket = withStorage(client, null);
-    mockModules({ resume: withBucket, tracker: withBucket });
+    mockModules({ resume: withBucket });
 
     const { GET } = await import("../app/api/health/route");
     const res = await GET();
@@ -52,10 +50,9 @@ describe("GET /api/health", () => {
   it("stays healthy with no template set — that is setup, not breakage", async () => {
     const { client } = fakeSupabase({
       "templates.select": { data: null, error: null },
-      "pipeline_threads.select": { data: [], error: null },
     });
     const withBucket = withStorage(client, null);
-    mockModules({ resume: withBucket, tracker: withBucket });
+    mockModules({ resume: withBucket });
 
     const { GET } = await import("../app/api/health/route");
     const res = await GET();
@@ -69,14 +66,29 @@ describe("GET /api/health", () => {
   it("fails when the storage bucket is unreachable", async () => {
     const { client } = fakeSupabase({
       "templates.select": { data: { name: "t", version: 1 }, error: null },
-      "pipeline_threads.select": { data: [], error: null },
     });
     const withBucket = withStorage(client, { message: "Bucket not found" });
-    mockModules({ resume: withBucket, tracker: withBucket });
+    mockModules({ resume: withBucket });
 
     const { GET } = await import("../app/api/health/route");
     const res = await GET();
     expect(res.status).toBe(503);
     expect((await res.json()).checks.find((c: { name: string }) => c.name === "storage").detail).toBe("Bucket not found");
+  });
+
+  /** The Pipeline Tracker was retired on 2026-10-20; its schema is being dropped. */
+  it("probes only what this app uses, and never the tracker schema", async () => {
+    const { client, calls } = fakeSupabase({
+      "templates.select": { data: { name: "t", version: 1 }, error: null },
+    });
+    mockModules({ resume: withStorage(client, null) });
+
+    const { GET } = await import("../app/api/health/route");
+    const res = await GET();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.checks.map((c: { name: string }) => c.name)).toEqual(["database", "storage", "active_template"]);
+    expect(calls.map((c) => c.table)).not.toContain("pipeline_threads");
   });
 });

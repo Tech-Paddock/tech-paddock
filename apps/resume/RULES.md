@@ -5,13 +5,11 @@ Scope: `apps/resume` (`resume.techpaddock.io`) and the `resume` schema. State an
 
 ## Purpose
 
-Pour a Jobright-tailored resume's text into the template, check the result, and record the
-submission. Jobright owns the content; this app owns formatting, verification, history and the
-application record.
+Pour a Jobright-tailored resume's text into the template, check the result, and record when it was
+sent. Jobright owns the content; this app owns formatting, verification and history.
 
 Pipeline: upload the tailored `.docx` → read its text → rewrite the template's `word/document.xml`
-→ lint the output as a parser reads it → confirm every source line arrived → record the
-submission against its Pipeline Tracker thread.
+→ lint the output as a parser reads it → confirm every source line arrived.
 
 ## Core rules
 
@@ -70,12 +68,10 @@ Schema `resume`. Columns are in the migrations under `supabase/`; never put a mi
   render's `template_snapshot` records engine, template id, version and sha256.
 - The original template bytes are kept and served by `GET /api/templates/[id]/file`, archived or
   not; the template is also the general-purpose resume.
-- **Renders** delete one at a time with both stored files. No cascade, no bulk delete. A render's
-  tracker thread is never touched; it is the application record.
+- **Renders** delete one at a time with both stored files. No cascade, no bulk delete.
 - **Append-only artifacts:** parsed content, coverage and the rendered file never change.
   `GET /api/renders/[id]/file` returns stored bytes, never a re-render. Application metadata stays
   editable; `submitted_at` stays null until the resume is sent.
-- Job details live on the tracker thread, never here.
 - **Storage:** private bucket `resume-files`, under `templates/`, `sources/`, `renders/`. Write the
   file before the row that points at it.
 
@@ -119,13 +115,11 @@ Schema `resume`. Columns are in the migrations under `supabase/`; never put a mi
 - Fixtures: `template-sample.docx` carries two blocking findings on purpose (a second table and a
   `<w:sdt>`); `tests/reformat-route.test.ts` asserts they survive. Use `template-flat-sample.docx`
   unless a test needs a defect.
-- `GET /api/health` probes database, bucket, tracker schema and active template. A missing
+- `GET /api/health` probes database, bucket and active template. A missing
   template reports not-ok at status 200.
 
 ## Boundaries
 
-- Never touch the shared auth plumbing, another app, or any schema but `resume`, except the
-  write-through into `tracker.pipeline_threads` (contract in `supabase/README.md`), which runs
-  though the tracker app is parked.
+- Never touch the shared auth plumbing, another app, or any schema but `resume`.
 - Never commit personal information. In a `.docx` that includes `.rels` targets and `docProps/`.
   Committed fixtures are scrubbed, with synthetic substitutes.
