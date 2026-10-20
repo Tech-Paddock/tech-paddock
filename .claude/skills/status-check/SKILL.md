@@ -1,6 +1,6 @@
 ---
 name: status-check
-description: Report what is in flight — open branches, uncommitted or unpushed work, items blocking work, and hot topics. Read-only. The owner types /status-check.
+description: Report what is in flight — open branches, uncommitted or unpushed work, items blocking work, hot topics — and whether this chat can be archived. Read-only. The owner types /status-check.
 disable-model-invocation: true
 ---
 
@@ -19,6 +19,10 @@ Read-only: no branch, commit, push, pull request or Linear, Vercel or Supabase w
    being blocked.
 4. **Hot topics:** CI and `drift` on `main`; issues In Progress or In Review; anything updated in
    the last 24 hours; any production deployment not `READY`.
+5. **This chat:** what archiving it would lose. Blockers: a running subagent; uncommitted or
+   unpushed work it made; a pull request it is subscribed to or a check-in it scheduled; a
+   question to the owner it is waiting on; a decision or request reached here that is in no
+   commit, `NOTES.md` or Linear issue.
 
 ## Report
 
@@ -39,4 +43,10 @@ Open branches
 
 Hot topics
 - main CI: … · drift: … · TEC-n in progress (title)
+
+Archive this chat
+- Safe to archive now.  |  Not yet: what is lost, and what clears it
 ```
+
+A decision that lives only in this chat is fixed by writing it down (a Linear issue or
+`NOTES.md`), not by keeping the chat.
