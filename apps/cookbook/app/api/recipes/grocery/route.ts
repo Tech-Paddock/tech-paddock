@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 /**
  * Put a recipe's ingredients on the shopping list — and the recipe on the menu.
  *
- * This is the half of Joel's original ask that had to wait for the book —
- * *"create a grocery list from recipes or random items I add"* — and it is why
+ * This is the half of the original ask that had to wait for the book — a
+ * grocery list built from recipes as well as from items added by hand — and it is why
  * `grocery_items.source` has an enum value called `recipe`. **This is its
  * writer**, and each line now carries the recipe's name (TEC-39 B).
  *

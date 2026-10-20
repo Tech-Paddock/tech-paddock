@@ -19,7 +19,7 @@ import { NO_FILTER, cuisinesIn, filterActive, matchesFilter, type BookFilter } f
  * The book: On the menu beside it, every kept recipe in it, and what you can do
  * to one — price helpings, add it to the list for a day, rate, edit, remove.
  *
- * **Adding one is the Add tab's** (`AddRecipe.tsx`, Joel, 2026-10-05). The two
+ * **Adding one is the Add tab's** (`AddRecipe.tsx`, 2026-10-05). The two
  * stay mounted side by side, so a recipe kept there reaches this one through
  * `version` rather than through shared state.
  */
@@ -190,14 +190,14 @@ export default function Book({
     <div className="flex flex-col gap-8">
 
       {/* On the menu, then the book: stacked on a phone, side by side on a wide
-          screen with the menu on the left (Joel, 2026-09-24, TEC-39 C). */}
+          screen with the menu on the left (TEC-39 C, 2026-09-24). */}
       <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start lg:gap-6">
       <Menu recipes={recipes} version={menuVersion} onOpen={openFromMenu} />
 
       {/* ------------------------------------------------------------------ */}
       {/* The book, under the form now. It is still the reason you came.     */}
       {/* ------------------------------------------------------------------ */}
-      {/* Boxed and named "Recipes", Joel on 2026-09-22 — the same frame as the
+      {/* Boxed and named "Recipes" — the same frame as the
           panel above, so the page reads as two things rather than one form
           trailing into a list. */}
       <section id="book" className="flex scroll-mt-4 flex-col gap-3 rounded-lg border border-line p-3">
@@ -289,9 +289,9 @@ function RecipeCard({
   onEdited: (recipe: Recipe, repriced: boolean) => void;
 }) {
   const [count, setCount] = useState("1");
-  // The day it goes on the menu (Joel, 2026-10-05). Today unless he picks another.
+  // The day it goes on the menu (2026-10-05). Today unless another is picked.
   const [day, setDay] = useState(() => localToday());
-  // Every field is editable (Joel, 2026-09-26), in place on the open card.
+  // Every field is editable (2026-09-26), in place on the open card.
   const [editing, setEditing] = useState(false);
   // **Remove asks first** (TEC-29 item 8): it is permanent, and it sat one tap
   // from Add to list.

@@ -11,7 +11,7 @@ import { useToast } from "./Toast";
  * On the menu — what Joel plans to cook, and on which day (TEC-39 C, 2026-09-24;
  * the day and the numbers, 2026-10-05).
  *
- * One row a recipe, soonest day first, in Joel's format:
+ * One row a recipe, soonest day first, in this format:
  * `Tue 10/7 | Fried Catfish | 520 cal · 38g P · 22g F · 30g C /serv`. **Tapping
  * the day moves it**, tapping the name opens it in the book, ✕ takes it off, and
  * **Clear all** empties the menu — nothing falls off by itself any more. None of

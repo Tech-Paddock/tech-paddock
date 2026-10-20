@@ -15,8 +15,8 @@ import {
 import { generatePrompt } from "@/lib/reroll";
 
 /**
- * Recipe metadata (TEC-52). What was agreed with Joel is binding, and these are
- * the tests that hold it: **no allergen or gluten-free claim, no macro-derived
+ * Recipe metadata (TEC-52). These rules are binding, and these are the
+ * tests that hold them: **no allergen or gluten-free claim, no macro-derived
  * tag, and a rating only a person sets.**
  */
 

@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { localToday, menuDayLabel, parseDay } from "@/lib/menuDay";
 
 /**
- * On the menu (TEC-39 C), with a day each (Joel, 2026-10-05): picked when the
+ * On the menu (TEC-39 C), with a day each (2026-10-05): picked when the
  * ingredients go to the list, shown as "Tue 10/7", and cleared only by Joel.
  */
 describe("the menu's day", () => {

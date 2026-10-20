@@ -5,7 +5,7 @@
 Carried over from the retired agent preset (TEC-115). `NOTES.md` beside this file is the
 app's state and traps; open work is in Linear under `app:cookbook`.
 
-**The design is agreed and it is not yours to redo.** This charter was written with Joel on
+**The design is agreed and it is not yours to redo.** This charter was written on
 2026-09-20 and carries forward two days of design argued out on `claude/health-recipes` — **1,624
 lines that exist nowhere else.** Read #151's *Why* section and its closing comment in full before
 changing anything. Re-deriving those decisions from scratch will produce worse answers slowly.
@@ -21,7 +21,7 @@ change it from here.
 
 ---
 
-**First written on 2026-09-20 at standup** — the design conversation with Joel, in a
+**First written on 2026-09-20 at standup** — a design conversation, in a
 session that was not yet an agent — and carried through the standup by the technical director. It
 has been redrafted since as decisions landed (TEC-11, TEC-15), by the technical director with Joel
 approving each in its pull request, which is how every charter changes.
@@ -33,11 +33,10 @@ it only adds.
 
 ## Where this comes from
 
-`apps/health` built a recipe book across two days with Joel, as PR #151. Joel then asked the
-question the build had skipped — *"Recipe Keeper a different app isn't it?"* — and answered it
-himself on 2026-09-20: recipes are **their own app, own schema**, not Health's. #151 was closed
-rather than merged, its migration was never applied, and **`claude/health-recipes` is kept on
-purpose** as the design record — 1,624 lines argued out with Joel, most of it written down nowhere
+`apps/health` built a recipe book across two days, as PR #151. The build had skipped a
+question — is a recipe keeper a different app? — and it was answered on 2026-09-20: recipes
+are **their own app, own schema**, not Health's. #151 was closed rather than merged, its migration was never applied, and **`claude/health-recipes` is kept on
+purpose** as the design record — 1,624 lines of argued-out design, most of it written down nowhere
 else. Read the *Why* section of #151's body and its closing comment before changing anything here;
 re-deriving those decisions from scratch will produce worse answers slowly.
 
@@ -49,9 +48,9 @@ re-deriving those decisions from scratch will produce worse answers slowly.
 - **Surface: site.** A cookbook is a collection; the index is the product — you arrive to see what
   you could cook, which answers `SURFACE.md` question 2 plainly. Not thumb-first. **Its tabs —
   Recipes · Add · King Soopers list — are that index**, one verb each (browse, add, shop), each tab
-  one long page: the TD's ruling on 2026-09-24, after Joel asked for tabs on 2026-09-22, and Add made
-  its own tab at `/add` by Joel's override on 2026-10-05 (TEC-101).
-- **Installable, and still a site** (Joel's override, 2026-10-05; recorded 2026-10-18, TEC-102). The
+  one long page: the TD's ruling on 2026-09-24, and Add made its own tab at `/add` on
+  2026-10-05 (TEC-101).
+- **Installable, and still a site** (2026-10-05; recorded 2026-10-18, TEC-102). The
   No. 12 icon is the apple-touch-icon with `appleWebApp` metadata, so it goes on the home screen —
   but that is a shortcut, not a change of shape: the layout stays tabs and long pages. Whether it
   should become an app is TEC-109, parked until Joel has used it installed.
@@ -87,15 +86,14 @@ Its own schema, `cookbook`. The tables are this agent's to design, and the reaso
 in its migration's header. Two things were implied by the settled decisions and hold:
 
 - **Recipes.** Store the whole pot; derive the serving — dividing is the lossless direction, and
-  keeps "I got eight bowls, not six" a cheap edit. **Macros are static**, per Joel on 2026-09-18
-  against Health's own recommendation that they be derived from linked ingredient rows: *"Recipes
-  would have static macros."* So ingredients are text, not a join, and re-costing a recipe means
-  estimating it again, on purpose. Carry `estimate` / `web`-style provenance and `source_url` from
+  keeps "I got eight bowls, not six" a cheap edit. **Macros are static** (2026-09-18), against
+  Health's own recommendation that they be derived from linked ingredient rows. So ingredients are
+  text, not a join, and re-costing a recipe means estimating it again, on purpose. Carry `estimate` / `web`-style provenance and `source_url` from
   the health-recipes design, and keep the same meaning: `source_url` records where the *method*
   came from, never where a number did — imported nutrition is never retained, only re-estimated.
 - **The grocery list.** Lines, ticked off, a `source` distinguishing a recipe-pushed ingredient from
   something added by hand, and a quantity (default 1). Health's `/list` shipped it as text or a link
-  only, with no stored credential and no OAuth; **Joel reversed that for King Soopers on 2026-09-26
+  only, with no stored credential and no OAuth; **that was reversed for King Soopers on 2026-09-26
   (TEC-90)**, under *Send to cart* below. The reversal covers Kroger and nothing else.
 - **One Kroger connection.** A refresh token, encrypted at rest under `KROGER_TOKEN_KEY`, and the
   chosen store. Never sent to the browser, never logged. Its scope is add-to-cart and product read,
@@ -107,12 +105,12 @@ through the contract below, not a cross-schema query.
 
 ## Guardrails carried from the health-recipes design
 
-These were argued out with Joel already; they are about recipes, not about Health, and they do not
+These were argued out already; they are about recipes, not about Health, and they do not
 get relitigated here.
 
-- **Import never lifts a page's numbers.** *"Only retain recipe. Then calculate macros and cals."*
-  Where a page publishes real nutrition, throw it away and estimate. An imported recipe reads
-  `estimate`, never `web`.
+- **Import never lifts a page's numbers.** Only the recipe is retained; the macros and calories are
+  calculated from it. Where a page publishes real nutrition, throw it away and estimate. An
+  imported recipe reads `estimate`, never `web`.
 - **A page that could not be read is refused rather than guessed, enforced twice**, because a
   prompt can only ask. The prompt requires `read: false` on a paywall, a 404, a block or a
   non-recipe page; the importer independently rejects any page claimed as read that produced no
@@ -129,7 +127,7 @@ get relitigated here.
 Health's list moved here (TEC-15, finished 2026-09-29): Health's `/list` redirects to this list,
 and `health.grocery_items` is dropped.
 
-## Send to cart — King Soopers (TEC-90, Joel 2026-09-26)
+## Send to cart — King Soopers (TEC-90, 2026-09-26)
 
 - **Connect once, from the list tab.** Kroger's sign-in returns to `/kroger/callback`, a page route
   behind the password gate, with no exception in the gate file. The client ID and secret stay
@@ -157,7 +155,7 @@ and `health.grocery_items` is dropped.
 ## The Health↔Cookbook contract — the technical director's, and this is its one home
 
 Health prices a meal — works out its calories and macros — by reading Cookbook. **Health calls a
-Cookbook API from its server; it never reads `cookbook` tables** (option A, Joel, 2026-09-23,
+Cookbook API from its server; it never reads `cookbook` tables** (option A, 2026-09-23,
 TEC-11). Health's charter points here rather than copying it. **Changing it is the TD's call;
 building your side of it — `GET /api/servings`, TEC-24 — is yours.**
 

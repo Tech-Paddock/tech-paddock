@@ -14,10 +14,10 @@ import type { Recipe } from "@/lib/recipes";
  *
  * **Tabs are the verb index.** The surface is *site*, settled at standup on
  * 2026-09-20, and its tabs are that index, one verb each: the technical
- * director's ruling on 2026-09-24, after Joel asked for tabs on 2026-09-22.
+ * director's ruling on 2026-09-24.
  * Adding a recipe and shopping are different errands minutes apart, and scrolling
  * past the whole book to reach the list stopped being cheaper than a tap. **Add
- * became the third** on 2026-10-05, Joel overruling the two-tab ruling.
+ * became the third** on 2026-10-05, replacing the two-tab ruling.
  *
  * **Each tab has an address** since TEC-22: `/` is the book and `/list` is the
  * list, which Health's `/list` redirects onto while the list moves here. Switching

@@ -2,8 +2,8 @@ import { productIdFromUrl } from "./kingsoopers";
 import type { Product } from "./kroger";
 
 /**
- * Refresh — what Kroger says now about every remembered product (Joel,
- * 2026-10-20). **No model call.** For each *this exact product* brand at the
+ * Refresh — what Kroger says now about every remembered product
+ * (2026-10-20). **No model call.** For each *this exact product* brand at the
  * chosen store: price and stock, a product number and page filled in from a
  * brand that only had a link, and **a product Kroger no longer returns is
  * flagged, never dropped** — the brand was Joel's choice, and the replacement

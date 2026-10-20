@@ -8,7 +8,7 @@ import { MODELS, type ModelId } from "@/lib/models";
 import type { Recipe } from "@/lib/recipes";
 
 /**
- * Editing a kept recipe, in place on its card (Joel, 2026-09-26). The rules —
+ * Editing a kept recipe, in place on its card (2026-09-26). The rules —
  * what re-prices and why a failed re-price writes nothing — are in `lib/edit.ts`.
  *
  * **The button says what the save will do.** "Save and re-price" when the

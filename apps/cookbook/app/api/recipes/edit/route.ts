@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Edit a recipe in the book: every field (Joel, 2026-09-26). `lib/edit.ts` has
+ * Edit a recipe in the book: every field (2026-09-26). `lib/edit.ts` has
  * the rules — what re-prices, and why a failed re-price writes nothing.
  *
  * Body: `{ id, model?, edit: { name, servings, ingredients, method, meta } }`.

@@ -30,8 +30,8 @@ export const maxDuration = 120;
  * draft, and the draft is not the book.**
  *
  * **The macros are always ours.** Even an imported recipe whose page publishes a
- * nutrition panel comes back `estimate` — Joel: *"Only retain recipe. Then
- * calculate macros and cals."* — and `source_url` records where the method came
+ * nutrition panel comes back `estimate` — only the recipe is kept, and the macros
+ * are calculated from it — and `source_url` records where the method came
  * from rather than where a number did. That is a cost named once, and it buys one
  * rule instead of two and a book whose numbers are comparable with each other.
  */
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       origin = "manual";
     } else if (mode === "generate") {
       const brief = typeof body.brief === "string" ? body.brief.trim() : "";
-      // The pickers (Joel, 2026-09-26): meal, diet, cuisine, time. With any
+      // The pickers (2026-09-26): meal, diet, cuisine, time. With any
       // picked, the brief may be empty — the picks are the ask.
       const picks = readPicks(body.picks);
       if (!brief && !hasPicks(picks)) {

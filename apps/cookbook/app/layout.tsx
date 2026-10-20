@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   title: "Paddock — Cookbook",
   description: "What you could cook, what it costs you, and what to buy for it.",
 
-  // **On the home screen, by Joel's word** (2026-10-05), overruling the site
+  // **On the home screen** (2026-10-05), overriding the site
   // call that left it off: the No. 12 tab icon becomes the app icon. Same
   // shape as Coffee and Health. The short name is what iOS prints under the
   // icon; "Paddock — Cookbook" is too long for that and gets truncated.

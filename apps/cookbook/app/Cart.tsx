@@ -17,7 +17,7 @@ import { useToast } from "./Toast";
  * and **a line already sent is not sent again without saying so**, because the
  * Cart API only adds. Checkout stays at King Soopers: the link opens their cart.
  *
- * **Refresh** (Joel, 2026-10-20): opening this tab with the last refresh over a
+ * **Refresh** (2026-10-20): opening this tab with the last refresh over a
  * week old starts one in the background; *Refresh now* starts one by hand.
  * Either way the result is said in words, and a failure is never silence.
  *

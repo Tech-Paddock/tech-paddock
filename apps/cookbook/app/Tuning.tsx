@@ -4,7 +4,7 @@ import { DIETS, MEALS, type Diet, type Meal } from "@/lib/metadata";
 import { NO_FILTER, TIME_CHOICES, filterActive, type BookFilter, type Picks } from "@/lib/tuning";
 
 /**
- * The tuning section on screen (Joel, 2026-09-26): meal, diet, cuisine and time
+ * The tuning section on screen (2026-09-26): meal, diet, cuisine and time
  * as pickers on Ask Claude, and the same four plus **High protein** as filters
  * on the book. Rules in `lib/tuning.ts`.
  *

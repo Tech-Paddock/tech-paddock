@@ -1,5 +1,5 @@
 /**
- * Whether opening the list tab should start a refresh (Joel, 2026-10-20).
+ * Whether opening the list tab should start a refresh (2026-10-20).
  *
  * **No imports**, because the browser runs it: the list tab asks this once per
  * open and, when it says yes, starts a refresh in the background without
