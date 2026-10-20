@@ -39,7 +39,7 @@ describe("ATS lint", () => {
 
 /**
  * Section headings and employment entry lines are set at the **same point size**
- * in Joel's template, so ranking by size alone reported all five of his jobs as
+ * in the template, so ranking by size alone reported all five of its jobs as
  * unrecognised headings. Five false findings in one document, on a warning whose
  * only job is to be believed.
  *

@@ -6,10 +6,10 @@ import type { Para } from "./paragraphs";
  * **This exists because the same question was being answered in three places and
  * one of them got it wrong.** `ats.ts` decided whether a heading was one a parser
  * would recognise, `outline.ts` decided which paragraphs opened a section, and
- * `label.ts` decided which line began a job — each with its own rule. On Joel's
+ * `label.ts` decided which line began a job — each with its own rule. On the
  * template `outline.ts` reported **Professional Experience as zero lines** and
- * his five jobs as five sibling sections, because its rule was run size alone and
- * his headings and entry lines are both 11pt.
+ * its five jobs as five sibling sections, because its rule was run size alone and
+ * the template's headings and entry lines are both 11pt.
  *
  * That is the drift `CLAUDE.md` names: one fact with three homes, and no way to
  * fix it once. It is one home now.
@@ -122,7 +122,7 @@ export function isEntryLine(p: Para): boolean {
  * range makes it a *job*.
  *
  * Size cannot decide this on its own, which is the whole reason this file
- * exists: Joel's template sets its headings and its entry lines at the same
+ * exists: the template sets its headings and its entry lines at the same
  * point size. The leading tab many templates put before a heading is trimmed
  * off first, so it decides nothing.
  */

@@ -23,8 +23,8 @@ export type Outline = {
  * misread is visible rather than silent.
  *
  * **It was misreading, and saying so confidently.** Deciding what a heading is by
- * run size alone made Joel's five job lines into five sibling sections and left
- * `Professional Experience` holding **zero lines**, because his headings and his
+ * run size alone made the template's five job lines into five sibling sections and left
+ * `Professional Experience` holding **zero lines**, because its headings and its
  * entry lines are both 11pt. A page whose only job is to show what was understood
  * is the worst place to be wrong, and it had no way to be fixed once: the same
  * question was answered separately here, in the ATS lint and in the labeller.
