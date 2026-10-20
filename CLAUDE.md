@@ -142,7 +142,8 @@ are the owner's.
 1. **`main` is protected:** `gate`, `drift` and `request-line` required, branches up to date.
 2. **The guard** (`.claude/hooks/guard.mjs`, fails closed) refuses a push to `main`, a non-squash
    merge, migration-history rewrites, and pull-request writes from anyone but Deployment; holds
-   starting Deployment, and Vercel and Supabase writes, for the owner; refuses a Linear issue without labels or Next steps.
+   starting Deployment, and Vercel and Supabase writes, for the owner; refuses a Linear issue
+   without labels or Next steps.
    `guard.test.mjs` proves each in CI.
 3. **CI `gate`:** every app typechecks, tests and builds, and `drift` passes
    (`node scripts/drift-check.mjs`): stamped copies, gate file per Next major, empty showcase, CI
