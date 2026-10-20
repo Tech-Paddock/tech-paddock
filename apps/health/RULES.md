@@ -1,172 +1,78 @@
 # Health — charter
 
-## Read first
+`NOTES.md` is the app's state and traps. The reasoning behind these rules is the Linear document
+"Health — plan" (team TEC, https://linear.app/tech-paddock/document/health-plan-c504dc02830d). Read
+it before designing or changing a feature; it is not this app's to redo. Where the two disagree,
+this file wins.
 
-Carried over from the retired agent preset (TEC-115). `NOTES.md` beside this file is the
-app's state and traps; open work is in Linear under `app:health`.
+## Scope
 
-**Two rules decide whether this tool is worth trusting, and they are the same rule from both ends.**
-A lookup that fails must never look like "not found" — a swallowed database error degrades the app
-into internet-first, *nothing on screen changes*, and the numbers quietly start drifting again,
-which is the one thing this design exists to prevent. And the database is read before anything
-external because a web search will cheerfully overwrite a correction Joel already made by hand.
-**Database-first is correctness, not cost.** **The livery is borrowed from the theme**; do not
-change it from here.
+- Record what was eaten; return its macros and the day's running total.
+- Food only. Exercise is out.
+- The log is the app. Everything else is a quiet footer link, never a tab.
+- A screen earns its place by being a different moment, not a different noun. A new screen still
+  goes to the owner first.
+- Recipes and the grocery list belong to the Cookbook. Health reads recipes to price a meal and
+  owns neither.
+- Recipes are read only through Cookbook's `GET /api/servings`, called from the server with the
+  caller's session; never from `cookbook` tables. The contract lives in Cookbook's charter and
+  changes only through the technical director.
 
----
+## Never
 
-You own `apps/health`. Nothing else in this repo is yours.
+1. Write without approval. Approving is the only write.
+2. Let a failed lookup look like "not found". A database error surfaces and never falls through
+   to the web; otherwise nothing on screen changes and the numbers drift.
+3. Replace a hand-entered number without keeping the old one. Hand corrections are the only
+   ground truth.
+4. Put real food-log data in the repo. Fixtures are invented food.
+5. Read or write another tool's schema. `lib/supabase.ts` pins `health`; never override it per
+   query.
+6. Estimate when the table already knows. Bypassing the table is a deliberate tap, never a
+   default.
 
-**Read `CLAUDE.md` first.** Its universal rules bind you and this file never overrides them; it only
-adds. Read `supabase/README.md` before writing a migration.
+Rules 2 and 6 are one rule: the database is read before anything external, because a web result
+would overwrite a hand correction. This is correctness, not cost.
 
-**This charter carries the rules; the Linear document "Health — plan" carries the reasoning**
-(team TEC, https://linear.app/tech-paddock/document/health-plan-c504dc02830d — it was
-`.claude/HEALTH-PLAN.md` until 2026-09-24). The plan was written before this agent existed.
-**Read it before designing or changing a feature** — it is why each rule below exists, and
-it is not yours to redo. Where the two ever disagree, this file wins. **Everything in the plan is the
-first feature of `health`, not the whole of it** — the name was chosen so a second kind of record
-can arrive without the app's name becoming a lie.
+## Lookup order
 
----
+- A line naming a Cookbook recipe asks the Cookbook first. Its numbers are never typed over here,
+  on a draft, a correction or `/debug`; the fix belongs in the Cookbook.
+- Everything else:
+  1. Exact match in the `health` table.
+  2. Near match on the normalised item name.
+  3. Miss: web search for branded items, a model estimate otherwise.
+  4. Approval writes the result back, so step 3 runs once per food.
 
-## What this tool is
+## Items and corrections
 
-**You record what you ate, it tells you the macros, and it keeps the day's running total.** Food
-only — exercise was considered and dropped. **The log is the app**; anything else must earn its
-screen under the rule below.
+- A row is what was ordered, not its components: a combo meal is one row, a combo and a cookie are
+  two.
+- The item name carries the whole specification ("large fry" and "medium fry" are two items). No
+  components, modifiers or per-instance overrides.
+- A correction fixes the item, never a past day. Item numbers are append-only versions.
+- An entry snapshots the item's numbers, item id and version when logged, so a past day's total
+  never moves.
 
-## A second screen, and what makes one legitimate
+## Models
 
-**Approved by Joel on 2026-09-19**, and recorded here by the technical director. It was written
-when a grocery list was the second screen in question; the list has since left (below), and the rule
-stands without it.
+- A registry, not two strings, following `apps/coffee/lib/models.ts`. Health's copy is its own.
+  Models differ in accepted parameters and web tool versions, so a bare swap is an error.
+- Haiku 4.5 is the default; Sonnet 5 is available. No effort dial.
+- Only the judgment call (the estimate) gets a model choice. The parse is pinned.
+- Every number carries its provenance: log, web or estimate, and the model that produced it.
+  Cookbook numbers carry `cookbook` and no model.
 
-**What was wrong with "one screen rather than two."** That clause was written to explain why
-exercise was dropped, and it was right about that. What it also did, without anybody deciding it,
-was turn a scope decision into a shape rule. **Food only is the scope rule and it still holds.** A
-grocery list is food: it is the same foods, one step before they are eaten.
+## Settled
 
-**The rule that replaces it.** The log is the app. Everything else reaches it as a quiet footer
-link, never a tab — `/debug` works that way, and `/list` did before it moved. **A screen earns
-its place by being a different moment, not a different noun.** You are not shopping while you are
-logging lunch, and you are not logging lunch in the aisle; two moments, two screens, one product.
-A second *noun* — exercise — is still out, and this does not reopen it.
+- No `/api/summary`. Nothing reads one.
+- The livery is the theme's (`apps/home`). `lib/livery.ts` pins `senna`, shared with the parked
+  tracker until TEC-12 resolves it. Do not change it from here.
+- The `health` schema and its tables belong to this app.
 
-**What this does not license.** It is not a general permission to add screens. **A screen added
-under this rule still goes to Joel first**; what changed is that the answer is no longer "the charter
-forbids it" before he has been asked.
+## Traps
 
-**The list itself has left, and the rule has not.** It moved to the Cookbook with the recipes — you
-shop from recipes, not from what you ate (TEC-15, finished 2026-09-29): `/list` redirects there and
-`health.grocery_items` is dropped. **The rule above was
-written about the list but is not about the list**, so it stays: it is what the next second-screen
-ask gets measured against.
-
-**Recipes are not yours, and that is settled rather than parked.** They moved out on
-2026-09-20: they are **their own app, with their own Postgres schema**, themed as a meal cookbook.
-**You read them to price a meal; you do not own them.** A recipe book, a generator or a URL import
-living in `apps/health` is the wrong answer, and so is a grocery list. **How you
-read a recipe is decided** (TEC-11, 2026-09-23): you call Cookbook's `GET /api/servings` from your
-server, forwarding the caller's session, and you never read `cookbook` tables. **The contract lives
-in Cookbook's charter** — one home, so read it there; changing it is the technical director's call.
-
----
-
-## Never — these do not bend for a feature
-
-Approved by Joel on 2026-09-17, in full, none struck. A guardrail is something that stays wrong even
-when breaking it would make the app better; that is the test each of these passed.
-
-1. **Never write without approval.** The draft is not the log. Approving is the only thing that
-   writes.
-2. **Never let a failed lookup look like "not found."** A database error surfaces; it never falls
-   through to the web. This is Coffee's trap and the one that would quietly undo the whole design —
-   nothing on screen changes, the numbers just start drifting again.
-3. **Never replace a hand-entered number without keeping the old one.** The correction made by hand
-   is the only real ground truth in the system.
-4. **Never put real food-log data in the repo.** Fixtures are invented food. The database is the
-   right home for what was actually eaten.
-5. **Never read or write another tool's schema.** `lib/supabase.ts` pins `health` and that is not a
-   default to be overridden per query.
-6. **Never estimate when the table already knows.** Database-first is a correctness rule, not a cost
-   optimisation — bypass is a deliberate tap and never a default.
-
-**Guardrail 2 and guardrail 6 are the same rule seen from both ends**, and together they are why
-this tool is trustworthy. A silent lookup failure degrades the app into internet-first and *nothing
-on screen changes* — the numbers simply start drifting again, which is the one thing this design
-exists to prevent. Coffee's `LookupError` class solves exactly this; take it wholesale.
-
----
-
-## The order of lookup, which is the product
-
-**A line naming a Cookbook recipe asks the Cookbook first** (TEC-25), through the
-`GET /api/servings` contract in Cookbook's charter, so a Cookbook edit reaches the next log. Its
-numbers are not typed over here, on a draft, a day's correction or `/debug`: the fix belongs in the
-Cookbook. Everything else runs this order:
-
-1. **Exact match** in your own table — free, instant, no model call.
-2. **Near match** on the normalised item name, so it matches parsed names rather than raw dictation.
-3. **Miss → outside.** Web search for branded items that publish real numbers; a model estimate for
-   "two eggs and toast", where searching buys nothing.
-4. **Approval writes it back**, so step 3 runs at most once per distinct food, ever.
-
-**The reason is correctness, not cost** — the plan has it in full.
-
-**A row is a thing that was ordered, not its components.** A Chick-fil-A #1 is one row even though
-it is three things in the bag; a #1 and a cookie is two. **The item name carries the whole
-specification** — "large fry" and "medium fry" are two remembered items with two sets of numbers.
-No components, no modifiers, no per-instance overrides. Wanting precision means saying more words.
-
-**A correction fixes the item and never a past day.** Because the name carries the specification, a
-correction means "that item's numbers are wrong", never "I ate less of that". Item numbers are
-append-only versions. **An entry snapshots the item's numbers when it is logged, with the item id
-and the version it snapshotted**, so a past day's total never moves and a backfill stays possible —
-settled on 2026-09-22 (#116) and approved for building on 2026-09-24. The code catches up
-through TEC-21; until it lands, a correction still reaches past days.
-
----
-
-## Model rules
-
-**A registry, not two strings.** Haiku 4.5 returns a 400 for `output_config.effort` outright and web
-tool versions differ between models, so a bare model swap is an error rather than a preference.
-`apps/coffee/lib/models.ts` is the shape to follow; your copy is your own, not Coffee's
-(`DECISIONS.md`).
-
-**Haiku 4.5 is the default and Sonnet 5 is available. No effort dial** — Sonnet accepts one and
-Haiku rejects one, and two models is a clean experiment where two models times five effort levels is
-a chore.
-
-**Only the judgment call gets a model choice.** Parsing "a number one from Chick-fil-A" into one item
-is a Haiku job at any setting. Coffee puts its toggle on `/api/search`, not `/api/identify` — the
-parse is pinned and the estimate is what varies.
-
-**Every number carries its provenance** — your log, the web, or an estimate, and which model produced
-it; a Cookbook recipe's numbers carry `cookbook` and name no model, because they are the Cookbook's own. That is not decoration: it says which line to scrutinise, and the debug harness in the plan
-depends on it.
-
----
-
-## What is settled and not yours to reopen
-
-- **No `/api/summary`.** Health was left off home's glance, and the glance itself is gone since
-  TEC-83, so nothing reads one. Build none.
-- **The livery is borrowed and is the theme's to settle** (`apps/home`). `lib/livery.ts` pins `senna` because
-  every livery was taken when this app was scaffolded, and the tracker wears it too. The tracker is
-  parked (since 2026-09-24), not retired, so **two apps share a livery until TEC-12 resolves it** —
-  do not fix it yourself; it is the theme, and the theme has one owner.
-- **The schema is `health`, and its tables are yours.** `20260918140357` and `20260918140405`
-  created it and granted it. They were deliberately not pre-empted at standup, because a scaffold
-  built before the design is a set of decisions nobody made.
-
----
-
-## Traps this repo has already paid for
-
-- **A debug route needs no edit to the gate file** (`proxy.ts` on Next 16). The matcher is a
-  catch-all negative, so any extra route is behind the password gate automatically. That matters
-  because the gate file is gated on the technical director and **the debug surface must never need it.**
-- **The exposed-schemas list in the Supabase dashboard is outside this repo.** A schema missing from
-  it fails as a permissions error that reads like a bad key. `/api/health` probes for it and names it.
+- A new route needs no edit to the gate file: its matcher is a catch-all negative. The debug
+  surface must never need the gate file.
+- The Supabase exposed-schemas list is outside the repo. A missing schema fails as a permissions
+  error that reads like a bad key; `/api/health` probes for it.
