@@ -9,11 +9,14 @@
   does not probe `/api/health`.
 - Livery `mcl39` (McLaren '25: papaya on anthracite), worn by Lando alone. The theme files carry
   it because this branch merged `claude/home-papaya-livery`.
-- The icon is a puppy in a racing helmet, visor up (`app/icon.svg`), in the mcl39 colours copied
-  from `lib/theme.css`. It is inspired by the livery: no team mark, wordmark, number or sponsor.
-  `favicon.ico`, `apple-touch-icon.png` (full-bleed) and `manifest-192/512.png` are drawn from it;
-  redraw all four when it changes. Two other concepts (a tyre paw, a profile with speed lines)
-  were offered; the owner may swap.
+- The icon is Lando in a racing helmet, visor up (`app/icon.svg`, concept A, the owner's pick). It
+  is a hand-drawn vector of the real dog: a chocolate-dapple and white miniature dachshund with a
+  white blaze, chocolate over both eyes, tan eyebrow dots and cheeks, amber eyes, a liver nose and
+  long speckled ears hanging below the helmet. The helmet and tile are the mcl39 colours copied
+  from `lib/theme.css`; the dog keeps his own. It is inspired by the livery: no team mark,
+  wordmark, number or sponsor. `favicon.ico` (16, 32, 48, RGBA PNG frames),
+  `apple-touch-icon.png` (180, full-bleed, opaque) and `manifest-192/512.png` (rounded, RGBA) are
+  rendered from it; re-render all four when it changes.
 - A web app manifest at `/app.webmanifest` (a route, `app/app.webmanifest/route.ts`) for Chrome's
   install. No other app has one.
 
@@ -58,5 +61,10 @@
   `crossOrigin="use-credentials"`. Next's `app/manifest.ts` writes the link without it outside
   Vercel previews, and the browser would get the login redirect instead. Its icons are static
   imports (`/_next/static`), which the gate admits. Signed out, the manifest is a 307: harmless.
+- The owner's photos of Lando were the reference for the icon and never enter the repo (RULES.md,
+  Never 2): the icon is drawn, not traced, and no photo or crop of one is committed. A redraw is hand-placed
+  vector shapes; never an `<image>` in the SVG.
+- `tsc` cannot resolve the PNG imports until `next build` (or `next dev`) has written
+  `next-env.d.ts`, which is not tracked. Build first on a fresh checkout.
 - `app/icon*.png` is a Next metadata convention; the manifest PNGs are named `manifest-*.png` so
   Next does not treat them as icons.

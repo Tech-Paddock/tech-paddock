@@ -1,26 +1,72 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Lando">
-  <!-- A puppy in a racing helmet, visor up. Colours are the mcl39 livery's,
-       copied from lib/theme.css: anthracite #121316 (bar), papaya #FF8000
-       (dark-mode accent), burnt papaya #A84200 (light-mode accent) and
-       #FFE8D4 (tone-1). Inspired by the livery; no real team mark, number or
-       sponsor. favicon.ico, apple-touch-icon.png and the manifest PNGs are
-       drawn from this file; apple-touch-icon.png is full-bleed (rx 0), since
-       iOS rounds the corners itself. -->
+  <!-- Lando, a chocolate-dapple miniature dachshund puppy, in a racing helmet
+       with the visor up. Drawn by hand as vector shapes; no photo is traced
+       or embedded (RULES.md, Never 2). The helmet and tile are the mcl39
+       livery's, copied from lib/theme.css: anthracite #121316, papaya
+       #FF8000, burnt papaya #A84200. The dog keeps his own colours:
+       chocolate, white and tan, a liver nose and amber eyes. Inspired by the
+       livery; no real team mark, number or sponsor. favicon.ico,
+       apple-touch-icon.png and the manifest PNGs are drawn from this file;
+       apple-touch-icon.png is full-bleed (rx 0), since iOS rounds the corners
+       itself. -->
+  <defs>
+    <clipPath id="face">
+      <path d="M256 214 C334 214 366 270 366 330 C366 400 318 446 256 446 C194 446 146 400 146 330 C146 270 178 214 256 214 Z"/>
+    </clipPath>
+    <clipPath id="shell">
+      <path clip-rule="evenodd" d="M256 64 C366 64 438 146 438 262 L438 340 C438 372 414 392 386 392 L362 392 C366 372 368 352 368 330 C368 262 330 222 256 222 C182 222 144 262 144 330 C144 352 146 372 150 392 L126 392 C98 392 74 372 74 340 L74 262 C74 146 146 64 256 64 Z"/>
+    </clipPath>
+  </defs>
   <rect width="512" height="512" rx="112" fill="#121316"/>
-  <!-- floppy ears, hanging out under the helmet -->
-  <path d="M100 330 C56 366 48 446 92 470 C130 490 168 458 172 414 L176 340 Z" fill="#A84200"/>
-  <path d="M412 330 C456 366 464 446 420 470 C382 490 344 458 340 414 L336 340 Z" fill="#A84200"/>
-  <!-- face -->
-  <path d="M256 214 C334 214 366 270 366 330 C366 400 318 446 256 446 C194 446 146 400 146 330 C146 270 178 214 256 214 Z" fill="#FFE8D4"/>
+
+  <!-- long floppy ears, chocolate with two dapple speckles each, hanging out
+       under the helmet -->
+  <path d="M112 338 C70 368 56 440 70 476 C84 506 140 504 160 472 C174 448 178 400 182 348 Z" fill="#7E5D51"/>
+  <path d="M400 338 C442 368 456 440 442 476 C428 506 372 504 352 472 C338 448 334 400 330 348 Z" fill="#7E5D51"/>
+  <ellipse cx="98" cy="432" rx="13" ry="10" fill="#C7AEA2"/>
+  <ellipse cx="132" cy="474" rx="9" ry="7" fill="#C7AEA2"/>
+  <ellipse cx="414" cy="442" rx="12" ry="9" fill="#C7AEA2"/>
+  <ellipse cx="380" cy="412" rx="8" ry="6" fill="#C7AEA2"/>
+
+  <!-- face: chocolate over both eyes and the sides of the head, a white blaze
+       from the forehead widening down the muzzle -->
+  <g clip-path="url(#face)">
+    <rect x="140" y="210" width="232" height="240" fill="#7E5D51"/>
+    <path d="M240 210 L272 210 C274 262 278 298 290 326 C316 340 340 360 352 392 L360 450 L152 450 L160 392 C172 360 196 340 222 326 C234 298 238 262 240 210 Z" fill="#FAF6F1"/>
+    <!-- tan at the cheeks, where the chocolate meets the white -->
+    <ellipse cx="180" cy="352" rx="14" ry="8" fill="#D9954F" transform="rotate(-40 180 352)"/>
+    <ellipse cx="332" cy="352" rx="14" ry="8" fill="#D9954F" transform="rotate(40 332 352)"/>
+    <!-- a dapple speckle on the head -->
+    <ellipse cx="174" cy="300" rx="8" ry="6" fill="#C7AEA2"/>
+  </g>
+
+  <!-- tan "eyebrow" dots -->
+  <ellipse cx="206" cy="282" rx="12" ry="8" fill="#E2A35E"/>
+  <ellipse cx="306" cy="282" rx="12" ry="8" fill="#E2A35E"/>
+  <!-- amber eyes -->
+  <circle cx="208" cy="314" r="19" fill="#2A1A14"/>
+  <circle cx="304" cy="314" r="19" fill="#2A1A14"/>
+  <circle cx="208" cy="314" r="14" fill="#C98A3A"/>
+  <circle cx="304" cy="314" r="14" fill="#C98A3A"/>
+  <circle cx="209" cy="316" r="8" fill="#1C110D"/>
+  <circle cx="305" cy="316" r="8" fill="#1C110D"/>
+  <circle cx="203" cy="308" r="4.5" fill="#FFFFFF"/>
+  <circle cx="299" cy="308" r="4.5" fill="#FFFFFF"/>
+  <!-- liver nose and mouth -->
+  <path d="M226 368 C226 350 286 350 286 368 C286 386 268 398 256 398 C244 398 226 386 226 368 Z" fill="#7A4842"/>
+  <ellipse cx="244" cy="362" rx="9" ry="5" fill="#A0706A"/>
+  <path d="M256 396 V408 C256 422 236 428 224 416 M256 408 C256 422 276 428 288 416" stroke="#5E3A34" stroke-width="8" stroke-linecap="round" fill="none"/>
+
   <!-- helmet shell: crown and cheeks, the face opening cut out -->
   <path fill="#FF8000" fill-rule="evenodd" d="M256 64 C366 64 438 146 438 262 L438 340 C438 372 414 392 386 392 L362 392 C366 372 368 352 368 330 C368 262 330 222 256 222 C182 222 144 262 144 330 C144 352 146 372 150 392 L126 392 C98 392 74 372 74 340 L74 262 C74 146 146 64 256 64 Z"/>
+  <!-- burnt-papaya shading: the shell's lower right and the cheek pads -->
+  <g clip-path="url(#shell)">
+    <path fill="#A84200" fill-rule="evenodd" d="M60 50 H452 V400 H60 Z M238 70 C352 70 424 150 424 260 C424 316 404 352 372 376 L370 330 C370 262 330 220 256 220 C182 220 142 262 142 330 L140 376 C104 350 88 316 88 262 C88 150 140 70 238 70 Z"/>
+  </g>
+  <!-- rim round the face opening -->
+  <path d="M150 392 C146 372 144 352 144 330 C144 262 182 222 256 222 C330 222 368 262 368 330 C368 352 366 372 362 392" stroke="#A84200" stroke-width="8" fill="none"/>
   <!-- raised visor across the crown, with its pivots -->
   <path d="M100 196 C150 120 362 120 412 196 L398 230 C344 168 168 168 114 230 Z" fill="#121316"/>
   <circle cx="104" cy="262" r="16" fill="#121316"/>
   <circle cx="408" cy="262" r="16" fill="#121316"/>
-  <!-- eyes, nose -->
-  <circle cx="210" cy="312" r="20" fill="#121316"/>
-  <circle cx="302" cy="312" r="20" fill="#121316"/>
-  <path d="M228 356 C228 340 284 340 284 356 C284 374 268 386 256 386 C244 386 228 374 228 356 Z" fill="#121316"/>
-  <path d="M256 384 V398 C256 414 232 420 220 406 M256 398 C256 414 280 420 292 406" stroke="#121316" stroke-width="9" stroke-linecap="round" fill="none"/>
 </svg>
