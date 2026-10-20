@@ -45,7 +45,7 @@ body {
    should be: the width of the text it draws, "Aug 28, 2026" and all. That
    width is a floor, so `width: 100%` cannot bring it under one — and the
    moment two of them share a row, the second runs out past the edge of the
-   card it sits in, which is what Joel photographed on 2026-09-20.
+   card it sits in.
 
    `appearance: none` drops the native box so the declared width holds, and
    `min-width: 0` removes the floor the intrinsic size would otherwise set.

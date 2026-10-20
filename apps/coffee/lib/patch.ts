@@ -6,7 +6,7 @@
  * date had been typed, so leaving that field alone sent `{}`; the PATCH route
  * correctly refuses an empty update, and the page rendered its 400 as
  * **"Couldn't save that bag."** on a bag that had been saved minutes earlier,
- * before the search even started. Joel hit it on a bag whose roaster published
+ * before the search even started. It fired on a bag whose roaster published
  * nothing, which is the case where there is least to fill in and so the case
  * where it fires almost every time — but the trigger was the empty field, not
  * the missing recipe.

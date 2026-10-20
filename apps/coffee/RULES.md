@@ -1,361 +1,189 @@
-# Coffee — charter
+# Coffee — rules
 
-## Read first
+`apps/coffee`, served at `coffee.techpaddock.io`. State and traps are in `NOTES.md`.
 
-Carried over from the retired agent preset (TEC-115). `NOTES.md` beside this file is the
-app's state and traps; open work is in Linear under `app:coffee`.
+## Purpose
 
-**The rule this tool lives or dies on:** no brewing parameter is stored without the verbatim
-sentence it came from and the URL that sentence was on. It is enforced in `lib/guide.ts`, **in
-code, not in the prompt**, because a prompt can only ask. Do not weaken it, do not move it into the
-prompt, and do not add a write path around it. A model with web search will produce a plausible
-recipe for a page that says nothing about brewing — and unlike a bad message draft, **you would
-actually brew it.**
+Photograph a coffee bag, retrieve the roaster's own brewing instructions for it, say plainly when
+there are none, and keep a library of bags bought and brews made.
 
-**An empty result and an unread result must not render the same.** That defect has appeared more
-than once in this one app.
-
----
-
-You own `apps/coffee` — `coffee.techpaddock.io`. Nothing else in this repo is yours.
-
----
-
-## Your job
-
-Photograph a coffee bag, get **the roaster's own** brewing instructions for that coffee, and keep a
-searchable library of what you have bought and how you brewed it.
-
-The emphasis is the entire product. Any model can produce a brewing recipe. This tool exists to
-retrieve the one the roaster actually published, and to say plainly when there isn't one.
-
-## The flow
-
-Photograph the bag → downscale in the browser → Claude reads roaster and coffee name off the label
-→ **you confirm** → **save** → Claude searches for brewing instructions → the guide lands on the
-saved bag, and where there is no guide to land, a recipe of Claude's own lands beside it instead.
-
-The confirm step is not ceremony. A misread roaster name sends the search somewhere useless, and
-it doubles as the manual-entry path when a photo cannot be read at all.
-
-**Save comes before the search, not after it.** The search reads real roaster pages and runs
-anywhere from thirty seconds to a few minutes, with nothing travelling on the connection while it
-works — so a phone concludes the request is dead and the answer is lost even though the server
-finished it. That happened on the first live run. The bag is therefore written first and the
-search updates that row, which is what `guide_status: 'not_searched'` was always for. The page
-polls the row rather than waiting on a response, so a dropped connection costs nothing and you can
-close the tab mid-search.
-
-## What you own
-
-`apps/coffee` — read the folder for its inventory; a list here only goes stale. The `coffee` schema —
-`coffee.bags` and `coffee.brews`, one to many — and the private `coffee-files` bucket. Two files
-matter more than the rest: `lib/guide.ts` is the rule below, and `lib/guideDisplay.ts`, which words
-and lights a tier, is kept apart from it on purpose.
-
----
-
-## The three rules that are not yours to relax
-
-### 1. No invented recipes, and it is enforced in code
-
-A model with web search will happily produce a plausible 1:16 / 205°F / 3:00 recipe for a page that
-says nothing about brewing. Unlike a bad message draft, **you would actually brew it.**
-
-So nothing reaches the database unless the model also produced the sentence it came from and the
-URL that sentence was on. That is enforced in `lib/guide.ts`, **not in the prompt**, because a
-prompt can only ask. `validateGuide`:
-
-- drops any parameter with no backing quote
-- rejects quotes citing a page the model never reported reading
-- refuses anything read off a site that is not the roaster's
-- demotes a `coffee_specific` claim to `roaster_generic` unless the instructions were genuinely
-  read on the product page itself
-
-It never throws. A malformed response becomes `status: "none"`, which is a legitimate outcome.
-
-Dropped values are surfaced in the UI next to what was kept, never silently discarded. The quotes
-render beside the parsed values so a misparse is visible rather than invisible.
-
-**Do not move any of this into the prompt. Do not add a parameter that bypasses it.**
-
-#### The one recipe that is invented, and why it does not breach this
-
-**Since 2026-09-19, a search that finds no recipe has Sonnet 5 generate a recommended one**, so that
-a bag whose roaster published nothing still leaves you with somewhere to start. This section was
-approved the same day; it is a change to the rule, not an agent reading around it.
-
-It does not breach §1 because §1 is a rule about `guide_*`, and `guide_*` is untouched.
-`validateGuide` still drops every parameter without a backing quote, a bag with no guide still reads
-**No Recipe Found**, and no path writes a generated value into a `guide_*` column. What changed is
-that `none` is no longer the end of the screen.
-
-Four things keep the two apart, and none of them is a preference:
-
-- **Its own column.** `suggested_recipe`, a single `jsonb` holding the parameters, the reasoning, the
-  model and the moment. "What did the roaster say" stays answerable by reading `guide_*` alone.
-- **No quote and no URL, ever.** A quote is a claim about a page somebody published. A suggestion has
-  no page, so a quote on it would be a lie told in the exact format this app uses to prove it is not
-  lying. `coerceSuggestion` drops a `status`, a `product_url` or a `quotes` array outright.
-- **No web search on the call.** Search would make the answer a blend of remembered practice and
-  something half-read, and the whole value of the separation is being able to say which you are
-  looking at. This one has read nothing, by construction.
-- **It says whose it is in its heading**, not in a caption — `lib/guideDisplay.ts`, with a test that
-  refuses wording claiming it was found, published or the roaster's.
-
-**The remaining risk is wording, and it is the only one.** Nothing in code can promote a suggestion
-to a retrieval; a heading that slowly starts reading like the block above it can. That is why the
-copy lives in the presentation module under test rather than inline in the card.
-
-**It does not prefill a brew, and that is settled rather than pending** (2026-09-19). `openingBrew` fills from `guide_dose`, `guide_water` and `guide_ratio` — the roaster's
-numbers — and letting a suggestion in there would make the two interchangeable at the only point
-where you act on them. **A suggestion is something you read and type in**, and typing it is the
-moment you decide to use it. Do not reopen this by making it a convenience.
-
-#### A recipe printed as an image counts, and the image is its proof
-
-Added to rule 1 on 2026-09-25. Some roasters publish their recipe only as a picture
-(a recipe card in the product gallery) that a page read as text never sees. A value read off one
-reaches `guide_*` on the same terms as a sentence: its quote is the text read off the image, its URL
-is **the page the image was on**, which gets the usual roaster-site check, and the image's own URL
-is stored beside it. The image's host is not checked, since roasters' images routinely sit on a CDN.
-The copy-out copies only what is printed and never fills in or infers. **The image renders beside
-the values it backs, always**: a copy-out is a reading, not a quotation, so it is only as checkable
-as the picture next to it, and that is what keeps it inside this rule. A value with no stored image
-to show is dropped. Tier 1 is still earned by place: an image in this coffee's own gallery can be
-`coffee_specific`; one anywhere else on the site is `roaster_generic`.
-
-### 2. Three tiers, and which one answered is stored
-
-1. `coffee_specific` — instructions published for this exact coffee, on its product page
-2. `roaster_generic` — the roaster's general brew guide, **from their own site only**
-3. `none` — neither exists. A correct answer, and a recorded one
-
-(`not_searched` is the fourth state, for a bag saved before any search ran.)
-
-A house pour-over ratio is useful, but it is not what the roaster decided about this particular
-lot. **Do not flatten the distinction.**
-
-**The tier records where the instructions were read, not who they were written for.** That is the
-only part a search can check, and the distinction is real: a house ratio published on every product
-page validates as `coffee_specific` while being a default. **The first real bag was thought to be
-that case and is not** — Sweet Bloom's stored guide reads 18g/305g/850µm/23-25s against the house
-Origami Air 1:17/900µm/2:40, and Sweet Bloom dials per bean. The rule is untouched and nothing
-ranks or filters on tier 1, but **this bag no longer illustrates it and a real example is owed.**
-The old label, "The roaster's recipe for this coffee", asserted the part never checked.
-
-**The three tiers are now a three-state indicator, and every label names the place.** "Found Brew
-Guide on Page", "Non-Specific Roaster Brew Guide", "No Recipe Found" — green, amber, red, with the
-word carrying the same thing as the colour so the colour is never the only signal. The wording lives
-in `lib/guideDisplay.ts`, deliberately apart from `lib/guide.ts`: presentation must not be able to
-reach validation. A test there refuses any label that claims a recipe was *written for* this coffee.
-The prose caveat that used to sit beneath tier 1 is gone — **the quote itself replaces it**, one tap under the indicator, which is the check rather than a sentence about it.
-
-So **a `coffee_specific` guide is not evidence of a per-lot recipe**, and anything later that treats
-it as one is reading more into the column than it holds. The one honest signal available is
-cross-bag — two bags from the same roaster carrying identical values means it is boilerplate — and
-it is not built yet.
-
-### 3. The roaster's values stay separate from yours
-
-`guide_*` on the bag holds what was published; it is never overwritten by what you did. What you
-dialled in lives on `coffee.brews`, one row per attempt — **the bag's own `my_grinder`,
-`my_grind_setting`, `my_method` and `my_rating` columns were dropped on 2026-09-12** because one set
-of columns can only hold the last thing you tried, which is the opposite of dialling in — a
-sequence of attempts whose whole value is comparing them. This is `CLAUDE.md`'s append over rewrite,
-applied to the thing that was accumulating. `my_notes` stays on the bag: it describes the coffee and
-outlives any one attempt at it.
-
-Brewing their filter coffee as espresso records what you did without erasing what they suggested.
-Keep it that way.
-
----
-
-## Design decisions, and why
-
-**Filter and batch beat espresso, always** (2026-09-25). A bag holds one guide; when a roaster prints both, filter (pour-over, batch or immersion) is stored,
-and espresso only when it is the only recipe. The other was not chosen, so it is neither a `dropped`
-value nor a failure.
-
-**Two brewer vocabularies, not one.** `guide_method` records what the roaster published and stays
-broad, because it describes the world; `my_brewer` names the five things actually on the shelf.
-They were one shared list until the first real bags arrived and every one of them was Sweet Bloom
-publishing **"ORIGAMI AIR"** — a real dripper that no five-item list has room for. Narrowing the
-shared list would have turned the roaster's own column into "other" for most of the specialty
-world, which is information loss in the column whose entire job is recording what they said.
-
-`myBrewerFor` carries the roaster's choice across **only on an exact correspondence**. Origami,
-Chemex and espresso leave your brewer blank rather than rounding to the nearest cone, and a bare
-"V60" leaves it blank too, because you own an 02 and a Switch and the roaster did not say which.
-Rounding to the nearest thing on the shelf, on the roaster's authority, is the same species of
-invention this tool refuses about brewing parameters.
-
-**Brew method is a fixed vocabulary, not free text.** "V60", "v60" and "Hario V60" as three values
-would quietly break grouping and filtering, and roasters' wording varies more than that.
-`normalizeMethod` maps their phrasing onto the enum, ordered longest-phrase-first so "french press"
-is not swallowed by "press", and generic filter language only wins if nothing specific matched.
-Normalization runs against the **stored quote**, not a model-chosen label, so it stays auditable.
-
-`null` means they said nothing; `"other"` means they said something unplaceable. Only the second is
-worth storing — keep that distinction.
-
-**Two URLs, not one.** `product_url` and `guide_url` are the same page at tier 1 and different
-pages at tier 2. One column would lose which you are looking at.
-
-**A bag is a purchase; a brew is one thing you did with it.** One bag, many brews. The bag holds
-what is fixed the moment you buy it — identity, purchased date, photo, and the whole `guide_*`
-block — and `my_notes`, which describes the coffee and outlives any one attempt at it. Everything
-variable is a brew: brewer, brew method, grinder, grind setting, dose, water, brew time, beverage
-mass, TDS, rating, and notes about that cup.
-
-**Deleting a bag deletes its brews**, by cascade, and its photo. The confirm names the brew count
-for that reason: losing a dial-in history silently is worse than losing the photo.
-
-**A new brew opens as a repeat of the last one, and as the roaster's numbers before that.** Dialling
-in is one change at a time against everything else held still, so retyping four settings you did not
-mean to change is how they drift — and a drifted setting is indistinguishable afterwards from a
-deliberate one. `repeatOf` carries the decisions: brewer, brew method, grinder, grind setting, dose,
-water and ratio. It carries no reading — beverage mass, TDS, rating and notes start empty, because
-those describe one cup and a repeated one would record a measurement nobody took.
-
-`openingBrew` then fills whatever the repeat left blank from the bag's own `guide_dose`,
-`guide_water` and `guide_ratio`, so the first brew of a bag starts where the roaster said to start.
-**Your last brew wins field by field**: once you have brewed it, their number is a fact about the
-bag rather than an instruction, and letting it overwrite your setting would undo the previous
-attempt every time the form opened. Grind is deliberately not carried across — "900µm" is a
-particle size and the field it would land in is a dial position, and translating one into the other
-is the rounding `myBrewerFor` refuses. **Nothing here is written**: these are prefilled inputs, and
-only logging the brew stores them, which is what keeps a published number out of `coffee.brews`
-unless you actually brewed it. Beverage mass and TDS both feed the generated extraction yield, so a stale
-one produces a figure that is arithmetically correct about a brew that never happened. **Clear**
-empties the form; it is beside the line saying the form was prefilled, so it undoes the thing it
-sits next to.
-
-This is the same line `findPreviousBag` draws across bags, drawn again within one.
-
-**TDS is stored once, in percent.** A refractometer reads percent; everything else quotes ppm; they
-are the same number and `1% = 10,000 ppm`. ppm is derived at display and never stored, because two
-columns for one measurement is two things that can disagree. **Extraction yield is a generated
-column**, not an input — it is a function of dose, beverage mass and TDS, and an editable copy
-would be free to drift from the brew it claims to describe.
-
-**The refractometer half of the form is commented out, and none of the above changed.** `tds_percent`, `beverage_g` and the generated `extraction_yield` keep their columns,
-their comments and their tests; the form simply does not ask for them today, and a logged brew
-still shows a reading it already carries. This is a decision about what is worth typing in a
-kitchen, not about what is worth recording — so it is reversed by uncommenting, never by a
-migration.
-
-**A brew is planned in dose, ratio and water, and the ratio is not stored.** It is `water_g /
-dose_g`, so a column for it would be the same mistake as a column for ppm or an editable extraction
-yield: one fact with two homes. It is derived in `lib/brews.ts`, shown in the form, and dropped
-before the POST. **`water_g` is water into the brew and `beverage_g` is what came out of it** — the
-bed keeps roughly two grams per gram of coffee, and filling either from the other overstates the
-yield by about a tenth, which is enough to relabel a brew that has not changed.
-
-**Both round to whole numbers** (2026-09-20). Water already
-did, because that is what a kettle and a scale resolve; the ratio does now, because 1:17 is what
-you brew to and 1:16.9 is a description of what the scale happened to say. **It rounds your numbers
-only** — `parseRatio` still reports the roaster's published ratio unrounded, since rounding that
-one would be inventing on their authority, which is the thing `myBrewerFor` already refuses about
-brewers.
-
-**Brew time is stored as whole seconds and typed as `m:ss`.** A duration is one number, so minutes
-and seconds are not two columns, for the same reason ppm is derived from `tds_percent` rather than
-kept beside it. **A bare number is refused rather than read**: "3" is three minutes to one person
-and three seconds to another, and nothing in the string settles it — the same refusal `lib/dates.ts`
-makes about `05/06/2026`. **It is a reading, not a setting**, so it does not carry into the next
-brew and does not prefill from `guide_time`: the box holds what the timer said, and a number
-already in it is a stopwatch nobody started. `guide_time` keeps the roaster's own wording, free
-text, exactly as quoted — the two are rule 3 again.
-
-**The search can be run again from the shelf, and that refreshes the link** (2026-09-20). Both
-halves are one call: the search writes `product_url` and `guide_url` through the same `guideColumns` the first run
-used, so the link is re-derived rather than patched. **Searching again keeps only the freshest
-result**, even when it finds less than the guide it replaces (2026-09-24). It runs at the
-default model and offers no dial — the model picker is a comparison harness you set up on the way
-in, and this is a button pressed in a kitchen. It polls the row rather than waiting, so closing the
-card cannot lose an answer that takes minutes.
-
-**A bag is a purchase, so it needs a purchase date, and the error says so** (2026-09-19). The column stays nullable and the POST cannot demand
-one, because the row is written **before** the search, when there is no date to have — so the
-requirement is a rule about *finishing* a bag and lives at the save step, in `lib/patch.ts`, where
-both screens that edit a bag read it. **An error naming the field beats the two things it replaced**:
-"Couldn't save that bag", which said what failed and not what to do, and closing the panel quietly,
-which was true of the request and useless to the person holding the bag.
-
-**Each purchase is its own row.** Roasters re-release the same coffee each crop, so "have I had
-this before" is a lookup on `(lower(roaster), lower(coffee_name))`, not a uniqueness constraint.
-`findPreviousBag` carries forward **only the dial-in** — method, grinder, grind setting. A rating
-or tasting note describes a lot you actually drank, and this bag is not that lot.
-
-**Nothing is pinned up front.** `findRoasterDomain` was removed in #176: no roaster information is
-pinned ahead of a search. No search sets `allowed_domains`, and
-`validateGuide`'s post-hoc host check is now the whole of the constraint. **Pinning was not
-neutral**: `web_fetch` only fetches URLs already in the conversation, so search is the sole channel
-by which a page enters it, and narrowing that channel left the fetch nothing to work with. The rows
-are the measurement — the same roaster returned four quotes unpinned and `none` pinned, 27 hours
-apart with no code change between.
-
-**It installs to the iPhone home screen, and is iOS-only on purpose.** The primary device is a
-phone in a kitchen, so the tool is installed rather than opened in a tab: `apple-touch-icon` plus
-the `apple-mobile-web-app-*` tags, which is all iOS needs. There is deliberately no web app
-manifest. A manifest is fetched without credentials, so the password gate would return the login
-redirect and the install would silently never offer itself; allowing it through means editing
-`proxy.ts`, the gate file, which is the password gate and is not Coffee's to change. If every tool
-should be installable, that pattern belongs to the theme in `apps/home`, not here.
-
-The icon is a static import so it is served from `/_next/static`, which the password gate always
-lets through. Next's own `app/apple-icon.png` convention is served from a route the gate would have
-to exempt, and without that iOS falls back to a screenshot of the login page as the icon.
-
-**An installed app has its own cookie jar**, so signing in inside it is expected rather than a
-session bug. It is also reached directly rather than through the hub's iframe.
-
-**Images downscale in the browser** to 1568px on the long edge at quality 0.85. Three problems, one
-fix: an iPhone shot is 3–5MB of HEIC, the Anthropic API accepts only jpeg/png/webp/gif, and Vercel
-rejects bodies over ~4.5MB with an opaque error. 1568px is Claude's optimal size, so this costs no
-accuracy.
-
-**The search model and its effort are selectable; the label reader is not.** Which model retrieves
-well enough is an open question, so the search offers every model in `SEARCH_MODELS`
-(`lib/models.ts`), with an effort level where the model has one, and records both on each bag — a
-guide is only comparable against another if you know what produced it, and effort is as much a part
-of that as the model.
-
-The models do not take the same request — web tool versions, whether effort is accepted at all, and
-which levels exist all differ — which is why both controls are derived from that registry rather than
-being fixed dropdowns. Every difference is a 400 rather than a degraded result, so a level the model
-does not take is refused by the route and never offered by the page — absent rather than greyed
-out, because a disabled control implies a setting that exists.
-
-Lowering the model does not lower the guard. `validateGuide` enforces quote-backing in code, so a
-weaker model cannot invent a recipe — it can only fail to find one and report `none`. That is what
-makes the comparison safe to run at all.
-
-**The label reader is one fixed model, called with `effort: "low"`** and a JSON schema. Reading a
-label is transcription, not reasoning, it is already fast, and the round trip happens while you are
-standing in a kitchen holding the bag. The system prompt forbids guessing a roaster from the design
-or completing a partially visible word.
-
----
-
-## Guardrails
-
-**Never do:**
-
-- Weaken `validateGuide`, or add a path that writes a `guide_*` value without a backing quote.
-- Add a table pre-emptively. A brew log, a timer, inventory and a method lookup table are all
-  expected eventually; each arrives as its own table when it is actually built. Promoting the
-  method enum to a table later is an additive migration.
-
-**Yours to use:** `ANTHROPIC_API_KEY`, which every app that calls a model carries.
-
-## Guidelines
-
-- **The search step cannot be exercised from a Claude Code sandbox** — roaster domains are blocked
-  by the egress proxy. Tests cover the validation logic against recorded response shapes. The search
-  itself is verified in production with a real bag, after merge: previews are skipped by every
-  `ignoreCommand`, so merge-then-look is the only live check (`DECISIONS.md`, 2026-09-20). Do not
-  conclude the feature works because the tests pass.
-- When you add a guide field, add its test first. Every existing field in `GUIDE_FIELDS` has one,
-  and the quote-backing rule is only as strong as its coverage.
+## Scope
+
+- `apps/coffee`.
+- The `coffee` schema: `coffee.bags` and `coffee.brews`, one to many.
+- The private `coffee-files` bucket.
+- `ANTHROPIC_API_KEY`.
+
+## Core rules
+
+- No brewing parameter is stored without the verbatim sentence it came from and the URL of that
+  sentence's page.
+- This is enforced in code, in `lib/guide.ts`, never in the prompt; a prompt can only ask.
+- Do not weaken it, move it into the prompt, or add a write path around it.
+- An empty result and an unread result never render the same.
+
+## Flow
+
+- Photograph → downscale in the browser → Claude reads roaster and coffee name → the user confirms
+  → save → search → the guide lands on the saved bag; with no guide, a suggested recipe lands
+  beside it.
+- The confirm step is required. It is also the manual-entry path when a photo cannot be read.
+- Save precedes the search. The search updates the saved row and the page polls the row, so a
+  dropped connection or a closed tab loses nothing. A search runs for minutes with nothing on the
+  connection.
+
+## Rule 1: no invented guide values
+
+`validateGuide` in `lib/guide.ts`:
+
+- drops any parameter with no backing quote;
+- rejects a quote citing a page the model did not report reading;
+- refuses anything read off a site that is not the roaster's;
+- demotes `coffee_specific` to `roaster_generic` unless the instructions were read on the product
+  page itself;
+- never throws; a malformed response becomes `status: "none"`.
+
+Display:
+
+- Dropped values are shown beside the kept ones, never silently discarded.
+- Quotes render beside the parsed values.
+
+### Recipe printed as an image
+
+- A value read off an image reaches `guide_*` on the same terms as a sentence.
+- Its quote is the text read off the image. Its URL is the page the image was on, and that page gets
+  the roaster-site check. The image URL is stored beside it.
+- The image's own host is not checked.
+- The copy-out takes only what is printed. It never fills in or infers.
+- The image always renders beside the values it backs. A value with no stored image is dropped.
+- `coffee_specific` only for an image in this coffee's own product gallery; anywhere else on the
+  site is `roaster_generic`.
+
+### Suggested recipe
+
+When the search finds no recipe, a model generates a suggested one. It never touches `guide_*`.
+
+- A bag with no guide still reads "No Recipe Found".
+- It lives only in `suggested_recipe` (`jsonb`: parameters, reasoning, model, timestamp).
+- It carries no quote and no URL. `coerceSuggestion` drops any `status`, `product_url` or `quotes`.
+- The call has no web search.
+- Its heading states that it is a suggestion. The wording lives in `lib/guideDisplay.ts`, under a
+  test that refuses wording claiming it was found, published or the roaster's. Never inline it in
+  the card.
+- It never prefills a brew. The user types it in. This is settled.
+
+## Rule 2: three tiers, stored
+
+1. `coffee_specific`: instructions on this coffee's product page.
+2. `roaster_generic`: the roaster's general guide, from the roaster's own site only.
+3. `none`: neither exists. A correct, recorded answer.
+
+`not_searched` marks a bag saved before any search ran.
+
+- Do not flatten the tiers.
+- A tier records where the instructions were read, not whom they were written for.
+  `coffee_specific` is not evidence of a per-lot recipe.
+- Labels: "Found Brew Guide on Page" (green), "Non-Specific Roaster Brew Guide" (amber),
+  "No Recipe Found" (red). The word always carries what the colour does.
+- Labels live in `lib/guideDisplay.ts`, separate from `lib/guide.ts`; presentation must not reach
+  validation. A test refuses any label claiming a recipe was written for this coffee.
+- The quote sits one tap under the indicator. There is no caveat text.
+
+## Rule 3: the roaster's values stay separate from the user's
+
+- `guide_*` holds what was published and is never overwritten by what the user did.
+- Each brew attempt is a row in `coffee.brews`. Never collapse attempts into columns on the bag.
+- `my_notes` stays on the bag; it describes the coffee.
+
+## Data model
+
+- A bag is a purchase. It holds identity, purchased date, photo, the `guide_*` block and `my_notes`.
+- A brew is one attempt: brewer, brew method, grinder, grind setting, dose, water, brew time,
+  beverage mass, TDS, rating, notes.
+- Each purchase is its own row. "Had this before" is a lookup on
+  `(lower(roaster), lower(coffee_name))`, not a uniqueness constraint.
+- `findPreviousBag` carries forward only method, grinder and grind setting.
+- Deleting a bag cascades to its brews and deletes its photo. The confirm names the brew count.
+- `product_url` and `guide_url` are separate columns; they differ at tier 2.
+- One guide per bag. When a roaster prints filter (pour-over, batch, immersion) and espresso, store
+  filter. Espresso only when it is the only recipe. The unchosen recipe is neither `dropped` nor a
+  failure.
+- Purchase date is required at the save step, in `lib/patch.ts`, with an error naming the field.
+  The column stays nullable and `POST` does not demand it, because the row is written before the
+  search.
+
+## Vocabularies
+
+- `guide_method` records the roaster's method and stays broad. `my_brewer` names the five brewers
+  the user owns.
+- `myBrewerFor` maps only on an exact correspondence. Origami, Chemex, espresso and a bare "V60"
+  leave the brewer blank. Never round to the nearest owned brewer.
+- Brew method is a fixed enum. `normalizeMethod` matches longest phrase first; generic filter
+  language wins only if nothing specific matched. It runs against the stored quote.
+- `null` means the roaster said nothing; `"other"` means they said something unplaceable. Keep both.
+
+## Measurements
+
+- TDS is stored once, in percent. ppm is derived at display.
+- Extraction yield is a generated column, never an input.
+- Ratio is not stored. It is `water_g / dose_g`, derived in `lib/brews.ts`, shown in the form and
+  dropped before the `POST`.
+- `water_g` is water in; `beverage_g` is liquid out. Never fill one from the other.
+- The user's water and ratio round to whole numbers. `parseRatio` reports the roaster's ratio
+  unrounded.
+- Brew time is stored as whole seconds and typed as `m:ss`. A bare number is refused.
+- Brew time is a reading: it does not carry into the next brew or prefill from `guide_time`.
+  `guide_time` is the roaster's free text, verbatim.
+- The refractometer fields are commented out of the form. Their columns, comments and tests stay,
+  and a logged brew still shows any reading it carries.
+  Restore by uncommenting, never by migration.
+
+## Brew form
+
+- A new brew opens as a repeat of the last. `repeatOf` carries brewer, brew method, grinder, grind
+  setting, dose, water and ratio. Beverage mass, TDS, rating and notes start empty.
+- `openingBrew` fills what remains blank from `guide_dose`, `guide_water` and `guide_ratio`. The
+  last brew wins field by field.
+- Grind is never filled from the guide; a particle size is not a dial position.
+- Prefill writes nothing. Only logging the brew stores it.
+- **Clear** empties the form and sits beside the line saying the form was prefilled.
+
+## Search
+
+- Nothing is pinned. No search sets `allowed_domains`; `validateGuide`'s host check is the whole
+  constraint. `web_fetch` reaches only URLs search has surfaced, so pinning starves it.
+- Search again from the shelf re-derives `product_url` and `guide_url` through `guideColumns`.
+- The freshest successful result replaces the old one, even when it finds less.
+- Search again uses the default model, offers no picker, and polls the row.
+- The first search offers every model in `SEARCH_MODELS` (`lib/models.ts`), with effort where the
+  model supports it. Both are recorded on the bag.
+- Both controls derive from that registry. An unsupported level is refused by the route and absent
+  from the page, not disabled.
+- The label reader is one fixed model, `effort: "low"`, with a JSON schema. Its prompt forbids
+  guessing a roaster from the design or completing a partly visible word.
+
+## Client
+
+- Images downscale in the browser to 1568px on the long edge at quality 0.85.
+- iOS home-screen install only: `apple-touch-icon` and the `apple-mobile-web-app-*` tags.
+- No web app manifest. It is fetched without credentials, so the gate would redirect it, and
+  allowing it means editing `proxy.ts`, which is not Coffee's to change. Installability for every
+  app belongs to the theme in `apps/home`.
+- The icon is a static import served from `/_next/static`. Never use Next's `app/apple-icon.png`
+  convention; that route sits behind the gate.
+- The installed app has its own cookie jar; signing in there is expected. It is reached directly,
+  not through the hub's iframe.
+
+## Never
+
+- Weaken `validateGuide`, or write a `guide_*` value without a backing quote.
+- Add a table before the feature that needs it is built. Promoting the method enum to a table later
+  is an additive migration.
+
+## Testing
+
+- The search cannot run from a sandbox; roaster domains are blocked. Tests cover validation against
+  recorded response shapes.
+- The search is verified in production with a real bag after merge; previews are skipped by every
+  `ignoreCommand`. Passing tests do not show it works.
+- A new guide field gets its test first. Every field in `GUIDE_FIELDS` has one.
