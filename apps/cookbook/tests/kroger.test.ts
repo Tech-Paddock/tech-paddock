@@ -256,7 +256,7 @@ describe("the callback", () => {
     expect(res.cookies.get("cookbook_kroger_state")?.value).toBe("");
   });
 
-  it("a sign-in Joel cancelled at Kroger saves nothing", async () => {
+  it("a sign-in cancelled at Kroger saves nothing", async () => {
     mem.row = null;
     const state = makeState(key());
     const res = await callback(`error=access_denied&state=${encodeURIComponent(state)}`, state);

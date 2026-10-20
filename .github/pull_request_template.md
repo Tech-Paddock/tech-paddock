@@ -1,44 +1,22 @@
-Requested by Joel on YYYY-MM-DD — "what he said"
+Requested on YYYY-MM-DD — "the request, quoted"
 
 ## What changed
 
 ## Why
 
 ## Blast radius
-<!-- Which apps does this touch? Which shared files? "One app, no shared files" is a fine answer. -->
+<!-- Apps and shared files touched. -->
 
 ## Verification
-- [ ] `npm run test --if-present` passes in every touched app
-- [ ] `npm run build` passes in every touched app
-- [ ] CI is green — the `gate` job covers the per-app builds and `drift`; a new app under `apps/` needs no workflow change
-- [ ] No personal information anywhere in the diff — names, addresses, phone numbers, emails, employers, schools, resume content. For any `.docx`, that includes hyperlink targets in `.rels` parts and the author fields in `docProps/`, not just `document.xml`.
-- [ ] `NOTES.md` updated for every app this touches, and it describes what this change leaves behind
-- [ ] Any schema change has its migration file in this PR, and its shape is stated below
+- [ ] CI `gate` is green (per-app typecheck, tests, build; `drift`)
+- [ ] No personal information in the diff (for a `.docx`, also `.rels` targets and `docProps/` authors)
+- [ ] `NOTES.md` updated for every app touched
+- [ ] Any schema change has its migration in this pull request
 
 ## Deployment
-<!--
-Four things, every time. "Nothing — it deploys itself on merge" is a valid answer and must be
-written; a blank section is indistinguishable from a forgotten one.
-
-- What happens by itself when this merges?
-- What does a human have to do, and in what order?
-- How do you verify it is genuinely live?
-- What breaks if the steps are skipped?
--->
+<!-- What happens on merge; manual steps, in order; how to verify; what breaks if a step is skipped.
+"Nothing — deploys on merge" is a valid answer. -->
 
 ## Rules impact
-<!--
-Does this change contradict anything settled — CLAUDE.md, the app's RULES.md,
-the domain map, env vars, or a stated decision?
-
-If so it should already have been raised with Joel BEFORE the work, not here.
-Flagging it at this point is the backstop for something you only discovered
-late, not the normal path — code already written applies pressure to approve it,
-which is what the rule exists to prevent.
-
-CLAUDE.md and every RULES.md change only with Joel's approval, given before the
-change is made. The technical director drafts them; anyone else proposes the
-change here or in a Linear issue — do not make it.
-
-Write "none" if nothing settled is affected.
--->
+<!-- Anything this contradicts in CLAUDE.md or a RULES.md, raised with the owner before the work.
+"None" if nothing. -->

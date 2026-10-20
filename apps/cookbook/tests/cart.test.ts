@@ -209,7 +209,7 @@ describe("a second send warns and shows what was already sent", () => {
     expect(add).not.toHaveBeenCalled();
   });
 
-  it("sends when Joel says again", async () => {
+  it("sends when the user says again", async () => {
     const add = vi.fn(async () => {});
     const outcomes = await sendLines({ open, picks, again: true }, { add, remember: vi.fn() });
     expect(outcomes.every((o) => o.result === "added")).toBe(true);

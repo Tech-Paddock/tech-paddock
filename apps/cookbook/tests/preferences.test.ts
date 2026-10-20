@@ -36,8 +36,8 @@ describe("matchPreference", () => {
   const prefs = [pref("milk"), pref("whole milk", { kind: "plain", terms: null })];
 
   it("the longest phrase decides", () => {
-    // Joel's own case, and the reason the table is the size of his decisions
-    // rather than the size of his vocabulary.
+    // The real case, and the reason the table is the size of the user's
+    // decisions rather than the size of their vocabulary.
     expect(matchPreference("2 cups whole milk", prefs)?.phrase).toBe("whole milk");
     expect(matchPreference("1 cup milk", prefs)?.phrase).toBe("milk");
   });

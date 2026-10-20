@@ -386,7 +386,7 @@ function replaceRowLabelItems(rowRaw: string, label: string, items: string): str
  * skip, and those keywords are the whole point of the section.
  *
  * So the template's own table was flattened into `Label:⇥items` paragraphs. The
- * renderer reads both because a template is a file Joel edits, not a shape this
+ * renderer reads both because a template is a file the user edits, not a shape this
  * code gets to assume — and because the alternative was worse than a defect: the
  * table branch simply passed paragraphs through, so a flattened template would
  * have rendered the *template's* competencies on every job while the input's were

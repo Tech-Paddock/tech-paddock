@@ -1,5 +1,4 @@
-# Pipeline Tracker — parked
+# Pipeline Tracker — rules
 
-Its rules and its contracts with the editor, the hub and the Resume Formatter are in
-`apps/home/RULES.md`, *The tracker's contracts*. Read them before touching anything here: all of
-them break quietly rather than loudly.
+Parked. Its rules and contracts are in `apps/home/RULES.md`, *The tracker*. Read them before any
+change: each contract fails silently.

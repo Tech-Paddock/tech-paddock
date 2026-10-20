@@ -63,7 +63,7 @@ export type RecipeDraft = {
   /**
    * Time, meal, main, cuisine, equipment, diet, tags — and the rating, which
    * only a person sets. A model's path arrives here with `rating: null`, and
-   * `POST /api/recipes` reads a rating only because Joel may set one on the
+   * `POST /api/recipes` reads a rating only because the user may set one on the
    * draft before Keep it.
    */
   meta: RecipeMeta;
@@ -369,7 +369,7 @@ export async function updateRecipe(id: string, edit: RecipeEdit, reprice: Repric
 /**
  * Rate a recipe already in the book, or clear its rating. **The one-tap edit**:
  * the stars on an open card save on their own, without opening the editor. A
- * rating is Joel's opinion, and it arrives after cooking, which is after the
+ * rating is the user's opinion, and it arrives after cooking, which is after the
  * recipe was kept. Every other field changes through `updateRecipe`.
  */
 export async function setRating(id: string, rating: unknown): Promise<Recipe> {

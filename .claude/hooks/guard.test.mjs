@@ -245,7 +245,7 @@ test("GitHub: every write to a pull request is the main session's, and reading i
 });
 
 test("GitHub, for the main session: merging and updating go through; auto-merge, reviews and API commits wait; nothing commits to main", () => {
-  const body = 'Requested by Joel on 2026-09-24 — "close out"\n\n## Deployment\nNothing.';
+  const body = 'Requested on 2026-09-24 — "close out"\n\n## Deployment\nNothing.';
   expectAll(
     [
       [["create_pull_request", { title: "x", body, head: "claude/x", base: "main" }], "allow"],
@@ -256,6 +256,7 @@ test("GitHub, for the main session: merging and updating go through; auto-merge,
       [["update_pull_request", { pullNumber: 1, title: "y" }], "allow"],
       [["update_pull_request", { pullNumber: 1, body }], "allow"],
       [["update_pull_request", { pullNumber: 1, body: "rewritten without the line" }], "deny"],
+      [["update_pull_request", { pullNumber: 1, body: 'Requested by X on 2026-09-24 — "old form"' }], "deny"],
       [["update_pull_request_branch", { pullNumber: 1 }], "allow"],
       [["pull_request_review_write", { method: "submit_pending", event: "APPROVE" }], "ask"], // got through
       [["push_files", { branch: "main", files: [] }], "deny"], // got through
@@ -270,7 +271,7 @@ test("GitHub, for the main session: merging and updating go through; auto-merge,
   assert.equal(mcp("mcp__github__push_files", { branch: "claude/x", files: [] }), "ask");
 });
 
-test("starting a helper is not the guard's: Joel's go on the work is the go (TEC-115)", () => {
+test("starting a helper is not the guard's: the owner's go on the work is the go (TEC-115)", () => {
   const start = (subagent_type, who = {}) => verdict(decide({ tool_name: "Agent", tool_input: { subagent_type, prompt: "x" }, ...who }));
   for (const t of ["builder", "deployment", "Explore", undefined]) {
     assert.equal(start(t), "allow", String(t));
@@ -292,12 +293,12 @@ test("a pull request from a shell is the main session's too", () => {
 test("Linear's diff tools act on the pull request, so they are the main session's", () => {
   for (const t of ["merge_diff", "update_diff", "submit_diff_review", "save_diff_comment", "resolve_diff_thread"]) {
     assert.equal(verdict(decide({ tool_name: `mcp__Linear__${t}`, tool_input: {}, ...HELPER })), "deny", t);
-    assert.equal(mcp(`mcp__Linear__${t}`, {}), "allow", t); // settings.json still asks Joel
+    assert.equal(mcp(`mcp__Linear__${t}`, {}), "allow", t); // settings.json still asks the owner
   }
   for (const t of ["get_diff", "list_diffs", "get_diff_threads"]) assert.equal(mcp(`mcp__Linear__${t}`, {}), "allow", t);
 });
 
-test("Supabase: reads and apply_migration go ahead; the rest waits for Joel", () => {
+test("Supabase: reads and apply_migration go ahead; the rest waits for the owner", () => {
   const sql = (query) => mcp("mcp__Supabase__execute_sql", { project_id: "p", query });
   assert.equal(sql("select count(*) from coffee.bags"), "allow");
   assert.equal(sql("select * from x where status = 'deleted' -- update later"), "allow");
@@ -320,7 +321,7 @@ test("Supabase: reads and apply_migration go ahead; the rest waits for Joel", ()
   }
 });
 
-test("Vercel: reads go ahead; changes and credentials wait for Joel", () => {
+test("Vercel: reads go ahead; changes and credentials wait for the owner", () => {
   for (const t of ["list_projects", "get_project", "list_deployments", "get_runtime_logs", "search_vercel_documentation", "get_firewall_config", "filter_project_envs", "web_fetch_vercel_url"]) {
     assert.equal(mcp(`mcp__Vercel__${t}`, {}), "allow", t);
   }
@@ -332,14 +333,14 @@ test("Vercel: reads go ahead; changes and credentials wait for Joel", () => {
 });
 
 test("Linear: an issue has an owner, at most one app, and ends with Next steps that name who acts", () => {
-  const good = "What and why.\n\n## Next steps\n\n1. **Joel:** decide.\n2. **TD:** build it.\n   * a detail\n3. **Done:** checked.\n";
+  const good = "What and why.\n\n## Next steps\n\n1. **Owner:** decide.\n2. **TD:** build it.\n   * a detail\n3. **Done:** checked.\n";
   const save = (input) => mcp("mcp__Linear__save_issue", input);
   const create = (extra) => save({ team: "TEC", title: "t", labels: ["owner:TD", "app:coffee"], description: good, ...extra });
   assert.equal(create({}), "allow");
-  assert.equal(create({ labels: ["owner:Joel", "app:health", "Parked"] }), "allow");
+  assert.equal(create({ labels: ["owner:Owner", "app:health", "Parked"] }), "allow");
   assert.equal(create({ labels: ["owner:TD"] }), "allow"); // a platform issue has no app
   assert.equal(create({ labels: ["app:coffee"] }), "deny");
-  assert.equal(create({ labels: ["owner:TD", "owner:Joel", "app:coffee"] }), "deny");
+  assert.equal(create({ labels: ["owner:TD", "owner:Owner", "app:coffee"] }), "deny");
   assert.equal(create({ labels: ["owner:TD", "app:coffee", "app:health"] }), "deny");
   assert.equal(create({ labels: ["1f4adc9b-38dc-4f83-9c67-6cdfaae4d47a", "owner:TD"] }), "deny");
   assert.equal(create({ description: undefined }), "deny");
@@ -356,7 +357,7 @@ test("Linear: an issue has an owner, at most one app, and ends with Next steps t
 
   assert.equal(save({ id: "TEC-1", state: "Done" }), "allow");
   assert.equal(save({ id: "TEC-1", addLabels: ["Parked"] }), "allow");
-  assert.equal(save({ id: "TEC-1", removeLabels: ["owner:TD"], addLabels: ["owner:Joel"] }), "allow");
+  assert.equal(save({ id: "TEC-1", removeLabels: ["owner:TD"], addLabels: ["owner:Owner"] }), "allow");
   assert.equal(save({ id: "TEC-1", removeLabels: ["owner:TD"] }), "deny");
   assert.equal(save({ id: "TEC-1", removeLabels: ["agent:TD"], addLabels: ["app:coffee"] }), "allow"); // the relabel
   assert.equal(save({ id: "TEC-1", addLabels: ["app:coffee", "app:health"] }), "deny");
@@ -376,7 +377,7 @@ test("Linear: an issue has an owner, at most one app, and ends with Next steps t
 test("helpers", () => {
   assert.ok(targetsMain("main") && targetsMain("refs/heads/main") && targetsMain("heads/main") && targetsMain("refs/heads/*"));
   assert.ok(!targetsMain("claude/main") && !targetsMain("refs/tags/main") && !targetsMain("mainline"));
-  assert.deepEqual(nextSteps("## Next steps\n1. **Joel:** go"), []);
+  assert.deepEqual(nextSteps("## Next steps\n1. **Owner:** go"), []);
   assert.equal(stripSql("select 'it''s -- not a comment' /* x */ from t -- y"), "select  ''    from t ");
   assert.deepEqual(
     lex("a && b | c; d\ne").map((s) => s.words[0]),

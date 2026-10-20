@@ -55,8 +55,8 @@ describe("domainRoot", () => {
   });
 
   it("refuses to read a company out of a free-mail address", () => {
-    expect(domainRoot("joel@gmail.com")).toBeNull();
-    expect(domainRoot("joel@outlook.com")).toBeNull();
+    expect(domainRoot("someone@gmail.com")).toBeNull();
+    expect(domainRoot("someone@outlook.com")).toBeNull();
   });
 });
 

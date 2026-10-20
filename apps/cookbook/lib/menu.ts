@@ -2,13 +2,13 @@ import { getServiceClient } from "./supabase";
 import { LookupError } from "./errors";
 
 /**
- * On the menu — what Joel plans to cook, and on which day (TEC-39 C, 2026-09-24;
+ * On the menu — what is planned for cooking, and on which day (TEC-39 C, 2026-09-24;
  * the day, 2026-10-05).
  *
  * **Adding a recipe's ingredients to the list is the only way on**, and that is
  * where the day is picked. **One row per recipe**: adding it again moves it to
- * the new day — Joel does not cook the same thing twice in a week. **Nothing
- * falls off by itself**: Joel clears it, one row or all of them. Reasoning in the
+ * the new day — the same thing is not cooked twice in a week. **Nothing
+ * falls off by itself**: the user clears it, one row or all of them. Reasoning in the
  * `cookbook_menu_day` migration; the day's own rules are in `lib/menuDay.ts`.
  */
 

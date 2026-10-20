@@ -81,7 +81,7 @@ export type CallbackOutcome = "connected" | "declined" | "bad-state" | "failed" 
  * **The state is checked before anything else is touched**: a callback whose
  * state does not match the cookie this browser was given — and this app's
  * signature on it — writes nothing and calls nobody. That is the CSRF guard: it
- * stops someone else's Kroger sign-in being attached to Joel's Cookbook by a
+ * stops someone else's Kroger sign-in being attached to this Cookbook by a
  * link.
  */
 export async function completeCallback(input: {

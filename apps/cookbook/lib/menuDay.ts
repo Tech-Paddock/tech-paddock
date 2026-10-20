@@ -22,7 +22,7 @@ export function parseDay(value: unknown): string | null {
   return value.trim();
 }
 
-/** Today where this code runs, as `YYYY-MM-DD`. In the browser that is where Joel is. */
+/** Today where this code runs, as `YYYY-MM-DD`. In the browser that is where the user is. */
 export function localToday(now: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;

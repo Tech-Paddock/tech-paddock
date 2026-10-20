@@ -1,70 +1,54 @@
 # Technical Director — notes
 
-State as of 2026-10-19. `RULES.md` has the role, `DECISIONS.md` the archive of reasoning; this is
-only what is true and the traps. Open work is in Linear, team TEC. **Branch and pull request state
-is never written here** — read it live.
+What is true now, and the traps. Branch and pull request state is never written here; read it live.
 
----
+## State
 
-## Where the work is
-
-**TD + one builder + CI** since TEC-115 (2026-10-19). You start the builder per task after Joel's
-go, it pushes and stops, and you merge through the `merge` skill. Deployment, the per-app agents,
-their presets and handoffs are retired; each app's `RULES.md` and `NOTES.md` sit in its folder.
-Linear labels are `owner:` (Joel, TD) and `app:<folder>`. **"Backlog" means a Linear issue in
-Backlog, not built.** The parking lot is the `Parked` label.
-
-## What is true now
-
-- **Every live app is on Next 16 with `proxy.ts`** (TEC-34, closed 2026-10-19); the parked editor
-  and tracker stay on 14 with `middleware.ts` until Joel unparks or retires them.
-- **Home no longer reads `INTERNAL_API_SECRET`** (TEC-83): it stays linked to the paused tracker and
-  editor, on builds from before it.
-- **Every `ANTHROPIC_API_KEY` is proven in production** (TEC-75). Resume and the editor have none.
-- **`apps/showcase` is yours to build, and public** (TEC-99): the scaffold waits on Joel showing
-  you the uploader.
-- **Linear writes don't prompt Joel** (TEC-59). Deletes, label retirement and diff tools still ask.
-- **Health prices a recipe line from Cookbook's `GET /api/servings`** (TEC-25), forwarding only
-  `paddock_session`. `SESSION_SECRET` parity between `tp-health` and `tp-cookbook` gates logging
-  too: a mismatch reads as "Couldn't reach the Cookbook", not as a login bug.
-- **This container cannot reach `*.techpaddock.io`** — nothing served there can be checked from
-  here. Vercel's runtime logs and Joel are the substitute.
-- **The guard tells the main session from a helper by `agent_id` on the hook input**; only the main
-  session may write to a pull request.
-- **The migration history is clean**: repo and `list_migrations` differ by exactly
-  `20260908235234`, withheld because it seeds personal data.
+- **Shape:** TD + one builder + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Linear
+  labels: `owner:Owner`, `owner:TD`, `app:<folder>`; the parking lot is the `Parked` label.
+- **Every live app is on Next 16 with `proxy.ts`.** The parked editor and tracker stay on 14 with
+  `middleware.ts` until unparked or retired.
 - **`INTERNAL_API_SECRET` is one team-shared variable** for hub → tracker and tracker → editor.
-  The paused tracker and editor are on builds from before it: a 401 there means an old build.
+  Home no longer reads it. The paused tracker and editor run builds from before it, so a 401 there
+  means an old build.
+- **Every `ANTHROPIC_API_KEY` is proven in production.** Resume and the editor have none.
+- **`apps/showcase`'s scaffold waits on the owner showing you the uploader.**
+- **Linear writes don't prompt.** Deletes, label retirement and diff tools still ask.
+- **Health prices recipe lines from Cookbook's `GET /api/servings`**, forwarding only
+  `paddock_session`. A `SESSION_SECRET` mismatch between `tp-health` and `tp-cookbook` reads as
+  "Couldn't reach the Cookbook", not a login bug.
+- **The guard tells the main session from a helper by `agent_id`;** only the main session writes to
+  a pull request.
+- **Migration history is clean:** repo and `list_migrations` differ by exactly `20260908235234`,
+  withheld because it seeds personal data.
+- **This container cannot reach `*.techpaddock.io`.** Use Vercel runtime logs, or ask the owner.
 
-## Traps only here
+## Traps
 
 - **Two TD sessions cannot see each other.** A second TD starts from `/kickoff second-opinion` and
-  writes nothing. Before calling a pushed branch abandoned, check its commit's `Claude-Session`
-  with `get_session`: a live session still owns it.
-- **The guard runs from this session's checkout.** Editing `.claude/hooks/` there changes your own
-  rules before merge; do that work in a separate worktree (TEC-115).
-- **A project env read cannot see team-shared variables.** `list_user_events`, Vercel's audit log,
-  records every change with its time, shared variables included.
-- **The firewall can't be read or written through the API here** (`Seawall Config not found`).
-- **Runtime logs hold no request lines for these apps.** To see whether a feature ran, count rows
-  with `execute_sql` — counts and sources only, never content (TEC-113).
-- **The GitHub integration moves Linear issues on its own**: In Progress when a linked pull request
-  opens, Done when one naming it merges. After a merge, reopen any issue with Next steps left.
-- **The auto-mode classifier can refuse work under `.claude/`** as self-modification. It clears once
-  Joel's own words name the change. Never route round it; never probe the guard by editing it live.
-- **A Linear patch matches the stored text.** Copy an anchor from `get_issue`, tags and all.
-- **You cannot delete or rename a remote branch.** The proxy refuses it, disguised as a network
-  blip: stop after one try. Merged branches auto-delete; Joel deletes stale ones.
+  writes nothing. Before calling a branch abandoned, check its commit's `Claude-Session` with
+  `get_session`.
+- **The guard runs from this session's checkout.** Edit `.claude/hooks/` in a separate worktree.
+- **A project env read cannot see team-shared variables.** `list_user_events` (the audit log) shows
+  every change, shared ones included.
+- **The firewall cannot be read or written through the API** (`Seawall Config not found`).
+- **Runtime logs hold no request lines.** To see whether a feature ran, count rows with
+  `execute_sql`: counts and sources only, never content.
+- **The GitHub integration moves Linear issues:** In Progress when a linked pull request opens,
+  Done when one naming it merges. Reopen any with Next steps left.
+- **The auto-mode classifier can refuse work under `.claude/`.** It clears once the owner's own
+  words name the change. Never route around it or probe the guard by editing it live.
+- **A Linear patch matches stored text.** Copy the anchor from `get_issue`, tags and all.
+- **Remote branches cannot be deleted or renamed from here.** The proxy refusal looks like a network
+  blip; stop after one try. Merged branches auto-delete; the owner deletes stale ones.
 - **A container restart kills the builder.** Unpushed work survives in `.claude/worktrees/agent-*`
   until the container goes; brief a fresh builder to carry it over.
 - **Parallel builders can pick the same migration timestamp.** Check before merging.
-- **With a pull request open, one push runs `gate` twice**, and a merge is refused while the second
-  is queued. Read checks with `pull_request_read` → `get_check_runs`, never a curl loop (TEC-112).
-- **A stacked branch conflicts once its base squash-merges.** Test first (`DECISIONS.md`): `main`'s
-  copy against the base tip it stacked on; identical means take the branch side.
-- **The hosted API renames migrations.** Read `list_migrations` back before merging and rename the
-  file on the branch; a stacked branch carrying the old name brings it back.
+- **With a pull request open, one push runs `gate` twice,** and merge is refused while the second
+  is queued. Read checks with `pull_request_read` → `get_check_runs`, not a curl loop.
+- **A stacked branch conflicts once its base squash-merges.** See `DECISIONS.md`.
+- **The hosted API renames migrations.** Read `list_migrations` back and rename the file on the
+  branch; a stacked branch carrying the old name brings it back.
 - **A helper worktree refuses git inside a loop, a variable or `git -C`.** Run each git plainly.
-- **Finished work hides in other sessions.** At kickoff, `list_sessions` and `git branch -r` show
-  branches with no pull request and questions Joel never answered.
-- **Cost is context × turns.** Brief tightly; end the session once the branches are merged.
+- **Finished work hides in other sessions.** At kickoff, `list_sessions` and `git branch -r`.
+- **Cost is context × turns.** Brief tightly; end the session once branches are merged.

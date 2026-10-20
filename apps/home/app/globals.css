@@ -574,7 +574,7 @@ body {
 
 /* ---------------------------------------------------------------- pit wall
    Open Linear issues, as cards. Every colour is an existing token. What waits
-   on Joel sits in a band above the board, tinted with the accent; parked work
+   on the owner sits in a band above the board, tinted with the accent; parked work
    is dimmed rather than hidden.
    -------------------------------------------------------------------------- */
 .pitwall {
@@ -694,7 +694,7 @@ body {
   background: var(--surface);
 }
 
-.pw-joel {
+.pw-waiting {
   border-left: 3px solid var(--accent);
 }
 

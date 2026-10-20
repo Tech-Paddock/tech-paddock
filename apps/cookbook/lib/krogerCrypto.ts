@@ -6,7 +6,7 @@ import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEq
  * **Server-side only.** Nothing in the browser imports this file, and nothing
  * here logs. The refresh token is the one credential this app holds for someone
  * else's service (TEC-90): its scope is add-to-cart and product read, so a leak's
- * worst case is items in Joel's cart, and encrypting it means a leaked database
+ * worst case is items in the cart, and encrypting it means a leaked database
  * row is not even that.
  *
  * **AES-256-GCM under `KROGER_TOKEN_KEY`** (base64, 32 bytes — `openssl rand

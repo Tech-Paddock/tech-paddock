@@ -39,20 +39,20 @@ function byPriority(a: PitIssue, b: PitIssue) {
   return b.updatedAt.localeCompare(a.updatedAt);
 }
 
-/** Waiting on Joel is not a column: it is the band above the board, unless parked. */
-export const needsJoel = (i: PitIssue) => i.waitingOnJoel && !i.parked;
+/** Waiting on the owner is not a column: it is the band above the board, unless parked. */
+export const needsOwner = (i: PitIssue) => i.waitingOnOwner && !i.parked;
 
 export type StatusBoard = {
-  joel: PitIssue[];
+  waiting: PitIssue[];
   columns: { id: Exclude<Column, "later">; name: string; issues: PitIssue[] }[];
   later: PitIssue[];
 };
 
-/** By status: what waits on Joel, then the three working columns, then what is parked or not started. */
+/** By status: what waits on the owner, then the three working columns, then what is parked or not started. */
 export function byStatus(issues: PitIssue[]): StatusBoard {
-  const rest = issues.filter((i) => !needsJoel(i));
+  const rest = issues.filter((i) => !needsOwner(i));
   return {
-    joel: issues.filter(needsJoel).sort(byPriority),
+    waiting: issues.filter(needsOwner).sort(byPriority),
     columns: COLUMNS.map((c) => ({ ...c, issues: rest.filter((i) => i.column === c.id).sort(byPriority) })),
     later: rest.filter((i) => i.column === "later").sort(byPriority),
   };
@@ -72,9 +72,9 @@ export function byApp(issues: PitIssue[]): AppGroup[] {
     issues: issues
       .filter((i) => (i.app ?? NONE) === app)
       .sort((a, b) => {
-        // Waiting on Joel first, then by how far along, then by priority.
-        const ja = needsJoel(a) ? 0 : STAGE[a.column];
-        const jb = needsJoel(b) ? 0 : STAGE[b.column];
+        // Waiting on the owner first, then by how far along, then by priority.
+        const ja = needsOwner(a) ? 0 : STAGE[a.column];
+        const jb = needsOwner(b) ? 0 : STAGE[b.column];
         return ja !== jb ? ja - jb : byPriority(a, b);
       }),
   }));

@@ -10,7 +10,7 @@ import { ConflictError } from "./errors";
  *
  * - **A line tied to an exact product in Your brands goes in as-is.** Its link
  *   carries the product number.
- * - **Any other line shows Kroger's top match at the chosen store**, and Joel
+ * - **Any other line shows Kroger's top match at the chosen store**, and the user
  *   adds it or replaces it with an exact product page — which is then remembered
  *   in Your brands. **No model picks a product.**
  * - **Every open line reports added, skipped or failed**, so a partial send never
@@ -99,7 +99,7 @@ export function alreadySent(lines: CartLine[]): CartLine[] {
     .sort((a, b) => (a.sent_at as string).localeCompare(b.sent_at as string));
 }
 
-/** A line Joel chose: a product number (exact, or a tapped match) or a page that replaces the match. */
+/** A line the user chose: a product number (exact, or a tapped match) or a page that replaces the match. */
 export type CartPick = { id: string; upc?: string; url?: string };
 
 export type Outcome = {

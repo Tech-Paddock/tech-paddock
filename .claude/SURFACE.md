@@ -1,112 +1,68 @@
 # Surface — site or app
 
-**What shape a tool is.** Not what it looks like: whether it has an index, what its shell is, how you
-arrive at it, and whether it is worth an icon on a home screen.
+Surface is a tool's shell: whether it has an index, how you arrive, and whether it earns a
+home-screen icon. It is not the theme (palette, tokens, type, components), which lives in
+`apps/home`. Surface is architecture and the TD's call; the owner can overrule it.
 
-**Read this before designing a screen**, and before settling a new app's surface (the `new-app` skill).
-It was unwritten for long enough to be a ledger item (closed pre-Linear ledger item 7), and in that
-time Health had to invent the rule this would have supplied.
+Read this before designing a screen or settling a new app's surface (the `new-app` skill).
 
-**Surface is not the theme.** Palette, tokens, type, spacing and the shared component language are
-the theme, which lives in `apps/home` and is one system across every app. Surface is shell, navigation and whether there is an index — that is
-architecture, and it is the technical director's, with Joel able to overrule. Settled 2026-09-18.
-
-**Most tools are websites; Coffee is the only real app, and Health will be.** A
-site is **a thin index grouped by verb wrapping one long page**. An app is **one screen, thumb-first,
-no index**.
-
----
+- **Site:** a thin index grouped by verb, wrapping one long page.
+- **App:** one screen, thumb-first, no index.
 
 ## The test
 
-Three questions, in order. They usually agree; when they do not, the first one wins, because
-frequency is what makes a home-screen icon worth its space.
+Ask in order. When the answers disagree, the first wins.
 
-1. **How often, and from where?** Many times a day, phone in hand, standing up, in the middle of
-   doing something else → **app**. A few times a week, sitting down, with time → **site**.
-2. **Do you arrive knowing what you want to do?** One specific thing, already decided → **app**.
-   You came to look at what is there → **site**.
-3. **Would you actually put it on your home screen?** If the honest answer is no, it is not an app,
-   whatever else is true of it.
+1. **How often, and from where?** Many times a day, phone in hand, mid-task → app. A few times a
+   week, sitting down → site.
+2. **Do you arrive knowing what to do?** One decided thing → app. Looking at what is there → site.
+3. **Would it go on the home screen?** If not, it is not an app.
 
-**A tool that fits neither is designed with Joel at standup**, and the answer goes into the draft
-charter before anything is scaffolded.
+A tool that fits neither is designed with the owner before scaffolding, and the answer goes in its
+draft `RULES.md`. A tool that seems to be both may be two tools.
 
-## Page count is not the test, and the roster proves it
+**Count how often it is opened and in what state of mind, never its routes.** Coffee, Resume
+Formatter and Message Editor each have one route; only Coffee is an app.
 
-The obvious reading of *"one screen, no index"* is that an app is a tool with one page. **That is
-wrong, and believing it will misclassify half the roster.** Measured against the code rather than
-remembered: Coffee has exactly one route. So does the Resume Formatter. So does the Message Editor.
-**Coffee is the app and the other two are sites**, and nothing about their route trees says so.
+## App rules
 
-What separates them is **how you arrive**. You open Coffee standing at the grinder with a bag in your
-hand, several times a day, to do the one thing you already decided to do on the way there. You open
-the Resume Formatter when you are applying for something, once in a while, sitting down, and you
-want to see what is in it. Same page count, different posture — and the posture is what decides the
-shell.
+- **One screen.** A second screen needs a written reason and the owner's approval. The bar: the same
+  nouns one step earlier or later, not new territory.
+- **No index, no tabs.** Secondary views are a quiet footer link.
+- **Thumb-first.** The primary action sits in the reachable half; assume one hand.
+- **Opens in its working state,** not a menu.
+- **Home-screen install is part of the design.** On iOS it is done from Safari.
 
-So: **count how often it is opened and in what state of mind, never how many routes it has.**
+## Site rules
 
-## If it is an app
+- **A thin index grouped by verb,** not entity. It may be a tab bar when each tab is a verb and one
+  long page (Cookbook: Recipes · Add · King Soopers list).
+- **One long page over many routes.**
+- **Works on a phone,** but is not designed around one-handed use.
+- **No home-screen install by default.** The owner can grant one; the site's shape does not change.
 
-- **One screen.** A second screen needs a reason that survives being written down and is Joel's to
-  approve. Health's grocery list set the precedent and the bar: it earned one because it is the same
-  foods, one step before they are eaten — the same nouns, not new territory. The list is moving to
-  the Cookbook with the recipes (TEC-15); the bar does not move with it.
-- **No index and no tabs.** There is nowhere else to go, because you did not come to browse. Anything
-  secondary reaches the main screen as **a quiet footer link, never a tab** — Health's own
-  formulation, and better than the one this guide would have supplied.
-- **Thumb-first.** The primary action sits in the reachable half of the screen. Assume one hand.
-- **It opens in its working state**, not on a menu asking what you would like to do.
-- **Home-screen install is part of the design, so it is Safari's.** Adding a web app to the iOS home
-  screen only works from Safari, which is the one place `CLAUDE.md` admits Safari on purpose.
+## Diagnostic routes
 
-## If it is a site
+`/admin` and `/debug` never appear in an index, tab bar or footer, and do not count toward the
+one-screen rule. Exception: The Garage is a tab on home beside the Pit Wall; `/admin` redirects to it.
 
-- **A thin index grouped by verb**, not by entity. The index answers *what am I here to do*, not
-  *what objects exist*. **It may be a tab bar** when each tab is a verb and each is one long page —
-  the Cookbook's Recipes · Add · King Soopers list.
-- **One long page over many routes.** For a single-user tool with this much content, scrolling beats
-  navigating: a route you have to find is worse than a section you scroll past.
-- **Not thumb-first**, and that is not a licence to ignore the phone. It still has to work there; it
-  just is not designed around one-handed use at a worktop.
-- **No home-screen install by default.** A site you open occasionally does not earn an icon. Joel
-  can grant one — the Cookbook's (2026-10-05) — and it stays a shortcut: the site's shape does not move.
+## The hub
 
-## Diagnostic routes are not surface
+`apps/home` is the index of tools, embedding each in an iframe. It is neither site nor app, and
+there is exactly one. A tool that seems to need a hub is a site whose index does too much.
 
-`/admin` and `/debug` are escape hatches, not navigation. **They never appear in an index, a tab bar
-or a footer link**, they do not count toward the one-screen rule, and a tool does not become a site
-by having one. **One exception, Joel's (2026-09-26, TEC-83):** The Garage is a tab on home, beside the
-Pit Wall, and `/admin` redirects to it.
-
-## The hub is neither, and there is exactly one
-
-`apps/home` is an index **of tools**, embedding each one in an iframe. It is the single place where
-an index is the whole product, which is why the site/app pair does not describe it and should not be
-stretched to. **No new tool is ever a hub.** If a tool seems to need one, it is a site whose index is
-doing more work than it should.
-
-## Where the roster stands
+## Roster
 
 | Tool | Surface | Why |
 |---|---|---|
-| Coffee | **App** | At the grinder, several times a day, one decided thing. Installed to the home screen. |
-| Health | **App** | Just ate, phone in hand, log it and close. Its grocery list is moving to the Cookbook (TEC-15). |
-| Resume Formatter | **Site** | Occasional, sitting down, arriving to look at what is there. |
-| Cookbook | **Site** | A collection: you arrive to see what you could cook, which is question 2 answering *site* plainly. Its tabs are the verb index. The King Soopers hand-off is a phone-in-a-shop moment that reads *app*; it was weighed and did not win (TD ruling, 2026-09-24). Installable since Joel's override of 2026-10-05, still a site (TEC-102); app is TEC-109. |
-| Pipeline Tracker | **Site** | Reviewing a pipeline is surveying, not doing one decided thing. Parked, so a record rather than a plan. |
-| Message Editor | **Site** | Composing is unhurried and desk-bound. Parked and frozen, so a record rather than a plan. |
-| Showcase | **Site** | Opened by someone else, once, arriving to look at what Joel built. Public; the rules are in the TD's charter. |
-| Hub | Neither | The index of tools. There is one, and it is the technical director's. |
+| Coffee | App | At the grinder, several times a day, one decided thing. Installed. |
+| Health | App | Just ate, phone in hand: log it and close. |
+| Resume Formatter | Site | Occasional, sitting down, to see what is there. |
+| Cookbook | Site | A collection to browse; tabs are the verb index. Installable (TEC-102); app is TEC-109. |
+| Pipeline Tracker | Site | Surveying a pipeline. Parked. |
+| Message Editor | Site | Unhurried, desk-bound composing. Parked. |
+| Showcase | Site | Opened once by a visitor. Public; rules in the TD's `RULES.md`. |
+| Hub | Neither | The index of tools. |
 
-**If a tool seems to be both, it may be two tools** — the thing to settle at standup rather than to
-design around.
-
-## Who decides, and when
-
-**The technical director, settled at standup**, beside the name and the schema, and written into the
-draft charter before a folder exists. Joel can overrule it. It is expensive to change afterwards because it is the shell:
-every screen is built inside the answer. **Using the existing surface costs nothing and needs
-nobody** — an app that stays one screen and a site that stays one long page are both already
-correct.
+Surface is settled with the name and schema, before a folder exists, because every screen is built
+inside it. Keeping the existing surface needs no approval.

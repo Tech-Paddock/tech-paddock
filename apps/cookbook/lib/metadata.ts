@@ -37,7 +37,7 @@ export type RecipeMeta = {
   equipment: string[];
   diet: Diet[];
   tags: string[];
-  /** 1–5, Joel's. No model path carries one. */
+  /** 1–5, set by the user. No model path carries one. */
   rating: number | null;
 };
 
