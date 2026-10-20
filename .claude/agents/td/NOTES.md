@@ -52,3 +52,5 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **A helper worktree refuses git inside a loop, a variable or `git -C`.** Run each git plainly.
 - **Finished work hides in other sessions.** At kickoff, `list_sessions` and `git branch -r`.
 - **Cost is context × turns.** Brief tightly; end the session once branches are merged.
+- **Deployment starts with an approval click** on top of `/deploy`; the hook cannot tell otherwise
+  that the owner asked.

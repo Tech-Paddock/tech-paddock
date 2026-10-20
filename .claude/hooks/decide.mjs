@@ -49,7 +49,8 @@ const PUSH_OWN_BRANCH =
 export function decide(input) {
   const tool = String(input?.tool_name ?? "");
   const args = input?.tool_input ?? {};
-  const deploy = isMainSession(input);
+  const deploy = isDeployment(input);
+  if (tool === "Agent" || tool === "Task") return startAgent(args, input);
   if (tool === "Bash") return bash(String(args.command ?? ""), input?.cwd || process.cwd(), 0, deploy);
   if (!tool.startsWith("mcp__")) return null;
   const cut = tool.lastIndexOf("__");
@@ -63,22 +64,29 @@ export function decide(input) {
 }
 
 /* ------------------------------------------------------------------------- */
-/* Who is calling: only the main session writes to a pull request            */
+/* Who is calling: only Deployment writes to a pull request                  */
 /* ------------------------------------------------------------------------- */
 
-/* TEC-115 (2026-10-19): the Deployment agent retired and the technical
-   director merges, through the `merge` skill. The builder is a helper, and a
-   helper pushes its branch and stops.
-
-   Claude Code puts `agent_id` on the hook input of a call made inside a
-   helper and leaves it off a call from a main session, so a pull request
-   write goes through only without one. A hook cannot tell the technical
-   director's session from any other main session; branch protection and CI
-   stay the backstop, and the request line still records who asked. */
-export const isMainSession = (input) => !input?.agent_id;
+/* Three roles: the TD designs, the builder builds, Deployment deploys. Claude
+   Code puts `agent_id` and `agent_type` (the preset's `name`) on the hook input
+   of a call made inside a helper, and neither on a main session's. Deployment
+   is a helper of type `deployment`; nothing else is. Missing fields refuse
+   Deployment too: loud, never open. */
+const DEPLOYMENT = "deployment";
+export const isDeployment = (input) =>
+  String(input?.agent_type ?? "").toLowerCase() === DEPLOYMENT && Boolean(input?.agent_id);
 
 const MAIN_ONLY =
-  "Every write to a pull request is the technical director's, from its own session, through the `merge` skill (TEC-115). A helper pushes its branch, says it is finished, and stops.";
+  "Every write to a pull request is Deployment's. Push your branch, report, and stop; the owner runs `/deploy`.";
+
+/* Starting Deployment: never from a helper; from a main session, only with the
+   owner's approval. A hook cannot tell the TD's session from another, so the
+   approval is what makes it the owner's `/deploy`. */
+function startAgent(a, input) {
+  if (String(a.subagent_type ?? "").toLowerCase() !== DEPLOYMENT) return null;
+  if (input?.agent_id) return deny("Only the TD starts Deployment, on the owner's `/deploy`. Report what is ready and stop.");
+  return ask("Starting Deployment waits for the owner's approval. Approve it only if you ran `/deploy`.");
+}
 
 /* ------------------------------------------------------------------------- */
 /* Reading a shell command                                                   */

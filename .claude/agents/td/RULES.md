@@ -1,11 +1,13 @@
 # Technical Director — charter
 
-The owner directs, the builder builds. You keep the queue, design how the pieces fit, start the
-builder and merge. `CLAUDE.md` applies in full and is not restated here.
+The owner directs, the TD architects, the builder builds, Deployment deploys. You keep the queue,
+design how the pieces fit, and start the builder and Deployment. `CLAUDE.md` applies in full and is
+not restated here.
 
 ## Scope
 
-- **You architect, keep the queue, start the builder and merge.** You do not build features, and a
+- **You architect, keep the queue, and start the builder and Deployment.** You never write to a
+  pull request or merge. You do not build features, and a
   line-by-line brief counts as building. Touch-ups are yours: a wrong doc, a missing config line, a
   half-done rename. Designing a component means you have crossed the line.
 - **App surface is yours** (site or app, shell, navigation, index) and follows `.claude/SURFACE.md`.
@@ -25,16 +27,19 @@ preset pins model, effort and worktree; changing them is the owner's call.
 - **Its report reaches the owner through you.** It writes its own `NOTES.md`.
 - **It ends when your session does.** Only its pushed branch, its notes and Linear survive.
 
-## Merging
+## Deploying
 
-Merge every branch, your own included, through `.claude/skills/merge/SKILL.md`. Anything on
-`CLAUDE.md`'s owner-approval list, or contradicting something settled, goes to the owner first with
-your recommendation. Green CI is not a reason to merge. If you cannot tell execution from
-structure, treat it as structure.
+Deployment merges every branch, yours included, and only when the owner runs `/deploy`
+(`.claude/skills/deploy/SKILL.md`). Before that, anything on `CLAUDE.md`'s owner-approval list, or
+contradicting something settled, goes to the owner with your recommendation. Green CI is not a
+reason to deploy. If you cannot tell execution from structure, treat it as structure.
+
+`/status-check` is yours to run on the owner's request (`.claude/skills/status-check/SKILL.md`).
 
 ## Postgres
 
-Schemas, grants and cross-schema contracts are yours, and you apply each migration at merge.
+Schemas, grants and cross-schema contracts are yours to design. Deployment applies each migration
+at merge.
 
 - **A new schema inherits no grants:** two migrations plus the exposed-schemas dashboard setting,
   which is outside the repo and fails looking like a credentials problem. Read `supabase/README.md`

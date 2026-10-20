@@ -7,18 +7,23 @@ deployed on its own. Simplicity beats multi-team defaults. This file binds every
 
 1. List your open Linear issues (team TEC) and lead your first message with them.
 2. Read your area's `RULES.md` (what must hold, and why) and `NOTES.md` (what is true now, and its
-   traps; never a to-do). TD: `.claude/agents/td/`. Builder: `apps/<app>/`.
+   traps; never a to-do). TD: `.claude/agents/td/`. Deployment: `.claude/agents/deployment/`.
+   Builder: `apps/<app>/`.
 
 ## Roles
 
 | Role | Does |
 |---|---|
 | **Owner** | Directs. Approves what has no undo. |
-| **Technical director (TD)** | Linear queue, architecture, app surface, Postgres design, cross-schema contracts, shared auth plumbing, `apps/showcase`, parked `apps/editor`. Briefs the builder. Merges, through the `merge` skill. |
-| **Builder** | One helper per task, started as "app: X". Builds in that app, commits, pushes, reports, stops. Never writes to a pull request. |
+| **Technical director (TD)** | Architects: Linear queue, design, app surface, Postgres design, cross-schema contracts, shared auth plumbing, `apps/showcase`, parked `apps/editor`. Briefs the builder and Deployment. Never merges. |
+| **Builder** | One helper per task, started as "app: X". Builds in that app, commits, pushes, reports, stops. |
+| **Deployment** | One helper, started by the TD when the owner runs `/deploy`. Checks for unfinished work; if clean, merges each ready branch through the `merge` skill and confirms it is live. |
 
-The TD does not build app features, except `apps/showcase` and touch-ups (a wrong doc, a missing
-config line).
+Only Deployment writes to a pull request. The TD does not build app features, except
+`apps/showcase` and touch-ups (a wrong doc, a missing config line).
+
+**Owner commands:** `/kickoff [brief]` starts a TD session; `/status-check` reports branches,
+unfinished work, blockers and hot topics; `/deploy` deploys what is ready, or holds and reports.
 
 **Propose before branching:** the job, what comes first, what it contradicts. No branch until the
 owner says go. "Backlog" means a Linear issue in Backlog, not a build.
@@ -60,7 +65,7 @@ go, go fully and do not reopen it.
   `ci`, `db`, `docs`, `platform`. Never reuse a branch.
 - **Builder report:** blast radius (apps, shared files) and the Deployment section. `NOTES.md` is
   updated on the same branch to what is true after merge.
-- **The TD merges with the `merge` skill:** pull request, CI green on the current head, migration,
+- **Deployment merges, on `/deploy` only:** pull request, CI green on the current head, migration,
   squash merge, deploy confirmed. The TD's own changes take the same path.
 - **Every pull request body carries the request line.** CI's `request-line` job checks it.
 
@@ -71,8 +76,8 @@ go, go fully and do not reopen it.
 - **Every pull request has a Deployment section:** what happens on merge, any manual steps in
   order, how to verify, what breaks if a step is skipped. "Nothing — deploys on merge" is valid.
 - **Migrations land before the code that needs them.** Additive changes ride with their code.
-  Destructive changes take two pull requests: stop using it, then drop it. The TD applies them at
-  merge. Cite a migration by name, not number.
+  Destructive changes take two pull requests: stop using it, then drop it. Deployment applies them
+  at merge. Cite a migration by name, not number.
 - **Stale branches are renamed `stale_<name>`.** Agents cannot delete remote branches.
 - **One session per working directory.** The builder uses its own worktree.
 - **Check a red status against `main` first.** Parked apps' Vercel checks are red on `main`; ignore
@@ -136,8 +141,8 @@ are the owner's.
 
 1. **`main` is protected:** `gate`, `drift` and `request-line` required, branches up to date.
 2. **The guard** (`.claude/hooks/guard.mjs`, fails closed) refuses a push to `main`, a non-squash
-   merge, migration-history rewrites, and pull-request writes from a helper; holds Vercel and
-   Supabase writes for the owner; refuses a Linear issue without labels or Next steps.
+   merge, migration-history rewrites, and pull-request writes from anyone but Deployment; holds
+   starting Deployment, and Vercel and Supabase writes, for the owner; refuses a Linear issue without labels or Next steps.
    `guard.test.mjs` proves each in CI.
 3. **CI `gate`:** every app typechecks, tests and builds, and `drift` passes
    (`node scripts/drift-check.mjs`): stamped copies, gate file per Next major, empty showcase, CI

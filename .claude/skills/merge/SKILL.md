@@ -1,6 +1,6 @@
 ---
 name: merge
-description: Take a pushed branch to main — the pull request, the gate, any migration, the squash merge, and confirming it is live. The technical director's; a helper cannot write to a pull request.
+description: Take a pushed branch to main — the pull request, the gate, any migration, the squash merge, and confirming it is live. Deployment's alone; the guard refuses a pull request write from anyone else.
 ---
 
 # Merge
@@ -10,9 +10,9 @@ pull requests, each branch head against `main`, `list_migrations`.
 
 ## 1. Before opening
 
-- **The request is recorded.** You need the owner's words for this change; none, no pull request.
-- **Check the owner-approval list** (`CLAUDE.md`). If it is on it, or contradicts something settled,
-  bring it to the owner with a recommendation first.
+- **The request is recorded.** The brief carries the owner's words; none, no pull request.
+- **Check the owner-approval list** (`CLAUDE.md`). If it is on it without approval, or contradicts
+  something settled, hold it and report it with a recommendation.
 - **Read the diff:** blast radius as stated, no personal information, no weakened check, and
   `NOTES.md` describes the state after merge. A stale `NOTES.md` goes back to the builder.
 - **Run locally:** `node scripts/drift-check.mjs` (0 fail), `node scripts/stamp-shared.mjs --check`,

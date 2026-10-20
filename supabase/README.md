@@ -52,7 +52,7 @@ local stack only.
 **`supabase db push` cannot work here:** it refuses while the remote holds a version the directory
 lacks, and the withheld seed always is one.
 
-The TD applies migrations through the hosted API (`apply_migration`) at merge time, before merging,
+Deployment applies migrations through the hosted API (`apply_migration`) at merge time, before merging,
 via the `merge` skill. Then:
 
 1. Read `supabase_migrations.schema_migrations` back.
