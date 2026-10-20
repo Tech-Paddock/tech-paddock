@@ -670,9 +670,8 @@ add("worklogs stay retired", existsSync(R(".claude/worklogs")) ? "fail" : "ok",
   existsSync(R(".claude/worklogs")) ? ".claude/worklogs/ is back — see the communication layer in CLAUDE.md" : "absent");
 add("KICKOFF.md stays retired", existsSync(R(".claude/agents/KICKOFF.md")) ? "fail" : "ok",
   existsSync(R(".claude/agents/KICKOFF.md")) ? ".claude/agents/KICKOFF.md is back — the TD starts from the kickoff skill, the builder from its preset (TEC-108)" : "absent; kickoff and closeout are skills");
-/* TEC-115: one builder replaced the per-app agents, and the TD merges. A
-   Deployment folder or a HANDOFF.md coming back is the old shape returning by
-   copy-paste from an old branch. */
+/* One builder replaced the per-app agents (TEC-115). A HANDOFF.md coming back
+   is the old shape returning by copy-paste from an old branch. */
 {
   const handoffs = [];
   const walk = (d) => { for (const e of readdirSync(d)) {
@@ -681,9 +680,8 @@ add("KICKOFF.md stays retired", existsSync(R(".claude/agents/KICKOFF.md")) ? "fa
     if (statSync(p).isDirectory()) walk(p); else if (e === "HANDOFF.md") handoffs.push(p.replace(repoRoot + "/", ""));
   } };
   walk(repoRoot);
-  const back = [...(existsSync(R(".claude/agents/deployment")) ? [".claude/agents/deployment/"] : []), ...handoffs];
-  add("per-agent handoffs and Deployment stay retired", back.length ? "fail" : "ok",
-    back.length ? `${back.join(", ")} is back — state lives in each app's NOTES.md and the TD merges (TEC-115)` : "absent; NOTES.md per app, the TD merges");
+  add("per-agent handoffs stay retired", handoffs.length ? "fail" : "ok",
+    handoffs.length ? `${handoffs.join(", ")} is back — state lives in each area's NOTES.md (TEC-115)` : "absent; NOTES.md per area");
 }
 add("ledger stays retired", existsSync(R(".claude/OPEN-ITEMS.md")) ? "fail" : "ok",
   existsSync(R(".claude/OPEN-ITEMS.md")) ? ".claude/OPEN-ITEMS.md is back — open items live in Linear, team TEC" : "absent; open items are in Linear");

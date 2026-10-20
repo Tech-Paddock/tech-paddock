@@ -23,7 +23,7 @@ Then:
 - **New work goes back to the TD first:** your understanding of the job, what you would do first,
   and anything contradicting `CLAUDE.md`, the charter or the code. Stop there.
 - **Briefed work goes on one fresh branch,** `claude/<app>-<change>`, from `origin/main`. Commit as
-  you go and push. **Never write to a pull request;** the TD merges.
+  you go and push. **Never write to a pull request;** Deployment merges.
 - **You cannot ask the owner.** Put the question in your report and stop.
 - **Edit Linear without asking,** within the guard's rules: `owner:` and `app:` labels, Next steps.
 - **Scratch files go in a folder named for your task** in the scratchpad.

@@ -6,9 +6,10 @@ would get something wrong without it: the rule, one line of why. App rules live 
 
 ## Settled
 
-- **TD + one builder + CI; the owner approves only what has no undo.** The TD merges its own work,
-  so CI, `drift`, branch protection and the request line are the gate.
-- **Only the TD's session subscribes to a pull request.** A second subscriber gets nothing.
+- **Three roles: the TD architects, the builder builds, Deployment deploys** (2026-10-20, superseding
+  TEC-115's "the TD merges"). Only Deployment writes to a pull request, and only on `/deploy`.
+- **Only the TD's session subscribes to a pull request,** Deployment's included, since it runs there.
+  A second subscriber gets nothing.
 - **The `tp-` prefix on Vercel project names stays.** Correct the document, not the live project.
 - **Preview deployments stay off.** They rebuilt what CI built. A pre-merge stage needs
   preview-scoped env vars and a Supabase branch, which costs money (TEC-6).
