@@ -59,42 +59,44 @@ function fakeDb(opts: { failRead?: boolean; insertError?: Err } = {}) {
 const ID = "11111111-1111-4111-8111-111111111111";
 const ID2 = "22222222-2222-4222-8222-222222222222";
 const ID3 = "33333333-3333-4333-8333-333333333333";
+const PEE = { what: "pee", where: "outside" };
+const MEAL = { type: "meal", item_id: "misc" };
 
 describe("writeEvent", () => {
   it("inserts a tap and returns the stored row", async () => {
     const { db, tables } = fakeDb();
-    const e = await writeEvent(db, { id: ID, kind: "pee" });
+    const e = await writeEvent(db, { id: ID, kind: "potty", details: PEE });
     expect(e.id).toBe(ID);
     expect(tables.events).toHaveLength(1);
   });
 
   it("saving the same tap twice stores it once — a retry never double-logs", async () => {
     const { db, tables } = fakeDb();
-    await writeEvent(db, { id: ID, kind: "pee" });
-    await writeEvent(db, { id: ID, kind: "pee" });
+    await writeEvent(db, { id: ID, kind: "potty", details: PEE });
+    await writeEvent(db, { id: ID, kind: "potty", details: PEE });
     expect(tables.events).toHaveLength(1);
   });
 
   it("a correction keeps the original's time when it sends none", async () => {
     const { db, tables } = fakeDb();
-    await writeEvent(db, { id: ID, kind: "meal", at: "2026-10-20T07:00:00Z" });
-    const fix = await writeEvent(db, { id: ID2, kind: "meal", voids: ID, details: { amount: "1 cup" } });
+    await writeEvent(db, { id: ID, kind: "food", at: "2026-10-20T07:00:00Z", details: MEAL });
+    const fix = await writeEvent(db, { id: ID2, kind: "food", voids: ID, details: { ...MEAL, amount: 1 } });
     expect(fix.at).toBe("2026-10-20T07:00:00.000Z");
     expect(fix.voids).toBe(ID);
     // The original is still there, untouched.
-    expect(tables.events[0]).toMatchObject({ id: ID, details: {} });
+    expect(tables.events[0]).toMatchObject({ id: ID, details: { amount: null } });
   });
 
   it("a second change to an already-replaced entry is a conflict, not a fork", async () => {
     const { db } = fakeDb();
-    await writeEvent(db, { id: ID, kind: "treat" });
+    await writeEvent(db, { id: ID, kind: "food", details: MEAL });
     await writeEvent(db, { id: ID2, kind: "void", voids: ID });
-    await expect(writeEvent(db, { id: ID3, kind: "treat", voids: ID })).rejects.toBeInstanceOf(Conflict);
+    await expect(writeEvent(db, { id: ID3, kind: "food", voids: ID, details: MEAL })).rejects.toBeInstanceOf(Conflict);
   });
 
   it("a delete never carries a time of its own choosing", async () => {
     const { db, inserts } = fakeDb();
-    await writeEvent(db, { id: ID, kind: "pee" });
+    await writeEvent(db, { id: ID, kind: "potty", details: PEE });
     await writeEvent(db, { id: ID2, kind: "void", voids: ID, at: "2020-01-01T00:00:00Z" });
     expect(inserts[1]).not.toHaveProperty("at");
   });
@@ -104,9 +106,19 @@ describe("writeEvent", () => {
     await expect(writeEvent(db, { id: ID, kind: "void", voids: ID2 })).rejects.toBeInstanceOf(InvalidEvent);
   });
 
+  it("stores the catalogue's snapshot of a food, not the phone's", async () => {
+    const { db, inserts } = fakeDb();
+    await writeEvent(db, {
+      id: ID,
+      kind: "food",
+      details: { type: "meal", item_id: "purina-pro-plan-toy-puppy-chicken-rice", amount: 0.5, kcal_per: 1 },
+    });
+    expect(inserts[0].details).toMatchObject({ kcal_per: 447, unit: "cup", amount: 0.5 });
+  });
+
   it("a database failure throws rather than looking saved", async () => {
     const { db } = fakeDb({ insertError: { code: "XX000", message: "boom" } });
-    await expect(writeEvent(db, { id: ID, kind: "pee" })).rejects.toThrow(/couldn't save/);
+    await expect(writeEvent(db, { id: ID, kind: "potty", details: PEE })).rejects.toThrow(/couldn't save/);
   });
 });
 
@@ -118,7 +130,7 @@ describe("readJournal", () => {
 
   it("reads every page", async () => {
     const { db, tables } = fakeDb();
-    for (let i = 0; i < 2500; i++) tables.events.push({ id: String(i), kind: "pee", at: "2026-10-20T10:00:00Z" });
+    for (let i = 0; i < 2500; i++) tables.events.push({ id: String(i), kind: "potty", at: "2026-10-20T10:00:00Z", details: PEE });
     expect(await readJournal(db, new Date("2026-10-20T06:00:00Z"))).toHaveLength(2500);
   });
 });

@@ -4,8 +4,8 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 ## Scope
 
-- Potty (pee, poop, accident), meals, treats, training sessions, weight; a growth chart from weights.
-- App surface: one screen, one-handed, opens on the since-last clocks and log buttons.
+- Potty, food, exercise and weight, each logged through a short form with defaults; analytics over the same events.
+- App surface, by the owner's override (2026-10-20): two tabs, Log and Analytics, opening on Log; one-handed, thumb-first.
 - Who logged it is a person picked from names stored in the database, never in the repo.
 
 ## Never

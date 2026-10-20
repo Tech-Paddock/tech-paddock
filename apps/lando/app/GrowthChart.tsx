@@ -16,16 +16,24 @@ const W = 320;
 const H = 160;
 const PAD = { top: 12, right: 12, bottom: 22, left: 36 };
 
-export default function GrowthChart({ events }: { events: JournalEvent[] }) {
+export default function GrowthChart({ events, since }: { events: JournalEvent[]; since?: Date }) {
   const unit = displayUnit(events);
+  const from = since?.getTime() ?? -Infinity;
   const points = useMemo(
-    () => growthPoints(events).map((p) => ({ ...p, v: round1(fromKg(p.kg, unit)), t: Date.parse(p.at) })),
-    [events, unit]
+    () =>
+      growthPoints(events)
+        .filter((p) => Date.parse(p.at) >= from)
+        .map((p) => ({ ...p, v: round1(fromKg(p.kg, unit)), t: Date.parse(p.at) })),
+    [events, unit, from]
   );
   const [active, setActive] = useState<number | null>(null);
 
   if (points.length === 0) {
-    return <p className="text-sm text-ink-soft">No weights yet. Tap Weight, then type the number.</p>;
+    return (
+      <p className="text-sm text-ink-soft">
+        {since ? "No weigh-ins in this window." : "No weights yet. Tap Weight to log one."}
+      </p>
+    );
   }
 
   const t0 = points[0].t;
@@ -60,7 +68,7 @@ export default function GrowthChart({ events }: { events: JournalEvent[] }) {
         {points.length > 1 && (
           <span className="text-ink-soft">
             {" "}
-            · {lo === hi ? "steady" : `from ${points[0].v} ${unit} on ${shortDate(points[0].at)}`}
+            · {lo === hi ? "steady" : `${latest.v >= points[0].v ? "up" : "down"} from ${points[0].v} ${unit} on ${shortDate(points[0].at)}`}
           </span>
         )}
       </p>
