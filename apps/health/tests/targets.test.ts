@@ -7,10 +7,10 @@ import {
 } from "@/lib/targets";
 
 /**
- * TEC-53's four commitments, approved by Joel on 2026-09-19, as tests: a target
- * is effective-dated; the split clamps at zero; none of it calls a model; and
+ * TEC-53's four commitments (agreed 2026-09-19) as tests: a target is
+ * effective-dated; the split clamps at zero; none of it calls a model; and
  * (in the migration and `lib/entries.ts`) deleting a meal never deletes the
- * food. Plus his answers of 2026-09-29: no backdating, the lock is remembered.
+ * food. Plus two rules settled 2026-09-29: no backdating, the lock is remembered.
  */
 
 const t = (effective_from: string, created_at: string, protein_g = 150) =>

@@ -51,11 +51,10 @@ export type Draft = {
  * a miss, because a swallowed database error degrades this whole app into
  * internet-first with nothing on screen changing.
  *
- * **A Cookbook recipe is asked before the table** (Joel, 2026-09-26, TEC-25),
+ * **A Cookbook recipe is asked before the table** (TEC-25),
  * so a Cookbook edit reaches the next log. When the Cookbook cannot be read,
- * only a line that could be a recipe fails, with "Couldn't reach the Cookbook"
- * (Joel, 2026-09-26): falling through would log a recipe with numbers that are
- * not its own. Every other line resolves as normal. See `findRecipe`.
+ * only a line that could be a recipe fails, with "Couldn't reach the Cookbook":
+ * falling through would log a recipe with numbers that are not its own. Every other line resolves as normal. See `findRecipe`.
  */
 export async function resolveItem(params: {
   name: string;

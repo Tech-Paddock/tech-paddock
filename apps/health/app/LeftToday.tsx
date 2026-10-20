@@ -18,8 +18,8 @@ export type TargetState =
 const UNIT: Record<keyof Macros, string> = { kcal: " kcal", protein_g: "g", carbs_g: "g", fat_g: "g" };
 
 /**
- * "Left today" — the one place a target shows (Joel, 2026-09-29: no past-days
- * view). It sits on the log screen because checking what is left is the same
+ * "Left today" — the one place a target shows; there is no past-days view.
+ * It sits on the log screen because checking what is left is the same
  * moment as logging.
  *
  * **Over target is `--danger`, locally, not `--sev-warn`**: every livery maps

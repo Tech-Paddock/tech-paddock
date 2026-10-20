@@ -97,7 +97,7 @@ export function decideLine(line: ApprovedLine, itemId: string | null, current: I
 /**
  * What approving a line that names a Cookbook recipe writes (TEC-25).
  *
- * **The recipe's numbers have one owner, the Cookbook** (Joel, 2026-09-26), so
+ * **The recipe's numbers have one owner, the Cookbook**, so
  * the line must carry exactly what the Cookbook says now, read again at approve
  * time rather than trusted from the browser. A number typed over here is
  * refused: stored as a Health correction it would be bypassed by the next log,

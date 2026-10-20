@@ -6,8 +6,8 @@ import type { Macros } from "./macros";
  *
  * Pure — no database, no model — so the screen can import it and the rules are
  * tested rather than reasoned about. The reads and writes are
- * `lib/targetStore.ts`. **Nothing in this feature calls a model** (Joel:
- * "macro tracker should only be reading from database"), and
+ * `lib/targetStore.ts`. **Nothing in this feature calls a model**: a macro tracker reads only from
+ * the database, and
  * `tests/targets.test.ts` walks the imports to hold that.
  */
 
@@ -155,7 +155,7 @@ export function remaining(target: Split, eaten: Macros): Macros {
 export type TargetInput = Split & { locked: GramKey[]; effective_from: string };
 
 /**
- * A new target applies from today and is never backdated (Joel, 2026-09-29).
+ * A new target applies from today and is never backdated.
  * "Today" is the phone's and is always sent, so the server cannot know it
  * exactly — but every timezone's today is within a day of UTC's, so a date
  * further out than that is a backdate or a forward-date, and refused.
