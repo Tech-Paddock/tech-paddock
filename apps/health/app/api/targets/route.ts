@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * Set a new target, from today (Joel, 2026-09-29: no backdating). Appends a
- * row; the days before keep the target they had.
+ * Set a new target, from today; a target is never backdated. Appends a row;
+ * the days before keep the target they had.
  */
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);

@@ -5,7 +5,7 @@ import type { Livery } from "./theme";
  *
  * All five liveries were taken when this app was scaffolded — martini (hub),
  * clark (editor), senna (tracker), mp44 (resume), jps (coffee). Senna is
- * borrowed from the tracker, which is **parked** (Joel, 2026-09-24) — not
+ * borrowed from the tracker, which is **parked** (since 2026-09-24) — not
  * retired — so **two apps wear the same livery**, which is precisely the drift
  * the one-owner theme rule exists to prevent.
  *

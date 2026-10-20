@@ -25,7 +25,7 @@ const EMPTY: Split = { protein_g: 0, carbs_g: 0, fat_g: 0 };
  * macro and the calories hold while the other unlocked macros give or take.
  * **Nothing goes below zero** — when a number cannot be honoured, the split
  * stops at zero and the screen says what it actually reaches. The locks are
- * saved with the target, so they are remembered (Joel, 2026-09-29).
+ * saved with the target, so they are remembered.
  *
  * A new target applies **from today**, never backdated; the days before keep
  * the one they had. No model is called from here.

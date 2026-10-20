@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
  * One screen, thumb-first, no index — the surface this tool was settled as.
  *
  * Two places to go from here, in the footer rather than in tabs: setting a
- * target is a different moment from logging a meal (Joel, 2026-09-29), and the
+ * target is a different moment from logging a meal, and the
  * debug harness validates the model rather than logging one. Neither earns a
  * tab, so the log stays the app. The grocery list lived here too until it
  * moved to the Cookbook (TEC-15); `/list` now only redirects there.

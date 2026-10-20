@@ -22,8 +22,8 @@ adds. Read `supabase/README.md` before writing a migration.
 
 **This charter carries the rules; the Linear document "Health — plan" carries the reasoning**
 (team TEC, https://linear.app/tech-paddock/document/health-plan-c504dc02830d — it was
-`.claude/HEALTH-PLAN.md` until 2026-09-24). The plan is Joel's, written with him before this agent
-existed. **Read it before designing or changing a feature** — it is why each rule below exists, and
+`.claude/HEALTH-PLAN.md` until 2026-09-24). The plan was written before this agent existed.
+**Read it before designing or changing a feature** — it is why each rule below exists, and
 it is not yours to redo. Where the two ever disagree, this file wins. **Everything in the plan is the
 first feature of `health`, not the whole of it** — the name was chosen so a second kind of record
 can arrive without the app's name becoming a lie.
@@ -38,16 +38,9 @@ screen under the rule below.
 
 ## A second screen, and what makes one legitimate
 
-**Approved by Joel on 2026-09-19.** He was asked for a yes or no on this wording and said
-*"Yes close out and PR."* **The approval was recorded here by the technical director, not by this
-agent** — the amendment asked for that, and Health's session had already ended.
-
-Joel asked for a grocery list on 2026-09-19: *"I want to be able to create a grocery list from
-recipes or random items I add. Then I want you to add it to my king soopers shopping cart"*, and
-chose the cheap version of it the same day — *"Let's build the cheap version."* He had twice said
-the charter would follow: *"Will change you charter later."* **This section is that change**, written
-by the agent and approved by Joel unchanged, which is why it reads as settled rather than carrying a
-caveat.
+**Approved by Joel on 2026-09-19**, and recorded here by the technical director. It was written
+when a grocery list was the second screen in question; the list has since left (below), and the rule
+stands without it.
 
 **What was wrong with "one screen rather than two."** That clause was written to explain why
 exercise was dropped, and it was right about that. What it also did, without anybody deciding it,
@@ -61,7 +54,7 @@ logging lunch, and you are not logging lunch in the aisle; two moments, two scre
 A second *noun* — exercise — is still out, and this does not reopen it.
 
 **What this does not license.** It is not a general permission to add screens. **A screen added
-under this rule still goes to him first**; what changed is that the answer is no longer "the charter
+under this rule still goes to Joel first**; what changed is that the answer is no longer "the charter
 forbids it" before he has been asked.
 
 **The list itself has left, and the rule has not.** It moved to the Cookbook with the recipes — you
@@ -70,7 +63,7 @@ shop from recipes, not from what you ate (TEC-15, finished 2026-09-29): `/list` 
 written about the list but is not about the list**, so it stays: it is what the next second-screen
 ask gets measured against.
 
-**Recipes are not yours, and that is settled rather than parked.** Joel moved them out on
+**Recipes are not yours, and that is settled rather than parked.** They moved out on
 2026-09-20: they are **their own app, with their own Postgres schema**, themed as a meal cookbook.
 **You read them to price a meal; you do not own them.** A recipe book, a generator or a URL import
 living in `apps/health` is the wrong answer, and so is a grocery list. **How you
@@ -108,7 +101,7 @@ exists to prevent. Coffee's `LookupError` class solves exactly this; take it who
 
 ## The order of lookup, which is the product
 
-**A line naming a Cookbook recipe asks the Cookbook first** (Joel, 2026-09-26, TEC-25), through the
+**A line naming a Cookbook recipe asks the Cookbook first** (TEC-25), through the
 `GET /api/servings` contract in Cookbook's charter, so a Cookbook edit reaches the next log. Its
 numbers are not typed over here, on a draft, a day's correction or `/debug`: the fix belongs in the
 Cookbook. Everything else runs this order:
@@ -130,7 +123,7 @@ No components, no modifiers, no per-instance overrides. Wanting precision means 
 correction means "that item's numbers are wrong", never "I ate less of that". Item numbers are
 append-only versions. **An entry snapshots the item's numbers when it is logged, with the item id
 and the version it snapshotted**, so a past day's total never moves and a backfill stays possible —
-settled by Joel on 2026-09-22 (#116) and approved for building on 2026-09-24. The code catches up
+settled on 2026-09-22 (#116) and approved for building on 2026-09-24. The code catches up
 through TEC-21; until it lands, a correction still reaches past days.
 
 ---
@@ -158,11 +151,11 @@ depends on it.
 
 ## What is settled and not yours to reopen
 
-- **No `/api/summary`.** Joel left Health off home's glance (*"leave it off for now"*), and the
-  glance itself is gone since TEC-83, so nothing reads one. Build none.
+- **No `/api/summary`.** Health was left off home's glance, and the glance itself is gone since
+  TEC-83, so nothing reads one. Build none.
 - **The livery is borrowed and is the theme's to settle** (`apps/home`). `lib/livery.ts` pins `senna` because
   every livery was taken when this app was scaffolded, and the tracker wears it too. The tracker is
-  parked (Joel, 2026-09-24), not retired, so **two apps share a livery until TEC-12 resolves it** —
+  parked (since 2026-09-24), not retired, so **two apps share a livery until TEC-12 resolves it** —
   do not fix it yourself; it is the theme, and the theme has one owner.
 - **The schema is `health`, and its tables are yours.** `20260918140357` and `20260918140405`
   created it and granted it. They were deliberately not pre-empted at standup, because a scaffold
