@@ -251,7 +251,7 @@ describe("downloading a template", () => {
    */
   it.each([
     ["an en dash", "House style – 2026.docx", "House style _ 2026.docx", "House%20style%20%E2%80%93%202026.docx"],
-    ["a curly apostrophe", "Joel’s template.docx", "Joel_s template.docx", "Joel%E2%80%99s%20template.docx"],
+    ["a curly apostrophe", "User’s template.docx", "User_s template.docx", "User%E2%80%99s%20template.docx"],
   ])("serves a name containing %s, keeping it exactly in filename*", async (_what, name, fallback, encoded) => {
     const { client } = fakeSupabase({ "templates.select": { data: { ...TEMPLATE, name }, error: null } });
     mockModules({ resume: client, download: async () => Buffer.from("PK-the-original") });
