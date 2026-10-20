@@ -80,7 +80,7 @@ export type Drift = {
  * until it has been given an icon.
  *
  * **Array order is the sidebar's order**, and it is deliberate: not
- * alphabetical and not the order these were built in. Changing it is Joel's call.
+ * alphabetical and not the order these were built in. Changing it is the owner's call.
  *
  * **The Message Editor is deliberately absent**, removed 2026-09-19 on the same
  * terms as the tracker below: out of the roster entirely rather than out of the
@@ -121,8 +121,8 @@ export const HOME: Project = {
 
 /**
  * Projects that still deploy but are not embedded, so The Garage keeps them in
- * sight. **Parked means paused on purpose**: Joel pauses a parked app's Vercel
- * project, so it not answering is expected, and The Garage shows it grey,
+ * sight. **Parked means paused on purpose**: a parked app's Vercel project is
+ * paused, so it not answering is expected, and The Garage shows it grey,
  * never red, and leaves its red deploys out.
  */
 export const PARKED: (Project & { parked: true })[] = [

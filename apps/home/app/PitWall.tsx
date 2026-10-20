@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import type { PitIssue, PitWallData } from "@/lib/linear";
-import { byApp, byStatus, needsJoel, type Grouping } from "@/lib/pitgroups";
+import { byApp, byStatus, needsOwner, type Grouping } from "@/lib/pitgroups";
 
 /**
  * The Pit Wall: every open issue in Linear, team TEC, and who acts next.
  *
- * Two arrangements behind one toggle — by status, with what waits on Joel in a
+ * Two arrangements behind one toggle — by status, with what waits on the owner in a
  * band above the board, or by app. The toggle regroups what is already on the
  * page, so it never asks Linear again; the choice rides in `?group=` so a
  * reload or a shared link keeps it.
@@ -27,10 +27,10 @@ function ago(iso: string) {
 }
 
 function Card({ issue, show }: { issue: PitIssue; show: "app" | "status" }) {
-  const joel = needsJoel(issue);
+  const waiting = needsOwner(issue);
   const where = show === "app" ? issue.app ?? "Platform" : issue.status;
   return (
-    <article className={`pw-card${joel ? " pw-joel" : ""}${issue.parked ? " pw-parked" : ""}`}>
+    <article className={`pw-card${waiting ? " pw-waiting" : ""}${issue.parked ? " pw-parked" : ""}`}>
       <div className="pw-card-top">
         <a className="pw-id" href={issue.url} target="_blank" rel="noopener noreferrer">
           {issue.id}
@@ -46,7 +46,7 @@ function Card({ issue, show }: { issue: PitIssue; show: "app" | "status" }) {
       </a>
       {issue.next ? (
         <p className="pw-next">
-          {issue.next.star && <span className="pw-star" aria-label="waiting on Joel">⭐ </span>}
+          {issue.next.star && <span className="pw-star" aria-label="waiting on you">⭐ </span>}
           {issue.next.actor && <b>{issue.next.actor}: </b>}
           {issue.next.text}
         </p>
@@ -68,13 +68,13 @@ function ByStatus({ issues }: { issues: PitIssue[] }) {
   const board = byStatus(issues);
   return (
     <>
-      {board.joel.length > 0 && (
+      {board.waiting.length > 0 && (
         <section className="pw-band">
           <h3>
-            Waiting on you <Count n={board.joel.length} />
+            Waiting on you <Count n={board.waiting.length} />
           </h3>
           <div className="pw-grid">
-            {board.joel.map((i) => (
+            {board.waiting.map((i) => (
               <Card key={i.id} issue={i} show="app" />
             ))}
           </div>

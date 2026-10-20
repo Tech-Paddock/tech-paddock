@@ -4,8 +4,8 @@ import { byApp, byStatus, groupingFrom } from "@/lib/pitgroups";
 
 describe("the next step on a card", () => {
   it("is the first numbered step, with its actor and star", () => {
-    const body = "What and why.\n\n## Next steps\n\n1. **Joel:** ⭐ say go.\n2. **TD:** build it.\n";
-    expect(nextStep(body)).toEqual({ actor: "Joel", text: "say go.", star: true });
+    const body = "What and why.\n\n## Next steps\n\n1. **Owner:** ⭐ say go.\n2. **TD:** build it.\n";
+    expect(nextStep(body)).toEqual({ actor: "Owner", text: "say go.", star: true });
   });
 
   it("skips steps marked done, struck through, or ticked", () => {
@@ -24,12 +24,12 @@ describe("the next step on a card", () => {
     const body = [
       "## Next steps",
       "",
-      "1. **Done, 2026-09-25, Joel:** step 1. The variable is linked.",
+      "1. **Done, 2026-09-25, Owner:** step 1. The variable is linked.",
       "2. **TD — done 2026-09-26:** approved the two-PR shape.",
-      '3. **Skipped, 2026-09-25, Joel: "skip it".** Was: a live test.',
-      "4. ⭐ **Joel:** add the rule to all seven projects.",
+      '3. **Skipped, 2026-09-25, Owner: "skip it".** Was: a live test.',
+      "4. ⭐ **Owner:** add the rule to all seven projects.",
     ].join("\n");
-    expect(nextStep(body)).toEqual({ actor: "Joel", text: "add the rule to all seven projects.", star: true });
+    expect(nextStep(body)).toEqual({ actor: "Owner", text: "add the rule to all seven projects.", star: true });
   });
 
   it("shortens a Linear issue link to its identifier", () => {
@@ -75,9 +75,9 @@ describe("a Linear issue on the board", () => {
     expect(i.owner).toBe("TD");
   });
 
-  it("is waiting on Joel when it has an assignee, and carries nothing of the user", () => {
+  it("is waiting on the owner when it has an assignee, and carries nothing of the user", () => {
     const i = toIssue(node({ assignee: { id: "u1" } }));
-    expect(i.waitingOnJoel).toBe(true);
+    expect(i.waitingOnOwner).toBe(true);
     expect(JSON.stringify(i)).not.toContain("u1");
   });
 
@@ -99,15 +99,15 @@ const issue = (over: Partial<PitIssue>): PitIssue => ({
 describe("the two groupings", () => {
   const issues = [
     issue({ id: "TEC-1", column: "progress", app: "health" }),
-    issue({ id: "TEC-2", column: "todo", app: "coffee", waitingOnJoel: true }),
-    issue({ id: "TEC-3", column: "later", app: "coffee", parked: true, waitingOnJoel: true }),
+    issue({ id: "TEC-2", column: "todo", app: "coffee", waitingOnOwner: true }),
+    issue({ id: "TEC-3", column: "later", app: "coffee", parked: true, waitingOnOwner: true }),
     issue({ id: "TEC-4", column: "review", app: null, priority: 1 }),
     issue({ id: "TEC-5", column: "review", app: "someone-new", priority: 4 }),
   ];
 
-  it("by status: Joel's band, three columns, and the rest folded", () => {
+  it("by status: the owner's band, three columns, and the rest folded", () => {
     const b = byStatus(issues);
-    expect(b.joel.map((i) => i.id)).toEqual(["TEC-2"]);
+    expect(b.waiting.map((i) => i.id)).toEqual(["TEC-2"]);
     expect(b.columns.map((c) => c.issues.map((i) => i.id))).toEqual([["TEC-1"], ["TEC-4", "TEC-5"], []]);
     expect(b.later.map((i) => i.id)).toEqual(["TEC-3"]);
   });

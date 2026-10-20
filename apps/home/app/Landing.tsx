@@ -24,7 +24,7 @@ import type { ReactNode } from "react";
  */
 
 // **`id` and `name` are deliberately not the same word.** `board` stays the id
-// because it is in the query string — `/?tab=board` is a link Joel may have
+// because it is in the query string — `/?tab=board` is a link that may be
 // bookmarked, and renaming an id breaks a URL to rename a label.
 export const TABS = [
   { id: "board", name: "Pit Wall" },
