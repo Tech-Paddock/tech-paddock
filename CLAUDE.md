@@ -134,7 +134,7 @@ are the owner's.
 
 ## Enforcement
 
-1. **`main` is protected:** `gate` required, branches up to date.
+1. **`main` is protected:** `gate` and `request-line` required, branches up to date.
 2. **The guard** (`.claude/hooks/guard.mjs`, fails closed) refuses a push to `main`, a non-squash
    merge, migration-history rewrites, and pull-request writes from a helper; holds Vercel and
    Supabase writes for the owner; refuses a Linear issue without labels or Next steps.
