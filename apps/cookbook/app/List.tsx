@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { asText, type GroceryItem, type TidyLine } from "@/lib/grocery";
+import { MAX_QUANTITY, asText, type GroceryItem, type TidyLine } from "@/lib/grocery";
 import type { ResolvedLink } from "@/lib/preferences";
 import Brands from "./Brands";
+import Cart from "./Cart";
 import { useToast } from "./Toast";
 
 /**
@@ -22,13 +23,10 @@ type ShoppingLine = GroceryItem & ResolvedLink;
  * **Named for where it goes, since 2026-09-22.** Every link on it is a King
  * Soopers search, so "What to buy" was a word vaguer than the thing deserves.
  *
- * **The cheap version, on purpose** — reconfirmed by Joel on 2026-09-21 when a
- * do-not-substitute rule and a delivery/pickup toggle were put to this app. Both
- * are Kroger account settings that a search link cannot carry; building them here
- * would be re-opening the cart push rather than adding a feature. The list leaves
- * as a block of text you copy or a King Soopers search you tap. No stored retailer credential, no OAuth, no
- * `proxy.ts` carve-out — the expensive version needs all three and the only
- * thing it buys is who does the tapping.
+ * **It leaves three ways**: a block of text you copy, a King Soopers search you
+ * tap, or **Send to cart** (`Cart.tsx`) — Joel reversed the no-OAuth rule for
+ * King Soopers on 2026-09-26 (TEC-90). Still no `proxy.ts` carve-out. Each line
+ * carries a quantity for the cart, default 1.
  */
 export default function List({ refreshKey }: { refreshKey: number }) {
   const [items, setItems] = useState<ShoppingLine[] | null>(null);
@@ -40,6 +38,8 @@ export default function List({ refreshKey }: { refreshKey: number }) {
   const [busy, setBusy] = useState<null | "adding" | "tidying" | "applying">(null);
   const [proposal, setProposal] = useState<TidyLine[] | null>(null);
   const [copied, setCopied] = useState(false);
+  // Bumped when the cart panel's refresh or a send changed Your brands.
+  const [brandsVersion, setBrandsVersion] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -77,6 +77,23 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       toast.error(e instanceof Error ? e.message : "Couldn't add that.");
     } finally {
       setBusy(null);
+    }
+  }
+
+  /** How many to put in the cart. Saved on blur or Enter; a refused write reloads the truth. */
+  async function setQuantity(item: GroceryItem, quantity: number) {
+    if (quantity === item.quantity) return;
+    setItems((current) => (current ?? []).map((i) => (i.id === item.id ? { ...i, quantity } : i)));
+    try {
+      const response = await fetch("/api/grocery", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, quantity }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't change how many.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't change how many.");
+      await load();
     }
   }
 
@@ -370,6 +387,7 @@ export default function List({ refreshKey }: { refreshKey: number }) {
                   <span className="ml-1.5 text-[11px] text-ink-soft">from a recipe</span>
                 ) : null}
               </span>
+              <Quantity key={`${item.id}:${item.quantity}`} item={item} onCommit={(q) => setQuantity(item, q)} />
             </li>
           ))}
         </ul>
@@ -385,9 +403,44 @@ export default function List({ refreshKey }: { refreshKey: number }) {
         </button>
       ) : null}
 
-      {/* Remembering a brand happens only in here, since 2026-09-24 (TEC-39). */}
-      <Brands onChanged={() => void load()} />
+      {/* Send to cart, King Soopers (TEC-90): under the list it sends. */}
+      <Cart onBrandsChanged={() => setBrandsVersion((v) => v + 1)} />
+
+      {/* Remembering a brand happens only in here, since 2026-09-24 (TEC-39) —
+          and from a send, when a match is replaced by an exact product page. */}
+      <Brands onChanged={() => void load()} refreshKey={brandsVersion} />
 
     </section>
+  );
+}
+
+/**
+ * How many of a line go in the cart (TEC-90). A local draft so typing "12"
+ * does not save "1" first; it commits on blur or Enter, and anything that is not
+ * a whole number from 1 to 99 snaps back. Keyed by the saved value, so a reload
+ * resets the draft.
+ */
+function Quantity({ item, onCommit }: { item: GroceryItem; onCommit: (q: number) => void }) {
+  const [draft, setDraft] = useState(String(item.quantity));
+  function commit() {
+    const n = Number(draft);
+    if (Number.isInteger(n) && n >= 1 && n <= MAX_QUANTITY) onCommit(n);
+    else setDraft(String(item.quantity));
+  }
+  return (
+    <label className="flex shrink-0 items-center gap-0.5 pr-2 text-xs text-ink-soft">
+      ×
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        inputMode="numeric"
+        aria-label={`How many ${item.name}`}
+        className="w-9 rounded border border-line bg-surface px-1 py-0.5 text-center text-sm"
+      />
+    </label>
   );
 }

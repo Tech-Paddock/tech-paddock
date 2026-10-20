@@ -2,19 +2,16 @@ import { getServiceClient } from "./supabase";
 import { ConflictError, InputError, LookupError } from "./errors";
 
 /**
- * The shopping list, and the two ways it leaves this app.
+ * The shopping list, and the three ways it leaves this app.
  *
- * **This is the cheap version, and it was chosen rather than settled for.** The
- * list goes to King Soopers as text you copy or a search link you tap — no
- * stored credential, no OAuth, no carve-out in `proxy.ts`. Pushing straight
- * into a Kroger cart needs all three and the only thing it buys is who does the
- * tapping. Joel picked this on 2026-09-19 and the constraint moved here with the
- * list rather than being reopened.
+ * **Text you copy, a search link you tap, or Send to cart.** The first two were
+ * the whole of it until Joel reversed the no-OAuth rule for King Soopers on
+ * 2026-09-26 (TEC-90); the cart lives in `lib/cart.ts` and `lib/kroger.ts`, and
+ * this file only carries what a line needs for it — a quantity, and when it was
+ * last sent. Still no carve-out in `proxy.ts`.
  *
- * **This is `cookbook.grocery_items`, not Health's table.** Health's `/list` is
- * live and stays Health's until its redirect onto this app's `/list` ships
- * (TEC-15 — destructive, so two pull requests). Nothing here writes `health.*`,
- * and nothing here assumes that screen disappears on any date.
+ * **This is `cookbook.grocery_items`.** Health's list moved here and its table
+ * is gone (TEC-15); nothing here writes `health.*`.
  */
 
 /**
@@ -51,13 +48,30 @@ export type GroceryItem = {
    * Empty for a typed line and for recipe lines added before the column existed.
    */
   recipes: string[];
+  /** How many to put in the cart. Default 1 (the `cookbook_list_quantity_and_sent` migration). */
+  quantity: number;
+  /** When this line last went to the Kroger cart, or null. What a second send warns about. */
+  sent_at: string | null;
 };
 
-const COLUMNS = "id, name, note, source, checked, created_at, recipes";
+const COLUMNS = "id, name, note, source, checked, created_at, recipes, quantity, sent_at";
 
-/** `text[]` can come back null from an older client or row; a line always has a list. */
+export const MAX_QUANTITY = 99;
+
+/** A quantity this app will store, or null. Whole, 1 to 99 — the same range the table checks. */
+export function readQuantity(value: unknown): number | null {
+  const n = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+  return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= MAX_QUANTITY ? n : null;
+}
+
+/** `text[]` can come back null from an older client or row; a line always has a list, and a quantity. */
 function hydrate(row: Record<string, unknown>): GroceryItem {
-  return { ...(row as unknown as GroceryItem), recipes: Array.isArray(row.recipes) ? (row.recipes as string[]) : [] };
+  return {
+    ...(row as unknown as GroceryItem),
+    recipes: Array.isArray(row.recipes) ? (row.recipes as string[]) : [],
+    quantity: readQuantity(row.quantity) ?? 1,
+    sent_at: typeof row.sent_at === "string" ? row.sent_at : null,
+  };
 }
 
 /**
@@ -112,7 +126,13 @@ export function searchUrl(item: Pick<GroceryItem, "name">): string {
 export function asText(items: GroceryItem[]): string {
   const open = items.filter((i) => !i.checked);
   if (open.length === 0) return "";
-  return open.map((i) => (i.note ? `${i.name} — ${i.note}` : i.name)).join("\n");
+  return open
+    .map((i) => {
+      // A quantity of one is the default and says nothing, so it is not printed.
+      const name = (i.quantity ?? 1) > 1 ? `${i.name} ×${i.quantity}` : i.name;
+      return i.note ? `${name} — ${i.note}` : name;
+    })
+    .join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +151,14 @@ export async function readList(): Promise<GroceryItem[]> {
 }
 
 export async function addItems(
-  lines: { name: string; note?: string | null; source?: GrocerySource; recipes?: string[] }[]
+  lines: {
+    name: string;
+    note?: string | null;
+    source?: GrocerySource;
+    recipes?: string[];
+    quantity?: number;
+    sent_at?: string | null;
+  }[]
 ): Promise<GroceryItem[]> {
   const rows = lines
     .map((l) => ({
@@ -139,6 +166,9 @@ export async function addItems(
       note: l.note?.trim() || null,
       source: l.source ?? ("manual" as GrocerySource),
       recipes: unionRecipes([{ recipes: l.recipes ?? [] }]),
+      // Only a tidy sends these; a typed or recipe line takes the table's defaults.
+      ...(l.quantity !== undefined ? { quantity: readQuantity(l.quantity) ?? 1 } : {}),
+      ...(l.sent_at ? { sent_at: l.sent_at } : {}),
     }))
     .filter((l) => l.name.length > 0);
 
@@ -156,6 +186,18 @@ export async function setChecked(id: string, checked: boolean): Promise<void> {
     .update({ checked })
     .eq("id", id);
   if (error) throw new LookupError(`Couldn't tick that off: ${error.message}`);
+}
+
+export async function setQuantity(id: string, quantity: number): Promise<void> {
+  const { error } = await getServiceClient().from("grocery_items").update({ quantity }).eq("id", id);
+  if (error) throw new LookupError(`Couldn't change how many: ${error.message}`);
+}
+
+/** Record that these lines went to the cart, so the next send can warn. */
+export async function markSent(ids: string[], at: string): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await getServiceClient().from("grocery_items").update({ sent_at: at }).in("id", ids);
+  if (error) throw new LookupError(`Couldn't record what was sent: ${error.message}`);
 }
 
 export async function removeItems(ids: string[]): Promise<void> {
@@ -228,18 +270,39 @@ function sourceOf(line: TidyLine, open: GroceryItem[]): GrocerySource {
   return sources.size === 1 ? ([...sources][0] as GrocerySource) : "manual";
 }
 
+/**
+ * What a merged line carries for the cart (TEC-90).
+ *
+ * **The largest quantity, not the sum**: two recipes' olive oil is one bottle,
+ * and summing would put two in the cart. **The latest send, if any absorbed line
+ * was sent**: a merge must never erase the warning, because the Cart API only
+ * adds — a merged line that forgot it was half-sent would double that half.
+ */
+export function carryCart(absorbed: Pick<GroceryItem, "quantity" | "sent_at">[]): {
+  quantity: number;
+  sent_at: string | null;
+} {
+  const quantity = Math.max(1, ...absorbed.map((a) => a.quantity ?? 1));
+  const sent = absorbed.map((a) => a.sent_at).filter((s): s is string => typeof s === "string").sort();
+  return { quantity, sent_at: sent.length > 0 ? sent[sent.length - 1] : null };
+}
+
 /** Apply an approved tidy: the absorbed rows go, the consolidated lines arrive. */
 export async function applyTidy(open: GroceryItem[], lines: TidyLine[]): Promise<GroceryItem[]> {
   const problem = validateTidy(open, lines);
   if (problem) throw new ConflictError(problem);
 
-  const rows = lines.map((l) => ({
-    name: l.name,
-    note: l.note,
-    source: sourceOf(l, open),
-    // The merged line names every recipe its rows came from (TEC-39 B).
-    recipes: unionRecipes(l.absorbed.map((id) => open.find((i) => i.id === id) ?? { recipes: [] })),
-  }));
+  const rows = lines.map((l) => {
+    const absorbed = l.absorbed.map((id) => open.find((i) => i.id === id)).filter((i): i is GroceryItem => !!i);
+    return {
+      name: l.name,
+      note: l.note,
+      source: sourceOf(l, open),
+      // The merged line names every recipe its rows came from (TEC-39 B).
+      recipes: unionRecipes(absorbed),
+      ...carryCart(absorbed),
+    };
+  });
 
   // Write first, then delete. The other order has a window where a failed insert
   // leaves you with no list at all, in a shop, which is the one outcome worth

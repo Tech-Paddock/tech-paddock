@@ -94,9 +94,12 @@ in its migration's header. Two things were implied by the settled decisions and 
   the health-recipes design, and keep the same meaning: `source_url` records where the *method*
   came from, never where a number did — imported nutrition is never retained, only re-estimated.
 - **The grocery list.** Lines, ticked off, a `source` distinguishing a recipe-pushed ingredient from
-  something added by hand. Health's `/list` shipped the cheap version of this on Joel's word — no
-  stored credential, no OAuth, text or a link only — and that constraint carries over rather than
-  being reopened for the move.
+  something added by hand, and a quantity (default 1). Health's `/list` shipped it as text or a link
+  only, with no stored credential and no OAuth; **Joel reversed that for King Soopers on 2026-09-26
+  (TEC-90)**, under *Send to cart* below. The reversal covers Kroger and nothing else.
+- **One Kroger connection.** A refresh token, encrypted at rest under `KROGER_TOKEN_KEY`, and the
+  chosen store. Never sent to the browser, never logged. Its scope is add-to-cart and product read,
+  so the worst case is items in Joel's cart.
 
 **Never another app's schema.** `lib/supabase.ts` pins `cookbook`; there is no default to override
 per query. This tool never reads or writes `health.*` directly — what it exposes to Health is
@@ -121,21 +124,35 @@ get relitigated here.
   tidying the list stays a deliberate tap, never something that happens to the list as a side
   effect of adding to it.
 
-## The grocery list — the move, in progress
+## The grocery list — moved, and done
 
-**Cookbook's list is built, and Health's `/list` is still live.** Moving ownership is a schema and
-data question, not just a feature, and it is sequenced as TEC-15, Joel approving, 2026-09-23. Both
-tables held zero rows then, so nothing is copied.
+Health's list moved here (TEC-15, finished 2026-09-29): Health's `/list` redirects to this list,
+and `health.grocery_items` is dropped.
 
-1. **Your part comes first — TEC-22:** the list needs a URL of its own (today it is tab state with
-   no address), so Health's `/list` can redirect straight onto it.
-2. **Health's part — TEC-23:** `/list` redirects there and Health stops touching
-   `health.grocery_items`.
-3. **The technical director's — TEC-15:** the table is dropped once that is live. A destructive
-   change splits into two pull requests (`CLAUDE.md`), and this is the second.
+## Send to cart — King Soopers (TEC-90, Joel 2026-09-26)
 
-Until Health's redirect is live, do not assume `/list` has gone, and never write to
-`health.grocery_items`.
+- **Connect once, from the list tab.** Kroger's sign-in returns to `/kroger/callback`, a page route
+  behind the password gate, with no exception in the gate file. The client ID and secret stay
+  server-side.
+- **Pick a store once**, so lookups price and stock at that store.
+- **Send to cart adds; it never checks out.** A line tied to an exact product in Your brands goes in
+  as-is. Any other line shows Kroger's top match, and Joel adds it or replaces it with the exact
+  product URL; a replacement is remembered in Your brands. **No model picks a product.**
+- **Every line reports added, skipped or failed.** A partial send never reads as a whole one.
+- **A second send warns and shows what was already sent.** The Cart API only adds, so a silent
+  repeat doubles every quantity.
+- **A link to checkout, not a checkout.** "Go to checkout" opens the King Soopers cart; the order is
+  placed and paid there, never here.
+- **Saved products stay current without a model.** Each saved brand keeps its Kroger product ID, page
+  link, size, last price and stock at Joel's store, and when it was checked. A refresh runs when the
+  list is opened more than seven days after the last one, or on **Refresh now**. It updates prices
+  and stock, fills in missing product IDs, and **flags a product Kroger no longer returns** rather
+  than dropping it. It also keeps the King Soopers connection alive. A failed refresh says so; it
+  never reads as "nothing changed".
+- **Kroger's public API cannot read the account**: no orders, no cart contents, no purchase history.
+  Nothing here claims to know what was bought.
+- **Kroger is mocked in tests**, because no session here can reach it. The first real check is Joel
+  connecting on production.
 
 ## The Health↔Cookbook contract — the technical director's, and this is its one home
 

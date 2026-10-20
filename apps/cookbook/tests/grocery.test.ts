@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { asText, searchUrl, splitLine, unionRecipes, validateTidy, type GroceryItem, type TidyLine } from "@/lib/grocery";
+import {
+  asText,
+  carryCart,
+  readQuantity,
+  searchUrl,
+  splitLine,
+  unionRecipes,
+  validateTidy,
+  type GroceryItem,
+  type TidyLine,
+} from "@/lib/grocery";
 
 /**
  * The shopping list's pure half, and it is mostly one function.
@@ -17,9 +27,41 @@ function item(over: Partial<GroceryItem> & { id: string; name: string }): Grocer
     checked: false,
     created_at: "2026-09-20T00:00:00Z",
     recipes: [],
+    quantity: 1,
+    sent_at: null,
     ...over,
   };
 }
+
+describe("a line's quantity (TEC-90)", () => {
+  it("is a whole number from 1 to 99, and nothing else", () => {
+    expect(readQuantity(1)).toBe(1);
+    expect(readQuantity("12")).toBe(12);
+    expect(readQuantity(99)).toBe(99);
+    for (const bad of [0, 100, 1.5, -1, "", "two", null, undefined]) expect(readQuantity(bad)).toBeNull();
+  });
+
+  it("is printed in the copied list only when it says something", () => {
+    expect(asText([item({ id: "a", name: "Milk", quantity: 2 }), item({ id: "b", name: "Eggs" })])).toBe("Milk ×2\nEggs");
+  });
+});
+
+describe("what a tidied line carries for the cart (TEC-90)", () => {
+  it("keeps the largest quantity — two recipes' olive oil is one bottle, not two", () => {
+    expect(carryCart([{ quantity: 1, sent_at: null }, { quantity: 3, sent_at: null }]).quantity).toBe(3);
+  });
+
+  it("keeps the latest send when any absorbed line was sent, so a merge never erases the warning", () => {
+    expect(
+      carryCart([
+        { quantity: 1, sent_at: null },
+        { quantity: 1, sent_at: "2026-10-19T10:00:00Z" },
+        { quantity: 1, sent_at: "2026-10-20T10:00:00Z" },
+      ]).sent_at
+    ).toBe("2026-10-20T10:00:00Z");
+    expect(carryCart([{ quantity: 1, sent_at: null }]).sent_at).toBeNull();
+  });
+});
 
 const open: GroceryItem[] = [
   item({ id: "a", name: "2 cloves garlic", source: "recipe" }),

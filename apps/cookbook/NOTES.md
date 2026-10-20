@@ -1,6 +1,7 @@
 # Cookbook — notes
 
-State as of 2026-10-18, after #257 (menu days, the Add tab, the icon), #259 (Surface) and Next 16.
+State as of 2026-10-20, after TEC-90 (Send to cart, King Soopers), on top of #257 (menu days, the Add
+tab, the icon), #259 (Surface) and Next 16.
 
 `RULES.md` has the charter. This file is only what is true right now, and its traps. **Open work is
 in Linear under `app:cookbook`** — never here.
@@ -33,7 +34,7 @@ the third copy of Coffee's registry, flagged). The four calls without a tool sen
 every call checks `stop_reason`. **`methodSteps` splits only on the next number in a run** — gas
 mark 4 stays put (its tests hold the edges).
 
-**Four tables in `cookbook`**, reasoning in the migration headers. `recipes` stores **the whole pot**;
+**Six tables in `cookbook`**, reasoning in the migration headers; the two Kroger ones are below. `recipes` stores **the whole pot**;
 `grocery_items` is this app's list; `brand_preferences` is unseeded (TEC-51); `menu` is **On the
 menu**: a row per recipe with a **`day`** (the `cookbook_menu_day` migration) picked beside *Add to
 list* — the only way on; re-adding moves it — shown per serving. **Nothing expires**: ✕ or Clear
@@ -49,14 +50,40 @@ until Joel sends their values (TEC-52). **Every field of a kept recipe is editab
 only changed ingredients re-price — one call before the one write, so a failure writes nothing;
 servings alone re-divides the same pot. Pill: rating and time always; meal · main · cuisine when wide.
 
-**The list is the cheap version and that is a decision, not a gap** — reconfirmed by Joel 2026-09-21:
-copied text or a King Soopers link, no credential, no OAuth. **A line's name is its link**; the
-checkbox is a separate tap target. "Milk — the small tin" stores a name and a note, and only the
+**The list leaves three ways: copied text, a King Soopers link, or Send to cart** (TEC-90; Joel
+reversed the no-OAuth rule for Kroger only). **A line's name is its link**; the checkbox is a
+separate tap target, and **each line has a quantity** (1–99, default 1, `quantity` column), which
+Tidy merges as the largest, not the sum. "Milk — the small tin" stores a name and a note, and only the
 name is searched. **Remembering a brand happens only in Your brands** (TEC-39): *Item*, then *this
 exact product* (with **Paste**, King Soopers product pages only) or *better search words*. **`plain`
 is refused by the editor and by Paste a batch**; the enum and `resolveLink` still honour old rows.
 The editor sends no brand or note, and **a field not sent is not overwritten**. The `brand` column is
 unused. Tidy is Haiku; `validateTidy` refuses a proposal that drops, doubles or invents a line.
+
+**Send to cart — King Soopers** (`app/Cart.tsx`, under the list). **No model call anywhere.**
+*Connect King Soopers* goes to `/kroger/connect`, then Kroger, then `/kroger/callback`. Both are
+**route handlers outside `/api/`**, so an expired session bounces through the login, and **`proxy.ts`
+has no exception for them**. The redirect URI is the constant `REDIRECT_URI` in `lib/kroger.ts`,
+never built from the request. The OAuth `state` is a signed nonce, double-submitted in an httpOnly
+`/kroger` cookie (`lib/krogerCrypto.ts`). **One connection row** (`kroger_connection`, `id` is a
+boolean that can only be true) holds the refresh token **sealed** with AES-256-GCM under
+`KROGER_TOKEN_KEY`. The table refuses a value without `v1:`. It also holds the store (plain) and
+`refreshed_at`. The access token is never stored: each request refreshes once (`withAccessToken`),
+and a rotated refresh token is resealed. **No route body carries a token**; `tests/kroger.test.ts`
+reads every one. Scopes are `cart.basic:write product.compact`. A missing variable is named in
+words on the list tab and in `/api/health`.
+**The review** (`GET /api/kroger/cart`): an exact-product brand goes in as-is (its URL's digits are
+the UPC, `productIdFromUrl`). Any other line shows Kroger's top match at the store. Joel ticks it, or
+pastes a product page, which `savePreference` remembers under the line's name. **One Cart call per
+line**, so each reports added, skipped or failed. **`sent_at`** marks a sent line. A send picking one
+again is refused 409 before Kroger is touched, unless `again`. Tidy carries the latest `sent_at`.
+*Go to checkout* is `CHECKOUT_URL` in `lib/kingsoopers.ts`, a constant.
+**Refresh** (`lib/refresh.ts`, `POST /api/kroger/refresh`) checks every *exact product* brand at the
+store. It writes `brand_products` (price, stock, page, `checked_at`). **A product Kroger stopped
+returning gets `missing_since` and is kept**, shown in Your brands and on its collapsed toggle.
+Search-word brands are counted, not checked. It runs on opening the list tab when `refreshed_at`
+is over 7 days old (`lib/refreshDue.ts`, in the background), or on *Refresh now*. **No cron.**
+`refreshed_at` moves only when the brands were checked.
 
 **`GET /api/servings` is a contract** (TEC-11, one home `RULES.md`): every recipe per serving,
 Cookbook dividing, unrounded, behind the ordinary session. `tests/servings.test.ts` holds its exact
@@ -64,7 +91,8 @@ fields; metadata never enters it. **Logging what you ate is Health's**, by desig
 
 **Every failure has one status, in `lib/errors.ts`**: `LookupError` 503 means only that the database
 did not answer — **Health reads a 503 as "couldn't reach the Cookbook"**; `InputError` 400;
-`ConflictError` 409; anything else 500, via `lib/respond.ts`.
+`ConflictError` 409; `UpstreamError` 502 (Kroger; `reconnect: true` in the body when the stored
+sign-in failed); `SetupError` 501 (a missing variable); anything else 500, via `lib/respond.ts`.
 
 ## Traps specific to this area
 
@@ -76,5 +104,24 @@ did not answer — **Health reads a 503 as "couldn't reach the Cookbook"**; `Inp
   reconsidered and kept by Joel, 2026-09-22). Do not thin the checks or re-ask.
 - **A client component must not import a lib that imports `supabase.ts`** — split the helper out.
 - **Read Vercel and Supabase live before writing a deployment step** — #159 missed two that existed.
+- **Kroger's request and response shapes were never loaded from here.** `developer.kroger.com` and
+  `api.kroger.com` are refused by egress, so the shapes in `lib/kroger.ts` come from the brief and
+  from public examples. These were confirmed by search only: the base URL, the OAuth paths, both
+  scopes, `filter.term` (3 characters to 8 words), `filter.locationId`, 8-character location IDs and
+  `filter.zipCode.near`. These were not confirmed: Basic auth on `/token`, `PUT /cart/add` with
+  `{items:[{upc,quantity}]}` and no `modality`, `filter.chain=KINGSOOPERS`, `productPageURI`,
+  `inventory.stockLevel` and `filter.productId` for a single product. **Joel's first Connect is the
+  first real check**; if one is wrong, it is one constant or one parser in that file.
+- **Changing `KROGER_TOKEN_KEY` orphans the stored token.** It cannot be opened under the new key,
+  so the list tab says to connect again. That is the designed way to rotate the key.
+- **Two refreshes at once can race the token rotation**, for example two tabs opening a stale list.
+  If Kroger spends the old refresh token on the first, the second fails with `reconnect`. Kroger
+  sign-in is unchanged; Connect again fixes it.
+- **A remembered replacement's phrase is the line's whole name**, such as `2 cups whole milk`, so it
+  only matches lines saying that. Shorten it in Your brands.
+- **Preview and local deployments cannot complete a Kroger sign-in.** The redirect URI is
+  production's, by registration.
+- **The two Kroger migrations must be applied before this code is live**: `readList` selects
+  `quantity` and `sent_at`, and `/api/preferences` reads `brand_products`.
 - **`claude/health-recipes` is the design record, kept on purpose.** Never revive a merged
   `claude/cookbook-*` branch.

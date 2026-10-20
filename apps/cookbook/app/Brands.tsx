@@ -162,8 +162,49 @@ export function RememberForm({
   );
 }
 
-export default function Brands({ onChanged }: { onChanged: () => void }) {
+/** What the refresh last saw for an exact-product brand (TEC-90). Mirrors `BrandProduct` in `lib/krogerStore.ts`, which a client cannot import. */
+type Checked = {
+  description: string | null;
+  size: string | null;
+  url: string | null;
+  price: number | null;
+  in_stock: boolean | null;
+  missing_since: string | null;
+  checked_at: string;
+};
+
+function day(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/** One line under a product brand: what Kroger said, or that it stopped saying anything. */
+function CheckedLine({ checked }: { checked: Checked }) {
+  if (checked.missing_since) {
+    // **Flagged, never dropped** (Joel, 2026-10-20): the brand stays, and
+    // choosing a replacement is his — edit it with a new product page.
+    return (
+      <span className="block text-xs text-danger">
+        Kroger no longer returns this product (since {day(checked.missing_since)}). Edit it with a new product page, or forget it.
+      </span>
+    );
+  }
+  const bits = [
+    checked.description,
+    checked.size,
+    checked.price !== null ? `$${checked.price.toFixed(2)}` : null,
+    checked.in_stock === false ? "out of stock" : checked.in_stock ? "in stock" : null,
+  ].filter(Boolean);
+  return (
+    <span className="block text-[11px] text-ink-soft">
+      {bits.join(" · ")} — checked {day(checked.checked_at)}
+    </span>
+  );
+}
+
+export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () => void; refreshKey?: number }) {
   const [preferences, setPreferences] = useState<Preference[] | null>(null);
+  const [checked, setChecked] = useState<Record<string, Checked>>({});
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   // The row being edited, "new" for an empty form, or null for no form.
@@ -177,6 +218,7 @@ export default function Brands({ onChanged }: { onChanged: () => void }) {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't read your brands.");
       setPreferences(body.preferences as Preference[]);
+      setChecked((body.products ?? {}) as Record<string, Checked>);
       setError(null);
     } catch (e) {
       // Same rule as the list: a failed read stays null, never [], because
@@ -185,9 +227,13 @@ export default function Brands({ onChanged }: { onChanged: () => void }) {
     }
   }, []);
 
+  // Read on open of the tab too, not only of the panel, so a product the refresh
+  // flagged shows on the collapsed toggle rather than waiting to be found.
   useEffect(() => {
-    if (open) void load();
-  }, [open, load]);
+    void load();
+  }, [open, load, refreshKey]);
+
+  const flagged = (preferences ?? []).filter((p) => checked[p.id]?.missing_since).length;
 
   async function forget(id: string) {
     const response = await fetch("/api/preferences", {
@@ -249,6 +295,11 @@ export default function Brands({ onChanged }: { onChanged: () => void }) {
         className="self-start text-xs text-ink-soft underline decoration-dotted underline-offset-2"
       >
         {open ? "Hide your brands" : "Your brands"}
+        {flagged > 0 ? (
+          <span className="ml-1 text-danger">
+            · {flagged} Kroger no longer returns
+          </span>
+        ) : null}
       </button>
 
       {open ? (
@@ -276,6 +327,7 @@ export default function Brands({ onChanged }: { onChanged: () => void }) {
                           ? " — a product page"
                           : ` — “${p.terms}”`}
                     </span>
+                    {p.kind === "product" && checked[p.id] ? <CheckedLine checked={checked[p.id]} /> : null}
                   </span>
                   <button
                     type="button"

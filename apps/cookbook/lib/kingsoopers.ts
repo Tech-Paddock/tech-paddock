@@ -22,3 +22,27 @@ export function isKingSoopersProduct(text: string): boolean {
     /^\/p\/[^/]/.test(url.pathname)
   );
 }
+
+/**
+ * Where checkout happens (Joel, 2026-10-20). **A constant, never the database**:
+ * the Cart API only adds and cannot check out, so the list tab and the send
+ * results link here, in a new tab, and that link does nothing else.
+ */
+export const CHECKOUT_URL = "https://www.kingsoopers.com/cart";
+
+/**
+ * The product number a King Soopers product page carries, or null.
+ *
+ * **What Send to cart puts in the cart for a line tied to an exact product**
+ * (TEC-90): a product page reads `/p/<slug>/<digits>`, and those digits are the
+ * product ID Kroger's Cart API takes as `upc`. Taken from King Soopers' own
+ * URLs, not loaded — the same provenance as `isKingSoopersProduct` — so a page
+ * whose address ends some other way is treated as a line with no exact product
+ * and gets Kroger's top match instead of a guess.
+ */
+export function productIdFromUrl(text: string): string | null {
+  if (!isKingSoopersProduct(text)) return null;
+  const segments = new URL(text.trim()).pathname.split("/").filter(Boolean);
+  const last = segments[segments.length - 1] ?? "";
+  return /^\d{8,14}$/.test(last) ? last : null;
+}

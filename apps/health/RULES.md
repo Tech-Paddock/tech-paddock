@@ -55,7 +55,7 @@ was turn a scope decision into a shape rule. **Food only is the scope rule and i
 grocery list is food: it is the same foods, one step before they are eaten.
 
 **The rule that replaces it.** The log is the app. Everything else reaches it as a quiet footer
-link, never a tab — `/debug` works that way, and so does `/list` until it moves. **A screen earns
+link, never a tab — `/debug` works that way, and `/list` did before it moved. **A screen earns
 its place by being a different moment, not a different noun.** You are not shopping while you are
 logging lunch, and you are not logging lunch in the aisle; two moments, two screens, one product.
 A second *noun* — exercise — is still out, and this does not reopen it.
@@ -64,17 +64,16 @@ A second *noun* — exercise — is still out, and this does not reopen it.
 under this rule still goes to him first**; what changed is that the answer is no longer "the charter
 forbids it" before he has been asked.
 
-**The list itself is leaving, and the rule is not.** It moves to the Cookbook with the recipes — you
-shop from recipes, not from what you ate — settled 2026-09-20 and sequenced as TEC-15: the
-Cookbook's list gets its own URL (TEC-22), then `/list` redirects there and Health stops touching
-`health.grocery_items` (TEC-23), then the table is dropped once that is live. **The rule above was
+**The list itself has left, and the rule has not.** It moved to the Cookbook with the recipes — you
+shop from recipes, not from what you ate (TEC-15, finished 2026-09-29): `/list` redirects there and
+`health.grocery_items` is dropped. **The rule above was
 written about the list but is not about the list**, so it stays: it is what the next second-screen
 ask gets measured against.
 
 **Recipes are not yours, and that is settled rather than parked.** Joel moved them out on
 2026-09-20: they are **their own app, with their own Postgres schema**, themed as a meal cookbook.
 **You read them to price a meal; you do not own them.** A recipe book, a generator or a URL import
-living in `apps/health` is the wrong answer, and so is a grocery list once TEC-15 lands. **How you
+living in `apps/health` is the wrong answer, and so is a grocery list. **How you
 read a recipe is decided** (TEC-11, 2026-09-23): you call Cookbook's `GET /api/servings` from your
 server, forwarding the caller's session, and you never read `cookbook` tables. **The contract lives
 in Cookbook's charter** — one home, so read it there; changing it is the technical director's call.

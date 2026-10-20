@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { errorResponse } from "@/lib/respond";
+import { readBrandProducts } from "@/lib/krogerStore";
 import {
   importPreferences,
   readDraft,
@@ -19,9 +20,18 @@ export const dynamic = "force-dynamic";
  * before writing any, and it reports what it refused rather than dropping it.
  */
 
+/**
+ * The brands, and what Kroger last said about each exact product (TEC-90's
+ * refresh) — price, stock, and a flag when Kroger stopped returning it.
+ * `products` is keyed by the brand's id; a brand with none has not been checked.
+ */
 export async function GET() {
   try {
-    return NextResponse.json({ preferences: await readPreferences() });
+    const [preferences, products] = await Promise.all([readPreferences(), readBrandProducts()]);
+    return NextResponse.json({
+      preferences,
+      products: Object.fromEntries(products.map((p) => [p.preference_id, p])),
+    });
   } catch (e) {
     return errorResponse(e, "Couldn't read your brands.");
   }

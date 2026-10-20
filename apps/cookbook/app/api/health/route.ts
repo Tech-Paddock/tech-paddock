@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
+import { configProblems } from "@/lib/kroger";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,16 @@ const probes: Record<string, () => Promise<Omit<Check, "name">>> = {
     if (!key) return { ok: false, detail: "ANTHROPIC_API_KEY is not set" };
     if (!key.startsWith("sk-ant-")) return { ok: false, detail: "ANTHROPIC_API_KEY is set but does not look like a key" };
     return { ok: true, detail: "present, shape looks right — not called" };
+  },
+
+  /**
+   * Send to cart's three variables (TEC-90): present, and the key the right
+   * length. Never a call to Kroger, and never a value — names only.
+   */
+  async kroger() {
+    const problems = configProblems();
+    if (problems.length > 0) return { ok: false, detail: problems.join("; ") };
+    return { ok: true, detail: "KROGER_CLIENT_ID, KROGER_CLIENT_SECRET and KROGER_TOKEN_KEY present — Kroger not called" };
   },
 
   async sessionSecret() {
