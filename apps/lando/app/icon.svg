@@ -1,13 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Lando">
-  <!-- A paw print. Colours are the Clark livery's, copied from lib/theme.css:
-       accent #0F5C33 and tone-4 #FFD84D. apple-touch-icon.png is this drawn
-       full-bleed at 180px (no rounded corners: iOS rounds them itself). -->
-  <rect width="64" height="64" rx="14" fill="#0F5C33"/>
-  <g fill="#FFD84D">
-    <ellipse cx="32" cy="41" rx="13" ry="11"/>
-    <ellipse cx="17" cy="27" rx="5" ry="6.5"/>
-    <ellipse cx="26.5" cy="19" rx="5" ry="6.5"/>
-    <ellipse cx="37.5" cy="19" rx="5" ry="6.5"/>
-    <ellipse cx="47" cy="27" rx="5" ry="6.5"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Lando">
+  <!-- A puppy in a racing helmet, visor up. Colours are the mcl39 livery's,
+       copied from lib/theme.css: anthracite #121316 (bar), papaya #FF8000
+       (dark-mode accent), burnt papaya #A84200 (light-mode accent) and
+       #FFE8D4 (tone-1). Inspired by the livery; no real team mark, number or
+       sponsor. favicon.ico, apple-touch-icon.png and the manifest PNGs are
+       drawn from this file; apple-touch-icon.png is full-bleed (rx 0), since
+       iOS rounds the corners itself. -->
+  <rect width="512" height="512" rx="112" fill="#121316"/>
+  <!-- floppy ears, hanging out under the helmet -->
+  <path d="M100 330 C56 366 48 446 92 470 C130 490 168 458 172 414 L176 340 Z" fill="#A84200"/>
+  <path d="M412 330 C456 366 464 446 420 470 C382 490 344 458 340 414 L336 340 Z" fill="#A84200"/>
+  <!-- face -->
+  <path d="M256 214 C334 214 366 270 366 330 C366 400 318 446 256 446 C194 446 146 400 146 330 C146 270 178 214 256 214 Z" fill="#FFE8D4"/>
+  <!-- helmet shell: crown and cheeks, the face opening cut out -->
+  <path fill="#FF8000" fill-rule="evenodd" d="M256 64 C366 64 438 146 438 262 L438 340 C438 372 414 392 386 392 L362 392 C366 372 368 352 368 330 C368 262 330 222 256 222 C182 222 144 262 144 330 C144 352 146 372 150 392 L126 392 C98 392 74 372 74 340 L74 262 C74 146 146 64 256 64 Z"/>
+  <!-- raised visor across the crown, with its pivots -->
+  <path d="M100 196 C150 120 362 120 412 196 L398 230 C344 168 168 168 114 230 Z" fill="#121316"/>
+  <circle cx="104" cy="262" r="16" fill="#121316"/>
+  <circle cx="408" cy="262" r="16" fill="#121316"/>
+  <!-- eyes, nose -->
+  <circle cx="210" cy="312" r="20" fill="#121316"/>
+  <circle cx="302" cy="312" r="20" fill="#121316"/>
+  <path d="M228 356 C228 340 284 340 284 356 C284 374 268 386 256 386 C244 386 228 374 228 356 Z" fill="#121316"/>
+  <path d="M256 384 V398 C256 414 232 420 220 406 M256 398 C256 414 280 420 292 406" stroke="#121316" stroke-width="9" stroke-linecap="round" fill="none"/>
 </svg>

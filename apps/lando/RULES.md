@@ -19,4 +19,4 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 ## Settled
 
 - Login is the shared password until per-person logins ship (TEC-118).
-- Livery: `clark` for now (freed by the editor's retirement); a papaya livery is a later home theme change.
+- Livery: McLaren '25 (`mcl39`), the theme's own; changed only in the theme.

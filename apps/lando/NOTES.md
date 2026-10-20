@@ -7,7 +7,15 @@
 - The gate file is `proxy.ts`, the base copy. Not yet in the hub's `TOOLS`
   (`apps/home/lib/platform.ts`); that is a separate home change, and until it lands The Garage
   does not probe `/api/health`.
-- Livery `clark`, which Cookbook also wears.
+- Livery `mcl39` (McLaren '25: papaya on anthracite), worn by Lando alone. The theme files carry
+  it because this branch merged `claude/home-papaya-livery`.
+- The icon is a puppy in a racing helmet, visor up (`app/icon.svg`), in the mcl39 colours copied
+  from `lib/theme.css`. It is inspired by the livery: no team mark, wordmark, number or sponsor.
+  `favicon.ico`, `apple-touch-icon.png` (full-bleed) and `manifest-192/512.png` are drawn from it;
+  redraw all four when it changes. Two other concepts (a tyre paw, a profile with speed lines)
+  were offered; the owner may swap.
+- A web app manifest at `/app.webmanifest` (a route, `app/app.webmanifest/route.ts`) for Chrome's
+  install. No other app has one.
 
 ## How it works
 
@@ -41,3 +49,14 @@
 - `TRUNCATE` is not covered by the append-only trigger.
 - Next 16 drops `apple-mobile-web-app-capable` unless `metadata.other` in `app/layout.tsx` writes it.
 - Turbopack refuses an ICO whose PNG frame is not RGBA; `app/favicon.ico` is RGBA.
+- **Merge order: `claude/home-papaya-livery` before `claude/lando-scaffold-v1`.** This branch
+  carries that one's theme files byte-identical, so once it is on `main` this branch's diff is
+  Lando's own. Merged the other way round, Lando would bring the livery with it and the livery
+  branch would be a no-op to close. `mcl39` must exist in `lib/theme.ts` or `lib/livery.ts` fails
+  the typecheck.
+- The manifest sits behind the gate, so `layout.tsx` links it with
+  `crossOrigin="use-credentials"`. Next's `app/manifest.ts` writes the link without it outside
+  Vercel previews, and the browser would get the login redirect instead. Its icons are static
+  imports (`/_next/static`), which the gate admits. Signed out, the manifest is a 307: harmless.
+- `app/icon*.png` is a Next metadata convention; the manifest PNGs are named `manifest-*.png` so
+  Next does not treat them as icons.
