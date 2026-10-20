@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Lando">
+  <!-- A paw print. Colours are the Clark livery's, copied from lib/theme.css:
+       accent #0F5C33 and tone-4 #FFD84D. apple-touch-icon.png is this drawn
+       full-bleed at 180px (no rounded corners: iOS rounds them itself). -->
+  <rect width="64" height="64" rx="14" fill="#0F5C33"/>
+  <g fill="#FFD84D">
+    <ellipse cx="32" cy="41" rx="13" ry="11"/>
+    <ellipse cx="17" cy="27" rx="5" ry="6.5"/>
+    <ellipse cx="26.5" cy="19" rx="5" ry="6.5"/>
+    <ellipse cx="37.5" cy="19" rx="5" ry="6.5"/>
+    <ellipse cx="47" cy="27" rx="5" ry="6.5"/>
+  </g>
+</svg>
