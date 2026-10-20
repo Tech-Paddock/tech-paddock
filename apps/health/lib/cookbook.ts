@@ -167,8 +167,8 @@ export function recipeBook(read: () => Promise<Recipe[]>): RecipeBook {
 }
 
 /**
- * The recipe a name names, **surviving an outage only where that is safe**
- * (Joel, 2026-09-26: "Only recipe lines fail").
+ * The recipe a name names, **surviving an outage only where that is safe**:
+ * only recipe lines fail.
  *
  * When the Cookbook cannot be read, a name Health has already stored with a
  * `cookbook` version is a known recipe: it rethrows `CookbookUnreachable`, so

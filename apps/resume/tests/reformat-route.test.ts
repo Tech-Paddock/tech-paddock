@@ -71,8 +71,8 @@ describe("POST /api/reformat", () => {
   });
 
   /**
-   * TEC-105. Joel, 2026-10-14: "block the download but give the specific issue
-   * in diagnostic". A FAIL hands out no bytes — not in the response, and not in
+   * TEC-105, 2026-10-14: a FAIL blocks the download and names the specific issue
+   * on Diagnostics. It hands out no bytes — not in the response, and not in
    * storage, where the Resumes list or `/api/renders/[id]/file` could offer them
    * later. The record of the render is still kept, because it is what says why.
    */
@@ -102,8 +102,8 @@ describe("POST /api/reformat", () => {
   });
 
   /**
-   * TEC-105, Joel 2026-10-18: a template section the source does not fill — a
-   * Summary the Jobright export lacks — "only warns". The render PASSes, says
+   * TEC-105, 2026-10-18: a template section the source does not fill — a
+   * Summary the Jobright export lacks — only warns. The render PASSes, says
    * so in a note, and hands out and stores its file like any other PASS. Source
    * text with no slot is a different case and still blocks (pinned above and in
    * `tests/feather.test.ts`).
@@ -154,7 +154,7 @@ describe("POST /api/reformat", () => {
   });
 
   /**
-   * TEC-105, Joel 2026-10-18: "Whole sections only." A source with fewer Career
+   * TEC-105, 2026-10-18: whole sections only. A source with fewer Career
    * Highlights than the template has cells fills the section only in part, so
    * the remaining cells would ship the template's own figures. That FAILs: no
    * file in the response and none in storage, though the render is recorded.

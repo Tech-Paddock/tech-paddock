@@ -23,7 +23,7 @@ export type Livery = "martini" | "clark" | "senna" | "mp44" | "jps";
 
 /**
  * Two lines, shown beside the page title: **who and when**, then **what and who
- * drove it**. Joel set that shape on 2026-09-19.
+ * drove it**.
  *
  * **Line one names the livery, not always the constructor.** Martini and JPS
  * were the identity of those cars more than Brabham and Lotus were, and the

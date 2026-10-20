@@ -15,7 +15,7 @@ import { EMPTY_META, type RecipeMeta } from "@/lib/metadata";
 import type { Macros } from "@/lib/macros";
 
 /**
- * The tuning section (Joel, 2026-09-26, "Both"): pickers that steer a draft and
+ * The tuning section (2026-09-26): pickers that steer a draft and
  * come back tagged on it, and the same options as filters on the book, with
  * high protein computed from the numbers rather than stored.
  */

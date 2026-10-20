@@ -33,7 +33,7 @@ describe("the generate prompt", () => {
   });
 });
 
-describe("turning a draft down — Something else and Bin it alike (Joel, 2026-09-25)", () => {
+describe("turning a draft down — Something else and Bin it alike (2026-09-25)", () => {
   const beans = { name: "Green bean almondine", ingredients: ["300g green beans"] };
   const asparagus = { name: "Asparagus almondine", ingredients: ["300g asparagus"] };
 

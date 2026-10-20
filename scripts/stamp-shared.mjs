@@ -73,7 +73,7 @@ export const MANIFEST = [
 
 export const SHARED_DIR = "packages/shared";
 
-/* The one app with no password (Joel, 2026-09-29; TEC-99). It is safe only
+/* The one app with no password (TEC-99). It is safe only
    because it holds nothing, so it takes only the entries marked `public` — the
    theme tokens — and never the auth files or the gated next.config.mjs, whose
    frame-ancestors and missing CSP are written for a tool behind the login.

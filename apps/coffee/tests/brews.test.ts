@@ -164,8 +164,7 @@ describe("ratio and water", () => {
   });
 
   it("rounds the ratio to a whole number", () => {
-    // Joel, 2026-09-20: "Whole numbers only for recipe." 1:17 is what you
-    // brew to; 1:16.7 is a description of what the scale happened to say.
+    // Whole numbers only (2026-09-20). 1:17 is what you brew to; 1:16.7 is a description of what the scale happened to say.
     expect(ratioFor(18, 300)).toBe(17);
     expect(ratioFor(20, 290)).toBe(15);
   });

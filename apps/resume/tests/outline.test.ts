@@ -40,8 +40,8 @@ describe("outline", () => {
  *     Lakeside Systems …          6 lines · 6 bullets
  *     Harbor Point Group …        4 lines · 4 bullets
  *
- * On the one page whose whole purpose is to show what was understood. Joel asked
- * why it read zero; this is that.
+ * On the one page whose whole purpose is to show what was understood. This is
+ * why it read zero.
  */
 describe("a job line is not a section heading", () => {
   it("keeps the jobs inside Professional Experience", async () => {

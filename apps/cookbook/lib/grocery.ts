@@ -5,7 +5,7 @@ import { ConflictError, InputError, LookupError } from "./errors";
  * The shopping list, and the three ways it leaves this app.
  *
  * **Text you copy, a search link you tap, or Send to cart.** The first two were
- * the whole of it until Joel reversed the no-OAuth rule for King Soopers on
+ * the whole of it until the no-OAuth rule was reversed for King Soopers on
  * 2026-09-26 (TEC-90); the cart lives in `lib/cart.ts` and `lib/kroger.ts`, and
  * this file only carries what a line needs for it — a quantity, and when it was
  * last sent. Still no carve-out in `proxy.ts`.

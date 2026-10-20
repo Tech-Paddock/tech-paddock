@@ -401,8 +401,8 @@ function Scan({ onSaved }: { onSaved: () => void }) {
     // field that produced the original bug: leaving it alone sent an empty
     // patch, the route correctly refused it, and the page reported
     // **"Couldn't save that bag"** about a bag that had been in the library
-    // for minutes. Naming the field is Joel's call over closing quietly —
-    // an error you can act on beats both the old message and no message.
+    // for minutes. Naming the field beats closing quietly — an error you
+    // can act on beats both the old message and no message.
     const missing = missingRequired(purchase);
     if (missing) {
       setError(missing);
@@ -1338,8 +1338,7 @@ function Brews({
  * **The rating leads**, because scanning a dial-in is looking for the good
  * one. **Nothing about the grinder shows** — it is one machine on one
  * counter and repeats on every row, so neither its name nor the dial
- * setting says anything while taking a line. Joel called this one on
- * 2026-09-21, closing the judgement call the setting had been left as.
+ * setting says anything while taking a line (settled 2026-09-21).
  * **"water" is gone from the numbers**, because `18g · 305g · 1:17` is
  * already unambiguous — the second mass in a brewing recipe is the water.
  * **The time sits beside them** behind a rule rather than under them, since
@@ -1504,17 +1503,15 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
 /**
  * Run the search again on a bag that has already been searched.
  *
- * Joel, 2026-09-20: *"Add refresh button to research for recipe. This should
- * also refresh link."* It does, and not as a second feature bolted beside the
- * first: the search writes `product_url` and `guide_url` through the same
+ * Searching again also refreshes the link (2026-09-20), and not as a second
+ * feature bolted beside the first: the search writes `product_url` and `guide_url` through the same
  * `guideColumns` the original run used, so the **Beans ↗** link on the pill is
  * re-derived from whatever this run found rather than patched separately. A
  * roaster who has since published a guide, or moved the page out from under
  * the old link, is the case this exists for.
  *
- * **It is a trigger, not a second kind of search.** Joel, 2026-09-22:
- * *"Research should just kick off the original search not be a unique
- * process."* So it posts the bag and nothing else: the route sources the
+ * **It is a trigger, not a second kind of search** (2026-09-22): it starts
+ * the original search rather than a process of its own. So it posts the bag and nothing else: the route sources the
  * product page from the row and falls back to its own default model and
  * effort, which is the dial this button never offered anyway — the scan
  * screen's picker is a comparison harness you set up deliberately on the way
@@ -1566,7 +1563,7 @@ function Research({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
       // The bag and nothing else. No product URL — the route reads that off
       // the row — and no model or effort, so the defaults this button always
       // used are the route's own rather than a second copy of them here.
-      // Joel, 2026-09-22: "Research is a trigger."
+      // Searching again is a trigger, not a second kind of search.
       body: JSON.stringify({ bag_id: bag.id, roaster: bag.roaster, coffee_name: bag.coffee_name }),
     }).catch(() => {});
   }
@@ -1741,9 +1738,8 @@ function SectionHead({ children }: { children: React.ReactNode }) {
  * putting the check behind one tap is the compromise between showing the
  * evidence and not making a shelf of bags unreadable.
  *
- * **It is a quiet line rather than a panel**, on Joel's instruction of
- * 2026-09-20: *"Remove the section around found brew guide on page. And make
- * font smaller and grey italic with the dropdown carrot."* A bordered box
+ * **It is a quiet line rather than a panel** (2026-09-20): no box around it,
+ * smaller grey italic type, and the disclosure caret beside it. A bordered box
  * gave the provenance the same weight as the instructions underneath it,
  * which is backwards — the recipe is what you came to read and this says
  * where it came from. **Nothing about the two-signal rule changed**: the dot

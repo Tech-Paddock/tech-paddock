@@ -64,7 +64,7 @@ export interface SourceContent {
    * `input-not-read` and named in coverage's `notRead`, never in `missing`:
    * the report says they were not read and not placed, and the verdict does
    * not fail on it, because Career Highlights repeat items from the body
-   * (Joel, 2026-09-29, TEC-87 option 3).
+   * (TEC-87 option 3, 2026-09-29).
    */
   unreadableHighlights?: string[];
 }
@@ -93,8 +93,8 @@ export interface UnplacedSection {
  * `input-not-read` is source text this reformat refused to read rather than
  * guess at — today only Career Highlights that do not pair up — and so did not
  * place. It is said, never silent, and it is a note rather than a vote: the
- * highlights repeat body items, so no unique content is lost (Joel, 2026-09-29,
- * TEC-87). **It is not `input-dropped`**, which still fails the verdict.
+ * highlights repeat body items, so no unique content is lost (TEC-87,
+ * 2026-09-29). **It is not `input-dropped`**, which still fails the verdict.
  */
 export type ChangeAction =
   | "replaced"
@@ -111,8 +111,8 @@ export type ChangeAction =
  * `feathered` is a Professional Experience line of the input the template's
  * entry had no slot for, inserted where the input has it — after the line that
  * precedes it there — as a copy of the template's nearest bullet paragraph,
- * whether or not the line is a bullet (Joel, 2026-10-14 and 2026-10-18,
- * TEC-107: "Like a bullet line"). Said every time, never a vote: the text
+ * whether or not the line is a bullet (TEC-107, 2026-10-14 and 2026-10-18).
+ * Said every time, never a vote: the text
  * arrived, and coverage checks that it did. **Professional Experience only.**
  * Every other section's template owns its shape, and a line with no slot there
  * stays missing and fails the render.

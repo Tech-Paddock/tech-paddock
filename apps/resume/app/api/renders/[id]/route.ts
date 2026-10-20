@@ -200,9 +200,9 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
  * Delete a render, and the two files it points at.
  *
  * **Archiving is the normal way one leaves the list; this is for the test runs.**
- * Joel asked for it on 2026-09-17 with fifteen of them on screen — and asked for
- * exactly this much: one at a time, no cascade, no bulk tool. *"i don't mind
- * clicking though it no need to build in complexity for a 1 off."*
+ * Added on 2026-09-17, when fifteen of them were on screen, and only this much:
+ * one at a time, no cascade, no bulk tool. Clearing test runs is a one-off, and
+ * a click per render costs less than the machinery to delete in bulk.
  *
  * The tracker thread is deliberately **not** touched. It is the record of an
  * application, owned by the Pipeline Tracker and reachable from it; deleting a

@@ -65,8 +65,8 @@ build was. **A merge reaches the repo and never the running app** — green CI i
 
 ## `apps/showcase` is yours to design and build — 2026-09-29
 
-Joel: *"Td to solution and build micro sites. I will potentially be sending this to interviewers to
-interact with my builds."* One app, a page per demo, at `showcase.techpaddock.io` (TEC-99). It is
+**A public place to show the builds to people outside, such as interviewers, without opening a
+tool.** One app, a page per demo, at `showcase.techpaddock.io` (TEC-99). It is
 the only app with no password, and **the only one you build**.
 
 **Why `.io` is safe, and exactly how far.** The session cookie is `HttpOnly`, `Secure`,

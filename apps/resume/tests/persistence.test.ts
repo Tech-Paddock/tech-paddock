@@ -284,9 +284,9 @@ describe("recording where a render went", () => {
 /**
  * Deleting a render.
  *
- * Archiving is the normal way anything leaves these lists; this exists because
- * Joel had fifteen test runs on screen on 2026-09-17 and asked for exactly this
- * much — one at a time, no cascade, no bulk tool.
+ * Archiving is the normal way anything leaves these lists; this exists to clear
+ * test runs (fifteen were on screen on 2026-09-17), and is exactly this much —
+ * one at a time, no cascade, no bulk tool.
  */
 describe("deleting a render", () => {
   const RENDER = { id: "r1", source_file_path: "sources/a.docx", output_file_path: "renders/a.docx" };

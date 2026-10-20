@@ -1,16 +1,15 @@
 name: Pull request
 
-# Agents commit and push. A pull request exists only because Joel asked for one,
-# and no other agent can see the conversation where he did — so the request is
+# A pull request exists only because Joel asked for the change, and no later
+# session can see the conversation where he did — so the request is
 # recorded in the pull request body or it did not happen as far as the repo is
 # concerned.
 #
-# This check reads that line. It cannot tell whether the quote is real, and it
-# is no longer the gate: since #186 a PreToolUse hook holds every pull request an
-# agent opens for Joel's click. What the hook leaves behind is nothing another
-# agent can read, so this line is the record of who asked and what he said. It
-# also catches a pull request opened somewhere the hook does not run. Kept on
-# that reasoning by Joel, 2026-09-23. It catches the line somebody forgot, not
+# This check reads that line. It cannot tell whether the quote is real. The guard
+# limits pull request writes to the technical director's session, but leaves
+# nothing a later session can read, so this line is the record of who asked and
+# what he said. It also catches a pull request opened somewhere the guard does
+# not run. It catches the line somebody forgot, not
 # one they invented.
 
 on:

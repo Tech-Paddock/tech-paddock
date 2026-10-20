@@ -66,7 +66,7 @@ export function decide(input) {
 /* Who is calling: only the main session writes to a pull request            */
 /* ------------------------------------------------------------------------- */
 
-/* TEC-115 (Joel, 2026-10-19): the Deployment agent retired and the technical
+/* TEC-115 (2026-10-19): the Deployment agent retired and the technical
    director merges, through the `merge` skill. The builder is a helper, and a
    helper pushes its branch and stops.
 
@@ -597,7 +597,7 @@ export function stripSql(sql) {
 /* ------------------------------------------------------------------------- */
 
 const HELD =
-  "It waits for Joel's click. Joel settled this on 2026-09-23 after an instruction to prepare was read as permission to act.";
+  "It waits for Joel's click, because an instruction to prepare was once read as permission to act.";
 /* Every write to a pull request is the main session's, and refused to a
    helper (above). For the main session nothing is held but what no gate
    covers: a squash merge, a body edit that keeps the request line, and
@@ -692,7 +692,7 @@ const VERCEL_CREDENTIAL = new Set([
 function vercel(name, a) {
   if (name === "web_fetch_vercel_url" || name === "status") return null;
   if (VERCEL_READ.test(name) && !VERCEL_CREDENTIAL.has(name) && !a?.decrypt) return null;
-  return ask(`\`${name}\` changes the Vercel account or hands out access to it. Vercel is Joel's (CLAUDE.md; Joel, 2026-09-23): projects, domains, DNS, environment variables, the firewall, deployments and billing. It waits for his click; approve it only if you asked for exactly this.`);
+  return ask(`\`${name}\` changes the Vercel account or hands out access to it. Vercel is Joel's (CLAUDE.md): projects, domains, DNS, environment variables, the firewall, deployments and billing. It waits for his click; approve it only if you asked for exactly this.`);
 }
 
 /* ------------------------------------------------------------------------- */

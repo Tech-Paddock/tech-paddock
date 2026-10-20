@@ -4,8 +4,8 @@ import type { ModelId } from "./models";
 import { ConflictError, InputError } from "./errors";
 
 /**
- * Editing a recipe already in the book (Joel, 2026-09-26: *"I should be able to
- * edit any part of the recipe. Editing the recipe should update macros."*).
+ * Editing a recipe already in the book (2026-09-26): any part of it can change,
+ * and changing the ingredients updates the macros.
  *
  * **Pure: no database, no model, no Next** — the route hands in what it needs as
  * `EditDeps`, so the rules below have tests without either. That matters most

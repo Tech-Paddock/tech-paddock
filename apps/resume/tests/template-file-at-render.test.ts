@@ -125,7 +125,7 @@ describe("the render is built from the template file", () => {
    *
    * A one-off template used to be one: it rendered from the upload and saved
    * nothing, which meant the template could be absent and the render still
-   * succeed. Removed on Joel's instruction 2026-09-17, so the refusals above are
+   * succeed. Removed on 2026-09-17, so the refusals above are
    * the only answers when the file cannot be read — there is nothing left to
    * fall through to.
    */

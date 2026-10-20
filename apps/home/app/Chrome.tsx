@@ -52,8 +52,8 @@ function Bar({ children }: { children: React.ReactNode }) {
                   : "Pit Wall — open work, and who acts next"}
             </span>
           </div>
-          {/* Switch with the brand, livery hard right — Joel's arrangement,
-              2026-09-19. The livery goes right because it is the one thing on
+          {/* Switch with the brand, livery hard right — set 2026-09-19.
+              The livery goes right because it is the one thing on
               this bar that also appears on the bar of whatever tool is framed
               below it, and the two want to line up; the switch comes left
               because it is a control and belongs with the thing it controls.

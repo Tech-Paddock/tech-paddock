@@ -54,7 +54,7 @@ export function sectionedLines(content: SourceContent): { text: string; section:
  * finished document, plus the source text it refused to read, named.
  *
  * Refused text is not in `linesTaken` — it was never taken, so it is not lost in
- * copying and does not fail the verdict (Joel, 2026-09-29, TEC-87). But it did
+ * copying and does not fail the verdict (TEC-87, 2026-09-29). But it did
  * not arrive either, and a report silent about it would read as a source with
  * no highlights: the overstatement TEC-79 fixed. So it rides in `notRead`.
  * Both routes call this, so Reformat and Diagnostics cannot disagree.

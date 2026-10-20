@@ -1,10 +1,9 @@
 /**
  * Pass or fail for one reformat, and why.
  *
- * Joel asked for this on 2026-09-19: *"I need a pass fail indicator on the front
- * page. if there were any irregularites with the reformat it should fail and
- * give reason."* It is the one judgement allowed on the Reformat tab, which
- * otherwise carries no readouts at all by his instruction the same day. A
+ * Any irregularity in a reformat fails it, with a reason (2026-09-19). It is the
+ * one judgement allowed on the Reformat tab, which otherwise carries no readouts
+ * at all. A
  * verdict is not telemetry: a document you are about to send either came
  * through intact or it did not, and that is a yes or no rather than a number.
  *
@@ -79,8 +78,8 @@ export function verdictFor(r: VerdictInput): Verdict {
   const notes = r.findings.filter((f) => f.severity === "warning").map((f) => f.message);
 
   // Template text the source did not replace (`not-found-in-input`), which
-  // ships the template's own words. Joel, 2026-10-18 (TEC-105): **whole
-  // sections only** warn. A section the source left entirely empty — a Summary
+  // ships the template's own words. **Whole sections only** warn (TEC-105,
+  // 2026-10-18). A section the source left entirely empty — a Summary
   // the Jobright export lacks — is a note, and the render passes and downloads.
   // A section the source filled **only in part** still fails, so the
   // template's own figures never ship on a downloadable resume: today that is
@@ -122,7 +121,7 @@ export function verdictFor(r: VerdictInput): Verdict {
   // Source text refused rather than guessed at, so not placed. Said every time,
   // because a report silent about it reads as a source that had none (TEC-79).
   // A note, not a vote: today it is only Career Highlights, which repeat items
-  // from the body, so no unique content is lost (Joel, 2026-09-29, TEC-87).
+  // from the body, so no unique content is lost (TEC-87, 2026-09-29).
   const notRead = r.changeLog.filter((c) => c.action === "input-not-read");
   if (notRead.length > 0) {
     notes.push(

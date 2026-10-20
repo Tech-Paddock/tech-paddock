@@ -79,8 +79,8 @@ export type Drift = {
  * completeness at compile time — add a tool here and the shell stops building
  * until it has been given an icon.
  *
- * **Array order is the sidebar's order**, and it is Joel's, not alphabetical
- * and not the order these were built in.
+ * **Array order is the sidebar's order**, and it is deliberate: not
+ * alphabetical and not the order these were built in. Changing it is Joel's call.
  *
  * **The Message Editor is deliberately absent**, removed 2026-09-19 on the same
  * terms as the tracker below: out of the roster entirely rather than out of the
@@ -88,7 +88,7 @@ export type Drift = {
  * serves — it is simply not one of the tools home lists or embeds.
  *
  * **The Pipeline Tracker is deliberately absent from the tools.** It is parked
- * (Joel, 2026-09-24), so it has no sidebar row and no frame. It still deploys,
+ * (2026-09-24), so it has no sidebar row and no frame. It still deploys,
  * though, so it is in `PARKED` below and The Garage still probes it, grey.
  * Un-parking it means moving its entry from there to here.
  * `apps/tracker` is untouched and still builds in CI — the roster CI derives

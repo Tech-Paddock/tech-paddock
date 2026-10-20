@@ -50,8 +50,8 @@ until Joel sends their values (TEC-52). **Every field of a kept recipe is editab
 only changed ingredients re-price — one call before the one write, so a failure writes nothing;
 servings alone re-divides the same pot. Pill: rating and time always; meal · main · cuisine when wide.
 
-**The list leaves three ways: copied text, a King Soopers link, or Send to cart** (TEC-90; Joel
-reversed the no-OAuth rule for Kroger only). **A line's name is its link**; the checkbox is a
+**The list leaves three ways: copied text, a King Soopers link, or Send to cart** (TEC-90; the
+no-OAuth rule is reversed for Kroger only). **A line's name is its link**; the checkbox is a
 separate tap target, and **each line has a quantity** (1–99, default 1, `quantity` column), which
 Tidy merges as the largest, not the sum. "Milk — the small tin" stores a name and a note, and only the
 name is searched. **Remembering a brand happens only in Your brands** (TEC-39): *Item*, then *this
@@ -104,7 +104,7 @@ sign-in failed); `SetupError` 501 (a missing variable); anything else 500, via `
 - **`/list` is a path another app depends on** — Health's redirect (TEC-23) names it, and Health's
   own `/list` stays live until then; `tests/tabs.test.ts` holds it. Renaming it is cross-app.
 - **The unread-page refusals and the re-estimate guardrail are settled** (`RULES.md`; the latter
-  reconsidered and kept by Joel, 2026-09-22). Do not thin the checks or re-ask.
+  reconsidered and kept on 2026-09-22). Do not thin the checks or re-ask.
 - **A client component must not import a lib that imports `supabase.ts`** — split the helper out.
 - **Read Vercel and Supabase live before writing a deployment step** — #159 missed two that existed.
 - **Kroger's request and response shapes were never loaded from here.** `developer.kroger.com` and

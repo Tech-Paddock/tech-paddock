@@ -47,16 +47,16 @@ apps/home/
   app/api/logout/       clears the domain-wide cookie for every subdomain at once
   lib/linear.ts         the Pit Wall's data — Linear's open issues
   lib/deploys.ts        production deployment state, from the statuses Vercel posts to GitHub
-  lib/platform.ts       TOOLS — the only list of tools; its order is Joel's
+  lib/platform.ts       TOOLS — the only list of tools; its order is Joel's call
   lib/diagnostics.ts    The Garage's live probes
   lib/theme.*           the token system — stamped copies; edit packages/shared
   scripts/collect-*.mjs build-time collectors — files above apps/home are unreadable at runtime
 ```
 
-**And `apps/tracker`, inherited on 2026-09-19** when Joel retired the Pipeline Tracker agent, and
-**parked since 2026-09-24** — Joel: *"I don't know what I'm doing with tracker."* Its code stays and
-still builds; Joel pauses `tp-tracker`. **Parked means you do not build on it and you do not delete
-it**; un-parking is his call. It keeps its name, `tracker.techpaddock.io`, the `tracker` Postgres
+**And `apps/tracker`, inherited on 2026-09-19** when the Pipeline Tracker agent was retired, and
+**parked since 2026-09-24**, because its future is undecided. Its code stays and still builds;
+Joel pauses `tp-tracker`. **Parked means you do not build on it and you do not delete it**;
+un-parking is his call. It keeps its name, `tracker.techpaddock.io`, the `tracker` Postgres
 schema and its own `middleware.ts` variant — it stays on Next 14 while parked, so the gate keeps that name (TEC-34).
 
 **`apps/editor` is NOT yours.** It went to the technical director on 2026-09-19 because it is parked
@@ -102,7 +102,7 @@ no longer read here** (TEC-83): the glance that used it is gone.
 Garage warns for as long as it is still set.
 
 **Home knows nothing about any tool** beyond `TOOLS` in `lib/platform.ts`, the one list. The glance
-that fanned out to each tool's `/api/summary` was removed with the Morning Paper (TEC-83, Joel,
+that fanned out to each tool's `/api/summary` was removed with the Morning Paper (TEC-83,
 2026-09-26). If a summary ever returns, the old line still holds: **counts and singles, never rows**
 — a home handed rows slowly becomes a worse copy of the tool.
 

@@ -1,5 +1,5 @@
 /**
- * The day a menu entry is planned for (Joel, 2026-10-05). Pure, so the browser
+ * The day a menu entry is planned for (2026-10-05). Pure, so the browser
  * can import it: `lib/menu.ts` reads the database, and a client component that
  * imported it would pull `supabase.ts` in after it.
  *
@@ -28,7 +28,7 @@ export function localToday(now: Date = new Date()): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-/** "Tue 10/7" — Joel's format for a menu row. */
+/** "Tue 10/7" — the format for a menu row. */
 export function menuDayLabel(day: string): string {
   const m = DAY.exec(day);
   if (!m) return day;

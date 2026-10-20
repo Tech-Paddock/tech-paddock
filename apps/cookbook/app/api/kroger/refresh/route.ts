@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Refresh: renew the King Soopers sign-in and check every remembered product's
- * price and stock at the chosen store (Joel, 2026-10-20). **No model call, and
+ * price and stock at the chosen store (2026-10-20). **No model call, and
  * no cron** — the list tab calls this in the background when the last refresh
  * is over a week old, and *Refresh now* calls it on demand.
  *

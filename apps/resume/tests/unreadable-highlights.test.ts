@@ -15,8 +15,8 @@ import { makeDocx, para, table } from "./helpers/docx";
  * highlight text reached the document nowhere. The charter's rule is that
  * coverage must not be able to lie; this is the case where it did.
  *
- * **What the verdict does about it is Joel's call, 2026-09-29 (TEC-87, option
- * 3): keep the truth, drop the failure.** The report says the highlights were
+ * **What the verdict does about it, since 2026-09-29 (TEC-87, option 3): keep
+ * the truth, drop the failure.** The report says the highlights were
  * not read and not placed, and names each refused line; the verdict passes,
  * because Career Highlights repeat items from the body and nothing unique is
  * lost. These tests assert both halves, so a report that goes silent fails
@@ -91,7 +91,7 @@ describe("Career Highlights the source has but cannot be read", () => {
     expect(coverage.missing).toEqual([]);
   });
 
-  // Behaviour change, Joel 2026-09-29 (TEC-87 option 3): this failed the
+  // Behaviour change, 2026-09-29 (TEC-87 option 3): this failed the
   // verdict until then. The note is what keeps it from passing silently.
   it("passes the verdict, and says in a note that Career Highlights were not read", async () => {
     const { verdict } = await run(MISALIGNED);

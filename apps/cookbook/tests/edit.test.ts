@@ -5,7 +5,7 @@ import { normalizeName, perServing, toServingRows, type Recipe } from "@/lib/rec
 import { ConflictError, InputError, statusOf } from "@/lib/errors";
 
 /**
- * Editing a kept recipe (Joel, 2026-09-26). What has to hold: an edit that
+ * Editing a kept recipe (2026-09-26). What has to hold: an edit that
  * changes the ingredients re-prices with one call, one that does not calls
  * nothing, and **a failed re-price writes nothing and never looks like success.**
  */
