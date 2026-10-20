@@ -1,63 +1,41 @@
 # Paddock
 
-A personal command center — one shared foundation supporting a set of standalone tools, each
-independently deployed off `techpaddock.io`.
-
-See **[CLAUDE.md](./CLAUDE.md)** for the architecture, the rules every agent works under, and how
-information moves between them. This file is the short version.
+A personal command center at `techpaddock.io`: one shared foundation and a set of standalone tools,
+each deployed on its own. [CLAUDE.md](./CLAUDE.md) holds the architecture and working rules.
 
 ## Layout
 
-A monorepo: one repo, one shared Supabase project, but each tool is its own app with its own
-`package.json`, deployed as its own Vercel project pointed at its subfolder via that project's Root
-Directory setting.
+One repo and one Supabase project. Each tool is its own app with its own `package.json` and its own
+Vercel project (Root Directory set to its folder).
 
 ```
 apps/
-  home/      → the hub            → techpaddock.io
-  editor/    → Message Editor     → editor.techpaddock.io   (parked)
-  tracker/   → Pipeline Tracker   → tracker.techpaddock.io  (parked)
-  resume/    → Resume Formatter   → resume.techpaddock.io
-  coffee/    → Coffee             → coffee.techpaddock.io
-  health/    → Health             → health.techpaddock.io
-  cookbook/  → Cookbook           → cookbook.techpaddock.io
+  home/      → hub               → techpaddock.io
+  editor/    → Message Editor    → editor.techpaddock.io   (parked)
+  tracker/   → Pipeline Tracker  → tracker.techpaddock.io  (parked)
+  resume/    → Resume Formatter  → resume.techpaddock.io
+  coffee/    → Coffee            → coffee.techpaddock.io
+  health/    → Health            → health.techpaddock.io
+  cookbook/  → Cookbook          → cookbook.techpaddock.io
 ```
 
-The hub opens on what is live rather than on a list of links. It holds no database credential: a
-tool that belongs on the glance exposes `/api/summary` and the hub fans out server-side, so adding a
-tool to the glance is a URL in `SOURCES` rather than new knowledge in the hub. The tokens it does
-hold are for the Pit Wall's reads of GitHub and Vercel.
+The hub shows what is live. It holds no database credential: tools expose `/api/summary` and the
+hub fetches them server-side (`SOURCES`). Its only tokens are for the Pit Wall's GitHub and Vercel
+reads.
 
-**There is no root `package.json`** — work inside the relevant app folder (`cd apps/<app> && npm
-install`). Each app's `.env.example` documents its own environment variables, with the commands to
-generate the ones that need generating.
+There is no root `package.json`; work inside an app (`cd apps/<app> && npm install`). Each app's
+`.env.example` lists its variables and how to generate them.
 
-[`packages/shared`](./packages/shared/README.md) holds the one real copy of every file that has to
-be identical in every app. Edit it there and run `node scripts/stamp-shared.mjs`; `--check` verifies
-without writing, and `drift` fails a copy that disagrees. **Do not edit the copies** — each one opens
-with a banner saying where it came from.
+[`packages/shared`](./packages/shared/README.md) holds the one copy of every file that must match
+across apps. Edit it there and run `node scripts/stamp-shared.mjs` (`--check` verifies). Never edit
+a stamped copy.
 
 ## Database
 
-One Supabase project, one Postgres schema per tool plus `shared`, never the default `public`. The
-migration history lives at [`supabase/`](./supabase/README.md) at the repo root rather than under any
-one app — one project means one history.
+One Postgres schema per tool, plus `shared`; never `public`. Migrations live in
+[`supabase/`](./supabase/README.md). Read that README before writing one.
 
-**Read that README before writing a migration.** Two things in it are load-bearing and neither is
-obvious: a new schema inherits no grants at all, and RLS is the only control standing between a
-leaked publishable key and the data.
+## Live state
 
-## What is actually running
-
-**Not written down here, on purpose.** Every fact of that kind has gone stale in prose at least
-once; a number typed into a document is wrong next week and nothing tells you. **`/admin`** — The
-Garage, on the hub — probes each project live, and shows what the repo declares and what `drift`
-reports as of the hub's last build. It does not show versions or test counts. What it covers, and
-what it does not, is in CLAUDE.md's shared foundation.
-
-## Working here as an agent
-
-List your open items in Linear, team TEC, first — a hook reminds you. Then the rules in
-[CLAUDE.md](./CLAUDE.md), loaded into every session automatically, and the `RULES.md` and
-`NOTES.md` for your area: `.claude/agents/td/` for the technical director, `apps/<app>/` for the
-builder. Sessions do not persist, so the repo and Linear are the only memory between them.
+Not written here; it goes stale. The Garage (`/admin` on the hub) probes each project live and shows
+`drift` as of the hub's last build.

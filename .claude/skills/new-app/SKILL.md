@@ -1,48 +1,47 @@
 ---
 name: new-app
-description: Stand up a new tool under apps/ — the design first, then the scaffold, then the short list of steps only Joel can do. Runs maybe twice a year.
+description: Stand up a new tool under apps/ — the design first, then the scaffold, then the short list of steps only the owner can do. Runs maybe twice a year.
 ---
 
 # New app
 
-The steps that can hurt are outside the repo — a Vercel project, a DNS record, a dashboard
-setting — and none has an undo. **Solution first, scaffold second, hand Joel only what he alone can
-do.**
+The risky steps are outside the repo (Vercel project, DNS record, dashboard setting) and have no
+undo. Design first, scaffold second, then hand the owner only what the owner alone can do.
 
 ## Settle first
 
-1. **What it is — Joel's**, worked out before any folder exists: what it is for, what it stores,
-   what it must never do. It lands as a draft `apps/<name>/RULES.md`, which Joel approves.
-2. **The name — Joel's.** It fixes the folder, the subdomain and the Vercel project at once.
-3. **Its own Postgres schema? — Joel's.** If yes: two migrations and one dashboard setting; read
+1. **What it is (owner):** purpose, what it stores, what it must never do. Lands as a draft
+   `apps/<name>/RULES.md` for approval.
+2. **The name (owner):** fixes folder, subdomain and Vercel project.
+3. **Own Postgres schema? (owner):** if yes, two migrations and a dashboard setting; read
    `supabase/README.md` first. A new schema inherits no grants.
-4. **Site or app — the TD's**, by `.claude/SURFACE.md`; Joel can overrule.
+4. **Site or app (TD),** by `.claude/SURFACE.md`; the owner can overrule.
 
-## In the repo — one branch
+## In the repo: one branch
 
-- **The app folder**, copied from the nearest existing app. **Stamp the shared files**
-  (`node scripts/stamp-shared.mjs`); a hand copy fails `drift`. The gate file its Next major runs
-  takes the **base** copy — a fourth variant fails `drift` on purpose.
+- **The app folder,** copied from the nearest app. Stamp shared files with
+  `node scripts/stamp-shared.mjs`; a hand copy fails `drift`. Use the **base** gate file for its
+  Next major; a fourth variant fails `drift`.
 - **`RULES.md`** (approved) and an empty **`NOTES.md`**.
-- **`.env.example`** — names and how to generate them, never a value.
-- **`/api/health`**, which The Garage probes.
-- **A row in `CLAUDE.md`'s domain map** — a `CLAUDE.md` edit, so Joel approves it.
-- The CI matrix and branch protection need nothing; adding `TOOLS` in
-  `apps/home/lib/platform.ts` is a separate home change.
+- **`.env.example`:** names and how to generate them, never values.
+- **`/api/health`,** probed by The Garage.
+- **A row in `CLAUDE.md`'s domain map** (needs owner approval).
+- CI and branch protection need nothing. Adding to `TOOLS` in `apps/home/lib/platform.ts` is a
+  separate home change.
 
-## Outside the repo — Joel's, in this order
+## Outside the repo: the owner's, in order
 
-Hand him one message; each line says what breaks if it is skipped.
+Send one message; each line says what breaks if skipped.
 
-1. **The Vercel project**, Root Directory `apps/<name>`.
-2. **Its environment variables.** `SESSION_SECRET` byte-identical to the others, or the shared
-   cookie silently stops working on every app.
-3. **The DNS record**, a CNAME like the rest.
-4. **The Supabase exposed-schemas list**, if it has a schema — the step that gets missed.
-5. **Build it again with `FORCE_BUILD`**, then remove it: variables bake in at build time and the
-   ignore step cancels a bare redeploy.
+1. **Vercel project,** Root Directory `apps/<name>`.
+2. **Environment variables.** `SESSION_SECRET` byte-identical to the others, or the shared cookie
+   silently fails on every app.
+3. **DNS record:** a CNAME like the rest.
+4. **Supabase exposed-schemas list,** if it has a schema. This is the step that gets missed.
+5. **Rebuild with `FORCE_BUILD`,** then remove it: vars bake in at build time and the ignore step
+   cancels a bare redeploy.
 
 ## Verify
 
-`drift` 0 fail; the app's probe in The Garage once `TOOLS` has it; the subdomain in a private
-window asks for the password.
+`drift` 0 fail; the app's probe in The Garage once `TOOLS` has it; the subdomain asks for the
+password in a private window.
