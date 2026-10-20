@@ -1,80 +1,42 @@
 # Home — notes
 
-State as of 2026-10-20.
-
-Read `RULES.md` first. Open work is in Linear, label `app:home` — never here.
-
----
-
 ## What is live
 
-**Home runs Next.js 16 and React 19** (TEC-34), behind `proxy.ts` on Node: the base copy, only the
-function renamed. Every server `fetch` is `no-store` in a `force-dynamic` page, so a reload reaches
-Linear, GitHub and each probe afresh (TEC-114). `/` awaits `searchParams`, the layout `cookies()`.
+- Next.js 16, React 19, `proxy.ts` (the base copy, function renamed). Every server `fetch` is
+  `no-store` in a `force-dynamic` page.
+- Tabs: the Pit Wall at `/` (id `board`) and The Garage at `/?tab=garage`; `/admin` redirects
+  there. Each loads in its own Suspense boundary; `?app=` renders a tool's frame and loads neither.
+- Pit Wall: open Linear issues, team TEC (`lib/linear.ts`). *By status* puts assigned, unparked
+  issues in a *Waiting on you* band, then In Progress, In Review, Todo, with the rest folded. *By
+  app* follows the roster, Platform last (`lib/pitgroups.ts`); `?group=app` keeps it.
+- The Garage: one stoplight row per item — green, amber (could not test), red, grey (parked). Each
+  failure is a sentence plus its raw code (`lib/diagnostics.ts`). Rules drift is baked at build
+  (`lib/drift-explain.ts`).
+- Bar controls, all stamped: `LiveryBadge` on every bar, framed or not; `ThemeControl` and
+  `LogoutControl` hidden in a frame. Tracker and editor have `/api/logout` and no control.
+- The tracker is in `PARKED`, shown grey. Its state is on TEC-36.
 
-**Home is two tabs: the Pit Wall, the landing, and The Garage** (`/?tab=garage`; `/admin`
-redirects there). The id `board` stays, so `/?tab=board` lives. Each tab loads its own data in its
-own Suspense boundary, and `?app=` renders a tool's frame without loading either. **The Morning
-Paper and the glance are gone** (TEC-83, 2026-09-26), so home asks no tool for `/api/summary`.
+## Traps
 
-**The Pit Wall is Linear's open issues, team TEC** (TEC-83), read server-side through
-`LINEAR_API_KEY` (`lib/linear.ts`). A card shows the id, title, agent, priority and **the first
-Next step not yet done**, parsed from the body. A toggle regroups the same issues, with no refetch:
-**by status** — a *Waiting on you* band for anything assigned and not parked, then In Progress, In
-Review and Todo, with Backlog and Parked folded — or **by agent**, in roster order
-(`lib/pitgroups.ts`); `?group=agent` keeps it. With no key, or Linear refusing, the page says why.
-
-**The Garage**, errors first (TEC-84). One row per thing with a stoplight — green, amber (could not
-test), red, grey (parked on purpose) — and no pills or tallies. **Every failure is a sentence plus
-its raw code**: `x-vercel-error` first, then the status, then the socket cause (`lib/diagnostics.ts`).
-**Environment errors** and **Deploy errors** (`lib/deploys.ts`: each latest production deployment,
-from the statuses Vercel posts to GitHub; parked left out) render only when there is one. **Rules
-drift** is baked at build: drifting checks grouped under one sentence each (`lib/drift-explain.ts`,
-keyed on name prefix until the check emits `explain`), holding ones folded — the gate-file rows too.
-
-**The theme system** — palettes, liveries, both polarities, one `--go`/`--caution` status-light pair
-for every livery, and **three stamped controls per bar**: `LiveryBadge` hard right on every bar
-including a framed tool's; `ThemeControl` and `LogoutControl` beside the brand, both hidden in a
-frame (below). `lib/theme.css` holds every token; `lib/livery.ts` differs per app. No
-`tailwind.config.ts` holds a colour: `rgb(var(--token-rgb) / <alpha-value>)` is all alpha can read.
-
-**Log out is everywhere at once** (TEC-73). Every app's `/api/logout` re-exports the stamped
-`lib/logout.ts`, which clears the `.techpaddock.io` cookie at max-age 0 (`tests/logout.test.ts`).
-The control is on every live app's bar, home's topbar included; tracker and editor carry the route
-and mount none. `lib/logout.ts` clears the shared cookie, so it is the TD's, not the theme's.
-
-**The tracker is parked** (2026-09-24). Its state and findings are on TEC-36; do no tracker
-work. It stays in `PARKED`, probed and grey. Its `/api/summary` has no reader since the glance went.
-
-## Traps specific to this app
-
-- **`lib/*.generated.ts` are gitignored, written by `predev`/`prebuild`/`pretest`** from files above
-  `apps/home` (build time only). A bare `npx tsc --noEmit` on a fresh checkout fails until one runs.
-- **`scripts/gate-file.test.mjs` takes its base-copy fixture from home's gate file**, with
-  `proxy` renamed back. Change home's `proxy.ts` and that test's fixtures move with it.
-- **`vercel.json`'s `ignoreCommand` skips previews and always builds production** — home diffs
-  nothing since #191, so every production merge rebuilds it, which is what keeps Rules drift
-  current. **Do not narrow it**: `.claude` changes alone must still rebuild home.
-- **Linear's user records carry a real name and email.** The query asks for `assignee { id }` and
-  nothing more; Joel is the only assignee, so "assigned" is all *Waiting on you* needs. Keep it so.
-- **Next steps are free text.** `nextStep` reads ⭐ before or after the actor and treats "done",
-  "skipped", ✅ or a strikethrough as finished; a new convention shows as the step it is.
-- **GitHub sees only git-triggered deploys**, so a dashboard rollback or redeploy is invisible to
-  Deploy errors. `GITHUB_TOKEN` needs *Deployments: read*; a 401 or 403 is named as the token.
-- **A function exported from a `"use client"` file cannot be called on the server** — that is why
-  `APPS` lives in `app/apps.ts` and the grouping in `lib/pitgroups.ts`.
-- **The shell was built around an iframe at `height: 100%`**; a document-length tab scrolls only
-  because `.content` sets `overflow-y` and `min-height: 0`.
-- **One switch per page is two halves that must stay together.** Framed, a tool hides its own
-  Light/Dark (`[data-embedded] .pd-modes`) and keeps its badge — safe only because home posts
-  `{type:"paddock-mode", mode}` into every frame and `ThemeControl` listens behind
-  `isPaddockOrigin()`. **A tool that drops `ThemeControl.tsx` silently ignores home's switch.**
-  `LogoutControl` hides framed too (`.pd-logout`), so only home's logs out of a home page.
-- **`LogoutControl` goes to `/login` only on a 2xx or a 401** (the gate file's answer without a
-  valid session); anything else shows as a failure, never `/login` while still signed in.
-- **`TOOLS` in `lib/platform.ts` is the only list of embedded tools, and its order is deliberate** —
-  changing it is Joel's call. It drives the sidebar and the `?app=` frame. `PROBED` adds the parked ones. **Never key anything off
-  a slug literal.**
-- **Drift's JSON shape is the TD's**; `scripts/drift-parse.mjs` renders no partial read, and a
-  renamed check family loses its sentence silently until the check emits `explain` itself.
-- **"Hub" stays in stamped comments and `proxy.ts`**: TEC-85 went docs only (2026-10-18).
+- `lib/*.generated.ts` are gitignored, written by `predev`/`prebuild`/`pretest`. `npx tsc --noEmit`
+  fails on a fresh checkout until one has run.
+- `scripts/gate-file.test.mjs` builds its base-copy fixture from home's `proxy.ts`.
+- `vercel.json`'s `ignoreCommand` always builds production, which keeps Rules drift current. Do not
+  narrow it: a `.claude`-only change must rebuild home.
+- The Linear query asks for `assignee { id }` only; user records carry a real name and email. The
+  owner is the only assignee, so "assigned" is enough.
+- `nextStep` treats "done", "skipped", ✅ or a strikethrough as finished; any other format shows as
+  open.
+- GitHub sees only git-triggered deploys, so a dashboard rollback is invisible to Deploy errors.
+  `GITHUB_TOKEN` needs *Deployments: read*.
+- A function exported from a `"use client"` file cannot run on the server; hence `app/apps.ts` and
+  `lib/pitgroups.ts`.
+- A long tab scrolls only because `.content` sets `overflow-y` and `min-height: 0`.
+- A framed tool hides its Light/Dark control and follows home's `{type:"paddock-mode"}` message,
+  checked by `isPaddockOrigin()`. A tool without `ThemeControl.tsx` ignores home's switch.
+- `LogoutControl` goes to `/login` only on a 2xx or 401.
+- No `tailwind.config.ts` holds a colour; alpha works only as `rgb(var(--token-rgb) / <alpha-value>)`.
+- `PROBED` is the live projects plus `PARKED`. Never key anything off a slug literal.
+- Drift's JSON shape is the TD's. A renamed check family loses its sentence until the check emits
+  `explain`.
+- "Hub" remains in stamped comments and `proxy.ts` (TEC-85).

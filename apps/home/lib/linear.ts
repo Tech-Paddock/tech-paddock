@@ -4,7 +4,7 @@
  * Server-side only, through one read-only key (`LINEAR_API_KEY`). What leaves
  * this module is the narrow `PitIssue` below: no issue body, and **no user
  * record** — the query asks for an assignee's id and nothing else, because
- * Linear's user records carry a real name and an email (`CLAUDE.md`). Joel is
+ * Linear's user records carry a real name and an email (`CLAUDE.md`). The owner is
  * the only assignee here by rule, so "has an assignee" is all "waiting on you"
  * needs.
  *
@@ -30,8 +30,8 @@ export type PitIssue = {
   /** The `owner:` label, without its prefix. */
   owner: string | null;
   parked: boolean;
-  /** Assigned, which here only ever means assigned to Joel. */
-  waitingOnJoel: boolean;
+  /** Assigned, which here only ever means assigned to the owner. */
+  waitingOnOwner: boolean;
   /** The first Next step not yet done. Null when there is none to show. */
   next: NextStep | null;
   updatedAt: string;
@@ -106,9 +106,9 @@ function plain(md: string): string {
  * tested directly.
  *
  * Steps are numbered and open with their actor in bold — `1. **TD:** …` — by
- * the rule the Linear hook enforces, with Joel's ⭐ before or after it. The
+ * the rule the Linear hook enforces, with the owner's ⭐ before or after it. The
  * way a step is marked finished has varied, so each of these counts as done:
- * "done", "skipped" or ✅ inside the bold lead (`**Done, 2026-09-25, Joel:**`),
+ * "done", "skipped" or ✅ inside the bold lead (`**Done, 2026-09-25, Owner:**`),
  * or the text after it opening with "done", "skipped", ✅ or a strikethrough.
  */
 export function nextStep(description: string | null): NextStep | null {
@@ -167,7 +167,7 @@ export function toIssue(n: LinearNode): PitIssue {
     app: labelValue(labels, "app:"),
     owner: labelValue(labels, "owner:"),
     parked,
-    waitingOnJoel: n.assignee !== null && n.assignee !== undefined,
+    waitingOnOwner: n.assignee !== null && n.assignee !== undefined,
     next: nextStep(n.description),
     updatedAt: n.updatedAt,
   };

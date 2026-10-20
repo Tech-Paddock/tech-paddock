@@ -13,7 +13,7 @@ import type { Probe } from "./diagnostics";
  * **Only the latest counts.** A failure followed by a good deploy is fixed and
  * leaves the page; a failure stays until something newer succeeds.
  *
- * **A parked project is left out.** Joel pauses its Vercel project, so it
+ * **A parked project is left out.** Its Vercel project is paused, so it
  * deploys red on `main` itself (`CLAUDE.md`). That is expected, and The
  * Garage's live connections already show it grey.
  *
