@@ -81,10 +81,9 @@ render beside the parsed values so a misparse is visible rather than invisible.
 
 #### The one recipe that is invented, and why it does not breach this
 
-**Joel asked for it on 2026-09-19**, having been asked twice what should happen when the roaster
-published nothing — *"failure to find a recipe should trigger sonnet five to generate a recommended
-recipe"* — and approved this section the same day. He owns this rule, so this is him deciding it,
-not an agent reading around it.
+**Since 2026-09-19, a search that finds no recipe has Sonnet 5 generate a recommended one**, so that
+a bag whose roaster published nothing still leaves you with somewhere to start. This section was
+approved the same day; it is a change to the rule, not an agent reading around it.
 
 It does not breach §1 because §1 is a rule about `guide_*`, and `guide_*` is untouched.
 `validateGuide` still drops every parameter without a backing quote, a bag with no guide still reads
@@ -108,15 +107,14 @@ Four things keep the two apart, and none of them is a preference:
 to a retrieval; a heading that slowly starts reading like the block above it can. That is why the
 copy lives in the presentation module under test rather than inline in the card.
 
-**It does not prefill a brew, and that is settled rather than pending.** Joel, 2026-09-19: *"Do not
-prefill."* `openingBrew` fills from `guide_dose`, `guide_water` and `guide_ratio` — the roaster's
+**It does not prefill a brew, and that is settled rather than pending** (2026-09-19). `openingBrew` fills from `guide_dose`, `guide_water` and `guide_ratio` — the roaster's
 numbers — and letting a suggestion in there would make the two interchangeable at the only point
 where you act on them. **A suggestion is something you read and type in**, and typing it is the
 moment you decide to use it. Do not reopen this by making it a convenience.
 
 #### A recipe printed as an image counts, and the image is its proof
 
-Joel, 2026-09-25: *"Update rule 1 of charter."* Some roasters publish their recipe only as a picture
+Added to rule 1 on 2026-09-25. Some roasters publish their recipe only as a picture
 (a recipe card in the product gallery) that a page read as text never sees. A value read off one
 reaches `guide_*` on the same terms as a sentence: its quote is the text read off the image, its URL
 is **the page the image was on**, which gets the usual roaster-site check, and the image's own URL
@@ -142,7 +140,7 @@ lot. **Do not flatten the distinction.**
 only part a search can check, and the distinction is real: a house ratio published on every product
 page validates as `coffee_specific` while being a default. **The first real bag was thought to be
 that case and is not** — Sweet Bloom's stored guide reads 18g/305g/850µm/23-25s against the house
-Origami Air 1:17/900µm/2:40, and Joel confirms they dial per bean. The rule is untouched and nothing
+Origami Air 1:17/900µm/2:40, and Sweet Bloom dials per bean. The rule is untouched and nothing
 ranks or filters on tier 1, but **this bag no longer illustrates it and a real example is owed.**
 The old label, "The roaster's recipe for this coffee", asserted the part never checked.
 
@@ -151,8 +149,7 @@ Guide on Page", "Non-Specific Roaster Brew Guide", "No Recipe Found" — green, 
 word carrying the same thing as the colour so the colour is never the only signal. The wording lives
 in `lib/guideDisplay.ts`, deliberately apart from `lib/guide.ts`: presentation must not be able to
 reach validation. A test there refuses any label that claims a recipe was *written for* this coffee.
-The prose caveat that used to sit beneath tier 1 is gone, at Joel's instruction — **the quote itself
-replaces it**, one tap under the indicator, which is the check rather than a sentence about it.
+The prose caveat that used to sit beneath tier 1 is gone — **the quote itself replaces it**, one tap under the indicator, which is the check rather than a sentence about it.
 
 So **a `coffee_specific` guide is not evidence of a per-lot recipe**, and anything later that treats
 it as one is reading more into the column than it holds. The one honest signal available is
@@ -176,8 +173,7 @@ Keep it that way.
 
 ## Design decisions, and why
 
-**Filter and batch beat espresso.** Joel, 2026-09-25: *"Always prefer filter/batch over espresso."*
-A bag holds one guide; when a roaster prints both, filter (pour-over, batch or immersion) is stored,
+**Filter and batch beat espresso, always** (2026-09-25). A bag holds one guide; when a roaster prints both, filter (pour-over, batch or immersion) is stored,
 and espresso only when it is the only recipe. The other was not chosen, so it is neither a `dropped`
 value nor a failure.
 
@@ -243,8 +239,7 @@ columns for one measurement is two things that can disagree. **Extraction yield 
 column**, not an input — it is a function of dose, beverage mass and TDS, and an editable copy
 would be free to drift from the brew it claims to describe.
 
-**The refractometer half of the form is commented out, on Joel's word, and none of the above
-changed.** `tds_percent`, `beverage_g` and the generated `extraction_yield` keep their columns,
+**The refractometer half of the form is commented out, and none of the above changed.** `tds_percent`, `beverage_g` and the generated `extraction_yield` keep their columns,
 their comments and their tests; the form simply does not ask for them today, and a logged brew
 still shows a reading it already carries. This is a decision about what is worth typing in a
 kitchen, not about what is worth recording — so it is reversed by uncommenting, never by a
@@ -257,7 +252,7 @@ before the POST. **`water_g` is water into the brew and `beverage_g` is what cam
 bed keeps roughly two grams per gram of coffee, and filling either from the other overstates the
 yield by about a tenth, which is enough to relabel a brew that has not changed.
 
-**Both round to whole numbers.** Joel, 2026-09-20: *"Whole numbers only for recipe."* Water already
+**Both round to whole numbers** (2026-09-20). Water already
 did, because that is what a kettle and a scale resolve; the ratio does now, because 1:17 is what
 you brew to and 1:16.9 is a description of what the scale happened to say. **It rounds your numbers
 only** — `parseRatio` still reports the roaster's published ratio unrounded, since rounding that
@@ -273,17 +268,15 @@ brew and does not prefill from `guide_time`: the box holds what the timer said, 
 already in it is a stopwatch nobody started. `guide_time` keeps the roaster's own wording, free
 text, exactly as quoted — the two are rule 3 again.
 
-**The search can be run again from the shelf, and that refreshes the link.** Joel, 2026-09-20:
-*"Add refresh button to research for recipe. This should also refresh link."* Both halves are one
-call: the search writes `product_url` and `guide_url` through the same `guideColumns` the first run
+**The search can be run again from the shelf, and that refreshes the link** (2026-09-20). Both
+halves are one call: the search writes `product_url` and `guide_url` through the same `guideColumns` the first run
 used, so the link is re-derived rather than patched. **Searching again keeps only the freshest
-result**, even when it finds less than the guide it replaces — Joel, 2026-09-24. It runs at the
+result**, even when it finds less than the guide it replaces (2026-09-24). It runs at the
 default model and offers no dial — the model picker is a comparison harness you set up on the way
 in, and this is a button pressed in a kitchen. It polls the row rather than waiting, so closing the
 card cannot lose an answer that takes minutes.
 
-**A bag is a purchase, so it needs a purchase date, and the error says so.** Joel, 2026-09-19:
-*"Error should say purchase date required."* The column stays nullable and the POST cannot demand
+**A bag is a purchase, so it needs a purchase date, and the error says so** (2026-09-19). The column stays nullable and the POST cannot demand
 one, because the row is written **before** the search, when there is no date to have — so the
 requirement is a rule about *finishing* a bag and lives at the save step, in `lib/patch.ts`, where
 both screens that edit a bag read it. **An error naming the field beats the two things it replaced**:
@@ -295,8 +288,8 @@ this before" is a lookup on `(lower(roaster), lower(coffee_name))`, not a unique
 `findPreviousBag` carries forward **only the dial-in** — method, grinder, grind setting. A rating
 or tasting note describes a lot you actually drank, and this bag is not that lot.
 
-**Nothing is pinned up front.** `findRoasterDomain` was removed in #176 on Joel's instruction —
-*"we should not be prepining any roaster info."* No search sets `allowed_domains`, and
+**Nothing is pinned up front.** `findRoasterDomain` was removed in #176: no roaster information is
+pinned ahead of a search. No search sets `allowed_domains`, and
 `validateGuide`'s post-hoc host check is now the whole of the constraint. **Pinning was not
 neutral**: `web_fetch` only fetches URLs already in the conversation, so search is the sole channel
 by which a page enters it, and narrowing that channel left the fetch nothing to work with. The rows

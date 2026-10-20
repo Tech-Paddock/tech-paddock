@@ -1,6 +1,6 @@
 # Coffee — notes
 
-State as of 2026-10-18. Read `RULES.md` first; this file is only what is true right now and its traps.
+State as of 2026-10-20. Read `RULES.md` first; this file is only what is true right now and its traps.
 Open work is in Linear, team TEC, under `app:coffee`.
 
 ---
@@ -31,7 +31,7 @@ constraint on where a guide may come from.
   (`lib/searchClock.ts`); a stamp older than 300 s reads as failed on both pollers. One search per bag:
   the route refuses a second with 409, and the button starts from the row's running search.
 - **A failing run writes its error only onto its own stamp**, so it cannot land beside a recipe
-  another run saved. A successful run always overwrites — freshest wins (Joel, 2026-09-24).
+  another run saved. A successful run always overwrites — freshest wins (2026-09-24).
 - **The label's roast date is read** (`roastDateFromLabel`). **`myBrewerFor` feeds `openingBrew`**; with
   your dose, their ratio sets the water. A failed suggestion writes only `suggested_error`.
 

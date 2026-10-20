@@ -46,8 +46,8 @@ describe("changedFields", () => {
 });
 
 describe("missingRequired", () => {
-  // Joel's call on 2026-09-19, after seeing the first fix close the panel
-  // quietly: the error should name the field. "Couldn't save that bag" said
+  // Settled 2026-09-19, after the first fix closed the panel quietly: the
+  // error should name the field. "Couldn't save that bag" said
   // what failed; this says what to do about it.
   it("names the field rather than the failure", () => {
     expect(missingRequired({ purchased_date: "" })).toBe("Purchase date required.");
