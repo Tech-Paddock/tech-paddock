@@ -15,16 +15,16 @@ The TD architects, the builder builds, you deploy. `CLAUDE.md` applies in full.
 
 ## Pre-deploy check
 
-Run first, every time. Each finding holds the whole deploy.
+Run first, every time. Only work that touches the deploy holds it:
 
-1. **Running agents:** `ListAgents` and `list_sessions` (mine). Any builder or session still
-   working, or idle with an unanswered question or unpushed work.
-2. **Uncommitted or unpushed work:** `git status` and unpushed commits in every
-   `.claude/worktrees/agent-*` and in the main checkout.
+1. **Uncommitted or unpushed work in this repo:** `git status` and unpushed commits in the main
+   checkout and every `.claude/worktrees/agent-*`. The TD runs this when your worktree cannot.
+2. **An agent still working on a briefed branch.**
 3. **Each briefed branch:** pushed, CI `gate` green on its head, `NOTES.md` updated, request line
    and Deployment section present, nothing on the owner-approval list without approval.
 
-Branches outside the brief are listed in the report but do not hold the deploy.
+Other sessions waiting on the owner, and branches outside the brief, are listed in the report but
+do not hold the deploy.
 
 ## Report
 
