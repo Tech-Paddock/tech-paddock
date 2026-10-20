@@ -43,10 +43,32 @@ export class ConflictError extends Error {
   }
 }
 
+/**
+ * Another service — Kroger, today — refused or did not answer. **502**, so it
+ * never reads as the database being down. `reconnect` is true when what failed
+ * is a stored sign-in, so the screen can say "connect again" rather than "retry".
+ */
+export class UpstreamError extends Error {
+  constructor(message: string, public reconnect = false) {
+    super(message);
+    this.name = "UpstreamError";
+  }
+}
+
+/** This deployment lacks something it needs — an environment variable. **501.** */
+export class SetupError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SetupError";
+  }
+}
+
 /** The status an error means. Anything unrecognised is a 500 — our fault, not the database's. */
 export function statusOf(e: unknown): number {
   if (e instanceof InputError) return 400;
   if (e instanceof ConflictError) return 409;
+  if (e instanceof UpstreamError) return 502;
+  if (e instanceof SetupError) return 501;
   if (e instanceof LookupError) return 503;
   return 500;
 }

@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addItems, readList, removeItems, setChecked, splitLine } from "@/lib/grocery";
+import {
+  MAX_QUANTITY,
+  addItems,
+  readList,
+  readQuantity,
+  removeItems,
+  setChecked,
+  setQuantity,
+  splitLine,
+} from "@/lib/grocery";
 import { errorResponse } from "@/lib/respond";
 import { readPreferences, resolveLink } from "@/lib/preferences";
 
@@ -10,9 +19,8 @@ export const dynamic = "force-dynamic";
  * route, because it is the only thing on this screen that needs judgement and it
  * should be visible in the URL that it does.
  *
- * This reads and writes `cookbook.grocery_items`. Health's `health.grocery_items`
- * is a different table belonging to a different app, and moving that one is the
- * technical director's (TEC-15).
+ * This reads and writes `cookbook.grocery_items`. Send to cart is its own routes
+ * under `/api/kroger` (TEC-90).
  */
 
 /**
@@ -64,6 +72,21 @@ export async function PATCH(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) return NextResponse.json({ error: "Which line?" }, { status: 400 });
+
+  // How many to put in the cart (TEC-90). Its own field, so a tick never moves it.
+  if (body.quantity !== undefined) {
+    const quantity = readQuantity(body.quantity);
+    if (quantity === null) {
+      return NextResponse.json({ error: `How many — a whole number from 1 to ${MAX_QUANTITY}.` }, { status: 400 });
+    }
+    try {
+      await setQuantity(id, quantity);
+      return NextResponse.json({ ok: true, quantity });
+    } catch (e) {
+      return errorResponse(e, "Couldn't change how many.");
+    }
+  }
+
   if (typeof body.checked !== "boolean") {
     return NextResponse.json({ error: "Ticked or not ticked?" }, { status: 400 });
   }
