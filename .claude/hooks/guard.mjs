@@ -9,7 +9,7 @@
  * Claude Code reads:
  *
  *   deny   the call does not happen, and the reason goes back to the agent
- *   ask    the call waits for Joel's click
+ *   ask    the call waits for the owner's approval
  *
  * and prints nothing when the call may go ahead.
  *

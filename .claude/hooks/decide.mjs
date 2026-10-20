@@ -8,7 +8,7 @@
  * call goes ahead) or one decision:
  *
  *   deny   the call does not happen, and the reason goes back to the agent
- *   ask    the call waits for Joel's click
+ *   ask    the call waits for the owner's approval
  *
  * ## Why it parses rather than greps
  *
@@ -43,7 +43,7 @@ const deny = (reason) => ({ decision: "deny", reason });
 const ask = (reason) => ({ decision: "ask", reason });
 
 const PUSH_OWN_BRANCH =
-  "Push your own branch instead: `git push -u origin <your-branch>`. Do not open a pull request until Joel asks for one.";
+  "Push your own branch instead: `git push -u origin <your-branch>`. Do not open a pull request until the owner asks for one.";
 
 /** The whole guard: hook input in, a decision or null out. */
 export function decide(input) {
@@ -268,7 +268,7 @@ export function lex(src) {
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 const KEYWORDS = new Set(["if", "then", "else", "elif", "do", "while", "until", "!", "{", "}", "time"]);
 const WRAPPERS = new Set(["command", "builtin", "exec", "nohup", "nice", "sudo", "doas", "env", "timeout", "stdbuf", "xargs"]);
-// Wrapper options that take the next word as their value (sudo -u joel, nice -n 5, …).
+// Wrapper options that take the next word as their value (sudo -u root, nice -n 5, …).
 const WRAPPER_VALUE = /^-(u|g|n|s|k|o|e|i|C|D|p|I|L|P|S)$/;
 const base = (w) => w.split("/").pop();
 
@@ -508,7 +508,7 @@ function barePush(remote, ctx) {
   if (cur === undefined) return cantTell("it pushes the current branch, and this guard could not read which one that is");
   if (cur === null) return null;
   if (cur === MAIN) {
-    return deny("You are on main, so a bare `git push` pushes main. Never push to main. Cut a branch first: `git switch -c claude/<area>-<change>`. Do not open a pull request until Joel asks for one.");
+    return deny("You are on main, so a bare `git push` pushes main. Never push to main. Cut a branch first: `git switch -c claude/<area>-<change>`. Do not open a pull request until the owner asks for one.");
   }
   const merge = git(ctx.dir, "config", "--get", `branch.${cur}.merge`).out;
   if (merge && targetsMain(merge)) {
@@ -597,21 +597,21 @@ export function stripSql(sql) {
 /* ------------------------------------------------------------------------- */
 
 const HELD =
-  "It waits for Joel's click, because an instruction to prepare was once read as permission to act.";
+  "It waits for the owner's approval.";
 /* Every write to a pull request is the main session's, and refused to a
    helper (above). For the main session nothing is held but what no gate
    covers: a squash merge, a body edit that keeps the request line, and
    bringing a branch up to date go through. Auto-merge still asks, because it
    merges on a timer with nobody reading the result; so does a review, which
    can approve, a human's act; and so do the API commit tools below, which
-   write past the local push guard whoever calls them. requested-by-joel in CI
+   write past the local push guard whoever calls them. request-line in CI
    still reads the body for the record of who asked. */
 const PR_ASK = {
   enable_pr_auto_merge: "Turning on auto-merge, which merges with no click once checks pass,",
   pull_request_review_write: "Writing a pull request review, which can approve it,",
 };
 const API_COMMITS = new Set(["push_files", "create_or_update_file", "delete_file"]);
-const REQUESTED = /Requested by Joel on \d{4}-\d{2}-\d{2}/;
+const REQUESTED = /Requested on \d{4}-\d{2}-\d{2}/;
 
 /* Reading a pull request is anyone's; the technical director watches them. A
    pull request tool added later that is not one of these reads counts as a
@@ -643,7 +643,7 @@ function github(name, a, deploy = false) {
     return ask(`\`${name}\` commits to \`${branch}\` through the GitHub API, past the local push guard. ${HELD} A \`git push\` of your branch needs no click.`);
   }
   if (name === "update_pull_request" && typeof a.body === "string" && !REQUESTED.test(a.body)) {
-    return deny('The new body drops the `Requested by Joel on YYYY-MM-DD — "what he said"` line. It is the only record of who asked for the pull request; keep it.');
+    return deny('The new body drops the `Requested on YYYY-MM-DD — "the request, quoted"` line. It is the only record of the request; keep it.');
   }
   if (name === "merge_pull_request" && a.merge_method !== "squash") {
     return deny('Merges here are squash merges (CLAUDE.md). Pass `merge_method: "squash"`.');
@@ -653,13 +653,13 @@ function github(name, a, deploy = false) {
 }
 
 /* ------------------------------------------------------------------------- */
-/* Supabase and Vercel: the changes that are Joel's                          */
+/* Supabase and Vercel: the changes that are the owner's                    */
 /* ------------------------------------------------------------------------- */
 
 /* Reads go ahead. So does apply_migration: the technical director applies each
    migration at merge time, from its file, before merging. Everything else —
    creating, pausing or restoring the project, branches, edge functions, and any
-   tool added later that is not a read — waits for Joel. */
+   tool added later that is not a read — waits for the owner. */
 const SUPABASE_READ = /^(get|list|search|generate)_|^query_logs$/;
 
 function supabase(name, a) {
@@ -668,16 +668,16 @@ function supabase(name, a) {
     if (/schema_migrations/i.test(sql) && WRITE_SQL.test(sql)) return deny(REPAIR_SQL);
     if (name === "apply_migration") return null;
     if (WRITE_SQL.test(sql)) {
-      return ask("This SQL changes the database outside a migration. A schema change without its migration file in the same pull request is a Never (CLAUDE.md), and migrations are applied at the gate with `apply_migration`. It waits for Joel's click.");
+      return ask("This SQL changes the database outside a migration. A schema change without its migration file in the same pull request is a Never (CLAUDE.md), and migrations are applied at the gate with `apply_migration`. It waits for the owner's approval.");
     }
     return null;
   }
   if (SUPABASE_READ.test(name)) return null;
-  return ask(`\`${name}\` changes the Supabase project itself, not a table. That is Joel's call. It waits for his click; approve it only if you asked for exactly this.`);
+  return ask(`\`${name}\` changes the Supabase project itself, not a table. It waits for the owner's approval.`);
 }
 
 /* Reads go ahead, less the ones that hand out a credential, an environment
-   variable's value or an access link. Everything else waits for Joel,
+   variable's value or an access link. Everything else waits for the owner,
    including any tool added later. */
 const VERCEL_READ = /^(get|list|search|read|filter|count|aggregate)_/;
 const VERCEL_CREDENTIAL = new Set([
@@ -692,7 +692,7 @@ const VERCEL_CREDENTIAL = new Set([
 function vercel(name, a) {
   if (name === "web_fetch_vercel_url" || name === "status") return null;
   if (VERCEL_READ.test(name) && !VERCEL_CREDENTIAL.has(name) && !a?.decrypt) return null;
-  return ask(`\`${name}\` changes the Vercel account or hands out access to it. Vercel is Joel's (CLAUDE.md): projects, domains, DNS, environment variables, the firewall, deployments and billing. It waits for his click; approve it only if you asked for exactly this.`);
+  return ask(`\`${name}\` changes the Vercel account or hands out access to it. Vercel writes are the owner's (CLAUDE.md). It waits for the owner's approval.`);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -705,18 +705,18 @@ const KINDS = ["owner:"];
 const OPTIONAL_KINDS = ["app:"];
 /* Who can act on a step: the roster by name, and the words for everyone or
    no one. Names are case-sensitive so a path does not count as an actor. */
-const ACTOR = /\b(Joel|TD|Builder)\b/;
+const ACTOR = /\b(Owner|TD|Builder)\b/;
 const ACTOR_WORDS = /\b(technical director|every ?one|every ?body|no ?one|nobody|each agent|every agent|each owner|whoever)\b/i;
 // A finished step has nobody left to act.
 const DONE = /^(~~|\*\*Done\b|Done\b)/;
 const RULE =
-  "Every issue carries one `owner:` label and at most one `app:` label, passed by name, and its body ends with a `## Next steps` section of numbered steps, each naming who acts, such as `1. **Joel:** …` (CLAUDE.md).";
+  "Every issue carries one `owner:` label and at most one `app:` label, passed by name, and its body ends with a `## Next steps` section of numbered steps, each naming who acts, such as `1. **Owner:** …` (CLAUDE.md).";
 
 const listOf = (v) => (Array.isArray(v) ? v.map(String) : typeof v === "string" ? [v] : []);
 
 /* Linear's diff tools act on the GitHub pull request behind a diff: merging one
    merges the pull request. They are the main session's like every other pull
-   request write, and settings.json still asks Joel for them on top. */
+   request write, and settings.json still asks the owner for them on top. */
 const LINEAR_PR_WRITES = new Set(["merge_diff", "update_diff", "submit_diff_review", "save_diff_comment", "resolve_diff_thread"]);
 
 function linear(name, a, deploy = false) {
@@ -803,7 +803,7 @@ export function nextSteps(body) {
     .filter((it) => !DONE.test(it.text) && !ACTOR.test(it.text) && !ACTOR_WORDS.test(it.text))
     .map((it) => it.n);
   if (nameless.length) {
-    return [`step ${nameless.join(", ")} of Next steps does not name who acts (start it with the actor: Joel, TD or Builder)`];
+    return [`step ${nameless.join(", ")} of Next steps does not name who acts (start it with the actor: Owner, TD or Builder)`];
   }
   return [];
 }
