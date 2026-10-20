@@ -18,13 +18,13 @@ type ShoppingLine = GroceryItem & ResolvedLink;
  * The shopping list — the other half of the book.
  *
  * **You shop from recipes, not from what you ate.** That is why this sits beside
- * the book rather than beside a food log, settled with Joel on 2026-09-20.
+ * the book rather than beside a food log, settled on 2026-09-20.
  *
  * **Named for where it goes, since 2026-09-22.** Every link on it is a King
  * Soopers search, so "What to buy" was a word vaguer than the thing deserves.
  *
  * **It leaves three ways**: a block of text you copy, a King Soopers search you
- * tap, or **Send to cart** (`Cart.tsx`) — Joel reversed the no-OAuth rule for
+ * tap, or **Send to cart** (`Cart.tsx`) — the no-OAuth rule was reversed for
  * King Soopers on 2026-09-26 (TEC-90). Still no `proxy.ts` carve-out. Each line
  * carries a quantity for the cart, default 1.
  */
@@ -214,12 +214,12 @@ export default function List({ refreshKey }: { refreshKey: number }) {
 
   return (
     <section id="shop" className="flex scroll-mt-4 flex-col gap-3">
-      {/* **Adding sits at the top**, Joel on 2026-09-22. It is what you do most
+      {/* **Adding sits at the top** (2026-09-22). It is what you do most
           on this tab, and under the list and the brands panel it was a scroll
           away on a phone. Clearing what you bought stays under the list, next to
           the lines it clears. */}
       <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
-        {/* Named, Joel on 2026-09-24 (TEC-39): the same frame as "Add a recipe"
+        {/* Named (TEC-39, 2026-09-24): the same frame as "Add a recipe"
             on the other tab, so both tabs open on a box that says what it is. */}
         <h2 className="text-base font-semibold">Add items</h2>
         <textarea
@@ -365,7 +365,7 @@ export default function List({ refreshKey }: { refreshKey: number }) {
                 />
               </label>
               <span className={`min-w-0 flex-1 py-2 pr-2 text-sm ${item.checked ? "text-ink-soft line-through" : ""}`}>
-                {/* **The name is the link** (Joel, 2026-09-24). It goes to your
+                {/* **The name is the link** (2026-09-24). It goes to your
                     remembered product or search when one decides this line, and
                     to a plain search of the name when none does — the server
                     resolved which. */}

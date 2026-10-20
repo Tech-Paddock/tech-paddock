@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 /**
  * Toasts — what a result says, briefly, and then gets out of the way.
  *
- * **Joel on 2026-09-22: banners should be toasts, not permanent.** A notice like
+ * **Banners are toasts, not permanent (2026-09-22).** A notice like
  * "Green bean is in the book" sat above the tabs until the next action replaced
  * it, pushing the page down by a box that had already been read.
  *

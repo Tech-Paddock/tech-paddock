@@ -8,8 +8,8 @@ import { LIVERY } from "@/lib/livery";
  *
  * **Surface is settled: site**, at standup on 2026-09-20 — a cookbook is a
  * collection, and for a collection the index *is* the product. Its tabs are that
- * index, one verb each (the technical director's ruling on 2026-09-24, after Joel
- * asked for tabs on 2026-09-22), and `.claude/SURFACE.md` holds the reasoning.
+ * index, one verb each (the technical director's ruling on
+ * 2026-09-24), and `.claude/SURFACE.md` holds the reasoning.
  *
  * **Each tab has an address** (TEC-22, 2026-09-25): `/` opens on the book and
  * `/list` opens on the King Soopers list. The list needed one because Health's
@@ -18,7 +18,7 @@ import { LIVERY } from "@/lib/livery";
  * is the Add tab (2026-10-05). Every route renders this one component, so they
  * cannot drift into separate pages.
  *
- * **On the home screen since 2026-10-05**, Joel's call over the site ruling's
+ * **On the home screen since 2026-10-05**, overriding the site ruling's
  * "no install": `layout.tsx` carries the icon and the `appleWebApp` metadata.
  */
 export default function Shell({ tab }: { tab: Tab }) {

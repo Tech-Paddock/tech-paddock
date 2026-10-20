@@ -12,7 +12,7 @@ import { searchFor, type GroceryItem } from "./grocery";
  * **Two kinds are written: `product`, a page you pasted, and `terms`, better
  * words to search.** A third, `plain` — *search this the ordinary way*, so a
  * narrow phrase could override a broad one — was dropped from the editor and
- * from Paste a batch by Joel on 2026-09-24 (TEC-39). The enum and the database
+ * from Paste a batch on 2026-09-24 (TEC-39). The enum and the database
  * still hold it, and `resolveLink` still honours a row that has it, because
  * dropping a value is a destructive change that zero rows did not justify.
  *
@@ -177,7 +177,7 @@ export function readDraft(raw: unknown): { row: PreferenceDraft } | { error: str
   const phrase = typeof o.phrase === "string" ? o.phrase.trim().replace(/\s+/g, " ") : "";
   if (!phrase) return { error: "A preference needs a phrase to match on." };
 
-  // **`plain` is no longer written** (Joel, 2026-09-24, TEC-39): only *this
+  // **`plain` is no longer written** (TEC-39, 2026-09-24): only *this
   // exact product* and *better search words* remain, from the editor and from
   // Paste a batch alike. The database still accepts `plain` and `resolveLink`
   // still honours a row that has it; nothing here makes a new one.

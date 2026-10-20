@@ -6,7 +6,7 @@ import { describeRefresh, refreshBrands, type CachedProduct, type RefreshBrand }
 import type { Product } from "@/lib/kroger";
 
 /**
- * Refresh (Joel, 2026-10-20): no cron, no model, Kroger mocked. Opening the list
+ * Refresh (2026-10-20): no cron, no model, Kroger mocked. Opening the list
  * tab past a week starts one; a product Kroger stopped returning is flagged and
  * kept; a failure is said in words.
  */

@@ -24,11 +24,11 @@ import { NO_PICKS, hasPicks, type Picks } from "@/lib/tuning";
  * **Typing one saves straight away, and that is the exception, added 2026-09-22.**
  * The draft step exists to show you what a model produced before it lands. On the
  * typed path you wrote the recipe, so the only thing the draft adds is the macros
- * — an approval of your own words back. Joel called it ceremony and he is right.
+ * — an approval of your own words back, which is ceremony.
  * **The charter still says all three land as a draft**; correcting it is the
  * technical director's, and the note is in this app's `NOTES.md`.
  *
- * **It is a tab of its own now** (Joel, 2026-10-05, overruling the two-tab
+ * **It is a tab of its own now** (2026-10-05, replacing the two-tab
  * index): Recipes · Add · King Soopers list. So it is always open — the collapse
  * it had while it sat above the book has nothing left to save room for.
  */
@@ -84,10 +84,10 @@ export default function AddRecipe({
   // The ask the pile was built against — brief and picks; a different ask is a fresh one.
   const [pileBrief, setPileBrief] = useState("");
   // The tuning pickers on Ask Claude, and the same options as filters on the book
-  // (Joel, 2026-09-26, "Both"). `lib/tuning.ts` has the rules.
+  // (2026-09-26). `lib/tuning.ts` has the rules.
   const [picks, setPicks] = useState<Picks>(NO_PICKS);
 
-  /** Bin it — a turn-down, the same as "Something else" (Joel, 2026-09-25). */
+  /** Bin it — a turn-down, the same as "Something else" (2026-09-25). */
   function binIt() {
     if (draft?.origin === "generated") setTurnedDown(turnDown(turnedDown, draft));
     setDraft(null);
@@ -112,7 +112,7 @@ export default function AddRecipe({
    * Draft one. **With `reroll`, it is "Something else"** (TEC-39 D): the draft on
    * screen joins the pile turned down this session, and the same brief goes back
    * with the whole pile and the optional reason, so the third reroll avoids both
-   * earlier ones. **Bin it turns a draft down too** (Joel, 2026-09-25), so a
+   * earlier ones. **Bin it turns a draft down too** (2026-09-25), so a
    * "Work it out" on the same brief after binning still avoids it; a new brief
    * is a fresh ask and starts a new pile (`pileForAsk`). Nothing is saved until
    * Keep it, and the pile is forgotten on leaving the page.

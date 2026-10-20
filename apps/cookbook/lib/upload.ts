@@ -1,7 +1,7 @@
 /**
  * What a recipe file has to be before a model is shown it.
  *
- * **The fourth way in, added 2026-09-22 on Joel's word ("missing from a file").**
+ * **The fourth way in, added 2026-09-22: a recipe from a file.**
  * A photo of a card, a screenshot, a scanned page or a PDF. It follows the rules
  * the link path already follows, for the same reasons:
  *

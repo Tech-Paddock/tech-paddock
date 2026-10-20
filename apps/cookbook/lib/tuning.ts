@@ -2,7 +2,7 @@ import { DIETS, MEALS, formatMinutes, type Diet, type Meal, type RecipeMeta } fr
 import type { Macros } from "./macros";
 
 /**
- * The tuning section (Joel, 2026-09-26, "Both"): the same four options — meal,
+ * The tuning section (2026-09-26): the same four options — meal,
  * diet, cuisine, time — **as pickers on Ask Claude** that steer a new draft and
  * come back tagged on it, and **as filters on the book**. Plus one filter that
  * is not a tag at all: **high protein, computed from the numbers** (TEC-52's

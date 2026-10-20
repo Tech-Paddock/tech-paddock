@@ -3,10 +3,10 @@ import { NO_PICKS, picksPrompt, type Picks } from "./tuning";
 
 /**
  * "Something else" — asking Claude again, with what was already turned down
- * (TEC-39 D, agreed with Joel 2026-09-24).
+ * (TEC-39 D, 2026-09-24).
  *
- * **The problem it fixes.** Joel asked for a side and got a green bean dish,
- * asked for "not green beans" and got the same dish with asparagus. Generating
+ * **The problem it fixes.** Asking for a side got a green bean dish, and
+ * asking for "not green beans" got the same dish with asparagus. Generating
  * sent only the brief, so the model never saw what it had offered. A reroll now
  * sends the brief **plus every draft turned down this session**, name and
  * ingredients, with an instruction to change what the dish is built on and how
@@ -51,8 +51,8 @@ export function readTurnedDown(raw: unknown): { turnedDown: TurnedDown[] } | { e
 }
 
 /**
- * A draft turned down — by "Something else" or by **Bin it**, which Joel ruled is
- * a turn-down too (2026-09-25: "yes it's a draft turn down"). The pile keeps the
+ * A draft turned down — by "Something else" or by **Bin it**, which is a
+ * turn-down too (2026-09-25). The pile keeps the
  * newest past the cap, so the latest refusals always travel.
  */
 export function turnDown(pile: TurnedDown[], draft: TurnedDown): TurnedDown[] {
@@ -61,7 +61,7 @@ export function turnDown(pile: TurnedDown[], draft: TurnedDown): TurnedDown[] {
 
 /**
  * The pile a "Work it out" carries. **A new brief is a fresh ask and starts
- * empty** (Joel, 2026-09-25: keep the reset as it is). The same brief after a
+ * empty** (2026-09-25). The same brief after a
  * Bin it is the same ask, so what was binned is still avoided — otherwise
  * binning would count as a turn-down and then be forgotten on the very next tap.
  */

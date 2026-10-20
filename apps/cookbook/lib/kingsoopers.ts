@@ -24,7 +24,7 @@ export function isKingSoopersProduct(text: string): boolean {
 }
 
 /**
- * Where checkout happens (Joel, 2026-10-20). **A constant, never the database**:
+ * Where checkout happens (2026-10-20). **A constant, never the database**:
  * the Cart API only adds and cannot check out, so the list tab and the send
  * results link here, in a new tab, and that link does nothing else.
  */

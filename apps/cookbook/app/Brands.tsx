@@ -7,7 +7,7 @@ import { isKingSoopersProduct } from "@/lib/kingsoopers";
 /**
  * Your brands — the panel that lists them, and the one editor.
  *
- * **Remembering happens only here** (Joel, 2026-09-24, TEC-39). The list's lines
+ * **Remembering happens only here** (TEC-39, 2026-09-24). The list's lines
  * used to carry a *remember* link each; they are just the item and its link now,
  * and **Remember a brand** opens the editor empty. It lives at the bottom of the
  * King Soopers list tab, collapsed, rather than on a settings page: a preferences
@@ -17,7 +17,7 @@ import { isKingSoopersProduct } from "@/lib/kingsoopers";
  * King Soopers in a new tab, cross-origin, and this project's proxy refuses
  * kingsoopers.com server-side, so nothing here can see where you ended up. Copy
  * the product page's address there, then **Paste** here: that is the floor, and
- * Joel knows it is.
+ * a known one.
  */
 
 const KINDS: { value: Exclude<PreferenceKind, "plain">; label: string; hint: string }[] = [
@@ -181,8 +181,8 @@ function day(iso: string): string {
 /** One line under a product brand: what Kroger said, or that it stopped saying anything. */
 function CheckedLine({ checked }: { checked: Checked }) {
   if (checked.missing_since) {
-    // **Flagged, never dropped** (Joel, 2026-10-20): the brand stays, and
-    // choosing a replacement is his — edit it with a new product page.
+    // **Flagged, never dropped** (2026-10-20): the brand was chosen by hand,
+    // so it stays until a replacement is too — edit it with a new product page.
     return (
       <span className="block text-xs text-danger">
         Kroger no longer returns this product (since {day(checked.missing_since)}). Edit it with a new product page, or forget it.

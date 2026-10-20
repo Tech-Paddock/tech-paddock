@@ -6,7 +6,7 @@
  * `https://cookbook.techpaddock.io/list` while the grocery list moves here
  * (TEC-15), so renaming it breaks a redirect in an app this one cannot see.
  *
- * **Add is a tab of its own** (Joel, 2026-10-05, overruling the two-tab index
+ * **Add is a tab of its own** (2026-10-05, replacing the two-tab index
  * of 2026-09-24). Still one verb each: browse, add, shop.
  */
 

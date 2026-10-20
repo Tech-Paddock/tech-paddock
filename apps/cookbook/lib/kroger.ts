@@ -11,7 +11,7 @@ import { SetupError, UpstreamError } from "./errors";
  * confirms it.
  *
  * **Provenance, because none of this could be loaded from here.** The base URL,
- * the two OAuth paths and the scope names are the ones Joel's brief and the TEC-90
+ * the two OAuth paths and the scope names are the ones the TEC-90 brief and
  * design give, and a search on 2026-10-20 agreed with them; `developer.kroger.com`
  * itself is refused by this project's egress, so the request and response shapes
  * below are from Kroger's published examples as they were known, not read live.

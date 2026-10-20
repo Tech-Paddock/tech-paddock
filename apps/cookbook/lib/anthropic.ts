@@ -348,8 +348,8 @@ export type RecipeImport = { read: boolean; fields: RecipeFields | null; reason:
  * actually brew it"*, and here you would actually cook it.
  *
  * **Only the recipe is kept.** The page's own nutrition panel, if it has one, is
- * discarded and the macros are re-estimated from the ingredients — Joel:
- * *"Only retain recipe. Then calculate macros and cals."* So `source_url` records
+ * discarded and the macros are re-estimated from the ingredients, so
+ * the book's numbers stay comparable with each other. So `source_url` records
  * where the method came from, never where a number did.
  */
 export async function importRecipe(params: {
