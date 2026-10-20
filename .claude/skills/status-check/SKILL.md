@@ -18,7 +18,7 @@ Read-only: no branch, commit, push, pull request or Linear, Vercel or Supabase w
 3. **Blocking:** open TEC issues with a ⭐ step or assigned to the owner, and issues Backlog for
    being blocked.
 4. **Hot topics:** CI and `drift` on `main`; issues In Progress or In Review; anything updated in
-   the last 24 hours; any production deployment not `READY`, parked apps aside.
+   the last 24 hours; any production deployment not `READY`.
 
 ## Report
 

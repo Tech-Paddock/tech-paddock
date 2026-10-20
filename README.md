@@ -11,17 +11,14 @@ Vercel project (Root Directory set to its folder).
 ```
 apps/
   home/      → hub               → techpaddock.io
-  editor/    → Message Editor    → editor.techpaddock.io   (parked)
-  tracker/   → Pipeline Tracker  → tracker.techpaddock.io  (parked)
   resume/    → Resume Formatter  → resume.techpaddock.io
   coffee/    → Coffee            → coffee.techpaddock.io
   health/    → Health            → health.techpaddock.io
   cookbook/  → Cookbook          → cookbook.techpaddock.io
 ```
 
-The hub shows what is live. It holds no database credential: tools expose `/api/summary` and the
-hub fetches them server-side (`SOURCES`). Its only tokens are for the Pit Wall's GitHub and Vercel
-reads.
+The hub frames each tool and shows what is live. It holds no database credential; its only tokens
+are for Linear (the Pit Wall) and GitHub deployment state (The Garage).
 
 There is no root `package.json`; work inside an app (`cd apps/<app> && npm install`). Each app's
 `.env.example` lists its variables and how to generate them.
@@ -32,7 +29,7 @@ a stamped copy.
 
 ## Database
 
-One Postgres schema per tool, plus `shared`; never `public`. Migrations live in
+One Postgres schema per tool; never `public`. Migrations live in
 [`supabase/`](./supabase/README.md). Read that README before writing one.
 
 ## Live state

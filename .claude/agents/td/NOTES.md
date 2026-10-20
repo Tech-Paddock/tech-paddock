@@ -6,12 +6,7 @@ What is true now, and the traps. Branch and pull request state is never written 
 
 - **Shape:** TD + one builder + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Linear
   labels: `owner:Owner`, `owner:TD`, `app:<folder>`; the parking lot is the `Parked` label.
-- **Every live app is on Next 16 with `proxy.ts`.** The parked editor and tracker stay on 14 with
-  `middleware.ts` until unparked or retired.
-- **`INTERNAL_API_SECRET` is one team-shared variable** for hub → tracker and tracker → editor.
-  Home no longer reads it. The paused tracker and editor run builds from before it, so a 401 there
-  means an old build.
-- **Every `ANTHROPIC_API_KEY` is proven in production.** Resume and the editor have none.
+- **Every app is on Next 16 with `proxy.ts`,** one gate copy.
 - **`apps/showcase`'s scaffold waits on the owner showing you the uploader.**
 - **Linear writes don't prompt.** Deletes, label retirement and diff tools still ask.
 - **Health prices recipe lines from Cookbook's `GET /api/servings`**, forwarding only

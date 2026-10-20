@@ -62,7 +62,7 @@ follow the pull request's Verify line.
   redeploying; a paused project cannot take it.
 - **`HEAD^..HEAD` in each `ignoreCommand` is correct because merges squash.** The apex DNS record is
   an A record on purpose; every subdomain is a CNAME.
-- **A parked app's red check is expected.** Check a red status against `main` first.
+- **Check a red status against `main` first.** Red there too is not the branch's.
 
 ## 6. After
 

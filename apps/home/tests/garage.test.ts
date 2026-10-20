@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { deployError, whyGitHub, type LatestDeploy } from "@/lib/deploys";
 import { envErrors, explainError, explainResponse, forParked, type Probe } from "@/lib/diagnostics";
 import { budgetDistance, explainDrift } from "@/lib/drift-explain";
-import { HOME, HOME_ENV, PARKED } from "@/lib/platform";
+import { HOME, HOME_ENV } from "@/lib/platform";
 import { parseDrift } from "../scripts/drift-parse.mjs";
 
 describe("a failure says what failed", () => {
@@ -33,7 +33,7 @@ describe("a failure says what failed", () => {
 });
 
 describe("a parked app is grey, not red", () => {
-  const probe = (status: Probe["status"]): Probe => ({ target: "Pipeline Tracker", status, detail: "the Vercel project is paused", raw: "503", ms: 12 });
+  const probe = (status: Probe["status"]): Probe => ({ target: "A parked app", status, detail: "the Vercel project is paused", raw: "503", ms: 12 });
 
   it("turns a failed probe of a parked app into parked, keeping the reason", () => {
     const p = forParked(probe("down"), true);
@@ -117,7 +117,7 @@ describe("deploy errors", () => {
   });
 
   it("leaves a parked project out, whose red deploy is expected", () => {
-    expect(deployError(deploy("failure", PARKED[0]))).toBeNull();
+    expect(deployError(deploy("failure", { ...HOME, slug: "parked-app", parked: true }))).toBeNull();
   });
 
   it("tells a refused token from a GitHub that did not answer", () => {

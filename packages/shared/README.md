@@ -22,19 +22,17 @@ node scripts/stamp-shared.mjs --check  # verify, write nothing
 | `lib/theme.ts` | The other half of the theme; drifts silently if unstamped. |
 | `next.config.mjs` | Security headers, including `frame-ancestors`. |
 | `app/ThemeControl.tsx` | Light/dark switch and the message that carries it into the hub's frames. |
-| `app/LogoutControl.tsx` | The header's Log out; reports a failure. Stamped into parked apps too. |
+| `app/LogoutControl.tsx` | The header's Log out; reports a failure. |
 
 Each copy lands at the same path under `apps/<app>/`. The login path is stamped because a fix
 applied to some copies of the password gate is a hole that looks closed.
 
 ## Not shared, deliberately
 
-- **Login pages:** styled per app. They call `login.ts` and `safe-redirect.ts`. The editor's route
-  wraps the handler to run its model check on login.
+- **Login pages:** styled per app. They call `login.ts` and `safe-redirect.ts`.
 - **`lib/supabase.ts`:** differs per app; `apps/home` has none and must stay credential-free.
-- **The gate file** (`middleware.ts`, or `proxy.ts` on Next 16): three deliberate variants — base,
-  editor's `/api/draft` bypass, tracker's `/api/summary` bypass and `/api/cron/*` bearer check.
-  `drift` measures them; a fourth variant fails it.
+- **The gate file** (`proxy.ts` on Next 16): shared auth plumbing, one version in every app.
+  `drift` fails a second version.
 
 ## Why copies, not imports
 

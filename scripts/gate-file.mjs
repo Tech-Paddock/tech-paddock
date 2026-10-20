@@ -152,8 +152,8 @@ export function gateFileFindings(appDir) {
 /**
  * A gate file's source with the exported function's name taken out, so that
  * the codemod's one-word rename (`middleware` → `proxy`) leaves a migrated app
- * in the variant group it was in. Nothing else is normalised: any other
- * difference is a different gate, which is what check 2 exists to see.
+ * in the same group. Nothing else is normalised: any other difference is a
+ * different gate, which is what check 2 exists to see.
  */
 export const normaliseGate = (src) =>
   src.replace(/\bexport(\s+)(async\s+)?function(\s+)(?:middleware|proxy)(\s*)\(/g,
@@ -175,16 +175,14 @@ export function gateHash(appDir) {
 
 /**
  * Check 2's verdict from every gated app's gateHash: `{ state, detail }`.
- * `results` is `[app, gateHash(app)]` pairs; `scoped` names the apps that each
- * carry a documented variant of their own (editor's and tracker's bypasses).
+ * `results` is `[app, gateHash(app)]` pairs. Every gated app runs the one
+ * stamped gate; a second version is a bypass nobody reviewed.
  */
-export function gateShape(results, scoped = ["editor", "tracker"]) {
+export function gateShape(results) {
   const unreadable = results.filter(([, r]) => r.error);
   const groups = new Map();
   for (const [a, r] of results) if (!r.error) groups.set(r.hash, [...(groups.get(r.hash) ?? []), a]);
   const shape = [...groups.values()].map((g) => g.sort().join("+")).sort();
-  const owns = (app) => [...groups.values()].some((g) => g.length === 1 && g[0] === app);
-  const base = [...groups.values()].filter((g) => !(g.length === 1 && scoped.includes(g[0])));
   const measured = shape.length ? ` — measured ${shape.join(" | ")}` : "";
 
   if (results.length === 0) return { state: "warn", detail: "no gated app on disk — cannot measure" };
@@ -192,20 +190,9 @@ export function gateShape(results, scoped = ["editor", "tracker"]) {
     return { state: "fail", detail:
       "no readable gate file, so the app is not in the comparison: " +
       unreadable.map(([a, r]) => `${a}: ${r.error}`).join("; ") + measured };
-  // An app that is not on disk at all is a deprecation, not a gate dropping out:
-  // the rule naming its bypass is what has to change, so say so and stop.
-  const missing = scoped.filter((a) => !results.some(([app]) => app === a));
-  if (missing.length)
-    return { state: "warn", detail: `cannot measure: apps/${missing.join(" and apps/")} not on disk, and this check names ${missing.length > 1 ? "their" : "its"} bypass${measured}` };
-  if (!scoped.every(owns))
+  if (groups.size > 1)
     return { state: "fail", detail:
-      `${scoped.join(" and ")} must each have a variant of their own${measured}. ` +
-      "A shared one means a scoped bypass was copied into an app that was never reviewed for it." };
-  if (base.length > 1)
-    return { state: "fail", detail:
-      `a fourth version of the password gate${measured}. ` +
-      "Use the base copy, or document the new variant in CLAUDE.md in this same pull request." };
-  if (base.length === 0)
-    return { state: "fail", detail: `only ${scoped.join(" and ")} have a gate file; nothing is running the base copy` };
-  return { state: "ok", detail: `${base[0].length} on the base copy, ${scoped.join(" and ")} scoped — ${shape.join(" | ")}` };
+      `more than one version of the password gate${measured}. ` +
+      "Every app runs the stamped copy; a variant is a bypass nobody reviewed." };
+  return { state: "ok", detail: `${results.length} on the one gate — ${shape[0]}` };
 }

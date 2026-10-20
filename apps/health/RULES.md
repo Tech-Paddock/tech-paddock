@@ -75,8 +75,7 @@ would overwrite a hand correction. This is correctness, not cost.
 ## Settled
 
 - No `/api/summary`. Nothing reads one.
-- The livery is the theme's (`apps/home`). `lib/livery.ts` pins `senna`, shared with the parked
-  tracker until TEC-12 resolves it. Do not change it from here.
+- The livery is the theme's (`apps/home`). `lib/livery.ts` pins `senna`. Do not change it from here.
 - The `health` schema and its tables belong to this app.
 
 ## Traps

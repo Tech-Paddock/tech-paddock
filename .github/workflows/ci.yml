@@ -185,8 +185,6 @@ jobs:
           SUPABASE_URL: https://example.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: dummy
           APP_PASSWORD_HASH: dummy
-          EDITOR_BASE_URL: https://editor.techpaddock.io
-          INTERNAL_API_SECRET: dummy
 
       # `next build` type-checks only what the build compiles. Tests, the vitest
       # config and anything else tsconfig includes are checked here, after the

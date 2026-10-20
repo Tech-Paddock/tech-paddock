@@ -29,7 +29,7 @@ describe("the service client", () => {
     // Named rather than implied. Each of these is a real schema on the same
     // Postgres instance, reachable with this key, holding somebody else's data.
     const client = getServiceClient();
-    for (const other of ["public", "shared", "editor", "tracker", "resume", "coffee"]) {
+    for (const other of ["public", "resume", "coffee", "cookbook"]) {
       expect(client.from("anything")["schema" as never], other).not.toBe(other);
     }
   });

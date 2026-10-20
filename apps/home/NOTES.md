@@ -13,8 +13,8 @@
   failure is a sentence plus its raw code (`lib/diagnostics.ts`). Rules drift is baked at build
   (`lib/drift-explain.ts`).
 - Bar controls, all stamped: `LiveryBadge` on every bar, framed or not; `ThemeControl` and
-  `LogoutControl` hidden in a frame. Tracker and editor have `/api/logout` and no control.
-- The tracker is in `PARKED`, shown grey. Its state is on TEC-36.
+  `LogoutControl` hidden in a frame.
+- `PARKED` is empty. A parked app would be probed and shown grey.
 
 ## Traps
 

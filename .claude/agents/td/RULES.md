@@ -46,14 +46,8 @@ at merge.
   which is outside the repo and fails looking like a credentials problem. Read `supabase/README.md`
   first.
 - **`supabase db push` cannot work here** (`.claude/DECISIONS.md`).
-- **Contracts live in `supabase/README.md`** (`shared.contacts`, the `tracker.pipeline_threads`
-  write-through). A write path in any other app is a new contract for the owner.
-
-## `apps/editor`: parked and frozen
-
-Caretaking only. `tp-message-editor` is paused, so every deployment reads `BLOCKED` and it serves
-its last good build; a merge never reaches the running app. The gate file exempts exactly
-`pathname === "/api/draft"`, authenticated by `INTERNAL_API_SECRET`, and that does not loosen.
+- **Contracts live in `supabase/README.md`.** A write path in any other app is a new contract for
+  the owner.
 
 ## `apps/showcase`: public, and yours to build
 
