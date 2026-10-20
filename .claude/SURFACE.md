@@ -9,8 +9,7 @@ time Health had to invent the rule this would have supplied.
 
 **Surface is not the theme.** Palette, tokens, type, spacing and the shared component language are
 the theme, which lives in `apps/home` and is one system across every app. Surface is shell, navigation and whether there is an index — that is
-architecture, and it is the technical director's, with Joel able to overrule. Settled 2026-09-18;
-the entry is in `.claude/DECISIONS.md` and this file does not restate the reasoning.
+architecture, and it is the technical director's, with Joel able to overrule. Settled 2026-09-18.
 
 **Joel, 2026-09-18:** *most tools are websites; Coffee is the only real app, and Health will be.* A
 site is **a thin index grouped by verb wrapping one long page**. An app is **one screen, thumb-first,

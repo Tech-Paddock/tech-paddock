@@ -96,7 +96,10 @@ sign-in failed); `SetupError` 501 (a missing variable); anything else 500, via `
 
 ## Traps specific to this area
 
-**Durable traps are in `DECISIONS.md`** — empty-vs-unread, the Supabase key, unconfigured `lint`.
+- **"Invalid API key" here comes from Supabase, not Anthropic.** Reading the book or the list calls
+  no model; only drafting a recipe and Tidy do. Check the Supabase key first.
+
+**Empty-vs-unread is in `DECISIONS.md`**; the Supabase key is above, and `lint` is unconfigured.
 
 - **`/list` is a path another app depends on** — Health's redirect (TEC-23) names it, and Health's
   own `/list` stays live until then; `tests/tabs.test.ts` holds it. Renaming it is cross-app.

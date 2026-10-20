@@ -57,6 +57,10 @@ Next 16 caches no `fetch` by default, and every GET reached the database on ever
 
 ## Traps specific to this app
 
+- **`templates.version` is max+1 across all rows, archived included.** Delete the newest and the next
+  upload reuses its number, so one version can name two files over time. Harmless, since renders keep
+  a `template_snapshot`, but it reads as a bug.
+
 - **A feathered role line carries the bullet glyph.** That is Joel's pick read literally; the
   header line is the fallback only when no template entry has a bullet at all.
 - **A reopened render's verdict and ATS findings are today's** (`verdictFor` over its stored log,
