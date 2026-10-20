@@ -7,6 +7,16 @@
 Photograph a coffee bag, retrieve the roaster's own brewing instructions for it, say plainly when
 there are none, and keep a library of bags bought and brews made.
 
+## Surface: app
+
+- One screen. A second needs a written reason and the owner's approval; it must be the same nouns
+  one step earlier or later, not new territory.
+- No index or tabs. Secondary views are a quiet footer link.
+- Thumb-first: the primary action sits in the reachable half; assume one hand.
+- Opens in its working state, not a menu.
+- Home-screen install is part of the design. On iOS it is done from Safari.
+- `/admin` and `/debug` never appear in navigation and do not count as screens.
+
 ## Scope
 
 - `apps/coffee`.
