@@ -30,8 +30,8 @@ export function auditAts(parts: DocxParts, paras: Para[]): AtsFinding[] {
   // keeps header1.xml behind after the text is cleared, and a first-page header
   // with no <w:titlePg/> is not even displayed — so a part-presence check
   // reports a header the author has already emptied and cannot see. Both of
-  // Joel's templates are the opposite case: the part is there, invisible in
-  // Word, and still full of his name and phone number. Read the text.
+  // the user's templates are the opposite case: the part is there, invisible in
+  // Word, and still full of the name and phone number. Read the text.
   const withText = parts.headerFooterParts.filter((name) => headerFooterText(parts.headerFooterXml[name]) !== "");
   if (withText.length > 0) {
     findings.push({

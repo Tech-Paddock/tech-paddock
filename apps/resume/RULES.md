@@ -1,351 +1,131 @@
-# Resume Formatter — charter
-
-## Read first
-
-Carried over from the retired agent preset (TEC-115). `NOTES.md` beside this file is the
-app's state and traps; open work is in Linear under `app:resume`.
-
-**Two rules define this tool and neither is negotiable.** There are no model calls in it, ever —
-a model escalation was dropped because it would make a saved render non-reproducible. And **every
-string in a render comes from the source**: the renderer edits the template's own XML, so a line
-can go missing but a word is never rewritten. Missing is caught, not impossible: the report and
-verdict once counted a dropped bullet as placed. **They must never overstate what arrived.**
-
-**Run `npm test` before every push.** Never widen an assertion to make a fixture pass.
-
-**This app handles real resumes**, so it is the likeliest place for personal information to reach
-the repo. For a `.docx` that means `.rels` and `docProps/`, not just `document.xml`.
-
----
-
-You own `apps/resume` — `resume.techpaddock.io`. Nothing else in this repo is yours.
-
----
-
-## Your job
-
-Pour a Jobright-tailored resume's text into Joel's own template, check the result, and record the
-submission.
-
-**This is not a content store.** Jobright authors and tailors the content. You own **formatting,
-verification, history and the application record.**
-
-**Pipeline:** upload the tailored `.docx` → read its text → rewrite the template's own
-`word/document.xml` with it → lint the output the way a parser will read it → confirm everything
-taken from the source arrived → record the submission against its Pipeline Tracker thread.
-
-### The one rule the whole app rests on (2026-09-16)
-
-**Never build a document. Edit the template's.** Behaviour that works is kept and built on; what is
-broken is flagged or fixed.
-
-The template's zip is opened, only the body of `word/document.xml` is rewritten block by block, and
-the same zip is written back out. `styles.xml`, `numbering.xml`, `theme1.xml`, `fontTable.xml`,
-`settings.xml`, the section properties, the headers and any embedded fonts are carried through
-untouched — **not copied carefully, never read at all**, which is a different and much stronger
-guarantee. Each paragraph keeps its own `pPr` and its first run's `rPr`; only the text changes.
-
-**This is not a preference, it is the correction of a measured failure.** Every earlier version
-synthesised a fresh document from a seventeen-field summary of the template and hardcoded the rest.
-Measured against the real template on 2026-09-16, that renderer produced **A4 pages from a US Letter
-template**, 10pt body text against the template's 10.5pt, a left-aligned Career Highlights block with
-its cell shading gone, an invented bullet glyph at an invented indent, and a section rule under every
-heading where the template draws three above. The constants that did match were fitted to one file
-and would have drifted the moment the template changed. Each of those is a property somebody had to
-think to carry; the list of properties a Word document has is not one you can finish.
-
-**So a change that starts modelling the template again is the bug coming back**, whatever it fixes
-locally. The test that catches it is in `tests/reskin.test.ts`: the output's `styles.xml`,
-`numbering.xml` and `theme1.xml` must be byte-identical to the template's.
-
-### Where the text comes from, and where it does not
-
-**Static sections are the template's, never the input's.** Education, Certifications and Hobbies do
-not change between applications, so they are passed through untouched and the change log says
-`passthrough`. Edit them in the template. This is also a quality gate: Jobright mangles Education
-into run-together lines, and passthrough is why that never reaches the output.
-
-**The name and contact block are the template's too** — they are front matter, dropped from the
-input deliberately so the template's header is the only copy.
-
-**Career Highlights is the one section with a diff check.** If the highlights already match the
-template's, the table is left completely untouched rather than rewritten to the same values. The only
-way to guarantee a byte is unchanged is not to write it.
-
-**Count mismatches resolve positionally**: the template's last bullet or row is cloned, with its
-formatting, for surplus input; unmatched template entries are dropped. Every one of those is a
-change-log line, never silent.
-
-**Professional Experience is the one section that feathers** (TEC-107, 2026-10-14). An input
-line the template's entry has no slot for is inserted after the line that precedes it in the input,
-formatted as a copy of the nearest template **bullet** paragraph, glyph included, whether or not it
-is a bullet — never the bold header line, which reads as a new heading to a person and to an ATS
-(2026-10-18); the header is the fallback only for a layout with no bullet. It is logged `feathered`:
-a note, never a vote. Coverage checks every Experience line as the input has it, not just the
-fields read from it. **Every other content section owns its shape**: a line with no slot there
-stays missing and fails the render, and a FAIL hands out no file (TEC-105). **A template section
-the input leaves entirely empty only warns** — a Summary a Jobright export lacks still downloads.
-**One it fills only partly fails**, because the unfilled slots would ship the template's own text,
-such as last year's Career Highlights figures (2026-10-18).
-
-## What you own
-
-Database: the `resume` schema.
-
-### `templates`
-id, version, name, `file_path` (original docx in Storage), `spec` (jsonb — extracted formatting),
-is_active, `archived_at` (nullable), created_at
-
-`is_active` auto-points at the newest upload, and pinning an older one is deliberate — it raises a
-persistent banner on the render screen naming both versions.
-
-**Templates leave the list two ways, and the difference is history.** Archiving (`archived_at`)
-hides one and keeps both the row and its stored `.docx`. Deleting removes both. The archived
-template and the active template are disjoint by constraint: neither can be the other, and
-**deleting the active one is still refused** — it would leave every future render with nothing to
-build on.
-
-This was append-only until 2026-09-14, when deletion was added so a duplicate upload could be
-removed, and the reasoning behind append-only never covered that case: a template with no renders
-is nobody's history. The amendment rode in #56, merged 2026-09-15.
-
-**Deleting a template no longer takes its renders with it, and is no longer refused because of
-them** — amended on 2026-09-17, so renders outlive their template. `renders.template_id` is nullable with `on delete set null` (migration `20260918041216`).
-
-**The amendment stands on its reasoning, and that is the point.** The
-old rule's premise was that deleting a template destroyed the account of what a render was built
-on. That stopped being true when the renderer started writing `template_snapshot` — the engine, the
-template's id, its version and a sha256 of its exact bytes at render time. A render keeps its own
-account of its origin, so the row it points at is no longer load-bearing for explaining it. **A
-guard whose reason has expired should be removed, not kept out of habit** — but check the reason
-before you remove it, which is what happened here.
-
-**Renders delete too**, one at a time, taking both stored files with them. No cascade and no bulk
-delete: clearing test runs is a one-off, and a click per render costs less than the machinery to
-delete in bulk. **A render's tracker thread is never touched.** It belongs to the
-Pipeline Tracker and is the record of an application; deleting the resume must not delete the
-application.
-
-**The template file is itself a deliverable**: it doubles as the general-purpose resume to hand
-someone when there is no specific job, so the original bytes are kept, not just the spec — and
-`GET /api/templates/[id]/file` returns those bytes, archived or not.
-
-### `renders`
-id, template_id, template_snapshot, `source_file_path`, `parsed_content` (jsonb), `coverage`
-(jsonb), `output_file_path`, content_hash, `thread_id` (FK → `tracker.pipeline_threads`, nullable),
-`submitted_at` (nullable), created_at
-
-**Storage:** the private `resume-files` bucket, under `templates/`, `sources/` and `renders/`. Files
-are written **before** the row that points at them, so a row never references an object that was
-never created.
-
----
-
-## The two rules that define this tool
-
-### No model calls, ever.
-
-Every check here is fully deterministic on both document families. **A model escalation was designed
-and deliberately dropped**: it would have had nothing to decide, and it would have made the output
-non-deterministic — which is exactly what a saved record must not be.
-
-**This survived the 2026-09-16 amendment unchanged, and was re-tested by it.** An AI pass before
-submission was proposed and declined on the merits, not on the rule: every defect the renderer had
-was a value sitting in the file — a page size, a fill colour, an indent — and every check that
-replaced it is a comparison between two documents. There is nothing here for a model to judge.
-
-The signal that would have triggered it is still worth having and still measured — a line the source
-has and the finished document does not, or an `unknown_heading` finding — but it surfaces in the UI
-for a human rather than routing to a model.
-
-**Do not reintroduce a model call.** If a document defeats the rules, the report names what it could
-not account for and you fix it by hand.
-
-### Never lose a field to keep its formatting.
-
-The two ways text is written are not equal, and when they conflict the ugly one wins.
-
-Run-granular replacement — used where company, title and date share one line against a right tab
-stop, and again for a `Label:⇥items` competency row whose label is bold and items are not — keeps
-each field's own weight, slant and colour by rewriting only the first run of each. It needs one
-non-empty run per field. **Where the template does not supply them, the fields with
-nowhere to go were silently dropped**, which is how a job shipped with no title and no dates. The
-renderer now reports which fields it could not place and composes the line whole instead: the
-per-field formatting is lost and the change log says so. A formatting loss is visible in the
-document; a dropped job title is not.
-
-### Lossless: every string comes from a document, never from this app.
-
-Labelling only assigns a paragraph a role, and the content check only says whether a line arrived.
-Neither ever rewrites a word. This matters because Jobright's specific wording *is* the ATS
-optimisation — a silently dropped line is lost keyword coverage.
-
-**That rule was broken once and fixed.** A bullet appearing before the first employer line was
-discarded while still being counted as placed, so the coverage report claimed 100% over text the
-output did not contain. **The claim is the whole point of the design; it must not be able to lie.**
-
-**It must not be able to cry wolf either, and that is the same rule.** The content check first
-matched whole lines, which called nine lines of forty-two missing on real files — every word present,
-the line merely split across two table cells or interrupted by a job title. A report that
-false-alarms that often is one you learn to ignore, which costs exactly what an overstatement costs.
-It now matches the longest run of consecutive words it can. **Runs, not loose words:** every word of
-"Delivered a representative accomplishment" occurs somewhere in a resume full of similar bullets, so
-counting words independently would report a deleted bullet as present. Both failure modes have a
-named regression test in `tests/compare.test.ts`.
-
----
-
-## Things that will catch you out
-
-**Content is not always a direct child of `<w:body>`.** Walk the tree, never just the body's direct
-children, or whole sections read as empty. There is a named regression test for this.
-
-**Core Competencies arrives as a table or as `Label:⇥items` paragraphs, and the renderer reads
-both.** The shape is the template's to choose, because the template is a file Joel edits rather
-than a shape this code may assume. **It is not a nicety: the renderer used to test for a table and
-pass anything else straight through**, so a flattened template would have shipped the *template's*
-skills on every application while the tailored ones were dropped — reporting 100% coverage while
-doing it, because coverage asks whether the input's text arrived and never whether it was allowed
-to leave. Flat is the better shape (*The ATS rules* below allow one table, and Career Highlights is it), but
-the renderer never flattens a table itself — that is the template's fix, not a rewrite at render
-time.
-
-**`<w:tab>` means two different things and the parent decides which.** In a run it is a tab
-character; in `<w:pPr><w:tabs>` it declares a tab *stop* and there is no text at all. Conflating
-them made every positioned paragraph extract with a leading tab this app had invented, which is
-precisely what `lib/docx/paragraphs.ts` must never do. It hid for as long as it did because `pPr`
-precedes its runs, so the fake tab always landed where `.trim()` took it away again.
-
-**A template may keep the name and contact in `word/header1.xml`**, and it is the worst ATS defect a
-template can have — a resume a parser cannot attach a name or a phone number to is worse off than
-one with an ugly heading. **Joel's template did until 2026-09-17, when he moved the block into the
-body**; its header parts are now present and empty, which is why the lint reads header *text*
-rather than checking whether the part exists. The machinery for the header case stays because the
-next template may do it again: spec extraction ranks body prose sizes, so when the name is not in
-the body every rank shifts and the render comes out with no hierarchy at all — the name set in body
-text. `extractSpec` therefore takes the name and contact sizes from the header when it finds them
-there, and shifts the body ranks up by one.
-
-**What is a section heading is decided in exactly one place — `lib/docx/headings.ts`.** It was
-decided in three, and the third was wrong: the check page reported `Professional Experience — 0
-lines` and each of Joel's five jobs as a sibling section, because it ranked by run size and his
-headings and entry lines are both 11pt. A heading is a bare label — no date range, no interior tab.
-**A job is narrower than that: the date range alone makes one**, because a `Systems:⇥…` competency
-row is tabbed identically and is not a job. Treating the two questions as one reported three jobs
-under Core Competencies, and there is a test on that line.
-
-**Whether Word displays that header is a separate question from whether a parser reads it, and the
-two have opposite answers.** A `w:type="first"` header needs `<w:titlePg/>` to be displayed at all;
-the 2026-09-17 template has it and the earlier one did not, so one looked fine on screen and the
-other looked empty — while both were fully present in the archive and equally invisible to a parser
-that skips headers. **Never reason from what Word shows.** `header_footer_content` reads the text.
-
-**Jobright pastes Career Highlights in as a markdown table** — a row of metrics, a `| :--- |`
-alignment row, and a row of descriptions, all as ordinary paragraphs. Transposed into pairs only
-when the cell counts line up; anything else falls through and renders verbatim, because a guess
-here costs keyword coverage. The alignment row is scaffolding and is counted on neither side of the
-coverage fraction, exactly as a blank paragraph already is.
-
-**Sizes are ranked, not hardcoded.** Jobright runs 25/11/10.5/10pt, the template 16/12.5/11/10pt,
-and the template sets its Career Highlights metrics *larger than its own headings* — so ranking
-ignores table and list text. Jobright's `styles.xml` defines no named styles whatsoever, which is
-why run size is the only signal available.
-
-**Append-only artifacts.** Parsed content, coverage and the rendered file never change once written.
-`GET /api/renders/[id]/file` returns the **stored bytes**, never a re-render — re-rendering would
-answer a different question. Application metadata stays editable, because a resume is usually
-rendered days before it goes out, and `submitted_at` stays null until it actually does.
-
-**Job details live on the linked tracker thread** — company, role, posting URL, contact — and are
-never duplicated here.
-
-## The ATS rules
-
-Avoid tables generally: many ATS parsers read raw XML order, not visual order, and content inside
-cells gets scrambled or dropped. Also no text boxes, no images (Jobright draws section rules as
-images — use real paragraph borders), contact details in the document body and **never** in a header
-or footer, section headings from a known vocabulary, and a plain bullet glyph.
-
-**They are now a lint on the template, not a constraint on the renderer, and that is the point.**
-The renderer this replaced enforced them by rebuilding the document to satisfy them — which is why it
-always passed its own check while getting the page size, the alignment and the bullets wrong. It was
-grading its own work. Editing the template's own XML means the output inherits whatever the template
-does, **including the template's ATS problems**, and `auditAts` reports them.
-
-So a finding on a render is almost always a finding about the template. Fix it there and every
-future render inherits the fix. **Do not make the renderer rewrite the document to clear a finding** —
-that is the old failure with a new justification.
-
-**The header finding is the one that matters most, and it is the one that has been cleared.** Many
-parsers skip headers entirely, and the renderer preserves a header faithfully — which means it
-preserves the problem. `header_footer_content` is the only thing that will ever say so. Joel's
-template now keeps its contact block in the body and **audits with no findings at all**; do not
-read that as the finding being unimportant, read it as the finding having worked.
-
-**A finding must be believable or it is worth nothing.** The heading check ranked by run size alone,
-and in Joel's template the section headings and the `Company   Title ⇥ Dates` lines are set at the
-same size — so it reported all five of his jobs as unrecognised headings. Five false findings in one
-document teaches you to skip the warning, which costs exactly what an overstatement costs. An entry
-line is now told apart by what a heading never has: a date range, or an interior tab. And the
-heading size is **the largest one that recurs** — a name appears once, headings repeat — rather than
-the second-largest size in the whole document, which landed on the headings by coincidence on one
-file and on nothing at all once the name moved into the body.
-
-**Two template fixtures, and choosing the wrong one hides bugs.** `template-sample.docx` carries two
-blocking findings — a second table and a `<w:sdt>` — and `tests/reformat-route.test.ts` asserts they
-survive into the output; that is not a defect awaiting a fix, it pins the guarantee that nothing
-rewrites the template silently. `template-flat-sample.docx` is the current template's structure: one
-run per field, real tab stops, flat competencies, contact in the body, and it audits clean. Reach
-for the flat one unless the test needs a defect to bite on.
+# Resume Formatter — rules
+
+Scope: `apps/resume` (`resume.techpaddock.io`) and the `resume` schema. State and traps are in
+`NOTES.md`; open work is in Linear under `app:resume`.
+
+## Purpose
+
+Pour a Jobright-tailored resume's text into the template, check the result, and record the
+submission. Jobright owns the content; this app owns formatting, verification, history and the
+application record.
+
+Pipeline: upload the tailored `.docx` → read its text → rewrite the template's `word/document.xml`
+→ lint the output as a parser reads it → confirm every source line arrived → record the
+submission against its Pipeline Tracker thread.
+
+## Core rules
+
+- **No model calls.** A saved render must be reproducible. When a document defeats the rules,
+  the report names what it could not account for and a human fixes it.
+- **Every string in a render comes from a document** (the source, or the template for passthrough
+  sections), never from this app. Labelling assigns roles and
+  the content check reports arrival; neither rewrites a word. Jobright's wording is the ATS
+  optimisation.
+- **Coverage and the verdict never overstate what arrived.** A dropped line counted as placed is
+  the failure this design exists to prevent.
+- **Coverage does not false-alarm either.** It matches the longest run of consecutive words, not
+  whole lines (a line split across cells still arrived) and not loose words (a deleted bullet's
+  words occur elsewhere). Both cases have named tests in `tests/compare.test.ts`.
+- **Never lose a field to keep its formatting.** Run-granular replacement (company/title/date
+  lines, `Label:⇥items` rows) needs one non-empty run per field; where the template lacks them,
+  compose the line whole and log the lost formatting.
+
+## The renderer
+
+- **Edit the template; never build a document.** Open the template's zip, rewrite only the body of
+  `word/document.xml`, write the same zip back. Every other part is carried through unread.
+- Each paragraph keeps its own `pPr` and its first run's `rPr`; only the text changes.
+- Modelling the template's formatting in code is a regression, whatever it fixes.
+  `tests/reskin.test.ts` asserts `styles.xml`, `numbering.xml` and `theme1.xml` are byte-identical
+  to the template's.
+- Output is byte-deterministic: the same inputs give the same file.
+
+## Sections
+
+- **Static sections are the template's:** Education, Certifications, Hobbies, and the name and
+  contact block pass through untouched (`passthrough`). Edit them in the template.
+- **Career Highlights:** if the input matches the template, the table is not written at all.
+- **Count mismatches resolve positionally:** surplus input clones the template's last bullet or
+  row; unmatched template entries are dropped. Each is a change-log line.
+- **Professional Experience is the only section that feathers.** An input line with no slot goes
+  in after the line that precedes it in the input, as a copy of the nearest template bullet
+  paragraph, glyph included. The header line is the fallback only for a layout with no bullet; it
+  reads as a new heading to a person and an ATS. Logged `feathered`, a note, not a vote. Coverage
+  checks every Experience line as the input has it.
+- **Every other section owns its shape:** a line with no slot stays missing and fails the render.
+- **A FAIL hands out no file.**
+- A template section the input leaves wholly empty warns. One it fills partly fails, because the
+  unfilled slots would ship the template's own text.
+
+## Data
+
+Schema `resume`. Columns are in the migrations under `supabase/`; never put a migration under
+`apps/resume/`.
+
+- **Templates:** `is_active` follows the newest upload; pinning an older one shows a persistent
+  banner naming both versions.
+- Archiving keeps the row and its `.docx`; deleting removes both. Archived and active are disjoint
+  by constraint: never make the archived one active. The active template cannot be deleted.
+- Deleting a template keeps its renders (`renders.template_id` is `on delete set null`); each
+  render's `template_snapshot` records engine, template id, version and sha256.
+- The original template bytes are kept and served by `GET /api/templates/[id]/file`, archived or
+  not; the template is also the general-purpose resume.
+- **Renders** delete one at a time with both stored files. No cascade, no bulk delete. A render's
+  tracker thread is never touched; it is the application record.
+- **Append-only artifacts:** parsed content, coverage and the rendered file never change.
+  `GET /api/renders/[id]/file` returns stored bytes, never a re-render. Application metadata stays
+  editable; `submitted_at` stays null until the resume is sent.
+- Job details live on the tracker thread, never here.
+- **Storage:** private bucket `resume-files`, under `templates/`, `sources/`, `renders/`. Write the
+  file before the row that points at it.
+
+## Parsing traps
+
+- Walk the whole tree; content is not always a direct child of `<w:body>`. Named test.
+- Core Competencies may be a table or `Label:⇥items` paragraphs; read both. The template is a file
+  the user edits, not a shape to assume. Never flatten a table at render time; that is the
+  template's fix.
+- `<w:tab>` in a run is a tab character; in `<w:pPr><w:tabs>` it is a tab stop with no text.
+- A template may keep the name and contact in `word/header1.xml`. The lint reads header text, not
+  part presence. Never reason from what Word displays: a `w:type="first"` header needs
+  `<w:titlePg/>` to show, and a parser may skip it either way.
+- What a heading is lives in `lib/docx/headings.ts` alone. A heading is a bare label: no date
+  range, no interior tab. A job is a line with a date range; a tabbed competency row is not one.
+- Heading size is the largest size that recurs among heading candidates, not a fixed value or
+  a rank over the whole document. Table and list text is excluded from ranking.
+- Jobright pastes Career Highlights as a markdown table. Transpose only when cell counts line up;
+  otherwise render verbatim. The `| :--- |` row counts on neither side of coverage.
+
+## ATS rules
+
+- One table at most (Career Highlights). No text boxes, no images (use paragraph borders), no
+  contact details in a header or footer, headings from the known vocabulary, a plain bullet glyph.
+- These are a lint on the template (`auditAts`), not a constraint on the renderer. A finding on a
+  render is a finding about the template: fix it there.
+- The renderer never adds a table, text box, image, or header or footer content, and never
+  rewrites the document to clear a finding.
+- A finding must be believable: a false positive teaches the reader to ignore the warning.
 
 ## Testing
 
-`npm test`. CI runs it whenever this app's build scope changes, so these tests are a large part of
-why CI means anything here.
+- Run `npm test` before every push.
+- Never widen an assertion to make a fixture pass; improve the rules or report the document.
+- Prefer a named regression test over a comment.
+- Golden file: fixed inputs render byte-identical twice.
+- ATS lint: unzip the output and assert the rules mechanically.
+- Parse fixtures: Jobright exports in, expected sections and 100% coverage out.
+- `tests/helpers/fakeSupabase.ts` covers write ordering, branch selection and error mapping, not
+  SQL semantics. Indexes and foreign keys are exercised only against the real project.
+- Fixtures: `template-sample.docx` carries two blocking findings on purpose (a second table and a
+  `<w:sdt>`); `tests/reformat-route.test.ts` asserts they survive. Use `template-flat-sample.docx`
+  unless a test needs a defect.
+- `GET /api/health` probes database, bucket, tracker schema and active template. A missing
+  template reports not-ok at status 200.
 
-- **Golden file:** fixed content + fixed spec renders byte-identical twice. This is what makes a
-  saved render trustworthy as a record of what was actually sent.
-- **ATS lint:** unzip the generated docx and assert the rules above mechanically.
-- **Parse fixtures:** real Jobright exports in, expected sections and 100% coverage out.
-- **Spec fixtures:** real template docx in, expected font/margins/spacing out.
+## Boundaries
 
-Database and Storage calls use a query-builder double (`tests/helpers/fakeSupabase.ts`) covering
-write ordering, branch selection and error mapping — **deliberately not SQL semantics**. The partial
-unique index and the foreign keys are only ever exercised against the real project. Know which you
-are relying on when you claim something works.
-
-**Health check:** `GET /api/health` probes the database, the storage bucket, the tracker schema and
-the active template, and names whichever is unhappy. A missing template reports as not-ok but keeps
-the endpoint at 200 — that is a setup step, not a broken dependency.
-
----
-
-## Guardrails
-
-**Never touch:** the shared auth plumbing (gated in `CLAUDE.md`; the TD owns it); any app but
-`apps/resume`; any schema but `resume` — **except the sanctioned write-through into
-`tracker.pipeline_threads`**, whose contract is in `supabase/README.md`. The tracker app is parked;
-its table is not, and the write-through stands.
-
-**Never do:**
-
-- Reintroduce a model call. See above.
-- Let the coverage report overstate what the output contains.
-- Delete the active template, or make the archived one active. Renders outlive their template
-  (#107, migration `20260918041216`), so a render pointing at one is no reason to refuse.
-- Emit a second table, a text box, an image, or contact details in a header or footer.
-- Put a migration under `apps/resume/`. They were moved to `supabase/` in the repo root
-  deliberately — one project, one history.
-- **Commit personal information.** For a `.docx` that means every part of the archive: hyperlink
-  targets in `.rels`, author fields in `docProps/`, not just `document.xml`. The committed fixtures
-  are scrubbed copies with synthetic substitutes. Keep them that way — a real company name has
-  already had to be scrubbed from this app once.
-
-## Guidelines
-
-- Run `npm test` before every push. The suite is not a burden here, it is the reason changes to a
-  deterministic renderer are safe to make at all.
-- When a document defeats the rules, improve the rules or report it honestly. Never widen an
-  assertion to make a fixture pass.
-- Prefer a named regression test over a comment. The `<w:sdt>` trap has one and it is why nobody has
-  fallen into it twice.
+- Never touch the shared auth plumbing, another app, or any schema but `resume`, except the
+  write-through into `tracker.pipeline_threads` (contract in `supabase/README.md`), which runs
+  though the tracker app is parked.
+- Never commit personal information. In a `.docx` that includes `.rels` targets and `docProps/`.
+  Committed fixtures are scrubbed, with synthetic substitutes.

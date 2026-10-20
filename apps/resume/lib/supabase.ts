@@ -39,5 +39,5 @@ export const getTrackerClient = () => clientFor("tracker");
 // `shared.contacts` contract in supabase/README.md the Message Editor is its
 // only writer, and this app only passes a `contact_id` through to the tracker
 // thread. A contact picker would be a read from the editor's list, never a
-// write — and a new write path is a contract change that goes to Joel through
+// write — and a new write path is a contract change that goes to the owner through
 // the technical director.

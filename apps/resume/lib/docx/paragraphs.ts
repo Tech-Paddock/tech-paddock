@@ -88,8 +88,8 @@ function hasTag(nodes: Node[], tag: string): boolean {
  * **`<w:tabs>` is the reason this set exists.** Inside `<w:pPr>` it declares tab
  * *stops*, and its children are also called `<w:tab>` — the same tag name a tab
  * *character* inside a run uses, distinguished only by its parent. Walking the
- * whole paragraph therefore emitted one `\t` per declared stop, so Joel's
- * headings extracted as `"\tProfessional Experience"` and his competency rows as
+ * whole paragraph therefore emitted one `\t` per declared stop, so the template's
+ * headings extracted as `"\tProfessional Experience"` and its competency rows as
  * `"\tSalesforce:\t…"` — a character the document does not contain, invented by
  * this app in the one place whose contract is that it never invents text.
  *
