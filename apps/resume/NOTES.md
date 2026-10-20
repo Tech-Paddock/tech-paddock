@@ -22,8 +22,8 @@ Current state and traps. Rules are in `RULES.md`; open work is in Linear under `
   VERDICT (`lib/storedRender.ts`).
 - `templates.spec` is nullable and unused. Activation is one transaction,
   `resume.activate_template`. No client for `shared`.
-- No tracker. Nothing reads or writes the `tracker` schema or `renders.thread_id`
-  (`tests/no-tracker.test.ts`); a render records only `submitted_at`, set by **Mark as sent**
+- No tracker. The `tracker` schema and `renders.thread_id` are dropped, and
+  `tests/no-tracker.test.ts` keeps them out; a render records only `submitted_at`, set by **Mark as sent**
   (`PATCH /api/renders/[id]`, which takes nothing else). The Resumes list shows no company or stage.
 - Next.js 16, React 19, `proxy.ts` on the Node runtime. Route handlers await `params`; tests pass
   `Promise.resolve({ id })`. No route opts into a cache.
@@ -45,5 +45,3 @@ Current state and traps. Rules are in `RULES.md`; open work is in Linear under `
 - `next build` rewrites `tsconfig.json`; commit what it writes.
 - The zip-bomb guard counts inflated bytes, streaming, in `loadDocx` and `readDocxParts`.
 - `String.replace` interprets `$&` even with a string pattern; splice by index.
-- `renders.thread_id` still exists until the drop migration lands, holding old thread ids. Never
-  select it: the drop would break the query.
