@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { getServiceClient, getTrackerClient } from "@/lib/supabase";
+import { getServiceClient } from "@/lib/supabase";
 import { fileLabel, sortResumeFiles, type ResumeFile } from "@/lib/resumes";
 
 export const dynamic = "force-dynamic";
-
-const THREAD_BATCH = 100;
 
 /**
  * Every resume file this app holds, as one typed list.
@@ -29,7 +27,7 @@ export async function GET() {
       .order("version", { ascending: false }),
     supabase
       .from("renders")
-      .select("id, created_at, submitted_at, thread_id, coverage, source_file_path, output_file_path")
+      .select("id, created_at, submitted_at, coverage, source_file_path, output_file_path")
       // No limit. This list is the Resume tab, and it capped renders at fifty
       // with nothing on screen saying so — the fifty-first simply was not there.
       .order("created_at", { ascending: false }),
@@ -39,25 +37,6 @@ export async function GET() {
   if (renders.error) return fail(500, "db_error", renders.error.message);
 
   const renderRows = renders.data ?? [];
-  const threadIds = [...new Set(renderRows.map((r) => r.thread_id).filter((id): id is string => !!id))];
-
-  // The job lives on the tracker thread and is never duplicated here, so a
-  // render only says where it went once joined back to it. A failure is
-  // reported rather than swallowed: every row silently reading "no job" looks
-  // like missing data, not like a broken cross-schema read.
-  //
-  // In batches, because the ids travel in the request URL: with no cap on the
-  // list, one `in` over every thread would eventually outgrow it.
-  const threads: Record<string, { company: string; stage: string }> = {};
-  for (let i = 0; i < threadIds.length; i += THREAD_BATCH) {
-    const { data, error } = await getTrackerClient()
-      .from("pipeline_threads")
-      .select("id, company, stage")
-      .in("id", threadIds.slice(i, i + THREAD_BATCH));
-    if (error) return fail(502, "tracker_error", `Couldn't read tracker threads: ${error.message}`);
-    for (const t of data ?? []) threads[t.id as string] = { company: t.company, stage: t.stage };
-  }
-
   const files: ResumeFile[] = [];
 
   for (const t of templates.data ?? []) {
@@ -71,23 +50,18 @@ export async function GET() {
       version: t.version as number,
       active: t.is_active === true,
       archived: t.archived_at !== null,
-      company: null,
-      stage: null,
       coverage: null,
       submittedAt: null,
     });
   }
 
   for (const r of renderRows) {
-    const thread = r.thread_id ? threads[r.thread_id as string] ?? null : null;
     const shared = {
       id: r.id as string,
       createdAt: r.created_at as string,
       version: null,
       active: false,
       archived: false,
-      company: thread?.company ?? null,
-      stage: thread?.stage ?? null,
       coverage: (r.coverage as { percent?: number } | null)?.percent ?? null,
       submittedAt: (r.submitted_at as string | null) ?? null,
     };

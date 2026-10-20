@@ -9,14 +9,23 @@ this file wins.
 
 - Record what was eaten; return its macros and the day's running total.
 - Food only. Exercise is out.
-- The log is the app. Everything else is a quiet footer link, never a tab.
-- A screen earns its place by being a different moment, not a different noun. A new screen still
-  goes to the owner first.
 - Recipes and the grocery list belong to the Cookbook. Health reads recipes to price a meal and
   owns neither.
 - Recipes are read only through Cookbook's `GET /api/servings`, called from the server with the
   caller's session; never from `cookbook` tables. The contract lives in Cookbook's charter and
   changes only through the technical director.
+
+## Surface: app
+
+- One screen. A second needs a written reason and the owner's approval; it must be the same nouns
+  one step earlier or later, not new territory.
+- No index or tabs. Secondary views are a quiet footer link.
+- Thumb-first: the primary action sits in the reachable half; assume one hand.
+- Opens in its working state, not a menu.
+- Home-screen install is part of the design. On iOS it is done from Safari.
+- `/admin` and `/debug` never appear in navigation and do not count as screens.
+- The log is the screen. A second earns its place by being a different moment, not a different
+  noun.
 
 ## Never
 
@@ -66,8 +75,7 @@ would overwrite a hand correction. This is correctness, not cost.
 ## Settled
 
 - No `/api/summary`. Nothing reads one.
-- The livery is the theme's (`apps/home`). `lib/livery.ts` pins `senna`, shared with the parked
-  tracker until TEC-12 resolves it. Do not change it from here.
+- The livery is the theme's (`apps/home`). `lib/livery.ts` pins `senna`. Do not change it from here.
 - The `health` schema and its tables belong to this app.
 
 ## Traps

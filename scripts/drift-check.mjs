@@ -166,30 +166,19 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
   }
 }
 
-/* 2 ── The password gate is deliberately NOT uniform, and the shape is the rule:
-   `editor` adds a scoped /api/draft bypass, `tracker` adds /api/summary and
-   waves /api/cron/* through, and every other app shares one base copy. An agent
-   who checks, finds three variants and concludes the rule is wrong has been
-   handed that conclusion by the rule itself — so measure the shape, not a count.
-
-   The two exceptions are named because they are a documented fact about those
-   two apps, not a roster: adding a sixth app does not change what editor's
-   bypass is for. The base group is deliberately unnamed, so a new app that
-   copies it is correct work and passes. A new app that brings its OWN variant
-   fails here on purpose — that is a fourth version of the password gate, and
-   it either belongs in CLAUDE.md in the same pull request or it should not
-   exist. Collapsing everything to one copy fails for the opposite reason.
+/* 2 ── Every app runs one password gate. A second version is a bypass nobody
+   reviewed, so measure the shape: one group, or fail.
 
    The gate file is middleware.ts on Next 14/15 and proxy.ts on Next 16
    (TEC-34), so each app is read under the name its own Next major runs, and the
    exported function's name is normalised before hashing: the codemod's rename
-   is the only difference between a base copy and a migrated one, and a naive
-   hash would call that a fourth variant. An app whose gate file cannot be read
-   FAILS rather than leaving the comparison — on the Next 16 spike a migrated
-   app simply dropped out and this check went on reading `ok`. */
+   is the only difference between a base copy and a migrated one. An app whose
+   gate file cannot be read FAILS rather than leaving the comparison — on the
+   Next 16 spike a migrated app simply dropped out and this check went on
+   reading `ok`. */
 {
   const r = gateShape(GATED.map((a) => [a, gateHash(R("apps", a))]));
-  add("middleware.ts / proxy.ts: a base copy plus the two scoped bypasses", r.state, r.detail);
+  add("middleware.ts / proxy.ts: every app on the one gate", r.state, r.detail);
 }
 
 /* 2b ── The password gate EXISTS in every app, which check 2 cannot see, and it

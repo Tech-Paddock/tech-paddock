@@ -83,14 +83,12 @@ export function orderTracker() {
 
 export const mockModules = (overrides: {
   resume?: unknown;
-  tracker?: unknown;
   upload?: (...args: unknown[]) => Promise<string>;
   download?: (...args: unknown[]) => Promise<Buffer>;
   remove?: (...args: unknown[]) => Promise<void>;
 }) => {
   vi.doMock("@/lib/supabase", () => ({
     getServiceClient: () => overrides.resume,
-    getTrackerClient: () => overrides.tracker,
   }));
   vi.doMock("@/lib/storage", async () => {
     const actual = await vi.importActual<typeof import("@/lib/storage")>("@/lib/storage");

@@ -9,11 +9,20 @@ Not reopened here. The design record is the kept branch `claude/health-recipes`;
 section and closing comment before changing anything in this file.
 
 - Name: Cookbook ("recipe" is Coffee's word, for a brew). Own app, own schema `cookbook`.
-- Surface: site. Tabs Recipes · Add · King Soopers list are the verb index, each one long page.
-  Installable is a shortcut, not a change of shape; becoming an app is TEC-109.
 - Macros are static; ingredients are text, not a join. Re-costing means estimating again.
 - The grocery list lives here. Health does not own recipes.
 - The livery is the theme's; it is not changed here.
+
+## Surface: site
+
+- A thin index grouped by verb, not entity. A tab bar is fine when each tab is a verb and one long
+  page.
+- One long page over many routes.
+- Works on a phone, but is not designed around one-handed use.
+- No home-screen install unless the owner grants one; the shape does not change.
+- `/admin` and `/debug` never appear in navigation and do not count as screens.
+- The tabs Recipes · Add · King Soopers list are the verb index. Installable is a shortcut, granted
+  by the owner; becoming an app is TEC-109.
 
 ## Recipes
 

@@ -15,7 +15,7 @@ deployed on its own. Simplicity beats multi-team defaults. This file binds every
 | Role | Does |
 |---|---|
 | **Owner** | Directs. Approves what has no undo. |
-| **Technical director (TD)** | Architects: Linear queue, design, app surface, Postgres design, cross-schema contracts, shared auth plumbing, `apps/showcase`, parked `apps/editor`. Briefs the builder and Deployment. Never merges. |
+| **Technical director (TD)** | Architects: Linear queue, design, app surface, Postgres design, cross-schema contracts, shared auth plumbing, `apps/showcase`. Briefs the builder and Deployment. Never merges. |
 | **Builder** | One helper per task, started as "app: X". Builds in that app, commits, pushes, reports, stops. |
 | **Deployment** | One helper, started by the TD when the owner runs `/deploy`. Checks for unfinished work; if clean, merges each ready branch through the `merge` skill and confirms it is live. |
 
@@ -29,8 +29,8 @@ unfinished work, blockers and hot topics; `/deploy` deploys what is ready, or ho
 owner says go. "Backlog" means a Linear issue in Backlog, not a build.
 
 **One theme.** Build with existing tokens. A new pattern is copied locally and named in the pull
-request. Site or app shell is the TD's call, per `.claude/SURFACE.md`; read it before designing a
-screen.
+request. Site or app shell is the TD's call; each app's `RULES.md` states its surface and its
+rules.
 
 ## Never
 
@@ -80,8 +80,7 @@ go, go fully and do not reopen it.
   at merge. Cite a migration by name, not number.
 - **Stale branches are renamed `stale_<name>`.** Agents cannot delete remote branches.
 - **One session per working directory.** The builder uses its own worktree.
-- **Check a red status against `main` first.** Parked apps' Vercel checks are red on `main`; ignore
-  them and never unpause those projects.
+- **Check a red status against `main` first.** A red check on `main` too is not the branch's.
 
 ## Linear, team TEC
 
@@ -100,7 +99,7 @@ go, go fully and do not reopen it.
   project. No root `package.json`. `packages/shared` holds the one copy of every file that must
   match across apps (`MANIFEST` in `scripts/stamp-shared.mjs`); `node scripts/stamp-shared.mjs`
   writes the copies. Never edit a copy. `lib/supabase.ts` is per-app; the hub has none.
-- **One Supabase project.** Each tool has its own schema, plus `shared`; never `public`. One
+- **One Supabase project.** Each tool has its own schema; never `public`. One
   migration history in `supabase/`. Read `supabase/README.md` before writing a migration; it holds
   the cross-schema contracts and the new-schema steps.
 - **RLS on every table, zero policies.** Servers use the service role key.
@@ -113,10 +112,9 @@ go, go fully and do not reopen it.
   project's Vercel Firewall. `apps/showcase` is the exception: public, static, holding nothing.
   `drift` enforces that.
 - **Shared auth plumbing:** the stamped `lib/auth.ts`, `lib/password.ts`, `lib/login.ts`,
-  `lib/safe-redirect.ts`, `lib/logout.ts`; the gate file; `SESSION_SECRET`, `INTERNAL_API_SECRET`,
-  `CRON_SECRET`. The gate file is `middleware.ts` on Next ≤15 and `proxy.ts` on 16+ (Next 14
-  ignores `proxy.ts`), in three variants: base, editor (`/api/draft`), tracker (`/api/summary`,
-  cron). A bad edit publishes an endpoint. `drift` checks which app runs which.
+  `lib/safe-redirect.ts`, `lib/logout.ts`; the gate file; `SESSION_SECRET`. The gate file is
+  `proxy.ts` on Next 16 (`middleware.ts` before it; Next 14 ignores `proxy.ts`), one copy in every
+  app. A bad edit publishes an endpoint; `drift` checks every app runs the same one.
 - **Append, don't rewrite,** anything that accumulates. Model synthesis is a separate step.
 - **Chrome is the target browser.** On iOS every browser is WebKit.
 - **The Garage** (`/admin` on home): probes are live; the drift panel is from home's last build.
@@ -127,8 +125,6 @@ Registrar.
 | Subdomain | Tool | Vercel project |
 |---|---|---|
 | `techpaddock.io` | Hub (`apps/home`) | `tp-home` |
-| `editor.techpaddock.io` | Message Editor (parked) | `tp-message-editor` |
-| `tracker.techpaddock.io` | Pipeline Tracker (parked) | `tp-tracker` |
 | `resume.techpaddock.io` | Resume Formatter | `tp-resume` |
 | `coffee.techpaddock.io` | Coffee | `tp-coffee-app` |
 | `health.techpaddock.io` | Health | `tp-health` |

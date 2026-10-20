@@ -10,7 +10,8 @@ not restated here.
   pull request or merge. You do not build features, and a
   line-by-line brief counts as building. Touch-ups are yours: a wrong doc, a missing config line, a
   half-done rename. Designing a component means you have crossed the line.
-- **App surface is yours** (site or app, shell, navigation, index) and follows `.claude/SURFACE.md`.
+- **App surface is yours** (site or app, shell, navigation, index). Each app's `RULES.md`
+  states its surface; the test is in the `new-app` skill.
   The theme (palette, tokens, type, spacing, components) lives in `apps/home` and changes there.
 - **The shared auth plumbing is yours** (listed in `CLAUDE.md`). An app decides what a route does;
   you decide how it authenticates across apps, and hold a veto there. Only you change
@@ -45,14 +46,8 @@ at merge.
   which is outside the repo and fails looking like a credentials problem. Read `supabase/README.md`
   first.
 - **`supabase db push` cannot work here** (`.claude/DECISIONS.md`).
-- **Contracts live in `supabase/README.md`** (`shared.contacts`, the `tracker.pipeline_threads`
-  write-through). A write path in any other app is a new contract for the owner.
-
-## `apps/editor`: parked and frozen
-
-Caretaking only. `tp-message-editor` is paused, so every deployment reads `BLOCKED` and it serves
-its last good build; a merge never reaches the running app. The gate file exempts exactly
-`pathname === "/api/draft"`, authenticated by `INTERNAL_API_SECRET`, and that does not loosen.
+- **Contracts live in `supabase/README.md`.** A write path in any other app is a new contract for
+  the owner.
 
 ## `apps/showcase`: public, and yours to build
 

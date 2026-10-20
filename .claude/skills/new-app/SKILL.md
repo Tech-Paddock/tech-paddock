@@ -15,7 +15,15 @@ undo. Design first, scaffold second, then hand the owner only what the owner alo
 2. **The name (owner):** fixes folder, subdomain and Vercel project.
 3. **Own Postgres schema? (owner):** if yes, two migrations and a dashboard setting; read
    `supabase/README.md` first. A new schema inherits no grants.
-4. **Site or app (TD),** by `.claude/SURFACE.md`; the owner can overrule.
+4. **Site or app (TD);** the owner can overrule. Ask in order; the first answer wins:
+   1. How often, and from where? Many times a day, phone in hand, mid-task: app. A few times a
+      week, sitting down: site.
+   2. Do you arrive knowing what to do? One decided thing: app. Looking at what is there: site.
+   3. Would it go on the home screen? If not, it is not an app.
+
+   Count how often it is opened and in what state of mind, never its routes. A tool that fits
+   neither is designed with the owner; one that seems to be both may be two tools. Copy the
+   matching Surface section from an existing app's `RULES.md` into the draft.
 
 ## In the repo: one branch
 

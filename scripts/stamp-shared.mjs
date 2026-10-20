@@ -34,12 +34,10 @@
  *
  * `lib/supabase.ts` is a genuinely different file per app, and one app has none
  * — the hub holds no database credential and that is a property worth keeping.
- * The gate file (`middleware.ts`, `proxy.ts` on Next 16) is three deliberate
- * variants, and drift already measures that
- * shape; collapsing it here would be a fourth version of the password gate
- * wearing a helpful-looking script. Neither belongs in this manifest, and an
- * agent adding one should read those two checks in scripts/drift-check.mjs
- * first.
+ * The gate file (`middleware.ts`, `proxy.ts` on Next 16) is shared auth
+ * plumbing, and drift measures that every app runs one version of it. Neither
+ * belongs in this manifest without the TD's design; read those two checks in
+ * scripts/drift-check.mjs first.
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, realpathSync } from "node:fs";
