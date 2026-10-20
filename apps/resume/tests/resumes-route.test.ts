@@ -24,7 +24,6 @@ const RENDER = {
   id: "r1",
   created_at: "2026-09-12T00:00:00Z",
   submitted_at: null,
-  thread_id: null,
   coverage: { totalLines: 20, present: 20, missing: [], percent: 100 },
   source_file_path: "sources/1757000000000-export.docx",
   output_file_path: "renders/1757000000000-tailored.docx",
@@ -33,9 +32,9 @@ const RENDER = {
 beforeEach(() => vi.resetModules());
 afterEach(() => vi.doUnmock("@/lib/supabase"));
 
-async function get(tables: Parameters<typeof fakeSupabase>[0], tracker?: unknown) {
+async function get(tables: Parameters<typeof fakeSupabase>[0]) {
   const { client } = fakeSupabase(tables);
-  mockModules({ resume: client, tracker: tracker ?? fakeSupabase({}).client });
+  mockModules({ resume: client });
   const { GET } = await import("@/app/api/resumes/route");
   const res = await GET();
   return { res, body: (await res.json()) as { files?: ResumeFile[]; error?: string } };
@@ -43,32 +42,22 @@ async function get(tables: Parameters<typeof fakeSupabase>[0], tracker?: unknown
 
 /** TEC-31. Renders were capped at fifty with nothing saying so. */
 describe("how much of the history it returns", () => {
-  it("returns every render rather than a silent first fifty, joining threads in batches", async () => {
+  it("returns every render rather than a silent first fifty", async () => {
     const renders = Array.from({ length: 230 }, (_, i) => ({
       ...RENDER,
       id: `r${i}`,
       created_at: `2026-09-12T00:00:${String(i % 60).padStart(2, "0")}Z`,
-      thread_id: `th${i}`,
     }));
     const { client, calls } = fakeSupabase({
       "templates.select": { data: [], error: null },
       "renders.select": { data: renders, error: null },
     });
-    const tracker = fakeSupabase({
-      "pipeline_threads.select": (call) => {
-        const ids = call.filters.find(([k]) => k === "in:id")?.[1] as string[];
-        return { data: ids.map((id) => ({ id, company: `Co ${id}`, stage: "Applied" })), error: null };
-      },
-    });
-    mockModules({ resume: client, tracker: tracker.client });
+    mockModules({ resume: client });
     const { GET } = await import("@/app/api/resumes/route");
     const body = (await (await GET()).json()) as { files: ResumeFile[] };
 
     expect(calls.find((c) => c.table === "renders")?.filters.some(([k]) => k === "limit")).toBe(false);
     expect(body.files.filter((f) => f.kind === "output")).toHaveLength(230);
-    expect(body.files.every((f) => f.company !== null)).toBe(true);
-    const batches = tracker.calls.map((c) => (c.filters.find(([k]) => k === "in:id")?.[1] as string[]).length);
-    expect(batches).toEqual([100, 100, 30]);
   });
 });
 
@@ -106,9 +95,8 @@ describe("the merged list", () => {
       active: true,
       archived: false,
       downloadHref: "/api/templates/t1/file",
-      // A template has no job and no coverage, and says so rather than borrowing
-      // a render's shape.
-      company: null,
+      // A template has no coverage, and says so rather than borrowing a
+      // render's shape.
       coverage: null,
       submittedAt: null,
     });
@@ -147,41 +135,22 @@ describe("the merged list", () => {
     expect(body.files).toEqual([]);
   });
 
-  it("joins the job from the tracker thread", async () => {
-    const { client: tracker } = fakeSupabase({
-      "pipeline_threads.select": { data: [{ id: "th1", company: "Northwind", stage: "Applied" }], error: null },
+  /** The Pipeline Tracker was retired on 2026-10-20: a file no longer names a job. */
+  it("reads no tracker thread and carries no job fields", async () => {
+    const { client, calls } = fakeSupabase({
+      "templates.select": { data: [TEMPLATE], error: null },
+      "renders.select": { data: [RENDER], error: null },
     });
-    const { body } = await get(
-      {
-        "templates.select": { data: [], error: null },
-        "renders.select": { data: [{ ...RENDER, thread_id: "th1" }], error: null },
-      },
-      tracker
-    );
+    mockModules({ resume: client });
+    const { GET } = await import("@/app/api/resumes/route");
+    const body = (await (await GET()).json()) as { files: ResumeFile[] };
 
-    expect(body.files?.map((f) => f.company)).toEqual(["Northwind", "Northwind"]);
-    expect(body.files?.[0].stage).toBe("Applied");
-  });
-
-  /**
-   * Swallowing this would render every row as "no job recorded", which looks
-   * like missing data rather than a broken cross-schema read. Same call as
-   * `/api/renders` makes, and deliberately the same answer.
-   */
-  it("reports a broken tracker read rather than showing every row as jobless", async () => {
-    const { client: tracker } = fakeSupabase({
-      "pipeline_threads.select": { data: null, error: { message: "permission denied" } },
-    });
-    const { res, body } = await get(
-      {
-        "templates.select": { data: [], error: null },
-        "renders.select": { data: [{ ...RENDER, thread_id: "th1" }], error: null },
-      },
-      tracker
-    );
-
-    expect(res.status).toBe(502);
-    expect(body.files).toBeUndefined();
+    expect(body.files).toHaveLength(3);
+    expect(calls.map((c) => c.table)).not.toContain("pipeline_threads");
+    for (const f of body.files) {
+      expect(f).not.toHaveProperty("company");
+      expect(f).not.toHaveProperty("stage");
+    }
   });
 });
 
@@ -212,8 +181,6 @@ describe("the order files are listed in", () => {
       version: null,
       active: false,
       archived: false,
-      company: null,
-      stage: null,
       coverage: null,
       submittedAt: null,
     });

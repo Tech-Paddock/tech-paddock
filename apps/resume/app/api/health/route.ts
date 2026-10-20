@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServiceClient, getTrackerClient } from "@/lib/supabase";
+import { getServiceClient } from "@/lib/supabase";
 import { BUCKET } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -44,11 +44,6 @@ const probes: Record<string, () => Promise<Omit<Check, "name">>> = {
     // and the key can reach it.
     const { error } = await getServiceClient().storage.from(BUCKET).list("templates", { limit: 1 });
     return error ? { ok: false, detail: error.message } : { ok: true, detail: `bucket ${BUCKET} reachable` };
-  },
-
-  async tracker() {
-    const { error } = await getTrackerClient().from("pipeline_threads").select("id").limit(1);
-    return error ? { ok: false, detail: error.message } : { ok: true, detail: "tracker schema reachable" };
   },
 
   async active_template() {

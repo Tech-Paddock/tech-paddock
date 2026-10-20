@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServiceClient, getTrackerClient } from "@/lib/supabase";
+import { getServiceClient } from "@/lib/supabase";
 import { StorageError, downloadDocx, removeDocx } from "@/lib/storage";
 import { DocxReadError, readDocxParts } from "@/lib/docx/read";
 import { extractParagraphs } from "@/lib/docx/paragraphs";
@@ -9,12 +9,7 @@ import { storedRenderView, type StoredRenderRow } from "@/lib/storedRender";
 export const dynamic = "force-dynamic";
 
 type Body = {
-  company?: string;
-  role?: string;
-  jobUrl?: string;
-  contactId?: string | null;
   submittedAt?: string | null;
-  threadId?: string | null;
 };
 
 /**
@@ -32,7 +27,7 @@ export async function GET(_request: NextRequest, props: { params: Promise<{ id: 
 
   const { data: render, error } = await supabase
     .from("renders")
-    .select("id, template_id, template_snapshot, parsed_content, coverage, output_file_path, thread_id, submitted_at")
+    .select("id, template_id, template_snapshot, parsed_content, coverage, output_file_path, submitted_at")
     .eq("id", params.id)
     .maybeSingle();
   if (error) return fail(500, "db_error", error.message);
@@ -57,30 +52,16 @@ export async function GET(_request: NextRequest, props: { params: Promise<{ id: 
     if (data) template = { name: data.name as string, version: data.version as number };
   }
 
-  // Where it went lives on the tracker thread. A failed read is said, not
-  // swallowed: silently showing the job form again invites logging the same
-  // application twice.
-  let loggedTo: string | null = null;
-  if (render.thread_id) {
-    const { data, error: threadError } = await getTrackerClient()
-      .from("pipeline_threads")
-      .select("company")
-      .eq("id", render.thread_id)
-      .maybeSingle();
-    if (threadError) return fail(502, "tracker_error", `Couldn't read the tracker thread: ${threadError.message}`);
-    loggedTo = (data?.company as string | undefined) ?? null;
-  }
-
   if (outputPath === null) {
     return NextResponse.json(
-      storedRenderView({ render: render as StoredRenderRow, template, findings: storedFindings ?? [], loggedTo })
+      storedRenderView({ render: render as StoredRenderRow, template, findings: storedFindings ?? [] })
     );
   }
 
   try {
     const parts = await readDocxParts(Buffer.from(await downloadDocx(outputPath)));
     const findings = auditAts(parts, extractParagraphs(parts.document));
-    return NextResponse.json(storedRenderView({ render: render as StoredRenderRow, template, findings, loggedTo }));
+    return NextResponse.json(storedRenderView({ render: render as StoredRenderRow, template, findings }));
   } catch (err) {
     if (err instanceof StorageError) return fail(502, "storage_error", err.message);
     if (err instanceof DocxReadError) return fail(422, err.code, err.message);
@@ -106,90 +87,36 @@ function recordedFindings(snapshot: unknown): AtsFinding[] | null {
 }
 
 /**
- * Record where a render went.
+ * Record when a render was sent.
  *
  * The document artifacts never change — parsed content, coverage and the file
- * are written once. Only the application metadata is editable, because a resume
- * is usually rendered days before it is actually sent.
- *
- * Naming a company creates or updates the tracker thread, which is the canonical
- * record of the application; this route only stores the link to it.
+ * are written once. Only `submitted_at` is editable, because a resume is
+ * usually rendered days before it is actually sent. Where it was sent is not
+ * recorded (the Pipeline Tracker that held it was retired on 2026-10-20).
  */
 export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const body = (await request.json().catch(() => ({}))) as Body;
+  const body = ((await request.json().catch(() => null)) ?? {}) as Body;
+  // Nothing else on a render is editable, so a body without it records nothing.
+  if (body.submittedAt === undefined) return fail(400, "bad_request", "Send submittedAt: a timestamp, or null.");
+  if (body.submittedAt !== null && (typeof body.submittedAt !== "string" || Number.isNaN(Date.parse(body.submittedAt)))) {
+    return fail(400, "bad_request", "submittedAt must be a timestamp or null.");
+  }
   const supabase = getServiceClient();
 
   const { data: render, error: loadError } = await supabase
     .from("renders")
-    .select("id, thread_id")
+    .select("id")
     .eq("id", params.id)
     .maybeSingle();
   if (loadError) return fail(500, "db_error", loadError.message);
   if (!render) return fail(404, "not_found", "No render with that id.");
 
-  let threadId: string | null = body.threadId ?? (render.thread_id as string | null);
-
-  if (body.company?.trim()) {
-    const tracker = getTrackerClient();
-    const notes = [body.role && `Role: ${body.role}`, body.jobUrl && `Posting: ${body.jobUrl}`]
-      .filter(Boolean)
-      .join("\n");
-    const touch = (body.submittedAt ?? new Date().toISOString()).slice(0, 10);
-
-    if (threadId) {
-      const { data: existing, error: readError } = await tracker
-        .from("pipeline_threads")
-        .select("notes")
-        .eq("id", threadId)
-        .maybeSingle();
-      if (readError) return fail(502, "tracker_error", `Couldn't read the tracker thread: ${readError.message}`);
-
-      // notes is a running log, so append rather than overwrite.
-      const entry = [`${touch} — resume sent`, notes].filter(Boolean).join("\n");
-      const merged = [existing?.notes, entry].filter(Boolean).join("\n\n");
-
-      const { error } = await tracker
-        .from("pipeline_threads")
-        .update({
-          company: body.company.trim(),
-          last_touch_date: touch,
-          notes: merged,
-          // Touching a thread clears its open Microsoft To Do task, so the stale check can
-          // raise a fresh one next time it goes cold. The tracker's own edit path
-          // does the same.
-          open_task_id: null,
-          ...(body.contactId !== undefined ? { contact_id: body.contactId } : {}),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", threadId);
-      if (error) return fail(502, "tracker_error", `Couldn't update the tracker thread: ${error.message}`);
-    } else {
-      const { data, error } = await tracker
-        .from("pipeline_threads")
-        .insert({
-          company: body.company.trim(),
-          stage: "Applied",
-          last_touch_date: touch,
-          next_action: "Follow up",
-          notes: [`${touch} — resume sent`, notes].filter(Boolean).join("\n"),
-          contact_id: body.contactId ?? null,
-        })
-        .select("id")
-        .single();
-      if (error) return fail(502, "tracker_error", `Couldn't create the tracker thread: ${error.message}`);
-      threadId = data.id as string;
-    }
-  }
-
   const { data, error } = await supabase
     .from("renders")
-    .update({
-      thread_id: threadId,
-      ...(body.submittedAt !== undefined ? { submitted_at: body.submittedAt } : {}),
-    })
+    .update({ submitted_at: body.submittedAt })
     .eq("id", params.id)
-    .select("id, submitted_at, thread_id")
+    .select("id, submitted_at")
     .single();
 
   if (error) return fail(500, "db_error", error.message);
@@ -203,11 +130,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
  * Added on 2026-09-17, when fifteen of them were on screen, and only this much:
  * one at a time, no cascade, no bulk tool. Clearing test runs is a one-off, and
  * a click per render costs less than the machinery to delete in bulk.
- *
- * The tracker thread is deliberately **not** touched. It is the record of an
- * application, owned by the Pipeline Tracker and reachable from it; deleting a
- * render here would silently delete somebody else's row. The thread simply stops
- * having a resume attached.
  *
  * Row first, then the objects — the same order the template route uses, and for
  * the same reason. The reverse leaves a row pointing at bytes that are gone,
