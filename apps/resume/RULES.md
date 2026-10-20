@@ -34,12 +34,10 @@ verification, history and the application record.**
 `word/document.xml` with it → lint the output the way a parser will read it → confirm everything
 taken from the source arrived → record the submission against its Pipeline Tracker thread.
 
-### The one rule the whole app rests on — approved by Joel 2026-09-16
+### The one rule the whole app rests on (2026-09-16)
 
-> *"I want the behavior to be the same it seemed to work. so lets set that functionality and build
-> from there."* … *"the caviat there is if its broken, flag it or fix it"*
-
-**Never build a document. Edit the template's.**
+**Never build a document. Edit the template's.** Behaviour that works is kept and built on; what is
+broken is flagged or fixed.
 
 The template's zip is opened, only the body of `word/document.xml` is rewritten block by block, and
 the same zip is written back out. `styles.xml`, `numbering.xml`, `theme1.xml`, `fontTable.xml`,
@@ -78,17 +76,17 @@ way to guarantee a byte is unchanged is not to write it.
 formatting, for surplus input; unmatched template entries are dropped. Every one of those is a
 change-log line, never silent.
 
-**Professional Experience is the one section that feathers** (Joel, 2026-10-14, TEC-107). An input
+**Professional Experience is the one section that feathers** (TEC-107, 2026-10-14). An input
 line the template's entry has no slot for is inserted after the line that precedes it in the input,
 formatted as a copy of the nearest template **bullet** paragraph, glyph included, whether or not it
-is a bullet — never the bold header line, which reads as a new heading to Joel and to an ATS (Joel,
-2026-10-18); the header is the fallback only for a layout with no bullet. It is logged `feathered`:
+is a bullet — never the bold header line, which reads as a new heading to a person and to an ATS
+(2026-10-18); the header is the fallback only for a layout with no bullet. It is logged `feathered`:
 a note, never a vote. Coverage checks every Experience line as the input has it, not just the
 fields read from it. **Every other content section owns its shape**: a line with no slot there
 stays missing and fails the render, and a FAIL hands out no file (TEC-105). **A template section
 the input leaves entirely empty only warns** — a Summary a Jobright export lacks still downloads.
 **One it fills only partly fails**, because the unfilled slots would ship the template's own text,
-such as last year's Career Highlights figures (Joel, 2026-10-18: "Whole sections only").
+such as last year's Career Highlights figures (2026-10-18).
 
 ## What you own
 
@@ -107,16 +105,14 @@ template and the active template are disjoint by constraint: neither can be the 
 **deleting the active one is still refused** — it would leave every future render with nothing to
 build on.
 
-This was append-only until 2026-09-14. Joel asked for deletion so a duplicate upload could be
+This was append-only until 2026-09-14, when deletion was added so a duplicate upload could be
 removed, and the reasoning behind append-only never covered that case: a template with no renders
-is nobody's history. **Approved by Joel 2026-09-14; ratified by the technical director 2026-09-15**, in the act of
-merging #56, which carried this amendment.
+is nobody's history. The amendment rode in #56, merged 2026-09-15.
 
 **Deleting a template no longer takes its renders with it, and is no longer refused because of
-them** — amended by Joel on 2026-09-17: *"Generally I want the renders to stay even if the templates
-go."* `renders.template_id` is nullable with `on delete set null` (migration `20260918041216`).
+them** — amended on 2026-09-17, so renders outlive their template. `renders.template_id` is nullable with `on delete set null` (migration `20260918041216`).
 
-**The amendment is sound rather than merely authorised, and that distinction is the point.** The
+**The amendment stands on its reasoning, and that is the point.** The
 old rule's premise was that deleting a template destroyed the account of what a render was built
 on. That stopped being true when the renderer started writing `template_snapshot` — the engine, the
 template's id, its version and a sha256 of its exact bytes at render time. A render keeps its own
@@ -125,8 +121,8 @@ guard whose reason has expired should be removed, not kept out of habit** — bu
 before you remove it, which is what happened here.
 
 **Renders delete too**, one at a time, taking both stored files with them. No cascade and no bulk
-delete: asked for and declined in the same breath — *"i don't mind clicking though it no need to
-build in complexity for a 1 off."* **A render's tracker thread is never touched.** It belongs to the
+delete: clearing test runs is a one-off, and a click per render costs less than the machinery to
+delete in bulk. **A render's tracker thread is never touched.** It belongs to the
 Pipeline Tracker and is the record of an application; deleting the resume must not delete the
 application.
 

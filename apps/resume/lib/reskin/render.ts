@@ -116,7 +116,7 @@ export function renderIntoTemplate(
   // without guessing, so none of that text reaches the document (TEC-79). Said
   // as not read and not placed, and named — but a note, not a drop: Career
   // Highlights repeat body items, so the verdict does not fail on it alone
-  // (Joel, 2026-09-29, TEC-87 option 3).
+  // (TEC-87 option 3, 2026-09-29).
   const unreadable = content.unreadableHighlights ?? [];
   if (unreadable.length > 0) {
     const n = unreadable.length;
@@ -808,8 +808,7 @@ function renderEntry(
 
 /**
  * Feather in every line of the input entry that the entry did not place
- * (Joel, 2026-10-14, TEC-107: *"rather than not including lines from the input
- * file I want it to feather it in where ever the input file has it"*).
+ * (TEC-107, 2026-10-14), where the input has it, rather than leave it out.
  *
  * **Placed means its text is in what was written**, by the same run-of-words
  * test coverage applies to the finished document — never "the reader assigned
@@ -823,7 +822,7 @@ function renderEntry(
  * input's line, verbatim and whole.
  *
  * **A bullet's, never a header line's, even for a line that is not a bullet**
- * (Joel, 2026-10-18, TEC-107: "Like a bullet line" — body size, not bold). The
+ * (TEC-107, 2026-10-18) — body size, not bold. The
  * header line is the job's bold title line: copying it set a role description
  * at heading weight, which read as a second job and which the lint flagged as
  * an unrecognised section heading. The header line is the fallback only for an

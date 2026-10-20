@@ -11,15 +11,15 @@ Linear, team TEC, labelled `app:resume`.
 
 **The screen is three tabs: Reformat · Resumes · Diagnostics** (the Resumes tab's id is still
 `resume`; `resumes`, `templates` and `history` alias it). Reformat is the landing tab and carries
-no readouts (Joel, 2026-09-19): the Current Template, the Input Resume, **Reformat and Download**,
+no readouts (2026-09-19): the Current Template, the Input Resume, **Reformat and Download**,
 and one judgement, **the verdict** (`lib/verdict.ts`). It fails on what happened to *this*
 reformat: a source line that reached the output nowhere, a blocking ATS finding, source text
 with nowhere to go (`input-dropped`), or a section the source filled only in part (Highlights
 cells keeping the template's figures). `template-trimmed`, `input-not-read`, `feathered` and a
-section the source left wholly empty are notes (Joel, 2026-10-18: "Whole sections only"). Partial
+section the source left wholly empty are notes (2026-10-18: whole sections only). Partial
 is read from the log: `not-found-in-input` beside an entry that wrote source text to that section.
 
-**A PASS downloads on the same click. A FAIL hands out no file** (Joel, 2026-10-14, TEC-105):
+**A PASS downloads on the same click. A FAIL hands out no file** (TEC-105, 2026-10-14):
 `/api/reformat` returns no `docxBase64` and stores no output (`output_file_path` null), so nothing
 can offer it later. The render is still recorded — source, coverage, change log, and the ATS
 findings in `template_snapshot.findings` — and a red toast points to Diagnostics, which names each
@@ -29,12 +29,12 @@ missing line, its section and the render's own reason (`coverage.missingDetail`,
 **Feathering, Professional Experience only** (TEC-107). Each entry carries `lines`, the input's
 lines in order. A line the entry did not place — tested by the same run-of-words check coverage
 uses — goes in after the line preceding it in the input, as a copy of the nearest template
-**bullet** paragraph, glyph included, bullet or not (Joel, 2026-10-18), logged `feathered`.
+**bullet** paragraph, glyph included, bullet or not (2026-10-18), logged `feathered`.
 Coverage checks every Experience line, not only the fields read out of it. Every other section
 is unchanged: a line with no slot stays missing and fails.
 
-**Unpairable Career Highlights are `input-not-read`: named, never a vote** (Joel, 2026-09-29,
-TEC-87 option 3). Pipe or Word table, every cell is one metric and one description or none is read.
+**Unpairable Career Highlights are `input-not-read`: named, never a vote** (TEC-87 option 3,
+2026-09-29). Pipe or Word table, every cell is one metric and one description or none is read.
 **A stored render reopens with its own record** via *Open* on either row: coverage and change log
 read as written, never re-rendered. **An unread record is NO VERDICT, never PASS**
 (`lib/storedRender.ts`). A FAIL with no output reopens from its recorded findings, no download.
@@ -61,7 +61,7 @@ Next 16 caches no `fetch` by default, and every GET reached the database on ever
   upload reuses its number, so one version can name two files over time. Harmless, since renders keep
   a `template_snapshot`, but it reads as a bug.
 
-- **A feathered role line carries the bullet glyph.** That is Joel's pick read literally; the
+- **A feathered role line carries the bullet glyph.** That is the rule read literally; the
   header line is the fallback only when no template entry has a bullet at all.
 - **A reopened render's verdict and ATS findings are today's** (`verdictFor` over its stored log,
   the lint over its stored bytes): one that failed only on a wholly empty section now reads PASS
@@ -69,7 +69,7 @@ Next 16 caches no `fetch` by default, and every GET reached the database on ever
 - **`input-not-read` passes**: only its log line, `notRead` and the note say so (a test pins each).
 - **`template-sample.docx` FAILs** on its two blocking findings, so it returns no bytes. A test
   that reads the output goes through `template-flat-sample.docx`.
-- **Renders that FAILed before the download block keep their stored output** (Joel, 2026-10-18).
+- **Renders that FAILed before the download block keep their stored output** (2026-10-18).
 - **`RULES.md` still describes `templates.spec` and `extractSpec`**, gone from code: TD's to redraft.
 - **A new database function needs its grants.** `activate_template` revokes PUBLIC and grants
   `service_role` alone — copy that.

@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   try {
     // **Every render is against the stored active template, and every render is
     // recorded.** A one-off template used to render here and save nothing —
-    // removed on Joel's instruction 2026-09-17, because the two paths made every
+    // removed on 2026-09-17, because the two paths made every
     // question below conditional: whether a render has an id, whether it can be
     // reopened, whether it appears in history. A preview that cannot be found
     // again is a worse answer than uploading the template first.
@@ -80,8 +80,8 @@ export async function POST(request: NextRequest) {
     const coverage = checkContent(content, renderedParas, changeLog);
     const contentHash = createHash("sha256").update(docx).digest("hex");
 
-    // **A FAIL is not handed out** (Joel, 2026-10-14, TEC-105: "block the
-    // download but give the specific issue in diagnostic"). Enforced here, not
+    // **A FAIL is not handed out**, and the specific issue goes to Diagnostics
+    // instead (TEC-105, 2026-10-14). Enforced here, not
     // only on the button: the bytes are neither returned nor stored, so no
     // route can offer them later — `/api/renders/[id]/file` answers 404 for a
     // render with no output, and the Resumes list shows no output row for it.

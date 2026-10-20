@@ -15,7 +15,7 @@ import { auditAts } from "../lib/docx/ats";
 import { verdictFor } from "../lib/verdict";
 
 /**
- * TEC-107 and TEC-105, Joel 2026-10-14: an input line with no slot in
+ * TEC-107 and TEC-105, 2026-10-14: an input line with no slot in
  * **Professional Experience** is feathered in where the input has it; a line
  * with no slot in **any other content section** stays missing and fails.
  *
@@ -89,8 +89,8 @@ describe("feathering a Professional Experience line the template has no slot for
   });
 
   /**
-   * Joel, 2026-10-18 (TEC-107): a feathered line that is not a bullet looks
-   * "Like a bullet line" — body size, not bold. It used to copy the job's header
+   * TEC-107, 2026-10-18: a feathered line that is not a bullet is set like a
+   * bullet line — body size, not bold. It used to copy the job's header
    * line, which in the real template is bold at heading size, so a role
    * description read as a second job and the lint called it an unrecognised
    * section heading. It is now a copy of the nearest template bullet paragraph,

@@ -44,8 +44,8 @@ describe("deleting a template", () => {
    * a real one: a render is the record of what was actually sent, so deleting
    * the template it was built from destroyed the account of what produced it.
    *
-   * Joel amended it — *"Generally I want the renders to stay even if the
-   * templates go"* — and the premise had already stopped being true. A render
+   * Renders now stay when their template goes, because the premise had
+   * already stopped being true. A render
    * carries `template_snapshot`: the engine, the template's id, its version and
    * a hash of its exact bytes at render time. Deleting the row takes nothing
    * the render needed. `renders.template_id` is nullable with `on delete set
