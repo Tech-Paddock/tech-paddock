@@ -75,9 +75,8 @@ async function setArchived(id: string, target: { is_active: boolean }, archived:
  *
  * This was refused for any template a render pointed at, on the reasoning that a
  * render is the record of what was actually sent and archiving is how such a
- * template leaves the list. Joel amended it on 2026-09-17 — *"Generally I want
- * the renders to stay even if the templates go"* — and the amendment is sound
- * rather than merely authorised: the objection was that deleting the template
+ * template leaves the list. Since 2026-09-17 renders stay when their template
+ * goes, and that is sound: the objection was that deleting the template
  * would destroy what a render was built on, and that has not been true since the
  * renderer started recording `template_snapshot`, which carries the template's
  * id, version and a hash of its exact bytes at render time.

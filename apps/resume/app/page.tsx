@@ -22,13 +22,13 @@ import LogoutControl from "./LogoutControl";
  * it is opened to run a Jobright export through the Current Template, and
  * Diagnostics is where you go afterwards.
  *
- * **The template is changed on Resumes, not here** (Joel, 2026-10-14, TEC-104).
+ * **The template is changed on Resumes, not here** (TEC-104, 2026-10-14).
  * Reformat is the act you repeat; replacing the template is the rare one, and it
  * sits beside the list of templates it adds to. The confirm step moved with it.
  *
- * **Reformat carries no readouts, and that is deliberate.** Joel, 2026-09-19:
- * *"Realistically I don't want any telemetry on the main tab. put it on the
- * Check tab, rename it to diagnostics"*. So the tab you land on is the act —
+ * **Reformat carries no readouts, and that is deliberate** (2026-09-19): every
+ * measurement lives on Diagnostics, the tab once called Check. So the tab you
+ * land on is the act —
  * pick, drop, reformat, download — and every measurement of the result lives one
  * tab over. **Diagnostics reads from two sources**: the render you just made,
  * shown without asking for a file, and any document you drop in. Both answer the
@@ -247,7 +247,7 @@ function Stat({ value, label, tone = "plain" }: { value: string; label: string; 
 /**
  * Two boxed sections: what you put in, and what came back.
  *
- * The frames are Joel's, 2026-09-19 — before them the rail and the results ran
+ * The frames date from 2026-09-19 — before them the rail and the results ran
  * together as one field of cards on the same ground, and which side a thing
  * belonged to was carried only by position. A border says it instead.
  */
@@ -261,14 +261,13 @@ function Workbench({ rail, children }: { rail: React.ReactNode; children: React.
 }
 
 /**
- * The red error toast a blocked download raises (Joel, 2026-10-14, TEC-105:
- * "Let's add a red error … toast message also").
+ * The red error toast a blocked download raises (TEC-105, 2026-10-14).
  *
  * **A local copy of Cookbook's toast pattern** (`apps/cookbook/app/Toast.tsx`),
  * flagged rather than shared: one kind, one at a time, pinned to the bottom,
  * gone after Cookbook's error lifetime or by hand. Solid red rather than
- * Cookbook's red outline because Joel asked for a red toast, and it is the only
- * word on a click that produced no file. Whether it becomes a shared component
+ * Cookbook's red outline because it is the only word on a click that produced
+ * no file. Whether it becomes a shared component
  * is TechPad Gen's call.
  */
 function ErrorToast({ text, onDismiss, onOpen }: { text: string; onDismiss: () => void; onOpen: () => void }) {
@@ -430,8 +429,8 @@ function ReformatShell() {
    *
    * Dropping a file used to upload it immediately, which made the gesture the
    * decision: there was no moment between "here is a file" and "this is now the
-   * Current Template every render is built on". Joel asked for the confirm, and a
-   * template is exactly the wrong thing to change by accident. It lives on the
+   * Current Template every render is built on". The confirm is that moment, because
+   * a template is exactly the wrong thing to change by accident. It lives on the
    * Resumes tab, beside the templates it adds to (TEC-104).
    */
   async function saveTemplate() {
@@ -450,8 +449,8 @@ function ReformatShell() {
   }
 
   /**
-   * One click renders and downloads (Joel, 2026-10-14, TEC-105: "Reformat button
-   * should be reformat and download").
+   * One click renders and downloads — the button is Reformat and Download
+   * (TEC-105, 2026-10-14).
    *
    * **A FAIL downloads nothing.** The server returns no bytes for one — it is
    * enforced there, not here — so this only has to notice and say so: a red
@@ -698,8 +697,8 @@ function ReformatShell() {
                 </button>
 
                 {/* Downloading again sits under the button that produced it, and
-                    its label does not change. Joel, 2026-09-19: "don't make this
-                    dynamic". A button whose text is the filename moves and
+                    its label does not change (2026-09-19). A button whose text is
+                    the filename moves and
                     re-wraps on every render, so the thing you reach for is never
                     in the same place. A FAIL offers no file at all (TEC-105). */}
                 {result &&
@@ -733,9 +732,9 @@ function ReformatShell() {
               </Panel>
             ) : (
               <>
-                {/* The verdict. Joel, 2026-09-19: "I need a pass fail indicator on the
-                    front page. if there were any irregularites with the reformat it
-                    should fail and give reason." The reasoning about what may vote on
+                {/* The verdict (2026-09-19): one pass or fail on the front page, and
+                    any irregularity in the reformat fails it with a reason. The
+                    reasoning about what may vote on
                     it — and what may not — is in lib/verdict.ts, with its tests. */}
                 {(() => {
                   // A reopened render whose record cannot be read gets no verdict
@@ -863,8 +862,9 @@ function ReformatShell() {
         {tab === "resume" && (
           <>
             {/* The template picker and its confirm step, moved here from Reformat
-                (Joel, 2026-10-14, TEC-104: "Replace the template should be on the
-                resume tab"). Dropping a file stages it; Save and activate commits it. */}
+                (TEC-104, 2026-10-14): replacing the template is the rare act, so it
+                sits beside the list it adds to. Dropping a file stages it; Save and
+                activate commits it. */}
             <div className="flex flex-col gap-3 sm:max-w-md">
               <FilePick
                 label={active ? "Replace the template" : "Template"}

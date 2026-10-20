@@ -1,8 +1,8 @@
 /**
  * The one list behind the Resume tab.
  *
- * **The view is merged; the tables are not.** Joel settled that on 2026-09-17 —
- * *"Merge the view"* — and the distinction is the whole design. `templates` are
+ * **The view is merged; the tables are not** (2026-09-17), and the distinction is
+ * the whole design. `templates` are
  * files: one row, one document, a version and a house style. `renders` are
  * *events*: one row holding two documents, a coverage figure, a content hash and
  * a link to the job it went to. Folding those into one table would have to throw

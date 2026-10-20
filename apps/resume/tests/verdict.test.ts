@@ -93,8 +93,8 @@ describe("the reformat verdict", () => {
   });
 
   /**
-   * Joel, 2026-10-18 (TEC-105): a template section the source does not fill
-   * "only warns". It used to fail, and so blocked the download of every render
+   * TEC-105, 2026-10-18: a template section the source does not fill only
+   * warns. It used to fail, and so blocked the download of every render
    * from an export with no Summary. It is still said, every time, because the
    * document goes out carrying the template's own words for that section.
    */
@@ -106,7 +106,7 @@ describe("the reformat verdict", () => {
   });
 
   /**
-   * Joel, 2026-10-18 (TEC-105): "Whole sections only." A section the source
+   * TEC-105, 2026-10-18: whole sections only. A section the source
    * filled only in part still fails, so the template's own figures never ship
    * on a downloadable resume. Partial means the section also carries an entry
    * that wrote source text into it.
