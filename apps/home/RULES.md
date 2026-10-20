@@ -87,6 +87,10 @@ attributes in `layout.tsx`, the colour-bearing utility classes, `lib/livery.ts`,
 stamped auth files, `lib/supabase.ts` or any API route — a grant wider than the job is how a gate
 gets talked past later.
 
+**One livery per app, both polarities, a toggle in every header** (2026-09-15). The livery is fixed
+per app, a build-time constant; only light/dark polarity is shared, as one `paddock_mode` cookie. A
+hub in one livery framing a tool in another is the design, not a defect.
+
 ## Two properties worth protecting
 
 **The hub holds no database credential.** It reads no schema directly and is the only app with **no
