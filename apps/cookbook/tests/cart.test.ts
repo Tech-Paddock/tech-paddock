@@ -50,7 +50,7 @@ describe("a King Soopers product page's number", () => {
   });
 });
 
-describe("the checkout link (Joel, 2026-10-20)", () => {
+describe("the checkout link (2026-10-20)", () => {
   it("is a fixed constant: King Soopers' cart", () => {
     expect(CHECKOUT_URL).toBe("https://www.kingsoopers.com/cart");
   });

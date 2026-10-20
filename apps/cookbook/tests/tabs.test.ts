@@ -24,7 +24,7 @@ describe("the tabs' addresses", () => {
   });
 });
 
-describe("the Add tab (Joel, 2026-10-05)", () => {
+describe("the Add tab (2026-10-05)", () => {
   it("sits between the book and the list, at /add", () => {
     expect(TABS.map((t) => t.label)).toEqual(["Recipes", "Add", "King Soopers list"]);
     expect(pathFor("add")).toBe("/add");
@@ -37,7 +37,7 @@ describe("the Add tab (Joel, 2026-10-05)", () => {
   });
 });
 
-describe("the home-screen icon (Joel, 2026-10-05)", () => {
+describe("the home-screen icon (2026-10-05)", () => {
   const layout = readFileSync(resolve(__dirname, "../app/layout.tsx"), "utf8");
 
   it("is a static import, so iOS fetches it past the password gate", () => {
