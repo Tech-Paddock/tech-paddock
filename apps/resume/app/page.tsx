@@ -92,7 +92,7 @@ type Reformatted = {
   docxBase64?: string;
   downloadHref?: string | null;
   unread?: string[];
-  loggedTo?: string | null;
+  submittedAt?: string | null;
 };
 
 type ContentCheck = { totalLines: number; present: number; missing: string[]; percent: number; notRead?: string[] };
@@ -323,7 +323,6 @@ function ReformatShell() {
   const [kindFilter, setKindFilter] = useState<ResumeKind | "all">("all");
   const [showArchived, setShowArchived] = useState(false);
 
-  const [job, setJob] = useState({ company: "", role: "", jobUrl: "" });
   const [saved, setSaved] = useState<string | null>(null);
   const [template, setTemplate] = useState<File | null>(null);
   const [source, setSource] = useState<File | null>(null);
@@ -405,19 +404,18 @@ function ReformatShell() {
     }
   }
 
-  async function recordJob() {
-    if (!result?.renderId || !job.company.trim()) return;
+  async function markSent() {
+    if (!result?.renderId) return;
     setError(null);
     try {
       const res = await fetch(`/api/renders/${result.renderId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...job, submittedAt: new Date().toISOString() }),
+        body: JSON.stringify({ submittedAt: new Date().toISOString() }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Couldn't record that.");
-      setSaved(`Logged against ${job.company.trim()} and added to the tracker.`);
-      setJob({ company: "", role: "", jobUrl: "" });
+      setSaved(`Marked sent on ${shortDate(data.render.submitted_at)}.`);
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't record that.");
@@ -462,7 +460,7 @@ function ReformatShell() {
     setResult(null);
     setToast(null);
     // Without this the previous render's confirmation sticks around and hides
-    // the job form for the new one.
+    // the Mark as sent button for the new one.
     setSaved(null);
     const body = new FormData();
     body.append("source", source);
@@ -512,7 +510,7 @@ function ReformatShell() {
       if (!res.ok) throw new Error(data?.error ?? `Couldn't open that render (${res.status}).`);
       const opened = data as Reformatted;
       setResult(opened);
-      setSaved(opened.loggedTo ? `Logged against ${opened.loggedTo}.` : null);
+      setSaved(opened.submittedAt ? `Marked sent on ${shortDate(opened.submittedAt)}.` : null);
       setTab("reformat");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't open that render.");
@@ -592,9 +590,7 @@ function ReformatShell() {
     // Both rows of a render delete the render. Saying so is the point of the
     // confirm — the other row is on screen and would otherwise look orphaned.
     const ok = window.confirm(
-      `Delete this render? Both files go — the resume you uploaded and the one that came out.${
-        f.company ? ` The tracker thread for ${f.company} stays.` : ""
-      }`
+      "Delete this render? Both files go — the resume you uploaded and the one that came out."
     );
     if (!ok) return;
     void mutate(`/api/renders/${f.id}`, { method: "DELETE" }, "That render was already gone.");
@@ -813,42 +809,22 @@ function ReformatShell() {
                   );
                 })()}
 
-                {/* A failed render produced no file to send, so there is nothing to log. */}
+                {/* A failed render produced no file to send, so there is nothing to mark. */}
                 {result.renderId && !failed && (
-                  <Panel title="Where did this go?">
+                  <Panel title="Sent it?">
                     {saved ? (
                       <p className="text-sm">{saved}</p>
                     ) : (
                       <div className="flex flex-col gap-3">
                         <p className="text-xs opacity-60">
-                          Naming a company creates the thread in Pipeline Tracker. Leave it blank if you have not sent
-                          this yet — it stays on the Resumes tab either way.
+                          Mark it once the resume has gone out. Leave it if you have not sent this yet — it stays on
+                          the Resumes tab either way.
                         </p>
-                        <div className="grid gap-3 sm:grid-cols-3">
-                          {(
-                            [
-                              ["company", "Company", "Northwind"],
-                              ["role", "Role", "Product Analyst II"],
-                              ["jobUrl", "Posting URL", "https://…"],
-                            ] as const
-                          ).map(([key, label, placeholder]) => (
-                            <label key={key} className="flex flex-col gap-1">
-                              <span className="text-[0.7rem] uppercase tracking-wide opacity-60">{label}</span>
-                              <input
-                                value={job[key]}
-                                onChange={(e) => setJob({ ...job, [key]: e.target.value })}
-                                placeholder={placeholder}
-                                className="border border-line rounded-lg px-3 py-2 text-sm bg-paper"
-                              />
-                            </label>
-                          ))}
-                        </div>
                         <button
-                          onClick={recordJob}
-                          disabled={!job.company.trim()}
-                          className="bg-accent text-accent-ink rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 w-fit"
+                          onClick={markSent}
+                          className="bg-accent text-accent-ink rounded-lg px-4 py-2 text-sm font-medium w-fit"
                         >
-                          Log as submitted
+                          Mark as sent
                         </button>
                       </div>
                     )}
@@ -986,8 +962,6 @@ function ReformatShell() {
                             ? "The Current Template — every render is built on this file"
                             : "Kept as uploaded"
                           : [
-                              f.company ?? "No job recorded",
-                              f.stage,
                               f.submittedAt ? `submitted ${shortDate(f.submittedAt)}` : "not sent",
                               f.coverage === null ? null : `${f.coverage}% coverage`,
                             ]

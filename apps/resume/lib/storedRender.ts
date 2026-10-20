@@ -63,8 +63,6 @@ export type StoredRenderView = {
   /** The stored bytes, not a re-render. Null when none were stored: a render
    *  whose verdict was FAIL keeps its record but not its file (TEC-105). */
   downloadHref: string | null;
-  /** Where it was logged, when it was: the tracker thread's company. */
-  loggedTo: string | null;
   submittedAt: string | null;
 };
 
@@ -132,9 +130,8 @@ export function storedRenderView(input: {
   /** The template row, or null when it has since been deleted. */
   template: { name: string; version: number } | null;
   findings: AtsFinding[];
-  loggedTo: string | null;
 }): StoredRenderView {
-  const { render, template, findings, loggedTo } = input;
+  const { render, template, findings } = input;
   const snapshot = isObject(render.template_snapshot) ? render.template_snapshot : null;
 
   const coverage = readCoverage(render.coverage);
@@ -171,7 +168,6 @@ export function storedRenderView(input: {
     summary: readSummary(render.parsed_content),
     unread,
     downloadHref: render.output_file_path ? `/api/renders/${render.id}/file` : null,
-    loggedTo,
     submittedAt: render.submitted_at,
   };
 }

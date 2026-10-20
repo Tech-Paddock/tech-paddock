@@ -33,8 +33,6 @@ export type ResumeFile = {
   archived: boolean;
 
   /** Renders only; null on templates. */
-  company: string | null;
-  stage: string | null;
   coverage: number | null;
   submittedAt: string | null;
 };

@@ -186,7 +186,7 @@ describe("reformat against the stored template", () => {
   });
 });
 
-describe("recording where a render went", () => {
+describe("recording when a render was sent", () => {
   const patch = (body: unknown) =>
     new NextRequest("http://localhost/x", {
       method: "PATCH",
@@ -194,89 +194,69 @@ describe("recording where a render went", () => {
       body: JSON.stringify(body),
     });
 
-  it("creates a tracker thread when the render has none", async () => {
-    const { client: resume } = fakeSupabase({
-      "renders.select": { data: { id: "r1", thread_id: null }, error: null },
-      "renders.update": { data: { id: "r1", thread_id: "th1", submitted_at: null }, error: null },
+  it("stores submitted_at on the render and nothing else", async () => {
+    const at = "2026-10-20T09:00:00.000Z";
+    const { client: resume, calls } = fakeSupabase({
+      "renders.select": { data: { id: "r1" }, error: null },
+      "renders.update": { data: { id: "r1", submitted_at: at }, error: null },
     });
-    const { client: tracker, calls: trackerCalls } = fakeSupabase({
-      "pipeline_threads.insert": { data: { id: "th1" }, error: null },
-    });
-    mockModules({ resume, tracker });
+    mockModules({ resume });
 
     const { PATCH } = await import("../app/api/renders/[id]/route");
-    const res = await PATCH(patch({ company: "Northwind", role: "Product Analyst II" }), { params: Promise.resolve({ id: "r1" }) });
+    const res = await PATCH(patch({ submittedAt: at }), { params: Promise.resolve({ id: "r1" }) });
 
     expect(res.status).toBe(200);
-    const insert = trackerCalls.find((c) => c.op === "insert");
-    expect(insert?.payload).toMatchObject({ company: "Northwind", stage: "Applied" });
-    expect((insert?.payload as { notes: string }).notes).toContain("Product Analyst II");
+    expect((await res.json()).render.submitted_at).toBe(at);
+    const update = calls.find((c) => c.op === "update");
+    expect(update?.payload).toEqual({ submitted_at: at });
+    expect(update?.filters).toContainEqual(["id", "r1"]);
   });
 
-  it("updates the existing thread instead of creating a duplicate", async () => {
-    const { client: resume } = fakeSupabase({
-      "renders.select": { data: { id: "r1", thread_id: "th9" }, error: null },
-      "renders.update": { data: { id: "r1" }, error: null },
+  it("clears submitted_at with null — rendered but not sent is valid", async () => {
+    const { client: resume, calls } = fakeSupabase({
+      "renders.select": { data: { id: "r1" }, error: null },
+      "renders.update": { data: { id: "r1", submitted_at: null }, error: null },
     });
-    const { client: tracker, calls: trackerCalls } = fakeSupabase({
-      "pipeline_threads.update": { data: null, error: null },
-    });
-    mockModules({ resume, tracker });
-
-    const { PATCH } = await import("../app/api/renders/[id]/route");
-    await PATCH(patch({ company: "Northwind" }), { params: Promise.resolve({ id: "r1" }) });
-
-    expect(trackerCalls.some((c) => c.op === "insert")).toBe(false);
-    const update = trackerCalls.find((c) => c.op === "update");
-    expect(update?.filters).toContainEqual(["id", "th9"]);
-  });
-
-  it("appends to the running log and clears the stale-task flag", async () => {
-    const { client: resume } = fakeSupabase({
-      "renders.select": { data: { id: "r1", thread_id: "th9" }, error: null },
-      "renders.update": { data: { id: "r1" }, error: null },
-    });
-    const { client: tracker, calls: trackerCalls } = fakeSupabase({
-      "pipeline_threads.select": { data: { notes: "Earlier note worth keeping" }, error: null },
-      "pipeline_threads.update": { data: null, error: null },
-    });
-    mockModules({ resume, tracker });
-
-    const { PATCH } = await import("../app/api/renders/[id]/route");
-    await PATCH(patch({ company: "Northwind", role: "Product Analyst II" }), { params: Promise.resolve({ id: "r1" }) });
-
-    const payload = trackerCalls.find((c) => c.op === "update")?.payload as {
-      notes: string;
-      open_task_id: string | null;
-    };
-    // notes is a running log — the earlier entry survives.
-    expect(payload.notes).toContain("Earlier note worth keeping");
-    expect(payload.notes).toContain("Product Analyst II");
-    // Touching a thread frees the stale check to raise a fresh Microsoft To Do task.
-    expect(payload.open_task_id).toBeNull();
-  });
-
-  it("touches no thread when no company is named — rendered but not sent is valid", async () => {
-    const { client: resume } = fakeSupabase({
-      "renders.select": { data: { id: "r1", thread_id: null }, error: null },
-      "renders.update": { data: { id: "r1" }, error: null },
-    });
-    const { client: tracker, calls: trackerCalls } = fakeSupabase({});
-    mockModules({ resume, tracker });
+    mockModules({ resume });
 
     const { PATCH } = await import("../app/api/renders/[id]/route");
     const res = await PATCH(patch({ submittedAt: null }), { params: Promise.resolve({ id: "r1" }) });
 
     expect(res.status).toBe(200);
-    expect(trackerCalls).toEqual([]);
+    expect(calls.find((c) => c.op === "update")?.payload).toEqual({ submitted_at: null });
+  });
+
+  /** Company, role and posting went to the retired Pipeline Tracker; nothing here stores them. */
+  it("writes nothing for job details without submittedAt", async () => {
+    const { client: resume, calls } = fakeSupabase({});
+    mockModules({ resume });
+
+    const { PATCH } = await import("../app/api/renders/[id]/route");
+    const res = await PATCH(patch({ company: "Northwind", role: "Product Analyst II" }), {
+      params: Promise.resolve({ id: "r1" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(calls).toEqual([]);
+  });
+
+  it("refuses a submittedAt that is not a timestamp", async () => {
+    const { client: resume, calls } = fakeSupabase({});
+    mockModules({ resume });
+
+    const { PATCH } = await import("../app/api/renders/[id]/route");
+    const res = await PATCH(patch({ submittedAt: "last tuesday" }), { params: Promise.resolve({ id: "r1" }) });
+
+    expect(res.status).toBe(400);
+    expect(calls).toEqual([]);
   });
 
   it("404s for a render that does not exist", async () => {
     const { client: resume } = fakeSupabase({ "renders.select": { data: null, error: null } });
-    mockModules({ resume, tracker: resume });
+    mockModules({ resume });
 
     const { PATCH } = await import("../app/api/renders/[id]/route");
-    const res = await PATCH(patch({ company: "Northwind" }), { params: Promise.resolve({ id: "nope" }) });
+    const res = await PATCH(patch({ submittedAt: null }), { params: Promise.resolve({ id: "nope" }) });
     expect(res.status).toBe(404);
   });
 });
@@ -310,27 +290,6 @@ describe("deleting a render", () => {
     // output that went out. Leaving either behind strands bytes nothing knows
     // about, and the source is the easier one to forget.
     expect(removed.sort()).toEqual(["renders/a.docx", "sources/a.docx"]);
-  });
-
-  /**
-   * The tracker thread is somebody else's row.
-   *
-   * A render that was sent somewhere carries `thread_id` into
-   * `tracker.pipeline_threads` — the canonical record of that application, owned
-   * by the Pipeline Tracker and reachable from it. Deleting the resume must not
-   * delete the application; the thread just stops having a resume attached.
-   */
-  it("never touches the tracker thread", async () => {
-    const { client } = fakeSupabase({
-      "renders.select": { data: { ...RENDER, thread_id: "th9" }, error: null },
-      "renders.delete": { data: null, error: null },
-    });
-    const { client: tracker, calls: trackerCalls } = fakeSupabase({});
-    mockModules({ resume: client, tracker });
-
-    const { DELETE } = await import("../app/api/renders/[id]/route");
-    expect((await DELETE(del(), { params: Promise.resolve({ id: "r1" }) })).status).toBe(200);
-    expect(trackerCalls).toEqual([]);
   });
 
   it("404s for a render that does not exist, and deletes nothing", async () => {

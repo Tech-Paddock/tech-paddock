@@ -70,7 +70,7 @@ describe("GET /api/renders/[id] — a stored render reopens with its own record"
     vi.resetModules();
     const saved = insertedRow as unknown as Record<string, unknown>;
     const { client: reader } = fakeSupabase({
-      "renders.select": { data: { id: "r1", thread_id: null, submitted_at: null, ...saved }, error: null },
+      "renders.select": { data: { id: "r1", submitted_at: null, ...saved }, error: null },
       "templates.select": { data: { name: "template.docx", version: 4 }, error: null },
     });
     const uploads: unknown[] = [];
@@ -129,7 +129,7 @@ describe("GET /api/renders/[id] — a stored render reopens with its own record"
     const downloads: unknown[] = [];
     const { client: reader } = fakeSupabase({
       "renders.select": {
-        data: { id: "r1", thread_id: null, submitted_at: null, ...(insertedRow as unknown as Record<string, unknown>) },
+        data: { id: "r1", submitted_at: null, ...(insertedRow as unknown as Record<string, unknown>) },
         error: null,
       },
       "templates.select": { data: { name: "template.docx", version: 4 }, error: null },
@@ -154,36 +154,11 @@ describe("GET /api/renders/[id] — a stored render reopens with its own record"
 
   it("refuses a render with neither a stored output nor recorded findings", async () => {
     const { client } = fakeSupabase({
-      "renders.select": { data: { ...row({ output_file_path: null }), template_id: "t1", thread_id: null }, error: null },
+      "renders.select": { data: { ...row({ output_file_path: null }), template_id: "t1" }, error: null },
     });
     mockModules({ resume: client });
     const res = await reopen();
     expect(res.status).toBe(409);
-  });
-
-  it("says where it was logged, so the screen does not offer to log it twice", async () => {
-    const { client } = fakeSupabase({
-      "renders.select": { data: { ...row(), template_id: "t1", thread_id: "th1" }, error: null },
-      "templates.select": { data: { name: "template.docx", version: 4 }, error: null },
-    });
-    const { client: tracker } = fakeSupabase({
-      "pipeline_threads.select": { data: { company: "Northwind" }, error: null },
-    });
-    mockModules({ resume: client, tracker, download: async () => fixture("template-flat-sample.docx") });
-    const back = await (await reopen()).json();
-    expect(back.loggedTo).toBe("Northwind");
-  });
-
-  it("reports a failed tracker read instead of showing the render as never logged", async () => {
-    const { client } = fakeSupabase({
-      "renders.select": { data: { ...row(), template_id: null, thread_id: "th1" }, error: null },
-    });
-    const { client: tracker } = fakeSupabase({
-      "pipeline_threads.select": { data: null, error: { message: "permission denied" } },
-    });
-    mockModules({ resume: client, tracker, download: async () => fixture("template-flat-sample.docx") });
-    const res = await reopen();
-    expect(res.status).toBe(502);
   });
 
   it("404s an unknown render and 409s one with no stored output", async () => {
@@ -193,7 +168,7 @@ describe("GET /api/renders/[id] — a stored render reopens with its own record"
 
     vi.resetModules();
     const noFile = fakeSupabase({
-      "renders.select": { data: { ...row({ output_file_path: null }), template_id: null, thread_id: null }, error: null },
+      "renders.select": { data: { ...row({ output_file_path: null }), template_id: null }, error: null },
     });
     mockModules({ resume: noFile.client });
     expect((await reopen()).status).toBe(409);
@@ -202,7 +177,7 @@ describe("GET /api/renders/[id] — a stored render reopens with its own record"
 
 describe("storedRenderView — an unread record never reads as a clean one", () => {
   const view = (render: StoredRenderRow, template: { name: string; version: number } | null = null) =>
-    storedRenderView({ render, template, findings: [], loggedTo: null });
+    storedRenderView({ render, template, findings: [] });
 
   it("gives a complete record no unread reasons", () => {
     const v = view(row(), { name: "template.docx", version: 4 });
