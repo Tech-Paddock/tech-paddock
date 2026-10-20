@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     method: typeof raw.method === "string" ? raw.method : null,
     note: typeof raw.note === "string" ? raw.note : null,
     // Re-read, never trusted as sent: a free-of claim or a macro tag the browser
-    // somehow carries is dropped here too. The rating is read because Joel may
+    // somehow carries is dropped here too. The rating is read because the user may
     // set one on the draft before Keep it; no model path produces one.
     meta: readMeta(raw.meta, { rating: true }),
   };

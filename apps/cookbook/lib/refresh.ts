@@ -6,8 +6,8 @@ import type { Product } from "./kroger";
  * (2026-10-20). **No model call.** For each *this exact product* brand at the
  * chosen store: price and stock, a product number and page filled in from a
  * brand that only had a link, and **a product Kroger no longer returns is
- * flagged, never dropped** — the brand was Joel's choice, and the replacement
- * is his to make in Your brands.
+ * flagged, never dropped** — the brand was the user's choice, and the replacement
+ * is theirs to make in Your brands.
  *
  * Pure, with Kroger and the database passed in; `runRefresh` in
  * `lib/refreshRun.ts` supplies them, and refreshing the token happens there.

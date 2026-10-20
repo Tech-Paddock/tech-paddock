@@ -8,7 +8,7 @@ import { menuDayLabel, parseDay } from "@/lib/menuDay";
 import { useToast } from "./Toast";
 
 /**
- * On the menu — what Joel plans to cook, and on which day (TEC-39 C, 2026-09-24;
+ * On the menu — what is planned for cooking, and on which day (TEC-39 C, 2026-09-24;
  * the day and the numbers, 2026-10-05).
  *
  * One row a recipe, soonest day first, in this format:

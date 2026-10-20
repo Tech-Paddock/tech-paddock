@@ -4,10 +4,10 @@ import { SetupError, UpstreamError } from "./errors";
 /**
  * Kroger's public API, as this app uses it (TEC-90). **Server-side only.**
  *
- * Four things and no more: sign Joel in once (OAuth2 Authorization Code), find
- * his store (Locations), look a line up at that store (Products), and add to his
+ * Four things and no more: sign in once (OAuth2 Authorization Code), find
+ * the store (Locations), look a line up at that store (Products), and add to the
  * cart (Cart — which only adds: it cannot read the cart and cannot check out).
- * **No model call anywhere**; Kroger's own search picks the top match and Joel
+ * **No model call anywhere**; Kroger's own search picks the top match and the user
  * confirms it.
  *
  * **Provenance, because none of this could be loaded from here.** The base URL,
@@ -16,7 +16,7 @@ import { SetupError, UpstreamError } from "./errors";
  * itself is refused by this project's egress, so the request and response shapes
  * below are from Kroger's published examples as they were known, not read live.
  * Each is one constant or one parser, so a wrong guess is a small fix, and the
- * tests mock Kroger entirely. The first real check is Joel connecting on
+ * tests mock Kroger entirely. The first real check is connecting on
  * production.
  *
  * **Tokens never leave this file except to Kroger or into `krogerCrypto.seal`.**
@@ -38,7 +38,7 @@ export const REDIRECT_URI = "https://cookbook.techpaddock.io/kroger/callback";
 
 /**
  * `cart.basic:write` to add, `product.compact` to look a line up. No
- * `profile.compact`: nothing here needs to know who Joel is at Kroger.
+ * `profile.compact`: nothing here needs to know who the user is at Kroger.
  */
 export const SCOPES = "cart.basic:write product.compact";
 
@@ -320,7 +320,7 @@ export async function topProduct(accessToken: string, term: string, locationId: 
 // ---------------------------------------------------------------------------
 
 /**
- * Add one product to Joel's cart. **One request per line on purpose**: the Cart
+ * Add one product to the cart. **One request per line on purpose**: the Cart
  * API takes a batch, but a refused batch says nothing about which line it
  * refused, and every line here has to report added, skipped or failed.
  */

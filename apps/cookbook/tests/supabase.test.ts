@@ -52,7 +52,7 @@ describe("the Supabase client", () => {
    * Throwing is the designed behaviour, and it matters more than it looks: a
    * client built from `undefined` would fail later, inside a request, as a
    * confusing network or auth error rather than as a missing-configuration
-   * one. The standup hands Joel a list of environment variables to set by
+   * one. The environment variables are set by
    * hand, so "one of them is missing" is a live possibility on day one.
    */
   it("refuses to build a client when either variable is missing", async () => {

@@ -13,7 +13,7 @@ import { DIETS, MEALS, formatMinutes, type RecipeMeta } from "@/lib/metadata";
  */
 
 /**
- * One to five, Joel's. Tapping the rating it already has clears it, so a
+ * One to five, set by the user. Tapping the rating it already has clears it, so a
  * mis-tap is undone by the same tap. `onRate` absent means read-only.
  */
 export function Stars({

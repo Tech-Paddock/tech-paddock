@@ -77,7 +77,7 @@ export function readEdit(raw: unknown): { edit: RecipeEdit } | { error: string }
   const method = typeof o.method === "string" ? o.method.trim() || null : null;
   if (method && method.length > MAX_METHOD) return { error: "That method is too long." };
 
-  // The rating is read: this is Joel's own form.
+  // The rating is read: this is the user's own form.
   return { edit: { name, servings, ingredients, method, meta: readMeta(o.meta, { rating: true }) } };
 }
 
