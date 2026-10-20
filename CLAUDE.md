@@ -29,8 +29,8 @@ unfinished work, blockers and hot topics; `/deploy` deploys what is ready, or ho
 owner says go. "Backlog" means a Linear issue in Backlog, not a build.
 
 **One theme.** Build with existing tokens. A new pattern is copied locally and named in the pull
-request. Site or app shell is the TD's call, per `.claude/SURFACE.md`; read it before designing a
-screen.
+request. Site or app shell is the TD's call; each app's `RULES.md` states its surface and its
+rules.
 
 ## Never
 
