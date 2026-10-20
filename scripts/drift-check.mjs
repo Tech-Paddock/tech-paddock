@@ -221,7 +221,7 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
 }
 
 /* 2c ── The public app holds nothing a password would have protected.
-   apps/showcase has no password (Joel, 2026-09-29; TEC-99), and it sits on
+   apps/showcase has no password (TEC-99), and it sits on
    .techpaddock.io, so the browser sends it the session cookie. That is safe
    only while no script there can act on it: no server, no secret, nothing a
    visitor supplies rendered as HTML or sent anywhere, and no frame around a

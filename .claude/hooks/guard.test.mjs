@@ -200,7 +200,7 @@ test("the migration history cannot be rewritten from a shell", () => {
   );
 });
 
-/* TEC-115 (Joel, 2026-10-19): the technical director merges, from its own
+/* TEC-115 (2026-10-19): the technical director merges, from its own
    session. A helper's call carries agent_id and agent_type; a main session's
    carries neither. */
 const MAIN = {};
@@ -418,8 +418,8 @@ test("settings.json sends each tool to the guard it needs, and no other", () => 
   }
 });
 
-/* Joel, 2026-09-24: "All agents edit linear without asking." The allow rule is
-   Linear's alone, and it never outranks the ask list: deleting, retiring a
+/* Linear edits need no click: an issue write is cheap to undo and the guard
+   checks its shape. The allow rule is Linear's alone, and it never outranks the ask list: deleting, retiring a
    label, and the diff tools (merge_diff merges a GitHub pull request, outside
    the guard's merge hold) still wait for his click. TEC-43. */
 test("settings.json lets Linear through without a click, except what cannot be undone", () => {
