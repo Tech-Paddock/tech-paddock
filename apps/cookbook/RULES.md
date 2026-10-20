@@ -141,6 +141,16 @@ and `health.grocery_items` is dropped.
 - **Every line reports added, skipped or failed.** A partial send never reads as a whole one.
 - **A second send warns and shows what was already sent.** The Cart API only adds, so a silent
   repeat doubles every quantity.
+- **A link to checkout, not a checkout.** "Go to checkout" opens the King Soopers cart; the order is
+  placed and paid there, never here.
+- **Saved products stay current without a model.** Each saved brand keeps its Kroger product ID, page
+  link, size, last price and stock at Joel's store, and when it was checked. A refresh runs when the
+  list is opened more than seven days after the last one, or on **Refresh now**. It updates prices
+  and stock, fills in missing product IDs, and **flags a product Kroger no longer returns** rather
+  than dropping it. It also keeps the King Soopers connection alive. A failed refresh says so; it
+  never reads as "nothing changed".
+- **Kroger's public API cannot read the account**: no orders, no cart contents, no purchase history.
+  Nothing here claims to know what was bought.
 - **Kroger is mocked in tests**, because no session here can reach it. The first real check is Joel
   connecting on production.
 
