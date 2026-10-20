@@ -15,6 +15,9 @@
 - Bar controls, all stamped: `LiveryBadge` on every bar, framed or not; `ThemeControl` and
   `LogoutControl` hidden in a frame.
 - `PARKED` is empty. A parked app would be probed and shown grey.
+- Liveries in `packages/shared/lib/theme.*`: `martini`, `clark`, `senna`, `mp44`, `jps`, `mcl39`
+  (McLaren '25, MCL39, papaya and anthracite; TEC-120). `mcl39` is worn by no app until Lando
+  switches to it.
 
 ## Traps
 
@@ -40,3 +43,9 @@
 - Drift's JSON shape is the TD's. A renamed check family loses its sentence until the check emits
   `explain`.
 - "Hub" remains in stamped comments and `proxy.ts` (TEC-85).
+- `theme.css` says it is generated from "the palette set the contrast gate checks". No such gate
+  or palette source is in the repo; a new livery is hand-written and measured by hand. Hold each
+  token pair at or above the lowest any existing livery holds for that pair.
+- A livery's bar must be dark. The shared header CSS paints bar ink at 0.72 and 0.4 alpha and the
+  failed-logout border in `--sev-urgent`; on a bright bar (papaya was tried) those fall under
+  4.5:1 and 3:1. A bright bar needs those shared rules changed first.
