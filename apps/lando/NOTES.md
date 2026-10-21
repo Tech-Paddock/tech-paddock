@@ -23,17 +23,23 @@
   does not probe `/api/health`.
 - Livery `mcl39` (McLaren '25: papaya on anthracite), worn by Lando alone. The theme files carry
   it because this branch merged `claude/home-papaya-livery`.
-- The icon is Lando in a racing helmet, visor down (`app/icon.svg`, concept A, the owner's pick).
-  The visor is smoked anthracite at 0.35 opacity with a highlight streak and a faint papaya
-  reflection, so his face reads through it. It is a hand-drawn vector of the real dog: a chocolate-dapple and white miniature dachshund with a
-  white blaze, chocolate over both eyes, tan eyebrow dots and cheeks, amber eyes, a liver nose and
-  long speckled ears hanging below the helmet. The helmet and tile are the mcl39 colours copied
-  from `lib/theme.css`; the dog keeps his own. It is inspired by the livery: no team mark,
-  wordmark, number or sponsor. `favicon.ico` (16, 32, 48, RGBA PNG frames),
-  `apple-touch-icon.png` (180, full-bleed, opaque) and `manifest-192/512.png` (rounded, RGBA) are
-  rendered from it; re-render all four when it changes. The favicon's 16px frame alone is drawn
-  from a variant: visor tint 0.22, no streak or reflection, since at 0.35 the face greys out at
-  16px. The SVG's header comment says so; keep that frame lighter on any redraw.
+- The icon is Lando in a racing helmet, visor down (`app/icon.svg`, concept A, the owner's pick),
+  wearing "the blob" (TEC-124, the owner's ask): a neon lime shell (`#D7FF1E`, shaded `#A9CC00`)
+  with a few thick black contour loops and squiggles (`#0E0F11`, stroke 18) clipped to the shell,
+  and a small smiley in the right-hand loop. Drawn freehand in the spirit of the design, not traced
+  or copied; no sponsor, team mark, wordmark or number. The visor is smoked anthracite at 0.35
+  opacity with a highlight streak and a faint lime reflection, so his face reads through it. The
+  dog is a hand-drawn vector of the real dog: a chocolate-dapple and white miniature dachshund
+  with a white blaze, chocolate over both eyes, tan eyebrow dots and cheeks, amber eyes, a liver
+  nose and long speckled ears hanging below the helmet. The tile and visor are the mcl39
+  anthracite from `lib/theme.css`; the helmet no longer wears the livery's papaya. `favicon.ico`
+  (16, 32, 48, RGBA PNG frames), `apple-touch-icon.png` (180, full-bleed, opaque) and
+  `manifest-192/512.png` (rounded, RGBA) are rendered from it with headless Chromium (Playwright,
+  browsers at `/opt/pw-browsers`) and packed with Pillow; re-render all four when it changes. The
+  favicon's 16px frame alone is drawn from a variant: visor tint 0.22, no streak or reflection,
+  and only the three largest blob shapes at stroke 30 with no smiley or cheek lines. At 16px the
+  full pattern turns to green mush and at 0.35 the face greys out. The SVG's header comment
+  describes the variant; keep that frame lighter and sparser on any redraw.
 - A web app manifest at `/app.webmanifest` (a route, `app/app.webmanifest/route.ts`) for Chrome's
   install. No other app has one.
 
@@ -123,7 +129,10 @@
   imports (`/_next/static`), which the gate admits. Signed out, the manifest is a 307: harmless.
 - The owner's photos of Lando were the reference for the icon and never enter the repo (RULES.md,
   Never 2): the icon is drawn, not traced, and no photo or crop of one is committed. A redraw is hand-placed
-  vector shapes; never an `<image>` in the SVG.
+  vector shapes; never an `<image>` in the SVG. The same holds for the owner's photo of the
+  blob helmet (TEC-124): reference only; the pattern is freehand, and its sponsor marks are not
+  copied. The repo has no render script; the favicon's 16px variant is made by editing a copy of
+  the SVG as its header comment says.
 - `tsc` cannot resolve the PNG imports until `next build` (or `next dev`) has written
   `next-env.d.ts`, which is not tracked. Build first on a fresh checkout.
 - `app/icon*.png` is a Next metadata convention; the manifest PNGs are named `manifest-*.png` so
