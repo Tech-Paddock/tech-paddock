@@ -60,6 +60,22 @@ via the `merge` skill. Then:
 
 A matching version is something to read back, never to assume.
 
+**A drop does not go through the connector:** destructive SQL times out there. The owner runs the
+file in the SQL Editor inside `begin; … commit;`, with
+`insert into supabase_migrations.schema_migrations (version, name)` for the file's own version in
+the same transaction, as `drop_editor_tracker_shared` was.
+
+## Dropping a schema
+
+An exposed schema that no longer exists stops PostgREST loading for **every** schema: all apps
+return PGRST002 until the list is fixed. So, in order:
+
+1. Remove the schema from **Project Settings → API → Exposed schemas** and save. (The
+   Integrations → Data API page can look right while the API still serves the old list.)
+2. Prove it took: rename the schema (`alter schema x rename to x_probe`) and confirm the apps still
+   load. If they break, rename it back; the API recovers within its 32-second retry.
+3. Then apply the drop.
+
 ## A new schema inherits nothing
 
 `20260910051549` granted USAGE to the schemas that existed then. A new schema has no USAGE for the
