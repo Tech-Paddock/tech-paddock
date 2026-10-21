@@ -1,6 +1,7 @@
 import { productIdFromUrl } from "./kingsoopers";
-import { isUpc, searchTerm, type Product } from "./kroger";
+import { isUpc, KrogerError, searchTerm, type Product } from "./kroger";
 import { ConflictError } from "./errors";
+import { modalityWord, type Modality } from "./modality";
 
 /**
  * Send to cart — what each line becomes, and what happened to it (TEC-90).
@@ -108,6 +109,8 @@ export type Outcome = {
   quantity: number;
   result: "added" | "skipped" | "failed";
   detail: string;
+  /** Added, but without the Pickup/Delivery choice, because Kroger refused it (TEC-121). */
+  withoutModality?: true;
 };
 
 /**
@@ -147,8 +150,8 @@ export function repeatsIn(open: CartLine[], picks: CartPick[]): CartLine[] {
 }
 
 export type SendDeps = {
-  /** Put one product in the cart; throws with a sentence when Kroger refuses. */
-  add: (upc: string, quantity: number) => Promise<void>;
+  /** Put one product in the cart, with the Pickup/Delivery choice when given; throws with a sentence when Kroger refuses. */
+  add: (upc: string, quantity: number, modality: Modality | null) => Promise<void>;
   /** Remember a replacement page in Your brands, under the line's name. */
   remember: (phrase: string, url: string) => Promise<void>;
 };
@@ -159,12 +162,20 @@ export type SendDeps = {
  * The repeat check runs first and adds nothing when it refuses: a send that put
  * half the list in the cart and then stopped at a warning would be the partial
  * send this exists to prevent.
+ *
+ * **Pickup or Delivery (TEC-121)** goes with each line. Kroger's cart may not
+ * take the field (unconfirmed until the first production Send), so a line
+ * refused as a bad request is **retried once without it**. If that goes in,
+ * the field was the problem: the rest of the send goes without it, and every
+ * line that did is marked so `modalityWarning` can say so.
  */
 export async function sendLines(
-  input: { open: CartLine[]; picks: CartPick[]; again: boolean },
+  input: { open: CartLine[]; picks: CartPick[]; again: boolean; modality?: Modality | null },
   deps: SendDeps
 ): Promise<Outcome[]> {
   const picked = new Map(input.picks.map((p) => [p.id, p]));
+  let modality = input.modality ?? null;
+  let dropped = false;
 
   if (!input.again) {
     const repeats = repeatsIn(input.open, input.picks);
@@ -203,15 +214,52 @@ export async function sendLines(
       continue;
     }
 
+    const without = (why: string): Outcome => ({
+      ...base,
+      result: "added",
+      detail: `Added ×${line.quantity}, without ${why}.${remembered}`,
+      withoutModality: true,
+    });
+
     try {
-      await deps.add(upc, line.quantity);
-      outcomes.push({ ...base, result: "added", detail: `Added ×${line.quantity}.${remembered}` });
+      await deps.add(upc, line.quantity, modality);
+      outcomes.push(
+        dropped ? without("Pickup/Delivery (Kroger refused it on an earlier line)") : { ...base, result: "added", detail: `Added ×${line.quantity}.${remembered}` }
+      );
     } catch (e) {
+      if (modality && refusedAsBadRequest(e)) {
+        try {
+          await deps.add(upc, line.quantity, null);
+          outcomes.push(without(`${modalityWord(modality)} — Kroger refused the choice`));
+          modality = null;
+          dropped = true;
+          continue;
+        } catch (retry) {
+          e = retry;
+        }
+      }
       const why = e instanceof Error ? e.message : "Kroger refused it.";
       outcomes.push({ ...base, result: "failed", detail: `${why}${remembered}` });
     }
   }
   return outcomes;
+}
+
+/** A refusal that could be the request's shape — the only kind the modality retry is for. Not sign-in, not Kroger down. */
+function refusedAsBadRequest(e: unknown): boolean {
+  return e instanceof KrogerError && (e.status === 400 || e.status === 422);
+}
+
+/**
+ * The send-level warning when Kroger refused Pickup/Delivery, or null.
+ * **Never silent**: the lines are in the cart, and the mode has to be chosen
+ * at checkout instead.
+ */
+export function modalityWarning(outcomes: Outcome[], modality: Modality | null): string | null {
+  const n = outcomes.filter((o) => o.withoutModality).length;
+  if (n === 0 || !modality) return null;
+  const word = modalityWord(modality);
+  return `Kroger refused the ${word} choice, so ${n} line${n === 1 ? "" : "s"} went in without it — choose ${word} at checkout.`;
 }
 
 /** "3 added, 1 skipped, 1 failed" — the sentence that never lets a partial send read as whole. */

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readList, markSent, type GroceryItem } from "@/lib/grocery";
-import { matchPreference, readDraft, readPreferences, savePreference } from "@/lib/preferences";
+import { readDraft, readPreferences, savePreference } from "@/lib/preferences";
+import { decider } from "@/lib/decide";
 import { addToCart, topProduct } from "@/lib/kroger";
 import { withAccessToken } from "@/lib/krogerConnection";
 import { readBrandProducts } from "@/lib/krogerStore";
@@ -10,10 +11,10 @@ import {
   repeatsIn,
   reviewLines,
   RepeatSendError,
+  modalityWarning,
   sendLines,
   summarize,
   type CartLine,
-  type Decision,
 } from "@/lib/cart";
 import { CHECKOUT_URL } from "@/lib/kingsoopers";
 import { ConflictError, InputError } from "@/lib/errors";
@@ -41,11 +42,7 @@ async function openLines(): Promise<CartLine[]> {
 export async function GET() {
   try {
     const [open, preferences, products] = await Promise.all([openLines(), readPreferences(), readBrandProducts()]);
-    const missing = new Set(products.filter((p) => p.missing_since).map((p) => p.preference_id));
-    const decide = (name: string): Decision => {
-      const p = matchPreference(name, preferences);
-      return p ? { phrase: p.phrase, kind: p.kind, url: p.url, terms: p.terms, missing: missing.has(p.id) } : null;
-    };
+    const decide = decider(preferences, products);
 
     const lines = await withAccessToken(async (accessToken, store) => {
       if (!store) throw new ConflictError("Pick a store first, so the matches are from your King Soopers.");
@@ -75,11 +72,13 @@ export async function POST(request: NextRequest) {
       if (repeats.length > 0) throw new RepeatSendError(repeats);
     }
 
-    const outcomes = await withAccessToken((accessToken) =>
-      sendLines(
-        { open, picks, again },
+    const { outcomes, modality } = await withAccessToken(async (accessToken, _store, modality) => ({
+      modality,
+      outcomes: await sendLines(
+        { open, picks, again, modality },
         {
-          add: (upc, quantity) => addToCart(accessToken, upc, quantity),
+          // Pickup or Delivery goes with each line; a refusal is retried once without it (lib/cart.ts).
+          add: (upc, quantity, m) => addToCart(accessToken, upc, quantity, m),
           // **A replacement is remembered in Your brands** (RULES.md), through
           // the same validation as the editor.
           remember: async (phrase, url) => {
@@ -88,8 +87,8 @@ export async function POST(request: NextRequest) {
             await savePreference(read.row);
           },
         }
-      )
-    );
+      ),
+    }));
 
     const added = outcomes.filter((o) => o.result === "added").map((o) => o.id);
     let recordError: string | null = null;
@@ -99,7 +98,14 @@ export async function POST(request: NextRequest) {
       recordError = "These are in the cart, but this app couldn't record it — a second send won't warn about them.";
     }
 
-    return NextResponse.json({ outcomes, summary: summarize(outcomes), recordError, checkoutUrl: CHECKOUT_URL });
+    return NextResponse.json({
+      outcomes,
+      summary: summarize(outcomes),
+      recordError,
+      modality,
+      modalityWarning: modalityWarning(outcomes, modality),
+      checkoutUrl: CHECKOUT_URL,
+    });
   } catch (e) {
     if (e instanceof RepeatSendError) {
       return NextResponse.json({ error: e.message, alreadySent: e.lines }, { status: 409 });

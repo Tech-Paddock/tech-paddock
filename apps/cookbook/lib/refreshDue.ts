@@ -24,3 +24,14 @@ export function refreshDue(status: RefreshInputs, now: number = Date.now()): boo
   // and a connection left to expire is not.
   return Number.isNaN(at) || now - at > REFRESH_EVERY_MS;
 }
+
+/**
+ * Whether opening the list tab should start a deal scan (TEC-121). **The same
+ * rule as the refresh** — over seven days since the last, or never — and it
+ * also needs a chosen store, since prices are per store. `lastScanAt` is the
+ * latest appended scan's `ran_at`.
+ */
+export function scanDue(status: RefreshInputs & { hasStore: boolean }, lastScanAt: string | null, now: number = Date.now()): boolean {
+  if (!status.hasStore) return false;
+  return refreshDue({ configured: status.configured, connected: status.connected, refreshedAt: lastScanAt }, now);
+}

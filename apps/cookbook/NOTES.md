@@ -33,7 +33,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 
 ## Tables (`cookbook`)
 
-Six; reasoning is in the migration headers.
+Reasoning is in the migration headers.
 
 - `recipes`: `macro_source` has no `web`; a unique index refuses a duplicate name.
 - `grocery_items`: `quantity` 1–99; `recipes` is a snapshot of names, so a rename never reaches
@@ -45,9 +45,13 @@ Six; reasoning is in the migration headers.
 - `menu`: one row per recipe with a `day`, set only beside *Add to list*; re-adding moves it.
   Shown per serving. Nothing expires; ✕ or Clear all.
 - `kroger_connection`: one row (`id` can only be true), the refresh token sealed with AES-256-GCM
-  (refused without `v1:`), the store, `refreshed_at`.
+  (refused without `v1:`), the store, `refreshed_at`, `modality` (PICKUP or DELIVERY, default
+  PICKUP; a disconnect deletes the row and the choice with it).
 - `brand_products`: price, stock, page, `checked_at`, `missing_since` (shown in Your brands and on
   its collapsed toggle).
+- `deal_scans`: one row per deal scan, insert only (`lib/dealStore.ts`). Deals, unpriced names and
+  failures are jsonb arrays; the store is copied onto the row, so a store change never rewrites
+  an old scan.
 
 ## Send to cart
 
@@ -65,6 +69,26 @@ Six; reasoning is in the migration headers.
 - A send re-picking a line with `sent_at` returns 409 before Kroger is called, unless `again`.
 - Refresh: `lib/refresh.ts`, `POST /api/kroger/refresh`, triggered by `lib/refreshDue.ts`. No cron.
   Search-word brands are counted, not checked. `refreshed_at` moves only when brands were checked.
+
+## Prices (TEC-121)
+
+- Pure logic in `lib/pricing.ts`, wired in `lib/dealRun.ts`; `lib/decide.ts` is the one brand
+  decider for the review, the estimate and the scan, so a line is priced as what Send would add.
+  Exact IDs go in one `productsByIds` call (50 per request); searches run four at a time.
+- Deal scan: `GET`/`POST /api/kroger/deals`. Every saved brand plus every open line; a deal is
+  `promo < regular`, sorted by percent off, then dollars. Runs when the list opens and the latest
+  scan is over seven days old (`scanDue`), or on *Scan for deals*. A scan that throws saves
+  nothing, so the next open retries.
+- Coupons are never read. *Find coupons* is `couponsUrl` (`lib/kingsoopers.ts`), a constant.
+- Estimate: `POST /api/kroger/estimate`, computed and not stored. Promo first, in cents. A line not
+  offered for the chosen mode, with no price or with no match is unpriced and named; with nothing
+  priced, `total` is null and the sentence says there is no estimate.
+- Pickup/Delivery: `PATCH /api/kroger`, `lib/modality.ts` (no imports; the browser runs it). Send
+  puts `modality` on each `/cart/add` item; a 400 or 422 is retried once without it, the rest of
+  that send goes without, and `modalityWarning` says so. Not retried on 401, 403 or an outage.
+- `Cart.tsx` runs every token-borrowing request through `serial`, one at a time: opening the list
+  can start a refresh and a scan together. The toggle, estimate panel and deal rows are local
+  patterns in `app/Deals.tsx`.
 
 ## Errors
 
@@ -92,5 +116,11 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 - Two concurrent refreshes can race token rotation; the second fails with `reconnect`.
 - A remembered replacement's phrase is the line's whole name; shorten it in Your brands.
 - Preview and local deployments cannot complete Kroger sign-in; the redirect URI is production's.
-- The two Kroger migrations must be applied before this code runs.
+- The two Kroger migrations and `cookbook_deal_scans_and_modality` must be applied before this
+  code runs; the connection read selects `modality`, so without it the whole list tab's King
+  Soopers panel fails.
+- The coupons search's `?query=` parameter is unconfirmed (kingsoopers.com is unreachable from
+  here). A wrong one still lands on the coupons page, unsearched; it is one constant.
+- `withAccessToken` is per request: two tabs open at once can still race token rotation, because
+  `serial` covers one page.
 - Never revive a merged `claude/cookbook-*` branch.
