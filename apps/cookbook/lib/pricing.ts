@@ -101,6 +101,14 @@ function nothingFor(target: Target): string {
 
 const cents = (dollars: number) => Math.round(dollars * 100);
 
+/** Whole percent off the regular price, or null when the product is not on sale (promo must be below regular). */
+export function percentOff(product: Pick<Product, "regular" | "promo">): number | null {
+  const { regular, promo } = product;
+  if (promo === null || regular === null || !(promo < regular)) return null;
+  // At least 1: a sale under half a percent is still a sale, and "0% off" would read as none.
+  return Math.max(1, Math.round(((regular - promo) / regular) * 100));
+}
+
 // ---------------------------------------------------------------------------
 // The estimated total
 // ---------------------------------------------------------------------------
@@ -116,6 +124,8 @@ export type PricedLine = {
   /** The unit price used: promo first. */
   unit: number;
   onSale: boolean;
+  /** The sale, when promo is below regular: what the list line's tag says (TEC-121 3a). */
+  sale: { percentOff: number; endsAt: string | null } | null;
   lineTotal: number;
 };
 
@@ -170,12 +180,14 @@ export function estimate(lines: EstimateLine[], found: Map<string, Lookup>, moda
       unpriced.push({ ...base, reason: "Kroger gave no price at your store" });
       continue;
     }
+    const off = percentOff(product);
     priced.push({
       ...base,
       description: product.description,
       url: product.url,
       unit: product.price,
-      onSale: product.promo !== null && product.regular !== null && product.promo < product.regular,
+      onSale: off !== null,
+      sale: off === null ? null : { percentOff: off, endsAt: product.promoEnds },
       lineTotal: (cents(product.price) * line.quantity) / 100,
     });
   }
@@ -300,7 +312,8 @@ export function findDeals(entries: ScanEntry[], found: Map<string, Lookup>): Sca
       unpriced.add(entry.name);
       continue;
     }
-    if (p.promo === null || p.regular === null || p.promo >= p.regular) continue;
+    const off = percentOff(p);
+    if (off === null || p.promo === null || p.regular === null) continue;
 
     const existing = deals.get(p.productId);
     if (existing) {
@@ -314,7 +327,7 @@ export function findDeals(entries: ScanEntry[], found: Map<string, Lookup>): Sca
       url: p.url,
       regular: p.regular,
       promo: p.promo,
-      percentOff: Math.round(((p.regular - p.promo) / p.regular) * 100),
+      percentOff: off,
       saving: (cents(p.regular) - cents(p.promo)) / 100,
       endsAt: p.promoEnds,
       for: [entry.name],

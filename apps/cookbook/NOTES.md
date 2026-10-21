@@ -86,6 +86,14 @@ Reasoning is in the migration headers.
 - Pickup/Delivery: `PATCH /api/kroger`, `lib/modality.ts` (no imports; the browser runs it). Send
   puts `modality` on each `/cart/add` item; a 400 or 422 is retried once without it, the rest of
   that send goes without, and `modalityWarning` says so. Not retried on 401, 403 or an outage.
+- On-sale tag on a list line: "On sale, N% off until <date>" (`lib/saleTag.ts`, type-only
+  imports). No Kroger call of its own: `Cart.tsx` hands the latest scan and the last estimate up
+  through `onSaleSources`. The scan matches open lines by name, case-insensitive, and only when its
+  `location_id` is the chosen store; the estimate overrides for the lines it priced. A passed end
+  date tags nothing; no end date drops "until". Says sale, never coupon (TEC-126). The chip is a
+  local pattern in `app/List.tsx`.
+- Picking a store clears the estimate but does not start a scan; the old store's scan stays shown
+  under its store name and tags nothing until the next scan.
 - `Cart.tsx` runs every token-borrowing request through `serial`, one at a time: opening the list
   can start a refresh and a scan together. The toggle, estimate panel and deal rows are local
   patterns in `app/Deals.tsx`.
@@ -121,6 +129,8 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   Soopers panel fails.
 - The coupons search's `?query=` parameter is unconfirmed (kingsoopers.com is unreachable from
   here). A wrong one still lands on the coupons page, unsearched; it is one constant.
+- A line added since the last scan has no sale tag until the next scan or *Calculate estimated
+  total*; a line renamed by Tidy loses its tag the same way.
 - `withAccessToken` is per request: two tabs open at once can still race token rotation, because
   `serial` covers one page.
 - Never revive a merged `claude/cookbook-*` branch.

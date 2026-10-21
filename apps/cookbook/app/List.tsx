@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MAX_QUANTITY, asText, type GroceryItem, type TidyLine } from "@/lib/grocery";
 import type { ResolvedLink } from "@/lib/preferences";
+import { saleTags, saleText, type SaleSources, type SaleTag } from "@/lib/saleTag";
 import Brands from "./Brands";
 import Cart from "./Cart";
 import { useToast } from "./Toast";
@@ -40,6 +41,9 @@ export default function List({ refreshKey }: { refreshKey: number }) {
   const [copied, setCopied] = useState(false);
   // Bumped when the cart panel's refresh or a send changed Your brands.
   const [brandsVersion, setBrandsVersion] = useState(0);
+  // The prices the cart panel already holds (latest deal scan, last estimate),
+  // read for the on-sale tags (TEC-121 3a). No Kroger call per render.
+  const [saleSources, setSaleSources] = useState<SaleSources | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -211,6 +215,11 @@ export default function List({ refreshKey }: { refreshKey: number }) {
 
   const open = (items ?? []).filter((i) => !i.checked);
   const bought = (items ?? []).filter((i) => i.checked);
+  // Open lines only: a ticked line is in the trolley already.
+  const onSale = useMemo(
+    () => (saleSources ? saleTags((items ?? []).filter((i) => !i.checked), saleSources) : new Map<string, SaleTag>()),
+    [items, saleSources]
+  );
 
   return (
     <section id="shop" className="flex scroll-mt-4 flex-col gap-3">
@@ -378,6 +387,14 @@ export default function List({ refreshKey }: { refreshKey: number }) {
                   {item.name}
                 </a>
                 {item.note ? <span className="text-ink-soft"> — {item.note}</span> : null}
+                {/* **On sale at the chosen store** (TEC-121 3a): Kroger's promo
+                    below regular, from the last scan or estimate. Says sale,
+                    never coupon. Local pattern: an outlined accent chip. */}
+                {onSale.has(item.id) ? (
+                  <span className="ml-1.5 whitespace-nowrap rounded border border-accent px-1 text-[11px] text-accent">
+                    {saleText(onSale.get(item.id)!)}
+                  </span>
+                ) : null}
                 {/* Where the line came from: the recipes by name, plain text
                     (TEC-39 B). A recipe line from before the names were kept
                     still says only "from a recipe"; a typed line says nothing. */}
@@ -404,7 +421,7 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       ) : null}
 
       {/* Send to cart, King Soopers (TEC-90): under the list it sends. */}
-      <Cart onBrandsChanged={() => setBrandsVersion((v) => v + 1)} />
+      <Cart onBrandsChanged={() => setBrandsVersion((v) => v + 1)} onSaleSources={setSaleSources} />
 
       {/* Remembering a brand happens only in here, since 2026-09-24 (TEC-39) —
           and from a send, when a match is replaced by an exact product page. */}

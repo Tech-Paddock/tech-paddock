@@ -6,6 +6,7 @@ import { refreshDue, scanDue } from "@/lib/refreshDue";
 import type { CartLine, Outcome, ReviewLine } from "@/lib/cart";
 import { modalityWord, type Modality } from "@/lib/modality";
 import type { Estimate, ScanRecord } from "@/lib/pricing";
+import type { SaleSources } from "@/lib/saleTag";
 import { DealsPanel, EstimatePanel, ModeToggle } from "./Deals";
 import { useToast } from "./Toast";
 
@@ -78,7 +79,14 @@ function CheckoutLink() {
   );
 }
 
-export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void }) {
+export default function Cart({
+  onBrandsChanged,
+  onSaleSources,
+}: {
+  onBrandsChanged: () => void;
+  /** The prices this panel already holds, handed up so the list can tag lines on sale (TEC-121 3a). No request of its own. */
+  onSaleSources?: (sources: SaleSources) => void;
+}) {
   const toast = useToast();
   const toastRef = useRef(toast);
   toastRef.current = toast;
@@ -240,6 +248,13 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
     });
   }, [loadStatus, refresh, loadScan, scan]);
 
+  // The list's on-sale tags read the latest scan and estimate held here, at
+  // the chosen store; nothing new is fetched for them.
+  const locationId = status?.connected ? (status.store?.locationId ?? null) : null;
+  useEffect(() => {
+    onSaleSources?.({ locationId, scan: latestScan, estimate: estimate?.estimate ?? null });
+  }, [onSaleSources, locationId, latestScan, estimate]);
+
   async function chooseModality(modality: Modality) {
     if (!status) return;
     const before = status.modality;
@@ -301,6 +316,8 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
       setStores(null);
       setChoosingStore(false);
       setReview(null);
+      // The estimate was another store's prices.
+      setEstimate(null);
       await loadStatus();
       // A new store means new prices: check them now rather than in a week.
       void refresh();
