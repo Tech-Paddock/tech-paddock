@@ -132,6 +132,7 @@ Registrar.
 | `coffee.techpaddock.io` | Coffee | `tp-coffee-app` |
 | `health.techpaddock.io` | Health | `tp-health` |
 | `cookbook.techpaddock.io` | Cookbook | `tp-cookbook` |
+| `lando.techpaddock.io` | Lando | `tp-lando` |
 
 A new app needs no CI change; the matrix derives from `apps/`. Its Vercel project and DNS record
 are the owner's.
