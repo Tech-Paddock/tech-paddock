@@ -5,8 +5,10 @@
 - v2 on Next.js 16: two tabs under the app bar, **Log** and **Analytics**, sticky, opening on Log
   (the owner's override of the one-screen rule, in RULES.md).
 - **Log**: four since-last pills in one row (pee, poop, food, exercise; label over value, the
-  clock time in the title and for screen readers), "Logging as", four section buttons (Potty, Food,
-  Exercise; Weight shows the newest weight in big type), today's timeline, the growth chart. Each
+  clock time in the title and for screen readers), "Logging as", four section buttons in one row
+  (Potty, Food, Exercise, Weight: label only, no description, 52px tall; the newest weight is in
+  the Weight button's title and screen-reader text, and in the growth chart), today's timeline, the
+  growth chart. Each
   button opens a bottom sheet (`app/Sheet.tsx`) with the form for that kind (`app/LogForm.tsx`),
   defaults filled in, so Save is usually the only other tap. Tapping a timeline row opens the same
   form on that entry to correct or delete it.
@@ -96,8 +98,15 @@
 - The training command list is in two places: `COMMANDS` in `lib/events.ts` and the
   `events_details_shape` check. Add a command to both.
 - Tailwind's `flex` beats the `hidden` attribute, so the tab panels also switch their class.
-- `datetime-local` is a native control; at 390px Chrome clips the end of "10:30 PM" in the When
-  field. The value is right; only the display is cut.
+- **The When field is a label over a transparent `datetime-local`** (`app/LogForm.tsx`). The native
+  control is wider than half a phone and pushed into Human, so the form shows `whenLabel`
+  (`lib/localtime.ts`: "Now" for an untouched new entry, else "Today 9:05 PM", "Yesterday …",
+  "Oct 19 …") and keeps the real input, `opacity-0`, over it; a tap calls `showPicker()`. Do not
+  give the input a visible style or a width of its own, or the overlap comes back. When and Human
+  are an equal two-column row in every form.
+- **Spacing has no theme tokens.** `lib/theme.css` holds colour only; spacing is Tailwind's default
+  scale. The compact pass (TEC-123) uses a 12px page gutter (`px-3`) on the page, tabs, app bar and
+  sheet, and keeps every control at least 44px tall; seg chips are unchanged.
 - `TRUNCATE` is not covered by the append-only trigger.
 - Next 16 drops `apple-mobile-web-app-capable` unless `metadata.other` in `app/layout.tsx` writes it.
 - Turbopack refuses an ICO whose PNG frame is not RGBA; `app/favicon.ico` is RGBA.
