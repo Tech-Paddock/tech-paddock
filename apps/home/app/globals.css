@@ -21,6 +21,16 @@ html {
   filter: grayscale(1);
 }
 
+/* A tool whose logo stands in for an emoji (app/apps.ts). Sized to the em box
+   so it sits where the glyph would, at the same size; the grayscale above
+   reaches it through the wrapping .icon. */
+.icon-image {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.25em;
+}
+
 /* Nothing defined a focus ring; the user agent default is not dependable
    against a near-black ground. */
 *:focus-visible {
