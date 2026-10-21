@@ -62,6 +62,7 @@ section and closing comment before changing anything in this file.
 - No model picks a product or runs anywhere in this flow.
 - Every line reports added, skipped or failed; a partial send never reads as whole.
 - A second send warns and shows what was already sent, because the Cart API only adds.
+- **Take back** removes what Cookbook sent, by sending negative quantities of the same products, and marks those lines unsent. It never claims the cart is empty: anything added elsewhere stays, and the button says so. If Kroger refuses a negative quantity, it reports that per line and offers the cart page.
 - Each saved brand keeps product ID, page, size, last price, stock and when checked. Refresh runs
   on opening the list over seven days after the last, or on **Refresh now**. It updates price and
   stock, fills missing IDs, keeps the connection alive, and flags a product Kroger no longer

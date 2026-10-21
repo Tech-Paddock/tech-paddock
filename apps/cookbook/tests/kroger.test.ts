@@ -26,6 +26,8 @@ const mem = vi.hoisted(() => ({
   list: [] as Record<string, unknown>[],
   prefs: [] as Record<string, unknown>[],
   sent: [] as string[],
+  unsent: [] as string[],
+  ledger: [] as Record<string, unknown>[],
   tokenWrites: [] as string[],
   scans: [] as Record<string, unknown>[],
 }));
@@ -69,6 +71,17 @@ vi.mock("@/lib/grocery", async (importOriginal) => ({
   markSent: async (ids: string[]) => {
     mem.sent.push(...ids);
   },
+  markUnsent: async (ids: string[]) => {
+    mem.unsent.push(...ids);
+  },
+}));
+
+vi.mock("@/lib/cartSends", () => ({
+  readSends: async (ids: string[]) => mem.ledger.filter((r) => ids.includes(String(r.item_id))),
+  appendSends: async (rows: Record<string, unknown>[]) => {
+    mem.ledger.push(...rows);
+  },
+  moveSends: async () => undefined,
 }));
 
 vi.mock("@/lib/preferences", async (importOriginal) => ({
@@ -138,6 +151,8 @@ beforeEach(() => {
     },
   ];
   mem.sent = [];
+  mem.unsent = [];
+  mem.ledger = [];
   mem.tokenWrites = [];
   mem.scans = [];
 });
@@ -463,5 +478,95 @@ describe("prices on the list tab (TEC-121)", () => {
     expect((await bodyOf(scan)).error).toMatch(/Pick a store/);
     expect((await est.POST()).status).toBe(409);
     expect(mem.scans).toEqual([]);
+  });
+});
+
+describe("Take back (TEC-127)", () => {
+  const secrets = () => [STORED_RT, NEW_RT, ACCESS, CLIENT_SECRET, String(mem.row?.refresh_token_sealed ?? "never")];
+  async function bodyOf(res: Response) {
+    const text = await res.text();
+    for (const secret of secrets()) expect(text).not.toContain(secret);
+    return JSON.parse(text);
+  }
+  const cartBodies = () =>
+    kroger.mock.calls.filter(([url]) => String(url).endsWith("/cart/add")).map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+  const takeBackPost = async (body: unknown) => {
+    const { POST } = await import("@/app/api/kroger/cart/take-back/route");
+    return POST(new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart/take-back", { method: "POST", body: JSON.stringify(body) }));
+  };
+
+  it("a send records the product, quantity and mode that went in", async () => {
+    mem.row = { ...mem.row, modality: "DELIVERY" };
+    const { POST } = await import("@/app/api/kroger/cart/route");
+    const body = await bodyOf(
+      await POST(
+        new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart", {
+          method: "POST",
+          body: JSON.stringify({ picks: [{ id: "a", upc: "0001111041700" }] }),
+        })
+      )
+    );
+    expect(body.recordError).toBeNull();
+    expect(mem.ledger).toEqual([{ item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "DELIVERY" }]);
+  });
+
+  it("takes back what was sent — not the line's quantity now — with the same mode, after a confirm, and marks it unsent", async () => {
+    mem.list[0].sent_at = "2026-10-21T01:00:00Z";
+    mem.list[0].quantity = 5; // changed since the send
+    mem.ledger = [{ item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "PICKUP" }];
+
+    const { GET } = await import("@/app/api/kroger/cart/take-back/route");
+    const preview = await bodyOf(await GET());
+    expect(preview.lines).toEqual([
+      { id: "a", name: "milk", sent_at: "2026-10-21T01:00:00Z", held: [{ upc: "0001111041700", quantity: 2, modality: "PICKUP" }] },
+    ]);
+    expect(cartBodies()).toEqual([]);
+
+    // The first tap alone takes nothing.
+    const unconfirmed = await takeBackPost({});
+    expect(unconfirmed.status).toBe(400);
+    expect(cartBodies()).toEqual([]);
+
+    const body = await bodyOf(await takeBackPost({ confirm: true }));
+    expect(cartBodies()).toEqual([{ items: [{ upc: "0001111041700", quantity: -2, modality: "PICKUP" }] }]);
+    expect(body.outcomes).toEqual([{ id: "a", name: "milk", result: "taken back", detail: "Took back ×2." }]);
+    expect(body.summary).toBe("1 taken back, 0 skipped, 0 failed. Anything added to the cart elsewhere is still there.");
+    expect(body.failed).toBe(false);
+    expect(mem.unsent).toEqual(["a"]);
+    expect(mem.ledger.at(-1)).toMatchObject({ kind: "taken_back", quantity: -2, modality: "PICKUP" });
+  });
+
+  it("when Kroger refuses a negative quantity, the line fails, stays sent, and the panel offers the cart page", async () => {
+    kroger.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
+      if (url.endsWith("/cart/add")) return json({ errors: { reason: "quantity must be positive" } }, 400);
+      return json({ data: [PRODUCT] });
+    });
+    mem.list[0].sent_at = "2026-10-21T01:00:00Z";
+    mem.ledger = [{ item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "PICKUP" }];
+
+    const body = await bodyOf(await takeBackPost({ confirm: true }));
+    expect(body.outcomes[0]).toMatchObject({ result: "failed", detail: expect.stringMatching(/Still marked sent/) });
+    expect(body.failed).toBe(true);
+    expect(body.checkoutUrl).toBe("https://www.kingsoopers.com/cart");
+    expect(mem.unsent).toEqual([]);
+    // Not retried without the mode.
+    expect(cartBodies()).toHaveLength(1);
+    // The reservation was reversed, so a later Take back still finds the milk.
+    const { GET } = await import("@/app/api/kroger/cart/take-back/route");
+    expect((await bodyOf(await GET())).lines[0].held).toEqual([{ upc: "0001111041700", quantity: 2, modality: "PICKUP" }]);
+  });
+
+  it("a line sent before the ledger is skipped without asking Kroger, and an empty list says so", async () => {
+    mem.list[1].sent_at = "2026-10-01T00:00:00Z";
+    const body = await bodyOf(await takeBackPost({ confirm: true }));
+    expect(body.outcomes).toEqual([expect.objectContaining({ id: "b", result: "skipped" })]);
+    expect(kroger).not.toHaveBeenCalled();
+
+    mem.list[1].sent_at = null;
+    const none = await takeBackPost({ confirm: true });
+    expect(none.status).toBe(400);
+    expect((await bodyOf(none)).error).toMatch(/hasn't sent anything/);
   });
 });

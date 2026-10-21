@@ -49,6 +49,10 @@ Reasoning is in the migration headers.
   PICKUP; a disconnect deletes the row and the choice with it).
 - `brand_products`: price, stock, page, `checked_at`, `missing_since` (shown in Your brands and on
   its collapsed toggle).
+- `cart_sends` (TEC-127): the cart ledger, insert only (`lib/cartSends.ts`) except `item_id`,
+  which a Tidy moves onto the merged line before deleting the old ones. Signed quantity: `sent`
+  and `refused` positive, `taken_back` negative; the sum per line, UPC and modality is what Take
+  back removes. `item_id` is set null when a line is cleared, and those rows are never taken back.
 - `deal_scans`: one row per deal scan, insert only (`lib/dealStore.ts`). Deals, unpriced names and
   failures are jsonb arrays; the store is copied onto the row, so a store change never rewrites
   an old scan.
@@ -67,6 +71,18 @@ Reasoning is in the migration headers.
 - `GET /api/kroger/cart` is the review: an exact product's UPC is its URL's digits
   (`productIdFromUrl`); a pasted page is remembered by `savePreference` under the line's name.
 - A send re-picking a line with `sent_at` returns 409 before Kroger is called, unless `again`.
+- A send appends a `sent` row per added line (`sentRows` in `lib/cart.ts`): the UPC that went in,
+  the quantity sent, and the modality it actually went with (null when Kroger refused the choice).
+  A failed append is named in `recordError`; the items are still in the cart.
+- **Take back** (TEC-127): rules in `lib/takeBack.ts`, route `/api/kroger/cart/take-back`. GET
+  reads the ledger for the confirm (no Kroger call); POST needs `confirm: true`. Only lines still
+  on the list, ticked or not. Per line it appends the `taken_back` rows first, then sends
+  `PUT /cart/add` with the negated quantity and the recorded modality (`takeBackFromCart`), never
+  retried without it; a refusal appends `refused` rows and the line stays sent. Only lines wholly
+  taken back get `sent_at` cleared (`markUnsent`). A line with `sent_at` and no ledger rows was sent
+  before the ledger and is skipped, with a pointer to the cart page. The summary always says
+  anything added elsewhere is still there; any failure shows the `CHECKOUT_URL` link. The button
+  and confirm are local patterns in `app/Cart.tsx`.
 - Refresh: `lib/refresh.ts`, `POST /api/kroger/refresh`, triggered by `lib/refreshDue.ts`. No cron.
   Search-word brands are counted, not checked. `refreshed_at` moves only when brands were checked.
 
@@ -123,7 +139,15 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   characters; search pages hold at most 50 and stop at 1,000 results. No rate-limit headers. The
   public API has no coupons, offers, orders or lists (404). An app token gets 403 `AUTH-1007` on
   `PUT /cart/add`, so the cart needs the user's sign-in; its body (`{items:[{upc,quantity}]}`,
-  with or without `modality`) is unconfirmed until the first production Send.
+  with or without `modality`) is unconfirmed until the first production Send. **A negative
+  `quantity` on `/cart/add` is unconfirmed too** (Take back rests on it): untested until the first
+  production Take back. A refusal is handled (the line fails, stays sent, the cart page is
+  offered). A 2xx that Kroger ignores, or treats as a positive add, would not be noticed here:
+  check the cart page after the first one.
+- **`cookbook_cart_sends` must be applied before this code runs**: without it a send can't record
+  what went in (the items still go in, and `recordError` says so), Take back fails to read, and
+  **Tidy fails before deleting**, which leaves the list duplicated.
+- Lines sent before `cookbook_cart_sends` have no ledger rows; Take back skips them and says so.
 - **Changing `KROGER_TOKEN_KEY` orphans the token**; the list asks to connect again. That is the
   rotation path.
 - Two concurrent refreshes can race token rotation; the second fails with `reconnect`.

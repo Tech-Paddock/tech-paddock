@@ -5,6 +5,7 @@ import { decider } from "@/lib/decide";
 import { addToCart, topProduct } from "@/lib/kroger";
 import { withAccessToken } from "@/lib/krogerConnection";
 import { readBrandProducts } from "@/lib/krogerStore";
+import { appendSends } from "@/lib/cartSends";
 import {
   alreadySent,
   readPicks,
@@ -13,6 +14,7 @@ import {
   RepeatSendError,
   modalityWarning,
   sendLines,
+  sentRows,
   summarize,
   type CartLine,
 } from "@/lib/cart";
@@ -91,12 +93,20 @@ export async function POST(request: NextRequest) {
     }));
 
     const added = outcomes.filter((o) => o.result === "added").map((o) => o.id);
-    let recordError: string | null = null;
+    const problems: string[] = [];
+    // **What actually went in** — product, quantity, mode — so Take back
+    // removes that, not whatever the line says later (TEC-127).
+    try {
+      await appendSends(sentRows(outcomes, modality));
+    } catch {
+      problems.push("Take back won't know about them — remove them on the King Soopers cart page if you need to.");
+    }
     try {
       await markSent(added, new Date().toISOString());
     } catch {
-      recordError = "These are in the cart, but this app couldn't record it — a second send won't warn about them.";
+      problems.push("A second send won't warn about them.");
     }
+    const recordError = problems.length > 0 ? `These are in the cart, but this app couldn't record it. ${problems.join(" ")}` : null;
 
     return NextResponse.json({
       outcomes,

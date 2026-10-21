@@ -7,6 +7,7 @@ import type { CartLine, Outcome, ReviewLine } from "@/lib/cart";
 import { modalityWord, type Modality } from "@/lib/modality";
 import type { Estimate, ScanRecord } from "@/lib/pricing";
 import type { SaleSources } from "@/lib/saleTag";
+import { describe as describeHeld, type TakeBackLine, type TakeBackOutcome } from "@/lib/takeBack";
 import { DealsPanel, EstimatePanel, ModeToggle } from "./Deals";
 import { useToast } from "./Toast";
 
@@ -32,9 +33,14 @@ import { useToast } from "./Toast";
  * refresh token's rotation, and opening the list can start a refresh and a
  * scan together.
  *
+ * **Take back (TEC-127)**: removes what Cookbook sent — the products,
+ * quantities and modes the ledger recorded — by negative quantities, after a
+ * second tap that shows what will come out. Never says the cart is empty.
+ *
  * Local patterns, named so they are a decision deferred rather than drift: the
- * per-line review rows (added / skipped / failed chips) and the store picker
- * are this file's own; they reuse the theme's tokens only.
+ * per-line review rows (added / skipped / failed chips, and Take back's taken
+ * back / skipped / failed), the Take back confirm and the store picker are this
+ * file's own; they reuse the theme's tokens only.
  */
 
 type Status = {
@@ -102,7 +108,15 @@ export default function Cart({
   const [stores, setStores] = useState<Store[] | null>(null);
   const [choosingStore, setChoosingStore] = useState(false);
 
-  const [busy, setBusy] = useState<null | "stores" | "review" | "send" | "disconnect">(null);
+  const [busy, setBusy] = useState<null | "stores" | "review" | "send" | "disconnect" | "take-back-look" | "take-back">(null);
+  // Take back (TEC-127): the first tap reads what would go, the second takes it.
+  const [takeBackPreview, setTakeBackPreview] = useState<TakeBackLine[] | null>(null);
+  const [takeBackResults, setTakeBackResults] = useState<{
+    outcomes: TakeBackOutcome[];
+    summary: string;
+    recordError: string | null;
+    failed: boolean;
+  } | null>(null);
   const [review, setReview] = useState<ReviewLine[] | null>(null);
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [confirmAgain, setConfirmAgain] = useState(false);
@@ -346,6 +360,8 @@ export default function Cart({
     if (busy) return;
     setBusy("review");
     setResults(null);
+    setTakeBackPreview(null);
+    setTakeBackResults(null);
     setRefused(null);
     setConfirmAgain(false);
     try {
@@ -415,6 +431,61 @@ export default function Cart({
       brandsChanged.current();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't send to the cart.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * **Take back, first tap**: read what Cookbook sent and is still on the list.
+   * The ledger only, no Kroger call. Nothing is removed until the second tap.
+   */
+  async function lookTakeBack() {
+    if (busy) return;
+    setBusy("take-back-look");
+    setTakeBackResults(null);
+    try {
+      const response = await fetch("/api/kroger/cart/take-back", { cache: "no-store" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Couldn't read what Cookbook sent.");
+      setTakeBackPreview(body.lines as TakeBackLine[]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't read what Cookbook sent.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * **Take back, second tap.** Two taps, like the list's Clear: it can't be
+   * undone from here (putting things back is another Send). Through `serial`,
+   * because it borrows a Kroger token.
+   */
+  async function confirmTakeBack() {
+    if (busy) return;
+    setBusy("take-back");
+    try {
+      const response = await serial(() =>
+        fetch("/api/kroger/cart/take-back", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        })
+      );
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Couldn't take back from the cart.");
+      setTakeBackResults({
+        outcomes: body.outcomes,
+        summary: body.summary,
+        recordError: body.recordError ?? null,
+        failed: body.failed === true,
+      });
+      setTakeBackPreview(null);
+      // What was sent has changed; a review or send result on screen is now stale.
+      setReview(null);
+      setResults(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't take back from the cart.");
     } finally {
       setBusy(null);
     }
@@ -526,7 +597,7 @@ export default function Cart({
         {/* Pickup or Delivery (TEC-121): remembered on the connection; Send
             passes it to the cart and the estimate prices what it offers. */}
         <div className="flex flex-wrap items-center gap-2">
-          <ModeToggle value={status.modality} onChange={(m) => void chooseModality(m)} disabled={busy === "send"} />
+          <ModeToggle value={status.modality} onChange={(m) => void chooseModality(m)} disabled={busy === "send" || busy === "take-back"} />
           <span className="text-xs text-ink-soft">The time slot is picked at King Soopers checkout.</span>
         </div>
 
@@ -548,7 +619,57 @@ export default function Cart({
             {estimating ? "Calculating…" : `Calculate estimated total (${modalityWord(status.modality)})`}
           </button>
           <CheckoutLink />
+          {/* **Says it leaves the rest** (RULES.md): Cookbook can only remove what it sent. */}
+          <button
+            type="button"
+            onClick={() => void lookTakeBack()}
+            disabled={busy !== null || takeBackPreview !== null}
+            className="rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50"
+          >
+            {busy === "take-back-look" ? "Checking…" : "Take back only what Cookbook sent"}
+          </button>
         </div>
+
+        {takeBackPreview ? (
+          <TakeBackConfirm
+            lines={takeBackPreview}
+            working={busy === "take-back"}
+            onConfirm={() => void confirmTakeBack()}
+            onCancel={() => setTakeBackPreview(null)}
+          />
+        ) : null}
+
+        {takeBackResults ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
+            <h3 className="text-sm font-semibold">{takeBackResults.summary}</h3>
+            <ul className="flex flex-col gap-1 text-sm">
+              {takeBackResults.outcomes.map((o) => (
+                <li key={o.id} className="flex items-baseline gap-2">
+                  <span
+                    className={`shrink-0 rounded border px-1.5 text-[11px] ${
+                      o.result === "taken back" ? "border-accent text-accent" : o.result === "failed" ? "border-danger/60 text-danger" : "border-line text-ink-soft"
+                    }`}
+                  >
+                    {o.result}
+                  </span>
+                  <span className="min-w-0">
+                    {o.name} <span className="text-ink-soft">— {o.detail}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {takeBackResults.recordError ? <p className="text-xs text-danger">{takeBackResults.recordError}</p> : null}
+            {takeBackResults.failed ? (
+              <p role="alert" className="text-xs text-warn">
+                Not everything came back out.{" "}
+                <a href={CHECKOUT_URL} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
+                  Open the King Soopers cart
+                </a>{" "}
+                to remove the rest by hand.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {estimate ? <EstimatePanel estimate={estimate.estimate} message={estimate.message} onClose={() => setEstimate(null)} /> : null}
 
@@ -611,6 +732,64 @@ export default function Cart({
           {refreshNote.text}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Take back's confirm (TEC-127): **what will come out, before it does**, and
+ * that nothing else in the cart is touched. A local pattern, like the review.
+ */
+function TakeBackConfirm(props: { lines: TakeBackLine[]; working: boolean; onConfirm: () => void; onCancel: () => void }) {
+  const recorded = props.lines.filter((l) => l.held.length > 0);
+  const unrecorded = props.lines.filter((l) => l.held.length === 0);
+
+  if (props.lines.length === 0) {
+    return (
+      <div className="flex items-baseline gap-2 rounded-lg border border-line p-3 text-sm text-ink-soft">
+        <span className="flex-1">Cookbook hasn&rsquo;t sent anything on this list to the cart, so there&rsquo;s nothing to take back.</span>
+        <button type="button" onClick={props.onCancel} className="text-xs underline decoration-dotted underline-offset-2">
+          OK
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-warn/60 p-3 text-sm">
+      <p className="font-semibold">Take these back out of the King Soopers cart?</p>
+      {recorded.length > 0 ? (
+        <ul className="flex flex-col gap-0.5">
+          {recorded.map((l) => (
+            <li key={l.id}>
+              {l.name} <span className="text-ink-soft">{describeHeld(l.held)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {unrecorded.length > 0 ? (
+        <p className="text-xs text-ink-soft">
+          Skipped — sent before Cookbook recorded what went in: {unrecorded.map((l) => l.name).join(", ")}. Remove those on the
+          King Soopers cart page.
+        </p>
+      ) : null}
+      <p className="text-xs text-ink-soft">
+        Only what Cookbook sent comes out; anything added to the cart elsewhere stays. This can&rsquo;t be undone from here — send
+        again to put them back.
+      </p>
+      <div className="flex gap-2">
+        <button type="button" onClick={props.onCancel} className="rounded-lg border border-line px-3 py-2 text-sm text-ink-soft">
+          Keep them
+        </button>
+        <button
+          type="button"
+          onClick={props.onConfirm}
+          disabled={props.working || recorded.length === 0}
+          className="ml-auto rounded-lg border border-danger/60 px-3 py-2 text-sm text-danger disabled:opacity-50"
+        >
+          {props.working ? "Taking back…" : `Take back ${recorded.length} — sure?`}
+        </button>
+      </div>
     </div>
   );
 }
