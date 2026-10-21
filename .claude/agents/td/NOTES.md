@@ -44,6 +44,14 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **A stacked branch conflicts once its base squash-merges.** See `DECISIONS.md`.
 - **The hosted API renames migrations.** Read `list_migrations` back and rename the file on the
   branch; a stacked branch carrying the old name brings it back.
+- **The Supabase connector cannot run destructive SQL.** `apply_migration` or `execute_sql` with a
+  `DROP` times out at 60s, while additive DDL goes through at once; a timed-out drop may still
+  land later. The owner runs drops in the SQL Editor, with the `schema_migrations` row in the same
+  transaction (`supabase/README.md`).
+- **Dropping an exposed schema takes down every app** (PGRST002) until the API's schema list loses
+  it. The live list is under Project Settings → API; the Integrations → Data API page can show a
+  clean list while the API still serves the old one. Clean that list first, prove it (rename the
+  schema and watch the API stay up), then drop.
 - **A helper worktree refuses git inside a loop, a variable or `git -C`.** Run each git plainly.
 - **Finished work hides in other sessions.** At kickoff, `list_sessions` and `git branch -r`.
 - **Cost is context × turns.** Brief tightly; end the session once branches are merged.
