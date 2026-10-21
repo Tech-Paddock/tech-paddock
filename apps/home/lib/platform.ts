@@ -88,7 +88,7 @@ export type Drift = {
  * been caught by before. A tool listed and down is a question with an answer; a
  * tool missing from here is invisible.
  */
-export type ToolSlug = "resume" | "coffee" | "health" | "cookbook";
+export type ToolSlug = "resume" | "coffee" | "health" | "cookbook" | "lando";
 
 export type Tool = Project & { slug: ToolSlug };
 
@@ -98,6 +98,7 @@ export const TOOLS: Tool[] = [
   { slug: "coffee", name: "Coffee", url: "https://coffee.techpaddock.io", vercelProject: "tp-coffee-app" },
   { slug: "health", name: "Health", url: "https://health.techpaddock.io", vercelProject: "tp-health" },
   { slug: "cookbook", name: "Cookbook", url: "https://cookbook.techpaddock.io", vercelProject: "tp-cookbook" },
+  { slug: "lando", name: "Lando", url: "https://lando.techpaddock.io", vercelProject: "tp-lando" },
 ];
 
 export const HOME: Project = {

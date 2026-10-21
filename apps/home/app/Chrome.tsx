@@ -83,7 +83,11 @@ function Bar({ children }: { children: React.ReactNode }) {
               href={`/?app=${a.slug}`}
               replace
             >
-              <span className="icon">{a.icon}</span> {a.name}
+              <span className="icon">
+                {/* alt is empty: the name sits beside it. */}
+                {a.image ? <img className="icon-image" src={a.image} alt="" /> : a.icon}
+              </span>{" "}
+              {a.name}
             </Link>
           ))}
         </nav>
