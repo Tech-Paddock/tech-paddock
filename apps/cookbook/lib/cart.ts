@@ -1,6 +1,7 @@
 import { productIdFromUrl } from "./kingsoopers";
-import { isUpc, searchTerm, type Product } from "./kroger";
+import { isUpc, KrogerError, searchTerm, type Product } from "./kroger";
 import { ConflictError } from "./errors";
+import { modalityWord, type Modality } from "./modality";
 
 /**
  * Send to cart — what each line becomes, and what happened to it (TEC-90).
@@ -11,8 +12,10 @@ import { ConflictError } from "./errors";
  * - **A line tied to an exact product in Your brands goes in as-is.** Its link
  *   carries the product number.
  * - **Any other line shows Kroger's top match at the chosen store**, and the user
- *   adds it or replaces it with an exact product page — which is then remembered
- *   in Your brands. **No model picks a product.**
+ *   adds it or replaces it with an exact product page. **Whichever goes in, the
+ *   match or the replacement, is remembered in Your brands** as an exact product
+ *   under the line's name (TEC-128) — only once its add succeeded, so a failed
+ *   add saves nothing. **No model picks a product.**
  * - **Every open line reports added, skipped or failed**, so a partial send never
  *   reads as a whole one.
  * - **A line already sent is refused without an explicit "again"**: the Cart API
@@ -99,8 +102,12 @@ export function alreadySent(lines: CartLine[]): CartLine[] {
     .sort((a, b) => (a.sent_at as string).localeCompare(b.sent_at as string));
 }
 
-/** A line the user chose: a product number (exact, or a tapped match) or a page that replaces the match. */
-export type CartPick = { id: string; upc?: string; url?: string };
+/**
+ * A line the user chose: a product number (exact, or a tapped match) or a page
+ * that replaces the match. **`match` is the tapped top match's page** (TEC-128),
+ * sent only for a match, never for an exact brand: it is what gets remembered.
+ */
+export type CartPick = { id: string; upc?: string; url?: string; match?: string };
 
 export type Outcome = {
   id: string;
@@ -108,6 +115,10 @@ export type Outcome = {
   quantity: number;
   result: "added" | "skipped" | "failed";
   detail: string;
+  /** Added, but without the Pickup/Delivery choice, because Kroger refused it (TEC-121). */
+  withoutModality?: true;
+  /** The product that went in, on an added line: what the send records so Take back can remove it (TEC-127). */
+  upc?: string;
 };
 
 /**
@@ -134,7 +145,10 @@ export function readPicks(raw: unknown): CartPick[] {
     seen.add(o.id);
     const pick: CartPick = { id: o.id };
     if (typeof o.url === "string" && o.url.trim()) pick.url = o.url.trim();
-    else if (typeof o.upc === "string" && o.upc) pick.upc = o.upc;
+    else if (typeof o.upc === "string" && o.upc) {
+      pick.upc = o.upc;
+      if (typeof o.match === "string" && o.match.trim()) pick.match = o.match.trim();
+    }
     picks.push(pick);
   }
   return picks;
@@ -147,9 +161,9 @@ export function repeatsIn(open: CartLine[], picks: CartPick[]): CartLine[] {
 }
 
 export type SendDeps = {
-  /** Put one product in the cart; throws with a sentence when Kroger refuses. */
-  add: (upc: string, quantity: number) => Promise<void>;
-  /** Remember a replacement page in Your brands, under the line's name. */
+  /** Put one product in the cart, with the Pickup/Delivery choice when given; throws with a sentence when Kroger refuses. */
+  add: (upc: string, quantity: number, modality: Modality | null) => Promise<void>;
+  /** Remember what went in — a replacement page or the tapped match's page — in Your brands, under the line's name. */
   remember: (phrase: string, url: string) => Promise<void>;
 };
 
@@ -159,12 +173,20 @@ export type SendDeps = {
  * The repeat check runs first and adds nothing when it refuses: a send that put
  * half the list in the cart and then stopped at a warning would be the partial
  * send this exists to prevent.
+ *
+ * **Pickup or Delivery (TEC-121)** goes with each line. Kroger's cart may not
+ * take the field (unconfirmed until the first production Send), so a line
+ * refused as a bad request is **retried once without it**. If that goes in,
+ * the field was the problem: the rest of the send goes without it, and every
+ * line that did is marked so `modalityWarning` can say so.
  */
 export async function sendLines(
-  input: { open: CartLine[]; picks: CartPick[]; again: boolean },
+  input: { open: CartLine[]; picks: CartPick[]; again: boolean; modality?: Modality | null },
   deps: SendDeps
 ): Promise<Outcome[]> {
   const picked = new Map(input.picks.map((p) => [p.id, p]));
+  let modality = input.modality ?? null;
+  let dropped = false;
 
   if (!input.again) {
     const repeats = repeatsIn(input.open, input.picks);
@@ -181,18 +203,11 @@ export async function sendLines(
     }
 
     let upc: string | null = null;
-    let remembered = "";
     if (pick.url) {
       upc = productIdFromUrl(pick.url);
       if (!upc) {
         outcomes.push({ ...base, result: "failed", detail: "That isn't a King Soopers product page with a product number." });
         continue;
-      }
-      try {
-        await deps.remember(line.name, pick.url);
-        remembered = " Remembered in Your brands.";
-      } catch {
-        remembered = " Couldn't remember it in Your brands.";
       }
     } else if (isUpc(pick.upc)) {
       upc = pick.upc;
@@ -203,15 +218,91 @@ export async function sendLines(
       continue;
     }
 
+    // The page to remember: the replacement, else the tapped match. An exact
+    // brand sends neither, so it is never re-saved.
+    const page = pick.url ?? pick.match ?? null;
+    const sent = { ...base, upc };
+
+    let added: { detail: string; withoutModality?: true } | null = null;
     try {
-      await deps.add(upc, line.quantity);
-      outcomes.push({ ...base, result: "added", detail: `Added ×${line.quantity}.${remembered}` });
+      await deps.add(upc, line.quantity, modality);
+      added = dropped
+        ? { detail: `Added ×${line.quantity}, without Pickup/Delivery (Kroger refused it on an earlier line).`, withoutModality: true }
+        : { detail: `Added ×${line.quantity}.` };
     } catch (e) {
-      const why = e instanceof Error ? e.message : "Kroger refused it.";
-      outcomes.push({ ...base, result: "failed", detail: `${why}${remembered}` });
+      let failure = e;
+      if (modality && refusedAsBadRequest(e)) {
+        try {
+          await deps.add(upc, line.quantity, null);
+          added = { detail: `Added ×${line.quantity}, without ${modalityWord(modality)} — Kroger refused the choice.`, withoutModality: true };
+          modality = null;
+          dropped = true;
+        } catch (retry) {
+          failure = retry;
+        }
+      }
+      if (!added) {
+        // **A failed add saves nothing** in Your brands (TEC-128).
+        const why = failure instanceof Error ? failure.message : "Kroger refused it.";
+        outcomes.push({ ...base, result: "failed", detail: why });
+        continue;
+      }
     }
+
+    // **Only after the add went in.** A failed save is said on the line and
+    // never undoes or hides the add: the product is in the cart either way.
+    const remembered = page ? await rememberPage(deps, line.name, page, upc) : "";
+    outcomes.push({ ...sent, result: "added", ...added, detail: `${added.detail}${remembered}` });
   }
   return outcomes;
+}
+
+/**
+ * Save what went in to Your brands, and say how that went, as a sentence to
+ * append to the line. **The page must carry the product number that went in**:
+ * a remembered page is read back as that number next time (`planLine`), so a
+ * page naming a different one would send a different product.
+ */
+async function rememberPage(deps: SendDeps, name: string, page: string, upc: string): Promise<string> {
+  if (productIdFromUrl(page) !== upc) return " Not remembered in Your brands: its page names a different product.";
+  try {
+    await deps.remember(name, page);
+    return " Remembered in Your brands.";
+  } catch (e) {
+    const why = e instanceof Error && e.message ? ` (${e.message.replace(/\.$/, "")})` : "";
+    return ` Couldn't remember it in Your brands${why} — save it there by hand.`;
+  }
+}
+
+/** A refusal that could be the request's shape — the only kind the modality retry is for. Not sign-in, not Kroger down. */
+function refusedAsBadRequest(e: unknown): boolean {
+  return e instanceof KrogerError && (e.status === 400 || e.status === 422);
+}
+
+/**
+ * The send-level warning when Kroger refused Pickup/Delivery, or null.
+ * **Never silent**: the lines are in the cart, and the mode has to be chosen
+ * at checkout instead.
+ */
+export function modalityWarning(outcomes: Outcome[], modality: Modality | null): string | null {
+  const n = outcomes.filter((o) => o.withoutModality).length;
+  if (n === 0 || !modality) return null;
+  const word = modalityWord(modality);
+  return `Kroger refused the ${word} choice, so ${n} line${n === 1 ? "" : "s"} went in without it — choose ${word} at checkout.`;
+}
+
+/**
+ * What a send put in the cart, as ledger rows (TEC-127): each added line's
+ * product, its quantity, and the mode it actually went with — none when Kroger
+ * refused the choice. Take back sends exactly this back, negated.
+ */
+export function sentRows(
+  outcomes: Outcome[],
+  modality: Modality | null
+): { item_id: string; name: string; kind: "sent"; upc: string; quantity: number; modality: Modality | null }[] {
+  return outcomes
+    .filter((o): o is Outcome & { upc: string } => o.result === "added" && typeof o.upc === "string")
+    .map((o) => ({ item_id: o.id, name: o.name, kind: "sent", upc: o.upc, quantity: o.quantity, modality: o.withoutModality ? null : modality }));
 }
 
 /** "3 added, 1 skipped, 1 failed" — the sentence that never lets a partial send read as whole. */

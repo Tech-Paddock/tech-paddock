@@ -33,7 +33,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 
 ## Tables (`cookbook`)
 
-Six; reasoning is in the migration headers.
+Reasoning is in the migration headers.
 
 - `recipes`: `macro_source` has no `web`; a unique index refuses a duplicate name.
 - `grocery_items`: `quantity` 1–99; `recipes` is a snapshot of names, so a rename never reaches
@@ -45,9 +45,17 @@ Six; reasoning is in the migration headers.
 - `menu`: one row per recipe with a `day`, set only beside *Add to list*; re-adding moves it.
   Shown per serving. Nothing expires; ✕ or Clear all.
 - `kroger_connection`: one row (`id` can only be true), the refresh token sealed with AES-256-GCM
-  (refused without `v1:`), the store, `refreshed_at`.
+  (refused without `v1:`), the store, `refreshed_at`, `modality` (PICKUP or DELIVERY, default
+  PICKUP; a disconnect deletes the row and the choice with it).
 - `brand_products`: price, stock, page, `checked_at`, `missing_since` (shown in Your brands and on
   its collapsed toggle).
+- `cart_sends` (TEC-127): the cart ledger, insert only (`lib/cartSends.ts`) except `item_id`,
+  which a Tidy moves onto the merged line before deleting the old ones. Signed quantity: `sent`
+  and `refused` positive, `taken_back` negative; the sum per line, UPC and modality is what Take
+  back removes. `item_id` is set null when a line is cleared, and those rows are never taken back.
+- `deal_scans`: one row per deal scan, insert only (`lib/dealStore.ts`). Deals, unpriced names and
+  failures are jsonb arrays; the store is copied onto the row, so a store change never rewrites
+  an old scan.
 
 ## Send to cart
 
@@ -61,10 +69,58 @@ Six; reasoning is in the migration headers.
 - Scopes: `cart.basic:write product.compact`. A missing variable is named on the list tab and in
   `/api/health`.
 - `GET /api/kroger/cart` is the review: an exact product's UPC is its URL's digits
-  (`productIdFromUrl`); a pasted page is remembered by `savePreference` under the line's name.
+  (`productIdFromUrl`).
+- **Remembering** (TEC-128): whatever goes in for a non-exact line, a pasted page or the tapped top
+  match, is saved by `savePreference` as a `product` row under the line's name (`splitLine`, so
+  never the note). The client sends the match's page as `match` beside its `upc`; an exact brand
+  sends none and is never re-saved. Only after that line's add succeeded (including the retry
+  without Pickup/Delivery); a failed add saves nothing. A page whose digits are not the UPC that
+  went in is not saved. A failed save is appended to the line's detail; the line stays added.
+  Same phrase as an existing row overwrites it (upsert on the normalised phrase), a `terms` row
+  included.
 - A send re-picking a line with `sent_at` returns 409 before Kroger is called, unless `again`.
+- A send appends a `sent` row per added line (`sentRows` in `lib/cart.ts`): the UPC that went in,
+  the quantity sent, and the modality it actually went with (null when Kroger refused the choice).
+  A failed append is named in `recordError`; the items are still in the cart.
+- **Take back** (TEC-127): rules in `lib/takeBack.ts`, route `/api/kroger/cart/take-back`. GET
+  reads the ledger for the confirm (no Kroger call); POST needs `confirm: true`. Only lines still
+  on the list, ticked or not. Per line it appends the `taken_back` rows first, then sends
+  `PUT /cart/add` with the negated quantity and the recorded modality (`takeBackFromCart`), never
+  retried without it; a refusal appends `refused` rows and the line stays sent. Only lines wholly
+  taken back get `sent_at` cleared (`markUnsent`). A line with `sent_at` and no ledger rows was sent
+  before the ledger and is skipped, with a pointer to the cart page. The summary always says
+  anything added elsewhere is still there; any failure shows the `CHECKOUT_URL` link. The button
+  and confirm are local patterns in `app/Cart.tsx`.
 - Refresh: `lib/refresh.ts`, `POST /api/kroger/refresh`, triggered by `lib/refreshDue.ts`. No cron.
   Search-word brands are counted, not checked. `refreshed_at` moves only when brands were checked.
+
+## Prices (TEC-121)
+
+- Pure logic in `lib/pricing.ts`, wired in `lib/dealRun.ts`; `lib/decide.ts` is the one brand
+  decider for the review, the estimate and the scan, so a line is priced as what Send would add.
+  Exact IDs go in one `productsByIds` call (50 per request); searches run four at a time.
+- Deal scan: `GET`/`POST /api/kroger/deals`. Every saved brand plus every open line; a deal is
+  `promo < regular`, sorted by percent off, then dollars. Runs when the list opens and the latest
+  scan is over seven days old (`scanDue`), or on *Scan for deals*. A scan that throws saves
+  nothing, so the next open retries.
+- Coupons are never read. *Find coupons* is `couponsUrl` (`lib/kingsoopers.ts`), a constant.
+- Estimate: `POST /api/kroger/estimate`, computed and not stored. Promo first, in cents. A line not
+  offered for the chosen mode, with no price or with no match is unpriced and named; with nothing
+  priced, `total` is null and the sentence says there is no estimate.
+- Pickup/Delivery: `PATCH /api/kroger`, `lib/modality.ts` (no imports; the browser runs it). Send
+  puts `modality` on each `/cart/add` item; a 400 or 422 is retried once without it, the rest of
+  that send goes without, and `modalityWarning` says so. Not retried on 401, 403 or an outage.
+- On-sale tag on a list line: "On sale, N% off until <date>" (`lib/saleTag.ts`, type-only
+  imports). No Kroger call of its own: `Cart.tsx` hands the latest scan and the last estimate up
+  through `onSaleSources`. The scan matches open lines by name, case-insensitive, and only when its
+  `location_id` is the chosen store; the estimate overrides for the lines it priced. A passed end
+  date tags nothing; no end date drops "until". Says sale, never coupon (TEC-126). The chip is a
+  local pattern in `app/List.tsx`.
+- Picking a store clears the estimate but does not start a scan; the old store's scan stays shown
+  under its store name and tags nothing until the next scan.
+- `Cart.tsx` runs every token-borrowing request through `serial`, one at a time: opening the list
+  can start a refresh and a scan together. The toggle, estimate panel and deal rows are local
+  patterns in `app/Deals.tsx`.
 
 ## Errors
 
@@ -81,16 +137,39 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 - A client component must not import a lib that imports `supabase.ts`.
 - Empty-vs-unread is in `DECISIONS.md`. `lint` is unconfigured.
 - Read Vercel and Supabase live before writing a deployment step.
-- **Kroger's API was never reached from here** (egress refuses it). Confirmed by search only: base
-  URL, OAuth paths, scopes, `filter.term` (3 characters to 8 words), `filter.locationId`,
-  8-character location IDs, `filter.zipCode.near`. Unconfirmed: Basic auth on `/token`,
-  `PUT /cart/add` with `{items:[{upc,quantity}]}` and no `modality`, `filter.chain=KINGSOOPERS`,
-  `productPageURI`, `inventory.stockLevel`, single-product `filter.productId`. Each is one constant
-  or parser in `lib/kroger.ts`; the first production Connect is the first real check.
+- **`api.kroger.com` is reachable from a session; `developer.kroger.com` and `kingsoopers.com`
+  are not.** A session holds a Kroger key only when the environment sets `KROGER_TEST_*`.
+  Confirmed live on the test app (2026-10-20): Basic auth on `/token` (the app token lasts 30
+  minutes), `filter.chain=KINGSOOPERS`, `filter.productId` with several comma-separated IDs,
+  `price.regular` plus `price.promo` with its start and end dates, `inventory.stockLevel`, the
+  aisle, fulfilment flags (pickup, delivery, in store, ship) and the product page link. Price,
+  stock and fulfilment come back empty without `filter.locationId`. `filter.term` needs at least 3
+  characters; search pages hold at most 50 and stop at 1,000 results. No rate-limit headers. The
+  public API has no coupons, offers, orders or lists (404). An app token gets 403 `AUTH-1007` on
+  `PUT /cart/add`, so the cart needs the user's sign-in; its body (`{items:[{upc,quantity}]}`,
+  with or without `modality`) is unconfirmed until the first production Send. **A negative
+  `quantity` on `/cart/add` is unconfirmed too** (Take back rests on it): untested until the first
+  production Take back. A refusal is handled (the line fails, stays sent, the cart page is
+  offered). A 2xx that Kroger ignores, or treats as a positive add, would not be noticed here:
+  check the cart page after the first one.
+- **`cookbook_cart_sends` must be applied before this code runs**: without it a send can't record
+  what went in (the items still go in, and `recordError` says so), Take back fails to read, and
+  **Tidy fails before deleting**, which leaves the list duplicated.
+- Lines sent before `cookbook_cart_sends` have no ledger rows; Take back skips them and says so.
 - **Changing `KROGER_TOKEN_KEY` orphans the token**; the list asks to connect again. That is the
   rotation path.
 - Two concurrent refreshes can race token rotation; the second fails with `reconnect`.
-- A remembered replacement's phrase is the line's whole name; shorten it in Your brands.
+- A remembered match or replacement's phrase is the line's whole name (less any note), so "whole
+  milk 2%" saves under that, not "milk"; shorten it in Your brands. Tapping a poor top match saves
+  it too: untick it or paste a page instead, or fix it in Your brands.
 - Preview and local deployments cannot complete Kroger sign-in; the redirect URI is production's.
-- The two Kroger migrations must be applied before this code runs.
+- The two Kroger migrations and `cookbook_deal_scans_and_modality` must be applied before this
+  code runs; the connection read selects `modality`, so without it the whole list tab's King
+  Soopers panel fails.
+- The coupons search's `?query=` parameter is unconfirmed (kingsoopers.com is unreachable from
+  here). A wrong one still lands on the coupons page, unsearched; it is one constant.
+- A line added since the last scan has no sale tag until the next scan or *Calculate estimated
+  total*; a line renamed by Tidy loses its tag the same way.
+- `withAccessToken` is per request: two tabs open at once can still race token rotation, because
+  `serial` covers one page.
 - Never revive a merged `claude/cookbook-*` branch.

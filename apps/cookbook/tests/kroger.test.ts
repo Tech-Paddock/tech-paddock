@@ -26,7 +26,20 @@ const mem = vi.hoisted(() => ({
   list: [] as Record<string, unknown>[],
   prefs: [] as Record<string, unknown>[],
   sent: [] as string[],
+  unsent: [] as string[],
+  ledger: [] as Record<string, unknown>[],
   tokenWrites: [] as string[],
+  scans: [] as Record<string, unknown>[],
+  saved: [] as Record<string, unknown>[],
+}));
+
+vi.mock("@/lib/dealStore", () => ({
+  readLatestScan: async () => mem.scans[mem.scans.length - 1] ?? null,
+  appendScan: async (scan: Record<string, unknown>) => {
+    const row = { id: `scan-${mem.scans.length + 1}`, ran_at: new Date().toISOString(), ...scan };
+    mem.scans.push(row);
+    return row;
+  },
 }));
 
 vi.mock("@/lib/krogerStore", () => ({
@@ -40,6 +53,9 @@ vi.mock("@/lib/krogerStore", () => ({
   },
   writeRefreshedAt: async (at: string) => {
     mem.row = { ...(mem.row ?? {}), refreshed_at: at };
+  },
+  writeModality: async (modality: string) => {
+    mem.row = { ...(mem.row ?? {}), modality };
   },
   deleteConnectionRow: async () => {
     mem.row = null;
@@ -56,12 +72,26 @@ vi.mock("@/lib/grocery", async (importOriginal) => ({
   markSent: async (ids: string[]) => {
     mem.sent.push(...ids);
   },
+  markUnsent: async (ids: string[]) => {
+    mem.unsent.push(...ids);
+  },
+}));
+
+vi.mock("@/lib/cartSends", () => ({
+  readSends: async (ids: string[]) => mem.ledger.filter((r) => ids.includes(String(r.item_id))),
+  appendSends: async (rows: Record<string, unknown>[]) => {
+    mem.ledger.push(...rows);
+  },
+  moveSends: async () => undefined,
 }));
 
 vi.mock("@/lib/preferences", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/preferences")>()),
   readPreferences: async () => mem.prefs,
-  savePreference: async (draft: Record<string, unknown>) => ({ id: "new", ...draft }),
+  savePreference: async (draft: Record<string, unknown>) => {
+    mem.saved.push(draft);
+    return { id: "new", ...draft };
+  },
 }));
 
 const PRODUCT = {
@@ -77,7 +107,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 /** Kroger, faked. Every request it receives is kept, so a test can say none was made. */
-const kroger = vi.fn(async (input: string | URL | Request) => {
+const defaultKroger = async (input: string | URL | Request, _init?: RequestInit) => {
   const url = String(input);
   if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT, expires_in: 1800 });
   if (url.includes("/locations")) {
@@ -86,7 +116,8 @@ const kroger = vi.fn(async (input: string | URL | Request) => {
   if (url.includes("/products")) return json({ data: [PRODUCT] });
   if (url.endsWith("/cart/add")) return new Response(null, { status: 204 });
   return json({ error: "unexpected" }, 500);
-});
+};
+const kroger = vi.fn(defaultKroger);
 
 function key() {
   return readKey(KEY_B64);
@@ -124,7 +155,11 @@ beforeEach(() => {
     },
   ];
   mem.sent = [];
+  mem.unsent = [];
+  mem.ledger = [];
   mem.tokenWrites = [];
+  mem.scans = [];
+  mem.saved = [];
 });
 
 afterEach(() => {
@@ -323,6 +358,50 @@ describe("no token appears in any response body", () => {
     expect(kroger.mock.calls.length).toBe(before);
   });
 
+  it("a tapped match goes in, then is remembered as an exact product under the line's name, note dropped (TEC-128)", async () => {
+    // An older row whose name still carries its note.
+    mem.list[1] = { ...mem.list[1], name: "eggs — the big box" };
+    const { GET, POST } = await import("@/app/api/kroger/cart/route");
+    const review = await bodyOf(await GET());
+    const match = review.lines[1].plan.product;
+    const body = await bodyOf(
+      await POST(
+        new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart", {
+          method: "POST",
+          body: JSON.stringify({ picks: [{ id: "b", upc: match.upc, match: match.url }] }),
+        })
+      )
+    );
+    expect(body.outcomes[1]).toMatchObject({ result: "added", detail: "Added ×1. Remembered in Your brands." });
+    expect(mem.saved).toEqual([expect.objectContaining({ phrase: "eggs", kind: "product", url: "https://www.kingsoopers.com/p/kroger-2-milk/0001111041700" })]);
+    // No model anywhere in this flow: Kroger is the only host called.
+    expect(kroger.mock.calls.every(([u]) => String(u).startsWith("https://api.kroger.com/"))).toBe(true);
+  });
+
+  it("a failed add remembers nothing (TEC-128)", async () => {
+    kroger.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
+      if (url.endsWith("/cart/add")) return json({ errors: { reason: "down" } }, 500);
+      return json({ data: [PRODUCT] });
+    });
+    try {
+      const { POST } = await import("@/app/api/kroger/cart/route");
+      const body = await bodyOf(
+        await POST(
+          new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart", {
+            method: "POST",
+            body: JSON.stringify({ picks: [{ id: "b", url: "https://www.kingsoopers.com/p/fairlife-2-milk/0085631200203" }] }),
+          })
+        )
+      );
+      expect(body.outcomes[1].result).toBe("failed");
+      expect(mem.saved).toEqual([]);
+    } finally {
+      kroger.mockImplementation(defaultKroger);
+    }
+  });
+
   it("the refresh", async () => {
     const { POST } = await import("@/app/api/kroger/refresh/route");
     const body = await bodyOf(await POST());
@@ -340,5 +419,203 @@ describe("no token appears in any response body", () => {
     const body = await bodyOf(res);
     expect(body.error).toMatch(/connect King Soopers again/);
     expect(body.reconnect).toBe(true);
+  });
+});
+
+describe("prices on the list tab (TEC-121)", () => {
+  const secrets = () => [STORED_RT, NEW_RT, ACCESS, CLIENT_SECRET, String(mem.row?.refresh_token_sealed ?? "never")];
+  async function bodyOf(res: Response) {
+    const text = await res.text();
+    for (const secret of secrets()) expect(text).not.toContain(secret);
+    return JSON.parse(text);
+  }
+  const onSale = { ...PRODUCT, items: [{ size: "1 gal", price: { regular: 4, promo: 3, expirationDate: { value: "2026-10-27T23:59:59Z" } } }] };
+
+  afterEach(() => {
+    kroger.mockImplementation(defaultKroger);
+  });
+
+  it("Pickup or Delivery is remembered on the connection, and anything else is refused", async () => {
+    const { GET, PATCH } = await import("@/app/api/kroger/route");
+    expect((await bodyOf(await GET())).modality).toBe("PICKUP");
+    const patch = (modality: unknown) =>
+      PATCH(new NextRequest("https://cookbook.techpaddock.io/api/kroger", { method: "PATCH", body: JSON.stringify({ modality }) }));
+    expect((await patch("SHIP")).status).toBe(400);
+    expect((await bodyOf(await patch("DELIVERY"))).modality).toBe("DELIVERY");
+    expect((await bodyOf(await GET())).modality).toBe("DELIVERY");
+  });
+
+  it("Send puts the chosen mode on the cart body", async () => {
+    mem.row = { ...mem.row, modality: "DELIVERY" };
+    const { POST } = await import("@/app/api/kroger/cart/route");
+    const body = await bodyOf(
+      await POST(
+        new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart", {
+          method: "POST",
+          body: JSON.stringify({ picks: [{ id: "a", upc: "0001111041700" }] }),
+        })
+      )
+    );
+    expect(body.modalityWarning).toBeNull();
+    const cartCall = kroger.mock.calls.find(([url]) => String(url).endsWith("/cart/add"));
+    expect(JSON.parse(String((cartCall?.[1] as RequestInit).body))).toEqual({
+      items: [{ upc: "0001111041700", quantity: 2, modality: "DELIVERY" }],
+    });
+  });
+
+  it("Send retries without the mode when Kroger refuses it, and warns", async () => {
+    kroger.mockImplementation(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
+      if (url.endsWith("/cart/add")) {
+        return String(init?.body).includes("modality") ? json({ errors: { reason: "invalid field" } }, 400) : new Response(null, { status: 204 });
+      }
+      return json({ data: [PRODUCT] });
+    });
+    const { POST } = await import("@/app/api/kroger/cart/route");
+    const body = await bodyOf(
+      await POST(
+        new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart", {
+          method: "POST",
+          body: JSON.stringify({ picks: [{ id: "a", upc: "0001111041700" }] }),
+        })
+      )
+    );
+    expect(body.outcomes[0]).toMatchObject({ result: "added", withoutModality: true });
+    expect(body.modalityWarning).toMatch(/refused the pickup choice/);
+    expect(mem.sent).toEqual(["a"]);
+  });
+
+  it("the estimate prices the list at the store, asking for the exact brands by ID", async () => {
+    const { POST } = await import("@/app/api/kroger/estimate/route");
+    const body = await bodyOf(await POST());
+    // milk ×2 (exact brand) and eggs ×1 (top match), both $3.49 in the fake.
+    expect(body.estimate.total).toBe(10.47);
+    expect(body.message).toMatch(/^Estimated total \$10\.47 for 2 lines, pickup at King Soopers Test/);
+    const productCalls = kroger.mock.calls.map(([u]) => decodeURIComponent(String(u))).filter((u) => u.includes("/products"));
+    expect(productCalls.some((u) => u.includes("filter.productId=0001111041700") && u.includes("filter.locationId=62000001"))).toBe(true);
+    expect(mem.scans).toEqual([]);
+  });
+
+  it("a deal scan is appended, never overwritten, and the latest is what GET shows", async () => {
+    kroger.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
+      return json({ data: [onSale] });
+    });
+    const { GET, POST } = await import("@/app/api/kroger/deals/route");
+    expect((await bodyOf(await GET())).latest).toBeNull();
+    const run = () => POST(new NextRequest("https://cookbook.techpaddock.io/api/kroger/deals", { method: "POST", body: "{}" }));
+    const first = await bodyOf(await run());
+    expect(first.scan.trigger).toBe("manual");
+    expect(first.scan.deals).toEqual([
+      expect.objectContaining({ productId: "0001111041700", regular: 4, promo: 3, percentOff: 25, for: ["milk", "eggs"] }),
+    ]);
+    // The saved brand, then the two open lines.
+    expect(first.message).toBe("Checked 3 at King Soopers Test: 1 on sale.");
+    await bodyOf(await run());
+    expect(mem.scans.map((s) => s.id)).toEqual(["scan-1", "scan-2"]);
+    expect((await bodyOf(await GET())).latest.id).toBe("scan-2");
+  });
+
+  it("without a store, the scan and the estimate say so and save nothing", async () => {
+    mem.row = { ...mem.row, location_id: null, store_name: null };
+    const deals = await import("@/app/api/kroger/deals/route");
+    const est = await import("@/app/api/kroger/estimate/route");
+    const scan = await deals.POST(new NextRequest("https://cookbook.techpaddock.io/api/kroger/deals", { method: "POST", body: "{}" }));
+    expect(scan.status).toBe(409);
+    expect((await bodyOf(scan)).error).toMatch(/Pick a store/);
+    expect((await est.POST()).status).toBe(409);
+    expect(mem.scans).toEqual([]);
+  });
+});
+
+describe("Take back (TEC-127)", () => {
+  const secrets = () => [STORED_RT, NEW_RT, ACCESS, CLIENT_SECRET, String(mem.row?.refresh_token_sealed ?? "never")];
+  async function bodyOf(res: Response) {
+    const text = await res.text();
+    for (const secret of secrets()) expect(text).not.toContain(secret);
+    return JSON.parse(text);
+  }
+  const cartBodies = () =>
+    kroger.mock.calls.filter(([url]) => String(url).endsWith("/cart/add")).map(([, init]) => JSON.parse(String((init as RequestInit).body)));
+  const takeBackPost = async (body: unknown) => {
+    const { POST } = await import("@/app/api/kroger/cart/take-back/route");
+    return POST(new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart/take-back", { method: "POST", body: JSON.stringify(body) }));
+  };
+
+  it("a send records the product, quantity and mode that went in", async () => {
+    mem.row = { ...mem.row, modality: "DELIVERY" };
+    const { POST } = await import("@/app/api/kroger/cart/route");
+    const body = await bodyOf(
+      await POST(
+        new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart", {
+          method: "POST",
+          body: JSON.stringify({ picks: [{ id: "a", upc: "0001111041700" }] }),
+        })
+      )
+    );
+    expect(body.recordError).toBeNull();
+    expect(mem.ledger).toEqual([{ item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "DELIVERY" }]);
+  });
+
+  it("takes back what was sent — not the line's quantity now — with the same mode, after a confirm, and marks it unsent", async () => {
+    mem.list[0].sent_at = "2026-10-21T01:00:00Z";
+    mem.list[0].quantity = 5; // changed since the send
+    mem.ledger = [{ item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "PICKUP" }];
+
+    const { GET } = await import("@/app/api/kroger/cart/take-back/route");
+    const preview = await bodyOf(await GET());
+    expect(preview.lines).toEqual([
+      { id: "a", name: "milk", sent_at: "2026-10-21T01:00:00Z", held: [{ upc: "0001111041700", quantity: 2, modality: "PICKUP" }] },
+    ]);
+    expect(cartBodies()).toEqual([]);
+
+    // The first tap alone takes nothing.
+    const unconfirmed = await takeBackPost({});
+    expect(unconfirmed.status).toBe(400);
+    expect(cartBodies()).toEqual([]);
+
+    const body = await bodyOf(await takeBackPost({ confirm: true }));
+    expect(cartBodies()).toEqual([{ items: [{ upc: "0001111041700", quantity: -2, modality: "PICKUP" }] }]);
+    expect(body.outcomes).toEqual([{ id: "a", name: "milk", result: "taken back", detail: "Took back ×2." }]);
+    expect(body.summary).toBe("1 taken back, 0 skipped, 0 failed. Anything added to the cart elsewhere is still there.");
+    expect(body.failed).toBe(false);
+    expect(mem.unsent).toEqual(["a"]);
+    expect(mem.ledger.at(-1)).toMatchObject({ kind: "taken_back", quantity: -2, modality: "PICKUP" });
+  });
+
+  it("when Kroger refuses a negative quantity, the line fails, stays sent, and the panel offers the cart page", async () => {
+    kroger.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
+      if (url.endsWith("/cart/add")) return json({ errors: { reason: "quantity must be positive" } }, 400);
+      return json({ data: [PRODUCT] });
+    });
+    mem.list[0].sent_at = "2026-10-21T01:00:00Z";
+    mem.ledger = [{ item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "PICKUP" }];
+
+    const body = await bodyOf(await takeBackPost({ confirm: true }));
+    expect(body.outcomes[0]).toMatchObject({ result: "failed", detail: expect.stringMatching(/Still marked sent/) });
+    expect(body.failed).toBe(true);
+    expect(body.checkoutUrl).toBe("https://www.kingsoopers.com/cart");
+    expect(mem.unsent).toEqual([]);
+    // Not retried without the mode.
+    expect(cartBodies()).toHaveLength(1);
+    // The reservation was reversed, so a later Take back still finds the milk.
+    const { GET } = await import("@/app/api/kroger/cart/take-back/route");
+    expect((await bodyOf(await GET())).lines[0].held).toEqual([{ upc: "0001111041700", quantity: 2, modality: "PICKUP" }]);
+  });
+
+  it("a line sent before the ledger is skipped without asking Kroger, and an empty list says so", async () => {
+    mem.list[1].sent_at = "2026-10-01T00:00:00Z";
+    const body = await bodyOf(await takeBackPost({ confirm: true }));
+    expect(body.outcomes).toEqual([expect.objectContaining({ id: "b", result: "skipped" })]);
+    expect(kroger).not.toHaveBeenCalled();
+
+    mem.list[1].sent_at = null;
+    const none = await takeBackPost({ confirm: true });
+    expect(none.status).toBe(400);
+    expect((await bodyOf(none)).error).toMatch(/hasn't sent anything/);
   });
 });

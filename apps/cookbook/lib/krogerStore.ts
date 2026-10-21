@@ -1,5 +1,6 @@
 import { getServiceClient } from "./supabase";
 import { ConflictError, LookupError } from "./errors";
+import type { Modality } from "./modality";
 
 /**
  * `cookbook.kroger_connection` (the one row) and `cookbook.brand_products`
@@ -17,12 +18,14 @@ export type ConnectionRow = {
   store_name: string | null;
   connected_at: string;
   refreshed_at: string | null;
+  /** PICKUP or DELIVERY (TEC-121; the `cookbook_deal_scans_and_modality` migration). */
+  modality: string | null;
 };
 
 export async function readConnectionRow(): Promise<ConnectionRow | null> {
   const { data, error } = await getServiceClient()
     .from("kroger_connection")
-    .select("refresh_token_sealed, location_id, store_name, connected_at, refreshed_at")
+    .select("refresh_token_sealed, location_id, store_name, connected_at, refreshed_at, modality")
     .maybeSingle();
   if (error) throw new LookupError(`Couldn't read the King Soopers connection: ${error.message}`);
   return (data as ConnectionRow | null) ?? null;
@@ -48,6 +51,17 @@ export async function writeStore(locationId: string, storeName: string): Promise
     .select("id");
   if (error) throw new LookupError(`Couldn't save the store: ${error.message}`);
   if (!data || data.length === 0) throw new ConflictError("Connect King Soopers before picking a store.");
+}
+
+/** Pickup or Delivery, remembered on the connection. The column's check refuses anything else. */
+export async function writeModality(modality: Modality): Promise<void> {
+  const { data, error } = await getServiceClient()
+    .from("kroger_connection")
+    .update({ modality, updated_at: new Date().toISOString() })
+    .eq("id", true)
+    .select("id");
+  if (error) throw new LookupError(`Couldn't save pickup or delivery: ${error.message}`);
+  if (!data || data.length === 0) throw new ConflictError("Connect King Soopers before choosing pickup or delivery.");
 }
 
 export async function writeRefreshedAt(at: string): Promise<void> {

@@ -58,10 +58,12 @@ section and closing comment before changing anything in this file.
 - Pick a store once; lookups price and stock there.
 - Send adds; it never checks out. "Go to checkout" opens the King Soopers cart.
 - An exact product in Your brands goes in as-is. Any other line shows Kroger's top match, which the
-  user adds or replaces with a product URL; a replacement is remembered in Your brands.
+  user adds or replaces with a product URL; whichever goes in, the match or the replacement, is
+  remembered in Your brands under the line's name.
 - No model picks a product or runs anywhere in this flow.
 - Every line reports added, skipped or failed; a partial send never reads as whole.
 - A second send warns and shows what was already sent, because the Cart API only adds.
+- **Take back** removes what Cookbook sent, by sending negative quantities of the same products, and marks those lines unsent. It never claims the cart is empty: anything added elsewhere stays, and the button says so. If Kroger refuses a negative quantity, it reports that per line and offers the cart page.
 - Each saved brand keeps product ID, page, size, last price, stock and when checked. Refresh runs
   on opening the list over seven days after the last, or on **Refresh now**. It updates price and
   stock, fills missing IDs, keeps the connection alive, and flags a product Kroger no longer

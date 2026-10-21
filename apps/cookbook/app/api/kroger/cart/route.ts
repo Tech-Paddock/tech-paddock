@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readList, markSent, type GroceryItem } from "@/lib/grocery";
-import { matchPreference, readDraft, readPreferences, savePreference } from "@/lib/preferences";
+import { readList, markSent, splitLine, type GroceryItem } from "@/lib/grocery";
+import { readDraft, readPreferences, savePreference } from "@/lib/preferences";
+import { decider } from "@/lib/decide";
 import { addToCart, topProduct } from "@/lib/kroger";
 import { withAccessToken } from "@/lib/krogerConnection";
 import { readBrandProducts } from "@/lib/krogerStore";
+import { appendSends } from "@/lib/cartSends";
 import {
   alreadySent,
   readPicks,
   repeatsIn,
   reviewLines,
   RepeatSendError,
+  modalityWarning,
   sendLines,
+  sentRows,
   summarize,
   type CartLine,
-  type Decision,
 } from "@/lib/cart";
 import { CHECKOUT_URL } from "@/lib/kingsoopers";
 import { ConflictError, InputError } from "@/lib/errors";
@@ -41,11 +44,7 @@ async function openLines(): Promise<CartLine[]> {
 export async function GET() {
   try {
     const [open, preferences, products] = await Promise.all([openLines(), readPreferences(), readBrandProducts()]);
-    const missing = new Set(products.filter((p) => p.missing_since).map((p) => p.preference_id));
-    const decide = (name: string): Decision => {
-      const p = matchPreference(name, preferences);
-      return p ? { phrase: p.phrase, kind: p.kind, url: p.url, terms: p.terms, missing: missing.has(p.id) } : null;
-    };
+    const decide = decider(preferences, products);
 
     const lines = await withAccessToken(async (accessToken, store) => {
       if (!store) throw new ConflictError("Pick a store first, so the matches are from your King Soopers.");
@@ -75,31 +74,50 @@ export async function POST(request: NextRequest) {
       if (repeats.length > 0) throw new RepeatSendError(repeats);
     }
 
-    const outcomes = await withAccessToken((accessToken) =>
-      sendLines(
-        { open, picks, again },
+    const { outcomes, modality } = await withAccessToken(async (accessToken, _store, modality) => ({
+      modality,
+      outcomes: await sendLines(
+        { open, picks, again, modality },
         {
-          add: (upc, quantity) => addToCart(accessToken, upc, quantity),
-          // **A replacement is remembered in Your brands** (RULES.md), through
-          // the same validation as the editor.
-          remember: async (phrase, url) => {
-            const read = readDraft({ phrase, kind: "product", url });
+          // Pickup or Delivery goes with each line; a refusal is retried once without it (lib/cart.ts).
+          add: (upc, quantity, m) => addToCart(accessToken, upc, quantity, m),
+          // **What went in is remembered in Your brands** (RULES.md, TEC-128):
+          // a replacement or the tapped match, as an exact product under the
+          // line's name — never its note — through the same validation as the
+          // editor. `sendLines` calls this only after the add succeeded.
+          remember: async (name, url) => {
+            const read = readDraft({ phrase: splitLine(name).name, kind: "product", url });
             if ("error" in read) throw new InputError(read.error);
             await savePreference(read.row);
           },
         }
-      )
-    );
+      ),
+    }));
 
     const added = outcomes.filter((o) => o.result === "added").map((o) => o.id);
-    let recordError: string | null = null;
+    const problems: string[] = [];
+    // **What actually went in** — product, quantity, mode — so Take back
+    // removes that, not whatever the line says later (TEC-127).
+    try {
+      await appendSends(sentRows(outcomes, modality));
+    } catch {
+      problems.push("Take back won't know about them — remove them on the King Soopers cart page if you need to.");
+    }
     try {
       await markSent(added, new Date().toISOString());
     } catch {
-      recordError = "These are in the cart, but this app couldn't record it — a second send won't warn about them.";
+      problems.push("A second send won't warn about them.");
     }
+    const recordError = problems.length > 0 ? `These are in the cart, but this app couldn't record it. ${problems.join(" ")}` : null;
 
-    return NextResponse.json({ outcomes, summary: summarize(outcomes), recordError, checkoutUrl: CHECKOUT_URL });
+    return NextResponse.json({
+      outcomes,
+      summary: summarize(outcomes),
+      recordError,
+      modality,
+      modalityWarning: modalityWarning(outcomes, modality),
+      checkoutUrl: CHECKOUT_URL,
+    });
   } catch (e) {
     if (e instanceof RepeatSendError) {
       return NextResponse.json({ error: e.message, alreadySent: e.lines }, { status: 409 });

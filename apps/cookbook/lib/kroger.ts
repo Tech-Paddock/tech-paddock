@@ -1,5 +1,6 @@
 import { keyProblem, readKey } from "./krogerCrypto";
 import { SetupError, UpstreamError } from "./errors";
+import type { Modality } from "./modality";
 
 /**
  * Kroger's public API, as this app uses it (TEC-90). **Server-side only.**
@@ -18,6 +19,12 @@ import { SetupError, UpstreamError } from "./errors";
  * Each is one constant or one parser, so a wrong guess is a small fix, and the
  * tests mock Kroger entirely. The first real check is connecting on
  * production.
+ *
+ * **Since 2026-10-20 the product side is confirmed** on a test app (TEC-121):
+ * Basic auth on the token route, the chain filter, several IDs per
+ * `filter.productId`, `price.regular` and `price.promo` with dates, stock,
+ * fulfilment flags, the product page. The cart body, with or without
+ * `modality`, still is not: an app token is refused there.
  *
  * **Tokens never leave this file except to Kroger or into `krogerCrypto.seal`.**
  * No function here returns one to a route, and no error message carries one:
@@ -213,6 +220,15 @@ export type Product = {
   size: string | null;
   /** The shelf price at the chosen store, promo first. Null when Kroger gave none. */
   price: number | null;
+  /** Kroger's regular price at the store, or null. */
+  regular: number | null;
+  /** Kroger's sale price at the store, or null when there is none (Kroger sends 0 for none). */
+  promo: number | null;
+  /** When the sale price ends, as Kroger gave it, or null (TEC-121). */
+  promoEnds: string | null;
+  /** Fulfilment at the store: pickup (Kroger's `curbside`) and delivery. Null when Kroger did not say. */
+  pickup: boolean | null;
+  delivery: boolean | null;
   /** Kroger's stock level at the store, read as yes or no. Null when Kroger gave none. */
   inStock: boolean | null;
   /** The product's King Soopers page: Kroger's own when it gives one, else built from the description and ID. */
@@ -246,6 +262,31 @@ function readStock(item: Record<string, unknown> | null): boolean | null {
   return level !== "TEMPORARILY_OUT_OF_STOCK";
 }
 
+/**
+ * A date Kroger gave on a price, or null. The 2026-10-20 probe saw start and
+ * end dates on the promo; a date is read as a string or as `{ value }`,
+ * because a wrong guess here should cost the date, not the deal.
+ */
+function readDate(raw: unknown): string | null {
+  const value = typeof raw === "string" ? raw : (raw as { value?: unknown } | null)?.value;
+  return typeof value === "string" && value && !Number.isNaN(Date.parse(value)) ? value : null;
+}
+
+/**
+ * One fulfilment flag, as yes, no or not said. **Keys are matched without
+ * case**, and pickup is read from `curbside` or `pickup`: Kroger's published
+ * examples say `curbside`, the probe's summary says "pickup", and either lands
+ * here.
+ */
+function readFulfilment(item: Record<string, unknown> | null, keys: string[]): boolean | null {
+  const flags = (item?.fulfillment ?? item?.fulfilment) as Record<string, unknown> | undefined;
+  if (!flags || typeof flags !== "object") return null;
+  for (const [k, v] of Object.entries(flags)) {
+    if (keys.includes(k.toLowerCase()) && typeof v === "boolean") return v;
+  }
+  return null;
+}
+
 export function isUpc(value: unknown): value is string {
   return typeof value === "string" && /^\d{8,14}$/.test(value);
 }
@@ -271,6 +312,11 @@ export function readProducts(body: unknown): Product[] {
       brand: typeof row.brand === "string" && row.brand ? row.brand : null,
       size: typeof item?.size === "string" && item.size ? item.size : null,
       price: promo ?? regular,
+      regular,
+      promo,
+      promoEnds: promo !== null ? readDate(price?.expirationDate) : null,
+      pickup: readFulfilment(item, ["curbside", "pickup"]),
+      delivery: readFulfilment(item, ["delivery"]),
       inStock: readStock(item),
       url: productPage(productId, description, row.productPageURI),
     });
@@ -292,6 +338,32 @@ export async function productById(accessToken: string, productId: string, locati
   if (!response.ok) throw new KrogerError(`Kroger's product lookup failed (${await errorCode(response)}).`, response.status);
   const products = readProducts(await response.json().catch(() => ({})));
   return products.find((p) => p.productId === productId || p.upc === productId) ?? null;
+}
+
+/** Kroger's page size, and so the most IDs one `filter.productId` request asks for (probed 2026-10-20). */
+export const PRODUCTS_PER_REQUEST = 50;
+
+/**
+ * Many products at the store by ID, **one request per fifty**: the probe
+ * confirmed `filter.productId` takes several comma-separated IDs. A product
+ * Kroger does not return is absent from the answer, and the caller says so.
+ * Price, stock and fulfilment are empty without `filter.locationId`, so it is
+ * always sent.
+ */
+export async function productsByIds(accessToken: string, productIds: string[], locationId: string): Promise<Product[]> {
+  const ids = [...new Set(productIds.filter(isUpc))];
+  const out: Product[] = [];
+  for (let i = 0; i < ids.length; i += PRODUCTS_PER_REQUEST) {
+    const url = new URL(`${KROGER_API}/products`);
+    url.searchParams.set("filter.productId", ids.slice(i, i + PRODUCTS_PER_REQUEST).join(","));
+    url.searchParams.set("filter.locationId", locationId);
+    url.searchParams.set("filter.limit", String(PRODUCTS_PER_REQUEST));
+    const response = await call(url.toString(), { headers: bearer(accessToken) });
+    if (response.status === 404) continue;
+    if (!response.ok) throw new KrogerError(`Kroger's product lookup failed (${await errorCode(response)}).`, response.status);
+    out.push(...readProducts(await response.json().catch(() => ({}))));
+  }
+  return out;
 }
 
 /**
@@ -323,14 +395,33 @@ export async function topProduct(accessToken: string, term: string, locationId: 
  * Add one product to the cart. **One request per line on purpose**: the Cart
  * API takes a batch, but a refused batch says nothing about which line it
  * refused, and every line here has to report added, skipped or failed.
+ *
+ * `modality` (PICKUP or DELIVERY, TEC-121) goes on the item when given. **It
+ * is unconfirmed**: an app token cannot reach this route, so the first
+ * production Send is its first check, and `sendLines` retries a refused line
+ * once without it and says so.
  */
-export async function addToCart(accessToken: string, upc: string, quantity: number): Promise<void> {
+export async function addToCart(accessToken: string, upc: string, quantity: number, modality: Modality | null = null): Promise<void> {
   const response = await call(`${KROGER_API}/cart/add`, {
     method: "PUT",
     headers: { ...bearer(accessToken), "Content-Type": "application/json" },
-    body: JSON.stringify({ items: [{ upc, quantity }] }),
+    body: JSON.stringify({ items: [modality ? { upc, quantity, modality } : { upc, quantity }] }),
   });
   if (!response.ok) {
     throw new KrogerError(`Kroger refused it (${await errorCode(response)}).`, response.status, response.status === 401);
   }
+}
+
+/**
+ * Take back what a send put in (TEC-127): **the same route, the same product
+ * and mode, the quantity negated**. The public Cart API has no remove.
+ *
+ * **Whether Kroger accepts a negative quantity is unconfirmed**; the first
+ * production Take back is its first check. A refusal throws, the line fails and
+ * stays marked sent. It is not retried without the mode: a product goes back
+ * out the way it went in.
+ */
+export async function takeBackFromCart(accessToken: string, upc: string, quantity: number, modality: Modality | null): Promise<void> {
+  if (!Number.isInteger(quantity) || quantity < 1) throw new KrogerError("Nothing to take back.", 0);
+  await addToCart(accessToken, upc, -quantity, modality);
 }
