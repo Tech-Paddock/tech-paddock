@@ -860,6 +860,189 @@
 }
 
 /* ====================================================================
+   McLaren MCL39 — papaya and anthracite, 2025
+
+   Papaya cannot carry text on a light ground (#FF8000 on white is 2.5:1), so
+   in light it is a fill only: tone 2, with anthracite ink. The light accent is
+   a burnt papaya dark enough for text, and the light pinstripe a deeper papaya
+   that still clears 3:1 on the page and on the bar. In dark, papaya is legible
+   on anthracite and becomes the accent itself.
+
+   Not MP4/4 side by side: these neutrals are a cool anthracite where MP4/4's
+   are a warm cream, and every colour here is orange where MP4/4's is red.
+
+   Why the bar is not papaya, though the car is: the shared header CSS paints
+   the bar's ink at 0.72 and 0.4 alpha and the failed-logout border in
+   --sev-urgent. On papaya those measure 4.25:1, 2.12:1 and 2.23:1 — text
+   under 4.5 and boundaries under 3 — so a papaya bar would need those shared
+   rules changed for every app.
+   ==================================================================== */
+
+[data-livery="mcl39"] {
+  color-scheme: light;
+
+  --paper-rgb: 245 245 246;
+  --paper: rgb(var(--paper-rgb));
+  --surface-rgb: 255 255 255;
+  --surface: rgb(var(--surface-rgb));
+  --surface-raised-rgb: 233 234 237;
+  --surface-raised: rgb(var(--surface-raised-rgb));
+
+  --ink-rgb: 18 19 22;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft-rgb: 88 90 95;
+  --ink-soft: rgb(var(--ink-soft-rgb));
+  --ink-invert-rgb: 255 255 255;
+  --ink-invert: rgb(var(--ink-invert-rgb));
+
+  --line-rgb: 145 147 151;
+  --line: rgb(var(--line-rgb));
+  --accent-rgb: 168 66 0;
+  --accent: rgb(var(--accent-rgb));
+  --accent-ink-rgb: 255 255 255;
+  --accent-ink: rgb(var(--accent-ink-rgb));
+  --pinstripe-rgb: 208 100 0;
+  --pinstripe: rgb(var(--pinstripe-rgb));
+
+  --sev-urgent-rgb: 198 40 40;
+  --sev-urgent: rgb(var(--sev-urgent-rgb));
+  --sev-info-rgb: 132 135 140;
+  --sev-info: rgb(var(--sev-info-rgb));
+  --danger-rgb: 179 38 30;
+  --danger: rgb(var(--danger-rgb));
+  --sev-warn-rgb: var(--accent-rgb);
+  --sev-warn: var(--accent);
+
+  --bar-rgb: 18 19 22;
+  --bar: rgb(var(--bar-rgb));
+  --bar-ink-rgb: 245 245 246;
+  --bar-ink: rgb(var(--bar-ink-rgb));
+
+  --tone-1-bg: #ffe8d4;
+  --tone-1-ink: #121316;
+  --tone-1-lip: #b8a799;
+  --tone-2-bg: #ff8000;
+  --tone-2-ink: #121316;
+  --tone-2-lip: #b85c00;
+  --tone-3-bg: #2b2d31;
+  --tone-3-ink: #ffffff;
+  --tone-3-lip: #1f2023;
+  --tone-4-bg: #a84200;
+  --tone-4-ink: #ffffff;
+  --tone-4-lip: #793000;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-livery="mcl39"]:not([data-mode="light"]) {
+    color-scheme: dark;
+
+    --paper-rgb: 12 12 13;
+    --paper: rgb(var(--paper-rgb));
+    --surface-rgb: 23 23 25;
+    --surface: rgb(var(--surface-rgb));
+    --surface-raised-rgb: 44 44 48;
+    --surface-raised: rgb(var(--surface-raised-rgb));
+
+    --ink-rgb: 244 241 236;
+    --ink: rgb(var(--ink-rgb));
+    --ink-soft-rgb: 166 162 158;
+    --ink-soft: rgb(var(--ink-soft-rgb));
+    --ink-invert-rgb: 12 12 13;
+    --ink-invert: rgb(var(--ink-invert-rgb));
+
+    --line-rgb: 104 102 100;
+    --line: rgb(var(--line-rgb));
+    --accent-rgb: 255 128 0;
+    --accent: rgb(var(--accent-rgb));
+    --accent-ink-rgb: 20 12 4;
+    --accent-ink: rgb(var(--accent-ink-rgb));
+    --pinstripe-rgb: 255 128 0;
+    --pinstripe: rgb(var(--pinstripe-rgb));
+
+    --sev-urgent-rgb: 239 95 120;
+    --sev-urgent: rgb(var(--sev-urgent-rgb));
+    --sev-info-rgb: 112 110 108;
+    --sev-info: rgb(var(--sev-info-rgb));
+    --danger-rgb: 255 138 128;
+    --danger: rgb(var(--danger-rgb));
+    --sev-warn-rgb: var(--accent-rgb);
+    --sev-warn: var(--accent);
+
+    --bar-rgb: 12 12 13;
+    --bar: rgb(var(--bar-rgb));
+    --bar-ink-rgb: 244 241 236;
+    --bar-ink: rgb(var(--bar-ink-rgb));
+
+    --tone-1-bg: #ffe2c6;
+    --tone-1-ink: #121316;
+    --tone-1-lip: #b8a38f;
+    --tone-2-bg: #ff8000;
+    --tone-2-ink: #140c04;
+    --tone-2-lip: #b85c00;
+    --tone-3-bg: #3a3c41;
+    --tone-3-ink: #f4f1ec;
+    --tone-3-lip: #2a2b2f;
+    --tone-4-bg: #a84200;
+    --tone-4-ink: #f4f1ec;
+    --tone-4-lip: #793000;
+  }
+}
+
+[data-livery="mcl39"][data-mode="dark"] {
+  color-scheme: dark;
+
+  --paper-rgb: 12 12 13;
+  --paper: rgb(var(--paper-rgb));
+  --surface-rgb: 23 23 25;
+  --surface: rgb(var(--surface-rgb));
+  --surface-raised-rgb: 44 44 48;
+  --surface-raised: rgb(var(--surface-raised-rgb));
+
+  --ink-rgb: 244 241 236;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft-rgb: 166 162 158;
+  --ink-soft: rgb(var(--ink-soft-rgb));
+  --ink-invert-rgb: 12 12 13;
+  --ink-invert: rgb(var(--ink-invert-rgb));
+
+  --line-rgb: 104 102 100;
+  --line: rgb(var(--line-rgb));
+  --accent-rgb: 255 128 0;
+  --accent: rgb(var(--accent-rgb));
+  --accent-ink-rgb: 20 12 4;
+  --accent-ink: rgb(var(--accent-ink-rgb));
+  --pinstripe-rgb: 255 128 0;
+  --pinstripe: rgb(var(--pinstripe-rgb));
+
+  --sev-urgent-rgb: 239 95 120;
+  --sev-urgent: rgb(var(--sev-urgent-rgb));
+  --sev-info-rgb: 112 110 108;
+  --sev-info: rgb(var(--sev-info-rgb));
+  --danger-rgb: 255 138 128;
+  --danger: rgb(var(--danger-rgb));
+  --sev-warn-rgb: var(--accent-rgb);
+  --sev-warn: var(--accent);
+
+  --bar-rgb: 12 12 13;
+  --bar: rgb(var(--bar-rgb));
+  --bar-ink-rgb: 244 241 236;
+  --bar-ink: rgb(var(--bar-ink-rgb));
+
+  --tone-1-bg: #ffe2c6;
+  --tone-1-ink: #121316;
+  --tone-1-lip: #b8a38f;
+  --tone-2-bg: #ff8000;
+  --tone-2-ink: #140c04;
+  --tone-2-lip: #b85c00;
+  --tone-3-bg: #3a3c41;
+  --tone-3-ink: #f4f1ec;
+  --tone-3-lip: #2a2b2f;
+  --tone-4-bg: #a84200;
+  --tone-4-ink: #f4f1ec;
+  --tone-4-lip: #793000;
+}
+
+/* ====================================================================
    Status lights — green and amber, for a stoplight dot. Red is --sev-urgent
    and off is --sev-info, both per livery above.
 

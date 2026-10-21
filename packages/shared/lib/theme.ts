@@ -19,7 +19,7 @@
 
 export type Mode = "light" | "dark";
 
-export type Livery = "martini" | "clark" | "senna" | "mp44" | "jps";
+export type Livery = "martini" | "clark" | "senna" | "mp44" | "jps" | "mcl39";
 
 /**
  * Two lines, shown beside the page title: **who and when**, then **what and who
@@ -59,6 +59,12 @@ export const LIVERIES: Record<Livery, { name: string; source: string }> = {
   jps: {
     name: "JPS '78",
     source: "Lotus 79, Mario Andretti",
+  },
+  mcl39: {
+    // Keyed by chassis like mp44, never "mclaren": two McLarens wear two
+    // different cars here, red-and-white 1988 and papaya 2025.
+    name: "McLaren '25",
+    source: "MCL39, Lando Norris",
   },
 };
 
