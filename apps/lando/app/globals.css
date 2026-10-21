@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The two values that cannot be utility classes, because nothing renders the
+   <body> element with a className. Both read the tokens lib/theme.css sets on
+   <html>, so they follow the livery and the polarity like everything else. */
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+}
+
+/* Installed to the home screen there is no browser chrome, so the page runs
+   under the notch and the home indicator. In Safari these insets are zero
+   and this changes nothing. */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Analytics chart series (app/StackedBars.tsx), a local pattern. Read from the
+   theme's tokens, never hex: papaya, then a second orange that differs from it
+   in both polarities (burnt in light, peach in dark, where the accent itself is
+   papaya), then the soft ink. Accidents use --danger directly. The dark rule is
+   written twice, as lib/theme.css does: once for the system setting, once for
+   the cookie-chosen mode. */
+:root {
+  --lando-series-1: var(--tone-2-bg);
+  --lando-series-2: var(--tone-4-bg);
+  --lando-series-3: var(--ink-soft);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode="light"]) {
+    --lando-series-2: var(--tone-1-bg);
+  }
+}
+:root[data-mode="dark"] {
+  --lando-series-2: var(--tone-1-bg);
+}
+
+/* The bottom sheet rises rather than appears, unless motion is reduced. */
+@media (prefers-reduced-motion: no-preference) {
+  .lando-sheet {
+    animation: lando-sheet-up 0.18s ease-out;
+  }
+}
+@keyframes lando-sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0.6;
+  }
+}

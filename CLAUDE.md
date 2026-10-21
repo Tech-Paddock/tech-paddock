@@ -92,6 +92,9 @@ go, go fully and do not reopen it.
   remain).
 - **Assign an issue only while a step waits on the owner,** and mark that step ⭐.
 - **Open every message to the owner with a `---` line.**
+- **Anything the owner should open outside the chat is a clickable link:** an app, a Linear issue,
+  a pull request, a dashboard page. Never a bare name, subdomain or path. Linear issues carry the
+  same links (an app's issue links its live URL).
 
 ## Shared foundation
 
@@ -129,6 +132,7 @@ Registrar.
 | `coffee.techpaddock.io` | Coffee | `tp-coffee-app` |
 | `health.techpaddock.io` | Health | `tp-health` |
 | `cookbook.techpaddock.io` | Cookbook | `tp-cookbook` |
+| `lando.techpaddock.io` | Lando | `tp-lando` |
 
 A new app needs no CI change; the matrix derives from `apps/`. Its Vercel project and DNS record
 are the owner's.

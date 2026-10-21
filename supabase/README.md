@@ -1,7 +1,7 @@
 # Supabase
 
 One project (`qyclakzsupyxgnqfgpiq`, `tech-paddock`) backs every app. Each tool has its own schema —
-`resume`, `coffee`, `health`, `cookbook` — never `public`. One
+`resume`, `coffee`, `health`, `cookbook`, `lando` — never `public`. One
 migration history, here at the repo root.
 
 ## History
