@@ -28,8 +28,8 @@ const EXERCISE: Series[] = [
 
 function Card({ title, summary, children }: { title: string; summary?: string; children: React.ReactNode }) {
   return (
-    <section className="grid min-w-0 gap-2 rounded-[14px] border border-line bg-surface p-3.5">
-      <h3 className="text-[17px] font-bold">{title}</h3>
+    <section className="grid min-w-0 gap-1.5 rounded-[14px] border border-line bg-surface p-3">
+      <h3 className="text-base font-bold">{title}</h3>
       {summary && <p className="text-sm tabular-nums text-ink-soft">{summary}</p>}
       {children}
     </section>
@@ -54,8 +54,8 @@ export default function Analytics({ events, now }: { events: JournalEvent[]; now
   const tooSoon = "Not a full day logged yet, so no average.";
 
   return (
-    <div className="flex flex-col gap-4">
-      <h2 className="text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-soft">Last {ANALYTICS_DAYS} days</h2>
+    <div className="flex flex-col gap-3">
+      <h2 className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Last {ANALYTICS_DAYS} days</h2>
       <Card title="Weight">
         <GrowthChart events={events} since={since} />
       </Card>

@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default function Page() {
   return (
     <main className="min-h-screen">
-      <header className="flex items-center gap-2 border-b-4 border-accent bg-bar px-4 py-3 text-bar-ink">
+      <header className="flex items-center gap-2 border-b-4 border-accent bg-bar px-3 py-2.5 text-bar-ink">
         <h1 className="text-lg font-semibold tracking-tight">Lando</h1>
         <ThemeControl onBar />
         <LogoutControl onBar />

@@ -22,7 +22,7 @@ import {
 } from "@/lib/events";
 import { formatAmount, parseAmount, picklist, findFood, unitLabel, type FoodType } from "@/lib/foods";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
-import { fromLocalInput, toLocalInput } from "@/lib/localtime";
+import { fromLocalInput, toLocalInput, whenLabel } from "@/lib/localtime";
 
 export type Person = { id: string; display_name: string };
 
@@ -54,9 +54,9 @@ type Props = {
 /* ── Small parts ─────────────────────────────────────────────────────────── */
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
-  const lbl = "text-[13px] uppercase tracking-[0.06em] text-ink-soft";
+  const lbl = "text-xs uppercase tracking-[0.06em] text-ink-soft";
   return (
-    <div className="grid min-w-0 gap-1.5">
+    <div className="grid min-w-0 gap-1">
       {htmlFor ? (
         <label htmlFor={htmlFor} className={lbl}>
           {label}
@@ -245,7 +245,7 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
   const title = KIND_LABELS[kind];
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3.5" noValidate>
+    <form onSubmit={submit} className="flex flex-col gap-3" noValidate>
       {kind === "potty" && (
         <>
           <Field label="What">
@@ -263,7 +263,7 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
           <Field label="Type">
             <Seg name="type" label="Type" value={foodType} onChange={pickFoodType} options={[["meal", "Meal"], ["treat", "Treat"]] as const} />
           </Field>
-          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2.5">
+          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2">
             <Field label="What" htmlFor="f-item">
               <select id="f-item" value={itemId} onChange={(e) => setItemId(e.target.value)} className={input}>
                 {/* A retired item stays selectable on the entry that already has it. */}
@@ -306,7 +306,7 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
           <Field label="With other dogs">
             <Seg name="dogs" label="With other dogs" value={withDogs} onChange={setWithDogs} options={YES_NO} />
           </Field>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-2">
             <Field label="Length (min)" htmlFor="f-mins">
               <input id="f-mins" type="number" inputMode="numeric" min={1} max={600} value={minutes} onChange={(e) => setMinutes(e.target.value)} className={input} />
             </Field>
@@ -339,7 +339,7 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
       )}
 
       {kind === "weight" && (
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 gap-2">
           <Field label="Weight" htmlFor="f-value">
             <input
               id="f-value"
@@ -359,18 +359,34 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
         </div>
       )}
 
-      <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-2.5">
+      <div className="grid grid-cols-2 gap-2">
         <Field label="When" htmlFor="f-when">
-          <input
-            id="f-when"
-            type="datetime-local"
-            value={when}
-            onChange={(e) => {
-              setWhen(e.target.value);
-              setWhenTouched(true);
-            }}
-            className={input}
-          />
+          {/* The native control is wider than half a phone and pushed into
+              Human, so a short label shows instead. The real input sits over
+              it, transparent: a tap opens the phone's own picker, and focus,
+              screen readers and keyboard editing still reach the input. */}
+          <div className="relative min-w-0 rounded-[10px] border border-line bg-paper focus-within:border-accent">
+            <span aria-hidden="true" className="block truncate px-2.5 py-2.5 tabular-nums">
+              {!editing && !whenTouched ? "Now" : whenLabel(when, new Date()) || "Pick a time"}
+            </span>
+            <input
+              id="f-when"
+              type="datetime-local"
+              value={when}
+              onClick={(e) => {
+                try {
+                  e.currentTarget.showPicker();
+                } catch {
+                  // Not supported, or not from a tap: the native control still edits.
+                }
+              }}
+              onChange={(e) => {
+                setWhen(e.target.value);
+                setWhenTouched(true);
+              }}
+              className="absolute inset-0 h-full w-full min-w-0 cursor-pointer opacity-0"
+            />
+          </div>
         </Field>
         <Field label="Human" htmlFor="f-who">
           <select id="f-who" value={personId} onChange={(e) => setPersonId(e.target.value)} className={input}>
@@ -397,7 +413,7 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
         type="submit"
         disabled={busy}
         data-autofocus={kind === "weight" && !editing ? undefined : true}
-        className="rounded-[14px] bg-[var(--tone-2-bg)] p-4 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)] disabled:opacity-60"
+        className="rounded-[14px] bg-[var(--tone-2-bg)] px-4 py-3 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)] disabled:opacity-60"
       >
         {busy ? "Saving…" : editing ? "Save changes" : `Save ${title.toLowerCase()}`}
       </button>
