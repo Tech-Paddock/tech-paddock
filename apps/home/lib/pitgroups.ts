@@ -26,7 +26,7 @@ export const COLUMNS: { id: Exclude<Column, "later">; name: string }[] = [
  * being dropped: the board must never hide an issue for carrying a new name.
  * Issues with no `app:` label are platform work and come last (TEC-115).
  */
-const ROSTER = ["home", "resume", "coffee", "health", "cookbook", "showcase"];
+const ROSTER = ["home", "resume", "coffee", "health", "cookbook", "lando", "showcase"];
 const NONE = "Platform";
 
 const STAGE: Record<Column, number> = { progress: 1, review: 2, todo: 3, later: 4 };

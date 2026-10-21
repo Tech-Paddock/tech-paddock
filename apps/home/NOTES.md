@@ -15,6 +15,11 @@
 - Bar controls, all stamped: `LiveryBadge` on every bar, framed or not; `ThemeControl` and
   `LogoutControl` hidden in a frame.
 - `PARKED` is empty. A parked app would be probed and shown grey.
+- `TOOLS`: resume, coffee, health, cookbook, lando (TEC-119). Lando went last as the neutral
+  choice; the order is still the owner's. It is also in the Pit Wall's `ROSTER`, before showcase.
+- Sidebar icons are emoji, except Lando's: `image: "/lando-icon.svg"` in `app/apps.ts`, rendered
+  as an `<img class="icon-image">` sized to the emoji box. Every sidebar icon is in full colour
+  (owner, 2026-10-21); nothing greys `.icon`. Parked grey is The Garage's stoplight only.
 - Liveries in `packages/shared/lib/theme.*`: `martini`, `clark`, `senna`, `mp44`, `jps`, `mcl39`
   (McLaren '25, MCL39, papaya and anthracite; TEC-120). `mcl39` is worn by no app until Lando
   switches to it.
@@ -40,6 +45,9 @@
 - `LogoutControl` goes to `/login` only on a 2xx or 401.
 - No `tailwind.config.ts` holds a colour; alpha works only as `rgb(var(--token-rgb) / <alpha-value>)`.
 - `PROBED` is the live projects plus `PARKED`. Never key anything off a slug literal.
+- `public/lando-icon.svg` is a byte copy of `apps/lando/app/icon.svg`, not stamped and not checked
+  by drift. Re-copy it when Lando's logo changes. It sits behind home's gate (not in
+  `PUBLIC_ICONS`), which is fine: only a signed-in page shows the sidebar.
 - Drift's JSON shape is the TD's. A renamed check family loses its sentence until the check emits
   `explain`.
 - "Hub" remains in stamped comments and `proxy.ts` (TEC-85).
