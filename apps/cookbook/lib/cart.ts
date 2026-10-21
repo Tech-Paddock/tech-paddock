@@ -111,6 +111,8 @@ export type Outcome = {
   detail: string;
   /** Added, but without the Pickup/Delivery choice, because Kroger refused it (TEC-121). */
   withoutModality?: true;
+  /** The product that went in, on an added line: what the send records so Take back can remove it (TEC-127). */
+  upc?: string;
 };
 
 /**
@@ -214,8 +216,9 @@ export async function sendLines(
       continue;
     }
 
+    const sent = { ...base, upc };
     const without = (why: string): Outcome => ({
-      ...base,
+      ...sent,
       result: "added",
       detail: `Added ×${line.quantity}, without ${why}.${remembered}`,
       withoutModality: true,
@@ -224,7 +227,7 @@ export async function sendLines(
     try {
       await deps.add(upc, line.quantity, modality);
       outcomes.push(
-        dropped ? without("Pickup/Delivery (Kroger refused it on an earlier line)") : { ...base, result: "added", detail: `Added ×${line.quantity}.${remembered}` }
+        dropped ? without("Pickup/Delivery (Kroger refused it on an earlier line)") : { ...sent, result: "added", detail: `Added ×${line.quantity}.${remembered}` }
       );
     } catch (e) {
       if (modality && refusedAsBadRequest(e)) {
@@ -260,6 +263,20 @@ export function modalityWarning(outcomes: Outcome[], modality: Modality | null):
   if (n === 0 || !modality) return null;
   const word = modalityWord(modality);
   return `Kroger refused the ${word} choice, so ${n} line${n === 1 ? "" : "s"} went in without it — choose ${word} at checkout.`;
+}
+
+/**
+ * What a send put in the cart, as ledger rows (TEC-127): each added line's
+ * product, its quantity, and the mode it actually went with — none when Kroger
+ * refused the choice. Take back sends exactly this back, negated.
+ */
+export function sentRows(
+  outcomes: Outcome[],
+  modality: Modality | null
+): { item_id: string; name: string; kind: "sent"; upc: string; quantity: number; modality: Modality | null }[] {
+  return outcomes
+    .filter((o): o is Outcome & { upc: string } => o.result === "added" && typeof o.upc === "string")
+    .map((o) => ({ item_id: o.id, name: o.name, kind: "sent", upc: o.upc, quantity: o.quantity, modality: o.withoutModality ? null : modality }));
 }
 
 /** "3 added, 1 skipped, 1 failed" — the sentence that never lets a partial send read as whole. */

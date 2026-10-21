@@ -411,3 +411,17 @@ export async function addToCart(accessToken: string, upc: string, quantity: numb
     throw new KrogerError(`Kroger refused it (${await errorCode(response)}).`, response.status, response.status === 401);
   }
 }
+
+/**
+ * Take back what a send put in (TEC-127): **the same route, the same product
+ * and mode, the quantity negated**. The public Cart API has no remove.
+ *
+ * **Whether Kroger accepts a negative quantity is unconfirmed**; the first
+ * production Take back is its first check. A refusal throws, the line fails and
+ * stays marked sent. It is not retried without the mode: a product goes back
+ * out the way it went in.
+ */
+export async function takeBackFromCart(accessToken: string, upc: string, quantity: number, modality: Modality | null): Promise<void> {
+  if (!Number.isInteger(quantity) || quantity < 1) throw new KrogerError("Nothing to take back.", 0);
+  await addToCart(accessToken, upc, -quantity, modality);
+}

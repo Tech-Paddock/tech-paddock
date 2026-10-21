@@ -1,5 +1,6 @@
 import { getServiceClient } from "./supabase";
 import { ConflictError, InputError, LookupError } from "./errors";
+import { moveSends } from "./cartSends";
 
 /**
  * The shopping list, and the three ways it leaves this app.
@@ -200,6 +201,16 @@ export async function markSent(ids: string[], at: string): Promise<void> {
   if (error) throw new LookupError(`Couldn't record what was sent: ${error.message}`);
 }
 
+/**
+ * Take back removed what Cookbook sent for these lines (TEC-127): they read as
+ * never sent, so the next send does not warn about them.
+ */
+export async function markUnsent(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await getServiceClient().from("grocery_items").update({ sent_at: null }).in("id", ids);
+  if (error) throw new LookupError(`Couldn't mark those as no longer sent: ${error.message}`);
+}
+
 export async function removeItems(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const { error } = await getServiceClient().from("grocery_items").delete().in("id", ids);
@@ -308,6 +319,16 @@ export async function applyTidy(open: GroceryItem[], lines: TidyLine[]): Promise
   // leaves you with no list at all, in a shop, which is the one outcome worth
   // designing around — a duplicated list is annoying and recoverable by ticking.
   const added = await addItems(rows);
+
+  // **What was sent follows the line** (TEC-127): the absorbed rows are about
+  // to go, and their cart sends would be let go with them, leaving a sent line
+  // that Take back can't find. Before the delete, so a failure leaves the
+  // duplicated list described above rather than a lost record.
+  if (added.length !== lines.length || added.some((a, i) => a.name !== rows[i].name.trim())) {
+    throw new ConflictError("The tidied lines came back out of order, so the old ones were kept. Your list may show both; tick or clear the extras.");
+  }
+  await Promise.all(lines.map((line, i) => moveSends(line.absorbed, added[i].id)));
+
   await removeItems(open.map((i) => i.id));
   return added;
 }
