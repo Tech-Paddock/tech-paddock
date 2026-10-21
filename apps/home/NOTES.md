@@ -18,7 +18,8 @@
 - `TOOLS`: resume, coffee, health, cookbook, lando (TEC-119). Lando went last as the neutral
   choice; the order is still the owner's. It is also in the Pit Wall's `ROSTER`, before showcase.
 - Sidebar icons are emoji, except Lando's: `image: "/lando-icon.svg"` in `app/apps.ts`, rendered
-  as an `<img class="icon-image">` sized to the emoji box and greyed by `.icon` like the rest.
+  as an `<img class="icon-image">` sized to the emoji box. Every sidebar icon is in full colour
+  (owner, 2026-10-21); nothing greys `.icon`. Parked grey is The Garage's stoplight only.
 - Liveries in `packages/shared/lib/theme.*`: `martini`, `clark`, `senna`, `mp44`, `jps`, `mcl39`
   (McLaren '25, MCL39, papaya and anthracite; TEC-120). `mcl39` is worn by no app until Lando
   switches to it.

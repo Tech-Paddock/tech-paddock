@@ -17,13 +17,12 @@ html {
   box-sizing: border-box;
 }
 
-.icon {
-  filter: grayscale(1);
-}
+/* Sidebar icons are in full colour (owner, 2026-10-21); `.icon` used to carry
+   grayscale(1). Parked grey is The Garage's stoplight, not this: a parked app
+   is never in the sidebar. */
 
 /* A tool whose logo stands in for an emoji (app/apps.ts). Sized to the em box
-   so it sits where the glyph would, at the same size; the grayscale above
-   reaches it through the wrapping .icon. */
+   so it sits where the glyph would, at the same size. */
 .icon-image {
   display: inline-block;
   width: 1.2em;
@@ -75,10 +74,6 @@ body {
      painting a black square on a black bar. The token name survived; its
      meaning inverted. */
   background: var(--accent);
-  /* This element also carries `icon`, and grayscale(1) desaturates the whole
-     element, background included — which turned the gold badge grey. The flag
-     glyph is already monochrome, so nothing is lost by opting out. */
-  filter: none;
   display: flex;
   align-items: center;
   justify-content: center;
