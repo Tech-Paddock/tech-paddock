@@ -81,12 +81,17 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 - A client component must not import a lib that imports `supabase.ts`.
 - Empty-vs-unread is in `DECISIONS.md`. `lint` is unconfigured.
 - Read Vercel and Supabase live before writing a deployment step.
-- **Kroger's API was never reached from here** (egress refuses it). Confirmed by search only: base
-  URL, OAuth paths, scopes, `filter.term` (3 characters to 8 words), `filter.locationId`,
-  8-character location IDs, `filter.zipCode.near`. Unconfirmed: Basic auth on `/token`,
-  `PUT /cart/add` with `{items:[{upc,quantity}]}` and no `modality`, `filter.chain=KINGSOOPERS`,
-  `productPageURI`, `inventory.stockLevel`, single-product `filter.productId`. Each is one constant
-  or parser in `lib/kroger.ts`; the first production Connect is the first real check.
+- **`api.kroger.com` is reachable from a session; `developer.kroger.com` and `kingsoopers.com`
+  are not.** A session holds a Kroger key only when the environment sets `KROGER_TEST_*`.
+  Confirmed live on the test app (2026-10-20): Basic auth on `/token` (the app token lasts 30
+  minutes), `filter.chain=KINGSOOPERS`, `filter.productId` with several comma-separated IDs,
+  `price.regular` plus `price.promo` with its start and end dates, `inventory.stockLevel`, the
+  aisle, fulfilment flags (pickup, delivery, in store, ship) and the product page link. Price,
+  stock and fulfilment come back empty without `filter.locationId`. `filter.term` needs at least 3
+  characters; search pages hold at most 50 and stop at 1,000 results. No rate-limit headers. The
+  public API has no coupons, offers, orders or lists (404). An app token gets 403 `AUTH-1007` on
+  `PUT /cart/add`, so the cart needs the user's sign-in; its body (`{items:[{upc,quantity}]}`,
+  with or without `modality`) is unconfirmed until the first production Send.
 - **Changing `KROGER_TOKEN_KEY` orphans the token**; the list asks to connect again. That is the
   rotation path.
 - Two concurrent refreshes can race token rotation; the second fails with `reconnect`.
