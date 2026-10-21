@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { getServiceClient } from "@/lib/supabase";
 type SupabaseClient = ReturnType<typeof getServiceClient>;
-import { Conflict, addPerson, readJournal, writeEvent } from "@/lib/journal";
+import { Conflict, addPerson, listDogs, readJournal, writeEvent } from "@/lib/journal";
 import { InvalidEvent } from "@/lib/events";
 
 /**
@@ -13,7 +13,7 @@ type Row = Record<string, any>;
 type Err = { code?: string; message: string } | null;
 
 function fakeDb(opts: { failRead?: boolean; insertError?: Err } = {}) {
-  const tables: Record<string, Row[]> = { events: [], people: [] };
+  const tables: Record<string, Row[]> = { events: [], people: [], dogs: [] };
   const inserts: Row[] = [];
 
   function builder(table: string) {
@@ -32,6 +32,7 @@ function fakeDb(opts: { failRead?: boolean; insertError?: Err } = {}) {
     const b: any = {
       select: () => b,
       eq: (col: string, v: unknown) => (filters.push((r) => r[col] === v), b),
+      in: (col: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[col])), b),
       or: () => b,
       order: () => b,
       range: (from: number, to: number) => ((range = [from, to]), b),
@@ -119,6 +120,43 @@ describe("writeEvent", () => {
   it("a database failure throws rather than looking saved", async () => {
     const { db } = fakeDb({ insertError: { code: "XX000", message: "boom" } });
     await expect(writeEvent(db, { id: ID, kind: "potty", details: PEE })).rejects.toThrow(/couldn't save/);
+  });
+});
+
+describe("writeEvent — friends' dogs", () => {
+  // Invented: no real dog's name is in the repo (charter, Never 2).
+  const DOG_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const DOG_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const WALK = { type: "walk", where: "outside", with_dogs: true, minutes: 15, treats: 0 };
+
+  it("saves a session naming dogs that are in the list", async () => {
+    const { db, tables } = fakeDb();
+    tables.dogs.push({ id: DOG_A, name: "Dog A" }, { id: DOG_B, name: "Dog B" });
+    const e = await writeEvent(db, { id: ID, kind: "exercise", details: { ...WALK, dogs: [DOG_A, DOG_B] } });
+    expect(e.details.dogs).toEqual([DOG_A, DOG_B]);
+  });
+
+  it("refuses a dog that is not in the list, and saves nothing", async () => {
+    const { db, tables } = fakeDb();
+    tables.dogs.push({ id: DOG_A, name: "Dog A" });
+    await expect(writeEvent(db, { id: ID, kind: "exercise", details: { ...WALK, dogs: [DOG_A, DOG_B] } })).rejects.toThrow(InvalidEvent);
+    expect(tables.events).toHaveLength(0);
+  });
+
+  it("needs no dog read for a session that names none", async () => {
+    const { db, tables } = fakeDb();
+    await writeEvent(db, { id: ID, kind: "exercise", details: WALK });
+    expect(tables.events).toHaveLength(1);
+  });
+});
+
+describe("listDogs", () => {
+  it("is an empty list when no dog is added, never an error", async () => {
+    expect(await listDogs(fakeDb().db)).toEqual([]);
+  });
+
+  it("throws on a failed read", async () => {
+    await expect(listDogs(fakeDb({ failRead: true }).db)).rejects.toThrow(/dogs/);
   });
 });
 

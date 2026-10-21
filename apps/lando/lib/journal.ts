@@ -5,6 +5,8 @@ import {
   checkVoid,
   correctionAt,
   parseNewEvent,
+  type Dog,
+  type ExerciseDetails,
   type JournalEvent,
 } from "./events";
 
@@ -65,6 +67,14 @@ export async function writeEvent(db: SupabaseClient, body: unknown, now = new Da
   const existing = await findEvent(db, next.id);
   if (existing) return existing;
 
+  // `dogs` is jsonb, so no foreign key holds it; every id must be a dog here.
+  const dogIds = next.kind === "exercise" ? ((next.details as ExerciseDetails).dogs ?? []) : [];
+  if (dogIds.length) {
+    const { data, error } = await db.from("dogs").select("id").in("id", dogIds);
+    if (error) throw new Error(`couldn't read dogs: ${error.message}`);
+    if ((data ?? []).length !== dogIds.length) throw new InvalidEvent("that dog is no longer in the list — reload");
+  }
+
   let at: string | undefined = next.at ?? undefined;
   if (next.voids) {
     const target = await findEvent(db, next.voids);
@@ -109,6 +119,16 @@ export async function listPeople(db: SupabaseClient): Promise<Person[]> {
     .order("created_at", { ascending: true });
   if (error) throw new Error(`couldn't read people: ${error.message}`);
   return data as Person[];
+}
+
+/**
+ * Friends' dogs, by name. Added by SQL, never in the app or the repo
+ * (charter, Never 2). An empty table is an empty list; a failed read throws.
+ */
+export async function listDogs(db: SupabaseClient): Promise<Dog[]> {
+  const { data, error } = await db.from("dogs").select("id, name").order("name", { ascending: true });
+  if (error) throw new Error(`couldn't read dogs: ${error.message}`);
+  return data as Dog[];
 }
 
 /** Add a person by name, or return the one already there under that name. */

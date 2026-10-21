@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
-import { listPeople, readJournal } from "@/lib/journal";
+import { listDogs, listPeople, readJournal } from "@/lib/journal";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +17,8 @@ export async function GET(req: NextRequest) {
   }
   try {
     const db = getServiceClient();
-    const [events, people] = await Promise.all([readJournal(db, since), listPeople(db)]);
-    return NextResponse.json({ events, people });
+    const [events, people, dogs] = await Promise.all([readJournal(db, since), listPeople(db), listDogs(db)]);
+    return NextResponse.json({ events, people, dogs });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 503 });
   }

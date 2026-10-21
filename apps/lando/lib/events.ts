@@ -8,7 +8,8 @@
  *
  * Four kinds, each logged through a short form with defaults: potty, food,
  * exercise, weight. The shapes of `details` below are also enforced by the
- * database (migration `lando_people_and_events`); change both together.
+ * database (migrations `lando_people_and_events`, then
+ * `widen_lando_events_details_shape`); change both together.
  */
 
 import { FOOD_TYPES, findFood, formatAmount, unitLabel, type FoodType } from "./foods";
@@ -28,7 +29,16 @@ export const KIND_LABELS: Record<LogKind, string> = {
 
 export const POTTY_WHAT = ["pee", "poop", "both"] as const;
 export const WHERE = ["outside", "inside"] as const;
-export type PottyDetails = { what: (typeof POTTY_WHAT)[number]; where: (typeof WHERE)[number] };
+/** How an outside potty went: on the leash, off it, or in the pen. Outside only. */
+export const LEASH = ["leashed", "unleashed", "pen"] as const;
+export type Leash = (typeof LEASH)[number];
+export const LEASH_LABELS: Record<Leash, string> = { leashed: "Leashed", unleashed: "Unleashed", pen: "In pen" };
+export type PottyDetails = {
+  what: (typeof POTTY_WHAT)[number];
+  where: (typeof WHERE)[number];
+  /** Outside only; entries from before it existed have none. */
+  leash?: Leash;
+};
 
 /** A snapshot of the catalogue item at log time, plus how much. */
 export type FoodDetails = {
@@ -69,7 +79,19 @@ export type ExerciseDetails = {
   treats: number;
   /** Training only. */
   commands?: CommandId[];
+  /**
+   * Which friends' dogs, by `lando.dogs` id: at least one when present, and
+   * then `with_dogs` is true. Entries from before it existed carry
+   * `with_dogs` alone. The form has no Yes/No: picking a dog is the answer.
+   */
+  dogs?: string[];
 };
+
+/** A friend's dog, from `lando.dogs`. Names live in the database, never in the repo. */
+export type Dog = { id: string; name: string };
+
+/** At most this many dogs on one session. */
+export const MAX_DOGS = 20;
 
 export const UNITS = ["lb", "kg"] as const;
 export type Unit = (typeof UNITS)[number];
@@ -209,13 +231,22 @@ export function displayUnit(events: JournalEvent[]): Unit {
 
 export const round1 = (n: number) => Math.round(n * 10) / 10;
 
-/** A timeline row: a bold title and one line of what the details say. */
-export function describe(e: Pick<JournalEvent, "kind" | "details">): { title: string; detail: string } {
+/**
+ * A timeline row: a bold title and one line of what the details say.
+ * `dogs` names the friends' dogs an exercise session lists; an id not in it
+ * reads "another dog".
+ */
+export function describe(
+  e: Pick<JournalEvent, "kind" | "details">,
+  dogs: readonly Dog[] = []
+): { title: string; detail: string } {
   switch (e.kind) {
     case "potty": {
       const p = potty(e);
       const what = p.what === "both" ? "pee + poop" : p.what;
-      return { title: isAccident(e) ? "Accident" : "Potty", detail: p.where === "inside" ? `${what}, inside` : what };
+      const detail =
+        p.where === "inside" ? `${what}, inside` : p.leash ? `${what} · ${LEASH_LABELS[p.leash].toLowerCase()}` : what;
+      return { title: isAccident(e) ? "Accident" : "Potty", detail };
     }
     case "food": {
       const f = food(e);
@@ -228,7 +259,11 @@ export function describe(e: Pick<JournalEvent, "kind" | "details">): { title: st
       const parts = [
         `${x.minutes} min`,
         x.where,
-        x.with_dogs ? "with dogs" : "",
+        x.dogs?.length
+          ? `with ${x.dogs.map((id) => dogs.find((d) => d.id === id)?.name ?? "another dog").join(", ")}`
+          : x.with_dogs
+            ? "with dogs"
+            : "",
         x.treats ? `${x.treats} ${x.treats === 1 ? "treat" : "treats"}` : "",
         (x.commands ?? []).map((c) => COMMAND_LABEL[c] ?? c).join(", "),
       ];
@@ -296,8 +331,14 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new InvalidEvent("details must be an object");
   const r = raw as Record<string, unknown>;
   switch (kind) {
-    case "potty":
-      return { what: oneOf(r.what, POTTY_WHAT, "what"), where: oneOf(r.where, WHERE, "where") } satisfies PottyDetails;
+    case "potty": {
+      const out: PottyDetails = { what: oneOf(r.what, POTTY_WHAT, "what"), where: oneOf(r.where, WHERE, "where") };
+      if (r.leash !== undefined && r.leash !== null) {
+        if (out.where !== "outside") throw new InvalidEvent("leashed, unleashed or in pen is for outside only");
+        out.leash = oneOf(r.leash, LEASH, "leash");
+      }
+      return out;
+    }
     case "food": {
       const type = oneOf(r.type, FOOD_TYPES, "type");
       if (typeof r.item_id !== "string") throw new InvalidEvent("pick a food");
@@ -327,6 +368,16 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
         }
         // Kept in the list's order, once each.
         out.commands = COMMANDS.map(([id]) => id).filter((id) => raw.includes(id));
+      }
+      if (r.dogs !== undefined && r.dogs !== null) {
+        if (!Array.isArray(r.dogs) || r.dogs.some((d) => !isUuid(d))) throw new InvalidEvent("dogs must come from the list");
+        // Once each, in the order picked; none picked is no key at all.
+        const ids = [...new Set((r.dogs as string[]).map((d) => d.toLowerCase()))];
+        if (ids.length > MAX_DOGS) throw new InvalidEvent(`at most ${MAX_DOGS} dogs on one session`);
+        if (ids.length) {
+          if (!out.with_dogs) throw new InvalidEvent("naming a dog means with other dogs");
+          out.dogs = ids;
+        }
       }
       return out;
     }

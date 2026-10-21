@@ -18,6 +18,7 @@ import {
   round1,
   sinceLast,
   weight as asWeight,
+  type Dog,
   type JournalEvent,
   type LogKind,
 } from "@/lib/events";
@@ -29,13 +30,13 @@ import {
   writeStore,
   type Remembered,
 } from "@/lib/defaults";
-import { clockTime, localMidnight, shortDate } from "@/lib/localtime";
+import { clockTime, localMidnight, rowTime, shortDate } from "@/lib/localtime";
 import Analytics from "./Analytics";
 import GrowthChart from "./GrowthChart";
 import LogForm, { type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
 
-type Loaded = { events: JournalEvent[]; people: Person[] };
+type Loaded = { events: JournalEvent[]; people: Person[]; dogs: Dog[] };
 
 /** A new entry on its way to the database, or one that did not get there. */
 type Pending = { body: LogBody; status: "saving" | "failed"; error?: string };
@@ -93,7 +94,7 @@ export default function Journal() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setLoaded({ events: data.events, people: data.people });
+      setLoaded({ events: data.events, people: data.people, dogs: data.dogs ?? [] });
       setLoadError(null);
     } catch (e) {
       // Keep whatever was on screen; say it may be stale. Never blank it.
@@ -174,6 +175,7 @@ export default function Journal() {
   }, [now, since]);
 
   const people = loaded?.people ?? [];
+  const dogs = loaded?.dogs ?? [];
   const person = people.find((p) => p.id === personId) ?? null;
   const nameOf = (id: string | null) => (id ? people.find((p) => p.id === id)?.display_name ?? "someone" : null);
   // First open on a phone: ask once whose it is.
@@ -413,7 +415,7 @@ export default function Journal() {
                     key={p.body.id}
                     className="grid grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border border-dashed border-line bg-surface px-2.5 py-2"
                   >
-                    <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{clockTime(p.body.at)}</span>
+                    <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{rowTime(p.body.kind, p.body.at, now)}</span>
                     <b className="truncate">{title}</b>
                     {p.status === "saving" ? (
                       <span className="text-sm text-ink-soft">Saving…</span>
@@ -438,7 +440,7 @@ export default function Journal() {
                 );
               })}
               {today.map((e) => {
-                const { title, detail } = describe(e);
+                const { title, detail } = describe(e, dogs);
                 const accident = isAccident(e);
                 return (
                   <li key={e.id}>
@@ -449,7 +451,7 @@ export default function Journal() {
                         accident ? "border-danger" : "border-line"
                       }`}
                     >
-                      <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{clockTime(e.at)}</span>
+                      <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{rowTime(e.kind, e.at, now)}</span>
                       <span className="min-w-0">
                         <b className={`mr-1.5 ${accident ? "text-danger" : ""}`}>{title}</b>
                         <span className="text-sm text-ink-soft">{detail}</span>
@@ -479,6 +481,7 @@ export default function Journal() {
             kind={open.kind}
             event={open.event}
             people={people}
+            dogs={dogs}
             phonePerson={person?.id ?? null}
             remembered={remembered}
             weightUnit={weightUnit}

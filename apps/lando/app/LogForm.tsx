@@ -7,6 +7,8 @@ import {
   EXERCISE_LABELS,
   InvalidEvent,
   KIND_LABELS,
+  LEASH,
+  LEASH_LABELS,
   UNITS,
   exercise as asExercise,
   food as asFood,
@@ -15,6 +17,8 @@ import {
   weight as asWeight,
   type CommandId,
   type Details,
+  type Dog,
+  type Leash,
   type ExerciseType,
   type JournalEvent,
   type LogKind,
@@ -22,7 +26,7 @@ import {
 } from "@/lib/events";
 import { formatAmount, parseAmount, picklist, findFood, unitLabel, type FoodType } from "@/lib/foods";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
-import { fromLocalInput, toLocalInput, whenLabel } from "@/lib/localtime";
+import { dateLabel, fromDateInput, fromLocalInput, toDateInput, toLocalInput, whenLabel } from "@/lib/localtime";
 
 export type Person = { id: string; display_name: string };
 
@@ -42,6 +46,8 @@ type Props = {
   /** Set when correcting an entry; the form opens on its values. */
   event?: JournalEvent;
   people: Person[];
+  /** Friends' dogs from `lando.dogs`; empty until the TD adds them. */
+  dogs: Dog[];
   phonePerson: string | null;
   remembered: Remembered;
   weightUnit: Unit;
@@ -107,10 +113,6 @@ function Seg<T extends string>({
 const input =
   "w-full min-w-0 rounded-[10px] border border-line bg-paper px-2.5 py-2.5 outline-none focus:border-accent";
 
-const YES_NO = [
-  ["no", "No"],
-  ["yes", "Yes"],
-] as const;
 const WHERE_OPTS = [
   ["outside", "Outside"],
   ["inside", "Inside"],
@@ -118,12 +120,46 @@ const WHERE_OPTS = [
 
 /* ── The form ────────────────────────────────────────────────────────────── */
 
-export default function LogForm({ kind, event, people, phonePerson, remembered, weightUnit, onLog, onChange }: Props) {
+/** Chips that toggle, several at once. Real checkboxes underneath. */
+function Chips<T extends string>({
+  label,
+  options,
+  picked,
+  onChange,
+}: {
+  label: string;
+  options: readonly (readonly [T, string])[];
+  picked: T[];
+  onChange: (next: T[]) => void;
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
+      {options.map(([id, text]) => (
+        <label key={id} className="relative">
+          <input
+            type="checkbox"
+            checked={picked.includes(id)}
+            onChange={(e) => onChange(e.target.checked ? [...picked, id] : picked.filter((c) => c !== id))}
+            className="peer absolute opacity-0"
+          />
+          <span className="block cursor-pointer whitespace-nowrap rounded-full border border-line bg-surface px-3.5 py-2 peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-pinstripe">
+            {text}
+          </span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+export default function LogForm({ kind, event, people, dogs, phonePerson, remembered, weightUnit, onLog, onChange }: Props) {
   const editing = !!event;
   const openedAt = useRef(new Date().toISOString());
+  // A weight is a day, not a moment: its When picks a date, stored at local noon.
+  const dateOnly = kind === "weight";
 
   // Common
   const [when, setWhen] = useState(toLocalInput(event?.at ?? openedAt.current));
+  const [day, setDay] = useState(toDateInput(event?.at ?? openedAt.current));
   const [whenTouched, setWhenTouched] = useState(false);
   const [personId, setPersonId] = useState(event ? event.person_id ?? "" : phonePerson ?? "");
   const [note, setNote] = useState(event?.note ?? "");
@@ -132,6 +168,9 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
   const p = event?.kind === "potty" ? asPotty(event) : null;
   const [what, setWhat] = useState(p?.what ?? "pee");
   const [where, setWhere] = useState(p?.where ?? (event?.kind === "exercise" ? asExercise(event).where : "outside"));
+  // Leashed by default. An outside entry from before the pick existed opens
+  // with nothing picked, so a correction never invents one.
+  const [leash, setLeash] = useState<Leash | "">(p ? (p.leash ?? (p.where === "inside" ? "leashed" : "")) : "leashed");
 
   // Food
   const f = event?.kind === "food" ? asFood(event) : null;
@@ -143,7 +182,11 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
   // Exercise
   const x = event?.kind === "exercise" ? asExercise(event) : null;
   const [exType, setExType] = useState<ExerciseType>(x?.type ?? "walk");
-  const [withDogs, setWithDogs] = useState<"yes" | "no">(x?.with_dogs ? "yes" : "no");
+  // Picking a dog is the answer to "with other dogs"; there is no Yes/No.
+  const [dogIds, setDogIds] = useState<string[]>(x?.dogs ?? []);
+  // An entry from before the dog list says "with dogs" and names none. Kept
+  // on a correction until a dog is tapped, so the fact is not lost.
+  const [unnamedDogs, setUnnamedDogs] = useState(!!x?.with_dogs && !x.dogs?.length);
   const [minutes, setMinutes] = useState(String(x?.minutes ?? 15));
   const [treats, setTreats] = useState(String(x?.treats ?? 0));
   const [commands, setCommands] = useState<CommandId[]>(x?.commands ?? []);
@@ -174,18 +217,22 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
   function rawDetails(): Record<string, unknown> {
     switch (kind) {
       case "potty":
-        return { what, where };
+        return { what, where, ...(where === "outside" && leash ? { leash } : {}) };
       case "food":
         return { type: foodType, item_id: itemId, amount: parseAmount(amount) };
-      case "exercise":
+      case "exercise": {
+        // In the list's order; an id no longer listed is dropped.
+        const picked = dogs.map((d) => d.id).filter((id) => dogIds.includes(id));
         return {
           type: exType,
           where,
-          with_dogs: withDogs === "yes",
+          with_dogs: picked.length > 0 || unnamedDogs,
           minutes: Number(minutes),
           treats: Number(treats || 0),
           ...(exType === "training" ? { commands } : {}),
+          ...(picked.length ? { dogs: picked } : {}),
         };
+      }
       case "weight":
         return { value: Number(value.replace(",", ".")), unit };
     }
@@ -207,7 +254,12 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
       return;
     }
     // An untouched "when" on a new entry means the moment Save was pressed.
-    const at = !editing && !whenTouched ? new Date().toISOString() : fromLocalInput(when);
+    // A weight's is today, at local noon like every weight.
+    const at = dateOnly
+      ? fromDateInput(!editing && !whenTouched ? toDateInput(new Date().toISOString()) : day)
+      : !editing && !whenTouched
+        ? new Date().toISOString()
+        : fromLocalInput(when);
     if (!at) {
       setError("pick a time");
       return;
@@ -254,6 +306,17 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
           <Field label="Where">
             <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
           </Field>
+          {where === "outside" && (
+            <Field label="Leash">
+              <Seg
+                name="leash"
+                label="Leash"
+                value={leash}
+                onChange={setLeash}
+                options={LEASH.map((l) => [l, LEASH_LABELS[l]] as const)}
+              />
+            </Field>
+          )}
           {where === "inside" && <p className="text-[13px] font-semibold text-danger">Inside counts as an accident.</p>}
         </>
       )}
@@ -303,8 +366,23 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
           <Field label="Where">
             <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
           </Field>
-          <Field label="With other dogs">
-            <Seg name="dogs" label="With other dogs" value={withDogs} onChange={setWithDogs} options={YES_NO} />
+          <Field label="Other dogs">
+            {dogs.length ? (
+              <Chips
+                label="Other dogs"
+                options={dogs.map((d) => [d.id, d.name] as const)}
+                picked={dogIds}
+                onChange={(next) => {
+                  setDogIds(next);
+                  setUnnamedDogs(false);
+                }}
+              />
+            ) : (
+              <p className="text-[13px] text-ink-soft">No friends&apos; dogs listed yet.</p>
+            )}
+            {unnamedDogs && dogIds.length === 0 && (
+              <p className="text-[13px] text-ink-soft">Logged as with dogs, none named. Tap one to name it.</p>
+            )}
           </Field>
           <div className="grid grid-cols-2 gap-2">
             <Field label="Length (min)" htmlFor="f-mins">
@@ -316,23 +394,7 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
           </div>
           {exType === "training" && (
             <Field label="Commands practised">
-              <div role="group" aria-label="Commands practised" className="flex flex-wrap gap-1.5">
-                {COMMANDS.map(([id, label]) => (
-                  <label key={id} className="relative">
-                    <input
-                      type="checkbox"
-                      checked={commands.includes(id)}
-                      onChange={(e) =>
-                        setCommands((cur) => (e.target.checked ? [...cur, id] : cur.filter((c) => c !== id)))
-                      }
-                      className="peer absolute opacity-0"
-                    />
-                    <span className="block cursor-pointer whitespace-nowrap rounded-full border border-line bg-surface px-3.5 py-2 peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-pinstripe">
-                      {label}
-                    </span>
-                  </label>
-                ))}
-              </div>
+              <Chips label="Commands practised" options={COMMANDS} picked={commands} onChange={setCommands} />
             </Field>
           )}
         </>
@@ -367,12 +429,17 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
               screen readers and keyboard editing still reach the input. */}
           <div className="relative min-w-0 rounded-[10px] border border-line bg-paper focus-within:border-accent">
             <span aria-hidden="true" className="block truncate px-2.5 py-2.5 tabular-nums">
-              {!editing && !whenTouched ? "Now" : whenLabel(when, new Date()) || "Pick a time"}
+              {dateOnly
+                ? dateLabel(day, new Date()) || "Pick a date"
+                : !editing && !whenTouched
+                  ? "Now"
+                  : whenLabel(when, new Date()) || "Pick a time"}
             </span>
             <input
               id="f-when"
-              type="datetime-local"
-              value={when}
+              type={dateOnly ? "date" : "datetime-local"}
+              value={dateOnly ? day : when}
+              max={dateOnly ? toDateInput(new Date().toISOString()) : undefined}
               onClick={(e) => {
                 try {
                   e.currentTarget.showPicker();
@@ -381,7 +448,8 @@ export default function LogForm({ kind, event, people, phonePerson, remembered, 
                 }
               }}
               onChange={(e) => {
-                setWhen(e.target.value);
+                if (dateOnly) setDay(e.target.value);
+                else setWhen(e.target.value);
                 setWhenTouched(true);
               }}
               className="absolute inset-0 h-full w-full min-w-0 cursor-pointer opacity-0"
