@@ -48,16 +48,16 @@ export default function Sheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby="sheet-title"
-        className="lando-sheet fixed inset-x-0 bottom-0 z-30 max-h-[88dvh] overflow-y-auto rounded-t-[18px] border-t-4 border-pinstripe bg-surface px-4 pt-4 outline-none"
+        className="lando-sheet fixed inset-x-0 bottom-0 z-30 max-h-[88dvh] overflow-y-auto rounded-t-[18px] border-t-4 border-pinstripe bg-surface px-3 pt-3 outline-none"
         style={{
-          paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
-          paddingLeft: "max(16px, env(safe-area-inset-left, 0px))",
-          paddingRight: "max(16px, env(safe-area-inset-right, 0px))",
+          paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
+          paddingLeft: "max(12px, env(safe-area-inset-left, 0px))",
+          paddingRight: "max(12px, env(safe-area-inset-right, 0px))",
         }}
       >
-        <div className="mx-auto flex max-w-md flex-col gap-3.5">
+        <div className="mx-auto flex max-w-md flex-col gap-3">
           <header className="flex items-center justify-between gap-3">
-            <h3 id="sheet-title" className="text-[22px] font-bold leading-tight">
+            <h3 id="sheet-title" className="text-xl font-bold leading-tight">
               {title}
             </h3>
             {onClose && (

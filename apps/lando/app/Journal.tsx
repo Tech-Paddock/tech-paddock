@@ -56,12 +56,6 @@ async function postJson(url: string, body: unknown): Promise<{ ok: boolean; stat
 const isLogBody = (b: unknown): b is LogBody =>
   !!b && typeof b === "object" && LOG_KINDS.includes((b as LogBody).kind) && typeof (b as LogBody).details === "object";
 
-const SECTION_HINTS: Record<Exclude<LogKind, "weight">, string> = {
-  potty: "Pee, poop, inside or out",
-  food: "Meal or treat",
-  exercise: "Walk, play, training",
-};
-
 /**
  * Two tabs, Log and Analytics, opening on Log (charter, Scope: the owner's
  * override, 2026-10-20). Log: since-last pills, who is logging, four section
@@ -259,9 +253,14 @@ export default function Journal() {
   const unsaved = [...pending].sort((a, b) => Date.parse(b.body.at) - Date.parse(a.body.at));
   const lastWeight = loaded ? latestWeight(loaded.events) : null;
   const weightUnit = loaded ? displayUnit(loaded.events) : "lb";
+  const weightNote = lastWeight
+    ? `last ${round1(asWeight(lastWeight).value)} ${asWeight(lastWeight).unit}, ${
+        Date.parse(lastWeight.at) >= since.getTime() ? "today" : shortDate(lastWeight.at)
+      }`
+    : null;
 
   const tabClass = (t: Tab) =>
-    `border-b-[3px] pb-2.5 pt-3 font-bold ${t === tab ? "border-pinstripe text-ink" : "border-transparent text-ink-soft"}`;
+    `border-b-[3px] pb-2 pt-2.5 font-bold ${t === tab ? "border-pinstripe text-ink" : "border-transparent text-ink-soft"}`;
 
   return (
     <>
@@ -271,7 +270,7 @@ export default function Journal() {
         className="sticky z-10 border-b border-line bg-paper"
         style={{ top: "env(safe-area-inset-top, 0px)" }}
       >
-        <div className="mx-auto grid max-w-md grid-cols-2 px-4">
+        <div className="mx-auto grid max-w-md grid-cols-2 px-3">
           <button role="tab" type="button" id="tab-log" aria-selected={tab === "log"} aria-controls="panel-log" onClick={() => showTab("log")} className={tabClass("log")}>
             Log
           </button>
@@ -281,9 +280,9 @@ export default function Journal() {
         </div>
       </nav>
 
-      <div className="mx-auto max-w-md px-4 pb-12 pt-4">
+      <div className="mx-auto max-w-md px-3 pb-10 pt-3">
         {loadError && (
-          <div className="mb-4 flex items-center gap-3 rounded-xl border border-urgent/40 bg-urgent/10 px-3 py-2 text-sm">
+          <div className="mb-3 flex items-center gap-3 rounded-xl border border-urgent/40 bg-urgent/10 px-3 py-2 text-sm">
             <span className="flex-1">
               {loaded ? "Couldn't refresh — this may be out of date." : "Couldn't load the journal."} ({loadError})
             </span>
@@ -304,7 +303,7 @@ export default function Journal() {
           role="tabpanel"
           aria-labelledby="tab-log"
           hidden={tab !== "log"}
-          className={tab === "log" ? "flex flex-col gap-5" : "hidden"}
+          className={tab === "log" ? "flex flex-col gap-4" : "hidden"}
         >
           {/* Since-last pills: one row, label over value; the clock time is in the title. */}
           <section aria-label="Since last" className="grid grid-cols-4 gap-1.5">
@@ -314,7 +313,7 @@ export default function Journal() {
                 <div
                   key={c}
                   title={last ? `${CLOCK_LABELS[c]} at ${clockTime(last.at)}` : undefined}
-                  className="min-w-0 rounded-2xl border border-line bg-surface px-2 py-1.5 text-center"
+                  className="min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center"
                 >
                   <div className="truncate text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] text-ink-soft">
                     {CLOCK_LABELS[c]}
@@ -331,7 +330,7 @@ export default function Journal() {
           </section>
 
           {/* Who is logging */}
-          <section className="flex items-center gap-2.5">
+          <section className="flex items-center gap-2">
             <label htmlFor="who" className="text-ink-soft">
               Logging as
             </label>
@@ -357,7 +356,7 @@ export default function Journal() {
                 id="who"
                 value={person?.id ?? ""}
                 onChange={(e) => (e.target.value === "__add" ? setAdding(true) : choosePerson(e.target.value || null))}
-                className="min-w-0 flex-1 rounded-[10px] border border-line bg-surface px-2.5 py-2.5"
+                className="min-w-0 flex-1 rounded-[10px] border border-line bg-surface px-2.5 py-2"
               >
                 <option value="">{loaded ? "Pick who you are" : "Loading…"}</option>
                 {people.map((p) => (
@@ -373,56 +372,46 @@ export default function Journal() {
 
           {/* Four sections, each opening its form */}
           <section aria-label="Log">
-            <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-soft">Log</h2>
-            <div className="grid grid-cols-2 gap-2.5">
+            <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Log</h2>
+            {/* Four across on a phone, label only (TEC-123). The newest weight
+                is in the Growth chart below; the Weight button carries it in its
+                title and for screen readers. */}
+            <div className="grid grid-cols-4 gap-1.5">
               {(["potty", "food", "exercise"] as const).map((k) => (
                 <button
                   key={k}
                   type="button"
                   onClick={() => setOpen({ kind: k })}
-                  className="grid min-h-[92px] content-start gap-0.5 rounded-2xl bg-[var(--tone-2-bg)] px-3.5 py-4 text-left text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)]"
+                  className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-1 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
                 >
-                  <b className="text-[21px] leading-tight">{KIND_LABELS[k]}</b>
-                  <span className="text-[13px] opacity-80">{SECTION_HINTS[k]}</span>
+                  <b className="truncate text-[15px] leading-tight">{KIND_LABELS[k]}</b>
                 </button>
               ))}
               <button
                 type="button"
                 onClick={() => setOpen({ kind: "weight" })}
-                className="grid min-h-[92px] content-start gap-0.5 rounded-2xl bg-raised px-3.5 py-4 text-left text-ink shadow-[0_4px_0_rgb(var(--line-rgb))] active:translate-y-0.5 active:shadow-[0_2px_0_rgb(var(--line-rgb))]"
+                title={weightNote ?? undefined}
+                className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-raised px-1 py-2 text-ink shadow-[0_3px_0_rgb(var(--line-rgb))] active:translate-y-0.5 active:shadow-[0_1px_0_rgb(var(--line-rgb))]"
               >
-                {lastWeight ? (
-                  <>
-                    <b className="whitespace-nowrap text-[28px] leading-tight tabular-nums">
-                      {round1(asWeight(lastWeight).value)} <span className="text-[17px]">{asWeight(lastWeight).unit}</span>
-                    </b>
-                    <span className="text-[13px] opacity-80">
-                      Weight · {Date.parse(lastWeight.at) >= since.getTime() ? "today" : shortDate(lastWeight.at)} · tap to log
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <b className="text-[21px] leading-tight">Weight</b>
-                    <span className="text-[13px] opacity-80">Weigh-in</span>
-                  </>
-                )}
+                <b className="truncate text-[15px] leading-tight">Weight</b>
+                {weightNote && <span className="sr-only">, {weightNote}</span>}
               </button>
             </div>
           </section>
 
           {/* Today */}
           <section aria-label="Today">
-            <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-soft">Today</h2>
+            <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Today</h2>
             {unsaved.length === 0 && today.length === 0 && (
               <p className="text-ink-soft">{loaded ? "Nothing logged yet today." : loadError ? "" : "Loading…"}</p>
             )}
-            <ul className="flex flex-col gap-1.5">
+            <ul className="flex flex-col gap-1">
               {unsaved.map((p) => {
                 const { title } = describe(p.body);
                 return (
                   <li
                     key={p.body.id}
-                    className="grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-baseline gap-2.5 rounded-xl border border-dashed border-line bg-surface px-3 py-2.5"
+                    className="grid grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border border-dashed border-line bg-surface px-2.5 py-2"
                   >
                     <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{clockTime(p.body.at)}</span>
                     <b className="truncate">{title}</b>
@@ -456,7 +445,7 @@ export default function Journal() {
                     <button
                       type="button"
                       onClick={() => setOpen({ kind: e.kind as LogKind, event: e })}
-                      className={`grid w-full grid-cols-[4.5rem_minmax(0,1fr)_auto] items-baseline gap-2.5 rounded-xl border bg-surface px-3 py-2.5 text-left ${
+                      className={`grid w-full grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border bg-surface px-2.5 py-2 text-left ${
                         accident ? "border-danger" : "border-line"
                       }`}
                     >
@@ -472,12 +461,12 @@ export default function Journal() {
                 );
               })}
             </ul>
-            {today.length > 0 && <p className="mt-2 text-[13px] text-ink-soft">Tap an entry to correct or delete it.</p>}
+            {today.length > 0 && <p className="mt-1.5 text-xs text-ink-soft">Tap an entry to correct or delete it.</p>}
           </section>
 
           {/* Growth */}
           <section aria-label="Growth">
-            <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-soft">Growth</h2>
+            <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Growth</h2>
             {loaded ? <GrowthChart events={loaded.events} /> : <p className="text-sm text-ink-soft">—</p>}
           </section>
         </div>
