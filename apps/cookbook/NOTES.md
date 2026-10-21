@@ -69,7 +69,15 @@ Reasoning is in the migration headers.
 - Scopes: `cart.basic:write product.compact`. A missing variable is named on the list tab and in
   `/api/health`.
 - `GET /api/kroger/cart` is the review: an exact product's UPC is its URL's digits
-  (`productIdFromUrl`); a pasted page is remembered by `savePreference` under the line's name.
+  (`productIdFromUrl`).
+- **Remembering** (TEC-128): whatever goes in for a non-exact line, a pasted page or the tapped top
+  match, is saved by `savePreference` as a `product` row under the line's name (`splitLine`, so
+  never the note). The client sends the match's page as `match` beside its `upc`; an exact brand
+  sends none and is never re-saved. Only after that line's add succeeded (including the retry
+  without Pickup/Delivery); a failed add saves nothing. A page whose digits are not the UPC that
+  went in is not saved. A failed save is appended to the line's detail; the line stays added.
+  Same phrase as an existing row overwrites it (upsert on the normalised phrase), a `terms` row
+  included.
 - A send re-picking a line with `sent_at` returns 409 before Kroger is called, unless `again`.
 - A send appends a `sent` row per added line (`sentRows` in `lib/cart.ts`): the UPC that went in,
   the quantity sent, and the modality it actually went with (null when Kroger refused the choice).
@@ -151,7 +159,9 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 - **Changing `KROGER_TOKEN_KEY` orphans the token**; the list asks to connect again. That is the
   rotation path.
 - Two concurrent refreshes can race token rotation; the second fails with `reconnect`.
-- A remembered replacement's phrase is the line's whole name; shorten it in Your brands.
+- A remembered match or replacement's phrase is the line's whole name (less any note), so "whole
+  milk 2%" saves under that, not "milk"; shorten it in Your brands. Tapping a poor top match saves
+  it too: untick it or paste a page instead, or fix it in Your brands.
 - Preview and local deployments cannot complete Kroger sign-in; the redirect URI is production's.
 - The two Kroger migrations and `cookbook_deal_scans_and_modality` must be applied before this
   code runs; the connection read selects `modality`, so without it the whole list tab's King
