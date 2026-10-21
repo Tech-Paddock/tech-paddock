@@ -59,8 +59,13 @@
   defaults to Leashed on a new entry. It is not remembered per phone. Correcting an old outside
   entry that has none opens with nothing picked, so a correction never invents one. The timeline
   shows it after the what: "pee · unleashed".
-- **Exercise's Other dogs** is its own section, always shown: chips of every row in `lando.dogs`,
-  by name. There is no Yes/No (the owner's call, 2026-10-21): the form saves `with_dogs` as "a dog
+- **Exercise's Other dogs** is its own section, always shown: a full-width picklist styled like
+  Human, several at once, over every row in `lando.dogs` by name (the owner's pick over chips,
+  2026-10-21). The closed box shows the picked names ("None", or "Dog A, Dog C"); a real
+  `<select multiple>` sits over it at `opacity-0`, so a tap opens the phone's own checklist (iOS's
+  picker, Android Chrome's dialog). Desktop Chrome has no popup for a multiple select: the
+  transparent listbox selects one row per click there and needs Ctrl or Cmd for more, which is
+  accepted, since the target is the phone. There is no Yes/No (the owner's call, 2026-10-21): the form saves `with_dogs` as "a dog
   was picked" and `dogs` only when one was. An empty table shows "No friends' dogs listed yet." and
   saves `with_dogs: false`. Correcting an old entry with `with_dogs: true` and no dogs keeps
   `with_dogs` true until a dog is tapped. The timeline names them: "with Dog A, Dog C"; an id no

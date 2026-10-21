@@ -187,6 +187,10 @@ export default function LogForm({ kind, event, people, dogs, phonePerson, rememb
   // An entry from before the dog list says "with dogs" and names none. Kept
   // on a correction until a dog is tapped, so the fact is not lost.
   const [unnamedDogs, setUnnamedDogs] = useState(!!x?.with_dogs && !x.dogs?.length);
+  const pickedNames = dogs
+    .filter((d) => dogIds.includes(d.id))
+    .map((d) => d.name)
+    .join(", ");
   const [minutes, setMinutes] = useState(String(x?.minutes ?? 15));
   const [treats, setTreats] = useState(String(x?.treats ?? 0));
   const [commands, setCommands] = useState<CommandId[]>(x?.commands ?? []);
@@ -366,17 +370,36 @@ export default function LogForm({ kind, event, people, dogs, phonePerson, rememb
           <Field label="Where">
             <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
           </Field>
-          <Field label="Other dogs">
+          <Field label="Other dogs" htmlFor={dogs.length ? "f-dogs" : undefined}>
             {dogs.length ? (
-              <Chips
-                label="Other dogs"
-                options={dogs.map((d) => [d.id, d.name] as const)}
-                picked={dogIds}
-                onChange={(next) => {
-                  setDogIds(next);
-                  setUnnamedDogs(false);
-                }}
-              />
+              /* A picklist like Human, several at once. The closed box shows
+                 the picked names; the real `<select multiple>` sits over it,
+                 transparent, so a tap opens the phone's own checklist (iOS's
+                 picker, Android's dialog). Same pattern as When. */
+              <div className="relative min-w-0 rounded-[10px] border border-line bg-paper focus-within:border-accent">
+                <span aria-hidden="true" className="flex min-h-[44px] items-center gap-2 py-2.5 pl-2.5 pr-2">
+                  <span className={`min-w-0 flex-1 truncate ${pickedNames ? "" : "text-ink-soft"}`}>{pickedNames || "None"}</span>
+                  <svg viewBox="0 0 16 16" width="16" height="16" className="shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                <select
+                  id="f-dogs"
+                  multiple
+                  value={dogIds}
+                  onChange={(e) => {
+                    setDogIds(Array.from(e.target.selectedOptions, (o) => o.value));
+                    setUnnamedDogs(false);
+                  }}
+                  className="absolute inset-0 h-full w-full min-w-0 cursor-pointer opacity-0"
+                >
+                  {dogs.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             ) : (
               <p className="text-[13px] text-ink-soft">No friends&apos; dogs listed yet.</p>
             )}
