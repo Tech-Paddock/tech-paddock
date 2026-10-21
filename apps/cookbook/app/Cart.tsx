@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CHECKOUT_URL, isKingSoopersProduct } from "@/lib/kingsoopers";
-import { refreshDue } from "@/lib/refreshDue";
+import { refreshDue, scanDue } from "@/lib/refreshDue";
 import type { CartLine, Outcome, ReviewLine } from "@/lib/cart";
+import { modalityWord, type Modality } from "@/lib/modality";
+import type { Estimate, ScanRecord } from "@/lib/pricing";
+import type { SaleSources } from "@/lib/saleTag";
+import { DealsPanel, EstimatePanel, ModeToggle } from "./Deals";
 import { useToast } from "./Toast";
 
 /**
@@ -21,6 +25,13 @@ import { useToast } from "./Toast";
  * week old starts one in the background; *Refresh now* starts one by hand.
  * Either way the result is said in words, and a failure is never silence.
  *
+ * **Prices (TEC-121)**: a Pickup/Delivery toggle (remembered on the
+ * connection, passed to Send), *Calculate estimated total*, and the deal scan,
+ * which runs on the refresh's rule. **Every request that borrows a Kroger
+ * token goes through `serial`**, one at a time: two at once can race the
+ * refresh token's rotation, and opening the list can start a refresh and a
+ * scan together.
+ *
  * Local patterns, named so they are a decision deferred rather than drift: the
  * per-line review rows (added / skipped / failed chips) and the store picker
  * are this file's own; they reuse the theme's tokens only.
@@ -32,6 +43,7 @@ type Status = {
   connected: boolean;
   store: { locationId: string; name: string } | null;
   refreshedAt: string | null;
+  modality: Modality;
 };
 
 type Store = { locationId: string; name: string; address: string };
@@ -67,7 +79,14 @@ function CheckoutLink() {
   );
 }
 
-export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void }) {
+export default function Cart({
+  onBrandsChanged,
+  onSaleSources,
+}: {
+  onBrandsChanged: () => void;
+  /** The prices this panel already holds, handed up so the list can tag lines on sale (TEC-121 3a). No request of its own. */
+  onSaleSources?: (sources: SaleSources) => void;
+}) {
   const toast = useToast();
   const toastRef = useRef(toast);
   toastRef.current = toast;
@@ -88,11 +107,37 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [confirmAgain, setConfirmAgain] = useState(false);
   const [refused, setRefused] = useState<CartLine[] | null>(null);
-  const [results, setResults] = useState<{ outcomes: Outcome[]; summary: string; recordError: string | null } | null>(null);
+  const [results, setResults] = useState<{
+    outcomes: Outcome[];
+    summary: string;
+    recordError: string | null;
+    modalityWarning: string | null;
+  } | null>(null);
 
   const [refreshing, setRefreshing] = useState(false);
   const [refreshNote, setRefreshNote] = useState<{ text: string; failed: boolean } | null>(null);
   const autoRefreshed = useRef(false);
+
+  const [estimating, setEstimating] = useState(false);
+  const [estimate, setEstimate] = useState<{ estimate: Estimate; message: string } | null>(null);
+
+  const [latestScan, setLatestScan] = useState<ScanRecord | null>(null);
+  const [scanLoaded, setScanLoaded] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<{ text: string; failed: boolean } | null>(null);
+  const autoScanned = useRef(false);
+
+  /**
+   * **One Kroger request at a time.** Each borrows the refresh token, and two
+   * at once can race its rotation (NOTES.md); opening the list can start a
+   * refresh and a deal scan together. A failed task does not stop the next.
+   */
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const serial = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
+    const run = queue.current.then(task, task);
+    queue.current = run.catch(() => undefined);
+    return run;
+  }, []);
 
   const loadStatus = useCallback(async (): Promise<Status | null> => {
     try {
@@ -111,7 +156,7 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const response = await fetch("/api/kroger/refresh", { method: "POST" });
+      const response = await serial(() => fetch("/api/kroger/refresh", { method: "POST" }));
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         // **Said in words, and never as "nothing changed".**
@@ -126,7 +171,51 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
     } finally {
       setRefreshing(false);
     }
-  }, [loadStatus]);
+  }, [loadStatus, serial]);
+
+  /** The latest appended scan, or null for never. */
+  const loadScan = useCallback(async (): Promise<ScanRecord | null | undefined> => {
+    try {
+      const response = await fetch("/api/kroger/deals", { cache: "no-store" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Couldn't read the last deal scan.");
+      setLatestScan(body.latest as ScanRecord | null);
+      setScanLoaded(true);
+      return body.latest as ScanRecord | null;
+    } catch (e) {
+      setScanNote({ text: e instanceof Error ? e.message : "Couldn't read the last deal scan.", failed: true });
+      return undefined;
+    }
+  }, []);
+
+  const scan = useCallback(
+    async (trigger: "opened" | "manual") => {
+      setScanning(true);
+      try {
+        const response = await serial(() =>
+          fetch("/api/kroger/deals", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ trigger }),
+          })
+        );
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          // **Said in words, never as "no deals".**
+          setScanNote({ text: `Deal scan failed: ${body.error ?? "Kroger or the database didn't answer."}`, failed: true });
+        } else {
+          setLatestScan(body.scan as ScanRecord);
+          setScanLoaded(true);
+          setScanNote({ text: body.message as string, failed: false });
+        }
+      } catch {
+        setScanNote({ text: "Deal scan failed: couldn't reach this app's server.", failed: true });
+      } finally {
+        setScanning(false);
+      }
+    },
+    [serial]
+  );
 
   // On open: read the connection, say how a sign-in just went, and start a
   // refresh **in the background** when the last one is over a week old.
@@ -142,19 +231,69 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
       window.history.replaceState(null, "", window.location.pathname + (rest ? `?${rest}` : ""));
     }
 
-    void loadStatus().then((s) => {
+    void loadStatus().then(async (s) => {
       if (s && !autoRefreshed.current && refreshDue(s)) {
         autoRefreshed.current = true;
         void refresh(); // not awaited: the page is never held for it
       }
+      // The deal scan, on the refresh's rule (TEC-121). Queued behind any
+      // refresh by `serial`, and likewise never awaited by the page.
+      if (s?.store) {
+        const latest = await loadScan();
+        if (latest !== undefined && !autoScanned.current && scanDue({ ...s, hasStore: true }, latest?.ran_at ?? null)) {
+          autoScanned.current = true;
+          void scan("opened");
+        }
+      }
     });
-  }, [loadStatus, refresh]);
+  }, [loadStatus, refresh, loadScan, scan]);
+
+  // The list's on-sale tags read the latest scan and estimate held here, at
+  // the chosen store; nothing new is fetched for them.
+  const locationId = status?.connected ? (status.store?.locationId ?? null) : null;
+  useEffect(() => {
+    onSaleSources?.({ locationId, scan: latestScan, estimate: estimate?.estimate ?? null });
+  }, [onSaleSources, locationId, latestScan, estimate]);
+
+  async function chooseModality(modality: Modality) {
+    if (!status) return;
+    const before = status.modality;
+    setStatus({ ...status, modality });
+    setEstimate(null);
+    try {
+      const response = await fetch("/api/kroger", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modality }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "Couldn't save pickup or delivery.");
+    } catch (e) {
+      setStatus((current) => (current ? { ...current, modality: before } : current));
+      toast.error(e instanceof Error ? e.message : "Couldn't save pickup or delivery.");
+    }
+  }
+
+  async function calculate() {
+    if (estimating) return;
+    setEstimating(true);
+    try {
+      const response = await serial(() => fetch("/api/kroger/estimate", { method: "POST" }));
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "Couldn't calculate the estimate.");
+      setEstimate(body as { estimate: Estimate; message: string });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't calculate the estimate.");
+    } finally {
+      setEstimating(false);
+    }
+  }
 
   async function findStores() {
     if (busy) return;
     setBusy("stores");
     try {
-      const response = await fetch(`/api/kroger/store?zip=${encodeURIComponent(zip.trim())}`, { cache: "no-store" });
+      const response = await serial(() => fetch(`/api/kroger/store?zip=${encodeURIComponent(zip.trim())}`, { cache: "no-store" }));
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't find stores.");
       setStores(body.stores as Store[]);
@@ -177,6 +316,8 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
       setStores(null);
       setChoosingStore(false);
       setReview(null);
+      // The estimate was another store's prices.
+      setEstimate(null);
       await loadStatus();
       // A new store means new prices: check them now rather than in a week.
       void refresh();
@@ -208,7 +349,7 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
     setRefused(null);
     setConfirmAgain(false);
     try {
-      const response = await fetch("/api/kroger/cart", { cache: "no-store" });
+      const response = await serial(() => fetch("/api/kroger/cart", { cache: "no-store" }));
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't get the list ready.");
       const lines = body.lines as ReviewLine[];
@@ -251,18 +392,25 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
     setBusy("send");
     setRefused(null);
     try {
-      const response = await fetch("/api/kroger/cart", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ picks, again: again.length > 0 && confirmAgain }),
-      });
+      const response = await serial(() =>
+        fetch("/api/kroger/cart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ picks, again: again.length > 0 && confirmAgain }),
+        })
+      );
       const body = await response.json();
       if (response.status === 409 && Array.isArray(body.alreadySent)) {
         setRefused(body.alreadySent as CartLine[]);
         return;
       }
       if (!response.ok) throw new Error(body.error ?? "Couldn't send to the cart.");
-      setResults({ outcomes: body.outcomes, summary: body.summary, recordError: body.recordError ?? null });
+      setResults({
+        outcomes: body.outcomes,
+        summary: body.summary,
+        recordError: body.recordError ?? null,
+        modalityWarning: body.modalityWarning ?? null,
+      });
       setReview(null);
       brandsChanged.current();
     } catch (e) {
@@ -375,6 +523,13 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
           </button>
         </div>
 
+        {/* Pickup or Delivery (TEC-121): remembered on the connection; Send
+            passes it to the cart and the estimate prices what it offers. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <ModeToggle value={status.modality} onChange={(m) => void chooseModality(m)} disabled={busy === "send"} />
+          <span className="text-xs text-ink-soft">The time slot is picked at King Soopers checkout.</span>
+        </div>
+
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -384,8 +539,18 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
           >
             {busy === "review" ? "Looking up…" : review ? "Look up again" : "Send to cart"}
           </button>
+          <button
+            type="button"
+            onClick={() => void calculate()}
+            disabled={estimating}
+            className="rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50"
+          >
+            {estimating ? "Calculating…" : `Calculate estimated total (${modalityWord(status.modality)})`}
+          </button>
           <CheckoutLink />
         </div>
+
+        {estimate ? <EstimatePanel estimate={estimate.estimate} message={estimate.message} onClose={() => setEstimate(null)} /> : null}
 
         {review ? (
           <ReviewPanel
@@ -423,12 +588,15 @@ export default function Cart({ onBrandsChanged }: { onBrandsChanged: () => void 
                 </li>
               ))}
             </ul>
+            {results.modalityWarning ? <p role="alert" className="text-xs text-warn">{results.modalityWarning}</p> : null}
             {results.recordError ? <p className="text-xs text-danger">{results.recordError}</p> : null}
             <div>
               <CheckoutLink />
             </div>
           </div>
         ) : null}
+
+        <DealsPanel latest={latestScan} loaded={scanLoaded} scanning={scanning} note={scanNote} onScan={() => void scan("manual")} />
       </div>
     );
   }

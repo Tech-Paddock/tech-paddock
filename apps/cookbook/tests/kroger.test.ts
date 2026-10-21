@@ -27,6 +27,16 @@ const mem = vi.hoisted(() => ({
   prefs: [] as Record<string, unknown>[],
   sent: [] as string[],
   tokenWrites: [] as string[],
+  scans: [] as Record<string, unknown>[],
+}));
+
+vi.mock("@/lib/dealStore", () => ({
+  readLatestScan: async () => mem.scans[mem.scans.length - 1] ?? null,
+  appendScan: async (scan: Record<string, unknown>) => {
+    const row = { id: `scan-${mem.scans.length + 1}`, ran_at: new Date().toISOString(), ...scan };
+    mem.scans.push(row);
+    return row;
+  },
 }));
 
 vi.mock("@/lib/krogerStore", () => ({
@@ -40,6 +50,9 @@ vi.mock("@/lib/krogerStore", () => ({
   },
   writeRefreshedAt: async (at: string) => {
     mem.row = { ...(mem.row ?? {}), refreshed_at: at };
+  },
+  writeModality: async (modality: string) => {
+    mem.row = { ...(mem.row ?? {}), modality };
   },
   deleteConnectionRow: async () => {
     mem.row = null;
@@ -77,7 +90,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 /** Kroger, faked. Every request it receives is kept, so a test can say none was made. */
-const kroger = vi.fn(async (input: string | URL | Request) => {
+const defaultKroger = async (input: string | URL | Request, _init?: RequestInit) => {
   const url = String(input);
   if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT, expires_in: 1800 });
   if (url.includes("/locations")) {
@@ -86,7 +99,8 @@ const kroger = vi.fn(async (input: string | URL | Request) => {
   if (url.includes("/products")) return json({ data: [PRODUCT] });
   if (url.endsWith("/cart/add")) return new Response(null, { status: 204 });
   return json({ error: "unexpected" }, 500);
-});
+};
+const kroger = vi.fn(defaultKroger);
 
 function key() {
   return readKey(KEY_B64);
@@ -125,6 +139,7 @@ beforeEach(() => {
   ];
   mem.sent = [];
   mem.tokenWrites = [];
+  mem.scans = [];
 });
 
 afterEach(() => {
@@ -340,5 +355,113 @@ describe("no token appears in any response body", () => {
     const body = await bodyOf(res);
     expect(body.error).toMatch(/connect King Soopers again/);
     expect(body.reconnect).toBe(true);
+  });
+});
+
+describe("prices on the list tab (TEC-121)", () => {
+  const secrets = () => [STORED_RT, NEW_RT, ACCESS, CLIENT_SECRET, String(mem.row?.refresh_token_sealed ?? "never")];
+  async function bodyOf(res: Response) {
+    const text = await res.text();
+    for (const secret of secrets()) expect(text).not.toContain(secret);
+    return JSON.parse(text);
+  }
+  const onSale = { ...PRODUCT, items: [{ size: "1 gal", price: { regular: 4, promo: 3, expirationDate: { value: "2026-10-27T23:59:59Z" } } }] };
+
+  afterEach(() => {
+    kroger.mockImplementation(defaultKroger);
+  });
+
+  it("Pickup or Delivery is remembered on the connection, and anything else is refused", async () => {
+    const { GET, PATCH } = await import("@/app/api/kroger/route");
+    expect((await bodyOf(await GET())).modality).toBe("PICKUP");
+    const patch = (modality: unknown) =>
+      PATCH(new NextRequest("https://cookbook.techpaddock.io/api/kroger", { method: "PATCH", body: JSON.stringify({ modality }) }));
+    expect((await patch("SHIP")).status).toBe(400);
+    expect((await bodyOf(await patch("DELIVERY"))).modality).toBe("DELIVERY");
+    expect((await bodyOf(await GET())).modality).toBe("DELIVERY");
+  });
+
+  it("Send puts the chosen mode on the cart body", async () => {
+    mem.row = { ...mem.row, modality: "DELIVERY" };
+    const { POST } = await import("@/app/api/kroger/cart/route");
+    const body = await bodyOf(
+      await POST(
+        new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart", {
+          method: "POST",
+          body: JSON.stringify({ picks: [{ id: "a", upc: "0001111041700" }] }),
+        })
+      )
+    );
+    expect(body.modalityWarning).toBeNull();
+    const cartCall = kroger.mock.calls.find(([url]) => String(url).endsWith("/cart/add"));
+    expect(JSON.parse(String((cartCall?.[1] as RequestInit).body))).toEqual({
+      items: [{ upc: "0001111041700", quantity: 2, modality: "DELIVERY" }],
+    });
+  });
+
+  it("Send retries without the mode when Kroger refuses it, and warns", async () => {
+    kroger.mockImplementation(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
+      if (url.endsWith("/cart/add")) {
+        return String(init?.body).includes("modality") ? json({ errors: { reason: "invalid field" } }, 400) : new Response(null, { status: 204 });
+      }
+      return json({ data: [PRODUCT] });
+    });
+    const { POST } = await import("@/app/api/kroger/cart/route");
+    const body = await bodyOf(
+      await POST(
+        new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart", {
+          method: "POST",
+          body: JSON.stringify({ picks: [{ id: "a", upc: "0001111041700" }] }),
+        })
+      )
+    );
+    expect(body.outcomes[0]).toMatchObject({ result: "added", withoutModality: true });
+    expect(body.modalityWarning).toMatch(/refused the pickup choice/);
+    expect(mem.sent).toEqual(["a"]);
+  });
+
+  it("the estimate prices the list at the store, asking for the exact brands by ID", async () => {
+    const { POST } = await import("@/app/api/kroger/estimate/route");
+    const body = await bodyOf(await POST());
+    // milk ×2 (exact brand) and eggs ×1 (top match), both $3.49 in the fake.
+    expect(body.estimate.total).toBe(10.47);
+    expect(body.message).toMatch(/^Estimated total \$10\.47 for 2 lines, pickup at King Soopers Test/);
+    const productCalls = kroger.mock.calls.map(([u]) => decodeURIComponent(String(u))).filter((u) => u.includes("/products"));
+    expect(productCalls.some((u) => u.includes("filter.productId=0001111041700") && u.includes("filter.locationId=62000001"))).toBe(true);
+    expect(mem.scans).toEqual([]);
+  });
+
+  it("a deal scan is appended, never overwritten, and the latest is what GET shows", async () => {
+    kroger.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
+      return json({ data: [onSale] });
+    });
+    const { GET, POST } = await import("@/app/api/kroger/deals/route");
+    expect((await bodyOf(await GET())).latest).toBeNull();
+    const run = () => POST(new NextRequest("https://cookbook.techpaddock.io/api/kroger/deals", { method: "POST", body: "{}" }));
+    const first = await bodyOf(await run());
+    expect(first.scan.trigger).toBe("manual");
+    expect(first.scan.deals).toEqual([
+      expect.objectContaining({ productId: "0001111041700", regular: 4, promo: 3, percentOff: 25, for: ["milk", "eggs"] }),
+    ]);
+    // The saved brand, then the two open lines.
+    expect(first.message).toBe("Checked 3 at King Soopers Test: 1 on sale.");
+    await bodyOf(await run());
+    expect(mem.scans.map((s) => s.id)).toEqual(["scan-1", "scan-2"]);
+    expect((await bodyOf(await GET())).latest.id).toBe("scan-2");
+  });
+
+  it("without a store, the scan and the estimate say so and save nothing", async () => {
+    mem.row = { ...mem.row, location_id: null, store_name: null };
+    const deals = await import("@/app/api/kroger/deals/route");
+    const est = await import("@/app/api/kroger/estimate/route");
+    const scan = await deals.POST(new NextRequest("https://cookbook.techpaddock.io/api/kroger/deals", { method: "POST", body: "{}" }));
+    expect(scan.status).toBe(409);
+    expect((await bodyOf(scan)).error).toMatch(/Pick a store/);
+    expect((await est.POST()).status).toBe(409);
+    expect(mem.scans).toEqual([]);
   });
 });

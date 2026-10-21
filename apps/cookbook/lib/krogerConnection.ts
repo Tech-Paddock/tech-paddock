@@ -2,6 +2,7 @@ import { configProblems, exchangeCode, krogerConfig, KrogerError, refresh } from
 import { open, seal, stateIsValid } from "./krogerCrypto";
 import { readConnectionRow, writeRefreshToken } from "./krogerStore";
 import { ConflictError } from "./errors";
+import { DEFAULT_MODALITY, isModality, type Modality } from "./modality";
 
 /**
  * The one King Soopers connection: what the list tab is told about it, how a
@@ -21,12 +22,18 @@ export type ConnectionStatus = {
   store: ChosenStore | null;
   /** When the last refresh finished; the list tab starts one when this is over a week old. */
   refreshedAt: string | null;
+  /** Pickup or Delivery (TEC-121), remembered on the connection. Pickup until chosen. */
+  modality: Modality;
 };
 
 export type ChosenStore = { locationId: string; name: string };
 
 function storeOf(row: { location_id: string | null; store_name: string | null }): ChosenStore | null {
   return row.location_id ? { locationId: row.location_id, name: row.store_name ?? row.location_id } : null;
+}
+
+function modalityOf(row: { modality?: string | null } | null): Modality {
+  return isModality(row?.modality) ? row.modality : DEFAULT_MODALITY;
 }
 
 export async function connectionStatus(): Promise<ConnectionStatus> {
@@ -38,6 +45,7 @@ export async function connectionStatus(): Promise<ConnectionStatus> {
     connected: row !== null,
     store: row ? storeOf(row) : null,
     refreshedAt: row?.refreshed_at ?? null,
+    modality: modalityOf(row),
   };
 }
 
@@ -49,7 +57,7 @@ export async function connectionStatus(): Promise<ConnectionStatus> {
  * and saved before `use` runs, because the old one may already be spent.
  */
 export async function withAccessToken<T>(
-  use: (accessToken: string, store: ChosenStore | null) => Promise<T>
+  use: (accessToken: string, store: ChosenStore | null, modality: Modality) => Promise<T>
 ): Promise<T> {
   const config = krogerConfig();
   const row = await readConnectionRow();
@@ -66,7 +74,7 @@ export async function withAccessToken<T>(
   if (tokens.refreshToken && tokens.refreshToken !== stored) {
     await writeRefreshToken(seal(tokens.refreshToken, config.key), false);
   }
-  return use(tokens.accessToken, storeOf(row));
+  return use(tokens.accessToken, storeOf(row), modalityOf(row));
 }
 
 /**

@@ -32,6 +32,11 @@ function product(over: Partial<Product> = {}): Product {
     brand: "Kroger",
     size: "1 gal",
     price: 3.49,
+    regular: 3.49,
+    promo: null,
+    promoEnds: null,
+    pickup: true,
+    delivery: true,
     inStock: true,
     url: "https://www.kingsoopers.com/p/kroger-2-milk/0001111041700",
     ...over,
@@ -155,7 +160,7 @@ describe("a send: every line reports added, skipped or failed", () => {
     ]);
     expect(outcomes[2].detail).toMatch(/Kroger refused it/);
     // The quantity is the line's own.
-    expect(add).toHaveBeenCalledWith("0000000000001", 2);
+    expect(add).toHaveBeenCalledWith("0000000000001", 2, null);
     expect(summarize(outcomes)).toBe("1 added, 2 skipped, 1 failed");
   });
 
@@ -167,7 +172,7 @@ describe("a send: every line reports added, skipped or failed", () => {
       { add, remember }
     );
     expect(remember).toHaveBeenCalledWith("milk", PAGE);
-    expect(add).toHaveBeenCalledWith("0085631200203", 1);
+    expect(add).toHaveBeenCalledWith("0085631200203", 1, null);
     expect(o).toMatchObject({ result: "added" });
     expect(o.detail).toMatch(/Remembered/);
   });
