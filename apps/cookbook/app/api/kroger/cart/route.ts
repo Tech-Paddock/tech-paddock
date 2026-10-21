@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readList, markSent, type GroceryItem } from "@/lib/grocery";
+import { readList, markSent, splitLine, type GroceryItem } from "@/lib/grocery";
 import { readDraft, readPreferences, savePreference } from "@/lib/preferences";
 import { decider } from "@/lib/decide";
 import { addToCart, topProduct } from "@/lib/kroger";
@@ -81,10 +81,12 @@ export async function POST(request: NextRequest) {
         {
           // Pickup or Delivery goes with each line; a refusal is retried once without it (lib/cart.ts).
           add: (upc, quantity, m) => addToCart(accessToken, upc, quantity, m),
-          // **A replacement is remembered in Your brands** (RULES.md), through
-          // the same validation as the editor.
-          remember: async (phrase, url) => {
-            const read = readDraft({ phrase, kind: "product", url });
+          // **What went in is remembered in Your brands** (RULES.md, TEC-128):
+          // a replacement or the tapped match, as an exact product under the
+          // line's name — never its note — through the same validation as the
+          // editor. `sendLines` calls this only after the add succeeded.
+          remember: async (name, url) => {
+            const read = readDraft({ phrase: splitLine(name).name, kind: "product", url });
             if ("error" in read) throw new InputError(read.error);
             await savePreference(read.row);
           },

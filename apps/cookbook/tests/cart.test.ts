@@ -165,15 +165,22 @@ describe("a send: every line reports added, skipped or failed", () => {
   });
 
   it("a replacement page goes in and is remembered in Your brands under the line's name", async () => {
-    const remember = vi.fn(async () => {});
-    const add = vi.fn(async () => {});
+    const order: string[] = [];
+    const remember = vi.fn(async () => {
+      order.push("remember");
+    });
+    const add = vi.fn(async () => {
+      order.push("add");
+    });
     const [o] = await sendLines(
       { open: [line({ id: "a", name: "milk" })], picks: [{ id: "a", url: PAGE }], again: false },
       { add, remember }
     );
     expect(remember).toHaveBeenCalledWith("milk", PAGE);
     expect(add).toHaveBeenCalledWith("0085631200203", 1, null);
-    expect(o).toMatchObject({ result: "added" });
+    // Saved only once the add went in (TEC-128).
+    expect(order).toEqual(["add", "remember"]);
+    expect(o).toMatchObject({ result: "added", upc: "0085631200203" });
     expect(o.detail).toMatch(/Remembered/);
   });
 
@@ -189,6 +196,110 @@ describe("a send: every line reports added, skipped or failed", () => {
 
   it("drops a malformed pick rather than guessing, so its line reports skipped", () => {
     expect(readPicks([{ id: "a", upc: "1" }, { nope: true }, { id: "a" }, "x"])).toEqual([{ id: "a", upc: "1" }]);
+  });
+});
+
+describe("whatever goes in for an unmatched line is remembered in Your brands (TEC-128)", () => {
+  const MATCH = product().url;
+  const UPC = product().upc;
+
+  it("a tapped top match is remembered as its page, under the line's name, after the add", async () => {
+    const order: string[] = [];
+    const add = vi.fn(async () => {
+      order.push("add");
+    });
+    const remember = vi.fn(async () => {
+      order.push("remember");
+    });
+    const [o] = await sendLines(
+      { open: [line({ id: "a", name: "milk", note: "the small tin" })], picks: [{ id: "a", upc: UPC, match: MATCH }], again: false },
+      { add, remember }
+    );
+    expect(add).toHaveBeenCalledWith(UPC, 1, null);
+    expect(remember).toHaveBeenCalledWith("milk", MATCH);
+    expect(order).toEqual(["add", "remember"]);
+    expect(o).toMatchObject({ result: "added", upc: UPC });
+    expect(o.detail).toBe("Added ×1. Remembered in Your brands.");
+  });
+
+  it("an exact brand sends no match page, so nothing is re-saved", async () => {
+    const remember = vi.fn(async () => {});
+    const [o] = await sendLines(
+      { open: [line({ id: "a", name: "milk" })], picks: [{ id: "a", upc: UPC }], again: false },
+      { add: vi.fn(async () => {}), remember }
+    );
+    expect(remember).not.toHaveBeenCalled();
+    expect(o.detail).toBe("Added ×1.");
+  });
+
+  it("a failed add saves nothing — match or replacement", async () => {
+    const remember = vi.fn(async () => {});
+    const add = vi.fn(async () => {
+      throw new Error("Kroger refused it (HTTP 500).");
+    });
+    const outcomes = await sendLines(
+      {
+        open: [line({ id: "a", name: "milk" }), line({ id: "b", name: "eggs" })],
+        picks: [
+          { id: "a", upc: UPC, match: MATCH },
+          { id: "b", url: PAGE },
+        ],
+        again: false,
+        modality: "PICKUP",
+      },
+      { add, remember }
+    );
+    expect(outcomes.map((o) => o.result)).toEqual(["failed", "failed"]);
+    expect(outcomes.every((o) => !/remember/i.test(o.detail))).toBe(true);
+    expect(remember).not.toHaveBeenCalled();
+  });
+
+  it("a failed save is said on the line and never undoes or hides the add", async () => {
+    const remember = vi.fn(async () => {
+      throw new Error("Couldn't save that preference: connection reset.");
+    });
+    const [o] = await sendLines(
+      { open: [line({ id: "a", name: "milk" })], picks: [{ id: "a", upc: UPC, match: MATCH }], again: false },
+      { add: vi.fn(async () => {}), remember }
+    );
+    expect(o).toMatchObject({ result: "added", upc: UPC });
+    expect(o.detail).toBe("Added ×1. Couldn't remember it in Your brands (Couldn't save that preference: connection reset) — save it there by hand.");
+  });
+
+  it("a line that went in without Pickup/Delivery is still remembered", async () => {
+    const { KrogerError } = await import("@/lib/kroger");
+    const add = vi.fn(async (_upc: string, _q: number, m: unknown) => {
+      if (m) throw new KrogerError("Kroger refused it (HTTP 400).", 400);
+    });
+    const remember = vi.fn(async () => {});
+    const [o] = await sendLines(
+      { open: [line({ id: "a", name: "milk" })], picks: [{ id: "a", upc: UPC, match: MATCH }], again: false, modality: "DELIVERY" },
+      { add, remember }
+    );
+    expect(o).toMatchObject({ result: "added", withoutModality: true });
+    expect(remember).toHaveBeenCalledWith("milk", MATCH);
+    expect(o.detail).toMatch(/Kroger refused the choice\. Remembered in Your brands\.$/);
+  });
+
+  it("a match page naming a different product is not remembered, and the add still stands", async () => {
+    const remember = vi.fn(async () => {});
+    const [o] = await sendLines(
+      { open: [line({ id: "a", name: "milk" })], picks: [{ id: "a", upc: UPC, match: PAGE }], again: false },
+      { add: vi.fn(async () => {}), remember }
+    );
+    expect(remember).not.toHaveBeenCalled();
+    expect(o).toMatchObject({ result: "added", upc: UPC });
+    expect(o.detail).toMatch(/Not remembered in Your brands/);
+  });
+
+  it("a pick keeps the match page only beside a product number, and a pasted page wins", () => {
+    expect(
+      readPicks([
+        { id: "a", upc: UPC, match: MATCH },
+        { id: "b", url: PAGE, upc: UPC, match: MATCH },
+        { id: "c", match: MATCH },
+      ])
+    ).toEqual([{ id: "a", upc: UPC, match: MATCH }, { id: "b", url: PAGE }, { id: "c" }]);
   });
 });
 

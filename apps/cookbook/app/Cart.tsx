@@ -17,7 +17,8 @@ import { useToast } from "./Toast";
  * On the list tab, under the list: connect once, pick a store once, then
  * review and send. **Every line is shown before anything is sent**: a line tied
  * to an exact product goes in as-is, any other shows Kroger's top match for a
- * tap, or takes an exact product page instead — remembered in Your brands.
+ * tap, or takes an exact product page instead; whichever goes in is remembered
+ * in Your brands (TEC-128).
  * **No model picks anything.** Every line then reports added, skipped or failed,
  * and **a line already sent is not sent again without saying so**, because the
  * Cart API only adds. Checkout stays at King Soopers: the link opens their cart.
@@ -388,13 +389,14 @@ export default function Cart({
     setChoices((current) => ({ ...current, [id]: { ...current[id], ...change } }));
   }
 
-  const picks = (review ?? []).flatMap((line): { id: string; upc?: string; url?: string }[] => {
+  const picks = (review ?? []).flatMap((line): { id: string; upc?: string; url?: string; match?: string }[] => {
     const choice = choices[line.id];
     if (!choice) return [];
     if (choice.url.trim()) return [{ id: line.id, url: choice.url.trim() }];
     if (!choice.include) return [];
     if (line.plan.kind === "exact") return [{ id: line.id, upc: line.plan.upc }];
-    if (line.plan.kind === "match") return [{ id: line.id, upc: line.plan.product.upc }];
+    // The match's page goes with it, so the server can remember it in Your brands (TEC-128).
+    if (line.plan.kind === "match") return [{ id: line.id, upc: line.plan.product.upc, match: line.plan.product.url }];
     return [];
   });
   const again = (review ?? []).filter((l) => l.sent_at !== null && picks.some((p) => p.id === l.id));

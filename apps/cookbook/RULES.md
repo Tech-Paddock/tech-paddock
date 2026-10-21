@@ -58,7 +58,8 @@ section and closing comment before changing anything in this file.
 - Pick a store once; lookups price and stock there.
 - Send adds; it never checks out. "Go to checkout" opens the King Soopers cart.
 - An exact product in Your brands goes in as-is. Any other line shows Kroger's top match, which the
-  user adds or replaces with a product URL; a replacement is remembered in Your brands.
+  user adds or replaces with a product URL; whichever goes in, the match or the replacement, is
+  remembered in Your brands under the line's name.
 - No model picks a product or runs anywhere in this flow.
 - Every line reports added, skipped or failed; a partial send never reads as whole.
 - A second send warns and shows what was already sent, because the Cart API only adds.
