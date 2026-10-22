@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { BREW_METHODS } from "./methods";
 import { coerceSuggestion, type Suggestion } from "./suggestion";
-import { SEARCH_MODELS, DEFAULT_SEARCH_MODEL, isEffortFor, type SearchModel } from "./models";
+import { MODEL, EFFORT, WEB_SEARCH_TOOL, WEB_FETCH_TOOL } from "./models";
 import { concludeSearch, readTurn, SearchFailed, type ResultBlock, type SearchOutcome } from "./searchRun";
 import { SEARCH_BUDGET_MS } from "./searchClock";
 import {
@@ -15,10 +15,27 @@ import {
 } from "./recipeImage";
 
 /**
- * Reading a label is transcription and it is already fast, so it stays on the
- * model that is known to do it well. Only the search is under comparison.
+ * Every call here sends `MODEL` at `output_config.effort: EFFORT`
+ * (`lib/models.ts`) and nothing else that steers sampling: no `thinking`
+ * (Sonnet 5.5 runs adaptive thinking by default, and `disabled` is a 400), no
+ * `temperature`/`top_p`/`top_k`, no forced `tool_choice`, no assistant prefill.
+ * `tests/anthropic.test.ts` pins every request to that.
+ *
+ * Thinking comes out of `max_tokens`, and at `medium` Sonnet 5.5 thinks
+ * briefly before almost every reply, so each budget below is sized for some
+ * thinking plus the answer. A cap that is hit is a `max_tokens` stop, which
+ * every call refuses rather than parses.
  */
-const IDENTIFY_MODEL = "claude-sonnet-5";
+
+/**
+ * A response that did not finish is not an answer, whichever call made it.
+ * `refusal` is named on its own because it is the one a person can act on.
+ */
+function stoppedEarly(what: string, stopReason: string | null): string | null {
+  if (stopReason === "end_turn") return null;
+  if (stopReason === "refusal") return `Claude declined ${what}.`;
+  return `Claude stopped before finishing ${what} (${stopReason ?? "no reason given"}).`;
+}
 
 let client: Anthropic | null = null;
 
@@ -53,19 +70,23 @@ const IDENTITY_SCHEMA = {
 };
 
 /**
- * Read the bag. This step is transcription, not reasoning — low effort is
- * the right setting and keeps the round trip short while you're standing in
- * a kitchen holding the bag.
+ * Read the bag. This step is transcription, not reasoning, and it runs on the
+ * one model and effort every call uses.
+ *
+ * **An unfinished read throws** rather than parsing to an empty label: an
+ * empty identity is what an illegible bag looks like, and a refusal or a
+ * truncated answer is not that. The route reports it, and the page opens the
+ * same confirm screen with the error beside it, as manual entry.
  */
 export async function identifyBag(image: {
   media_type: Anthropic.Base64ImageSource["media_type"];
   data: string;
 }): Promise<BagIdentity> {
   const response = await getClient().messages.create({
-    model: IDENTIFY_MODEL,
-    max_tokens: 1024,
+    model: MODEL,
+    max_tokens: 4096,
     output_config: {
-      effort: "low",
+      effort: EFFORT,
       format: { type: "json_schema", schema: IDENTITY_SCHEMA },
     },
     system:
@@ -85,6 +106,9 @@ export async function identifyBag(image: {
       },
     ],
   });
+
+  const stopped = stoppedEarly("to read this label", response.stop_reason);
+  if (stopped) throw new Error(stopped);
 
   const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
   try {
@@ -149,18 +173,10 @@ export async function searchBrewGuide(params: {
   coffeeName: string;
   /** A product page a previous search found, read first when we have one. */
   productUrl?: string | null;
-  model?: SearchModel;
-  effort?: string | null;
 }): Promise<SearchOutcome> {
-  const model = params.model ?? DEFAULT_SEARCH_MODEL;
-  const spec = SEARCH_MODELS[model];
-  // Only a level this model accepts is sent. Anything else is dropped rather
-  // than passed through, because the request would fail rather than degrade.
-  const effort = isEffortFor(model, params.effort) ? params.effort : null;
-
   const tools: Anthropic.ToolUnion[] = [
-    { type: spec.search, name: "web_search", max_uses: 6 },
-    { type: spec.fetch, name: "web_fetch", max_uses: 6 },
+    { type: WEB_SEARCH_TOOL, name: "web_search", max_uses: 6 },
+    { type: WEB_FETCH_TOOL, name: "web_fetch", max_uses: 6 },
   ];
 
   const known = params.productUrl?.trim() || null;
@@ -207,11 +223,9 @@ export async function searchBrewGuide(params: {
   // that was still working.
   for (let i = 0; i < 10; i++) {
     const request: Anthropic.MessageCreateParamsNonStreaming = {
-      model,
-      max_tokens: searchMaxTokens(effort),
-      // Omitted rather than defaulted for a model that has no effort control:
-      // sending it anyway is a 400, not a no-op.
-      ...(effort ? { output_config: { effort } } : {}),
+      model: MODEL,
+      max_tokens: SEARCH_MAX_TOKENS,
+      output_config: { effort: EFFORT },
       // Each resume re-sends the whole conversation, fetched pages included.
       // Caching the prefix makes a resume pay for what is new rather than for
       // everything read so far. Top-level, so the breakpoint moves to the end
@@ -267,13 +281,10 @@ export async function searchBrewGuide(params: {
 }
 
 /**
- * Transcribing a printed card is the label reader's job in another shape, so
- * it runs on the same model, at `effort: "low"`, with a JSON schema — and, like
- * the label reader, with no web tools: it reads the images it is handed and
- * nothing else.
+ * Transcribing a printed card is the label reader's job in another shape: the
+ * same model and effort, a JSON schema, and, like the label reader, no web
+ * tools. It reads the images it is handed and nothing else.
  */
-const RECIPE_CARD_MODEL = "claude-sonnet-5";
-
 const RECIPE_CARD_SYSTEM = `You copy brewing recipes off images from a coffee roaster's product page.
 
 Some roasters print their recipe as a picture — a recipe card, a table, a label — instead of as
@@ -376,14 +387,17 @@ export async function readRecipeImages(productUrl: string, signal: AbortSignal):
 
     const response = await getClient().messages.create(
       {
-        model: RECIPE_CARD_MODEL,
-        max_tokens: 2048,
-        output_config: { effort: "low", format: { type: "json_schema", schema: RECIPE_CARD_SCHEMA } },
+        model: MODEL,
+        max_tokens: 8192,
+        output_config: { effort: EFFORT, format: { type: "json_schema", schema: RECIPE_CARD_SCHEMA } },
         system: RECIPE_CARD_SYSTEM,
         messages: [{ role: "user", content }],
       },
       { signal }
     );
+    if (response.stop_reason === "refusal") {
+      return { kind: "failed", message: "the image reader declined to read them" };
+    }
     if (response.stop_reason !== "end_turn") {
       return { kind: "failed", message: `the image reader stopped early (${response.stop_reason ?? "no reason given"})` };
     }
@@ -409,37 +423,15 @@ export async function readRecipeImages(productUrl: string, signal: AbortSignal):
 }
 
 /**
- * Room for the answer. At `xhigh` and `max` the model thinks more, and the
- * thinking comes out of this same budget — 8192 left a long search able to
- * spend its whole allowance thinking and stop at `max_tokens` before it wrote
- * the JSON. 16000 stays under the SDK's non-streaming ceiling (about 21,000),
- * past which it refuses the request and demands streaming.
+ * Room for the answer, per turn. Thinking comes out of this same budget, and
+ * 8192 once left a long search able to spend its whole allowance thinking and
+ * stop at `max_tokens` before it wrote the JSON. 16000 stays under the SDK's
+ * non-streaming ceiling (about 21,000), past which it refuses the request and
+ * demands streaming.
  */
-function searchMaxTokens(effort: string | null): number {
-  return effort === "xhigh" || effort === "max" ? 16_000 : 8192;
-}
+const SEARCH_MAX_TOKENS = 16_000;
 
 export const METHOD_VOCABULARY = BREW_METHODS;
-
-/**
- * Reading a label is transcription; retrieving a guide is retrieval; this is
- * the only call in the app that is asked for a judgement. It runs on Sonnet 5,
- * set when the feature was added on 2026-09-19, and it is fixed rather than
- * selectable: the search offers a model picker because which model
- * *retrieves* well enough is an open question with a right answer somewhere.
- * There is no comparable right answer here, so a dial would only produce
- * suggestions that are not comparable with each other.
- */
-const SUGGEST_MODEL = "claude-sonnet-5";
-
-/**
- * `medium`, not the default `high`. The reasoning asked for is short — a
- * handful of known attributes onto a starting point — and the output is six
- * strings and a sentence. `high` bought nothing on a task this shaped, and
- * this call runs unattended at the end of a search that has already taken
- * minutes.
- */
-const SUGGEST_EFFORT = "medium";
 
 const SUGGESTION_SCHEMA = {
   type: "object" as const,
@@ -505,10 +497,10 @@ export async function suggestRecipe(bag: {
   ].filter(Boolean);
 
   const response = await getClient().messages.create({
-    model: SUGGEST_MODEL,
-    max_tokens: 2048,
+    model: MODEL,
+    max_tokens: 4096,
     output_config: {
-      effort: SUGGEST_EFFORT,
+      effort: EFFORT,
       format: { type: "json_schema", schema: SUGGESTION_SCHEMA },
     },
     system: SUGGEST_SYSTEM,
@@ -523,6 +515,11 @@ export async function suggestRecipe(bag: {
     ],
   }, { signal });
 
+  // Thrown, so `suggestOnBag` records why in `suggested_error`: a refusal or a
+  // cut-off answer is not "Claude returned nothing usable".
+  const stopped = stoppedEarly("to suggest a recipe", response.stop_reason);
+  if (stopped) throw new Error(stopped);
+
   const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
   let raw: unknown = null;
   try {
@@ -531,5 +528,5 @@ export async function suggestRecipe(bag: {
     // A response that did not come back as the schema asked is nothing, not a
     // half-recipe. coerceSuggestion says the same thing about a null.
   }
-  return coerceSuggestion(raw, SUGGEST_MODEL);
+  return coerceSuggestion(raw, MODEL);
 }
