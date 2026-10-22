@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MAX_QUANTITY, asText, type GroceryItem, type TidyLine } from "@/lib/grocery";
 import type { ResolvedLink } from "@/lib/preferences";
 import { saleTags, saleText, type SaleSources, type SaleTag } from "@/lib/saleTag";
-import Brands from "./Brands";
 import Cart from "./Cart";
 import { useToast } from "./Toast";
 
@@ -13,7 +12,22 @@ import { useToast } from "./Toast";
  * what decided that. **The browser never matches a preference itself** — see
  * `app/api/grocery/route.ts`.
  */
-type ShoppingLine = GroceryItem & ResolvedLink;
+type ShoppingLine = GroceryItem &
+  ResolvedLink & {
+    /**
+     * The line as what you buy (TEC-131; `lib/lineView.ts`): the item without
+     * prep words or a saved product's shopping unit, the combined amount, and
+     * the note unless it was only amounts. Display only.
+     */
+    view?: { name: string; amount: string | null; note: string | null };
+  };
+
+/** What follows the name, small: the recipes, then the amount, then a typed note (TEC-131). */
+function details(item: ShoppingLine): string[] {
+  const recipes = item.recipes.length > 0 ? item.recipes.join(", ") : item.source === "recipe" ? "from a recipe" : null;
+  const note = item.view ? item.view.note : item.note;
+  return [recipes, item.view?.amount ?? null, note].filter((x): x is string => !!x);
+}
 
 /**
  * The shopping list — the other half of the book.
@@ -29,7 +43,7 @@ type ShoppingLine = GroceryItem & ResolvedLink;
  * King Soopers on 2026-09-26 (TEC-90). Still no `proxy.ts` carve-out. Each line
  * carries a quantity for the cart, default 1.
  */
-export default function List({ refreshKey }: { refreshKey: number }) {
+export default function List({ refreshKey, onBrandsChanged }: { refreshKey: number; onBrandsChanged?: () => void }) {
   const [items, setItems] = useState<ShoppingLine[] | null>(null);
   // The read only; everything else is a toast. Same split as the book.
   const [readError, setReadError] = useState<string | null>(null);
@@ -39,8 +53,6 @@ export default function List({ refreshKey }: { refreshKey: number }) {
   const [busy, setBusy] = useState<null | "adding" | "tidying" | "applying">(null);
   const [proposal, setProposal] = useState<TidyLine[] | null>(null);
   const [copied, setCopied] = useState(false);
-  // Bumped when the cart panel's refresh or a send changed Your brands.
-  const [brandsVersion, setBrandsVersion] = useState(0);
   // The prices the cart panel already holds (latest deal scan, last estimate),
   // read for the on-sale tags (TEC-121 3a). No Kroger call per render.
   const [saleSources, setSaleSources] = useState<SaleSources | null>(null);
@@ -384,9 +396,8 @@ export default function List({ refreshKey }: { refreshKey: number }) {
                   rel="noreferrer"
                   className="underline decoration-line decoration-dotted underline-offset-2"
                 >
-                  {item.name}
+                  {item.view?.name ?? item.name}
                 </a>
-                {item.note ? <span className="text-ink-soft"> — {item.note}</span> : null}
                 {/* **On sale at the chosen store** (TEC-121 3a): Kroger's promo
                     below regular, from the last scan or estimate. Says sale,
                     never coupon. Local pattern: an outlined accent chip. */}
@@ -395,13 +406,12 @@ export default function List({ refreshKey }: { refreshKey: number }) {
                     {saleText(onSale.get(item.id)!)}
                   </span>
                 ) : null}
-                {/* Where the line came from: the recipes by name, plain text
-                    (TEC-39 B). A recipe line from before the names were kept
-                    still says only "from a recipe"; a typed line says nothing. */}
-                {item.recipes.length > 0 ? (
-                  <span className="text-[11px] text-ink-soft"> · {item.recipes.join(", ")}</span>
-                ) : item.source === "recipe" ? (
-                  <span className="ml-1.5 text-[11px] text-ink-soft">from a recipe</span>
+                {/* After the dash, small (TEC-131): the recipes by name (TEC-39 B;
+                    "from a recipe" for a line from before the names were kept),
+                    then the combined amount, then a typed note. Only the item
+                    is full size. */}
+                {details(item).length > 0 ? (
+                  <span className="text-[11px] text-ink-soft"> — {details(item).join(" · ")}</span>
                 ) : null}
               </span>
               <Quantity key={`${item.id}:${item.quantity}`} item={item} onCommit={(q) => setQuantity(item, q)} />
@@ -421,11 +431,9 @@ export default function List({ refreshKey }: { refreshKey: number }) {
       ) : null}
 
       {/* Send to cart, King Soopers (TEC-90): under the list it sends. */}
-      <Cart onBrandsChanged={() => setBrandsVersion((v) => v + 1)} onSaleSources={setSaleSources} />
-
-      {/* Remembering a brand happens only in here, since 2026-09-24 (TEC-39) —
-          and from a send, when a match is replaced by an exact product page. */}
-      <Brands onChanged={() => void load()} refreshKey={brandsVersion} />
+      {/* A refresh or a send changes Your brands, which is its own tab since
+          TEC-131; the tab is told so it reads again. */}
+      <Cart onBrandsChanged={() => onBrandsChanged?.()} onSaleSources={setSaleSources} />
 
     </section>
   );

@@ -3,10 +3,11 @@ import { ConflictError, LookupError } from "./errors";
 import type { Modality } from "./modality";
 
 /**
- * `cookbook.kroger_connection` (the one row) and `cookbook.brand_products`
- * (Kroger's view of each remembered product). Reasoning in the
+ * `cookbook.kroger_connection` (the one row). Reasoning in the
  * `cookbook_kroger_connection_and_products` migration. Reads and writes only;
- * what the rows mean is `lib/krogerConnection.ts` and `lib/refresh.ts`.
+ * what the row means is `lib/krogerConnection.ts`. `cookbook.brand_products`
+ * is no longer read or written (TEC-131): what Kroger says about a saved
+ * product lives on its row in `cookbook.products` (`lib/productStore.ts`).
  *
  * **The token column holds the sealed form and nothing else**, and the table
  * refuses a value without the `v1:` prefix. This file never sees plaintext.
@@ -72,38 +73,4 @@ export async function writeRefreshedAt(at: string): Promise<void> {
 export async function deleteConnectionRow(): Promise<void> {
   const { error } = await getServiceClient().from("kroger_connection").delete().eq("id", true);
   if (error) throw new LookupError(`Couldn't disconnect King Soopers: ${error.message}`);
-}
-
-// ---------------------------------------------------------------------------
-// brand_products
-// ---------------------------------------------------------------------------
-
-export type BrandProduct = {
-  preference_id: string;
-  product_id: string | null;
-  description: string | null;
-  brand: string | null;
-  size: string | null;
-  url: string | null;
-  price: number | null;
-  in_stock: boolean | null;
-  missing_since: string | null;
-  checked_at: string;
-};
-
-const PRODUCT_COLUMNS = "preference_id, product_id, description, brand, size, url, price, in_stock, missing_since, checked_at";
-
-export async function readBrandProducts(): Promise<BrandProduct[]> {
-  const { data, error } = await getServiceClient().from("brand_products").select(PRODUCT_COLUMNS);
-  if (error) throw new LookupError(`Couldn't read what Kroger last said about your brands: ${error.message}`);
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-    ...(r as unknown as BrandProduct),
-    // numeric comes back as a string from PostgREST.
-    price: r.price === null || r.price === undefined ? null : Number(r.price),
-  }));
-}
-
-export async function writeBrandProduct(row: Omit<BrandProduct, "checked_at"> & { checked_at: string }): Promise<void> {
-  const { error } = await getServiceClient().from("brand_products").upsert(row, { onConflict: "preference_id" });
-  if (error) throw new LookupError(`Couldn't save what Kroger said: ${error.message}`);
 }

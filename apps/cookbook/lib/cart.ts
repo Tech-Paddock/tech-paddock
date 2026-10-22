@@ -2,6 +2,8 @@ import { productIdFromUrl } from "./kingsoopers";
 import { isUpc, KrogerError, searchTerm, type Product } from "./kroger";
 import { ConflictError } from "./errors";
 import { modalityWord, type Modality } from "./modality";
+import { itemWords } from "./itemWords";
+import type { Candidate, Decision } from "./brands";
 
 /**
  * Send to cart — what each line becomes, and what happened to it (TEC-90).
@@ -9,13 +11,18 @@ import { modalityWord, type Modality } from "./modality";
  * **Pure, with Kroger and the database passed in**, so every rule here is
  * tested without either. The routes in `app/api/kroger/cart` supply them.
  *
- * - **A line tied to an exact product in Your brands goes in as-is.** Its link
- *   carries the product number.
- * - **Any other line shows Kroger's top match at the chosen store**, and the user
- *   adds it or replaces it with an exact product page. **Whichever goes in, the
- *   match or the replacement, is remembered in Your brands** as an exact product
- *   under the line's name (TEC-128) — only once its add succeeded, so a failed
- *   add saves nothing. **No model picks a product.**
+ * - **A line that matches exactly one product in Your brands goes in as-is**
+ *   (TEC-131): by its code, its saved names, or — when no name matches — its
+ *   item words in the product's official Kroger name. The list tab sends these
+ *   without a tap when they have not been sent.
+ * - **A line matching several products is Settle these**, most counted first,
+ *   for one pick.
+ * - **Any other line shows Kroger's top match at the chosen store** for the
+ *   item alone, and the user adds it or replaces it with an exact product page.
+ *   **Whichever goes in — a pick, the match or the replacement — is
+ *   remembered**: the line's name is added to that product's names, or a new
+ *   product row is made (TEC-128, TEC-131), only once its add succeeded, so a
+ *   failed add saves nothing. **No model picks a product.**
  * - **Every open line reports added, skipped or failed**, so a partial send never
  *   reads as a whole one.
  * - **A line already sent is refused without an explicit "again"**: the Cart API
@@ -30,40 +37,47 @@ export type CartLine = {
   sent_at: string | null;
 };
 
-/** The preference that decides a line, reduced to what the cart cares about. */
-export type Decision = {
-  phrase: string;
-  kind: "product" | "terms" | "plain";
-  url: string | null;
-  terms: string | null;
-  /** The last refresh found Kroger no longer returns this product. It still goes in as-is; the review says so. */
-  missing?: boolean;
-} | null;
+export type { Candidate, Decision } from "./brands";
 
 export type Plan =
-  | { kind: "exact"; upc: string; url: string; phrase: string; missing: boolean }
+  | { kind: "exact"; upc: string; url: string; phrase: string; missing: boolean; via: "code" | "name" | "description"; option: Candidate }
+  | { kind: "settle"; phrase: string; via: "name" | "description"; options: Candidate[] }
   | { kind: "match"; product: Product }
   | { kind: "none"; reason: string };
 
 export type ReviewLine = CartLine & { plan: Plan };
 
-/** What one line becomes, before anyone taps anything. */
+/**
+ * What a line is searched as when no saved product decides it: **the item
+ * alone** (TEC-131; `lib/itemWords.ts`), "6 cloves of garlic" as "garlic
+ * cloves". When that leaves too little, the line as typed.
+ */
+export function lineTerm(name: string): string | null {
+  return searchTerm(itemWords(name)) ?? searchTerm(name);
+}
+
+/**
+ * What one line becomes, before anyone taps anything (TEC-131): one saved
+ * product goes in as-is (`exact`), several are *Settle these*, anything else
+ * is Kroger's top match for the item alone, or for a phrase's search words.
+ */
 export async function planLine(
   line: CartLine,
   decide: (name: string) => Decision,
   search: (term: string) => Promise<Product | null>
 ): Promise<Plan> {
-  const preference = decide(line.name);
+  const decision = decide(line.name);
 
-  if (preference?.kind === "product" && preference.url) {
-    const upc = productIdFromUrl(preference.url);
-    if (upc) return { kind: "exact", upc, url: preference.url, phrase: preference.phrase, missing: !!preference.missing };
-    // A remembered page with no product number in it falls through to a search
-    // rather than being guessed at.
+  if (decision?.kind === "products") {
+    const options = decision.candidates;
+    if (options.length === 1) {
+      const [only] = options;
+      return { kind: "exact", upc: only.upc, url: only.url, phrase: only.names[0] ?? decision.name, missing: only.missing, via: decision.via, option: only };
+    }
+    if (options.length > 1) return { kind: "settle", phrase: decision.name, via: decision.via === "description" ? "description" : "name", options };
   }
 
-  const words = preference?.kind === "terms" && preference.terms ? preference.terms : line.name;
-  const term = searchTerm(words);
+  const term = decision?.kind === "terms" ? searchTerm(decision.terms) : lineTerm(line.name);
   if (!term) return { kind: "none", reason: "Too short for Kroger's search — paste the exact product." };
 
   try {
@@ -105,9 +119,11 @@ export function alreadySent(lines: CartLine[]): CartLine[] {
 /**
  * A line the user chose: a product number (exact, or a tapped match) or a page
  * that replaces the match. **`match` is the tapped top match's page** (TEC-128),
- * sent only for a match, never for an exact brand: it is what gets remembered.
+ * sent only for a match or a Settle these pick, never for an exact brand: it
+ * is what gets remembered. `size` is the size Kroger showed for the match,
+ * kept as the size first bought when the product is new to Your brands.
  */
-export type CartPick = { id: string; upc?: string; url?: string; match?: string };
+export type CartPick = { id: string; upc?: string; url?: string; match?: string; size?: string };
 
 export type Outcome = {
   id: string;
@@ -147,7 +163,10 @@ export function readPicks(raw: unknown): CartPick[] {
     if (typeof o.url === "string" && o.url.trim()) pick.url = o.url.trim();
     else if (typeof o.upc === "string" && o.upc) {
       pick.upc = o.upc;
-      if (typeof o.match === "string" && o.match.trim()) pick.match = o.match.trim();
+      if (typeof o.match === "string" && o.match.trim()) {
+        pick.match = o.match.trim();
+        if (typeof o.size === "string" && o.size.trim()) pick.size = o.size.trim().slice(0, 60);
+      }
     }
     picks.push(pick);
   }
@@ -163,8 +182,12 @@ export function repeatsIn(open: CartLine[], picks: CartPick[]): CartLine[] {
 export type SendDeps = {
   /** Put one product in the cart, with the Pickup/Delivery choice when given; throws with a sentence when Kroger refuses. */
   add: (upc: string, quantity: number, modality: Modality | null) => Promise<void>;
-  /** Remember what went in — a replacement page or the tapped match's page — in Your brands, under the line's name. */
-  remember: (phrase: string, url: string) => Promise<void>;
+  /**
+   * Remember what went in — a replacement page, the tapped match's page or a
+   * Settle these pick — in Your brands: the line's name on that product, or a
+   * new product row (TEC-131).
+   */
+  remember: (name: string, url: string, upc: string, size: string | null) => Promise<void>;
 };
 
 /**
@@ -251,7 +274,7 @@ export async function sendLines(
 
     // **Only after the add went in.** A failed save is said on the line and
     // never undoes or hides the add: the product is in the cart either way.
-    const remembered = page ? await rememberPage(deps, line.name, page, upc) : "";
+    const remembered = page ? await rememberPage(deps, line.name, page, upc, pick.url ? null : (pick.size ?? null)) : "";
     outcomes.push({ ...sent, result: "added", ...added, detail: `${added.detail}${remembered}` });
   }
   return outcomes;
@@ -263,10 +286,10 @@ export async function sendLines(
  * a remembered page is read back as that number next time (`planLine`), so a
  * page naming a different one would send a different product.
  */
-async function rememberPage(deps: SendDeps, name: string, page: string, upc: string): Promise<string> {
+async function rememberPage(deps: SendDeps, name: string, page: string, upc: string, size: string | null): Promise<string> {
   if (productIdFromUrl(page) !== upc) return " Not remembered in Your brands: its page names a different product.";
   try {
-    await deps.remember(name, page);
+    await deps.remember(name, page, upc, size);
     return " Remembered in Your brands.";
   } catch (e) {
     const why = e instanceof Error && e.message ? ` (${e.message.replace(/\.$/, "")})` : "";

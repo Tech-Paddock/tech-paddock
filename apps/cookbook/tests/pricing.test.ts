@@ -12,7 +12,7 @@ import {
   targetFor,
   type EstimateLine,
 } from "@/lib/pricing";
-import { modalityWarning, sendLines, type CartLine } from "@/lib/cart";
+import { modalityWarning, sendLines, type CartLine, type Decision } from "@/lib/cart";
 import { COUPONS_SEARCH_URL, couponsUrl } from "@/lib/kingsoopers";
 import { scanDue, REFRESH_EVERY_MS } from "@/lib/refreshDue";
 
@@ -24,6 +24,18 @@ import { scanDue, REFRESH_EVERY_MS } from "@/lib/refreshDue";
 
 const MILK = "0001111041700";
 const EGGS = "0001111060933";
+
+/** A line decided by one saved product with this code (TEC-131). */
+function saved(productId: string, name = "milk"): Decision {
+  return {
+    kind: "products",
+    via: "name",
+    name,
+    candidates: [
+      { id: "p1", upc: productId, url: `https://www.kingsoopers.com/p/x/${productId}`, count: 0, missing: false, description: null, size: null, sizeFirst: null, price: null, names: [name] },
+    ],
+  };
+}
 
 function product(over: Partial<Product> = {}): Product {
   return {
@@ -78,16 +90,18 @@ describe("reading Kroger's product", () => {
 
 describe("what a line is looked up as", () => {
   it("an exact product is its ID; search words and plain lines are a search", () => {
-    expect(targetFor("milk", { phrase: "milk", kind: "product", url: `https://www.kingsoopers.com/p/x/${MILK}`, terms: null })).toEqual({
+    expect(targetFor("milk", saved(MILK))).toEqual({
       kind: "id",
       productId: MILK,
     });
-    expect(targetFor("bread", { phrase: "bread", kind: "terms", url: null, terms: "dave's killer bread" })).toEqual({
+    expect(targetFor("bread", { kind: "terms", phrase: "bread", terms: "dave's killer bread" })).toEqual({
       kind: "term",
       term: "dave's killer bread",
     });
     expect(targetFor("eggs", null)).toEqual({ kind: "term", term: "eggs" });
     expect(targetFor("ok", null)).toMatchObject({ kind: "none" });
+    // The item alone (TEC-131): quantities, units and prep words dropped.
+    expect(targetFor("2 cups chopped onion", null)).toEqual({ kind: "term", term: "onion" });
   });
 
   it("looks every ID up in one batch and each search once, however many lines share it", async () => {
@@ -174,14 +188,13 @@ describe("the estimated total", () => {
 });
 
 describe("the deal scan", () => {
-  const brands = [
-    { id: "p1", phrase: "milk", kind: "product" as const, url: `https://www.kingsoopers.com/p/kroger-2-milk/${MILK}`, terms: null },
-    { id: "p2", phrase: "bread", kind: "terms" as const, url: null, terms: "sourdough bread" },
-  ];
+  const products = [{ product_id: MILK, names: ["milk"] }];
+  const words = [{ phrase: "bread", kind: "terms" as const, terms: "sourdough bread" }];
+  const MILK_PAGE = `https://www.kingsoopers.com/p/kroger-2-milk/${MILK}`;
 
-  it("checks every saved brand and every list line, the way Send would", () => {
-    const entries = scanEntries(brands, [], [{ name: "2% milk" }, { name: "eggs" }], (name) =>
-      name.includes("milk") ? { phrase: "milk", kind: "product", url: brands[0].url, terms: null } : null
+  it("checks every saved product, every phrase and every list line, the way Send would", () => {
+    const entries = scanEntries(products, words, [{ name: "2% milk" }, { name: "eggs" }], (name) =>
+      name.includes("milk") ? saved(MILK) : null
     );
     expect(entries).toEqual([
       { name: "milk", target: { kind: "id", productId: MILK } },
@@ -192,8 +205,8 @@ describe("the deal scan", () => {
   });
 
   it("shows only promo below regular, biggest percentage first, one row per product naming everything it stands for", () => {
-    const entries = scanEntries(brands, [], [{ name: "2% milk" }, { name: "eggs" }, { name: "butter" }], (name) =>
-      name.includes("milk") ? { phrase: "milk", kind: "product", url: brands[0].url, terms: null } : null
+    const entries = scanEntries(products, words, [{ name: "2% milk" }, { name: "eggs" }, { name: "butter" }], (name) =>
+      name.includes("milk") ? saved(MILK) : null
     );
     const found = new Map([
       [`id:${MILK}`, { product: product({ regular: 4, promo: 3, price: 3, promoEnds: "2026-10-27T23:59:59Z" }), error: null }],
@@ -206,22 +219,22 @@ describe("the deal scan", () => {
       ["Sourdough", 50, 2.5],
       ["Kroger 2% Milk", 25, 1],
     ]);
-    expect(r.deals[1]).toMatchObject({ for: ["milk", "2% milk"], endsAt: "2026-10-27T23:59:59Z", url: brands[0].url });
+    expect(r.deals[1]).toMatchObject({ for: ["milk", "2% milk"], endsAt: "2026-10-27T23:59:59Z", url: MILK_PAGE });
     expect(r.unpriced).toEqual(["butter"]);
     expect(r.checked).toBe(5);
     expect(describeScan(r, "S")).toBe("Checked 5 at S: 2 on sale. No price for butter.");
   });
 
   it("names what it could not check, so a failed scan never reads as 'no deals'", () => {
-    const entries = scanEntries([{ id: "p3", phrase: "oats", kind: "product", url: null, terms: null }], [], [{ name: "eggs" }], () => null);
+    const entries = scanEntries([], [{ phrase: "ox", kind: "terms", terms: "ox" }], [{ name: "eggs" }], () => null);
     const r = findDeals(entries, new Map([["term:eggs", { product: null, error: "Kroger's search failed (HTTP 500)." }]]));
     expect(r.deals).toEqual([]);
-    expect(describeScan(r, "S")).toMatch(/Couldn't check oats \(its link carries no product number\); eggs \(Kroger's search failed/);
+    expect(describeScan(r, "S")).toMatch(/Couldn't check ox \(too short for Kroger's search\); eggs \(Kroger's search failed/);
   });
 
-  it("an exact brand with no ID in its link uses the one the last refresh found", () => {
-    const [entry] = scanEntries([{ id: "p3", phrase: "oats", kind: "product", url: null, terms: null }], [{ preference_id: "p3", product_id: MILK }], [], () => null);
-    expect(entry.target).toEqual({ kind: "id", productId: MILK });
+  it("a saved product is looked up by its code, named by its first name", () => {
+    const [entry] = scanEntries([{ product_id: EGGS, names: ["eggs", "a dozen eggs"] }], [], [], () => null);
+    expect(entry).toEqual({ name: "eggs", target: { kind: "id", productId: EGGS } });
   });
 
   it("runs on the refresh's rule: over a week, or never, and only with a store", () => {

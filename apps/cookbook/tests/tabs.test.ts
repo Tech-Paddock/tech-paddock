@@ -26,7 +26,7 @@ describe("the tabs' addresses", () => {
 
 describe("the Add tab (2026-10-05)", () => {
   it("sits between the book and the list, at /add", () => {
-    expect(TABS.map((t) => t.label)).toEqual(["Recipes", "Add", "King Soopers list"]);
+    expect(TABS.map((t) => t.label).slice(0, 3)).toEqual(["Recipes", "Add", "King Soopers list"]);
     expect(pathFor("add")).toBe("/add");
   });
 
@@ -34,6 +34,21 @@ describe("the Add tab (2026-10-05)", () => {
     const page = resolve(__dirname, "../app/add/page.tsx");
     expect(existsSync(page)).toBe(true);
     expect(readFileSync(page, "utf8")).toMatch(/<Shell tab="add" \/>/);
+  });
+});
+
+describe("Your brands, its own tab (TEC-131)", () => {
+  it("comes after the King Soopers list, at /brands, and the list keeps /list", () => {
+    expect(TABS.map((t) => t.label)).toEqual(["Recipes", "Add", "King Soopers list", "Your brands"]);
+    expect(pathFor("brands")).toBe("/brands");
+    expect(pathFor("shop")).toBe("/list");
+  });
+
+  it("has a route that opens on it, and has left the list page", () => {
+    const page = resolve(__dirname, "../app/brands/page.tsx");
+    expect(existsSync(page)).toBe(true);
+    expect(readFileSync(page, "utf8")).toMatch(/<Shell tab="brands" \/>/);
+    expect(readFileSync(resolve(__dirname, "../app/List.tsx"), "utf8")).not.toMatch(/<Brands/);
   });
 });
 

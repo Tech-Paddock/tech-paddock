@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CHECKOUT_URL, isKingSoopersProduct } from "@/lib/kingsoopers";
 import { refreshDue, scanDue } from "@/lib/refreshDue";
-import type { CartLine, Option, Outcome, ReviewLine } from "@/lib/cart";
+import type { Candidate, CartLine, Outcome, ReviewLine } from "@/lib/cart";
+import { describeDrift, sizeDrift } from "@/lib/sizeDrift";
 import { modalityWord, type Modality } from "@/lib/modality";
 import type { Estimate, ScanRecord } from "@/lib/pricing";
 import type { SaleSources } from "@/lib/saleTag";
@@ -15,11 +16,12 @@ import { useToast } from "./Toast";
  * Send to cart — King Soopers (TEC-90; `RULES.md`, *Send to cart*).
  *
  * On the list tab, under the list: connect once, pick a store once, then
- * send. **Send puts every unsent line matching exactly one brand straight in**
- * (TEC-51), then shows the rest in three sections: matched lines already sent,
- * **Settle these** (several brands match: one pick, most counted first) and
- * **No match** (Kroger's top match for a tap, or an exact product page instead);
- * whichever goes in is remembered in Your brands (TEC-128).
+ * send. **Send puts every unsent line matching exactly one product in Your
+ * brands straight in** (TEC-131), then shows the rest in three sections:
+ * matched lines already sent, **Settle these** (several products match: one
+ * pick, most counted first) and **No match** (Kroger's top match for the item
+ * alone, or an exact product page instead); whichever goes in is remembered in
+ * Your brands (TEC-128).
  * **No model picks anything.** Every line then reports added, skipped or failed,
  * and **a line already sent is not sent again without saying so**, because the
  * Cart API only adds. Checkout stays at King Soopers: the link opens their cart.
@@ -139,7 +141,7 @@ export default function Cart({
   const [confirmAgain, setConfirmAgain] = useState(false);
   const [refused, setRefused] = useState<CartLine[] | null>(null);
   const [results, setResults] = useState<Results | null>(null);
-  // What Send put straight in (TEC-51): every unsent line matching exactly one brand.
+  // What Send put straight in (TEC-131): every unsent line matching exactly one brand.
   const [straightIn, setStraightIn] = useState<Results | null>(null);
 
   const [refreshing, setRefreshing] = useState(false);
@@ -382,7 +384,7 @@ export default function Cart({
   }
 
   /**
-   * **Send to cart** (TEC-51; RULES.md): look every line up, then **put each
+   * **Send to cart** (TEC-131; RULES.md): look every line up, then **put each
    * unsent line that matches exactly one brand straight in**, no tap. What is
    * left is the review: Settle these (several brands match), No match (Kroger's
    * top match), and matched lines already sent, which still warn.
@@ -463,14 +465,17 @@ export default function Cart({
     if (!choice) return [];
     if (choice.url.trim()) return [{ id: line.id, url: choice.url.trim() }];
     if (line.plan.kind === "settle") {
-      // The pick's page goes with it, so it is remembered the way a match is (TEC-51).
+      // The pick's page goes with it, so it is remembered the way a match is (TEC-131).
       const option = line.plan.options.find((o) => o.upc === choice.pick);
       return option ? [{ id: line.id, upc: option.upc, match: option.url }] : [];
     }
     if (!choice.include) return [];
     if (line.plan.kind === "exact") return [{ id: line.id, upc: line.plan.upc }];
     // The match's page goes with it, so the server can remember it in Your brands (TEC-128).
-    if (line.plan.kind === "match") return [{ id: line.id, upc: line.plan.product.upc, match: line.plan.product.url }];
+    if (line.plan.kind === "match") {
+      const p = line.plan.product;
+      return [{ id: line.id, upc: p.upc, match: p.url, ...(p.size ? { size: p.size } : {}) }];
+    }
     return [];
   });
   const again = (review ?? []).filter((l) => l.sent_at !== null && picks.some((p) => p.id === l.id));
@@ -884,13 +889,19 @@ function TakeBackConfirm(props: { lines: TakeBackLine[]; working: boolean; onCon
   );
 }
 
+/** "was 12 oz, now 10 oz" on a saved product whose size changed since it was first bought (TEC-131). */
+function DriftNote({ candidate }: { candidate: Candidate }) {
+  const drift = sizeDrift(candidate.sizeFirst, candidate.size, candidate.price);
+  return drift ? <span className="ml-1 text-[11px] text-warn">· {describeDrift(drift)}</span> : null;
+}
+
 /**
- * Settle these (TEC-51): **one line, several saved products** — sizes,
+ * Settle these (TEC-131): **one line, several saved products** — sizes,
  * flavours — most counted first, for one pick. Nothing is preselected: the
- * count ranks, it does not choose (an automatic tie-break is later). Tapping
+ * count ranks, it does not choose. Tapping
  * the picked one again clears it. A local pattern: a radio list of chips.
  */
-function SettleOptions(props: { line: ReviewLine; options: Option[]; picked: string | undefined; onPick: (upc: string) => void }) {
+function SettleOptions(props: { line: ReviewLine; options: Candidate[]; picked: string | undefined; onPick: (upc: string) => void }) {
   return (
     <div role="radiogroup" aria-label={`Which ${props.line.name}`} className="flex flex-wrap gap-1.5">
       {props.options.map((o) => {
@@ -908,11 +919,12 @@ function SettleOptions(props: { line: ReviewLine; options: Option[]; picked: str
               className={`rounded-lg border px-2 py-1 text-left text-xs ${on ? "border-accent text-accent" : "border-line text-ink-soft"}`}
             >
               {label}
-              <span className="ml-1 text-[11px] text-ink-soft">×{o.tally}</span>
+              <span className="ml-1 text-[11px] text-ink-soft">×{o.count}</span>
               {o.missing ? <span className="ml-1 text-[11px] text-danger">· Kroger stopped returning it</span> : null}
+              <DriftNote candidate={o} />
             </button>
             <a
-              href={o.page ?? o.url}
+              href={o.url}
               target="_blank"
               rel="noreferrer"
               aria-label={`Open ${label} at King Soopers`}
@@ -979,10 +991,13 @@ function ReviewPanel(props: {
         {plan.kind === "exact" ? (
           <span className="text-xs text-ink-soft">
             Your brand ({plan.phrase}) —{" "}
-            <a href={plan.option?.page ?? plan.url} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
-              {plan.option?.description ?? "the exact product"}
+            <a href={plan.url} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
+              {plan.option.description ?? "the exact product"}
             </a>
+            {plan.via === "description" ? <span> · its Kroger name matches this line</span> : null}
+            {plan.via === "code" ? <span> · by its product code</span> : null}
             {plan.missing ? <span className="text-danger"> · Kroger stopped returning it at the last refresh</span> : null}
+            <DriftNote candidate={plan.option} />
           </span>
         ) : plan.kind === "settle" ? (
           <SettleOptions
@@ -1034,7 +1049,7 @@ function ReviewPanel(props: {
         </div>
       ) : null}
 
-      {/* **Three sections** (TEC-51; RULES.md): matched lines still here (already
+      {/* **Three sections** (TEC-131; RULES.md): matched lines still here (already
           sent, or not taken straight in), Settle these, then No match. */}
       {matched.length > 0 ? (
         <section className="flex flex-col gap-1">

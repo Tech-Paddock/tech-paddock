@@ -4,13 +4,14 @@ import { useCallback, useState } from "react";
 import AddRecipe from "./AddRecipe";
 import Book from "./Book";
 import List from "./List";
+import Brands from "./Brands";
 import { ToastProvider } from "./Toast";
 import { TABS, pathFor, type Tab } from "@/lib/tabs";
 import { cuisinesIn } from "@/lib/tuning";
 import type { Recipe } from "@/lib/recipes";
 
 /**
- * The three tabs, and the little state they share.
+ * The tabs, and the little state they share.
  *
  * **Tabs are the verb index.** The surface is *site*, settled at standup on
  * 2026-09-20, and its tabs are that index, one verb each: the technical
@@ -42,6 +43,9 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
   const [listVersion, setListVersion] = useState(0);
   const [bookVersion, setBookVersion] = useState(0);
   const [cuisines, setCuisines] = useState<string[]>([]);
+  // Your brands and the list each change what the other shows: a send or a
+  // refresh changes Your brands, and an edit there changes the list's links.
+  const [brandsVersion, setBrandsVersion] = useState(0);
   const onRead = useCallback((recipes: Recipe[]) => setCuisines(cuisinesIn(recipes)), []);
 
   function choose(next: Tab) {
@@ -90,7 +94,12 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
         </div>
         <div role="tabpanel" id="panel-shop" aria-labelledby="tab-shop" hidden={tab !== "shop"}>
           <div className="mx-auto w-full max-w-2xl">
-            <List refreshKey={listVersion} />
+            <List refreshKey={listVersion} onBrandsChanged={() => setBrandsVersion((n) => n + 1)} />
+          </div>
+        </div>
+        <div role="tabpanel" id="panel-brands" aria-labelledby="tab-brands" hidden={tab !== "brands"}>
+          <div className="mx-auto w-full max-w-2xl">
+            <Brands refreshKey={brandsVersion} onChanged={() => setListVersion((n) => n + 1)} />
           </div>
         </div>
       </div>
