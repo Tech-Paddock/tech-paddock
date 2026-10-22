@@ -45,13 +45,41 @@
 
 ## How it works
 
-- **Four kinds plus `void`** (`lib/events.ts`). `details` per kind, every key required:
-  potty `{what: pee|poop|both, where: outside|inside}` (inside = an accident: warned in the form,
-  red in the timeline, counted apart in Analytics); food `{type, item_id, item_name, kcal_per,
-  unit, amount}`; exercise `{type: walk|playtime|training, where, with_dogs, minutes, treats,
-  commands?}` (commands on training only, from the fixed list `COMMANDS`); weight `{value, unit}`.
-  `parseDetails` checks these on the phone (before the sheet closes) and again on the server; the
-  database's `events_details_shape` check holds the same shapes.
+- **Four kinds plus `void`** (`lib/events.ts`). `details` per kind, every key required unless
+  marked `?`: potty `{what: pee|poop|both, where: outside|inside, leash?: leashed|unleashed|pen}`
+  (inside = an accident: warned in the form, red in the timeline, counted apart in Analytics;
+  `leash` only when outside); food `{type, item_id, item_name, kcal_per, unit, amount}`; exercise
+  `{type: walk|playtime|training, where, with_dogs, minutes, treats, commands?, dogs?}` (commands
+  on training only, from the fixed list `COMMANDS`; `dogs` is 1 to 20 `lando.dogs` ids, only when
+  `with_dogs` is true); weight `{value, unit}`. `parseDetails` checks these on the phone (before
+  the sheet closes) and again on the server; the database's `events_details_shape` check
+  (migration `widen_lando_events_details_shape`) holds the same shapes. Entries from before
+  `leash` and `dogs` (TEC-125) have neither and read as before: "pee", "with dogs".
+- **Potty's Leash pick** (Leashed / Unleashed / In pen) shows only while Where is Outside, and
+  defaults to Leashed on a new entry. It is not remembered per phone. Correcting an old outside
+  entry that has none opens with nothing picked, so a correction never invents one. The timeline
+  shows it after the what: "pee · unleashed".
+- **Exercise's Other dogs** is its own section, always shown: a full-width picklist styled like
+  Human, several at once, over every row in `lando.dogs` by name (the owner's pick over chips,
+  2026-10-21). The closed box shows the picked names ("None", or "Dog A, Dog C"); a real
+  `<select multiple>` sits over it at `opacity-0`, so a tap opens the phone's own checklist (iOS's
+  picker, Android Chrome's dialog). Desktop Chrome has no popup for a multiple select: the
+  transparent listbox selects one row per click there and needs Ctrl or Cmd for more, which is
+  accepted, since the target is the phone. There is no Yes/No (the owner's call, 2026-10-21): the form saves `with_dogs` as "a dog
+  was picked" and `dogs` only when one was. An empty table shows "No friends' dogs listed yet." and
+  saves `with_dogs: false`. Correcting an old entry with `with_dogs: true` and no dogs keeps
+  `with_dogs` true until a dog is tapped. The timeline names them: "with Dog A, Dog C"; an id no
+  longer in the table reads "another dog". The server refuses an id not in `lando.dogs`
+  (`writeEvent`), since jsonb carries no foreign key.
+- **Friends' dogs** (`lando.dogs`, migration `create_lando_dogs`): id, name (1 to 40 characters,
+  unique ignoring case and outer spaces). Added by SQL only; the app has no way to add one. Read
+  with the journal (`listDogs`), ordered by name.
+- **A weight is a date.** Its When picks a day (`type="date"` under the same label overlay:
+  "Today", "Yesterday", "Oct 19"), stored at local noon (`lib/localtime.ts:fromDateInput`,
+  `DATE_ONLY_HOUR`), so it never slips a day across a time zone. An untouched new weight saves
+  today at noon, also when saved before noon. The timeline shows a weight's row by day
+  (`rowTime`); the growth chart was already by day. Weights from before this keep their
+  logged time. Every other form keeps date and time.
 - **Food catalogue** (`lib/foods.ts`), fixed in code; Misc last in each list, no "add another".
   The server builds the food snapshot (name, kcal-per, unit) from the catalogue by `item_id`;
   whatever the phone sends for those is ignored. **Calories are recorded and never shown.** Each
@@ -59,11 +87,11 @@
 - **Defaults per phone** (`lib/defaults.ts`, `localStorage`): `lando.person` (asked once on a
   phone's first open, "Whose phone is this?"), `lando.defaults` (last meal item, last treat item,
   last weight unit, last meal amount). A first log defaults to Misc. Treats default to an amount of
-  1; exercise to a 15-minute walk outside, no other dogs, no treats; potty to pee outside; "when"
-  to the moment Save is pressed unless it was changed.
+  1; exercise to a 15-minute walk outside, no dogs picked, no treats; potty to pee outside,
+  leashed; "when" to the moment Save is pressed unless it was changed (a weight: today at noon).
 - **One read** (`GET /api/journal?since=`, `lib/journal.ts:readJournal`): `since` is the phone's
   local midnight. It returns the 30 days before it (`HORIZON_DAYS`), every weight ever, every
-  voiding event, and all people. Paged; past 20 000 rows it fails rather than reading short.
+  voiding event, all people and all friends' dogs. Paged; past 20 000 rows it fails rather than reading short.
   Analytics uses the same read.
 - **Live events** (`lib/events.ts:liveEvents`): an event is live when no event's `voids` names it,
   and a `void` is never live. Pills, timeline, charts and Analytics read live events only.
@@ -99,8 +127,24 @@
   `item_id`). Changing a name or calorie figure is safe; old entries keep their snapshot. A new id
   must match `^[a-z0-9-]{1,60}$` or the database refuses it.
 - **A new detail field needs three edits:** `parseDetails` in `lib/events.ts`, the
-  `events_details_shape` check (a new migration once this one is applied), and the tests. The
+  `events_details_shape` check (a new migration; see the swap trap below), and the tests. The
   check allows no unknown key, so a field added in the app alone fails every save with a 503.
+- **`events_details_shape` is replaced by a DROP and an ADD in one ALTER**, and the connector
+  cannot run a DROP. Any further widening is a new migration the owner runs in the SQL Editor
+  inside `begin; … commit;` with its `schema_migrations` row, as
+  `widen_lando_events_details_shape` was. Copy the whole current check into it: the ADD replaces
+  every shape, not just the one that changes.
+- **The dogs check is a jsonpath filter in `strict` mode.** A CHECK cannot hold a subquery, so each
+  id is tested with `jsonb_path_exists`; lax mode unwraps nested arrays and would let `[[id]]`
+  through.
+- **`lando.dogs` is history's key, like the food catalogue.** Never delete a dog or change its id
+  while an entry names it: the entry would read "another dog", and a correction that keeps it is
+  refused. Renaming is safe. `lando.dogs` has no append-only trigger.
+- **The journal read fails whole without `lando.dogs`.** `/api/journal` reads it with the events;
+  if the table is missing (code merged before `create_lando_dogs`), every load is a 503. An empty
+  table is fine.
+- **Never parse a weight's date with `new Date("YYYY-MM-DD")`**: that is UTC midnight, the day
+  before west of Greenwich. `fromDateInput` builds local noon from the parts.
 - The training command list is in two places: `COMMANDS` in `lib/events.ts` and the
   `events_details_shape` check. Add a command to both.
 - Tailwind's `flex` beats the `hidden` attribute, so the tab panels also switch their class.

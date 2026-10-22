@@ -220,6 +220,28 @@ describe("describe — a timeline row", () => {
     ).toEqual({ title: "Training", detail: "10 min · inside · with dogs · 6 treats · Sit, Leave it" });
   });
 
+  it("shows an outside potty's leash pick; an old entry without one reads as before", () => {
+    expect(describeEvent({ kind: "potty", details: { what: "pee", where: "outside", leash: "unleashed" } }).detail).toBe("pee · unleashed");
+    expect(describeEvent({ kind: "potty", details: { what: "both", where: "outside", leash: "pen" } }).detail).toBe("pee + poop · in pen");
+    expect(describeEvent({ kind: "potty", details: { what: "poop", where: "outside" } }).detail).toBe("poop");
+  });
+
+  it("names the dogs a session was with; an old entry still says with dogs", () => {
+    const dogs = [
+      { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Dog A" },
+      { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Dog B" },
+    ];
+    const base = { type: "walk", where: "outside", minutes: 20, treats: 0 };
+    expect(
+      describeEvent({ kind: "exercise", details: { ...base, with_dogs: true, dogs: [dogs[1].id, dogs[0].id] } }, dogs).detail
+    ).toBe("20 min · outside · with Dog B, Dog A");
+    expect(
+      describeEvent({ kind: "exercise", details: { ...base, with_dogs: true, dogs: ["cccccccc-cccc-4ccc-8ccc-cccccccccccc"] } }, dogs).detail
+    ).toBe("20 min · outside · with another dog");
+    expect(describeEvent({ kind: "exercise", details: { ...base, with_dogs: true } }, dogs).detail).toBe("20 min · outside · with dogs");
+    expect(describeEvent({ kind: "exercise", details: { ...base, with_dogs: false } }).detail).toBe("20 min · outside");
+  });
+
   it("rounds a weight to one decimal", () => {
     expect(describeEvent({ kind: "weight", details: { value: 4.26, unit: "kg" } })).toEqual({ title: "Weight", detail: "4.3 kg" });
   });
@@ -287,6 +309,40 @@ describe("parseNewEvent — what the server accepts", () => {
     expect(() => parseNewEvent({ id, kind: "exercise", details: { ...base, minutes: 1.5 } }, NOW)).toThrow(/minutes/);
     expect(() => parseNewEvent({ id, kind: "exercise", details: { ...base, treats: -1 } }, NOW)).toThrow(/treats/);
     expect(() => parseNewEvent({ id, kind: "exercise", details: { ...base, with_dogs: "no" } }, NOW)).toThrow(/dogs/);
+  });
+
+  it("keeps a leash pick on an outside potty only", () => {
+    for (const leash of ["leashed", "unleashed", "pen"]) {
+      expect(parseNewEvent({ id, kind: "potty", details: { ...potty, leash } }, NOW).details).toEqual({ ...potty, leash });
+    }
+    // Old entries carry none and stay valid; null is none.
+    expect(parseNewEvent({ id, kind: "potty", details: potty }, NOW).details).not.toHaveProperty("leash");
+    expect(parseNewEvent({ id, kind: "potty", details: { ...potty, leash: null } }, NOW).details).toEqual(potty);
+    expect(() => parseNewEvent({ id, kind: "potty", details: { what: "pee", where: "inside", leash: "leashed" } }, NOW)).toThrow(/outside only/);
+    expect(() => parseNewEvent({ id, kind: "potty", details: { ...potty, leash: "loose" } }, NOW)).toThrow(/leash/);
+    expect(() => parseNewEvent({ id, kind: "potty", details: { ...potty, leash: ["leashed"] } }, NOW)).toThrow(/leash/);
+  });
+
+  it("keeps the dogs an exercise was with: once each, picked order, only with dogs", () => {
+    const base = { type: "walk", where: "outside", with_dogs: true, minutes: 15, treats: 0 };
+    const dogA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const dogB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    expect(parseNewEvent({ id, kind: "exercise", details: { ...base, dogs: [dogB, dogA, dogB.toUpperCase()] } }, NOW).details).toEqual({
+      ...base,
+      dogs: [dogB, dogA],
+    });
+    // Old entries: with dogs, none named, still valid.
+    expect(parseNewEvent({ id, kind: "exercise", details: base }, NOW).details).toEqual(base);
+    // None picked is no key at all, never an empty list.
+    expect(parseNewEvent({ id, kind: "exercise", details: { ...base, with_dogs: false, dogs: [] } }, NOW).details).not.toHaveProperty("dogs");
+    expect(parseNewEvent({ id, kind: "exercise", details: { ...base, dogs: null } }, NOW).details).not.toHaveProperty("dogs");
+    expect(() => parseNewEvent({ id, kind: "exercise", details: { ...base, with_dogs: false, dogs: [dogA] } }, NOW)).toThrow(/with other dogs/);
+    expect(() => parseNewEvent({ id, kind: "exercise", details: { ...base, dogs: ["Dog A"] } }, NOW)).toThrow(/dogs must come from the list/);
+    expect(() => parseNewEvent({ id, kind: "exercise", details: { ...base, dogs: dogA } }, NOW)).toThrow(/dogs must come from the list/);
+    expect(() => parseNewEvent({ id, kind: "exercise", details: { ...base, dogs: [[dogA]] } }, NOW)).toThrow(/dogs must come from the list/);
+    const many = Array.from({ length: 21 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`);
+    expect(() => parseNewEvent({ id, kind: "exercise", details: { ...base, dogs: many } }, NOW)).toThrow(/at most 20/);
+    expect(parseNewEvent({ id, kind: "exercise", details: { ...base, dogs: many.slice(0, 20) } }, NOW).details).toHaveProperty("dogs");
   });
 
   it("needs a positive number and a known unit for a weight", () => {
