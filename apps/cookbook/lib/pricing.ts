@@ -1,6 +1,5 @@
-import { productIdFromUrl } from "./kingsoopers";
 import { searchTerm, type Product } from "./kroger";
-import type { Decision } from "./cart";
+import { lineTerm, type Decision } from "./cart";
 import { modalityWord, type Modality } from "./modality";
 
 /**
@@ -9,9 +8,9 @@ import { modalityWord, type Modality } from "./modality";
  * **Pure, with Kroger passed in**, like `lib/cart.ts` and `lib/refresh.ts`;
  * `lib/dealRun.ts` supplies the token and the store. **No model call.**
  *
- * - **What a line is priced as** is what Send would put in the cart: an exact
- *   product in Your brands, else Kroger's top match for the line (or for the
- *   brand's search words).
+ * - **What a line is priced as** is what Send would put in the cart: a saved
+ *   product in Your brands (the most counted, when several match), else
+ *   Kroger's top match for the item alone (or for a phrase's search words).
  * - **A line with no price is counted and named, never $0.** The total is an
  *   estimate and says so; it is Kroger's shelf price, promo first, before tax,
  *   fees and coupons.
@@ -25,14 +24,15 @@ export type Target =
   | { kind: "term"; term: string }
   | { kind: "none"; reason: string };
 
-/** What a line is looked up as. The same choice `planLine` makes for Send. */
+/**
+ * What a line is looked up as. The same choice `planLine` makes for Send: the
+ * top-ranked saved product when products decide it (Settle these is priced as
+ * its most-counted choice), else Kroger's top match for a phrase's words or
+ * for the item alone (TEC-131).
+ */
 export function targetFor(name: string, decision: Decision): Target {
-  if (decision?.kind === "product" && decision.url) {
-    const productId = productIdFromUrl(decision.url);
-    if (productId) return { kind: "id", productId };
-  }
-  const words = decision?.kind === "terms" && decision.terms ? decision.terms : name;
-  const term = searchTerm(words);
+  if (decision?.kind === "products" && decision.candidates[0]) return { kind: "id", productId: decision.candidates[0].upc };
+  const term = decision?.kind === "terms" ? searchTerm(decision.terms) : lineTerm(name);
   return term ? { kind: "term", term } : { kind: "none", reason: "too short for Kroger's search" };
 }
 
@@ -221,35 +221,30 @@ export function describeEstimate(e: Estimate): string {
 // ---------------------------------------------------------------------------
 
 /** A brand as the scan needs it. */
-export type ScanBrand = { id: string; phrase: string; kind: "product" | "terms" | "plain"; url: string | null; terms: string | null };
+export type ScanWords = { phrase: string; kind: "product" | "terms" | "plain"; terms: string | null };
 
 export type ScanEntry = { name: string; target: Target };
 
 /**
- * What the scan checks: **every saved brand, then every open line on the
- * list**. An exact-product brand is its product number (from its link, or from
- * what the last refresh found); a search-word brand is Kroger's top match for
- * its words. Duplicates collapse in `lookUp` and merge their names in the deal.
+ * What the scan checks: **every saved product, every search-word phrase, then
+ * every open line on the list** (TEC-131). A product is its code, named by its
+ * first name; a phrase is Kroger's top match for its words. Duplicates
+ * collapse in `lookUp` and merge their names in the deal.
  */
 export function scanEntries(
-  brands: ScanBrand[],
-  cached: { preference_id: string; product_id: string | null }[],
+  products: { product_id: string; names: string[] }[],
+  words: ScanWords[],
   lines: { name: string }[],
   decide: (name: string) => Decision
 ): ScanEntry[] {
-  const known = new Map(cached.map((c) => [c.preference_id, c.product_id]));
   const entries: ScanEntry[] = [];
-  for (const b of brands) {
-    if (b.kind === "product") {
-      const productId = (b.url ? productIdFromUrl(b.url) : null) ?? known.get(b.id) ?? null;
-      entries.push({
-        name: b.phrase,
-        target: productId ? { kind: "id", productId } : { kind: "none", reason: "its link carries no product number" },
-      });
-    } else {
-      const term = searchTerm(b.kind === "terms" && b.terms ? b.terms : b.phrase);
-      entries.push({ name: b.phrase, target: term ? { kind: "term", term } : { kind: "none", reason: "too short for Kroger's search" } });
-    }
+  for (const p of products) {
+    entries.push({ name: p.names[0] ?? p.product_id, target: { kind: "id", productId: p.product_id } });
+  }
+  for (const w of words) {
+    if (w.kind === "product") continue;
+    const term = searchTerm(w.kind === "terms" && w.terms ? w.terms : w.phrase);
+    entries.push({ name: w.phrase, target: term ? { kind: "term", term } : { kind: "none", reason: "too short for Kroger's search" } });
   }
   for (const line of lines) entries.push({ name: line.name, target: targetFor(line.name, decide(line.name)) });
   return entries;

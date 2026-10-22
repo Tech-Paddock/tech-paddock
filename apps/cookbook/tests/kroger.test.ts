@@ -31,6 +31,8 @@ const mem = vi.hoisted(() => ({
   tokenWrites: [] as string[],
   scans: [] as Record<string, unknown>[],
   saved: [] as Record<string, unknown>[],
+  brandRows: [] as Record<string, unknown>[],
+  bumps: [] as string[][],
 }));
 
 vi.mock("@/lib/dealStore", () => ({
@@ -60,9 +62,19 @@ vi.mock("@/lib/krogerStore", () => ({
   deleteConnectionRow: async () => {
     mem.row = null;
   },
-  readBrandProducts: async () => mem.products,
-  writeBrandProduct: async (r: Record<string, unknown>) => {
-    mem.products = [...mem.products.filter((p) => p.preference_id !== r.preference_id), r];
+}));
+
+// Your brands, one row per product code (TEC-131), in memory.
+vi.mock("@/lib/productStore", () => ({
+  readProducts: async () => mem.brandRows,
+  rememberProduct: async (name: string, upc: string, page: string, size: string | null) => {
+    mem.saved.push({ name, upc, page, size });
+  },
+  bumpCounts: async (upcs: string[]) => {
+    mem.bumps.push(upcs);
+  },
+  writeCache: async (id: string, patch: Record<string, unknown>) => {
+    mem.products.push({ id, ...patch });
   },
 }));
 
@@ -88,10 +100,6 @@ vi.mock("@/lib/cartSends", () => ({
 vi.mock("@/lib/preferences", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/preferences")>()),
   readPreferences: async () => mem.prefs,
-  savePreference: async (draft: Record<string, unknown>) => {
-    mem.saved.push(draft);
-    return { id: "new", ...draft };
-  },
 }));
 
 const PRODUCT = {
@@ -141,19 +149,33 @@ beforeEach(() => {
     { id: "a", name: "milk", note: null, source: "manual", checked: false, created_at: "2026-10-20T00:00:00Z", recipes: [], quantity: 2, sent_at: null },
     { id: "b", name: "eggs", note: null, source: "manual", checked: false, created_at: "2026-10-20T00:00:00Z", recipes: [], quantity: 1, sent_at: null },
   ];
-  mem.prefs = [
+  mem.prefs = [];
+  mem.brandRows = [
     {
       id: "p1",
-      phrase: "milk",
-      kind: "product",
-      url: "https://www.kingsoopers.com/p/kroger-2-milk/0001111041700",
-      terms: null,
+      product_id: "0001111041700",
+      names: ["milk"],
+      count: 4,
+      size_first: "1 gal",
       brand: null,
       note: null,
+      description: null,
+      kroger_brand: null,
+      size: null,
+      url: "https://www.kingsoopers.com/p/kroger-2-milk/0001111041700",
+      price: null,
+      in_stock: null,
+      checked_at: null,
+      missing_since: null,
+      successor: null,
+      pack_label: null,
+      pack_size: null,
+      pack_unit: null,
       created_at: "2026-10-01T00:00:00Z",
       updated_at: "2026-10-01T00:00:00Z",
     },
   ];
+  mem.bumps = [];
   mem.sent = [];
   mem.unsent = [];
   mem.ledger = [];
@@ -373,7 +395,9 @@ describe("no token appears in any response body", () => {
       )
     );
     expect(body.outcomes[1]).toMatchObject({ result: "added", detail: "Added ×1. Remembered in Your brands." });
-    expect(mem.saved).toEqual([expect.objectContaining({ phrase: "eggs", kind: "product", url: "https://www.kingsoopers.com/p/kroger-2-milk/0001111041700" })]);
+    // TEC-131: the line's name goes on that product (or a new row), and its count goes up.
+    expect(mem.saved).toEqual([{ name: "eggs", upc: "0001111041700", page: "https://www.kingsoopers.com/p/kroger-2-milk/0001111041700", size: null }]);
+    expect(mem.bumps).toEqual([["0001111041700"]]);
     // No model anywhere in this flow: Kroger is the only host called.
     expect(kroger.mock.calls.every(([u]) => String(u).startsWith("https://api.kroger.com/"))).toBe(true);
   });

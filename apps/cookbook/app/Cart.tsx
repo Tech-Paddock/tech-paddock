@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CHECKOUT_URL, isKingSoopersProduct } from "@/lib/kingsoopers";
 import { refreshDue, scanDue } from "@/lib/refreshDue";
-import type { CartLine, Outcome, ReviewLine } from "@/lib/cart";
+import type { Candidate, CartLine, Outcome, ReviewLine } from "@/lib/cart";
+import { describeDrift, sizeDrift } from "@/lib/sizeDrift";
 import { modalityWord, type Modality } from "@/lib/modality";
 import type { Estimate, ScanRecord } from "@/lib/pricing";
 import type { SaleSources } from "@/lib/saleTag";
@@ -15,10 +16,12 @@ import { useToast } from "./Toast";
  * Send to cart — King Soopers (TEC-90; `RULES.md`, *Send to cart*).
  *
  * On the list tab, under the list: connect once, pick a store once, then
- * review and send. **Every line is shown before anything is sent**: a line tied
- * to an exact product goes in as-is, any other shows Kroger's top match for a
- * tap, or takes an exact product page instead; whichever goes in is remembered
- * in Your brands (TEC-128).
+ * send. **Send puts every unsent line matching exactly one product in Your
+ * brands straight in** (TEC-131), then shows the rest in three sections:
+ * matched lines already sent, **Settle these** (several products match: one
+ * pick, most counted first) and **No match** (Kroger's top match for the item
+ * alone, or an exact product page instead); whichever goes in is remembered in
+ * Your brands (TEC-128).
  * **No model picks anything.** Every line then reports added, skipped or failed,
  * and **a line already sent is not sent again without saying so**, because the
  * Cart API only adds. Checkout stays at King Soopers: the link opens their cart.
@@ -55,8 +58,23 @@ type Status = {
 
 type Store = { locationId: string; name: string; address: string };
 
-/** What the user has decided for one line in the review. */
-type Choice = { include: boolean; url: string };
+/** What the user has decided for one line in the review; `pick` is the product number chosen under Settle these. */
+type Choice = { include: boolean; url: string; pick?: string };
+
+type Results = {
+  outcomes: Outcome[];
+  summary: string;
+  recordError: string | null;
+  modalityWarning: string | null;
+};
+
+/** "3 added, 1 failed" for the lines shown — the server's summary counts every open line. */
+function tally(outcomes: Outcome[]): string {
+  const n = (r: Outcome["result"]) => outcomes.filter((o) => o.result === r).length;
+  return [`${n("added")} added`, n("skipped") ? `${n("skipped")} skipped` : null, n("failed") ? `${n("failed")} failed` : null]
+    .filter(Boolean)
+    .join(", ");
+}
 
 const CALLBACK_WORDS: Record<string, string> = {
   connected: "King Soopers connected.",
@@ -122,12 +140,9 @@ export default function Cart({
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [confirmAgain, setConfirmAgain] = useState(false);
   const [refused, setRefused] = useState<CartLine[] | null>(null);
-  const [results, setResults] = useState<{
-    outcomes: Outcome[];
-    summary: string;
-    recordError: string | null;
-    modalityWarning: string | null;
-  } | null>(null);
+  const [results, setResults] = useState<Results | null>(null);
+  // What Send put straight in (TEC-131): every unsent line matching exactly one brand.
+  const [straightIn, setStraightIn] = useState<Results | null>(null);
 
   const [refreshing, setRefreshing] = useState(false);
   const [refreshNote, setRefreshNote] = useState<{ text: string; failed: boolean } | null>(null);
@@ -349,6 +364,7 @@ export default function Cart({
       if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't disconnect.");
       setReview(null);
       setResults(null);
+      setStraightIn(null);
       await loadStatus();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't disconnect.");
@@ -357,10 +373,27 @@ export default function Cart({
     }
   }
 
+  function postSend(body: { picks: unknown[]; again: boolean }) {
+    return serial(() =>
+      fetch("/api/kroger/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+    );
+  }
+
+  /**
+   * **Send to cart** (TEC-131; RULES.md): look every line up, then **put each
+   * unsent line that matches exactly one brand straight in**, no tap. What is
+   * left is the review: Settle these (several brands match), No match (Kroger's
+   * top match), and matched lines already sent, which still warn.
+   */
   async function startReview() {
     if (busy) return;
     setBusy("review");
     setResults(null);
+    setStraightIn(null);
     setTakeBackPreview(null);
     setTakeBackResults(null);
     setRefused(null);
@@ -370,12 +403,50 @@ export default function Cart({
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't get the list ready.");
       const lines = body.lines as ReviewLine[];
-      setReview(lines);
-      // **Exact products start ticked; a match waits for a tap** (RULES.md).
-      // A line already sent starts unticked, whatever it is.
+
+      const auto = lines.filter((l) => l.plan.kind === "exact" && l.sent_at === null);
+      let rest = lines.filter((l) => !auto.includes(l));
+      if (auto.length > 0) {
+        setBusy("send");
+        const autoIds = new Set(auto.map((l) => l.id));
+        let sent: Response | null = null;
+        try {
+          sent = await postSend({
+            picks: auto.map((l) => ({ id: l.id, upc: (l.plan as { upc: string }).upc })),
+            again: false,
+          });
+        } catch {
+          // Unknown whether anything went in: say so, and offer them again,
+          // where a second send of a line that did go in still warns.
+          toast.error("Lost touch with this app's server while sending the matched lines. Check the King Soopers cart before sending them again.");
+        }
+        const result = sent ? await sent.json().catch(() => ({})) : {};
+        if (!sent) {
+          rest = lines;
+        } else if (sent.ok) {
+          const outcomes = (result.outcomes as Outcome[]).filter((o) => autoIds.has(o.id));
+          setStraightIn({
+            outcomes,
+            summary: tally(outcomes),
+            recordError: result.recordError ?? null,
+            modalityWarning: result.modalityWarning ?? null,
+          });
+          brandsChanged.current();
+        } else {
+          // Nothing went in (a 409 means another tab sent them first): they
+          // join the review, ticked, so nothing is lost silently.
+          toast.error(result.error ?? "Couldn't put the matched lines in the cart.");
+          rest = lines;
+        }
+      }
+
+      setReview(rest);
+      // **Settle these and No match wait for a tap** (RULES.md). A matched line
+      // here is one already sent or one that failed to go in straight away: it
+      // starts ticked only if it has never been sent.
       setChoices(
         Object.fromEntries(
-          lines.map((l) => [l.id, { include: l.plan.kind === "exact" && l.sent_at === null, url: "" }])
+          rest.map((l) => [l.id, { include: l.plan.kind === "exact" && l.sent_at === null, url: "" }])
         )
       );
     } catch (e) {
@@ -393,10 +464,18 @@ export default function Cart({
     const choice = choices[line.id];
     if (!choice) return [];
     if (choice.url.trim()) return [{ id: line.id, url: choice.url.trim() }];
+    if (line.plan.kind === "settle") {
+      // The pick's page goes with it, so it is remembered the way a match is (TEC-131).
+      const option = line.plan.options.find((o) => o.upc === choice.pick);
+      return option ? [{ id: line.id, upc: option.upc, match: option.url }] : [];
+    }
     if (!choice.include) return [];
     if (line.plan.kind === "exact") return [{ id: line.id, upc: line.plan.upc }];
     // The match's page goes with it, so the server can remember it in Your brands (TEC-128).
-    if (line.plan.kind === "match") return [{ id: line.id, upc: line.plan.product.upc, match: line.plan.product.url }];
+    if (line.plan.kind === "match") {
+      const p = line.plan.product;
+      return [{ id: line.id, upc: p.upc, match: p.url, ...(p.size ? { size: p.size } : {}) }];
+    }
     return [];
   });
   const again = (review ?? []).filter((l) => l.sent_at !== null && picks.some((p) => p.id === l.id));
@@ -410,22 +489,19 @@ export default function Cart({
     setBusy("send");
     setRefused(null);
     try {
-      const response = await serial(() =>
-        fetch("/api/kroger/cart", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ picks, again: again.length > 0 && confirmAgain }),
-        })
-      );
+      const response = await postSend({ picks, again: again.length > 0 && confirmAgain });
       const body = await response.json();
       if (response.status === 409 && Array.isArray(body.alreadySent)) {
         setRefused(body.alreadySent as CartLine[]);
         return;
       }
       if (!response.ok) throw new Error(body.error ?? "Couldn't send to the cart.");
+      // Only the lines this review held: the ones that went straight in are reported above.
+      const shown = new Set((review ?? []).map((l) => l.id));
+      const outcomes = (body.outcomes as Outcome[]).filter((o) => shown.has(o.id));
       setResults({
-        outcomes: body.outcomes,
-        summary: body.summary,
+        outcomes,
+        summary: tally(outcomes),
         recordError: body.recordError ?? null,
         modalityWarning: body.modalityWarning ?? null,
       });
@@ -486,6 +562,7 @@ export default function Cart({
       // What was sent has changed; a review or send result on screen is now stale.
       setReview(null);
       setResults(null);
+      setStraightIn(null);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't take back from the cart.");
     } finally {
@@ -610,7 +687,7 @@ export default function Cart({
             disabled={busy !== null}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
           >
-            {busy === "review" ? "Looking up…" : review ? "Look up again" : "Send to cart"}
+            {busy === "review" ? "Looking up…" : busy === "send" && !review ? "Sending matched…" : review ? "Look up again" : "Send to cart"}
           </button>
           <button
             type="button"
@@ -675,7 +752,15 @@ export default function Cart({
 
         {estimate ? <EstimatePanel estimate={estimate.estimate} message={estimate.message} onClose={() => setEstimate(null)} /> : null}
 
-        {review ? (
+        {straightIn ? (
+          <SendResults
+            title={`Straight in from Your brands: ${straightIn.summary}`}
+            results={straightIn}
+            checkout={!review || review.length === 0}
+          />
+        ) : null}
+
+        {review && !(review.length === 0 && straightIn) ? (
           <ReviewPanel
             review={review}
             choices={choices}
@@ -692,32 +777,7 @@ export default function Cart({
           />
         ) : null}
 
-        {results ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
-            <h3 className="text-sm font-semibold">{results.summary}</h3>
-            <ul className="flex flex-col gap-1 text-sm">
-              {results.outcomes.map((o) => (
-                <li key={o.id} className="flex items-baseline gap-2">
-                  <span
-                    className={`shrink-0 rounded border px-1.5 text-[11px] ${
-                      o.result === "added" ? "border-accent text-accent" : o.result === "failed" ? "border-danger/60 text-danger" : "border-line text-ink-soft"
-                    }`}
-                  >
-                    {o.result}
-                  </span>
-                  <span className="min-w-0">
-                    {o.name} <span className="text-ink-soft">— {o.detail}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {results.modalityWarning ? <p role="alert" className="text-xs text-warn">{results.modalityWarning}</p> : null}
-            {results.recordError ? <p className="text-xs text-danger">{results.recordError}</p> : null}
-            <div>
-              <CheckoutLink />
-            </div>
-          </div>
-        ) : null}
+        {results ? <SendResults title={results.summary} results={results} checkout /> : null}
 
         <DealsPanel latest={latestScan} loaded={scanLoaded} scanning={scanning} note={scanNote} onScan={() => void scan("manual")} />
       </div>
@@ -733,6 +793,39 @@ export default function Cart({
         <p role={refreshNote.failed ? "alert" : undefined} className={`text-xs ${refreshNote.failed ? "text-danger" : "text-ink-soft"}`}>
           {refreshNote.text}
         </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** A send's per-line outcomes: added, skipped or failed, never a partial send read as whole. */
+function SendResults(props: { title: string; results: Results; checkout: boolean }) {
+  const { results } = props;
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
+      <h3 className="text-sm font-semibold">{props.title}</h3>
+      <ul className="flex flex-col gap-1 text-sm">
+        {results.outcomes.map((o) => (
+          <li key={o.id} className="flex items-baseline gap-2">
+            <span
+              className={`shrink-0 rounded border px-1.5 text-[11px] ${
+                o.result === "added" ? "border-accent text-accent" : o.result === "failed" ? "border-danger/60 text-danger" : "border-line text-ink-soft"
+              }`}
+            >
+              {o.result}
+            </span>
+            <span className="min-w-0">
+              {o.name} <span className="text-ink-soft">— {o.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {results.modalityWarning ? <p role="alert" className="text-xs text-warn">{results.modalityWarning}</p> : null}
+      {results.recordError ? <p className="text-xs text-danger">{results.recordError}</p> : null}
+      {props.checkout ? (
+        <div>
+          <CheckoutLink />
+        </div>
       ) : null}
     </div>
   );
@@ -796,6 +889,56 @@ function TakeBackConfirm(props: { lines: TakeBackLine[]; working: boolean; onCon
   );
 }
 
+/** "was 12 oz, now 10 oz" on a saved product whose size changed since it was first bought (TEC-131). */
+function DriftNote({ candidate }: { candidate: Candidate }) {
+  const drift = sizeDrift(candidate.sizeFirst, candidate.size, candidate.price);
+  return drift ? <span className="ml-1 text-[11px] text-warn">· {describeDrift(drift)}</span> : null;
+}
+
+/**
+ * Settle these (TEC-131): **one line, several saved products** — sizes,
+ * flavours — most counted first, for one pick. Nothing is preselected: the
+ * count ranks, it does not choose. Tapping
+ * the picked one again clears it. A local pattern: a radio list of chips.
+ */
+function SettleOptions(props: { line: ReviewLine; options: Candidate[]; picked: string | undefined; onPick: (upc: string) => void }) {
+  return (
+    <div role="radiogroup" aria-label={`Which ${props.line.name}`} className="flex flex-wrap gap-1.5">
+      {props.options.map((o) => {
+        const on = props.picked === o.upc;
+        const label = [o.description ?? `Product ${o.upc}`, o.size, o.price !== null ? `$${o.price.toFixed(2)}` : null]
+          .filter(Boolean)
+          .join(" · ");
+        return (
+          <span key={o.upc} className="flex items-baseline gap-1">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => props.onPick(o.upc)}
+              className={`rounded-lg border px-2 py-1 text-left text-xs ${on ? "border-accent text-accent" : "border-line text-ink-soft"}`}
+            >
+              {label}
+              <span className="ml-1 text-[11px] text-ink-soft">×{o.count}</span>
+              {o.missing ? <span className="ml-1 text-[11px] text-danger">· Kroger stopped returning it</span> : null}
+              <DriftNote candidate={o} />
+            </button>
+            <a
+              href={o.url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Open ${label} at King Soopers`}
+              className="text-[11px] text-ink-soft underline decoration-dotted underline-offset-2"
+            >
+              page
+            </a>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function ReviewPanel(props: {
   review: ReviewLine[];
   choices: Record<string, Choice>;
@@ -817,6 +960,79 @@ function ReviewPanel(props: {
     return <p className="text-sm text-ink-soft">Nothing on the list to send — ticked lines are already bought.</p>;
   }
 
+  const matched = review.filter((l) => l.plan.kind === "exact");
+  const settle = review.filter((l) => l.plan.kind === "settle");
+  const noMatch = review.filter((l) => l.plan.kind === "match" || l.plan.kind === "none");
+
+  const row = (line: ReviewLine) => {
+    const choice = choices[line.id] ?? { include: false, url: "" };
+    const plan = line.plan;
+    const pasted = !!choice.url.trim();
+    return (
+      <li key={line.id} className="flex flex-col gap-1 py-2 text-sm">
+        <div className="flex items-baseline gap-2">
+          <span className="min-w-0 flex-1">
+            <b>{line.name}</b> <span className="text-ink-soft">×{line.quantity}</span>
+            {line.note ? <span className="text-ink-soft"> — {line.note}</span> : null}
+          </span>
+          {(plan.kind === "exact" || plan.kind === "match") && !pasted ? (
+            <label className="flex shrink-0 items-center gap-1 text-xs">
+              <input
+                type="checkbox"
+                checked={choice.include}
+                onChange={(e) => choose(line.id, { include: e.target.checked })}
+                className="size-4 accent-accent"
+              />
+              {plan.kind === "exact" ? "Send" : "Add"}
+            </label>
+          ) : null}
+        </div>
+
+        {plan.kind === "exact" ? (
+          <span className="text-xs text-ink-soft">
+            Your brand ({plan.phrase}) —{" "}
+            <a href={plan.url} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
+              {plan.option.description ?? "the exact product"}
+            </a>
+            {plan.via === "description" ? <span> · its Kroger name matches this line</span> : null}
+            {plan.via === "code" ? <span> · by its product code</span> : null}
+            {plan.missing ? <span className="text-danger"> · Kroger stopped returning it at the last refresh</span> : null}
+            <DriftNote candidate={plan.option} />
+          </span>
+        ) : plan.kind === "settle" ? (
+          <SettleOptions
+            line={line}
+            options={plan.options}
+            picked={pasted ? undefined : choice.pick}
+            onPick={(upc) => choose(line.id, { pick: choice.pick === upc ? undefined : upc, url: "" })}
+          />
+        ) : plan.kind === "match" ? (
+          <span className="text-xs text-ink-soft">
+            Kroger&rsquo;s top match:{" "}
+            <a href={plan.product.url} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
+              {plan.product.description}
+            </a>
+            {plan.product.size ? ` · ${plan.product.size}` : ""}
+            {plan.product.price !== null ? ` · $${plan.product.price.toFixed(2)}` : ""}
+            {plan.product.inStock === false ? " · out of stock" : ""}
+          </span>
+        ) : (
+          <span className="text-xs text-ink-soft">{plan.reason}</span>
+        )}
+
+        {plan.kind !== "exact" ? (
+          <input
+            value={choice.url}
+            onChange={(e) => choose(line.id, { url: e.target.value })}
+            placeholder="Or paste the exact product page — it will be remembered"
+            aria-label={`Exact product page for ${line.name}`}
+            className="rounded-lg border border-line bg-surface p-2 text-xs"
+          />
+        ) : null}
+      </li>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-3">
       {/* **A second send warns and shows what was already sent** (RULES.md). */}
@@ -833,65 +1049,26 @@ function ReviewPanel(props: {
         </div>
       ) : null}
 
-      <ul className="flex flex-col divide-y divide-line">
-        {review.map((line) => {
-          const choice = choices[line.id] ?? { include: false, url: "" };
-          const plan = line.plan;
-          return (
-            <li key={line.id} className="flex flex-col gap-1 py-2 text-sm">
-              <div className="flex items-baseline gap-2">
-                <span className="min-w-0 flex-1">
-                  <b>{line.name}</b> <span className="text-ink-soft">×{line.quantity}</span>
-                  {line.note ? <span className="text-ink-soft"> — {line.note}</span> : null}
-                </span>
-                {plan.kind !== "none" && !choice.url.trim() ? (
-                  <label className="flex shrink-0 items-center gap-1 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={choice.include}
-                      onChange={(e) => choose(line.id, { include: e.target.checked })}
-                      className="size-4 accent-accent"
-                    />
-                    {plan.kind === "exact" ? "Send" : "Add"}
-                  </label>
-                ) : null}
-              </div>
-
-              {plan.kind === "exact" ? (
-                <span className="text-xs text-ink-soft">
-                  Your brand ({plan.phrase}) —{" "}
-                  <a href={plan.url} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
-                    the exact product
-                  </a>
-                  {plan.missing ? <span className="text-danger"> · Kroger stopped returning it at the last refresh</span> : null}
-                </span>
-              ) : plan.kind === "match" ? (
-                <span className="text-xs text-ink-soft">
-                  Kroger&rsquo;s top match:{" "}
-                  <a href={plan.product.url} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
-                    {plan.product.description}
-                  </a>
-                  {plan.product.size ? ` · ${plan.product.size}` : ""}
-                  {plan.product.price !== null ? ` · $${plan.product.price.toFixed(2)}` : ""}
-                  {plan.product.inStock === false ? " · out of stock" : ""}
-                </span>
-              ) : (
-                <span className="text-xs text-ink-soft">{plan.reason}</span>
-              )}
-
-              {plan.kind !== "exact" ? (
-                <input
-                  value={choice.url}
-                  onChange={(e) => choose(line.id, { url: e.target.value })}
-                  placeholder="Or paste the exact product page — it will be remembered"
-                  aria-label={`Exact product page for ${line.name}`}
-                  className="rounded-lg border border-line bg-surface p-2 text-xs"
-                />
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
+      {/* **Three sections** (TEC-131; RULES.md): matched lines still here (already
+          sent, or not taken straight in), Settle these, then No match. */}
+      {matched.length > 0 ? (
+        <section className="flex flex-col gap-1">
+          <h3 className="text-xs font-semibold text-ink-soft">Matched in Your brands</h3>
+          <ul className="flex flex-col divide-y divide-line">{matched.map(row)}</ul>
+        </section>
+      ) : null}
+      {settle.length > 0 ? (
+        <section className="flex flex-col gap-1">
+          <h3 className="text-xs font-semibold text-ink-soft">Settle these — pick one, most bought first</h3>
+          <ul className="flex flex-col divide-y divide-line">{settle.map(row)}</ul>
+        </section>
+      ) : null}
+      {noMatch.length > 0 ? (
+        <section className="flex flex-col gap-1">
+          <h3 className="text-xs font-semibold text-ink-soft">No match in Your brands</h3>
+          <ul className="flex flex-col divide-y divide-line">{noMatch.map(row)}</ul>
+        </section>
+      ) : null}
 
       {props.refused ? (
         <p role="alert" className="text-xs text-danger">
