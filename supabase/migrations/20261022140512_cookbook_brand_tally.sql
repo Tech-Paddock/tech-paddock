@@ -28,6 +28,9 @@
 -- exactly as it did (it finds a phrase's first row). Undoing it means
 -- recreating `brand_preferences_phrase_key`, which fails once a phrase holds two
 -- products — forget the extras in Your brands first.
+--
+-- The old index cannot be restored once a phrase holds two products; the owner
+-- approved the swap on 2026-10-22.
 
 alter table cookbook.brand_preferences
   add column tally integer not null default 0 check (tally >= 0);

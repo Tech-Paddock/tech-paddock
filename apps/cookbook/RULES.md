@@ -52,6 +52,7 @@ section and closing comment before changing anything in this file.
   the chosen store. Never sent to the browser or logged. Scope: add-to-cart and product read.
 - **Each brand carries a count.** It starts from the owner's own purchase history, which is supplied by hand and never stored or committed, and goes up by one each time Send adds it. It ranks choices; it never claims what was bought.
 - **Paste a batch shows every row for a tick before anything is written,** and Your brands exports as JSON.
+- **A phrase holds several products, one row each, or one set of search words, never both.**
 
 ## Send to cart — King Soopers
 
