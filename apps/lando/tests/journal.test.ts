@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { getServiceClient } from "@/lib/supabase";
 type SupabaseClient = ReturnType<typeof getServiceClient>;
-import { Conflict, addPerson, listDogs, readJournal, writeEvent } from "@/lib/journal";
+import { Conflict, addDog, addPerson, listDogs, readJournal, writeEvent } from "@/lib/journal";
 import { InvalidEvent } from "@/lib/events";
 
 /**
@@ -187,5 +187,47 @@ describe("addPerson", () => {
     const { db } = fakeDb();
     await expect(addPerson(db, "   ")).rejects.toBeInstanceOf(InvalidEvent);
     await expect(addPerson(db, "x".repeat(41))).rejects.toBeInstanceOf(InvalidEvent);
+  });
+});
+
+describe("addDog", () => {
+  // Invented names (charter, Never 2).
+  it("adds a dog by its tidied name and returns the row", async () => {
+    const { db, tables, inserts } = fakeDb();
+    const d = await addDog(db, "  Test   Pup ");
+    expect(d.name).toBe("Test Pup");
+    expect(inserts).toEqual([{ name: "Test Pup" }]);
+    expect(tables.dogs).toHaveLength(1);
+  });
+
+  it("returns the existing dog for the same name in another case, never a second row", async () => {
+    const { db, tables } = fakeDb();
+    tables.dogs.push({ id: ID3, name: "Test Pup" });
+    const d = await addDog(db, "test pup");
+    expect(d).toEqual({ id: ID3, name: "Test Pup" });
+    expect(tables.dogs).toHaveLength(1);
+  });
+
+  it("refuses an empty or overlong name", async () => {
+    const { db } = fakeDb();
+    await expect(addDog(db, "  ")).rejects.toBeInstanceOf(InvalidEvent);
+    await expect(addDog(db, "x".repeat(41))).rejects.toBeInstanceOf(InvalidEvent);
+    await expect(addDog(db, 7)).rejects.toBeInstanceOf(InvalidEvent);
+  });
+
+  it("finds the winner when another phone added the same name first", async () => {
+    const { db, tables } = fakeDb({ insertError: { code: "23505", message: "duplicate key" } });
+    // The fake records the insert as refused; the other phone's row is what a re-read finds.
+    const realFrom = (db as any).from;
+    let reads = 0;
+    (db as any).from = (t: string) => {
+      if (t === "dogs" && ++reads === 2) tables.dogs.push({ id: ID2, name: "Test Pup" });
+      return realFrom(t);
+    };
+    expect(await addDog(db, "Test Pup")).toEqual({ id: ID2, name: "Test Pup" });
+  });
+
+  it("throws on a failed read rather than adding blind", async () => {
+    await expect(addDog(fakeDb({ failRead: true }).db, "Test Pup")).rejects.toThrow(/dogs/);
   });
 });

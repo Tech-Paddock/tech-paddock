@@ -58,15 +58,19 @@ describe("form defaults", () => {
     expect(defaultAmount("meal", {})).toBeNull();
   });
 
-  it("opens on the last item and meal amount this phone used", () => {
-    const r = { meal: "purina-pro-plan-toy-puppy-chicken-rice", treat: "bixbi-pocket-trainers-bacon", mealAmount: 0.333 };
+  it("opens a meal on the last meal item and amount this phone used", () => {
+    const r = { meal: "purina-pro-plan-toy-puppy-chicken-rice", mealAmount: 0.333 };
     expect(defaultFood("meal", r)).toBe(r.meal);
-    expect(defaultFood("treat", r)).toBe(r.treat);
     expect(defaultAmount("meal", r)).toBe(0.333);
+  });
+
+  it("always opens a treat on Misc and one, even with a treat remembered from before (TEC-129)", () => {
+    const r = { meal: "purina-pro-plan-toy-puppy-chicken-rice", treat: "bixbi-pocket-trainers-bacon" };
+    expect(defaultFood("treat", r)).toBe(MISC_ID);
     expect(defaultAmount("treat", r)).toBe(1);
   });
 
-  it("falls back to Misc when the remembered item has left the list", () => {
-    expect(defaultFood("treat", { treat: "gone" })).toBe(MISC_ID);
+  it("falls back to Misc when the remembered meal has left the list", () => {
+    expect(defaultFood("meal", { meal: "gone" })).toBe(MISC_ID);
   });
 });

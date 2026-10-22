@@ -9,7 +9,8 @@
  * Four kinds, each logged through a short form with defaults: potty, food,
  * exercise, weight. The shapes of `details` below are also enforced by the
  * database (migrations `lando_people_and_events`, then
- * `widen_lando_events_details_shape`); change both together.
+ * `widen_lando_events_details_shape`, then `widen_lando_potty_none`); change
+ * both together.
  */
 
 import { FOOD_TYPES, findFood, formatAmount, unitLabel, type FoodType } from "./foods";
@@ -27,14 +28,20 @@ export const KIND_LABELS: Record<LogKind, string> = {
 
 /* ── Shapes ──────────────────────────────────────────────────────────────── */
 
-export const POTTY_WHAT = ["pee", "poop", "both"] as const;
+/**
+ * `none` is a trip out with nothing done ("No potty", TEC-129): logged, but it
+ * resets neither clock, is never an accident, and counts as no pee or poop.
+ */
+export const POTTY_WHAT = ["pee", "poop", "both", "none"] as const;
+export type PottyWhat = (typeof POTTY_WHAT)[number];
+export const POTTY_WHAT_LABELS: Record<PottyWhat, string> = { pee: "Pee", poop: "Poop", both: "Both", none: "No potty" };
 export const WHERE = ["outside", "inside"] as const;
 /** How an outside potty went: on the leash, off it, or in the pen. Outside only. */
 export const LEASH = ["leashed", "unleashed", "pen"] as const;
 export type Leash = (typeof LEASH)[number];
 export const LEASH_LABELS: Record<Leash, string> = { leashed: "Leashed", unleashed: "Unleashed", pen: "In pen" };
 export type PottyDetails = {
-  what: (typeof POTTY_WHAT)[number];
+  what: PottyWhat;
   where: (typeof WHERE)[number];
   /** Outside only; entries from before it existed have none. */
   leash?: Leash;
@@ -93,6 +100,45 @@ export type Dog = { id: string; name: string };
 /** At most this many dogs on one session. */
 export const MAX_DOGS = 20;
 
+/*
+ * Other dogs is one pick (TEC-129): None, one dog by id, Multiple, or Add dog.
+ * These are the picklist values that are not a dog id.
+ */
+export const DOGS_NONE = "";
+export const DOGS_MULTIPLE = "__multiple";
+export const DOGS_ADD = "__add";
+/** A correction of an entry naming several dogs, or one no longer listed: kept as it was. */
+export const DOGS_KEPT = "__kept";
+
+/**
+ * The `with_dogs` and `dogs` an Other dogs pick saves. One dog: its id.
+ * Multiple: `with_dogs` and no ids (the same shape as an entry from before the
+ * list). `kept` is what a correction opened on, saved again while
+ * `DOGS_KEPT` is still the pick.
+ */
+export function dogsFromPick(pick: string, kept: readonly string[] | null): Pick<ExerciseDetails, "with_dogs" | "dogs"> {
+  if (pick === DOGS_NONE || pick === DOGS_ADD) return { with_dogs: false };
+  if (pick === DOGS_MULTIPLE) return { with_dogs: true };
+  if (pick === DOGS_KEPT) return kept?.length ? { with_dogs: true, dogs: [...kept] } : { with_dogs: true };
+  return { with_dogs: true, dogs: [pick] };
+}
+
+/**
+ * What a form opens Other dogs on, for an entry being corrected (or none).
+ * `kept` is set when the entry names dogs the single pick cannot show: several,
+ * or one no longer in the list.
+ */
+export function dogsPickFor(
+  x: Pick<ExerciseDetails, "with_dogs" | "dogs"> | null,
+  dogs: readonly Dog[]
+): { pick: string; kept: string[] | null } {
+  if (!x) return { pick: DOGS_NONE, kept: null };
+  const ids = x.dogs ?? [];
+  if (ids.length === 1 && dogs.some((d) => d.id === ids[0])) return { pick: ids[0], kept: null };
+  if (ids.length) return { pick: DOGS_KEPT, kept: [...ids] };
+  return { pick: x.with_dogs ? DOGS_MULTIPLE : DOGS_NONE, kept: null };
+}
+
 export const UNITS = ["lb", "kg"] as const;
 export type Unit = (typeof UNITS)[number];
 const KG_PER_LB = 0.45359237;
@@ -117,9 +163,12 @@ export const food = (e: Pick<JournalEvent, "details">) => e.details as FoodDetai
 export const exercise = (e: Pick<JournalEvent, "details">) => e.details as ExerciseDetails;
 export const weight = (e: Pick<JournalEvent, "details">) => e.details as WeightDetails;
 
-/** Inside is an accident: warned in the form, red in the timeline, counted apart. */
+/**
+ * Inside is an accident: warned in the form, red in the timeline, counted
+ * apart. A No potty is never one, wherever it was: nothing happened.
+ */
 export const isAccident = (e: Pick<JournalEvent, "kind" | "details">) =>
-  e.kind === "potty" && potty(e).where === "inside";
+  e.kind === "potty" && potty(e).where === "inside" && potty(e).what !== "none";
 
 /* ── Reading ─────────────────────────────────────────────────────────────── */
 
@@ -146,7 +195,8 @@ function countsFor(e: JournalEvent, clock: Clock): boolean {
   switch (clock) {
     case "pee":
     case "poop": {
-      // An accident inside is still a pee or a poop, and the next one is due from it.
+      // An accident inside is still a pee or a poop, and the next one is due
+      // from it. A No potty is neither: the clock keeps running.
       if (e.kind !== "potty") return false;
       const w = potty(e).what;
       return w === clock || w === "both";
@@ -243,7 +293,7 @@ export function describe(
   switch (e.kind) {
     case "potty": {
       const p = potty(e);
-      const what = p.what === "both" ? "pee + poop" : p.what;
+      const what = p.what === "both" ? "pee + poop" : p.what === "none" ? "no potty" : p.what;
       const detail =
         p.where === "inside" ? `${what}, inside` : p.leash ? `${what} · ${LEASH_LABELS[p.leash].toLowerCase()}` : what;
       return { title: isAccident(e) ? "Accident" : "Potty", detail };
@@ -262,7 +312,7 @@ export function describe(
         x.dogs?.length
           ? `with ${x.dogs.map((id) => dogs.find((d) => d.id === id)?.name ?? "another dog").join(", ")}`
           : x.with_dogs
-            ? "with dogs"
+            ? "with several dogs" // Multiple, and entries from before the list (the owner's call, 2026-10-22)
             : "",
         x.treats ? `${x.treats} ${x.treats === 1 ? "treat" : "treats"}` : "",
         (x.commands ?? []).map((c) => COMMAND_LABEL[c] ?? c).join(", "),

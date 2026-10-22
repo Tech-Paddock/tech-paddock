@@ -31,8 +31,8 @@ import {
   type Remembered,
 } from "@/lib/defaults";
 import { clockTime, localMidnight, rowTime, shortDate } from "@/lib/localtime";
+import { nameBoxWidth } from "@/lib/names";
 import Analytics from "./Analytics";
-import GrowthChart from "./GrowthChart";
 import LogForm, { type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
 
@@ -60,8 +60,8 @@ const isLogBody = (b: unknown): b is LogBody =>
 /**
  * Two tabs, Log and Analytics, opening on Log (charter, Scope: the owner's
  * override, 2026-10-20). Log: since-last pills, who is logging, four section
- * buttons that each open a short form with defaults, today's timeline, the
- * growth chart. Analytics: the last fourteen days.
+ * buttons that each open a short form with defaults, today's timeline with a
+ * filter by kind. Analytics: the last fourteen days and the growth chart.
  *
  * **Save never waits.** The sheet closes at once and the entry shows as
  * "Saving…", then joins the timeline, or stays as "Not saved" with Retry
@@ -79,6 +79,8 @@ export default function Journal() {
   const [remembered, setRemembered] = useState<Remembered>({});
   const [storageRead, setStorageRead] = useState(false);
   const [open, setOpen] = useState<Open>(null);
+  // Today's feed shows one kind, or every kind when null (TEC-129). Not remembered.
+  const [only, setOnly] = useState<LogKind | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
@@ -203,12 +205,31 @@ export default function Journal() {
     }
   }
 
+  async function addDog(name: string): Promise<{ dog: Dog | null; error: string | null }> {
+    try {
+      const { ok, data } = await postJson("/api/dogs", { name });
+      if (!ok) return { dog: null, error: data.error ?? "couldn't add" };
+      const dog = data.dog as Dog;
+      setLoaded((prev) =>
+        prev && !prev.dogs.some((d) => d.id === dog.id)
+          ? { ...prev, dogs: [...prev.dogs, dog].sort((a, b) => a.name.localeCompare(b.name)) }
+          : prev
+      );
+      return { dog, error: null };
+    } catch (e) {
+      return { dog: null, error: e instanceof TypeError ? "no connection" : (e as Error).message };
+    }
+  }
+
   function remember(body: LogBody) {
     const next = { ...remembered };
+    // A meal's item and amount are remembered; a treat always opens on Misc.
     if (body.kind === "food") {
       const f = asFood(body);
-      next[f.type] = f.item_id;
-      if (f.type === "meal" && f.amount !== null) next.mealAmount = f.amount;
+      if (f.type === "meal") {
+        next.meal = f.item_id;
+        if (f.amount !== null) next.mealAmount = f.amount;
+      }
     }
     if (body.kind === "weight") next.unit = asWeight(body).unit;
     setRemembered(next);
@@ -253,6 +274,8 @@ export default function Journal() {
     [loaded, since]
   );
   const unsaved = [...pending].sort((a, b) => Date.parse(b.body.at) - Date.parse(a.body.at));
+  const shownToday = only ? today.filter((e) => e.kind === only) : today;
+  const shownUnsaved = only ? unsaved.filter((p) => p.body.kind === only) : unsaved;
   const lastWeight = loaded ? latestWeight(loaded.events) : null;
   const weightUnit = loaded ? displayUnit(loaded.events) : "lb";
   const weightNote = lastWeight
@@ -358,9 +381,10 @@ export default function Journal() {
                 id="who"
                 value={person?.id ?? ""}
                 onChange={(e) => (e.target.value === "__add" ? setAdding(true) : choosePerson(e.target.value || null))}
-                className="min-w-0 flex-1 rounded-[10px] border border-line bg-surface px-2.5 py-2"
+                className="min-w-0 rounded-[10px] border border-line bg-surface px-2.5 py-2"
+                style={{ width: nameBoxWidth(people.map((p) => p.display_name)) }}
               >
-                <option value="">{loaded ? "Pick who you are" : "Loading…"}</option>
+                <option value="">{loaded ? "Who?" : "…"}</option>
                 {people.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.display_name}
@@ -376,8 +400,8 @@ export default function Journal() {
           <section aria-label="Log">
             <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Log</h2>
             {/* Four across on a phone, label only (TEC-123). The newest weight
-                is in the Growth chart below; the Weight button carries it in its
-                title and for screen readers. */}
+                is in the Weight button's title and for screen readers, and in
+                Analytics' growth chart. */}
             <div className="grid grid-cols-4 gap-1.5">
               {(["potty", "food", "exercise"] as const).map((k) => (
                 <button
@@ -404,11 +428,35 @@ export default function Journal() {
           {/* Today */}
           <section aria-label="Today">
             <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Today</h2>
-            {unsaved.length === 0 && today.length === 0 && (
-              <p className="text-ink-soft">{loaded ? "Nothing logged yet today." : loadError ? "" : "Loading…"}</p>
+            {/* Filter by kind (TEC-129): tap one to show only it, tap it again for all. */}
+            <div role="group" aria-label="Show only" className="mb-2 flex flex-wrap gap-1.5">
+              {LOG_KINDS.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={only === k}
+                  onClick={() => setOnly(only === k ? null : k)}
+                  className={`min-h-[36px] whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm ${
+                    only === k ? "border-accent bg-accent text-accent-ink" : "border-line bg-surface"
+                  }`}
+                >
+                  {KIND_LABELS[k]}
+                </button>
+              ))}
+            </div>
+            {shownUnsaved.length === 0 && shownToday.length === 0 && (
+              <p className="text-ink-soft">
+                {!loaded
+                  ? loadError
+                    ? ""
+                    : "Loading…"
+                  : only && (today.length > 0 || unsaved.length > 0)
+                    ? `No ${KIND_LABELS[only].toLowerCase()} entries yet today.`
+                    : "Nothing logged yet today."}
+              </p>
             )}
             <ul className="flex flex-col gap-1">
-              {unsaved.map((p) => {
+              {shownUnsaved.map((p) => {
                 const { title } = describe(p.body);
                 return (
                   <li
@@ -439,7 +487,7 @@ export default function Journal() {
                   </li>
                 );
               })}
-              {today.map((e) => {
+              {shownToday.map((e) => {
                 const { title, detail } = describe(e, dogs);
                 const accident = isAccident(e);
                 return (
@@ -463,13 +511,7 @@ export default function Journal() {
                 );
               })}
             </ul>
-            {today.length > 0 && <p className="mt-1.5 text-xs text-ink-soft">Tap an entry to correct or delete it.</p>}
-          </section>
-
-          {/* Growth */}
-          <section aria-label="Growth">
-            <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Growth</h2>
-            {loaded ? <GrowthChart events={loaded.events} /> : <p className="text-sm text-ink-soft">—</p>}
+            {shownToday.length > 0 && <p className="mt-1.5 text-xs text-ink-soft">Tap an entry to correct or delete it.</p>}
           </section>
         </div>
       </div>
@@ -482,6 +524,7 @@ export default function Journal() {
             event={open.event}
             people={people}
             dogs={dogs}
+            onAddDog={addDog}
             phonePerson={person?.id ?? null}
             remembered={remembered}
             weightUnit={weightUnit}

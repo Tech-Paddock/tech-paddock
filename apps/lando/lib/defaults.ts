@@ -2,7 +2,7 @@
  * What each form starts with, remembered per phone in `localStorage`.
  *
  * Browser storage holds conveniences only: who this phone logs as, the last
- * food picked, the last weight unit and meal amount, and saves not yet made.
+ * meal picked, the last weight unit and meal amount, and saves not yet made.
  * Any of it can vanish (a private window, cleared data); the forms then fall
  * back to Misc and the journal is untouched. The database is the journal.
  */
@@ -16,6 +16,7 @@ export const UNSAVED_KEY = "lando.unsaved";
 
 export type Remembered = {
   meal?: string;
+  /** No longer written or read: a treat opens on Misc. Older phones may still hold one. */
   treat?: string;
   unit?: Unit;
   mealAmount?: number;
@@ -39,9 +40,13 @@ export function writeStore(key: string, value: unknown) {
   }
 }
 
-/** The item a food form opens on: the last one picked of that type, or Misc. */
+/**
+ * The item a food form opens on. A meal: the last meal picked, or Misc. A
+ * treat: always Misc (the owner's call, TEC-129), whatever was picked last.
+ */
 export function defaultFood(type: FoodType, remembered: Remembered): string {
-  const id = remembered[type];
+  if (type === "treat") return MISC_ID;
+  const id = remembered.meal;
   return id && picklist(type).some((f) => f.id === id) ? id : MISC_ID;
 }
 
