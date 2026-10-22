@@ -59,6 +59,8 @@
 - `lib/models.ts` is a flagged copy of Coffee's; they have diverged. No third copy.
 - `max_tokens` covers adaptive thinking as well as the JSON (parse 8192, estimate 16000). Lowering
   it toward the JSON's size turns a thinking turn into a `max_tokens` failure.
+- A refusal fails the line by design: no `fallbacks`, no second model (owner, 2026-10-22: "No
+  fallback, fail visibly"). Adding one would stamp a number with a model that did not make it.
 - `health.comparisons` stays in the schema with nothing reading or writing it since TEC-133.
   Dropping it is a destructive migration and the owner's call.
 - Every livery maps `--sev-warn` onto the accent, so over-target uses `--danger` locally
