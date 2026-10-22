@@ -12,8 +12,15 @@ import {
   liveEvents,
   parseNewEvent,
   sinceLast,
+  DOGS_ADD,
+  DOGS_KEPT,
+  DOGS_MULTIPLE,
+  DOGS_NONE,
+  dogsFromPick,
+  dogsPickFor,
   type JournalEvent,
 } from "@/lib/events";
+import { nameBoxWidth } from "@/lib/names";
 
 // Invented ids. Nothing here is a real person or a real dog's record.
 let n = 0;
@@ -96,6 +103,14 @@ describe("sinceLast — the pills", () => {
     const out = sinceLast([pee("2026-10-20T10:00:00Z"), b], NOW);
     expect(out.pee).toBe(b);
     expect(out.poop).toBe(b);
+  });
+
+  it("resets neither clock for a No potty", () => {
+    const earlier = pee("2026-10-20T10:00:00Z");
+    const none = ev({ kind: "potty", at: "2026-10-20T14:00:00Z", details: { what: "none", where: "outside", leash: "leashed" } });
+    const out = sinceLast([earlier, none], NOW);
+    expect(out.pee).toBe(earlier);
+    expect(out.poop).toBeNull();
   });
 
   it("counts an accident inside toward its pee or poop clock", () => {
@@ -217,7 +232,7 @@ describe("describe — a timeline row", () => {
         kind: "exercise",
         details: { type: "training", where: "inside", with_dogs: true, minutes: 10, treats: 6, commands: ["sit", "leave-it"] },
       })
-    ).toEqual({ title: "Training", detail: "10 min · inside · with dogs · 6 treats · Sit, Leave it" });
+    ).toEqual({ title: "Training", detail: "10 min · inside · with several dogs · 6 treats · Sit, Leave it" });
   });
 
   it("shows an outside potty's leash pick; an old entry without one reads as before", () => {
@@ -226,7 +241,26 @@ describe("describe — a timeline row", () => {
     expect(describeEvent({ kind: "potty", details: { what: "poop", where: "outside" } }).detail).toBe("poop");
   });
 
-  it("names the dogs a session was with; an old entry still says with dogs", () => {
+  it("reads a No potty as a trip out, never as an accident", () => {
+    expect(describeEvent({ kind: "potty", details: { what: "none", where: "outside", leash: "pen" } })).toEqual({
+      title: "Potty",
+      detail: "no potty · in pen",
+    });
+    const inside = { kind: "potty" as const, details: { what: "none", where: "inside" } };
+    expect(describeEvent(inside)).toEqual({ title: "Potty", detail: "no potty, inside" });
+    expect(isAccident(inside)).toBe(false);
+  });
+
+  it("reads an old multi-dog entry by name, as before the single pick", () => {
+    const dogs = [
+      { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Dog A" },
+      { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Dog B" },
+    ];
+    const details = { type: "walk", where: "outside", minutes: 20, treats: 0, with_dogs: true, dogs: dogs.map((d) => d.id) };
+    expect(describeEvent({ kind: "exercise", details }, dogs).detail).toBe("20 min · outside · with Dog A, Dog B");
+  });
+
+  it("names the dogs a session was with; Multiple and an old unnamed entry say with several dogs", () => {
     const dogs = [
       { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Dog A" },
       { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Dog B" },
@@ -238,7 +272,7 @@ describe("describe — a timeline row", () => {
     expect(
       describeEvent({ kind: "exercise", details: { ...base, with_dogs: true, dogs: ["cccccccc-cccc-4ccc-8ccc-cccccccccccc"] } }, dogs).detail
     ).toBe("20 min · outside · with another dog");
-    expect(describeEvent({ kind: "exercise", details: { ...base, with_dogs: true } }, dogs).detail).toBe("20 min · outside · with dogs");
+    expect(describeEvent({ kind: "exercise", details: { ...base, with_dogs: true } }, dogs).detail).toBe("20 min · outside · with several dogs");
     expect(describeEvent({ kind: "exercise", details: { ...base, with_dogs: false } }).detail).toBe("20 min · outside");
   });
 
@@ -323,6 +357,13 @@ describe("parseNewEvent — what the server accepts", () => {
     expect(() => parseNewEvent({ id, kind: "potty", details: { ...potty, leash: ["leashed"] } }, NOW)).toThrow(/leash/);
   });
 
+  it("accepts a No potty, with its where and leash picks; refuses other values", () => {
+    const none = { what: "none", where: "outside", leash: "unleashed" };
+    expect(parseNewEvent({ id, kind: "potty", details: none }, NOW).details).toEqual(none);
+    expect(parseNewEvent({ id, kind: "potty", details: { what: "none", where: "inside" } }, NOW).details).toEqual({ what: "none", where: "inside" });
+    expect(() => parseNewEvent({ id, kind: "potty", details: { what: "neither", where: "outside" } }, NOW)).toThrow(/what must be/);
+  });
+
   it("keeps the dogs an exercise was with: once each, picked order, only with dogs", () => {
     const base = { type: "walk", where: "outside", with_dogs: true, minutes: 15, treats: 0 };
     const dogA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -394,5 +435,54 @@ describe("checkVoid — what may replace what", () => {
 
   it("keeps the original time when a correction does not send one", () => {
     expect(correctionAt(next("food"), target)).toBe(target.at);
+  });
+});
+
+describe("Other dogs — one pick (TEC-129)", () => {
+  // Invented: no real dog's name is in the repo (charter, Never 2).
+  const A = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Dog A" };
+  const B = { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Dog B" };
+  const GONE = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const base = { type: "walk", where: "outside", minutes: 15, treats: 0 };
+  const saved = (pick: string, kept: string[] | null = null) =>
+    parseNewEvent({ id: uuid(), kind: "exercise", details: { ...base, ...dogsFromPick(pick, kept) } }, new Date()).details;
+
+  it("saves one dog by id, Multiple as with dogs and no ids, None as without", () => {
+    expect(saved(A.id)).toEqual({ ...base, with_dogs: true, dogs: [A.id] });
+    expect(saved(DOGS_MULTIPLE)).toEqual({ ...base, with_dogs: true });
+    expect(saved(DOGS_NONE)).toEqual({ ...base, with_dogs: false });
+    // Add dog is never a value that saves; if it were sent, it is none.
+    expect(saved(DOGS_ADD)).toEqual({ ...base, with_dogs: false });
+  });
+
+  it("opens a new entry on None, and a correction on what it saved", () => {
+    expect(dogsPickFor(null, [A, B])).toEqual({ pick: DOGS_NONE, kept: null });
+    expect(dogsPickFor({ with_dogs: false }, [A, B])).toEqual({ pick: DOGS_NONE, kept: null });
+    expect(dogsPickFor({ with_dogs: true, dogs: [B.id] }, [A, B])).toEqual({ pick: B.id, kept: null });
+    // Multiple, or an entry from before the list: the same shape, opened on Multiple.
+    expect(dogsPickFor({ with_dogs: true }, [A, B])).toEqual({ pick: DOGS_MULTIPLE, kept: null });
+  });
+
+  it("keeps an old multi-dog entry's dogs on a correction unless another pick is made", () => {
+    const old = { with_dogs: true, dogs: [B.id, A.id] };
+    const { pick, kept } = dogsPickFor(old, [A, B]);
+    expect(pick).toBe(DOGS_KEPT);
+    expect(saved(pick, kept)).toEqual({ ...base, with_dogs: true, dogs: [B.id, A.id] });
+    expect(saved(A.id, kept)).toEqual({ ...base, with_dogs: true, dogs: [A.id] });
+  });
+
+  it("keeps a single dog no longer listed rather than showing the wrong one", () => {
+    const { pick, kept } = dogsPickFor({ with_dogs: true, dogs: [GONE] }, [A, B]);
+    expect(pick).toBe(DOGS_KEPT);
+    expect(kept).toEqual([GONE]);
+  });
+});
+
+describe("nameBoxWidth — a person box fits a name", () => {
+  it("is the longest name plus one, between the floor and the cap, plus padding and arrow", () => {
+    expect(nameBoxWidth(["Al", "Bea"])).toBe("calc(7ch + 2.75rem)");
+    expect(nameBoxWidth(["Alexandra"])).toBe("calc(10ch + 2.75rem)");
+    expect(nameBoxWidth(["x".repeat(40)])).toBe("calc(15ch + 2.75rem)");
+    expect(nameBoxWidth([])).toBe("calc(7ch + 2.75rem)");
   });
 });

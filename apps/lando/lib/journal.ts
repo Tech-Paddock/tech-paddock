@@ -122,8 +122,9 @@ export async function listPeople(db: SupabaseClient): Promise<Person[]> {
 }
 
 /**
- * Friends' dogs, by name. Added by SQL, never in the app or the repo
- * (charter, Never 2). An empty table is an empty list; a failed read throws.
+ * Friends' dogs, by name. Added in the app (`addDog`, Other dogs' "Add dog…")
+ * or by SQL; never in the repo (charter, Never 2). An empty table is an empty
+ * list; a failed read throws.
  */
 export async function listDogs(db: SupabaseClient): Promise<Dog[]> {
   const { data, error } = await db.from("dogs").select("id, name").order("name", { ascending: true });
@@ -133,8 +134,7 @@ export async function listDogs(db: SupabaseClient): Promise<Dog[]> {
 
 /** Add a person by name, or return the one already there under that name. */
 export async function addPerson(db: SupabaseClient, raw: unknown): Promise<Person> {
-  const name = typeof raw === "string" ? raw.trim().replace(/\s+/g, " ") : "";
-  if (name.length < 1 || name.length > 40) throw new InvalidEvent("a name is 1 to 40 characters");
+  const name = cleanName(raw);
   const same = (p: Person) => p.display_name.trim().toLowerCase() === name.toLowerCase();
 
   const before = (await listPeople(db)).find(same);
@@ -147,4 +147,33 @@ export async function addPerson(db: SupabaseClient, raw: unknown): Promise<Perso
     if (after) return after;
   }
   throw new Error(`couldn't add person: ${error.message}`);
+}
+
+/** A name as typed: outer spaces off, inner runs of spaces made one. 1 to 40 characters. */
+function cleanName(raw: unknown): string {
+  const name = typeof raw === "string" ? raw.trim().replace(/\s+/g, " ") : "";
+  if (name.length < 1 || name.length > 40) throw new InvalidEvent("a name is 1 to 40 characters");
+  return name;
+}
+
+/**
+ * Add a friend's dog by name, or return the one already there under that name
+ * in any case (the table's unique index is on `lower(btrim(name))`). The same
+ * pattern as `addPerson`.
+ */
+export async function addDog(db: SupabaseClient, raw: unknown): Promise<Dog> {
+  const name = cleanName(raw);
+  const same = (d: Dog) => d.name.trim().toLowerCase() === name.toLowerCase();
+
+  const before = (await listDogs(db)).find(same);
+  if (before) return before;
+
+  const { data, error } = await db.from("dogs").insert({ name }).select("id, name").single();
+  if (!error) return data as Dog;
+  if (error.code === "23505") {
+    // Two phones adding the same dog at once: the other one won.
+    const after = (await listDogs(db)).find(same);
+    if (after) return after;
+  }
+  throw new Error(`couldn't add dog: ${error.message}`);
 }

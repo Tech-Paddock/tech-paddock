@@ -7,13 +7,17 @@
 - **Log**: four since-last pills in one row (pee, poop, food, exercise; label over value, the
   clock time in the title and for screen readers), "Logging as", four section buttons in one row
   (Potty, Food, Exercise, Weight: label only, no description, 52px tall; the newest weight is in
-  the Weight button's title and screen-reader text, and in the growth chart), today's timeline, the
-  growth chart. Each
+  the Weight button's title and screen-reader text), today's timeline under four filter chips
+  (TEC-129). No growth chart on Log since TEC-129: it lives in Analytics only. Each
   button opens a bottom sheet (`app/Sheet.tsx`) with the form for that kind (`app/LogForm.tsx`),
   defaults filled in, so Save is usually the only other tap. Tapping a timeline row opens the same
   form on that entry to correct or delete it.
+- **Today's filter**: chips Potty, Food, Exercise, Weight (`LOG_KINDS`) between the Today heading
+  and the feed. Tap one to show only that kind (unsaved rows too), tap it again for all; still
+  today only, newest first. Food covers meals and treats. Held in memory, not remembered: every
+  open starts on all. An empty filtered day reads "No potty entries yet today." and so on.
 - **Analytics** (`app/Analytics.tsx`): the last 14 of the phone's local days: weight trend (the
-  growth chart over the window), potty per day (pee, poop, accidents stacked, plus an accident-trend
+  growth chart over the window, with its table), potty per day (pee, poop, accidents stacked, plus an accident-trend
   line), food per day (meals, treats), exercise per day (walks, playtime, training, plus average
   sessions and minutes). Plain SVG (`app/StackedBars.tsx`); tap a day for its numbers.
 - The design is the prototype artifact `https://claude.ai/artifact/XdiVZzBqyzeQEVxwXyqAfv`, built
@@ -46,34 +50,46 @@
 ## How it works
 
 - **Four kinds plus `void`** (`lib/events.ts`). `details` per kind, every key required unless
-  marked `?`: potty `{what: pee|poop|both, where: outside|inside, leash?: leashed|unleashed|pen}`
+  marked `?`: potty `{what: pee|poop|both|none, where: outside|inside, leash?: leashed|unleashed|pen}`
   (inside = an accident: warned in the form, red in the timeline, counted apart in Analytics;
   `leash` only when outside); food `{type, item_id, item_name, kcal_per, unit, amount}`; exercise
   `{type: walk|playtime|training, where, with_dogs, minutes, treats, commands?, dogs?}` (commands
   on training only, from the fixed list `COMMANDS`; `dogs` is 1 to 20 `lando.dogs` ids, only when
   `with_dogs` is true); weight `{value, unit}`. `parseDetails` checks these on the phone (before
   the sheet closes) and again on the server; the database's `events_details_shape` check
-  (migration `widen_lando_events_details_shape`) holds the same shapes. Entries from before
-  `leash` and `dogs` (TEC-125) have neither and read as before: "pee", "with dogs".
+  (migration `widen_lando_potty_none`, which replaced `widen_lando_events_details_shape`'s) holds
+  the same shapes. Entries from before
+  `leash` and `dogs` (TEC-125) have neither: "pee", and "with several dogs" (see Other dogs).
+- **No potty** (`what: "none"`, TEC-129; the owner's label, POTTY_WHAT_LABELS): a trip out with
+  nothing done. It keeps Where and, outside, Leash, like any potty. It resets neither the pee nor
+  the poop clock, is never an accident (`isAccident`; inside hides the accident warning and the
+  row is not red), and counts as nothing in Analytics' per-day rows. The timeline reads
+  "no potty · leashed" or "no potty, inside".
 - **Potty's Leash pick** (Leashed / Unleashed / In pen) shows only while Where is Outside, and
   defaults to Leashed on a new entry. It is not remembered per phone. Correcting an old outside
   entry that has none opens with nothing picked, so a correction never invents one. The timeline
   shows it after the what: "pee · unleashed".
-- **Exercise's Other dogs** is its own section, always shown: a full-width picklist styled like
-  Human, several at once, over every row in `lando.dogs` by name (the owner's pick over chips,
-  2026-10-21). The closed box shows the picked names ("None", or "Dog A, Dog C"); a real
-  `<select multiple>` sits over it at `opacity-0`, so a tap opens the phone's own checklist (iOS's
-  picker, Android Chrome's dialog). Desktop Chrome has no popup for a multiple select: the
-  transparent listbox selects one row per click there and needs Ctrl or Cmd for more, which is
-  accepted, since the target is the phone. There is no Yes/No (the owner's call, 2026-10-21): the form saves `with_dogs` as "a dog
-  was picked" and `dogs` only when one was. An empty table shows "No friends' dogs listed yet." and
-  saves `with_dogs: false`. Correcting an old entry with `with_dogs: true` and no dogs keeps
-  `with_dogs` true until a dog is tapped. The timeline names them: "with Dog A, Dog C"; an id no
-  longer in the table reads "another dog". The server refuses an id not in `lando.dogs`
-  (`writeEvent`), since jsonb carries no foreign key.
+- **Exercise's Other dogs** is one pick (TEC-129, replacing TEC-125's multi-select): a plain
+  full-width `<select>`: None, every row in `lando.dogs` by name, Multiple, "Add dog…". There is
+  no Yes/No. `dogsFromPick` (`lib/events.ts`) maps the pick: a dog saves `with_dogs: true,
+  dogs: [id]`; Multiple saves `with_dogs: true` and no `dogs`; None saves `with_dogs: false`.
+  Add dog never becomes the value: it swaps the select for a name box with Add and Cancel (Enter
+  adds; it is not a nested form, so Enter does not save the session), and the new dog is then
+  picked. `dogsPickFor` opens a correction: one listed dog opens on it; `with_dogs` with no ids
+  (Multiple, or an entry from before TEC-125) opens on Multiple, which saves the same shape; an
+  entry naming several dogs, or one no longer listed, opens on an extra option showing those
+  names (`DOGS_KEPT`) and saves them unchanged until another pick is made. The timeline names
+  them: "with Dog A, Dog C"; `with_dogs` and no ids reads "with several dogs" (Multiple and pre-TEC-125 entries
+  alike; the owner accepted the relabel, 2026-10-22); an id no longer in the table
+  reads "another dog". `MAX_DOGS` (20) and the array check stay, for old entries. The server
+  refuses an id not in `lando.dogs` (`writeEvent`), since jsonb carries no foreign key.
 - **Friends' dogs** (`lando.dogs`, migration `create_lando_dogs`): id, name (1 to 40 characters,
-  unique ignoring case and outer spaces). Added by SQL only; the app has no way to add one. Read
-  with the journal (`listDogs`), ordered by name.
+  unique ignoring case and outer spaces). Added in the app by Add dog (`POST /api/dogs`,
+  `lib/journal.ts:addDog`, the same pattern as people: the name is trimmed and inner spaces
+  collapsed; one already there in any case is returned, not duplicated) or by SQL. The new dog is
+  merged into the loaded list in name order without a reload. Read with the journal (`listDogs`),
+  ordered by name. The `create_lando_dogs` header still says "added by SQL, never in the app";
+  that file is applied and is not edited.
 - **A weight is a date.** Its When picks a day (`type="date"` under the same label overlay:
   "Today", "Yesterday", "Oct 19"), stored at local noon (`lib/localtime.ts:fromDateInput`,
   `DATE_ONLY_HOUR`), so it never slips a day across a time zone. An untouched new weight saves
@@ -85,9 +101,11 @@
   whatever the phone sends for those is ignored. **Calories are recorded and never shown.** Each
   figure's source is a comment on its item.
 - **Defaults per phone** (`lib/defaults.ts`, `localStorage`): `lando.person` (asked once on a
-  phone's first open, "Whose phone is this?"), `lando.defaults` (last meal item, last treat item,
-  last weight unit, last meal amount). A first log defaults to Misc. Treats default to an amount of
-  1; exercise to a 15-minute walk outside, no dogs picked, no treats; potty to pee outside,
+  phone's first open, "Whose phone is this?"), `lando.defaults` (last meal item, last weight unit,
+  last meal amount). A meal opens on the last meal item and amount saved from this phone, or Misc
+  on its first. A treat always opens on Misc and an amount of 1 (TEC-129); the last treat is no
+  longer written, and a `treat` key left on an older phone is ignored. Only new entries are
+  remembered, never corrections; exercise to a 15-minute walk outside, no dogs picked, no treats; potty to pee outside,
   leashed; "when" to the moment Save is pressed unless it was changed (a weight: today at noon).
 - **One read** (`GET /api/journal?since=`, `lib/journal.ts:readJournal`): `since` is the phone's
   local midnight. It returns the 30 days before it (`HORIZON_DAYS`), every weight ever, every
@@ -114,7 +132,13 @@
   (`new Date(y, m, d - i)`), never by subtracting 24 h, so a DST change cannot shift an evening.
   Averages count complete days only, from the first day anything was logged.
 - **Growth chart** (`app/GrowthChart.tsx`): live weights in the newest weight's unit, y axis from
-  zero, tap for the nearest point, a table underneath; `since` limits it to a window.
+  zero, tap for the nearest point, a table underneath; `since` limits it to a window. Shown in
+  Analytics only.
+- **Person boxes fit a name** (TEC-129): Human in every form and "Logging as" take an inline
+  width from `nameBoxWidth` (`lib/names.ts`): the longest `display_name` in `ch`, at least 6
+  (the "Nobody" option) and at most 14, plus one `ch` and room for the padding and arrow. Past
+  14 characters the closed box truncates; the open list shows the name whole. The empty options
+  read "Nobody" (Human) and "Who?" (Logging as) so they fit.
 - **Chart colours** are `--lando-series-1..3` in `app/globals.css`, read from the theme's tone and
   ink tokens; series 2 is burnt orange in light and peach in dark, where the accent is papaya.
 
@@ -132,8 +156,11 @@
 - **`events_details_shape` is replaced by a DROP and an ADD in one ALTER**, and the connector
   cannot run a DROP. Any further widening is a new migration the owner runs in the SQL Editor
   inside `begin; … commit;` with its `schema_migrations` row, as
-  `widen_lando_events_details_shape` was. Copy the whole current check into it: the ADD replaces
-  every shape, not just the one that changes.
+  `widen_lando_events_details_shape` and `widen_lando_potty_none` were. Copy the whole current
+  check into it (now `widen_lando_potty_none`'s): the ADD replaces every shape, not just the one
+  that changes.
+- **The potty `what` list is in two places:** `POTTY_WHAT` in `lib/events.ts` and the
+  `events_details_shape` check. A value in the app alone fails every save of it with a 503.
 - **The dogs check is a jsonpath filter in `strict` mode.** A CHECK cannot hold a subquery, so each
   id is tested with `jsonb_path_exists`; lax mode unwraps nested arrays and would let `[[id]]`
   through.
@@ -153,7 +180,9 @@
   (`lib/localtime.ts`: "Now" for an untouched new entry, else "Today 9:05 PM", "Yesterday …",
   "Oct 19 …") and keeps the real input, `opacity-0`, over it; a tap calls `showPicker()`. Do not
   give the input a visible style or a width of its own, or the overlap comes back. When and Human
-  are an equal two-column row in every form.
+  share a row in every form: `grid-cols-[minmax(0,1fr)_auto]`, Human sized by `nameBoxWidth`,
+  When taking the rest. Keep `minmax(0, …)` on When's column, or the native control's own width
+  can push Human off the row again.
 - **Spacing has no theme tokens.** `lib/theme.css` holds colour only; spacing is Tailwind's default
   scale. The compact pass (TEC-123) uses a 12px page gutter (`px-3`) on the page, tabs, app bar and
   sheet, and keeps every control at least 44px tall; seg chips are unchanged.

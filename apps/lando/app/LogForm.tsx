@@ -3,12 +3,20 @@
 import { useRef, useState } from "react";
 import {
   COMMANDS,
+  DOGS_ADD,
+  DOGS_KEPT,
+  DOGS_MULTIPLE,
+  DOGS_NONE,
   EXERCISE_TYPES,
   EXERCISE_LABELS,
   InvalidEvent,
   KIND_LABELS,
+  dogsFromPick,
+  dogsPickFor,
   LEASH,
   LEASH_LABELS,
+  POTTY_WHAT,
+  POTTY_WHAT_LABELS,
   UNITS,
   exercise as asExercise,
   food as asFood,
@@ -27,6 +35,7 @@ import {
 import { formatAmount, parseAmount, picklist, findFood, unitLabel, type FoodType } from "@/lib/foods";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import { dateLabel, fromDateInput, fromLocalInput, toDateInput, toLocalInput, whenLabel } from "@/lib/localtime";
+import { nameBoxWidth } from "@/lib/names";
 
 export type Person = { id: string; display_name: string };
 
@@ -46,8 +55,10 @@ type Props = {
   /** Set when correcting an entry; the form opens on its values. */
   event?: JournalEvent;
   people: Person[];
-  /** Friends' dogs from `lando.dogs`; empty until the TD adds them. */
+  /** Friends' dogs from `lando.dogs`, by name. */
   dogs: Dog[];
+  /** Other dogs' "Add dog…": adds one to `lando.dogs` (or finds it) and hands it back. */
+  onAddDog: (name: string) => Promise<{ dog: Dog | null; error: string | null }>;
   phonePerson: string | null;
   remembered: Remembered;
   weightUnit: Unit;
@@ -151,7 +162,7 @@ function Chips<T extends string>({
   );
 }
 
-export default function LogForm({ kind, event, people, dogs, phonePerson, remembered, weightUnit, onLog, onChange }: Props) {
+export default function LogForm({ kind, event, people, dogs, onAddDog, phonePerson, remembered, weightUnit, onLog, onChange }: Props) {
   const editing = !!event;
   const openedAt = useRef(new Date().toISOString());
   // A weight is a day, not a moment: its When picks a date, stored at local noon.
@@ -182,15 +193,19 @@ export default function LogForm({ kind, event, people, dogs, phonePerson, rememb
   // Exercise
   const x = event?.kind === "exercise" ? asExercise(event) : null;
   const [exType, setExType] = useState<ExerciseType>(x?.type ?? "walk");
-  // Picking a dog is the answer to "with other dogs"; there is no Yes/No.
-  const [dogIds, setDogIds] = useState<string[]>(x?.dogs ?? []);
-  // An entry from before the dog list says "with dogs" and names none. Kept
-  // on a correction until a dog is tapped, so the fact is not lost.
-  const [unnamedDogs, setUnnamedDogs] = useState(!!x?.with_dogs && !x.dogs?.length);
-  const pickedNames = dogs
-    .filter((d) => dogIds.includes(d.id))
-    .map((d) => d.name)
-    .join(", ");
+  // One pick (TEC-129): None, a dog, or Multiple; picking is the answer to
+  // "with other dogs", there is no Yes/No. An entry with `with_dogs` and no
+  // ids (Multiple, or from before the list) opens on Multiple, which saves
+  // the same. An entry naming several dogs (TEC-125's multi-select), or one
+  // no longer listed, opens on those as they were and keeps them until
+  // another pick is made.
+  const [{ pick: firstDogPick, kept: keptDogs }] = useState(() => dogsPickFor(x, dogs));
+  const [dogPick, setDogPick] = useState(firstDogPick);
+  const keptLabel = keptDogs?.map((id) => dogs.find((d) => d.id === id)?.name ?? "another dog").join(", ") ?? "";
+  const [addingDog, setAddingDog] = useState(false);
+  const [dogName, setDogName] = useState("");
+  const [dogError, setDogError] = useState<string | null>(null);
+  const [dogBusy, setDogBusy] = useState(false);
   const [minutes, setMinutes] = useState(String(x?.minutes ?? 15));
   const [treats, setTreats] = useState(String(x?.treats ?? 0));
   const [commands, setCommands] = useState<CommandId[]>(x?.commands ?? []);
@@ -215,6 +230,21 @@ export default function LogForm({ kind, event, people, dogs, phonePerson, rememb
     setAmount(a === null ? "" : formatAmount(a));
   }
 
+  async function addDog(e: { preventDefault(): void }) {
+    e.preventDefault();
+    setDogError(null);
+    setDogBusy(true);
+    const { dog, error } = await onAddDog(dogName);
+    setDogBusy(false);
+    if (!dog) {
+      setDogError(error ?? "couldn't add");
+      return;
+    }
+    setDogPick(dog.id);
+    setAddingDog(false);
+    setDogName("");
+  }
+
   const item = findFood(foodType, itemId);
   const amountUnit = item?.unit ? unitLabel(item.unit, parseAmount(amount) ?? 2) : null;
 
@@ -224,19 +254,15 @@ export default function LogForm({ kind, event, people, dogs, phonePerson, rememb
         return { what, where, ...(where === "outside" && leash ? { leash } : {}) };
       case "food":
         return { type: foodType, item_id: itemId, amount: parseAmount(amount) };
-      case "exercise": {
-        // In the list's order; an id no longer listed is dropped.
-        const picked = dogs.map((d) => d.id).filter((id) => dogIds.includes(id));
+      case "exercise":
         return {
           type: exType,
           where,
-          with_dogs: picked.length > 0 || unnamedDogs,
           minutes: Number(minutes),
           treats: Number(treats || 0),
           ...(exType === "training" ? { commands } : {}),
-          ...(picked.length ? { dogs: picked } : {}),
+          ...dogsFromPick(dogPick, keptDogs),
         };
-      }
       case "weight":
         return { value: Number(value.replace(",", ".")), unit };
     }
@@ -305,7 +331,7 @@ export default function LogForm({ kind, event, people, dogs, phonePerson, rememb
       {kind === "potty" && (
         <>
           <Field label="What">
-            <Seg name="what" label="What" value={what} onChange={setWhat} options={[["pee", "Pee"], ["poop", "Poop"], ["both", "Both"]] as const} />
+            <Seg name="what" label="What" value={what} onChange={setWhat} options={POTTY_WHAT.map((v) => [v, POTTY_WHAT_LABELS[v]] as const)} />
           </Field>
           <Field label="Where">
             <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
@@ -321,7 +347,9 @@ export default function LogForm({ kind, event, people, dogs, phonePerson, rememb
               />
             </Field>
           )}
-          {where === "inside" && <p className="text-[13px] font-semibold text-danger">Inside counts as an accident.</p>}
+          {where === "inside" && what !== "none" && (
+            <p className="text-[13px] font-semibold text-danger">Inside counts as an accident.</p>
+          )}
         </>
       )}
 
@@ -370,42 +398,69 @@ export default function LogForm({ kind, event, people, dogs, phonePerson, rememb
           <Field label="Where">
             <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
           </Field>
-          <Field label="Other dogs" htmlFor={dogs.length ? "f-dogs" : undefined}>
-            {dogs.length ? (
-              /* A picklist like Human, several at once. The closed box shows
-                 the picked names; the real `<select multiple>` sits over it,
-                 transparent, so a tap opens the phone's own checklist (iOS's
-                 picker, Android's dialog). Same pattern as When. */
-              <div className="relative min-w-0 rounded-[10px] border border-line bg-paper focus-within:border-accent">
-                <span aria-hidden="true" className="flex min-h-[44px] items-center gap-2 py-2.5 pl-2.5 pr-2">
-                  <span className={`min-w-0 flex-1 truncate ${pickedNames ? "" : "text-ink-soft"}`}>{pickedNames || "None"}</span>
-                  <svg viewBox="0 0 16 16" width="16" height="16" className="shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                <select
-                  id="f-dogs"
-                  multiple
-                  value={dogIds}
-                  onChange={(e) => {
-                    setDogIds(Array.from(e.target.selectedOptions, (o) => o.value));
-                    setUnnamedDogs(false);
+          <Field label="Other dogs" htmlFor={addingDog ? "f-dog-name" : "f-dogs"}>
+            {addingDog ? (
+              /* Not a nested <form> (HTML has none): Enter here adds the dog
+                 rather than saving the session. */
+              <div className="flex min-w-0 items-center gap-2">
+                <input
+                  id="f-dog-name"
+                  autoFocus
+                  value={dogName}
+                  onChange={(e) => setDogName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void addDog(e);
                   }}
-                  className="absolute inset-0 h-full w-full min-w-0 cursor-pointer opacity-0"
+                  maxLength={40}
+                  placeholder="Dog's name"
+                  className={`${input} flex-1`}
+                />
+                <button
+                  type="button"
+                  onClick={(e) => void addDog(e)}
+                  disabled={dogBusy}
+                  className="rounded-[10px] bg-accent px-3 py-2.5 font-medium text-accent-ink disabled:opacity-60"
                 >
-                  {dogs.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
+                  {dogBusy ? "Adding…" : "Add"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddingDog(false);
+                    setDogError(null);
+                  }}
+                  className="text-ink-soft"
+                >
+                  Cancel
+                </button>
               </div>
             ) : (
-              <p className="text-[13px] text-ink-soft">No friends&apos; dogs listed yet.</p>
+              /* One pick (TEC-129): every dog by name, then Multiple, then
+                 Add dog. Add dog never becomes the value: it opens the name
+                 box and the pick stays where it was until a dog is added. */
+              <select
+                id="f-dogs"
+                value={dogPick}
+                onChange={(e) => {
+                  if (e.target.value === DOGS_ADD) {
+                    setAddingDog(true);
+                    setDogError(null);
+                  } else setDogPick(e.target.value);
+                }}
+                className={input}
+              >
+                <option value={DOGS_NONE}>None</option>
+                {keptDogs && <option value={DOGS_KEPT}>{keptLabel}</option>}
+                {dogs.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+                <option value={DOGS_MULTIPLE}>Multiple</option>
+                <option value={DOGS_ADD}>Add dog…</option>
+              </select>
             )}
-            {unnamedDogs && dogIds.length === 0 && (
-              <p className="text-[13px] text-ink-soft">Logged as with dogs, none named. Tap one to name it.</p>
-            )}
+            {dogError && <p className="text-[13px] font-semibold text-danger">{dogError}</p>}
           </Field>
           <div className="grid grid-cols-2 gap-2">
             <Field label="Length (min)" htmlFor="f-mins">
@@ -444,7 +499,8 @@ export default function LogForm({ kind, event, people, dogs, phonePerson, rememb
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2">
+      {/* When takes the row; Human is as wide as the longest name (TEC-129). */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
         <Field label="When" htmlFor="f-when">
           {/* The native control is wider than half a phone and pushed into
               Human, so a short label shows instead. The real input sits over
@@ -480,8 +536,14 @@ export default function LogForm({ kind, event, people, dogs, phonePerson, rememb
           </div>
         </Field>
         <Field label="Human" htmlFor="f-who">
-          <select id="f-who" value={personId} onChange={(e) => setPersonId(e.target.value)} className={input}>
-            <option value="">Nobody picked</option>
+          <select
+            id="f-who"
+            value={personId}
+            onChange={(e) => setPersonId(e.target.value)}
+            className={input}
+            style={{ width: nameBoxWidth(people.map((p) => p.display_name)) }}
+          >
+            <option value="">Nobody</option>
             {people.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.display_name}
