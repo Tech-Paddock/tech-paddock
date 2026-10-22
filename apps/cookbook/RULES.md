@@ -21,8 +21,9 @@ section and closing comment before changing anything in this file.
 - Works on a phone, but is not designed around one-handed use.
 - No home-screen install unless the owner grants one; the shape does not change.
 - `/admin` and `/debug` never appear in navigation and do not count as screens.
-- The tabs Recipes · Add · King Soopers list are the verb index. Installable is a shortcut, granted
-  by the owner; becoming an app is TEC-109.
+- The tabs Recipes · Add · King Soopers list · Your brands · Deals are the verb index: browse,
+  add, shop, remember, save. Deals arrives with TEC-132. Installable is a shortcut, granted by the
+  owner; becoming an app is TEC-109.
 
 ## Recipes
 
@@ -73,6 +74,11 @@ section and closing comment before changing anything in this file.
   flavours), most-bought first, for one pick. Under that, **No match** shows Kroger's top match,
   which the user adds or replaces with a product URL. Whichever goes in is remembered: the line's
   name is added to that product's names, or a new product row is made.
+- **A line is searched by its item alone.** A fixed rule drops quantities, units and prep words,
+  and reads "X of Y" as "Y X": "6 cloves of garlic" searches "garlic cloves". No model runs.
+- **A line that is a product code goes in as that product.** A line that matches none of the saved
+  names is matched against each saved product's official Kroger name. One hit goes straight in;
+  several go to Settle these.
 - No model picks a product or runs anywhere in this flow.
 - Every line reports added, skipped or failed; a partial send never reads as whole.
 - A second send warns and shows what was already sent, because the Cart API only adds.
