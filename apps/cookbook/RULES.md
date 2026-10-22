@@ -50,8 +50,8 @@ section and closing comment before changing anything in this file.
 - A grocery line has a ticked state, a `source` (recipe or by hand) and a quantity, default 1.
   Adding to the list is additive; tidying is a deliberate tap, never a side effect.
 - **A list line reads as what you buy:** the item without prep words ("garlic, thinly sliced" →
-  garlic, or the saved product's shopping unit, "Heads of Garlic"), then the combined recipe
-  amount, then its recipes. The stored line is never rewritten for this.
+  garlic, or the saved product's shopping unit, "Heads of Garlic"), then its recipes, then the
+  combined recipe amount. The stored line is never rewritten for this.
 - **The quantity is what goes in the cart, rounded up.** A saved product may carry a pack
   conversion (1 head = 10 cloves): the amount becomes packs, rounded up. Without one, a typed
   count is the quantity ("2 onions", "3 bunches cilantro"), and a measure (tsp, cup) is one
