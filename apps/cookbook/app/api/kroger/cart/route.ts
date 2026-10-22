@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readList, markSent, splitLine, type GroceryItem } from "@/lib/grocery";
-import { readDraft, readPreferences, savePreference } from "@/lib/preferences";
+import { bumpTallies, readDraft, readPreferences, savePreference } from "@/lib/preferences";
 import { decider } from "@/lib/decide";
 import { addToCart, topProduct } from "@/lib/kroger";
 import { withAccessToken } from "@/lib/krogerConnection";
@@ -107,6 +107,14 @@ export async function POST(request: NextRequest) {
       await markSent(added, new Date().toISOString());
     } catch {
       problems.push("A second send won't warn about them.");
+    }
+    // **+1 on each product that went in** (TEC-51), after remembering, so a
+    // match saved by this send counts its first add. The ranking only: a
+    // failure is said, and the items are in the cart either way.
+    try {
+      await bumpTallies(outcomes.filter((o) => o.result === "added" && o.upc).map((o) => o.upc as string));
+    } catch {
+      problems.push("The counts in Your brands didn't go up.");
     }
     const recordError = problems.length > 0 ? `These are in the cart, but this app couldn't record it. ${problems.join(" ")}` : null;
 

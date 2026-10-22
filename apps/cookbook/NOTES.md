@@ -39,9 +39,15 @@ Reasoning is in the migration headers.
 - `grocery_items`: `quantity` 1–99; `recipes` is a snapshot of names, so a rename never reaches
   it. Tidy (Haiku, checked by `validateTidy`) unions names, takes the largest quantity and the latest
   `sent_at`. "Milk — the small tin" is a name and a note; only the name is searched.
-- `brand_preferences`: unseeded (TEC-51). Edited only in Your brands; **Paste** takes King Soopers
-  product pages only. `plain` is refused on write but honoured on old rows. A field not sent is
-  not overwritten. The `brand` column is unused.
+- `brand_preferences`: unseeded until the owner pastes the seed (TEC-51 step 6). Edited only in
+  Your brands; **Paste** takes King Soopers product pages only. `plain` is refused on write but
+  honoured on old rows. A field not sent is not overwritten. `brand` is kept from a batch, never
+  shown. **A phrase holds several product rows** (unique on phrase and `url`) or one search-word
+  row, never both; `placeDraft` (`lib/preferences.ts`) is the one rule for where a write lands, and
+  compares product numbers, not URLs. `tally` is the count (`cookbook_brand_tally`): 0 by default,
+  set only by a batch, +1 per Send add on **every** product row whose page carries that number
+  (`tallyBumps`), so a product saved under two phrases counts on both. Take back does not lower
+  it. The editor neither shows nor sets it, and edits by `id`.
 - `menu`: one row per recipe with a `day`, set only beside *Add to list*; re-adding moves it.
   Shown per serving. Nothing expires; ✕ or Clear all.
 - `kroger_connection`: one row (`id` can only be true), the refresh token sealed with AES-256-GCM
@@ -70,14 +76,28 @@ Reasoning is in the migration headers.
   `/api/health`.
 - `GET /api/kroger/cart` is the review: an exact product's UPC is its URL's digits
   (`productIdFromUrl`).
+- **Three sections** (TEC-51): `matchCandidates` returns the longest matching phrase's rows
+  (products only when it has any), most counted then most recently updated. `planLine` makes one
+  product number `exact`, several `settle` (`options`, deduped by number; a page without one is
+  dropped), none a Kroger search (`match` / `none`). The estimate and the deal scan price the top
+  candidate. **Tapping Send to cart** runs the review, then `Cart.tsx` POSTs every `exact` line
+  with no `sent_at` at once (reported as *Straight in from Your brands*); the rest show as
+  *Matched in Your brands* (already sent, or not taken in), *Settle these* (chips, nothing
+  preselected) and *No match*. If that first POST fails or 409s, those lines join the review
+  ticked. Each result block shows only its own lines; the server's `summary` still counts every
+  open line. A Settle these pick sends `upc` plus `match` (its page), so it is remembered like a
+  match: under the line's name, which is a no-op when that is the phrase itself. The chips and
+  section headings are local patterns in `app/Cart.tsx`.
+- After `markSent`, the route calls `bumpTallies` with every added UPC (read, then update each row;
+  `updated_at` untouched). A failure joins `recordError`; the items stay in the cart.
 - **Remembering** (TEC-128): whatever goes in for a non-exact line, a pasted page or the tapped top
   match, is saved by `savePreference` as a `product` row under the line's name (`splitLine`, so
   never the note). The client sends the match's page as `match` beside its `upc`; an exact brand
   sends none and is never re-saved. Only after that line's add succeeded (including the retry
   without Pickup/Delivery); a failed add saves nothing. A page whose digits are not the UPC that
   went in is not saved. A failed save is appended to the line's detail; the line stays added.
-  Same phrase as an existing row overwrites it (upsert on the normalised phrase), a `terms` row
-  included.
+  The same phrase and product number updates that row; a phrase saved as search words is
+  overwritten by the product; otherwise it is a new row beside the phrase's other products.
 - A send re-picking a line with `sent_at` returns 409 before Kroger is called, unless `again`.
 - A send appends a `sent` row per added line (`sentRows` in `lib/cart.ts`): the UPC that went in,
   the quantity sent, and the modality it actually went with (null when Kroger refused the choice).
@@ -121,6 +141,45 @@ Reasoning is in the migration headers.
 - `Cart.tsx` runs every token-borrowing request through `serial`, one at a time: opening the list
   can start a refresh and a scan together. The toggle, estimate panel and deal rows are local
   patterns in `app/Deals.tsx`.
+
+## Paste a batch format (TEC-51)
+
+One format in and out: Export writes it, Paste a batch reads it, and a TD helper or the weekly
+Chrome task (TEC-126) produces it. Parsed by `readBatch` (`lib/brandBatch.ts`); change both
+together. A batch is a **JSON array**; each element is one phrase:
+
+| Field | Required | Meaning |
+|---|---|---|
+| `phrase` | yes | Text that must appear, as whole words, in a list line. Trimmed, spaces collapsed; compared case-insensitively. |
+| `product` | one of `product` / `terms` | A King Soopers product page `https://www.kingsoopers.com/p/<slug>/<digits>` (or `kingsoopers.com`), **or** the bare product number, 8–14 digits, as a string (a JSON number loses leading zeros). A bare number is stored as `https://www.kingsoopers.com/p/<phrase-slug>/<digits>`. `url` is accepted as the older name. |
+| `terms` | one of `product` / `terms` | Search words instead of a product. No `count`, no `alternatives`. |
+| `count` | no | Whole number ≥ 0: the product's count, **absolute, not an increment**. Left out: 0 on a new row, unchanged on a ticked existing one. |
+| `alternatives` | no | Array of `{ "product": …, "count": …, "brand"?: …, "note"?: … }`: other products for the same phrase (sizes, flavours). Each becomes its own row; Settle these offers them all. |
+| `brand`, `note` | no | Text kept on the row (an alternative carries its own). |
+| `kind` | no | `"product"` or `"terms"`; inferred from the fields. `"plain"` is refused. |
+| `replace` | no | `true` only on a row the review ticked over a saved one. A producer never sets it. |
+
+```json
+[
+  { "phrase": "test cereal", "product": "0001111000001", "count": 6,
+    "alternatives": [
+      { "product": "https://www.kingsoopers.com/p/test-cereal-family/0001111000003", "count": 2 }
+    ] },
+  { "phrase": "test rice", "terms": "long grain test rice" }
+]
+```
+
+- **The review** (`POST /api/preferences/preview`, writes nothing) shows one line per product:
+  `new`, `adds` (another choice beside N saved), `already` (same phrase and product number, or same
+  words), `replaces` (overwrites the phrase's search-word row, or its one product with words), or
+  `refused` with the reason (bad field, `plain`, twice in the batch, words for a phrase holding
+  several products). New and adds start ticked; already and replaces start unticked and show
+  what is saved now. **Write** posts the ticked lines' `send` rows to `POST /api/preferences`,
+  which refuses any row that would change a saved one unless it carries `replace: true`.
+- **Export** (`GET /api/preferences/export`) downloads `cookbook-brands-<date>.json`: phrases
+  alphabetical, the most counted product as `product`, the rest as `alternatives`, counts always
+  present. Pasted back, every line reviews as `already`; a `plain` row exports as
+  `"kind": "plain"` and is refused by name on the way back in.
 
 ## Errors
 
@@ -172,4 +231,14 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   total*; a line renamed by Tidy loses its tag the same way.
 - `withAccessToken` is per request: two tabs open at once can still race token rotation, because
   `serial` covers one page.
+- **`cookbook_brand_tally` must be applied before this code runs**: `readPreferences` selects
+  `tally`, so without it the list's links, Your brands, Send to cart, the estimate, the deal scan
+  and the refresh all fail to read. It also swaps the one-row-per-phrase index for two partial
+  ones; undoing that fails once a phrase holds two products.
+- **A bare product number becomes `/p/<phrase-slug>/<digits>`, unconfirmed** as a page King Soopers
+  serves (kingsoopers.com is unreachable from here). Send reads only the digits, so the cart is
+  unaffected; the refresh stores Kroger's own page in `brand_products.url`, which the review links
+  when present. Run **Refresh now** after pasting a seed.
+- The weekly task (TEC-126) has to send absolute counts; to add to one, it needs the current
+  count from an Export.
 - Never revive a merged `claude/cookbook-*` branch.

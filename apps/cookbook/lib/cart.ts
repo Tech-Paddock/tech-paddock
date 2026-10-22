@@ -9,9 +9,13 @@ import { modalityWord, type Modality } from "./modality";
  * **Pure, with Kroger and the database passed in**, so every rule here is
  * tested without either. The routes in `app/api/kroger/cart` supply them.
  *
- * - **A line tied to an exact product in Your brands goes in as-is.** Its link
- *   carries the product number.
- * - **Any other line shows Kroger's top match at the chosen store**, and the user
+ * - **A line that matches exactly one product in Your brands goes straight in**
+ *   (TEC-51): its link carries the product number, and the list tab sends it
+ *   without a tap when it has not been sent.
+ * - **A line that matches several saved products is Settle these**: the
+ *   candidates, most counted first, for one pick. The pick is remembered the
+ *   way a match is.
+ * - **Any other line shows Kroger's top match at the chosen store** (No match), and the user
  *   adds it or replaces it with an exact product page. **Whichever goes in, the
  *   match or the replacement, is remembered in Your brands** as an exact product
  *   under the line's name (TEC-128) — only once its add succeeded, so a failed
@@ -38,14 +42,59 @@ export type Decision = {
   terms: string | null;
   /** The last refresh found Kroger no longer returns this product. It still goes in as-is; the review says so. */
   missing?: boolean;
+  /**
+   * Every saved product the line matches, most counted first (TEC-51;
+   * `lib/decide.ts`). Absent on a decision built by hand: the one `url` is the
+   * only candidate then.
+   */
+  candidates?: Candidate[];
 } | null;
 
+/** One saved product a line matches, with what the last refresh said about it. */
+export type Candidate = {
+  id: string;
+  url: string;
+  tally: number;
+  missing: boolean;
+  description: string | null;
+  size: string | null;
+  price: number | null;
+  /** Kroger's own page for it, when the refresh has seen it. */
+  page: string | null;
+};
+
+/** A candidate a line could go in as: its product number read off its page. */
+export type Option = Candidate & { upc: string };
+
 export type Plan =
-  | { kind: "exact"; upc: string; url: string; phrase: string; missing: boolean }
+  | { kind: "exact"; upc: string; url: string; phrase: string; missing: boolean; option?: Option }
+  | { kind: "settle"; phrase: string; options: Option[] }
   | { kind: "match"; product: Product }
   | { kind: "none"; reason: string };
 
 export type ReviewLine = CartLine & { plan: Plan };
+
+/**
+ * A decision's products, as product numbers, best first. **A page with no
+ * number is left out** rather than guessed at, and the same number twice is
+ * one option.
+ */
+export function optionsOf(preference: NonNullable<Decision>): Option[] {
+  const candidates: Candidate[] =
+    preference.candidates ??
+    (preference.url
+      ? [{ id: "", url: preference.url, tally: 0, missing: !!preference.missing, description: null, size: null, price: null, page: null }]
+      : []);
+  const seen = new Set<string>();
+  const out: Option[] = [];
+  for (const c of candidates) {
+    const upc = productIdFromUrl(c.url);
+    if (!upc || seen.has(upc)) continue;
+    seen.add(upc);
+    out.push({ ...c, upc });
+  }
+  return out;
+}
 
 /** What one line becomes, before anyone taps anything. */
 export async function planLine(
@@ -55,9 +104,13 @@ export async function planLine(
 ): Promise<Plan> {
   const preference = decide(line.name);
 
-  if (preference?.kind === "product" && preference.url) {
-    const upc = productIdFromUrl(preference.url);
-    if (upc) return { kind: "exact", upc, url: preference.url, phrase: preference.phrase, missing: !!preference.missing };
+  if (preference?.kind === "product") {
+    const options = optionsOf(preference);
+    if (options.length === 1) {
+      const [only] = options;
+      return { kind: "exact", upc: only.upc, url: only.url, phrase: preference.phrase, missing: only.missing, option: only };
+    }
+    if (options.length > 1) return { kind: "settle", phrase: preference.phrase, options };
     // A remembered page with no product number in it falls through to a search
     // rather than being guessed at.
   }

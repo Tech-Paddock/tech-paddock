@@ -18,6 +18,7 @@ function pref(phrase: string, over: Partial<Preference> = {}): Preference {
     terms: `${phrase} the good one`,
     brand: null,
     note: null,
+    tally: 0,
     created_at: "2026-09-20T00:00:00Z",
     updated_at: "2026-09-20T00:00:00Z",
     ...over,

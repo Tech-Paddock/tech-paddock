@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Preference, PreferenceKind } from "@/lib/preferences";
+import type { PreviewEntry } from "@/lib/brandBatch";
 import { isKingSoopersProduct } from "@/lib/kingsoopers";
 
 /**
@@ -69,11 +70,13 @@ export function RememberForm({
     try {
       // **No brand and no note in this body, on purpose.** A field left out is a
       // field the save leaves alone (`readDraft`), so editing a rule never wipes
-      // the note a batch gave it.
+      // the note a batch gave it. **The row's id when editing** (TEC-51): a
+      // phrase can hold several products, so the phrase alone no longer says
+      // which row this is.
       const response = await fetch("/api/preferences", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phrase: text, kind, url, terms }),
+        body: JSON.stringify({ ...(existing ? { id: existing.id } : {}), phrase: text, kind, url, terms }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't save that.");
@@ -202,6 +205,121 @@ function CheckedLine({ checked }: { checked: Checked }) {
   );
 }
 
+/** Your brands, grouped: phrases alphabetical, a phrase's products most counted first (TEC-51). */
+function ordered(preferences: Preference[]): Preference[] {
+  return [...preferences].sort((a, b) => {
+    const phrase = a.phrase.toLowerCase().localeCompare(b.phrase.toLowerCase());
+    if (phrase !== 0) return phrase;
+    const counted = (b.tally ?? 0) - (a.tally ?? 0);
+    return counted !== 0 ? counted : b.updated_at.localeCompare(a.updated_at);
+  });
+}
+
+const STATUS_WORDS: Record<PreviewEntry["status"], string> = {
+  new: "new",
+  adds: "another choice",
+  already: "already in Your brands",
+  replaces: "replaces what is saved",
+  refused: "refused",
+};
+
+/**
+ * Paste a batch's review (TEC-51): **every row, with a tick, before anything is
+ * written.** New rows start ticked; a row already in Your brands, or one that
+ * would replace a saved row, starts unticked and says what is there now — it is
+ * never overwritten unless ticked. Refused rows show why and cannot be ticked.
+ * A local pattern: a checklist of status chips, on the theme's tokens.
+ */
+function BatchReview(props: {
+  entries: PreviewEntry[];
+  ticked: Set<number>;
+  toggle: (i: number) => void;
+  writing: boolean;
+  onWrite: () => void;
+  onCancel: () => void;
+}) {
+  const { entries, ticked } = props;
+  const writable = entries.filter((e) => e.status !== "refused").length;
+  return (
+    <div className="mt-2 flex flex-col gap-2 rounded-lg border border-accent p-2">
+      <p className="text-xs text-ink-soft">
+        {entries.length} row{entries.length === 1 ? "" : "s"} · {writable} can be written · nothing is saved until you tap Write.
+      </p>
+      <ul className="flex flex-col divide-y divide-line">
+        {entries.map((e, i) => {
+          const on = ticked.has(i);
+          const product = e.kind === "product" ? (e.productId ? `product ${e.productId}` : e.url) : `“${e.terms}”`;
+          return (
+            <li key={i} className="flex items-baseline gap-2 py-1.5 text-xs">
+              <input
+                type="checkbox"
+                checked={on}
+                disabled={e.status === "refused"}
+                onChange={() => props.toggle(i)}
+                aria-label={`Write ${e.phrase || `row ${e.row}`}`}
+                className="size-4 shrink-0 accent-accent disabled:opacity-40"
+              />
+              <span className="min-w-0 flex-1">
+                <b>{e.phrase || `Row ${e.row}`}</b>
+                {e.status !== "refused" ? (
+                  <>
+                    {" → "}
+                    {e.kind === "product" && e.url ? (
+                      <a href={e.url} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
+                        {product}
+                      </a>
+                    ) : (
+                      product
+                    )}
+                    {e.kind === "product" ? <span className="text-ink-soft"> · count {e.count ?? (e.existing?.count ?? 0)}</span> : null}
+                  </>
+                ) : null}
+                <span
+                  className={`ml-1 rounded border px-1 text-[11px] ${
+                    e.status === "refused"
+                      ? "border-danger/60 text-danger"
+                      : e.status === "new" || e.status === "adds"
+                        ? "border-accent text-accent"
+                        : "border-warn/60 text-warn"
+                  }`}
+                >
+                  {STATUS_WORDS[e.status]}
+                  {e.status === "adds" && e.beside ? ` beside ${e.beside}` : ""}
+                </span>
+                {e.existing ? (
+                  <span className="block text-[11px] text-ink-soft">
+                    Saved now:{" "}
+                    {e.existing.kind === "product"
+                      ? `${e.existing.url ?? "a product"} · count ${e.existing.count}`
+                      : e.existing.kind === "terms"
+                        ? `“${e.existing.terms}”`
+                        : "searched plainly"}
+                    {on ? " — ticked, so it will be overwritten." : " — left as it is unless ticked."}
+                  </span>
+                ) : null}
+                {e.reason ? <span className="block text-[11px] text-danger">{e.reason}</span> : null}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="flex gap-2">
+        <button type="button" onClick={props.onCancel} className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-soft">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={props.onWrite}
+          disabled={props.writing || ticked.size === 0}
+          className="ml-auto rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink disabled:opacity-50"
+        >
+          {props.writing ? "Writing…" : `Write ${ticked.size} ticked`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () => void; refreshKey?: number }) {
   const [preferences, setPreferences] = useState<Preference[] | null>(null);
   const [checked, setChecked] = useState<Record<string, Checked>>({});
@@ -211,6 +329,9 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
   const [editing, setEditing] = useState<Preference | "new" | null>(null);
   const [paste, setPaste] = useState("");
   const [outcome, setOutcome] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PreviewEntry[] | null>(null);
+  const [ticked, setTicked] = useState<Set<number>>(new Set());
+  const [writing, setWriting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -251,8 +372,10 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
     onChanged();
   }
 
-  async function importRows() {
+  /** Step one: the review. **Nothing is written here.** */
+  async function reviewRows() {
     setOutcome(null);
+    setPreview(null);
     let rows: unknown;
     try {
       rows = JSON.parse(paste);
@@ -260,31 +383,58 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
       setOutcome("That is not valid JSON.");
       return;
     }
-    if (!Array.isArray(rows)) {
+    if (!Array.isArray(rows) || rows.length === 0) {
       setOutcome("Expected a JSON array of rows.");
       return;
     }
-
-    const response = await fetch("/api/preferences", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rows }),
-    });
-    const body = await response.json();
-    if (!response.ok) {
-      setOutcome(body.error ?? "Couldn't import that.");
-      return;
+    try {
+      const response = await fetch("/api/preferences/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Couldn't review that batch.");
+      const entries = body.entries as PreviewEntry[];
+      setPreview(entries);
+      setTicked(new Set(entries.flatMap((e, i) => (e.status === "new" || e.status === "adds" ? [i] : []))));
+    } catch (e) {
+      setOutcome(e instanceof Error ? e.message : "Couldn't review that batch.");
     }
-    // Every refusal is named. A count of failures with no reasons is how a seed
-    // of forty quietly lands as thirty-eight.
-    const refused = (body.rejected as { row: number; reason: string }[]) ?? [];
-    setOutcome(
-      `Saved ${body.saved}.` +
-        (refused.length ? ` Refused ${refused.length}: ${refused.map((r) => `row ${r.row} — ${r.reason}`).join("; ")}` : "")
-    );
-    setPaste("");
-    await load();
-    onChanged();
+  }
+
+  /** Step two: write exactly the ticked rows. */
+  async function writeTicked() {
+    if (!preview || writing) return;
+    const rows = preview.flatMap((e, i) => (ticked.has(i) && e.send ? [e.send] : []));
+    if (rows.length === 0) return;
+    setWriting(true);
+    try {
+      const response = await fetch("/api/preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Couldn't write those.");
+      // Every refusal is named. A count of failures with no reasons is how a seed
+      // of forty quietly lands as thirty-eight.
+      const refused = (body.rejected as { row: number; reason: string }[]) ?? [];
+      const left = preview.length - rows.length;
+      setOutcome(
+        `Saved ${body.saved}.` +
+          (left > 0 ? ` Left out ${left}.` : "") +
+          (refused.length ? ` Refused ${refused.length}: ${refused.map((r) => r.reason).join("; ")}` : "")
+      );
+      setPreview(null);
+      setPaste("");
+      await load();
+      onChanged();
+    } catch (e) {
+      setOutcome(e instanceof Error ? e.message : "Couldn't write those.");
+    } finally {
+      setWriting(false);
+    }
   }
 
   return (
@@ -316,7 +466,7 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
 
           {preferences && preferences.length > 0 ? (
             <ul className="flex flex-col divide-y divide-line">
-              {preferences.map((p) => (
+              {ordered(preferences).map((p) => (
                 <li key={p.id} className="flex items-baseline gap-3 py-2 text-sm">
                   <span className="min-w-0 flex-1">
                     <b>{p.phrase}</b>
@@ -324,7 +474,7 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
                       {p.kind === "plain"
                         ? " — searched plainly, on purpose"
                         : p.kind === "product"
-                          ? " — a product page"
+                          ? ` — a product page · count ${p.tally ?? 0}`
                           : ` — “${p.terms}”`}
                     </span>
                     {p.kind === "product" && checked[p.id] ? <CheckedLine checked={checked[p.id]} /> : null}
@@ -363,36 +513,67 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
               }}
             />
           ) : (
-            <button
-              type="button"
-              onClick={() => setEditing("new")}
-              className="self-start rounded-lg border border-line px-3 py-1.5 text-xs"
-            >
-              Remember a brand
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setEditing("new")}
+                className="rounded-lg border border-line px-3 py-1.5 text-xs"
+              >
+                Remember a brand
+              </button>
+              {/* **Export** (TEC-51): the batch format, so the file pastes back in. */}
+              <a
+                href="/api/preferences/export"
+                download
+                className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-soft"
+              >
+                Export
+              </a>
+            </div>
           )}
 
-          {/* The receipts path. The aggregation happens in a session that has the
-              receipts; this only ever sees the rows it produced, and the receipts
-              themselves never reach this app or the repo. */}
+          {/* The purchase-history path. The aggregation happens in a session that
+              has the history; this only ever sees the rows it produced, and the
+              history itself never reaches this app or the repo. Format: NOTES.md. */}
           <details>
             <summary className="cursor-pointer text-xs text-ink-soft">Paste a batch</summary>
             <textarea
               value={paste}
-              onChange={(e) => setPaste(e.target.value)}
+              onChange={(e) => {
+                setPaste(e.target.value);
+                setPreview(null);
+              }}
               rows={4}
-              placeholder={'[{"phrase":"milk","kind":"terms","terms":"fairlife 2%"}]'}
+              placeholder={'[{"phrase":"oat milk","product":"0001111000001","count":3}]'}
               aria-label="A batch of preferences as JSON"
               className="mt-2 w-full rounded-lg border border-line bg-surface p-2 font-mono text-xs"
             />
-            <button
-              type="button"
-              onClick={importRows}
-              disabled={paste.trim() === ""}
-              className="mt-2 rounded-lg border border-line px-3 py-1.5 text-xs text-ink-soft disabled:opacity-50"
-            >
-              Import
-            </button>
+            {preview ? (
+              <BatchReview
+                entries={preview}
+                ticked={ticked}
+                toggle={(i) =>
+                  setTicked((current) => {
+                    const next = new Set(current);
+                    if (next.has(i)) next.delete(i);
+                    else next.add(i);
+                    return next;
+                  })
+                }
+                writing={writing}
+                onWrite={() => void writeTicked()}
+                onCancel={() => setPreview(null)}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => void reviewRows()}
+                disabled={paste.trim() === ""}
+                className="mt-2 rounded-lg border border-line px-3 py-1.5 text-xs text-ink-soft disabled:opacity-50"
+              >
+                Review
+              </button>
+            )}
             {outcome ? <p className="mt-2 text-xs text-ink-soft">{outcome}</p> : null}
           </details>
         </div>

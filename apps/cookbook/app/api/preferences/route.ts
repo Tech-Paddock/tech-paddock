@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { errorResponse } from "@/lib/respond";
 import { readBrandProducts } from "@/lib/krogerStore";
+import { readBatch } from "@/lib/brandBatch";
 import {
   importPreferences,
   readDraft,
@@ -14,10 +15,13 @@ export const dynamic = "force-dynamic";
 /**
  * Remembered brands. **No model call on any verb here.**
  *
- * The aggregation that turns a stack of receipts into preferences happens
- * somewhere else — a session with the receipts in front of it — and arrives here
+ * The aggregation that turns a purchase history into preferences happens
+ * somewhere else — a session with the history in front of it — and arrives here
  * as rows. **This route is the gate, not the author**: it validates every row
- * before writing any, and it reports what it refused rather than dropping it.
+ * before writing any, it reports what it refused rather than dropping it, and
+ * (TEC-51) it never overwrites a saved row unless the review ticked it
+ * (`replace: true`). The review itself is `POST /api/preferences/preview`,
+ * which writes nothing.
  */
 
 /**
@@ -37,7 +41,10 @@ export async function GET() {
   }
 }
 
-/** One preference from a tap, or a batch from a receipts session. */
+/**
+ * One preference from the editor — with `id` when it edits that row — or the
+ * ticked rows of a Paste a batch review (format: NOTES.md).
+ */
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
 
@@ -46,12 +53,21 @@ export async function POST(request: NextRequest) {
       if (body.rows.length === 0) {
         return NextResponse.json({ error: "Nothing to import." }, { status: 400 });
       }
-      return NextResponse.json(await importPreferences(body.rows));
+      const { entries, refused } = readBatch(body.rows);
+      return NextResponse.json(
+        await importPreferences(
+          entries,
+          refused.map((r) => ({ row: r.row, reason: r.reason }))
+        )
+      );
     }
 
     const read = readDraft(body);
     if ("error" in read) return NextResponse.json({ error: read.error }, { status: 400 });
-    return NextResponse.json({ preference: await savePreference(read.row) });
+    // The editor never sets a count; only a batch does.
+    delete read.row.tally;
+    const id = typeof body.id === "string" && body.id ? body.id : undefined;
+    return NextResponse.json({ preference: await savePreference(read.row, undefined, { id }) });
   } catch (e) {
     return errorResponse(e, "Couldn't save that.");
   }

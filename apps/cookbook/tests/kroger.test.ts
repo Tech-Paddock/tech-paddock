@@ -85,14 +85,24 @@ vi.mock("@/lib/cartSends", () => ({
   moveSends: async () => undefined,
 }));
 
-vi.mock("@/lib/preferences", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/preferences")>()),
-  readPreferences: async () => mem.prefs,
-  savePreference: async (draft: Record<string, unknown>) => {
-    mem.saved.push(draft);
-    return { id: "new", ...draft };
-  },
-}));
+vi.mock("@/lib/preferences", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/preferences")>();
+  return {
+    ...actual,
+    readPreferences: async () => mem.prefs,
+    savePreference: async (draft: Record<string, unknown>) => {
+      mem.saved.push(draft);
+      return { id: "new", ...draft };
+    },
+    // The real rule (tallyBumps) against the in-memory rows (TEC-51).
+    bumpTallies: async (upcs: string[]) => {
+      for (const { id, tally } of actual.tallyBumps(mem.prefs as never, upcs)) {
+        const row = mem.prefs.find((p) => p.id === id);
+        if (row) row.tally = tally;
+      }
+    },
+  };
+});
 
 const PRODUCT = {
   productId: "0001111041700",
@@ -617,5 +627,58 @@ describe("Take back (TEC-127)", () => {
     const none = await takeBackPost({ confirm: true });
     expect(none.status).toBe(400);
     expect((await bodyOf(none)).error).toMatch(/hasn't sent anything/);
+  });
+});
+
+describe("Your brands' count and Settle these, through the routes (TEC-51)", () => {
+  // A Take back test above leaves Kroger refusing; start from the default.
+  beforeEach(() => {
+    kroger.mockImplementation(defaultKroger);
+  });
+  async function bodyOf(res: Response) {
+    return JSON.parse(await res.text());
+  }
+  const post = async (picks: unknown[], again = false) => {
+    const { POST } = await import("@/app/api/kroger/cart/route");
+    return POST(new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart", { method: "POST", body: JSON.stringify({ picks, again }) }));
+  };
+
+  it("a send that adds a brand's product moves its count up by one", async () => {
+    mem.prefs[0].tally = 4;
+    const body = await bodyOf(await post([{ id: "a", upc: "0001111041700" }]));
+    expect(body.recordError).toBeNull();
+    expect(mem.prefs[0].tally).toBe(5);
+  });
+
+  it("a failed add moves no count", async () => {
+    kroger.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
+      if (url.endsWith("/cart/add")) return json({ errors: { reason: "down" } }, 500);
+      return json({ data: [PRODUCT] });
+    });
+    try {
+      mem.prefs[0].tally = 4;
+      await post([{ id: "a", upc: "0001111041700" }]);
+      expect(mem.prefs[0].tally).toBe(4);
+    } finally {
+      kroger.mockImplementation(defaultKroger);
+    }
+  });
+
+  it("a line matching two saved products is Settle these in the review, most counted first, and no search is made for it", async () => {
+    mem.prefs.push({ ...mem.prefs[0], id: "p2", url: "https://www.kingsoopers.com/p/test-milk-half/0001111000002", tally: 9 });
+    mem.list = [mem.list[0]];
+    const { GET } = await import("@/app/api/kroger/cart/route");
+    const review = await bodyOf(await GET());
+    expect(review.lines[0].plan.kind).toBe("settle");
+    expect(review.lines[0].plan.options.map((o: { upc: string }) => o.upc)).toEqual(["0001111000002", "0001111041700"]);
+    expect(kroger.mock.calls.some(([u]) => String(u).includes("/products"))).toBe(false);
+  });
+
+  it("a line already sent still warns, whichever section it is in", async () => {
+    mem.list[0].sent_at = "2026-10-20T12:00:00Z";
+    const refused = await post([{ id: "a", upc: "0001111041700" }]);
+    expect(refused.status).toBe(409);
   });
 });

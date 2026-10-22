@@ -50,6 +50,8 @@ section and closing comment before changing anything in this file.
   Adding to the list is additive; tidying is a deliberate tap, never a side effect.
 - Kroger is the only stored credential: one refresh token, encrypted under `KROGER_TOKEN_KEY`, plus
   the chosen store. Never sent to the browser or logged. Scope: add-to-cart and product read.
+- **Each brand carries a count.** It starts from the owner's own purchase history, which is supplied by hand and never stored or committed, and goes up by one each time Send adds it. It ranks choices; it never claims what was bought.
+- **Paste a batch shows every row for a tick before anything is written,** and Your brands exports as JSON.
 
 ## Send to cart — King Soopers
 
@@ -57,9 +59,7 @@ section and closing comment before changing anything in this file.
   password gate with no gate-file exception. Client ID and secret stay server-side.
 - Pick a store once; lookups price and stock there.
 - Send adds; it never checks out. "Go to checkout" opens the King Soopers cart.
-- An exact product in Your brands goes in as-is. Any other line shows Kroger's top match, which the
-  user adds or replaces with a product URL; whichever goes in, the match or the replacement, is
-  remembered in Your brands under the line's name.
+- **Send puts every unsent line that matches exactly one product in Your brands straight into the cart.** Below it, **Settle these** lists lines that match several saved products (sizes, flavours), most-bought first, for one pick. Under that, **No match** shows Kroger's top match, which the user adds or replaces with a product URL; whichever goes in is remembered in Your brands under the line's name.
 - No model picks a product or runs anywhere in this flow.
 - Every line reports added, skipped or failed; a partial send never reads as whole.
 - A second send warns and shows what was already sent, because the Cart API only adds.
