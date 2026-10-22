@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic";
 /**
  * One screen, thumb-first, no index — the surface this tool was settled as.
  *
- * Two places to go from here, in the footer rather than in tabs: setting a
- * target is a different moment from logging a meal, and the
- * debug harness validates the model rather than logging one. Neither earns a
- * tab, so the log stays the app. The grocery list lived here too until it
+ * One place to go from here, in the footer rather than in tabs: setting a
+ * target is a different moment from logging a meal, which does not earn a tab,
+ * so the log stays the app. The model comparison under `/debug` went with
+ * TEC-133 (one model, no comparison). The grocery list lived here too until it
  * moved to the Cookbook (TEC-15); `/list` now only redirects there.
  */
 export default function Page() {
@@ -36,12 +36,6 @@ export default function Page() {
               Targets
             </Link>
             <span> — set the day&rsquo;s calories and how they split.</span>
-          </div>
-          <div>
-            <Link href="/debug" className="underline decoration-dotted underline-offset-2">
-              Model comparison
-            </Link>
-            <span> — run both models on one food and keep the better answer.</span>
           </div>
         </footer>
       </div>

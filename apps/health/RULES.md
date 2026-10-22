@@ -65,10 +65,10 @@ would overwrite a hand correction. This is correctness, not cost.
 
 ## Models
 
-- A registry, not two strings, following `apps/coffee/lib/models.ts`. Health's copy is its own.
-  Models differ in accepted parameters and web tool versions, so a bare swap is an error.
-- Haiku 4.5 is the default; Sonnet 5 is available. No effort dial.
-- Only the judgment call (the estimate) gets a model choice. The parse is pinned.
+- One model, Claude Sonnet 5.5 at effort medium, set in `lib/models.ts`. No picker, no effort
+  dial, no comparison.
+- A registry entry, not a bare string. Health's copy is its own. Models differ in accepted
+  parameters and web tool versions, so a bare swap is an error.
 - Every number carries its provenance: log, web or estimate, and the model that produced it.
   Cookbook numbers carry `cookbook` and no model.
 
