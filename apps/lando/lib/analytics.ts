@@ -54,7 +54,7 @@ const empty = (start: Date): DayRow => ({
  * its correction; a deleted one not at all).
  *
  * Potty: inside is an accident and counts only as one; outside counts a pee, a
- * poop, or one of each for both.
+ * poop, or one of each for both. A No potty counts as nothing, inside or out.
  */
 export function perDay(events: JournalEvent[], now: Date, days = ANALYTICS_DAYS): DayRow[] {
   const starts = dayStarts(now, days);
@@ -71,6 +71,7 @@ export function perDay(events: JournalEvent[], now: Date, days = ANALYTICS_DAYS)
     switch (e.kind) {
       case "potty": {
         const p = potty(e);
+        if (p.what === "none") break;
         if (p.where === "inside") row.accident++;
         else {
           if (p.what !== "poop") row.pee++;

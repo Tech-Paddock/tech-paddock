@@ -83,6 +83,11 @@ describe("perDay — one row per local day", () => {
     expect(rows[13]).toMatchObject({ pee: 1, poop: 1, accident: 2 });
   });
 
+  it("counts a No potty as nothing: no pee, no poop, no accident, inside or out", () => {
+    const rows = perDay([potty(local(10, 20, 8), "none"), potty(local(10, 20, 9), "none", "inside")], NOW);
+    expect(rows[13]).toMatchObject({ pee: 0, poop: 0, accident: 0 });
+  });
+
   it("skips voided entries and counts a correction once, on its own day", () => {
     const deleted = potty(local(10, 20, 7), "pee");
     const wrongDay = food(local(10, 20, 8), "meal");
