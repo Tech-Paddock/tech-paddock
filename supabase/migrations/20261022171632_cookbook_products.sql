@@ -48,7 +48,7 @@
 -- the most recently checked of them, and **`size_first` is the size cached
 -- now**. Counts start at 0; the seed sets them. A product row with no code in
 -- either place cannot be a product row here and is left where it is
--- (2026-10-22: none; all three product rows carried a code).
+-- (read on 2026-10-22: every product row then carried a code).
 --
 -- `brand_preferences` keeps its search-word (`terms`) and old `plain` rows and
 -- is still read for them. Its `product` rows and `brand_products` are no longer
@@ -155,7 +155,8 @@ select
   l.description,
   l.kroger_brand,
   l.size,
-  coalesce(l.kroger_url, l.page),
+  -- Kroger's page, else the pasted page when it carries this code.
+  coalesce(l.kroger_url, case when (regexp_match(l.page, '/(\d{8,14})/?(?:[?#].*)?$'))[1] = l.code then l.page end),
   l.price,
   l.in_stock,
   l.checked_at,

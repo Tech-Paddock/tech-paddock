@@ -226,6 +226,7 @@ export function decider(products: SavedProduct[], words: WordRow[]): (name: stri
  * first spelling kept.
  */
 export function readNames(raw: unknown): string[] | { error: string } {
+  if (raw === undefined || raw === null) return { error: "needs at least one name" };
   const parts = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : null;
   if (!parts) return { error: "names must be a list of words" };
   const out: string[] = [];
