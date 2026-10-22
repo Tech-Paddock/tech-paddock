@@ -59,7 +59,7 @@
   the sheet closes) and again on the server; the database's `events_details_shape` check
   (migration `widen_lando_potty_none`, which replaced `widen_lando_events_details_shape`'s) holds
   the same shapes. Entries from before
-  `leash` and `dogs` (TEC-125) have neither and read as before: "pee", "with dogs".
+  `leash` and `dogs` (TEC-125) have neither: "pee", and "with several dogs" (see Other dogs).
 - **No potty** (`what: "none"`, TEC-129; the owner's label, POTTY_WHAT_LABELS): a trip out with
   nothing done. It keeps Where and, outside, Leash, like any potty. It resets neither the pee nor
   the poop clock, is never an accident (`isAccident`; inside hides the accident warning and the
@@ -79,7 +79,8 @@
   (Multiple, or an entry from before TEC-125) opens on Multiple, which saves the same shape; an
   entry naming several dogs, or one no longer listed, opens on an extra option showing those
   names (`DOGS_KEPT`) and saves them unchanged until another pick is made. The timeline names
-  them: "with Dog A, Dog C"; `with_dogs` and no ids reads "with dogs"; an id no longer in the table
+  them: "with Dog A, Dog C"; `with_dogs` and no ids reads "with several dogs" (Multiple and pre-TEC-125 entries
+  alike; the owner accepted the relabel, 2026-10-22); an id no longer in the table
   reads "another dog". `MAX_DOGS` (20) and the array check stay, for old entries. The server
   refuses an id not in `lando.dogs` (`writeEvent`), since jsonb carries no foreign key.
 - **Friends' dogs** (`lando.dogs`, migration `create_lando_dogs`): id, name (1 to 40 characters,

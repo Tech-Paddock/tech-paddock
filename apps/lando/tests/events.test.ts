@@ -232,7 +232,7 @@ describe("describe — a timeline row", () => {
         kind: "exercise",
         details: { type: "training", where: "inside", with_dogs: true, minutes: 10, treats: 6, commands: ["sit", "leave-it"] },
       })
-    ).toEqual({ title: "Training", detail: "10 min · inside · with dogs · 6 treats · Sit, Leave it" });
+    ).toEqual({ title: "Training", detail: "10 min · inside · with several dogs · 6 treats · Sit, Leave it" });
   });
 
   it("shows an outside potty's leash pick; an old entry without one reads as before", () => {
@@ -260,7 +260,7 @@ describe("describe — a timeline row", () => {
     expect(describeEvent({ kind: "exercise", details }, dogs).detail).toBe("20 min · outside · with Dog A, Dog B");
   });
 
-  it("names the dogs a session was with; an old entry still says with dogs", () => {
+  it("names the dogs a session was with; Multiple and an old unnamed entry say with several dogs", () => {
     const dogs = [
       { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Dog A" },
       { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Dog B" },
@@ -272,7 +272,7 @@ describe("describe — a timeline row", () => {
     expect(
       describeEvent({ kind: "exercise", details: { ...base, with_dogs: true, dogs: ["cccccccc-cccc-4ccc-8ccc-cccccccccccc"] } }, dogs).detail
     ).toBe("20 min · outside · with another dog");
-    expect(describeEvent({ kind: "exercise", details: { ...base, with_dogs: true } }, dogs).detail).toBe("20 min · outside · with dogs");
+    expect(describeEvent({ kind: "exercise", details: { ...base, with_dogs: true } }, dogs).detail).toBe("20 min · outside · with several dogs");
     expect(describeEvent({ kind: "exercise", details: { ...base, with_dogs: false } }).detail).toBe("20 min · outside");
   });
 

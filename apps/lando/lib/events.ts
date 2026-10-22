@@ -312,7 +312,7 @@ export function describe(
         x.dogs?.length
           ? `with ${x.dogs.map((id) => dogs.find((d) => d.id === id)?.name ?? "another dog").join(", ")}`
           : x.with_dogs
-            ? "with dogs"
+            ? "with several dogs" // Multiple, and entries from before the list (the owner's call, 2026-10-22)
             : "",
         x.treats ? `${x.treats} ${x.treats === 1 ? "treat" : "treats"}` : "",
         (x.commands ?? []).map((c) => COMMAND_LABEL[c] ?? c).join(", "),
