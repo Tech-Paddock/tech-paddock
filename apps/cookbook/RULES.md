@@ -50,6 +50,17 @@ section and closing comment before changing anything in this file.
   Adding to the list is additive; tidying is a deliberate tap, never a side effect.
 - Kroger is the only stored credential: one refresh token, encrypted under `KROGER_TOKEN_KEY`, plus
   the chosen store. Never sent to the browser or logged. Scope: add-to-cart and product read.
+- **Your brands is one row per King Soopers product code.** The row holds its names: every way a
+  list line may refer to it, each matched as whole words. A name may sit on several products; a
+  product code is never saved twice. Search words stay their own kind: a name with search words
+  and no product.
+- **Each product carries a count.** It starts from the owner's own purchase history, which is
+  supplied by hand and never stored or committed, and goes up by one each time Send adds it. It
+  ranks choices; it never claims what was bought.
+- **Each product keeps the size first bought beside the size Kroger reports now.** A refresh that
+  sees a different size flags it, with price per unit, and never overwrites the size first bought.
+- **Paste a batch shows every row for a tick before anything is written,** and Your brands exports
+  in the same format.
 
 ## Send to cart — King Soopers
 
@@ -57,9 +68,11 @@ section and closing comment before changing anything in this file.
   password gate with no gate-file exception. Client ID and secret stay server-side.
 - Pick a store once; lookups price and stock there.
 - Send adds; it never checks out. "Go to checkout" opens the King Soopers cart.
-- An exact product in Your brands goes in as-is. Any other line shows Kroger's top match, which the
-  user adds or replaces with a product URL; whichever goes in, the match or the replacement, is
-  remembered in Your brands under the line's name.
+- **Send puts every unsent line whose name matches exactly one product in Your brands straight
+  into the cart.** Below that, **Settle these** lists lines that match several products (sizes,
+  flavours), most-bought first, for one pick. Under that, **No match** shows Kroger's top match,
+  which the user adds or replaces with a product URL. Whichever goes in is remembered: the line's
+  name is added to that product's names, or a new product row is made.
 - No model picks a product or runs anywhere in this flow.
 - Every line reports added, skipped or failed; a partial send never reads as whole.
 - A second send warns and shows what was already sent, because the Cart API only adds.
@@ -67,7 +80,8 @@ section and closing comment before changing anything in this file.
 - Each saved brand keeps product ID, page, size, last price, stock and when checked. Refresh runs
   on opening the list over seven days after the last, or on **Refresh now**. It updates price and
   stock, fills missing IDs, keeps the connection alive, and flags a product Kroger no longer
-  returns rather than dropping it. A failed refresh says so.
+  returns rather than dropping it, and offers the closest product by name as its successor;
+  replacing keeps the names and count, and happens only on a tap. A failed refresh says so.
 - The API cannot read the account; nothing here claims to know what was bought.
 - Kroger is mocked in tests.
 
