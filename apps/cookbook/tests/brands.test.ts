@@ -42,6 +42,7 @@ function product(over: Partial<SavedProduct> = {}): SavedProduct {
     pack_label: null,
     pack_size: null,
     pack_unit: null,
+    default_for: [],
     created_at: "2026-10-01T00:00:00Z",
     updated_at: "2026-10-01T00:00:00Z",
     ...over,

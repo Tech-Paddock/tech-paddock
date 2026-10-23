@@ -1,5 +1,5 @@
 import { pageFor, productIdFromUrl } from "./kingsoopers";
-import { itemInName, itemWords } from "./itemWords";
+import { itemInName, itemWords, sameWord, wordsOf } from "./itemWords";
 
 /**
  * Your brands, one row per King Soopers product code (TEC-131; `RULES.md`,
@@ -11,10 +11,18 @@ import { itemInName, itemWords } from "./itemWords";
  * 1. **A line that is a product code** (8–14 digits) is that exact product.
  * 2. **Saved names**, as whole words, longest first: `whole milk` overrides
  *    `milk`. Every product carrying the longest matching name is a candidate,
- *    so a name on several products is *Settle these*. A search-word row whose
+ *    so a name on several products is *Pick one*. A search-word row whose
  *    phrase is longer decides instead; on the same length, products win.
+ *    Among several candidates (TEC-135), **a product the line names wins**:
+ *    the line's item words beyond the matched name ("sourdough" in
+ *    "sourdough english muffins") all appear in exactly one candidate's
+ *    official name or names. Otherwise **the name's default** goes in, when it
+ *    has exactly one. Either is `chosen`, and moves to the front.
  * 3. **Only when no name matched**, the item alone (`lib/itemWords.ts`) against
- *    each saved product's official Kroger name, as whole words.
+ *    each saved product's official Kroger name, as whole words. **These are
+ *    unconfirmed**: Send offers one only when Kroger's own search for the item
+ *    also returns its code (`planLine`, `lib/cart.ts`), so "spaghetti" never
+ *    goes in as a pasta sauce.
  *
  * Candidates are ranked **most counted first, then most recently updated**.
  * The count ranks; it never claims what was bought.
@@ -49,6 +57,12 @@ export type SavedProduct = {
   pack_label: string | null;
   pack_size: number | null;
   pack_unit: string | null;
+  /**
+   * The names (as matched: `normalizeName`) this product is the **default**
+   * for (TEC-135). One product per name: `setDefault` clears the others, and
+   * two claims on a name read as none.
+   */
+  default_for: string[];
   created_at: string;
   updated_at: string;
 };
@@ -76,11 +90,22 @@ export type Candidate = {
   names: string[];
   /** The pack conversion, when the product has one (`lib/lineView.ts`). */
   pack?: { label: string | null; size: number | null; unit: string | null };
+  /** The default for the name that matched the line (TEC-135). */
+  isDefault?: boolean;
 };
 
 /** What decides a line. One copy, for the cart review, the estimate, the deal scan and the list's links. */
 export type Decision =
-  | { kind: "products"; via: "code" | "name" | "description"; name: string; candidates: Candidate[] }
+  | {
+      kind: "products";
+      via: "code" | "name" | "description";
+      name: string;
+      candidates: Candidate[];
+      /** The saved name that matched, as matched; only on `via: "name"`. What Make default sets. */
+      matched?: string | null;
+      /** Why `candidates[0]` goes in without a pick when there are several (TEC-135). */
+      chosen?: "default" | "named" | null;
+    }
   | { kind: "terms"; phrase: string; terms: string }
   | { kind: "plain"; phrase: string }
   | null;
@@ -128,7 +153,7 @@ export function pageOf(p: Pick<SavedProduct, "product_id" | "url" | "names" | "d
   return p.url && productIdFromUrl(p.url) === p.product_id ? p.url : pageFor(p.product_id, p.description ?? p.names[0] ?? p.product_id);
 }
 
-export function candidateOf(p: SavedProduct): Candidate {
+export function candidateOf(p: SavedProduct, matched: string | null = null): Candidate {
   return {
     id: p.id,
     upc: p.product_id,
@@ -141,15 +166,75 @@ export function candidateOf(p: SavedProduct): Candidate {
     price: p.price,
     names: p.names,
     pack: { label: p.pack_label ?? null, size: p.pack_size ?? null, unit: p.pack_unit ?? null },
+    ...(matched !== null ? { isDefault: claims(p, matched) } : {}),
   };
 }
 
-/** The longest saved name of this product that the line mentions, or 0. */
-function longestName(line: string, p: SavedProduct): number {
-  let best = 0;
+/** Does this row claim to be the default for this name? Only for a name it still carries. */
+function claims(p: SavedProduct, name: string): boolean {
+  const n = normalizeName(name);
+  return (p.default_for ?? []).includes(n) && p.names.some((x) => normalizeName(x) === n);
+}
+
+/**
+ * **The default for a name** (TEC-135): the one product claiming it, among
+ * these. None, or two claims (a race `setDefault` can lose), is null — which
+ * only ever means *Pick one*, never the wrong product.
+ */
+export function defaultFor(name: string, products: SavedProduct[]): SavedProduct | null {
+  const claimed = products.filter((p) => claims(p, name));
+  return claimed.length === 1 ? claimed[0] : null;
+}
+
+/** The words a product is known by: its official Kroger name and every saved name. */
+function knownWords(p: SavedProduct): string[] {
+  return wordsOf([p.description ?? "", ...p.names].join(" "));
+}
+
+/**
+ * **The product this line names** among several candidates (TEC-135): the
+ * line's item words beyond the matched name must all be words this product is
+ * known by, and fit no other candidate. "sourdough english muffins" against
+ * "english muffins" leaves "sourdough". Null when the line says nothing more,
+ * or what it says fits none or several.
+ */
+export function namedAmong(line: string, matched: string, hits: SavedProduct[]): SavedProduct | null {
+  const base = wordsOf(matched);
+  const extra = wordsOf(itemWords(line) || line).filter((w) => !base.some((b) => sameWord(b, w)));
+  if (extra.length === 0) return null;
+  const fits = hits.filter((p) => {
+    const known = knownWords(p);
+    return extra.every((w) => known.some((k) => sameWord(k, w)));
+  });
+  return fits.length === 1 ? fits[0] : null;
+}
+
+/**
+ * What to put on a line to get this product rather than the default — *"when
+ * the line says …"* in Your brands (TEC-135). Words of its official name (or
+ * first name) that no other product in the group is known by and that are not
+ * the group's names, at most two, in the name's order; each would pick it on
+ * its own under `namedAmong`. Null when there is no such word.
+ */
+export function namingHint(p: SavedProduct, group: SavedProduct[], groupNames: string[]): string | null {
+  const others = group.filter((o) => o.id !== p.id).map(knownWords);
+  const taken = wordsOf(groupNames.join(" "));
+  const own = wordsOf(p.description ?? p.names[0] ?? "").filter(
+    (w, i, all) =>
+      /^[a-z][a-z%']{2,}$/.test(w) &&
+      all.indexOf(w) === i &&
+      !taken.some((t) => sameWord(t, w)) &&
+      !others.some((known) => known.some((k) => sameWord(k, w)))
+  );
+  return own.length > 0 ? own.slice(0, 2).join(" ") : null;
+}
+
+/** The longest saved name of this product that the line mentions, as matched, or "". */
+function longestName(line: string, p: SavedProduct): string {
+  let best = "";
   for (const name of p.names) {
     const n = normalizeName(name);
-    if (n.length > best && mentions(line, n)) best = n.length;
+    if (n.length > best.length && mentions(line, n)) best = n;
   }
   return best;
 }
@@ -170,14 +255,19 @@ export function decide(line: string, products: SavedProduct[], words: WordRow[])
   // 2. Saved names and search-word phrases, longest first.
   let best = 0;
   let hits: SavedProduct[] = [];
+  const matchedBy = new Set<string>();
   for (const p of products) {
-    const length = longestName(name, p);
+    const found = longestName(name, p);
+    const length = found.length;
     if (length === 0) continue;
     if (length > best) {
       best = length;
       hits = [p];
+      matchedBy.clear();
+      matchedBy.add(found);
     } else if (length === best) {
       hits.push(p);
+      matchedBy.add(found);
     }
   }
 
@@ -197,7 +287,22 @@ export function decide(line: string, products: SavedProduct[], words: WordRow[])
     return word.kind === "terms" && word.terms ? { kind: "terms", phrase: word.phrase, terms: word.terms } : { kind: "plain", phrase: word.phrase };
   }
   if (hits.length > 0) {
-    return { kind: "products", via: "name", name, candidates: [...hits].sort(byRank).map(candidateOf) };
+    // One name matched; two of the same length on different rows is no one name to default.
+    const matched = matchedBy.size === 1 ? [...matchedBy][0] : null;
+    const ranked = [...hits].sort(byRank);
+    let chosen: "default" | "named" | null = null;
+    let first: SavedProduct | null = null;
+    if (ranked.length > 1 && matched) {
+      // **A named product beats the default** (RULES.md).
+      first = namedAmong(name, matched, ranked);
+      if (first) chosen = "named";
+      else {
+        first = defaultFor(matched, ranked);
+        if (first) chosen = "default";
+      }
+    }
+    const ordered = first ? [first, ...ranked.filter((p) => p !== first)] : ranked;
+    return { kind: "products", via: "name", name, matched, chosen, candidates: ordered.map((p) => candidateOf(p, matched)) };
   }
 
   // 3. The item alone against each product's official Kroger name.
@@ -205,10 +310,26 @@ export function decide(line: string, products: SavedProduct[], words: WordRow[])
   if (item) {
     const named = products.filter((p) => p.description && itemInName(item, p.description));
     if (named.length > 0) {
-      return { kind: "products", via: "description", name, candidates: [...named].sort(byRank).map(candidateOf) };
+      return { kind: "products", via: "description", name, candidates: [...named].sort(byRank).map((p) => candidateOf(p)) };
     }
   }
   return null;
+}
+
+/**
+ * A list line's marker (TEC-135), from what decides it, without Kroger:
+ * **★** goes in as a saved product — its code, its only product, its name's
+ * default or one it names; **?** needs a pick at Send (several, no default);
+ * **+** is not saved yet under that name — Kroger's search decides, including
+ * a product found only by its Kroger name, which Send checks first.
+ */
+export type LineMark = "★" | "?" | "+";
+
+export function lineMark(decision: Decision): LineMark {
+  if (decision?.kind !== "products" || decision.via === "description") return "+";
+  // A code typed on the list that is not saved goes in, but nothing is saved.
+  if (decision.candidates[0]?.id === null) return "+";
+  return decision.candidates.length === 1 || decision.chosen ? "★" : "?";
 }
 
 /** `decide`, bound to the rows. */
@@ -366,6 +487,45 @@ export function rememberPlacement(
   if (!existing) return { action: "insert" };
   const names = unionNames(existing.names, [cleanName(name)]);
   return names.length === existing.names.length ? { action: "none", id: existing.id } : { action: "add-name", id: existing.id, names };
+}
+
+/**
+ * **Make default** (TEC-135): the writes that make the product with this code
+ * the one default for each of these names. Every other row claiming one of
+ * them gives it up, so one product per name holds without an index (the
+ * `cookbook_product_defaults` migration). A name the product does not carry
+ * is refused: a default for a name that never reaches it would decide nothing.
+ */
+export function defaultPatches(
+  all: SavedProduct[],
+  names: string[],
+  upc: string
+): { patches: { id: string; default_for: string[] }[] } | { error: string } {
+  const target = all.find((p) => p.product_id === upc);
+  if (!target) return { error: "That product is not in Your brands yet, so it can't be a default." };
+  const wanted = [...new Set(names.map(normalizeName).filter(Boolean))];
+  if (wanted.length === 0) return { error: "No name to make it the default for." };
+  const carried = new Set(target.names.map(normalizeName));
+  const missing = wanted.filter((n) => !carried.has(n));
+  if (missing.length > 0) return { error: `"${missing[0]}" isn't one of its names, so it can't be the default for it.` };
+
+  const patches: { id: string; default_for: string[] }[] = [];
+  for (const p of all) {
+    const current = p.default_for ?? [];
+    const next =
+      p.id === target.id
+        ? [...new Set([...current.filter((n) => carried.has(n)), ...wanted])]
+        : current.filter((n) => !wanted.includes(n));
+    const same = next.length === current.length && next.every((n, i) => n === current[i]);
+    if (!same) patches.push({ id: p.id, default_for: next });
+  }
+  return { patches };
+}
+
+/** A row's defaults kept to the names it still carries — what an edit of its names writes. */
+export function keptDefaults(defaults: string[], names: string[]): string[] {
+  const carried = new Set(names.map(normalizeName));
+  return defaults.filter((n) => carried.has(n));
 }
 
 /** The counts a send moves: **+1 per add**, on the row with that code. */

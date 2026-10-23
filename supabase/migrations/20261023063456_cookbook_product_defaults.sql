@@ -1,0 +1,35 @@
+-- Cookbook · a default product per name in Your brands (TEC-135)
+--
+-- A name may sit on several products ("english muffins" on Original, Cinnamon
+-- Raisin and Sourdough), and until now every such line asked at Send. The
+-- owner asked on 2026-10-23 for a **Make default**: once one product is the
+-- default for a name, a line that only says that name goes straight in as it,
+-- and another product goes in only when the line names it ("sourdough english
+-- muffins"). `RULES.md`, *Storage* and *Send to cart*.
+--
+-- ## products.default_for — the names this product is the default for
+--
+-- * A `text[]` of **names as matched**: trimmed, spaces collapsed, lowercase
+--   (`normalizeName` in `lib/brands.ts`). Empty for most rows.
+-- * **Per name, not per product.** A product carrying "coke zero" and "coke"
+--   can be the default for "coke zero" and not for "coke". A plain boolean
+--   would make it the default for every name it carries.
+-- * **One product per name.** Postgres cannot put a unique index across the
+--   elements of arrays on different rows, and a second table keyed by name
+--   would be a second home for the names. So the one writer
+--   (`setDefault` in `lib/productStore.ts`, from Send's Make default and the
+--   Your brands button) takes the name off every other row before adding it
+--   to the chosen one, and **the reader treats two claims on a name as no
+--   default** (`decide`), so a race can only read as "Pick one", never as the
+--   wrong product in the cart.
+-- * An element that is no longer one of the row's names is ignored on read
+--   and dropped on the row's next edit; removing a name never leaves a default
+--   behind it.
+--
+-- Shape: **additive.** A new column with a default, no rewrite of what is
+-- there. Code from before this migration does not read it, so the database
+-- sitting ahead of the code is harmless; the code after it selects it, so it
+-- must be applied first.
+
+alter table cookbook.products
+  add column default_for text[] not null default '{}';

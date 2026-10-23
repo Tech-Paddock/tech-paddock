@@ -92,7 +92,7 @@ describe("what a line becomes", () => {
     expect(search).not.toHaveBeenCalled();
   });
 
-  it("a line matching several products is Settle these, in the order given (most counted first)", async () => {
+  it("a line matching several products and no default is Pick one, in the order given (most counted first)", async () => {
     const search = vi.fn();
     const a = candidate({ id: "a", upc: "0000000000011", url: "https://www.kingsoopers.com/p/a/0000000000011", count: 9 });
     const b = candidate({ id: "b", upc: "0000000000022", url: "https://www.kingsoopers.com/p/b/0000000000022", count: 2 });
@@ -102,18 +102,18 @@ describe("what a line becomes", () => {
   });
 
   it("searches the item alone when nothing in Your brands decides the line (TEC-131)", async () => {
-    const search = vi.fn(async () => product());
+    const search = vi.fn(async () => [product()]);
     await planLine(line({ id: "a", name: "6 cloves of garlic" }), none, search);
     expect(search).toHaveBeenCalledWith("garlic cloves");
   });
 
   it("any other line shows Kroger's top match", async () => {
-    const plan = await planLine(line({ id: "a", name: "eggs" }), none, async () => product());
+    const plan = await planLine(line({ id: "a", name: "eggs" }), none, async () => [product()]);
     expect(plan).toMatchObject({ kind: "match", product: { upc: "0001111041700" } });
   });
 
   it("searches a terms brand's words, not the line's", async () => {
-    const search = vi.fn(async () => product());
+    const search = vi.fn(async () => [product()]);
     await planLine(
       line({ id: "a", name: "milk" }),
       () => ({ kind: "terms", phrase: "milk", terms: "fairlife 2%" }),
@@ -123,7 +123,7 @@ describe("what a line becomes", () => {
   });
 
   it("says so when Kroger has nothing, or the search fails — never a guess", async () => {
-    expect(await planLine(line({ id: "a", name: "unicorn" }), none, async () => null)).toMatchObject({ kind: "none" });
+    expect(await planLine(line({ id: "a", name: "unicorn" }), none, async () => [])).toMatchObject({ kind: "none" });
     const failed = await planLine(line({ id: "a", name: "eggs" }), none, async () => {
       throw new Error("Kroger's search failed (HTTP 500).");
     });
