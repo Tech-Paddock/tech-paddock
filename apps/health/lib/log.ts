@@ -10,7 +10,7 @@ import {
 } from "./cookbook";
 import { total, round, namesNoModel, type Macros, type MacroSource } from "./macros";
 import type { Meal } from "./meals";
-import { DEFAULT_MODEL, type ModelId } from "./models";
+import { MODEL } from "./models";
 
 /**
  * The lookup order, the draft it produces, and what approving one writes.
@@ -61,7 +61,6 @@ export async function resolveItem(params: {
   quantity: number;
   onDate: string;
   recipes: RecipeBook;
-  model?: ModelId;
 }): Promise<DraftItem> {
   const base = {
     name: params.name,
@@ -131,13 +130,15 @@ export async function resolveItem(params: {
   }
 
   // Tier 3. Only reached on a genuine miss.
-  const model = params.model ?? DEFAULT_MODEL;
+  // The one model (`lib/models.ts`), recorded on the line so its provenance
+  // names what produced the number.
+  const model = MODEL;
   try {
-    const estimate = await estimateMacros({ name: params.name, model });
+    const estimate = await estimateMacros({ name: params.name });
     return {
       ...base,
       macros: estimate.macros,
-      // The model was given the choice and this records which it took: a page
+      // The model chose how to answer and this records which it took: a page
       // it actually read, or its own knowledge. The distinction is what makes
       // the provenance worth showing.
       source: estimate.source_url ? "web" : "estimate",

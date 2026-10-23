@@ -1,14 +1,14 @@
 import type { MacroSource } from "@/lib/macros";
-import { MODELS, isModelId } from "@/lib/models";
+import { modelLabel as labelFor } from "@/lib/models";
 
 /**
  * Where a number came from, said out loud on every line.
  *
  * **This is not decoration and it is not a detail view.** It is what tells you
- * which line to scrutinise before approving, and it is what stops the debug
- * harness measuring a model against its own earlier guess — a match against a
- * hand-entered figure is evidence, a match against the same model's estimate
- * from three weeks ago is not, and those must not look the same.
+ * which line to scrutinise before approving: a hand-entered figure is
+ * evidence, a model's estimate is a guess, and those must not look the same.
+ * A past line keeps the model that produced it, including models this app no
+ * longer calls.
  *
  * Four states, deliberately different weights: your own log and the Cookbook
  * are the quiet ones because they are the trustworthy ones, and an estimate is
@@ -24,7 +24,7 @@ export default function Provenance({
   model?: string | null;
   url?: string | null;
 }) {
-  const modelLabel = model && isModelId(model) ? MODELS[model].label : model;
+  const modelLabel = model ? labelFor(model) : null;
 
   // A Cookbook recipe is quiet like your own log: its numbers are the ones you
   // wrote down there (TEC-25), and they name no model.

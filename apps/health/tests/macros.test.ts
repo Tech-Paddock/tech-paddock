@@ -1,40 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { agrees, disagreements, parseMacros, scale, total, round, TOLERANCE } from "@/lib/macros";
+import { parseMacros, scale, total, round } from "@/lib/macros";
 
 const base = { kcal: 600, protein_g: 30, carbs_g: 50, fat_g: 25 };
-
-describe("agreement", () => {
-  it("treats a rounding-scale difference as agreement", () => {
-    // 620 against 625 is the case that would otherwise ask you to arbitrate
-    // forty times a week until you stopped reading it.
-    expect(agrees({ ...base, kcal: 620 }, { ...base, kcal: 625 })).toBe(true);
-  });
-
-  it("treats a real gap as disagreement", () => {
-    expect(agrees({ ...base, kcal: 620 }, { ...base, kcal: 890 })).toBe(false);
-  });
-
-  it("needs every field to agree, not the headline one", () => {
-    // An otherwise-close estimate with one wildly wrong macro is exactly the
-    // disagreement worth surfacing.
-    const off = { ...base, fat_g: base.fat_g + 40 };
-    expect(agrees(base, off)).toBe(false);
-    expect(disagreements(base, off)).toEqual(["fat_g"]);
-  });
-
-  it("uses an absolute floor so small macros do not disagree over nothing", () => {
-    // 20% of 2g is 0.4g, which would make every low-fat item disagree on a
-    // rounding difference. The floor is the half that matters.
-    expect(agrees({ ...base, fat_g: 2 }, { ...base, fat_g: 5 })).toBe(true);
-    expect(TOLERANCE.macro.floor).toBeGreaterThan(0);
-  });
-
-  it("is symmetric", () => {
-    const a = { ...base, kcal: 500 };
-    const b = { ...base, kcal: 900 };
-    expect(agrees(a, b)).toBe(agrees(b, a));
-  });
-});
 
 describe("arithmetic", () => {
   it("scales by quantity", () => {

@@ -3,7 +3,8 @@
 ## State
 
 - The macro log is live on Next.js 16: dictate, approve the draft, the day's total updates.
-- `/debug` runs both models on one food and keeps every run. It has not been run.
+- Every model call (the parse and the estimate) is Claude Sonnet 5.5 at effort `medium`, set once
+  in `lib/models.ts` (TEC-133). No picker, no effort dial; the `/debug` comparison is gone.
 - The gate file is `proxy.ts` (Node runtime), the base copy with the function renamed.
 
 ## How it works
@@ -22,9 +23,12 @@
   unreadable or filed under another day is stated in words.
 - **Web provenance** (`lib/webEvidence.ts`): a cited URL is kept only if that run's own search or
   fetch results contain it.
-- **`/debug`** (`lib/harness.ts`) judges each model against the stored number and stores both pairs.
-  It asks for a pick only on a real disagreement; a failed side is named, never a match. A pick is
-  claimed on the row first, then read from the stored run.
+- **Models** (`lib/models.ts`): `requestBase()` is spread into every `messages.create` and is the
+  only place a model or effort is set; `tests/models.test.ts` pins the request shape and walks the
+  source for any other. Thinking stays adaptive; nothing is prefilled; `tool_choice` is the
+  default. A stop other than `end_turn`/`stop_sequence` (including `refusal`) fails the line, and
+  there is no fallback model. Past rows keep the model they recorded; `modelLabel` still names
+  Haiku 4.5 and Sonnet 5 for them.
 - **Approve** (`lib/approve.ts:decideLine`) decides every line before writing. A number is `hand`
   only when the line says it was typed over. An untyped difference, a stale `item_id`, a failed
   line or a duplicate food is a 409 and nothing is written. A renamed line re-resolves through
@@ -53,6 +57,12 @@
 - `normalizeName` is the item key (folds accents, apostrophes, simple plurals). Changing it once
   `health.items` has rows splits foods and needs a re-keying migration.
 - `lib/models.ts` is a flagged copy of Coffee's; they have diverged. No third copy.
+- `max_tokens` covers adaptive thinking as well as the JSON (parse 8192, estimate 16000). Lowering
+  it toward the JSON's size turns a thinking turn into a `max_tokens` failure.
+- A refusal fails the line by design: no `fallbacks`, no second model (owner, 2026-10-22: "No
+  fallback, fail visibly"). Adding one would stamp a number with a model that did not make it.
+- `health.comparisons` stays in the schema with nothing reading or writing it since TEC-133.
+  Dropping it is a destructive migration and the owner's call.
 - Every livery maps `--sev-warn` onto the accent, so over-target uses `--danger` locally
   (`app/LeftToday.tsx`).
 - `eaten_at` is never set by the app and duplicates `created_at`; a day's total reads `eaten_on`.
