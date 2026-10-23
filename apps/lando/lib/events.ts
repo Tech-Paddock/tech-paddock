@@ -14,6 +14,7 @@
  */
 
 import { FOOD_TYPES, findFood, formatAmount, unitLabel, type FoodType } from "./foods";
+import { dateLabel, fromDateInput, toDateInput } from "./localtime";
 
 export const LOG_KINDS = ["potty", "food", "exercise", "weight"] as const;
 export type LogKind = (typeof LOG_KINDS)[number];
@@ -25,6 +26,33 @@ export const KIND_LABELS: Record<LogKind, string> = {
   exercise: "Exercise",
   weight: "Weight",
 };
+
+/**
+ * The five forms on the Log tab (TEC-136): Fun and Training replace Exercise.
+ * Both save as kind `exercise` with the existing `type`; the data shape is
+ * unchanged. Fun is walk or playtime, Training is `type: "training"`.
+ */
+export const FORM_KINDS = ["potty", "food", "fun", "training", "weight"] as const;
+export type FormKind = (typeof FORM_KINDS)[number];
+export const FORM_LABELS: Record<FormKind, string> = {
+  potty: "Potty",
+  food: "Food",
+  fun: "Fun",
+  training: "Training",
+  weight: "Weight",
+};
+
+/** The kind a form saves. */
+export function kindOfForm(form: FormKind): LogKind {
+  return form === "fun" || form === "training" ? "exercise" : form;
+}
+
+/** The form an entry opens in, and the filter chip it falls under. Null for a void. */
+export function formOf(e: { kind: Kind; details: Details }): FormKind | null {
+  if (e.kind === "void") return null;
+  if (e.kind === "exercise") return (e.details as ExerciseDetails).type === "training" ? "training" : "fun";
+  return e.kind;
+}
 
 /* ── Shapes ──────────────────────────────────────────────────────────────── */
 
@@ -60,6 +88,8 @@ export type FoodDetails = {
 export const EXERCISE_TYPES = ["walk", "playtime", "training"] as const;
 export type ExerciseType = (typeof EXERCISE_TYPES)[number];
 export const EXERCISE_LABELS: Record<ExerciseType, string> = { walk: "Walk", playtime: "Playtime", training: "Training" };
+/** The Fun form's types: exercise without training. */
+export const FUN_TYPES = ["walk", "playtime"] as const satisfies readonly ExerciseType[];
 
 /** The fixed list of commands a training session can practise, in display order. */
 export const COMMANDS = [
@@ -182,6 +212,90 @@ export function liveEvents(events: JournalEvent[]): JournalEvent[] {
 /** Newest first by `at`, then by `created_at` so two saves in one second keep their order. */
 export function newestFirst(a: JournalEvent, b: JournalEvent): number {
   return Date.parse(b.at) - Date.parse(a.at) || Date.parse(b.created_at) - Date.parse(a.created_at);
+}
+
+/* ── The feed (TEC-136) ──────────────────────────────────────────────────── */
+
+/**
+ * When a row happened, for ordering: its `at` (the When picked in the form),
+ * never `created_at`. A weight is a day, so it orders at local noon of its day
+ * whatever time an older one was logged at.
+ */
+export function happenedAt(e: { kind: Kind; at: string }): number {
+  if (e.kind === "weight") {
+    const noon = fromDateInput(toDateInput(e.at));
+    if (noon) return Date.parse(noon);
+  }
+  return Date.parse(e.at);
+}
+
+/** A feed row: a saved entry (`created_at` set) or one not saved yet (`created_at` null). */
+export type FeedRow<T> = { kind: Kind; at: string; created_at: string | null; item: T };
+export type FeedDay<T> = { day: string; label: string; rows: FeedRow<T>[] };
+
+/**
+ * Rows grouped under the phone's local day they happened on, newest day first
+ * and newest first within a day, by `happenedAt`. Ties: unsaved rows first,
+ * then the later save. Labels are "Today", "Yesterday", then a short date.
+ */
+export function feedDays<T>(rows: FeedRow<T>[], now: Date): FeedDay<T>[] {
+  const unsavedFirst = (r: FeedRow<T>) => (r.created_at === null ? 0 : 1);
+  const sorted = [...rows].sort(
+    (a, b) =>
+      happenedAt(b) - happenedAt(a) ||
+      unsavedFirst(a) - unsavedFirst(b) ||
+      (a.created_at && b.created_at ? Date.parse(b.created_at) - Date.parse(a.created_at) : 0)
+  );
+  const out: FeedDay<T>[] = [];
+  for (const r of sorted) {
+    const day = toDateInput(new Date(happenedAt(r)).toISOString());
+    const last = out[out.length - 1];
+    if (last?.day === day) last.rows.push(r);
+    else out.push({ day, label: dateLabel(day, now), rows: [r] });
+  }
+  return out;
+}
+
+/** The empty feed's line: "Nothing logged yet." or, under a chip, "No training entries yet." */
+export function emptyFeedText(only: FormKind | null): string {
+  return only ? `No ${FORM_LABELS[only].toLowerCase()} entries yet.` : "Nothing logged yet.";
+}
+
+/**
+ * The treats logged from a training's Treats pop-up: live food treats at the
+ * training's exact time. Each is saved at the session's `at`, to the
+ * millisecond, so nothing else lands on it; there is no link column (the data
+ * shape is unchanged). A correction that moves the session's time leaves its
+ * treats where they were, and they then no longer show on it.
+ */
+export function treatsWith(events: JournalEvent[], training: Pick<JournalEvent, "at">): JournalEvent[] {
+  const t = Date.parse(training.at);
+  return liveEvents(events).filter((e) => e.kind === "food" && food(e).type === "treat" && Date.parse(e.at) === t);
+}
+
+/**
+ * A treat picked in Training's Treats pop-up, waiting in the form for the
+ * session's Save. Its id is fixed when it is picked, so a retry is the same row.
+ */
+export type QueuedTreat = { id: string; item_id: string; amount: number | null };
+
+/**
+ * The food entry a queued treat becomes: a `treat` at the session's time, by
+ * the session's person, with no note. Throws `InvalidEvent` like any form.
+ */
+export function treatEntry(
+  t: QueuedTreat,
+  at: string,
+  personId: string | null
+): { id: string; kind: "food"; at: string; person_id: string | null; details: Details; note: null } {
+  return {
+    id: t.id,
+    kind: "food",
+    at,
+    person_id: personId,
+    details: parseDetails("food", { type: "treat", item_id: t.item_id, amount: t.amount }),
+    note: null,
+  };
 }
 
 /** How far behind today the journal is read. A clock with nothing in it says so. */

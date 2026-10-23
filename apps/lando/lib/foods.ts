@@ -83,14 +83,18 @@ export function unitLabel(unit: string, amount: number | null): string {
 }
 
 const FRACTIONS: [number, string][] = [
+  [1 / 8, "1/8"],
   [1 / 4, "1/4"],
   [1 / 3, "1/3"],
+  [3 / 8, "3/8"],
   [1 / 2, "1/2"],
+  [5 / 8, "5/8"],
   [2 / 3, "2/3"],
   [3 / 4, "3/4"],
+  [7 / 8, "7/8"],
 ];
 
-/** 0.333 → "1/3", 1.5 → "1 1/2", 2 → "2", 0.4 → "0.4". */
+/** 0.125 → "1/8", 0.333 → "1/3", 1.5 → "1 1/2", 2 → "2", 0.4 → "0.4". Eighths reduce: 0.25 → "1/4". */
 export function formatAmount(n: number): string {
   const whole = Math.floor(n + 1e-9);
   const rest = n - whole;
@@ -115,4 +119,31 @@ export function parseAmount(raw: string): number | null {
   else return null;
   if (!Number.isFinite(n) || n <= 0) return null;
   return Math.round(n * 1000) / 1000;
+}
+
+/* ── The amount scroller (TEC-136) ───────────────────────────────────────── */
+
+/** The scroller steps in eighths. */
+export const AMOUNT_STEP = 1 / 8;
+/**
+ * The scroller's last step. The stored bound is still above 0 and at most
+ * 1000 (`parseDetails`); the picker offers the useful part of it.
+ */
+export const AMOUNT_PICKER_MAX = 20;
+
+/**
+ * What the amount scroller offers: null (no amount, as before) and then every
+ * eighth from 1/8 to `AMOUNT_PICKER_MAX`. Each `keep` is an amount the form
+ * opened on (or a default it fell back to) that is not an eighth or is past
+ * the end (an older entry's 1/3, a phone's remembered 0.4): it is slotted in at
+ * its place, so a correction never changes an amount nobody touched.
+ */
+export function amountOptions(...keep: (number | null)[]): (number | null)[] {
+  const steps: number[] = [];
+  for (let i = 1; i <= AMOUNT_PICKER_MAX / AMOUNT_STEP; i++) steps.push(i * AMOUNT_STEP);
+  for (const k of keep) {
+    if (k !== null && k > 0 && !steps.some((v) => Math.abs(v - k) < 1e-9)) steps.push(k);
+  }
+  steps.sort((a, b) => a - b);
+  return [null, ...steps];
 }
