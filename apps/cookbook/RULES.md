@@ -27,8 +27,9 @@ section and closing comment before changing anything in this file.
 
 ## Recipes
 
-- Four ways in: type it (the model only prices it); ask Claude (it writes, then prices); from a
-  link (read, then priced); from a file (photo or PDF, read then priced, never stored).
+- Four ways in, in this order: ask Claude (it writes, then prices); from a link (read, then
+  priced); from a file (photo or PDF, read then priced, never stored); type it (the model only
+  prices it).
 - Anything a model wrote lands as a draft; keeping it is the write. A typed recipe saves at once.
 - **Import keeps only the recipe.** Published nutrition is discarded and re-estimated; the macro
   source is `estimate`, never `web`. `source_url` records where the method came from, never a
@@ -62,7 +63,7 @@ section and closing comment before changing anything in this file.
 - **Your brands is one row per King Soopers product code.** The row holds its names: every way a
   list line may refer to it, each matched as whole words. A name may sit on several products; a
   product code is never saved twice. Search words stay their own kind: a name with search words
-  and no product.
+  and no product. Each name may mark one of its products as the **default**.
 - **Each product carries a count.** It starts from the owner's own purchase history, which is
   supplied by hand and never stored or committed, and goes up by one each time Send adds it. It
   ranks choices; it never claims what was bought.
@@ -77,16 +78,24 @@ section and closing comment before changing anything in this file.
   password gate with no gate-file exception. Client ID and secret stay server-side.
 - Pick a store once; lookups price and stock there.
 - Send adds; it never checks out. "Go to checkout" opens the King Soopers cart.
-- **Send puts every unsent line whose name matches exactly one product in Your brands straight
-  into the cart.** Below that, **Settle these** lists lines that match several products (sizes,
-  flavours), most-bought first, for one pick. Under that, **No match** shows Kroger's top match,
-  which the user adds or replaces with a product URL. Whichever goes in is remembered: the line's
-  name is added to that product's names, or a new product row is made.
+- **Send groups the list into Going in, Pick one and Not saved yet.**
+  - **Going in:** a line that matches one product, its name's default, or a saved product the line
+    names.
+  - **Pick one:** a line that matches several products and has no default. The most-bought is
+    pre-picked, and a **Make default** checkbox sets it as the default.
+  - **Not saved yet:** Kroger's top match, ticked to add, or replaced with a product URL.
+  - Whichever goes in is remembered: the line's name is added to that product's names, or a new
+    product row is made.
+- **A named product beats the default.** "english muffins" gets the default; "sourdough english
+  muffins" gets the saved sourdough.
+- **Nothing is skipped silently.** A line stays unsent only on **Not this trip**. After Send, every
+  unsent line stays listed under **Still on your list**.
 - **A line is searched by its item alone.** A fixed rule drops quantities, units and prep words,
   and reads "X of Y" as "Y X": "6 cloves of garlic" searches "garlic cloves". No model runs.
 - **A line that is a product code goes in as that product.** A line that matches none of the saved
-  names is matched against each saved product's official Kroger name. One hit goes straight in;
-  several go to Settle these.
+  names is matched against each saved product's official Kroger name, and that product is offered
+  only when Kroger's own search for the item also returns it, so "spaghetti" never matches a sauce.
+  One hit goes straight in; several go to Settle these.
 - No model picks a product or runs anywhere in this flow.
 - Every line reports added, skipped or failed; a partial send never reads as whole.
 - A second send warns and shows what was already sent, because the Cart API only adds.

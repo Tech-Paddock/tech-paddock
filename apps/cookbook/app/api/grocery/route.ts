@@ -13,6 +13,7 @@ import { errorResponse } from "@/lib/respond";
 import { linkFor, readPreferences } from "@/lib/preferences";
 import { readProducts } from "@/lib/productStore";
 import { decider } from "@/lib/decide";
+import { lineMark } from "@/lib/brands";
 import { lineView } from "@/lib/lineView";
 import { packOf, quantityRule } from "@/lib/lineQuantity";
 
@@ -46,7 +47,8 @@ export async function GET() {
         // **What you buy** (TEC-131): the item, its amount, the note unless it
         // was only amounts. Display only; the stored line is not rewritten.
         const { quantity: _rule, ...view } = lineView(item, packOf(decision));
-        return { ...item, ...linkFor(item.name, decision), view };
+        // ★ / ? / + (TEC-135): what Send will do with it, said before Send.
+        return { ...item, ...linkFor(item.name, decision), view, mark: lineMark(decision) };
       }),
     });
   } catch (e) {
