@@ -251,7 +251,7 @@ export type SendDeps = {
   add: (upc: string, quantity: number, modality: Modality | null) => Promise<void>;
   /**
    * Remember what went in — a replacement page, the tapped match's page or a
-   * Settle these pick — in Your brands: the line's name on that product, or a
+   * Pick one pick — in Your brands: the line's name on that product, or a
    * new product row (TEC-131).
    */
   remember: (name: string, url: string, upc: string, size: string | null) => Promise<void>;
