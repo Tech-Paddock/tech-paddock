@@ -1,67 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { SEARCH_MODELS, MODEL_LABELS, DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT, effortsFor, isEffortFor, isSearchModel, type SearchModel } from "@/lib/models";
+import * as models from "@/lib/models";
 
-describe("the search model registry", () => {
-  it("refuses a model it does not know", () => {
-    // A model name that falls through to a default would mean testing one
-    // model and reading the results as another's.
-    for (const bad of ["claude-opus-5", "haiku", "", null, undefined, 4]) {
-      expect(isSearchModel(bad)).toBe(false);
-    }
-    expect(isSearchModel(DEFAULT_SEARCH_MODEL)).toBe(true);
+describe("the one model", () => {
+  it("is Claude Sonnet 5.5 at effort medium (TEC-133)", () => {
+    // Changing either is the owner's call; this test changes with it.
+    expect(models.MODEL).toBe("claude-sonnet-5-5");
+    expect(models.EFFORT).toBe("medium");
   });
 
-  it("carries a web search and fetch tool version for every model", () => {
-    // The request shapes differ per model, and a missing tool type is a 400
-    // at the moment someone picks that model rather than at build time.
-    for (const [model, spec] of Object.entries(SEARCH_MODELS)) {
-      expect(spec.search, model).toMatch(/^web_search_\d{8}$/);
-      expect(spec.fetch, model).toMatch(/^web_fetch_\d{8}$/);
-      expect(MODEL_LABELS[model as SearchModel], model).toBeTruthy();
-    }
+  it("uses the dynamic-filtering web tools, which Sonnet 5.5 supports", () => {
+    expect(models.WEB_SEARCH_TOOL).toBe("web_search_20260209");
+    expect(models.WEB_FETCH_TOOL).toBe("web_fetch_20260209");
   });
 
-  it("offers no effort level for Haiku 4.5, which rejects the parameter", () => {
-    // Not a preference. `output_config.effort` is a 400 on this model, so an
-    // empty list is the honest answer and the toggle has to respect it.
-    expect(effortsFor("claude-haiku-4-5")).toEqual([]);
-    for (const level of ["low", "medium", "high", "xhigh", "max"]) {
-      expect(isEffortFor("claude-haiku-4-5", level), level).toBe(false);
+  it("exports no registry to pick from", () => {
+    // The picker and the effort dial derived from these. Their return would
+    // be a choice again.
+    for (const gone of ["SEARCH_MODELS", "DEFAULT_SEARCH_MODEL", "DEFAULT_EFFORT", "MODEL_LABELS", "effortsFor", "isEffortFor", "isSearchModel"]) {
+      expect(models, gone).not.toHaveProperty(gone);
     }
   });
 
-  it("offers xhigh only on the model that has it", () => {
-    // xhigh arrived a generation after Sonnet 4.6, so offering it there would
-    // be a 400 raised by a dropdown.
-    expect(isEffortFor("claude-sonnet-5", "xhigh")).toBe(true);
-    expect(isEffortFor("claude-sonnet-4-6", "xhigh")).toBe(false);
-    expect(isEffortFor("claude-sonnet-4-6", "max")).toBe(true);
-  });
-
-  it("refuses a level no model has", () => {
-    for (const model of Object.keys(SEARCH_MODELS) as SearchModel[]) {
-      expect(isEffortFor(model, "highest"), model).toBe(false);
-      expect(isEffortFor(model, ""), model).toBe(false);
-      expect(isEffortFor(model, null), model).toBe(false);
-    }
-  });
-
-  it("defaults to a level every effort-capable model accepts", () => {
-    for (const model of Object.keys(SEARCH_MODELS) as SearchModel[]) {
-      if (effortsFor(model).length === 0) continue;
-      expect(isEffortFor(model, DEFAULT_EFFORT), model).toBe(true);
-    }
-  });
-
-  it("pairs the dynamic-filtering web tools only with models that have them", () => {
-    // web_search_20260209 needs Sonnet 4.6 or better; Haiku 4.5 must stay on
-    // the basic variant or the request fails.
-    for (const [model, spec] of Object.entries(SEARCH_MODELS)) {
-      if (model.startsWith("claude-haiku")) {
-        expect(spec.search, model).toBe("web_search_20250305");
-      } else {
-        expect(spec.search, model).toBe("web_search_20260209");
-      }
-    }
+  it("still names the models older rows recorded", () => {
+    // A bag keeps its guide_model and a suggestion its model; the page names
+    // them as they were.
+    expect(models.modelLabel("claude-sonnet-5-5")).toBe("Sonnet 5.5");
+    expect(models.modelLabel("claude-sonnet-5")).toBe("Sonnet 5");
+    expect(models.modelLabel("claude-haiku-4-5")).toBe("Haiku 4.5");
+    expect(models.modelLabel("claude-something-new")).toBe("claude-something-new");
   });
 });

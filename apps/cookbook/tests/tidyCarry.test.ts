@@ -7,7 +7,7 @@ import type { GroceryItem } from "@/lib/grocery";
  * back. The database is a fake that records calls, in order.
  */
 
-const db = vi.hoisted(() => ({ calls: [] as string[], moves: [] as { from: string[]; to: string }[] }));
+const db = vi.hoisted(() => ({ calls: [] as string[], moves: [] as { from: string[]; to: string }[], inserted: [] as Record<string, unknown>[] }));
 
 vi.mock("@/lib/cartSends", () => ({
   moveSends: async (from: string[], to: string) => {
@@ -22,6 +22,7 @@ vi.mock("@/lib/supabase", () => ({
       insert: (rows: { name: string }[]) => ({
         select: async () => {
           db.calls.push("insert");
+          db.inserted.push(...rows);
           return { data: rows.map((r, i) => ({ ...r, id: `new-${i}`, checked: false, created_at: "", quantity: 1 })), error: null };
         },
       }),
@@ -42,6 +43,7 @@ function line(id: string, name: string, sent_at: string | null = null): GroceryI
 beforeEach(() => {
   db.calls = [];
   db.moves = [];
+  db.inserted = [];
 });
 
 describe("a Tidy and what was sent", () => {
@@ -57,5 +59,23 @@ describe("a Tidy and what was sent", () => {
       { from: ["c"], to: "new-1" },
     ]);
     expect(db.calls.indexOf("delete")).toBeGreaterThan(db.calls.lastIndexOf("move"));
+  });
+});
+
+describe("a Tidy and the cart quantity (TEC-131)", () => {
+  it("takes the larger of the carried quantity and the fixed rules' for the merged line", async () => {
+    const { applyTidy } = await import("@/lib/grocery");
+    const { lineView } = await import("@/lib/lineView");
+    const garlic = { label: "Heads of Garlic", size: 10, unit: "cloves" };
+    const open = [line("a", "6 cloves garlic"), line("b", "8 cloves garlic"), { ...line("c", "eggs"), quantity: 3 }];
+    await applyTidy(
+      open,
+      [
+        { name: "garlic", note: "6 cloves and 8 cloves", absorbed: ["a", "b"] },
+        { name: "eggs", note: null, absorbed: ["c"] },
+      ],
+      (l) => lineView(l, l.name === "garlic" ? garlic : null).quantity
+    );
+    expect(db.inserted.map((r) => r.quantity)).toEqual([2, 3]);
   });
 });

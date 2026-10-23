@@ -30,7 +30,7 @@ import type { Suggestion } from "@/lib/suggestion";
 import { roastDateFromLabel } from "@/lib/dates";
 import { searchIsRunning, searchIsStale, SEARCH_START_GRACE_MS, STALE_SEARCH_MESSAGE } from "@/lib/searchClock";
 import { changedFields, hasChanges, missingRequired } from "@/lib/patch";
-import { MODEL_LABELS, DEFAULT_SEARCH_MODEL, DEFAULT_EFFORT, effortsFor, isEffortFor, type SearchModel } from "@/lib/models";
+import { modelLabel } from "@/lib/models";
 
 type Identity = {
   roaster: string | null;
@@ -220,8 +220,6 @@ function Scan({ onSaved }: { onSaved: () => void }) {
   const [previous, setPrevious] = useState<PreviousBag | null>(null);
   // The previous-purchase lookup failing is not "you have never had this".
   const [previousError, setPreviousError] = useState<string | null>(null);
-  const [model, setModel] = useState<SearchModel>(DEFAULT_SEARCH_MODEL);
-  const [effort, setEffort] = useState<string>(DEFAULT_EFFORT);
   const [bagId, setBagId] = useState<string | null>(null);
   const [waited, setWaited] = useState(0);
 
@@ -310,10 +308,8 @@ function Scan({ onSaved }: { onSaved: () => void }) {
           bag_id: id,
           roaster: identity.roaster,
           coffee_name: identity.coffee_name,
-          model,
-          // Sent only when this model has the control. Haiku 4.5 returns a
-          // 400 for it rather than ignoring it.
-          effort: isEffortFor(model, effort) ? effort : null,
+          // No model or effort: there is one of each, set in `lib/models.ts`
+          // and chosen by the route (TEC-133).
         }),
       }).catch(() => {});
     } catch (e) {
@@ -547,43 +543,6 @@ function Scan({ onSaved }: { onSaved: () => void }) {
 
       {stage === "confirm" && (
         <div className="flex flex-col gap-2">
-          <div className="text-sm text-ink/60 flex items-center gap-3 flex-wrap">
-            <label className="flex items-center gap-2">
-              Search with
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value as SearchModel)}
-                className="border border-line rounded-lg px-2 py-1 bg-surface"
-              >
-                {(Object.keys(MODEL_LABELS) as SearchModel[]).map((m) => (
-                  <option key={m} value={m}>
-                    {MODEL_LABELS[m]}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {/* Absent rather than disabled for a model with no effort control:
-                a greyed-out control implies a setting that exists. */}
-            {effortsFor(model).length > 0 ? (
-              <label className="flex items-center gap-2">
-                at effort
-                <select
-                  value={isEffortFor(model, effort) ? effort : DEFAULT_EFFORT}
-                  onChange={(e) => setEffort(e.target.value)}
-                  className="border border-line rounded-lg px-2 py-1 bg-surface"
-                >
-                  {effortsFor(model).map((level) => (
-                    <option key={level} value={level}>
-                      {level}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : (
-              <span className="text-ink/40">no effort control on this model</span>
-            )}
-          </div>
           <button
             onClick={() => void findAndSave()}
             className="bg-accent text-accent-ink rounded-xl px-4 py-3 font-medium"
@@ -1512,12 +1471,9 @@ function BrewRow({ brew, onDelete }: { brew: Brew; onDelete: () => void }) {
  *
  * **It is a trigger, not a second kind of search** (2026-09-22): it starts
  * the original search rather than a process of its own. So it posts the bag and nothing else: the route sources the
- * product page from the row and falls back to its own default model and
- * effort, which is the dial this button never offered anyway — the scan
- * screen's picker is a comparison harness you set up deliberately on the way
- * in, and this is a button pressed one-handed in a kitchen. What ran is
- * recorded on the row either way, and the search itself cannot tell which of
- * the two started it.
+ * product page from the row and runs the one model and effort every call uses
+ * (`lib/models.ts`). What ran is recorded on the row, and the search itself
+ * cannot tell which of the two buttons started it.
  *
  * **It polls rather than waits**, for the reason the scan screen does: the
  * search runs for minutes with nothing on the connection, and the answer
@@ -1561,8 +1517,8 @@ function Research({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // The bag and nothing else. No product URL — the route reads that off
-      // the row — and no model or effort, so the defaults this button always
-      // used are the route's own rather than a second copy of them here.
+      // the row — and no model or effort, which the route sets for every
+      // search.
       // Searching again is a trigger, not a second kind of search.
       body: JSON.stringify({ bag_id: bag.id, roaster: bag.roaster, coffee_name: bag.coffee_name }),
     }).catch(() => {});
@@ -1688,7 +1644,7 @@ function SuggestedRecipe({ bag, onChanged }: { bag: Bag; onChanged: () => void }
           {suggestion.rationale && <p className="text-sm text-ink/70">{suggestion.rationale}</p>}
           <p className="text-xs text-ink-soft">
             {SUGGESTION_PRESENTATION.note}{" "}
-            {MODEL_LABELS[suggestion.model as SearchModel] ?? suggestion.model}, {" "}
+            {modelLabel(suggestion.model)}, {" "}
             {new Date(suggestion.generated_at).toLocaleDateString()}.
           </p>
         </>

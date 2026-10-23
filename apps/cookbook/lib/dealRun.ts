@@ -1,6 +1,6 @@
 import { withAccessToken } from "./krogerConnection";
 import { productsByIds, topProduct } from "./kroger";
-import { readBrandProducts } from "./krogerStore";
+import { readProducts } from "./productStore";
 import { readPreferences } from "./preferences";
 import { readList } from "./grocery";
 import { decider } from "./decide";
@@ -40,12 +40,12 @@ async function openLines() {
   return (await readList()).filter((i) => !i.checked);
 }
 
-/** One scan of every saved brand and every open line, **appended** to `deal_scans`. */
+/** One scan of every saved product, every search-word phrase and every open line, **appended** to `deal_scans`. */
 export async function runDealScan(trigger: ScanTrigger): Promise<{ scan: ScanRecord; message: string }> {
   return withAccessToken(async (accessToken, store) => {
     if (!store) throw new ConflictError(NEED_STORE);
-    const [brands, products, open] = await Promise.all([readPreferences(), readBrandProducts(), openLines()]);
-    const entries = scanEntries(brands, products, open, decider(brands, products));
+    const [words, products, open] = await Promise.all([readPreferences(), readProducts(), openLines()]);
+    const entries = scanEntries(products, words, open, decider(products, words));
     const found = await lookUp(
       entries.map((e) => e.target),
       lookups(accessToken, store.locationId)
@@ -60,8 +60,8 @@ export async function runDealScan(trigger: ScanTrigger): Promise<{ scan: ScanRec
 export async function runEstimate(): Promise<{ estimate: Estimate; message: string }> {
   return withAccessToken(async (accessToken, store, modality) => {
     if (!store) throw new ConflictError(NEED_STORE);
-    const [brands, products, open] = await Promise.all([readPreferences(), readBrandProducts(), openLines()]);
-    const decide = decider(brands, products);
+    const [words, products, open] = await Promise.all([readPreferences(), readProducts(), openLines()]);
+    const decide = decider(products, words);
     const lines = open.map((l) => ({ id: l.id, name: l.name, quantity: l.quantity, target: targetFor(l.name, decide(l.name)) }));
     const found = await lookUp(
       lines.map((l) => l.target),

@@ -1,5 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "model": "claude-sonnet-5-5",
+  "effortLevel": "medium",
   "permissions": {
     "allow": [
       "mcp__Linear"

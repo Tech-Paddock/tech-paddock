@@ -167,7 +167,7 @@ export async function addItems(
       note: l.note?.trim() || null,
       source: l.source ?? ("manual" as GrocerySource),
       recipes: unionRecipes([{ recipes: l.recipes ?? [] }]),
-      // Only a tidy sends these; a typed or recipe line takes the table's defaults.
+      // The quantity comes from the fixed rules (TEC-131, `lib/lineView.ts`) or a tidy; sent_at only from a tidy.
       ...(l.quantity !== undefined ? { quantity: readQuantity(l.quantity) ?? 1 } : {}),
       ...(l.sent_at ? { sent_at: l.sent_at } : {}),
     }))
@@ -299,19 +299,27 @@ export function carryCart(absorbed: Pick<GroceryItem, "quantity" | "sent_at">[])
 }
 
 /** Apply an approved tidy: the absorbed rows go, the consolidated lines arrive. */
-export async function applyTidy(open: GroceryItem[], lines: TidyLine[]): Promise<GroceryItem[]> {
+export async function applyTidy(
+  open: GroceryItem[],
+  lines: TidyLine[],
+  /** The fixed rules' cart quantity for a merged line (TEC-131); the larger of it and the carried one goes in. */
+  quantityOf?: (line: { name: string; note: string | null }) => number
+): Promise<GroceryItem[]> {
   const problem = validateTidy(open, lines);
   if (problem) throw new ConflictError(problem);
 
   const rows = lines.map((l) => {
     const absorbed = l.absorbed.map((id) => open.find((i) => i.id === id)).filter((i): i is GroceryItem => !!i);
+    const carried = carryCart(absorbed);
     return {
       name: l.name,
       note: l.note,
       source: sourceOf(l, open),
       // The merged line names every recipe its rows came from (TEC-39 B).
       recipes: unionRecipes(absorbed),
-      ...carryCart(absorbed),
+      ...carried,
+      // 6 cloves and 8 cloves were a head each; together, 14, they are two.
+      quantity: Math.max(carried.quantity, quantityOf ? quantityOf({ name: l.name, note: l.note }) : 1),
     };
   });
 

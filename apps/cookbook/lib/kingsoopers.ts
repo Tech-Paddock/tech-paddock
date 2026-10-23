@@ -56,6 +56,22 @@ export function couponsUrl(item: string): string {
  * whose address ends some other way is treated as a line with no exact product
  * and gets Kroger's top match instead of a guess.
  */
+/**
+ * A product page address built from a product code (TEC-131): `/p/<slug>/<code>`,
+ * the shape King Soopers' own pages use and the one `productIdFromUrl` reads
+ * back. Used for a code with no page yet (a pasted batch, a line that is a
+ * code); the refresh replaces it with Kroger's own page.
+ */
+export function pageFor(productId: string, description: string): string {
+  const slug =
+    description
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "product";
+  return `https://www.kingsoopers.com/p/${slug}/${productId}`;
+}
+
 export function productIdFromUrl(text: string): string | null {
   if (!isKingSoopersProduct(text)) return null;
   const segments = new URL(text.trim()).pathname.split("/").filter(Boolean);

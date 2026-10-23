@@ -86,7 +86,7 @@ describe("the on-sale tag on a list line", () => {
   it("says sale, never coupon", () => {
     expect(saleText({ percentOff: 5, endsAt: "2026-10-27" })).not.toMatch(/coupon/i);
     const list = readFileSync(resolve(__dirname, "../app/List.tsx"), "utf8");
-    const at = list.indexOf("onSale.has(item.id)");
+    const at = list.indexOf("saleText(props.sale)");
     expect(at).toBeGreaterThan(0);
     expect(list.slice(at, at + 400)).not.toMatch(/coupon/i);
   });
@@ -140,7 +140,12 @@ describe("from Kroger's answer to the tag, with Kroger mocked", () => {
     const e = estimate([{ id: "a", name: "2% milk", quantity: 1, target }], found, "PICKUP", "S");
     expect(e.priced[0].sale).toEqual({ percentOff: 25, endsAt: "2026-10-27T23:59:59Z" });
 
-    const entries = scanEntries([], [], [{ name: "2% milk" }], () => ({ phrase: "milk", kind: "product", url: deal().url, terms: null }));
+    const entries = scanEntries([], [], [{ name: "2% milk" }], () => ({
+      kind: "products",
+      via: "name",
+      name: "2% milk",
+      candidates: [{ id: "p1", upc: MILK, url: deal().url, count: 0, missing: false, description: null, size: null, sizeFirst: null, price: null, names: ["milk"] }],
+    }));
     const scan = findDeals(entries, found);
     const fromScan = saleTags(lines, { locationId: STORE, scan: { location_id: STORE, deals: scan.deals }, estimate: null }, NOW);
     const fromEstimate = saleTags(lines, { locationId: STORE, scan: null, estimate: e }, NOW);

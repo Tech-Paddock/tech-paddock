@@ -1,7 +1,7 @@
 ---
 name: builder
 description: "The builder: one helper that builds in whichever app its brief names (\"app: X\"). Started by the technical director after the owner's go on the work; pushes its branch and reports back."
-model: claude-opus-5-5
+model: claude-sonnet-5-5
 effort: medium
 isolation: worktree
 skills:

@@ -31,16 +31,23 @@ import { NO_PICKS, hasPicks, type Picks } from "@/lib/tuning";
  * **It is a tab of its own now** (2026-10-05, replacing the two-tab
  * index): Recipes · Add · King Soopers list. So it is always open — the collapse
  * it had while it sat above the book has nothing left to save room for.
+ *
+ * **The order is Ask Claude · Link · File · Type it, with Ask Claude chosen
+ * first** (TEC-135, the owner's mockup of 2026-10-23; `RULES.md`, *Recipes*).
+ * Only the order, the labels and the look changed; every way in works as before.
  */
 
 type Mode = "manual" | "generate" | "import" | "file";
 
 const MODE_LABELS: Record<Mode, string> = {
-  manual: "Type it",
   generate: "Ask Claude",
-  import: "From a link",
-  file: "From a file",
+  import: "Link",
+  file: "File",
+  manual: "Type it",
 };
+
+/** The order on the tab (TEC-135). */
+const MODES: Mode[] = ["generate", "import", "file", "manual"];
 
 /**
  * Turn a chosen file into what the draft route accepts.
@@ -94,7 +101,7 @@ export default function AddRecipe({
   }
   const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
 
-  const [mode, setMode] = useState<Mode>("manual");
+  const [mode, setMode] = useState<Mode>("generate");
   const [name, setName] = useState("");
   const [servings, setServings] = useState("4");
   const [ingredients, setIngredients] = useState("");
@@ -240,8 +247,11 @@ export default function AddRecipe({
           : file !== null && !preparing;
 
   return (
-    <section id="add" className="flex flex-col gap-3 rounded-lg border border-line p-3">
-      <h2 className="text-base font-semibold">Add a recipe</h2>
+    <section id="add" className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1 px-2">
+        <h2 className="text-xl font-bold">Add a recipe</h2>
+        <p className="text-[13px] text-ink-soft">Anything Claude writes lands as a draft. Nothing saves until you keep it.</p>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         {/* The model picker sits here and nowhere else, because pricing a dish
             is the only judgement in the app. Reading the book calls nothing,
@@ -262,20 +272,18 @@ export default function AddRecipe({
         </label>
       </div>
 
-      {/* Two by two on a phone: four labels in one row would crush "From a
-          link" and "From a file" into two lines each. */}
-      <div className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-surface p-1 text-sm sm:grid-cols-4">
-        {(["manual", "generate", "import", "file"] as Mode[]).map((m) => (
+      {/* Four short labels fit one row on a phone (TEC-135). */}
+      <div role="group" aria-label="How to add it" className="grid grid-cols-4 gap-1 rounded-xl bg-raised p-1 text-[13px]">
+        {MODES.map((m) => (
           <button
             key={m}
             type="button"
+            aria-pressed={mode === m}
             onClick={() => {
               setMode(m);
               setDraft(null);
             }}
-            className={`rounded px-2 py-2 ${
-              mode === m ? "bg-accent font-semibold text-accent-ink" : "text-ink-soft"
-            }`}
+            className={`min-h-11 rounded-[9px] px-1 ${mode === m ? "bg-surface font-bold text-ink" : "text-ink-soft"}`}
           >
             {MODE_LABELS[m]}
           </button>
