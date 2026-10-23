@@ -4,17 +4,17 @@ import { applyEdit, readEdit } from "@/lib/edit";
 import { getRecipe, nameTakenByOther, normalizeName, updateRecipe, type Recipe } from "@/lib/recipes";
 import { statusOf } from "@/lib/errors";
 import { errorResponse } from "@/lib/respond";
-import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
 
 export const dynamic = "force-dynamic";
-// An edit that changes the ingredients makes one pricing call before it writes.
-export const maxDuration = 60;
+// An edit that changes the ingredients makes one pricing call before it writes,
+// thinking at medium effort (TEC-133).
+export const maxDuration = 120;
 
 /**
  * Edit a recipe in the book: every field (2026-09-26). `lib/edit.ts` has
  * the rules — what re-prices, and why a failed re-price writes nothing.
  *
- * Body: `{ id, model?, edit: { name, servings, ingredients, method, meta } }`.
+ * Body: `{ id, edit:{ name, servings, ingredients, method, meta } }`.
  * Answers `{ recipe, repriced }`. **Not contract** — `/api/servings` is the only
  * route Health reads, and it reads the edited row the next time it asks.
  */
@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
   const read = readEdit(body.edit);
   if ("error" in read) return NextResponse.json({ error: read.error }, { status: 400 });
 
-  const model: ModelId =
-    typeof body.model === "string" && body.model in MODELS ? (body.model as ModelId) : DEFAULT_MODEL;
+  // A `model` in the body (an installed copy of the page from before TEC-133)
+  // is ignored, not refused: a re-price runs on lib/models.ts's one model.
 
   try {
     const result = await applyEdit<Recipe>(
@@ -35,12 +35,11 @@ export async function POST(request: NextRequest) {
         getRecipe,
         nameTakenByOther,
         normalizeName,
-        estimate: (recipe) => estimateRecipeMacros({ recipe, model }),
+        estimate: (recipe) => estimateRecipeMacros({ recipe }),
         update: updateRecipe,
       },
       id,
-      read.edit,
-      model
+      read.edit
     );
     return NextResponse.json(result);
   } catch (e) {

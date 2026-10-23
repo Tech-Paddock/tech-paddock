@@ -4,7 +4,6 @@ import { useState } from "react";
 import Provenance from "./Provenance";
 import MacroRow from "./MacroRow";
 import { useToast } from "./Toast";
-import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
 import { methodSteps, perServing, type Recipe, type RecipeDraft } from "@/lib/recipes";
 import { MAX_FILE_BYTES, isFileMediaType, type RecipeFile } from "@/lib/upload";
 import { MAX_STEER, pileForAsk, turnDown, type TurnedDown } from "@/lib/reroll";
@@ -99,7 +98,6 @@ export default function AddRecipe({
     if (draft?.origin === "generated") setTurnedDown(turnDown(turnedDown, draft));
     setDraft(null);
   }
-  const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
 
   const [mode, setMode] = useState<Mode>("generate");
   const [name, setName] = useState("");
@@ -142,7 +140,6 @@ export default function AddRecipe({
         mode === "manual"
           ? {
               mode,
-              model,
               name,
               servings: Number(servings),
               ingredients: ingredients.split("\n").map((l) => l.trim()).filter(Boolean),
@@ -150,10 +147,10 @@ export default function AddRecipe({
               meta: metaForm,
             }
           : mode === "generate"
-            ? { mode, model, brief, picks, turned_down: pile, steer: reroll ? steer : "" }
+            ? { mode, brief, picks, turned_down: pile, steer: reroll ? steer : "" }
             : mode === "import"
-              ? { mode, model, url }
-              : { mode, model, file: file && { mediaType: file.mediaType, data: file.data } };
+              ? { mode, url }
+              : { mode, file:file && { mediaType: file.mediaType, data: file.data } };
 
       const response = await fetch("/api/recipes/draft", {
         method: "POST",
@@ -252,26 +249,6 @@ export default function AddRecipe({
         <h2 className="text-xl font-bold">Add a recipe</h2>
         <p className="text-[13px] text-ink-soft">Anything Claude writes lands as a draft. Nothing saves until you keep it.</p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {/* The model picker sits here and nowhere else, because pricing a dish
-            is the only judgement in the app. Reading the book calls nothing,
-            and neither does keeping a draft. */}
-        <label className="ml-auto flex items-center gap-1.5 text-xs text-ink-soft">
-          <span>Model</span>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value as ModelId)}
-            className="rounded border border-line bg-surface px-2 py-1 text-xs"
-          >
-            {Object.entries(MODELS).map(([id, spec]) => (
-              <option key={id} value={id}>
-                {spec.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
       {/* Four short labels fit one row on a phone (TEC-135). */}
       <div role="group" aria-label="How to add it" className="grid grid-cols-4 gap-1 rounded-xl bg-raised p-1 text-[13px]">
         {MODES.map((m) => (

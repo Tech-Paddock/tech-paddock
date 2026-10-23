@@ -45,11 +45,11 @@ describe("what re-prices", () => {
   it("a changed ingredient does, with one call, and the new pot is what is written", async () => {
     const d = deps();
     const next = edit({ ingredients: ["750g beef mince", "1 tin kidney beans"] });
-    const result = await applyEdit(d, "r1", next, "claude-haiku-4-5");
+    const result = await applyEdit(d, "r1", next);
     expect(d.estimate).toHaveBeenCalledTimes(1);
     expect(d.update).toHaveBeenCalledWith("r1", next, {
       macros: newPot,
-      model: "claude-haiku-4-5",
+      model: "claude-sonnet-5-5",
       note: "assumed 1 tbsp oil",
     });
     expect(result.repriced).toBe(true);
@@ -57,7 +57,7 @@ describe("what re-prices", () => {
 
   it("servings alone does not: same pot, a new divisor", async () => {
     const d = deps();
-    const result = await applyEdit(d, "r1", edit({ servings: 8 }), "claude-haiku-4-5");
+    const result = await applyEdit(d, "r1", edit({ servings: 8 }));
     expect(d.estimate).not.toHaveBeenCalled();
     expect(d.update).toHaveBeenCalledWith("r1", edit({ servings: 8 }), null);
     expect(result.repriced).toBe(false);
@@ -68,8 +68,7 @@ describe("what re-prices", () => {
     await applyEdit(
       d,
       "r1",
-      edit({ name: "Friday chilli", method: "Just cook it.", meta: { ...EMPTY_META, meal: "dinner", rating: 5 } }),
-      "claude-haiku-4-5"
+      edit({ name: "Friday chilli", method: "Just cook it.", meta: { ...EMPTY_META, meal: "dinner", rating: 5 } })
     );
     expect(d.estimate).not.toHaveBeenCalled();
   });
@@ -89,7 +88,7 @@ describe("a failed re-price", () => {
       }),
     });
     await expect(
-      applyEdit(d, "r1", edit({ ingredients: ["750g beef mince"], name: "Renamed" }), "claude-haiku-4-5")
+      applyEdit(d, "r1", edit({ ingredients: ["750g beef mince"], name: "Renamed" }))
     ).rejects.toThrow(/ran out of room/);
     // The name change rode with it and was not written on its own either.
     expect(d.update).not.toHaveBeenCalled();
@@ -103,7 +102,7 @@ describe("a failed re-price", () => {
 describe("refusals before any call", () => {
   it("a name another recipe holds is a 409, and pays for no pricing", async () => {
     const d = deps({ nameTakenByOther: vi.fn(async () => true) });
-    const run = applyEdit(d, "r1", edit({ name: "Beef stew", ingredients: ["other"] }), "claude-haiku-4-5");
+    const run = applyEdit(d, "r1", edit({ name: "Beef stew", ingredients: ["other"] }));
     await expect(run).rejects.toBeInstanceOf(ConflictError);
     expect(d.estimate).not.toHaveBeenCalled();
     expect(d.update).not.toHaveBeenCalled();
@@ -111,14 +110,14 @@ describe("refusals before any call", () => {
 
   it("re-casing its own name is not a collision with itself", async () => {
     const d = deps({ nameTakenByOther: vi.fn(async () => true) });
-    await applyEdit(d, "r1", edit({ name: "weeknight  CHILLI" }), "claude-haiku-4-5");
+    await applyEdit(d, "r1", edit({ name: "weeknight  CHILLI" }));
     expect(d.nameTakenByOther).not.toHaveBeenCalled();
     expect(d.update).toHaveBeenCalled();
   });
 
   it("a recipe no longer in the book is a 400, not an outage", async () => {
     const d = deps({ getRecipe: vi.fn(async () => null) });
-    await expect(applyEdit(d, "gone", edit(), "claude-haiku-4-5")).rejects.toBeInstanceOf(InputError);
+    await expect(applyEdit(d, "gone", edit())).rejects.toBeInstanceOf(InputError);
     expect(d.update).not.toHaveBeenCalled();
   });
 });

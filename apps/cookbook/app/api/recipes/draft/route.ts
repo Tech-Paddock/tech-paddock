@@ -5,14 +5,15 @@ import { MAX_STEER, readTurnedDown } from "@/lib/reroll";
 import { nameTaken, type RecipeDraft } from "@/lib/recipes";
 import { statusOf } from "@/lib/errors";
 import { errorResponse } from "@/lib/respond";
-import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
+import { MODEL } from "@/lib/models";
 import { EMPTY_META, readMeta } from "@/lib/metadata";
 import { hasPicks, readPicks, tagWithPicks } from "@/lib/tuning";
 
 export const dynamic = "force-dynamic";
 // Reading a page and then pricing it is two model calls, one of them with a
-// server tool. The Vercel default would cut the second one off mid-thought.
-export const maxDuration = 120;
+// server tool that may pause and resume. Both think at medium effort (TEC-133),
+// so the room is Coffee's search route's, not the Vercel default.
+export const maxDuration = 300;
 
 /**
  * Four ways into the book, and **none of them writes anything.**
@@ -38,8 +39,8 @@ export const maxDuration = 120;
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const mode = typeof body.mode === "string" ? body.mode : "";
-  const model: ModelId =
-    typeof body.model === "string" && body.model in MODELS ? (body.model as ModelId) : DEFAULT_MODEL;
+  // A `model` in the body (an installed copy of the page from before TEC-133)
+  // is ignored, not refused: every call runs on lib/models.ts's one model.
 
   try {
     let fields: RecipeFields;
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
       const steer = typeof body.steer === "string" ? body.steer.trim() : "";
       if (steer.length > MAX_STEER) return NextResponse.json({ error: "That reason is long." }, { status: 413 });
 
-      fields = await generateRecipe({ brief, model, turnedDown: avoid.turnedDown, steer, picks });
+      fields = await generateRecipe({ brief, turnedDown: avoid.turnedDown, steer, picks });
       // Tagged with what was picked — diet only where the model agrees
       // (`tagWithPicks` says why), and any shortfall said in the note.
       const tagged = tagWithPicks(fields.meta ?? EMPTY_META, picks);
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "That does not look like a link." }, { status: 400 });
       }
 
-      const read = await importRecipe({ url, model });
+      const read = await importRecipe({ url });
       // **The guardrail, failing loudly rather than degrading.** A page that
       // could not be read is a refusal, not a starting point — a recipe
       // reconstructed from a URL slug is indistinguishable from one that was
@@ -135,7 +136,7 @@ export async function POST(request: NextRequest) {
       const checked = validateRecipeFile(body.file);
       if ("error" in checked) return NextResponse.json({ error: checked.error }, { status: 400 });
 
-      const read = await readRecipeFile({ file: checked.file, model });
+      const read = await readRecipeFile({ file: checked.file });
       // The same loud refusal as a page that could not be read.
       if (!read.read || !read.fields) {
         return NextResponse.json(
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
     const assumedServings = fields.servings < 1;
     const servings = assumedServings ? 4 : fields.servings;
 
-    const estimate = await estimateRecipeMacros({ recipe: { ...fields, servings }, model });
+    const estimate = await estimateRecipeMacros({ recipe: { ...fields, servings } });
 
     const draft: RecipeDraft = {
       name: fields.name,
@@ -167,7 +168,7 @@ export async function POST(request: NextRequest) {
       macros: estimate.macros,
       origin,
       source: "estimate",
-      model,
+      model: MODEL,
       source_url: sourceUrl,
       ingredients: fields.ingredients,
       method: fields.method,

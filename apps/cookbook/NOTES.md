@@ -17,9 +17,19 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 - Install icon: `app/apple-touch-icon.png` (No. 12, full-bleed) with `appleWebApp` metadata; its
   colours are fixed in dark mode too.
 - No GET route is cached; caching would serve Health stale servings.
-- Model requests come from `requestShape` in `lib/models.ts` (the third copy of Coffee's registry).
-  Haiku 4.5 gets no effort parameter; it returns 400. Tool-less calls send a JSON schema; every call
-  checks `stop_reason`.
+- **One model, set in `lib/models.ts`** (TEC-133): every call (pricing, Ask Claude, link, file, edit
+  re-price, Tidy, and a resumed `pause_turn`) goes out as `claude-sonnet-5-5` at effort `medium`
+  through `requestShape`, with `THINKING_HEADROOM` added to `max_tokens` because thinking counts
+  against it. No picker; the draft and edit routes ignore a `model` an older page sends. A kept
+  recipe keeps the model that priced it, and `modelLabel` still names Haiku 4.5 and Sonnet 5 for
+  those rows; the save route accepts any model `lib/models.ts` labels, so a draft made before a
+  deploy and kept after it is not refused. `tests/models.test.ts` fails if any other file under
+  `app/` or `lib/` names a model id, an effort, a thinking or sampling setting, `tool_choice` or a
+  tool version. Tool-less calls send a JSON schema; every call checks `stop_reason`, and a
+  `refusal` or `max_tokens` throws a sentence with no retry or fallback.
+- **Sonnet 5.5 400s on** `thinking: {type: "disabled"}`, `budget_tokens`, non-default
+  `temperature`/`top_p`/`top_k`, forced `tool_choice`, and a prefill. Its default effort is `high`,
+  so `medium` is always sent. The draft route allows 300 s, the edit route 120 s.
 
 ## Recipes
 
@@ -48,7 +58,7 @@ Reasoning is in the migration headers.
 
 - `recipes`: `macro_source` has no `web`; a unique index refuses a duplicate name.
 - `grocery_items`: `quantity` 1–99; `recipes` is a snapshot of names, so a rename never reaches
-  it. Tidy (Haiku, checked by `validateTidy`) unions names, takes the larger of the largest absorbed
+  it. Tidy (checked by `validateTidy`) unions names, takes the larger of the largest absorbed
   quantity and the fixed rules' quantity for the merged line, and the latest `sent_at`. "Milk — the
   small tin" is a name and a note; only the name is searched.
 - `products` (`cookbook_products`, TEC-131): **Your brands, one row per product code**
