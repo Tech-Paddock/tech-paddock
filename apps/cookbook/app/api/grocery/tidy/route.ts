@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { tidyList } from "@/lib/anthropic";
 import { applyTidy, readList, validateTidy, type TidyLine } from "@/lib/grocery";
+import { quantityRule } from "@/lib/lineQuantity";
 import { statusOf } from "@/lib/errors";
 import { errorResponse } from "@/lib/respond";
 
@@ -85,7 +86,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ items: await applyTidy(open, lines) });
+    return NextResponse.json({ items: await applyTidy(open, lines, await quantityRule()) });
   } catch (e) {
     return errorResponse(e, "Couldn't apply that.");
   }

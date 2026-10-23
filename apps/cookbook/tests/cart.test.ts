@@ -6,6 +6,7 @@ import {
   RepeatSendError,
   sendLines,
   summarize,
+  type Candidate,
   type CartLine,
   type Decision,
 } from "@/lib/cart";
@@ -19,6 +20,22 @@ import { readProducts, searchTerm, type Product } from "@/lib/kroger";
  */
 
 const PAGE = "https://www.kingsoopers.com/p/fairlife-2-milk/0085631200203";
+
+function candidate(over: Partial<Candidate> = {}): Candidate {
+  return {
+    id: "p1",
+    upc: "0085631200203",
+    url: PAGE,
+    count: 0,
+    missing: false,
+    description: "fairlife 2% Milk",
+    size: "52 fl oz",
+    sizeFirst: "52 fl oz",
+    price: 4.99,
+    names: ["milk"],
+    ...over,
+  };
+}
 
 function line(over: Partial<CartLine> & { id: string; name: string }): CartLine {
   return { note: null, quantity: 1, sent_at: null, ...over };
@@ -68,30 +85,45 @@ describe("what a line becomes", () => {
     const search = vi.fn();
     const plan = await planLine(
       line({ id: "a", name: "milk" }),
-      () => ({ phrase: "milk", kind: "product", url: PAGE, terms: null }),
+      () => ({ kind: "products", via: "name", name: "milk", candidates: [candidate()] }),
       search
     );
-    expect(plan).toMatchObject({ kind: "exact", upc: "0085631200203" });
+    expect(plan).toMatchObject({ kind: "exact", upc: "0085631200203", via: "name" });
     expect(search).not.toHaveBeenCalled();
   });
 
+  it("a line matching several products and no default is Pick one, in the order given (most counted first)", async () => {
+    const search = vi.fn();
+    const a = candidate({ id: "a", upc: "0000000000011", url: "https://www.kingsoopers.com/p/a/0000000000011", count: 9 });
+    const b = candidate({ id: "b", upc: "0000000000022", url: "https://www.kingsoopers.com/p/b/0000000000022", count: 2 });
+    const plan = await planLine(line({ id: "x", name: "coke" }), () => ({ kind: "products", via: "name", name: "coke", candidates: [a, b] }), search);
+    expect(plan).toMatchObject({ kind: "settle", options: [{ upc: "0000000000011" }, { upc: "0000000000022" }] });
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  it("searches the item alone when nothing in Your brands decides the line (TEC-131)", async () => {
+    const search = vi.fn(async () => [product()]);
+    await planLine(line({ id: "a", name: "6 cloves of garlic" }), none, search);
+    expect(search).toHaveBeenCalledWith("garlic cloves");
+  });
+
   it("any other line shows Kroger's top match", async () => {
-    const plan = await planLine(line({ id: "a", name: "eggs" }), none, async () => product());
+    const plan = await planLine(line({ id: "a", name: "eggs" }), none, async () => [product()]);
     expect(plan).toMatchObject({ kind: "match", product: { upc: "0001111041700" } });
   });
 
   it("searches a terms brand's words, not the line's", async () => {
-    const search = vi.fn(async () => product());
+    const search = vi.fn(async () => [product()]);
     await planLine(
       line({ id: "a", name: "milk" }),
-      () => ({ phrase: "milk", kind: "terms", url: null, terms: "fairlife 2%" }),
+      () => ({ kind: "terms", phrase: "milk", terms: "fairlife 2%" }),
       search
     );
     expect(search).toHaveBeenCalledWith("fairlife 2%");
   });
 
   it("says so when Kroger has nothing, or the search fails — never a guess", async () => {
-    expect(await planLine(line({ id: "a", name: "unicorn" }), none, async () => null)).toMatchObject({ kind: "none" });
+    expect(await planLine(line({ id: "a", name: "unicorn" }), none, async () => [])).toMatchObject({ kind: "none" });
     const failed = await planLine(line({ id: "a", name: "eggs" }), none, async () => {
       throw new Error("Kroger's search failed (HTTP 500).");
     });
@@ -176,7 +208,7 @@ describe("a send: every line reports added, skipped or failed", () => {
       { open: [line({ id: "a", name: "milk" })], picks: [{ id: "a", url: PAGE }], again: false },
       { add, remember }
     );
-    expect(remember).toHaveBeenCalledWith("milk", PAGE);
+    expect(remember).toHaveBeenCalledWith("milk", PAGE, "0085631200203", null);
     expect(add).toHaveBeenCalledWith("0085631200203", 1, null);
     // Saved only once the add went in (TEC-128).
     expect(order).toEqual(["add", "remember"]);
@@ -216,7 +248,7 @@ describe("whatever goes in for an unmatched line is remembered in Your brands (T
       { add, remember }
     );
     expect(add).toHaveBeenCalledWith(UPC, 1, null);
-    expect(remember).toHaveBeenCalledWith("milk", MATCH);
+    expect(remember).toHaveBeenCalledWith("milk", MATCH, UPC, null);
     expect(order).toEqual(["add", "remember"]);
     expect(o).toMatchObject({ result: "added", upc: UPC });
     expect(o.detail).toBe("Added ×1. Remembered in Your brands.");
@@ -277,7 +309,7 @@ describe("whatever goes in for an unmatched line is remembered in Your brands (T
       { add, remember }
     );
     expect(o).toMatchObject({ result: "added", withoutModality: true });
-    expect(remember).toHaveBeenCalledWith("milk", MATCH);
+    expect(remember).toHaveBeenCalledWith("milk", MATCH, UPC, null);
     expect(o.detail).toMatch(/Kroger refused the choice\. Remembered in Your brands\.$/);
   });
 

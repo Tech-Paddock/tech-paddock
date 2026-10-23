@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readList, markSent, splitLine, type GroceryItem } from "@/lib/grocery";
-import { readDraft, readPreferences, savePreference } from "@/lib/preferences";
+import { readPreferences } from "@/lib/preferences";
 import { decider } from "@/lib/decide";
-import { addToCart, topProduct } from "@/lib/kroger";
+import { addToCart, searchProducts } from "@/lib/kroger";
 import { withAccessToken } from "@/lib/krogerConnection";
-import { readBrandProducts } from "@/lib/krogerStore";
+import { bumpCounts, readProducts, rememberProduct, setDefault } from "@/lib/productStore";
 import { appendSends } from "@/lib/cartSends";
 import {
+  CHECK_RESULTS,
   alreadySent,
   readPicks,
   repeatsIn,
@@ -25,8 +26,11 @@ import { errorResponse } from "@/lib/respond";
 export const dynamic = "force-dynamic";
 
 /**
- * Send to cart (TEC-90). **No model call on either verb**: Kroger's own search
- * picks the top match, and the user confirms it.
+ * Send to cart (TEC-90). **No model call on either verb**: Your brands decides
+ * what it can (TEC-131), Kroger's own search picks the top match for the rest,
+ * and the user confirms it. **A product found only by its Kroger name is
+ * checked against Kroger's own search for the item** (TEC-135), so the review
+ * reads up to `CHECK_RESULTS` results per search, not one.
  *
  * GET is the review — every open line with what it would become. POST is the
  * send — the lines the user chose, each reported added, skipped or failed.
@@ -43,12 +47,12 @@ async function openLines(): Promise<CartLine[]> {
 
 export async function GET() {
   try {
-    const [open, preferences, products] = await Promise.all([openLines(), readPreferences(), readBrandProducts()]);
-    const decide = decider(preferences, products);
+    const [open, words, products] = await Promise.all([openLines(), readPreferences(), readProducts()]);
+    const decide = decider(products, words);
 
     const lines = await withAccessToken(async (accessToken, store) => {
       if (!store) throw new ConflictError("Pick a store first, so the matches are from your King Soopers.");
-      return reviewLines(open, decide, (term) => topProduct(accessToken, term, store.locationId));
+      return reviewLines(open, decide, (term) => searchProducts(accessToken, term, store.locationId, CHECK_RESULTS));
     });
 
     return NextResponse.json({ lines, alreadySent: alreadySent(open), checkoutUrl: CHECKOUT_URL });
@@ -74,6 +78,20 @@ export async function POST(request: NextRequest) {
       if (repeats.length > 0) throw new RepeatSendError(repeats);
     }
 
+    // **Make default** (TEC-135): the name each ticked line matched, read
+    // *before* the send, because remembering a pick can add the line's own
+    // name to the product and change what the line matches afterwards.
+    const defaultNames = new Map<string, string>();
+    if (picks.some((p) => p.makeDefault)) {
+      const [words, products] = await Promise.all([readPreferences(), readProducts()]);
+      const decide = decider(products, words);
+      for (const line of open) {
+        if (!picks.some((p) => p.id === line.id && p.makeDefault)) continue;
+        const decision = decide(line.name);
+        if (decision?.kind === "products" && decision.matched) defaultNames.set(line.id, decision.matched);
+      }
+    }
+
     const { outcomes, modality } = await withAccessToken(async (accessToken, _store, modality) => ({
       modality,
       outcomes: await sendLines(
@@ -81,14 +99,16 @@ export async function POST(request: NextRequest) {
         {
           // Pickup or Delivery goes with each line; a refusal is retried once without it (lib/cart.ts).
           add: (upc, quantity, m) => addToCart(accessToken, upc, quantity, m),
-          // **What went in is remembered in Your brands** (RULES.md, TEC-128):
-          // a replacement or the tapped match, as an exact product under the
-          // line's name — never its note — through the same validation as the
-          // editor. `sendLines` calls this only after the add succeeded.
-          remember: async (name, url) => {
-            const read = readDraft({ phrase: splitLine(name).name, kind: "product", url });
-            if ("error" in read) throw new InputError(read.error);
-            await savePreference(read.row);
+          // **What went in is remembered in Your brands** (RULES.md, TEC-128,
+          // TEC-131): a pick, a replacement or the tapped match — the line's
+          // name (never its note) added to that product's names, or a new
+          // product row. `sendLines` calls this only after the add succeeded.
+          remember: (name, page, upc, size) => rememberProduct(splitLine(name).name, upc, page, size),
+          // Only for a name that matched several saved products (RULES.md).
+          makeDefault: async (line, upc) => {
+            const name = defaultNames.get(line.id);
+            if (!name) throw new ConflictError("this line no longer matches a saved name");
+            await setDefault([name], upc);
           },
         }
       ),
@@ -107,6 +127,14 @@ export async function POST(request: NextRequest) {
       await markSent(added, new Date().toISOString());
     } catch {
       problems.push("A second send won't warn about them.");
+    }
+    // **+1 on each product that went in** (TEC-131), after remembering, so a
+    // product saved by this send counts its first add. A failure is said;
+    // the items are in the cart either way.
+    try {
+      await bumpCounts(outcomes.flatMap((o) => (o.result === "added" && o.upc ? [o.upc] : [])));
+    } catch {
+      problems.push("The counts in Your brands didn't go up.");
     }
     const recordError = problems.length > 0 ? `These are in the cart, but this app couldn't record it. ${problems.join(" ")}` : null;
 
