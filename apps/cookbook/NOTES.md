@@ -279,7 +279,9 @@ array**; each element is a product row or a search-word row.
 ## List lines (TEC-131)
 
 - **The tab** (TEC-135): the header (**N still to buy** · about $N · the store, and Pickup/Delivery),
-  a one-line add box ("notes after a dash"; Enter adds), **Cooking this week** (the menu as day and
+  an add box that looks one line high and grows to show a paste: **one item per line**
+  (`typedLines`, `lib/typedLines.ts`; owner, 2026-10-23, "Keep multi-line paste"; Enter adds,
+  Shift+Enter starts a line; "notes after a dash"), **Cooking this week** (the menu as day and
   recipe chips with a two-tap Clear; names come from the book via `Cookbook.tsx`; moving a day
   stays on the book's *On the menu*), **Still to buy · N** with Copy · Tidy · Clear ticked · Clear
   all, the lines, the legend, the King Soopers panel, then the sticky bar.

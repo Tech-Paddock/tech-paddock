@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { typedLines } from "@/lib/typedLines";
 import { MAX_QUANTITY, asText, type GroceryItem, type TidyLine } from "@/lib/grocery";
 import type { ResolvedLink } from "@/lib/preferences";
 import type { LineMark } from "@/lib/brands";
@@ -81,6 +82,14 @@ export default function List({
   const [proposal, setProposal] = useState<TidyLine[] | null>(null);
   const [copied, setCopied] = useState(false);
   const [reloads, setReloads] = useState(0);
+  // The add box looks like one line and grows to show a pasted list before Add.
+  const box = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [typed]);
 
   const load = useCallback(async () => {
     try {
@@ -108,7 +117,8 @@ export default function List({
   });
 
   async function add() {
-    const lines = typed.split("\n").map((l) => l.trim()).filter(Boolean);
+    // **One item per line** (owner, 2026-10-23: "Keep multi-line paste").
+    const lines = typedLines(typed);
     if (lines.length === 0 || busy) return;
     setBusy("adding");
     try {
@@ -309,23 +319,30 @@ export default function List({
 
       {/* **Adding sits at the top** (2026-09-22): it is what you do most here. */}
       <div className="flex gap-2">
-        <input
+        {/* One line to look at; a paste of several lines shows them all, one
+            item each. Enter adds; Shift+Enter starts another line. */}
+        <textarea
+          ref={box}
+          rows={1}
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") void add();
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              void add();
+            }
           }}
           placeholder="Add an item — notes after a dash"
-          aria-label="Add an item"
-          className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3.5 text-base"
+          aria-label="Add items, one per line"
+          className="min-h-11 min-w-0 flex-1 resize-none overflow-hidden rounded-xl border border-line bg-surface px-3.5 py-2.5 text-base leading-snug"
         />
         <button
           type="button"
           onClick={() => void add()}
           disabled={typed.trim() === "" || busy !== null}
-          className="min-h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-50"
+          className="min-h-11 self-start rounded-xl bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-50"
         >
-          {busy === "adding" ? "Adding…" : "Add"}
+          {busy === "adding" ? "Adding…" : typedLines(typed).length > 1 ? `Add ${typedLines(typed).length}` : "Add"}
         </button>
       </div>
 
