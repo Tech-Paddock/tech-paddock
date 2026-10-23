@@ -5,19 +5,38 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 ## Shape
 
 - Next 16, React 19. Gate: `proxy.ts`, Node runtime, base copy; `drift` fails a `middleware.ts`.
-- Tabs in `lib/tabs.ts`, rendered by `app/Cookbook.tsx`: `/` Recipes, `/add` (`AddRecipe.tsx`),
-  `/list` (signed out, it round-trips `/login?from=/list`), `/brands` Your brands (`Brands.tsx`,
-  TEC-131). All panels stay mounted; a send or refresh on the list bumps Your brands, and an edit
-  in Your brands reloads the list. Results are toasts; a failed read stays inline.
+- Tabs in `lib/tabs.ts`, rendered by `app/Cookbook.tsx` as one scrolling row of pills: `/`
+  Recipes, `/add` (`AddRecipe.tsx`), `/list` (signed out, it round-trips `/login?from=/list`),
+  `/brands` Your brands (`Brands.tsx`, TEC-131). All panels stay mounted; a send or refresh on the
+  list bumps Your brands, and an edit in Your brands reloads the list. Results are toasts; a failed
+  read stays inline.
+- **The look is the owner's mockup of 2026-10-23** (TEC-135; the canvas is linked from TEC-135):
+  bold headings with a one-line count under them, cards on `bg-surface` with no border, segmented
+  switches on `bg-raised`, uppercase section headings, sticky action bars at the bottom. Theme
+  tokens only; the mock's peach and green stood in for the livery. Deals (TEC-132) is not built.
 - Install icon: `app/apple-touch-icon.png` (No. 12, full-bleed) with `appleWebApp` metadata; its
   colours are fixed in dark mode too.
 - No GET route is cached; caching would serve Health stale servings.
-- Model requests come from `requestShape` in `lib/models.ts` (the third copy of Coffee's registry).
-  Haiku 4.5 gets no effort parameter; it returns 400. Tool-less calls send a JSON schema; every call
-  checks `stop_reason`.
+- **One model, set in `lib/models.ts`** (TEC-133): every call (pricing, Ask Claude, link, file, edit
+  re-price, Tidy, and a resumed `pause_turn`) goes out as `claude-sonnet-5-5` at effort `medium`
+  through `requestShape`, with `THINKING_HEADROOM` added to `max_tokens` because thinking counts
+  against it. No picker; the draft and edit routes ignore a `model` an older page sends. A kept
+  recipe keeps the model that priced it, and `modelLabel` still names Haiku 4.5 and Sonnet 5 for
+  those rows; the save route accepts any model `lib/models.ts` labels, so a draft made before a
+  deploy and kept after it is not refused. `tests/models.test.ts` fails if any other file under
+  `app/` or `lib/` names a model id, an effort, a thinking or sampling setting, `tool_choice` or a
+  tool version. Tool-less calls send a JSON schema; every call checks `stop_reason`, and a
+  `refusal` or `max_tokens` throws a sentence with no retry or fallback.
+- **Sonnet 5.5 400s on** `thinking: {type: "disabled"}`, `budget_tokens`, non-default
+  `temperature`/`top_p`/`top_k`, forced `tool_choice`, and a prefill. Its default effort is `high`,
+  so `medium` is always sent. The draft route allows 300 s, the edit route 120 s.
 
 ## Recipes
 
+- **Add's order is Ask Claude · Link · File · Type it, and it opens on Ask Claude** (TEC-135,
+  `MODES` in `AddRecipe.tsx`). The modes' behaviour is unchanged.
+- Recipes cards (TEC-135): name with rating · time, the facts line, and four macro tiles per
+  serving; opening one is unchanged. *On the menu* stays beside the book.
 - The typed path runs a name check before its pricing call.
 - An import is also refused when no fetch returned a page (`lib/fetchRun.ts`).
 - **Something else** re-asks with every turned-down draft and its reason (`lib/reroll.ts`); **Bin
@@ -39,19 +58,27 @@ Reasoning is in the migration headers.
 
 - `recipes`: `macro_source` has no `web`; a unique index refuses a duplicate name.
 - `grocery_items`: `quantity` 1–99; `recipes` is a snapshot of names, so a rename never reaches
-  it. Tidy (Haiku, checked by `validateTidy`) unions names, takes the larger of the largest absorbed
+  it. Tidy (checked by `validateTidy`) unions names, takes the larger of the largest absorbed
   quantity and the fixed rules' quantity for the merged line, and the latest `sent_at`. "Milk — the
   small tin" is a name and a note; only the name is searched.
 - `products` (`cookbook_products`, TEC-131): **Your brands, one row per product code**
   (`product_id`, unique, 8–14 digits). `names` text[] (at least one; matched in code), `count`
   (+1 per Send add via `bumpCounts`; set absolutely by a batch; the editor never sets it),
   `size_first` (never overwritten by a refresh, which only fills it when empty; a batch fills it
-  only when empty; the editor can correct it), `brand`/`note` (owner's words), Kroger's fields
+  only when empty; the editor can correct it), `brand`/`note` (owner's words; a `note` starting
+  `check:` lists the row under Fix these), `default_for` (TEC-135, below), Kroger's fields
   (`description`, `kroger_brand`, `size`, `url`, `price`, `in_stock`, `checked_at`,
   `missing_since`), `successor` jsonb, and the optional pack conversion `pack_label` (shopping unit
   shown on the list, "Heads of Garlic"), `pack_size` + `pack_unit` (together or neither: 1 holds
   10 cloves). Reads/writes in `lib/productStore.ts`; rules in `lib/brands.ts`. Changing a row's
   code in the editor clears Kroger's fields.
+- `products.default_for` (`cookbook_product_defaults`, TEC-135): text[], the names (as matched,
+  `normalizeName`) this product is the **default** for. No index can hold one per name across
+  rows, so `setDefault` (`lib/productStore.ts`, from `defaultPatches`) takes the name off every
+  other row before adding it, and `defaultFor` reads two claims as none, so a race reads as Pick
+  one. An element that is no longer one of the row's names is ignored, and an edit of the names
+  drops it (`keptDefaults`). A successor replace keeps it. **Not in the batch format**: Export
+  leaves it out and Paste a batch never sets it.
 - `brand_preferences`: since TEC-131 **only its `terms` and old `plain` rows are read**
   (`readPreferences` filters `kind <> 'product'`). Its `product` rows were copied to `products` by
   the migration and are kept, unread, until the drop pull request; their phrases still hold the
@@ -83,28 +110,54 @@ Reasoning is in the migration headers.
 - Scopes: `cart.basic:write product.compact`. A missing variable is named on the list tab and in
   `/api/health`.
 - `GET /api/kroger/cart` is the review. **Which products decide a line** is `decide`
-  (`lib/brands.ts`), one copy for the review, the estimate, the deal scan and the list's links:
-  (1) a line that is 8–14 digits is that code, saved or not; (2) saved names as whole words,
+  (`lib/brands.ts`), one copy for the review, the estimate, the deal scan, the list's links and
+  marks: (1) a line that is 8–14 digits is that code, saved or not; (2) saved names as whole words,
   longest first, every product carrying the longest matching name a candidate; a search-word
-  phrase longer than that decides instead, and on equal length products win; (3) only when no name
-  matched, the item alone (`itemWords`) against each product's `description`, every item word a
-  whole word in any order, a trailing s/es either side. Candidates are most counted, then most
-  recently updated. `planLine`: one candidate is `exact`, several `settle`, none a Kroger search
-  (`match` / `none`). The estimate and the deal scan price the top candidate.
-- **Three sections**: tapping **Send to cart** runs the review, then `Cart.tsx` POSTs every
-  `exact` line with no `sent_at` at once (*Straight in from Your brands*); the rest show as
-  *Matched in Your brands* (already sent, or not taken in), *Settle these* (chips, nothing
-  preselected, a drift note on a chip whose size changed) and *No match*. If that first POST fails
-  or 409s, those lines join the review ticked. Each result block shows only its own lines; the
-  server's `summary` still counts every open line. The chips, the drift note and the section
+  phrase longer than that decides instead, and on equal length products win. Among several
+  (TEC-135), **a product the line names** wins (`namedAmong`: the line's item words beyond the
+  matched name all in exactly one candidate's description or names, "sourdough" in "sourdough
+  english muffins"), else **the matched name's default** (`defaultFor`); either is `chosen` and
+  moves first. `matched` is the one name that matched (null when two different names of equal
+  length did: no default then). (3) Only when no name matched, the item alone (`itemWords`)
+  against each product's `description`, every item word a whole word in any order, a trailing
+  s/es either side: `via: "description"`, **unconfirmed** until Send checks it. Candidates are
+  most counted, then most recently updated.
+- `planLine` (`lib/cart.ts`): one candidate, or a `chosen` one, is `exact` (*Going in*, carrying
+  every option for "tap to change" and `chosen: one | default | named`); several and none chosen
+  is `settle` (*Pick one*, carrying `matched`); anything else is a Kroger search (`match` /
+  `none`). **The official-name check** (TEC-135): `search` returns up to `CHECK_RESULTS` of
+  Kroger's results for the item (`searchProducts`); a `description` candidate passes only when its
+  code is among them. One passing is `exact`, several `settle`; none falls to `match` with that
+  search's top result. Tests: `tests/sendDefaults.test.ts` ("8 oz spaghetti" vs a sauce, "1 tsp
+  salt" vs caramels, `fetch` stubbed).
+- **The review** (`SendView`, `app/Cart.tsx`) replaces the list on the list tab, with *← Back to
+  the list*; nothing goes in until **Send N to cart**. One list in sections: *Pick one* (most
+  bought pre-picked; opens on the first), *Going in* (tap to change), *Not saved yet* (ticked;
+  *Paste a product page*), and *Already sent* (unticked; ticking one needs the "add again" box).
+  A picked option is filled with the accent. **Make default** (a checkbox, only where `matched`
+  and several options) rides on the pick as `makeDefault`. **Not this trip** is the only way a
+  line with a product stays out; a line with nothing to add is sent as a bare `{id}` and comes
+  back "No product to add.". After Send the same view shows every outcome, and **Still on your
+  list** names every line this send left unsent. The rows, filled options, boxes and section
   headings are local patterns in `app/Cart.tsx`.
+- **Make default on Send**: the route reads each ticked line's `matched` name **before** sending
+  (remembering a pick can add the line's own name to the product, which would change what it
+  matches), and `sendLines` calls `makeDefault` only after that line's add succeeded, after
+  remembering. A failure is appended to the line ("Couldn't make it the default … do it in Your
+  brands"); the line stays added.
+- A line left out of the picks reports skipped, "Not this trip — still on your list."
+- The state is `useCart` (`app/Cart.tsx`); `List.tsx` lays out `SendView`, `CartPanel`
+  (connection, store, refresh, Take back's confirm, the estimate, deals) and `CartBar` (sticky
+  **Send to cart** and **Take back**). `serialKroger` is module-level, so the list and Your
+  brands' Refresh now share one Kroger queue.
 - **Searching by the item alone** (TEC-131): `lineTerm` (`lib/cart.ts`) is
   `searchTerm(itemWords(name)) ?? searchTerm(name)`, used by `planLine` and `targetFor`; a
   phrase's search words are searched as written. The list's links use `itemWords` too
   (`linkFor`, `lib/preferences.ts`). Rule and edges: `lib/itemWords.ts`,
   `tests/itemWords.test.ts`.
-- **Remembering** (TEC-128, TEC-131): whatever goes in for a non-exact line, a Settle these pick,
-  a pasted page or the tapped top match, goes through `rememberProduct`: the line's name
+- **Remembering** (TEC-128, TEC-131): whatever goes in other than a Going in line's own product,
+  a Pick one pick, a changed Going in pick, a pasted page or the tapped top match, goes through
+  `rememberProduct`: the line's name
   (`splitLine`, so never the note) is added to the names of the row with that code, or a new row
   is made (`size_first` = the match's `size`, which the client sends beside `match`; null for a
   pasted page until the next refresh fills it). The client sends the page as `match` beside its
@@ -143,14 +196,17 @@ Reasoning is in the migration headers.
 ## Prices (TEC-121)
 
 - Pure logic in `lib/pricing.ts`, wired in `lib/dealRun.ts`; `lib/decide.ts` is the one brand
-  decider for the review, the estimate and the scan, so a line is priced as what Send would add.
+  decider for the review, the estimate and the scan, so a line is priced as what Send would add
+  (its default or named product first). A line decided only by a product's Kroger name is priced
+  as Kroger's top match for the item (`targetFor`), because only Send checks that product.
   Exact IDs go in one `productsByIds` call (50 per request); searches run four at a time.
 - Deal scan: `GET`/`POST /api/kroger/deals`. Every saved product (by code), every search-word phrase, plus every open line; a deal is
   `promo < regular`, sorted by percent off, then dollars. Runs when the list opens and the latest
   scan is over seven days old (`scanDue`), or on *Scan for deals*. A scan that throws saves
   nothing, so the next open retries.
 - Coupons are never read. *Find coupons* is `couponsUrl` (`lib/kingsoopers.ts`), a constant.
-- Estimate: `POST /api/kroger/estimate`, computed and not stored. Promo first, in cents. A line not
+- Estimate: `POST /api/kroger/estimate`, computed and not stored. The list header shows "about
+  $N" (rounded) from the last one, or *estimate it*. Promo first, in cents. A line not
   offered for the chosen mode, with no price or with no match is unpriced and named; with nothing
   priced, `total` is null and the sentence says there is no estimate.
 - Pickup/Delivery: `PATCH /api/kroger`, `lib/modality.ts` (no imports; the browser runs it). Send
@@ -170,12 +226,18 @@ Reasoning is in the migration headers.
 
 ## Your brands (TEC-131)
 
-- The tab (`app/Brands.tsx`): counts (products, phrases, how many changed size, how many Kroger no
-  longer returns), a filter over names, Kroger's name and code, one row per product (names, count,
-  code linking to its page, what the last refresh saw, the size first bought, a drift line, the
-  pack conversion, the missing flag with its successor and **Replace with it**), search words, the
-  editors, Export and Paste a batch. The rows, drift and successor lines, filter and batch chips
-  are local patterns.
+- The tab (`app/Brands.tsx`, TEC-135 look): the count and when last checked, **Refresh now** (the
+  list's refresh, through `serialKroger`), a search over names, Kroger's name and code, and the
+  filters **All · Pick a default · Fix these · N**. **Fix these · shrank, discontinued or seeded
+  wrong** (`fixThese`, `lib/brandGroups.ts`): size drift (shrank / grew / changed size), a product
+  Kroger no longer returns (**Replace** when a successor was found, else edit), and rows whose note
+  starts `check:`. Then **groups** (`brandGroups`): products joined through any shared name
+  (union-find), titled by the shared name most carry, the default first and starred, "bought N×",
+  *when the line says "…"* (`namingHint`: up to two words of its Kroger name no other member is
+  known by) and **Make default** on the others. Make default posts `POST /api/brands/default`
+  with every shared name that product carries. A lone product is its own group and its own
+  default. Footer: Remember a product · Paste a batch · Export · Search words. The cards, rows,
+  Fix these panel and the filter are local patterns.
 - Routes: `GET/POST/DELETE /api/brands` (POST a product: `names` as one comma-separated field or a
   list, `product` as a page or code, optional `size_first`, `pack_*`; `id` to edit, whose names are
   then the whole list; without `id` a saved code gets the names added. `kind: "terms"` for search
@@ -226,6 +288,16 @@ array**; each element is a product row or a search-word row.
 
 ## List lines (TEC-131)
 
+- **The tab** (TEC-135): the header (**N still to buy** · about $N · the store, and Pickup/Delivery),
+  an add box that looks one line high and grows to show a paste: **one item per line**
+  (`typedLines`, `lib/typedLines.ts`; owner, 2026-10-23, "Keep multi-line paste"; Enter adds,
+  Shift+Enter starts a line; "notes after a dash"), **Cooking this week** (the menu as day and
+  recipe chips with a two-tap Clear; names come from the book via `Cookbook.tsx`; moving a day
+  stays on the book's *On the menu*), **Still to buy · N** with Copy · Tidy · Clear ticked · Clear
+  all, the lines, the legend, the King Soopers panel, then the sticky bar.
+- **Each line's mark** (`lineMark`, `lib/brands.ts`; `GET /api/grocery` adds `mark`): ★ goes in
+  as a saved product (code, only product, default, or named), ? needs a pick at Send, + anything
+  else, including a product found only by its Kroger name and a typed code that is not saved.
 - **Shown as what you buy** (`lib/lineView.ts`, display only; `GET /api/grocery` adds `view` to
   each line): `[ ] <name> — <recipes> · <amount> · <note>   ×<quantity>`, the name full size and
   the rest small. The name is the decided product's `pack_label` (the top candidate when several
@@ -288,7 +360,20 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 - A product name equal to a search-word phrase: the product wins, and the phrase row is dead
   until one of them is renamed or forgotten.
 - Matching by official name only runs when no saved name matched, and only after a refresh has
-  filled `description`; a freshly pasted seed matches by names only until **Refresh now**.
+  filled `description`; a freshly pasted seed matches by names only until **Refresh now**. Since
+  TEC-135 Send offers such a match only when Kroger's top `CHECK_RESULTS` for the item include
+  its code, so a real match that Kroger ranks lower falls to Not saved yet; tap the right product
+  (it is remembered) or add the name in Your brands.
+- **`cookbook_product_defaults` must be applied before this code runs**: `readProducts` selects
+  `default_for`, so without it every reader of `products` fails (the list's links, Your brands,
+  Send, the estimate, the scan, the refresh).
+- A Pick one pick is remembered, so the line's whole name joins that product's names; the next
+  time that exact line has one match and goes straight in, whatever the default.
+- The list's link and the estimate for a line decided by default follow the default; changing the
+  default in Your brands changes them on the next read.
+- Your brands' groups chain through shared names, so one broad name ("milk") can pull unrelated
+  products into one card. Make default sets only the shared names that product carries; when it
+  does not carry the card's title name, the card still reads as needing a default.
 - A bare code becomes `/p/<first-name-slug>/<code>`, unconfirmed as a page King Soopers serves
   (kingsoopers.com is unreachable from here). Send reads only the digits; the refresh replaces it
   with Kroger's own page. Run **Refresh now** after pasting a seed.

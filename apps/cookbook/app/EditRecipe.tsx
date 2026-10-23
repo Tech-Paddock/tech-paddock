@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useToast } from "./Toast";
 import { MetaFields, formFromMeta, type MetaForm } from "./Meta";
 import { changesThePot, cleanIngredients } from "@/lib/edit";
-import { MODELS, type ModelId } from "@/lib/models";
 import type { Recipe } from "@/lib/recipes";
 
 /**
@@ -18,14 +17,10 @@ import type { Recipe } from "@/lib/recipes";
  */
 export default function EditRecipe({
   recipe,
-  model,
-  onModel,
   onSaved,
   onCancel,
 }: {
   recipe: Recipe;
-  model: ModelId;
-  onModel: (model: ModelId) => void;
   onSaved: (recipe: Recipe, repriced: boolean) => void;
   onCancel: () => void;
 }) {
@@ -50,7 +45,6 @@ export default function EditRecipe({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: recipe.id,
-          model,
           edit: { name, servings: Number(servings), ingredients: lines, method, meta },
         }),
       });
@@ -113,22 +107,6 @@ export default function EditRecipe({
         <button type="button" onClick={onCancel} disabled={saving} className="rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50">
           Cancel
         </button>
-        {reprices ? (
-          <label className="ml-auto flex items-center gap-1.5 text-xs text-ink-soft">
-            <span>Model</span>
-            <select
-              value={model}
-              onChange={(e) => onModel(e.target.value as ModelId)}
-              className="rounded border border-line bg-surface px-2 py-1 text-xs"
-            >
-              {Object.entries(MODELS).map(([id, spec]) => (
-                <option key={id} value={id}>
-                  {spec.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
         <button
           type="button"
           onClick={save}

@@ -4,7 +4,6 @@ import { useState } from "react";
 import Provenance from "./Provenance";
 import MacroRow from "./MacroRow";
 import { useToast } from "./Toast";
-import { MODELS, DEFAULT_MODEL, type ModelId } from "@/lib/models";
 import { methodSteps, perServing, type Recipe, type RecipeDraft } from "@/lib/recipes";
 import { MAX_FILE_BYTES, isFileMediaType, type RecipeFile } from "@/lib/upload";
 import { MAX_STEER, pileForAsk, turnDown, type TurnedDown } from "@/lib/reroll";
@@ -31,16 +30,23 @@ import { NO_PICKS, hasPicks, type Picks } from "@/lib/tuning";
  * **It is a tab of its own now** (2026-10-05, replacing the two-tab
  * index): Recipes · Add · King Soopers list. So it is always open — the collapse
  * it had while it sat above the book has nothing left to save room for.
+ *
+ * **The order is Ask Claude · Link · File · Type it, with Ask Claude chosen
+ * first** (TEC-135, the owner's mockup of 2026-10-23; `RULES.md`, *Recipes*).
+ * Only the order, the labels and the look changed; every way in works as before.
  */
 
 type Mode = "manual" | "generate" | "import" | "file";
 
 const MODE_LABELS: Record<Mode, string> = {
-  manual: "Type it",
   generate: "Ask Claude",
-  import: "From a link",
-  file: "From a file",
+  import: "Link",
+  file: "File",
+  manual: "Type it",
 };
+
+/** The order on the tab (TEC-135). */
+const MODES: Mode[] = ["generate", "import", "file", "manual"];
 
 /**
  * Turn a chosen file into what the draft route accepts.
@@ -92,9 +98,8 @@ export default function AddRecipe({
     if (draft?.origin === "generated") setTurnedDown(turnDown(turnedDown, draft));
     setDraft(null);
   }
-  const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
 
-  const [mode, setMode] = useState<Mode>("manual");
+  const [mode, setMode] = useState<Mode>("generate");
   const [name, setName] = useState("");
   const [servings, setServings] = useState("4");
   const [ingredients, setIngredients] = useState("");
@@ -135,7 +140,6 @@ export default function AddRecipe({
         mode === "manual"
           ? {
               mode,
-              model,
               name,
               servings: Number(servings),
               ingredients: ingredients.split("\n").map((l) => l.trim()).filter(Boolean),
@@ -143,10 +147,10 @@ export default function AddRecipe({
               meta: metaForm,
             }
           : mode === "generate"
-            ? { mode, model, brief, picks, turned_down: pile, steer: reroll ? steer : "" }
+            ? { mode, brief, picks, turned_down: pile, steer: reroll ? steer : "" }
             : mode === "import"
-              ? { mode, model, url }
-              : { mode, model, file: file && { mediaType: file.mediaType, data: file.data } };
+              ? { mode, url }
+              : { mode, file:file && { mediaType: file.mediaType, data: file.data } };
 
       const response = await fetch("/api/recipes/draft", {
         method: "POST",
@@ -240,42 +244,23 @@ export default function AddRecipe({
           : file !== null && !preparing;
 
   return (
-    <section id="add" className="flex flex-col gap-3 rounded-lg border border-line p-3">
-      <h2 className="text-base font-semibold">Add a recipe</h2>
-      <div className="flex flex-wrap items-center gap-2">
-        {/* The model picker sits here and nowhere else, because pricing a dish
-            is the only judgement in the app. Reading the book calls nothing,
-            and neither does keeping a draft. */}
-        <label className="ml-auto flex items-center gap-1.5 text-xs text-ink-soft">
-          <span>Model</span>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value as ModelId)}
-            className="rounded border border-line bg-surface px-2 py-1 text-xs"
-          >
-            {Object.entries(MODELS).map(([id, spec]) => (
-              <option key={id} value={id}>
-                {spec.label}
-              </option>
-            ))}
-          </select>
-        </label>
+    <section id="add" className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1 px-2">
+        <h2 className="text-xl font-bold">Add a recipe</h2>
+        <p className="text-[13px] text-ink-soft">Anything Claude writes lands as a draft. Nothing saves until you keep it.</p>
       </div>
-
-      {/* Two by two on a phone: four labels in one row would crush "From a
-          link" and "From a file" into two lines each. */}
-      <div className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-surface p-1 text-sm sm:grid-cols-4">
-        {(["manual", "generate", "import", "file"] as Mode[]).map((m) => (
+      {/* Four short labels fit one row on a phone (TEC-135). */}
+      <div role="group" aria-label="How to add it" className="grid grid-cols-4 gap-1 rounded-xl bg-raised p-1 text-[13px]">
+        {MODES.map((m) => (
           <button
             key={m}
             type="button"
+            aria-pressed={mode === m}
             onClick={() => {
               setMode(m);
               setDraft(null);
             }}
-            className={`rounded px-2 py-2 ${
-              mode === m ? "bg-accent font-semibold text-accent-ink" : "text-ink-soft"
-            }`}
+            className={`min-h-11 rounded-[9px] px-1 ${mode === m ? "bg-surface font-bold text-ink" : "text-ink-soft"}`}
           >
             {MODE_LABELS[m]}
           </button>

@@ -6,7 +6,6 @@ import Menu from "./Menu";
 import MacroRow from "./MacroRow";
 import { useToast } from "./Toast";
 import { round, scale } from "@/lib/macros";
-import { DEFAULT_MODEL, type ModelId } from "@/lib/models";
 import { methodSteps, perServing, type Recipe, type RecipeOrigin } from "@/lib/recipes";
 import { formatMinutes, pillFacts } from "@/lib/metadata";
 import { localToday, menuDayLabel, parseDay } from "@/lib/menuDay";
@@ -47,8 +46,6 @@ export default function Book({
   const [readError, setReadError] = useState<string | null>(null);
   const toast = useToast();
   const [filter, setFilter] = useState<BookFilter>(NO_FILTER);
-  // The model an edit re-prices with. Drafting has its own, on the Add tab.
-  const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -200,20 +197,27 @@ export default function Book({
       {/* Boxed and named "Recipes" — the same frame as the
           panel above, so the page reads as two things rather than one form
           trailing into a list. */}
-      <section id="book" className="flex scroll-mt-4 flex-col gap-3 rounded-lg border border-line p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold">Recipes</h2>
-          {recipes !== null && recipes.length > 0 ? (
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              type="search"
-              placeholder="Search"
-              aria-label="Search your recipes"
-              className="ml-auto min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm sm:max-w-56"
-            />
+      {/* The new look (TEC-135, the owner's mockup): a heading with the count,
+          a full-width search, the filters, then cards. Behaviour unchanged. */}
+      <section id="book" className="flex scroll-mt-4 flex-col gap-3">
+        <div className="flex flex-col gap-1 px-2">
+          <h2 className="text-xl font-bold">Recipes</h2>
+          {recipes !== null ? (
+            <p className="text-[13px] text-ink-soft">
+              {recipes.length} recipe{recipes.length === 1 ? "" : "s"} · per serving
+            </p>
           ) : null}
         </div>
+        {recipes !== null && recipes.length > 0 ? (
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            type="search"
+            placeholder="Search the book"
+            aria-label="Search recipes"
+            className="min-h-11 rounded-xl border border-line bg-surface px-3.5 text-base"
+          />
+        ) : null}
         {recipes !== null && recipes.length > 0 ? (
           <BookFilters value={filter} onChange={setFilter} cuisines={cuisinesIn(recipes)} />
         ) : null}
@@ -250,8 +254,6 @@ export default function Book({
                 rating={rating === recipe.id}
                 onRate={(value) => rate(recipe, value)}
                 onRemove={() => remove(recipe)}
-                model={model}
-                onModel={setModel}
                 onEdited={edited}
               />
             ))}
@@ -272,8 +274,6 @@ function RecipeCard({
   onList,
   onRate,
   onRemove,
-  model,
-  onModel,
   onEdited,
 }: {
   recipe: Recipe;
@@ -284,8 +284,6 @@ function RecipeCard({
   onList: (day: string) => void;
   onRate: (value: number | null) => void;
   onRemove: () => void;
-  model: ModelId;
-  onModel: (model: ModelId) => void;
   onEdited: (recipe: Recipe, repriced: boolean) => void;
 }) {
   const [count, setCount] = useState("1");
@@ -304,7 +302,7 @@ function RecipeCard({
 
   return (
     // The id is what "On the menu" scrolls to.
-    <li id={`recipe-${recipe.id}`} className="scroll-mt-4 rounded-lg border border-line bg-surface">
+    <li id={`recipe-${recipe.id}`} className="scroll-mt-4 overflow-hidden rounded-xl bg-surface">
       {/* **A lean pill: the name gives way, the facts do not.** `truncate` rather
           than a character count — a count that fits a laptop overflows a phone,
           and this is mostly a phone object. `min-w-0` is what lets the name
@@ -313,20 +311,34 @@ function RecipeCard({
           **Rating and time stay on a phone; meal, main and cuisine give way**
           (TEC-52), as the origin already did. Each is simply absent when unset,
           which is every recipe until the backfill. */}
-      <button type="button" onClick={onToggle} className="flex w-full items-baseline gap-2 p-3 text-left">
-        <span className="min-w-0 truncate text-sm font-medium">{recipe.name}</span>
-        {recipe.rating ? (
-          <span className="shrink-0 text-[11px]">
-            <Stars rating={recipe.rating} />
+      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full flex-col gap-1.5 px-3.5 py-3 text-left">
+        <span className="flex w-full items-baseline justify-between gap-2">
+          <span className="min-w-0 truncate text-base font-semibold">{recipe.name}</span>
+          <span className="flex shrink-0 items-baseline gap-1 whitespace-nowrap text-xs text-ink-soft">
+            {recipe.rating ? <Stars rating={recipe.rating} /> : null}
+            {recipe.rating && minutes ? " · " : null}
+            {minutes ? <span className="tabular-nums">{minutes}</span> : null}
           </span>
-        ) : null}
-        {minutes ? <span className="shrink-0 text-[11px] tabular-nums text-ink-soft">{minutes}</span> : null}
-        <span className="hidden shrink-0 text-[11px] text-ink-soft sm:inline">
+        </span>
+        <span className="text-xs text-ink-soft">
           {facts.length ? `${facts.join(" · ")} · ` : ""}
           {ORIGIN_LABELS[recipe.origin]} · makes {recipe.servings}
         </span>
-        <span className="ml-auto shrink-0 text-xs tabular-nums text-ink-soft">
-          {round(serving).kcal} kcal a serving
+        {/* One serving's numbers as four tiles. */}
+        <span className="grid w-full grid-cols-4 gap-1">
+          {(
+            [
+              ["kcal", String(round(serving).kcal)],
+              ["protein", `${round(serving).protein_g}g`],
+              ["carbs", `${round(serving).carbs_g}g`],
+              ["fat", `${round(serving).fat_g}g`],
+            ] as const
+          ).map(([k, v]) => (
+            <span key={k} className="flex flex-col rounded-lg bg-raised px-2 py-1.5">
+              <span className="text-sm font-bold tabular-nums">{v}</span>
+              <span className="text-[11px] text-ink-soft">{k}</span>
+            </span>
+          ))}
         </span>
       </button>
 
@@ -334,8 +346,6 @@ function RecipeCard({
         <div className="border-t border-line p-3">
           <EditRecipe
             recipe={recipe}
-            model={model}
-            onModel={onModel}
             onCancel={() => setEditing(false)}
             onSaved={(updated, repriced) => {
               setEditing(false);
@@ -344,7 +354,7 @@ function RecipeCard({
           />
         </div>
       ) : open ? (
-        <div className="flex flex-col gap-3 border-t border-line p-3">
+        <div className="flex flex-col gap-3 border-t border-line/40 px-3.5 py-3">
           <MacroRow macros={serving} per="one serving" />
           <Provenance source={recipe.source} model={recipe.model} url={recipe.source_url} />
           <MetaSummary meta={recipe} />
@@ -418,7 +428,7 @@ function RecipeCard({
                 if (picked) onList(picked);
               }}
               disabled={recipe.ingredients.length === 0 || listing || !parseDay(day)}
-              className="rounded border border-line px-3 py-1.5 text-sm disabled:opacity-50"
+              className="min-h-11 rounded-[10px] bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-50"
             >
               {listing ? "Adding…" : "Add to list"}
             </button>

@@ -8,6 +8,12 @@ Current state and traps. Rules are in `RULES.md`; open work is in Linear under `
   `templates` and `history` alias it.
 - Reformat shows the current template, the input, **Reformat and Download**, and the verdict
   (`lib/verdict.ts`). Diagnostics runs the same check (`checkContent`).
+- Diagnostics' rail carries **What the messages mean** (`app/MessageGuide.tsx`) under the file
+  pickers: one collapsed entry per verdict category, Diagnostics panel and non-voting change-log
+  action. The words live in `lib/messageGuide.ts`, keyed by action, severity and coverage like the
+  verdict. `tests/message-guide.test.ts` runs `verdictFor` per category, so a new action, a note
+  that starts failing, or a reworded verdict phrase (`reads`) fails it. The rail scrolls inside
+  itself on desktop (`lg:max-h`) so the open guide never hides under the sticky edge.
 - Resumes is one list (`/api/resumes`), filtered Template / Input / Output; a render is up to two
   rows sharing its id. Templates are added and activated there.
 - **Verdict FAIL:** a missing source line, a blocking ATS finding, `input-dropped`, or a section
@@ -44,4 +50,7 @@ Current state and traps. Rules are in `RULES.md`; open work is in Linear under `
 - Next 14 ignores `proxy.ts` silently; `package.json`, lockfile and gate file move together.
 - `next build` rewrites `tsconfig.json`; commit what it writes.
 - The zip-bomb guard counts inflated bytes, streaming, in `loadDocx` and `readDocxParts`.
+- Changing the verdict means changing `lib/messageGuide.ts` in the same branch: a new
+  `ChangeAction` fails the typecheck (`ACTION_GUIDE` is a `Record`), and the test reads
+  `KNOWN_ACTIONS` and `verdict.ts`'s own literals from source.
 - `String.replace` interprets `$&` even with a string pattern; splice by index.
