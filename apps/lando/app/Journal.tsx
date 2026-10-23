@@ -4,23 +4,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CLOCKS,
   CLOCK_LABELS,
+  FORM_KINDS,
+  FORM_LABELS,
   HORIZON_DAYS,
   KIND_LABELS,
   LOG_KINDS,
   describe,
   displayUnit,
+  emptyFeedText,
+  feedDays,
   food as asFood,
+  formOf,
   formatAgo,
   isAccident,
   latestWeight,
   liveEvents,
-  newestFirst,
   round1,
   sinceLast,
+  treatsWith,
   weight as asWeight,
   type Dog,
+  type FeedRow,
+  type FormKind,
   type JournalEvent,
-  type LogKind,
 } from "@/lib/events";
 import {
   DEFAULTS_KEY,
@@ -30,7 +36,7 @@ import {
   writeStore,
   type Remembered,
 } from "@/lib/defaults";
-import { clockTime, localMidnight, rowTime, shortDate } from "@/lib/localtime";
+import { clockTime, localMidnight, shortDate } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
 import Analytics from "./Analytics";
 import LogForm, { type LogBody, type Person } from "./LogForm";
@@ -38,10 +44,17 @@ import Sheet from "./Sheet";
 
 type Loaded = { events: JournalEvent[]; people: Person[]; dogs: Dog[] };
 
-/** A new entry on its way to the database, or one that did not get there. */
-type Pending = { body: LogBody; status: "saving" | "failed"; error?: string };
+/**
+ * A new entry on its way to the database, or one that did not get there.
+ * `then` are the treats picked in a training's Treats pop-up: saved once the
+ * training is, discarded with it (TEC-136).
+ */
+type Pending = { body: LogBody; status: "saving" | "failed"; error?: string; then?: LogBody[] };
 
-type Open = { kind: LogKind; event?: JournalEvent } | null;
+/** What `lando.unsaved` holds per entry: the body, plus its treats when it has any. */
+type Stored = LogBody & { then?: LogBody[] };
+
+type Open = { form: FormKind; event?: JournalEvent } | null;
 type Tab = "log" | "analytics";
 
 async function postJson(url: string, body: unknown): Promise<{ ok: boolean; status: number; data: any }> {
@@ -59,12 +72,14 @@ const isLogBody = (b: unknown): b is LogBody =>
 
 /**
  * Two tabs, Log and Analytics, opening on Log (charter, Scope: the owner's
- * override, 2026-10-20). Log: since-last pills, who is logging, four section
- * buttons that each open a short form with defaults, today's timeline with a
- * filter by kind. Analytics: the last fourteen days and the growth chart.
+ * override, 2026-10-20). Log: since-last pills, who is logging, five section
+ * buttons that each open a short form with defaults (Potty, Food, Fun,
+ * Training, Weight; TEC-136), and a feed of every loaded day, by when each
+ * entry happened, with a filter matching the buttons. Analytics: the last
+ * fourteen days and the growth chart.
  *
  * **Save never waits.** The sheet closes at once and the entry shows as
- * "Saving…", then joins the timeline, or stays as "Not saved" with Retry
+ * "Saving…", then joins the feed, or stays as "Not saved" with Retry
  * (charter, Never 5). Unsaved entries are mirrored to storage and retried on
  * the next open.
  */
@@ -79,8 +94,8 @@ export default function Journal() {
   const [remembered, setRemembered] = useState<Remembered>({});
   const [storageRead, setStorageRead] = useState(false);
   const [open, setOpen] = useState<Open>(null);
-  // Today's feed shows one kind, or every kind when null (TEC-129). Not remembered.
-  const [only, setOnly] = useState<LogKind | null>(null);
+  // The feed shows one form's entries, or all when null (TEC-129, TEC-136). Not remembered.
+  const [only, setOnly] = useState<FormKind | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
@@ -107,7 +122,10 @@ export default function Journal() {
   const updatePending = useCallback((fn: (list: Pending[]) => Pending[]) => {
     setPending((prev) => {
       const next = fn(prev);
-      writeStore(UNSAVED_KEY, next.length ? next.map((p) => p.body) : null);
+      writeStore(
+        UNSAVED_KEY,
+        next.length ? next.map((p): Stored => (p.then?.length ? { ...p.body, then: p.then } : p.body)) : null
+      );
       return next;
     });
   }, []);
@@ -125,8 +143,9 @@ export default function Journal() {
   }, []);
 
   const save = useCallback(
-    async (body: LogBody, announce: boolean) => {
-      updatePending((list) => [...list.filter((p) => p.body.id !== body.id), { body, status: "saving" }]);
+    async function save(body: LogBody, announce: boolean, then?: LogBody[]): Promise<void> {
+      const after = then?.length ? then : undefined;
+      updatePending((list) => [...list.filter((p) => p.body.id !== body.id), { body, status: "saving", then: after }]);
       try {
         const { ok, data } = await postJson("/api/events", body);
         if (!ok) throw new Error(data.error ?? "the server refused it");
@@ -136,7 +155,10 @@ export default function Journal() {
       } catch (e) {
         const error = e instanceof TypeError ? "no connection" : (e as Error).message;
         updatePending((list) => list.map((p) => (p.body.id === body.id ? { ...p, status: "failed", error } : p)));
+        return;
       }
+      // The training is in: now its treats, each its own row with its own Retry.
+      for (const t of after ?? []) void save(t, false);
     },
     [mergeEvent, updatePending, say]
   );
@@ -147,7 +169,12 @@ export default function Journal() {
     setRemembered(readStore<Remembered>(DEFAULTS_KEY, {}) ?? {});
     setStorageRead(true);
     const unsaved = readStore<unknown[]>(UNSAVED_KEY, []);
-    if (Array.isArray(unsaved)) for (const body of unsaved.filter(isLogBody)) void save(body, false);
+    if (Array.isArray(unsaved)) {
+      for (const stored of unsaved.filter(isLogBody) as Stored[]) {
+        const { then, ...body } = stored;
+        void save(body, false, Array.isArray(then) ? then.filter(isLogBody) : undefined);
+      }
+    }
     void load();
   }, [load, save]);
 
@@ -236,13 +263,13 @@ export default function Journal() {
     writeStore(DEFAULTS_KEY, next);
   }
 
-  function logNew(body: LogBody) {
+  function logNew(body: LogBody, then?: LogBody[]) {
     remember(body);
     setOpen(null);
-    void save(body, true);
+    void save(body, true, then);
   }
 
-  async function change(body: Record<string, unknown>): Promise<{ error: string | null }> {
+  async function change(body: Record<string, unknown>, then?: LogBody[]): Promise<{ error: string | null }> {
     try {
       const { ok, status, data } = await postJson("/api/events", body);
       if (!ok) {
@@ -251,6 +278,8 @@ export default function Journal() {
       }
       mergeEvent(data.event);
       setOpen(null);
+      // Treats added to a corrected training: saved now, each with its own Retry.
+      for (const t of then ?? []) void save(t, false);
       say(body.kind === "void" ? "Entry deleted" : "Entry corrected");
       return { error: null };
     } catch (e) {
@@ -264,18 +293,26 @@ export default function Journal() {
   }
 
   const clocks = useMemo(() => (loaded ? sinceLast(loaded.events, now) : null), [loaded, now]);
-  const today = useMemo(
-    () =>
-      loaded
-        ? liveEvents(loaded.events)
-            .filter((e) => Date.parse(e.at) >= since.getTime())
-            .sort(newestFirst)
-        : [],
-    [loaded, since]
-  );
-  const unsaved = [...pending].sort((a, b) => Date.parse(b.body.at) - Date.parse(a.body.at));
-  const shownToday = only ? today.filter((e) => e.kind === only) : today;
-  const shownUnsaved = only ? unsaved.filter((p) => p.body.kind === only) : unsaved;
+  // The feed (TEC-136): every live entry in the read's window (today and the
+  // HORIZON_DAYS before it; older weights stay in Analytics' growth chart),
+  // plus anything not saved yet, under one chip's filter.
+  const live = useMemo(() => {
+    if (!loaded) return [];
+    const start = since.getTime() - HORIZON_DAYS * 86_400_000; // the same window the server reads
+    return liveEvents(loaded.events).filter((e) => Date.parse(e.at) >= start);
+  }, [loaded, since]);
+  type Row = { saved: JournalEvent } | { pending: Pending };
+  const days = useMemo(() => {
+    const rows: FeedRow<Row>[] = [
+      ...pending.map((p) => ({ kind: p.body.kind, at: p.body.at, created_at: null, item: { pending: p } })),
+      ...live.map((e) => ({ kind: e.kind, at: e.at, created_at: e.created_at, item: { saved: e } })),
+    ];
+    const shown = only
+      ? rows.filter((r) => formOf("saved" in r.item ? r.item.saved : r.item.pending.body) === only)
+      : rows;
+    return feedDays(shown, now);
+  }, [live, pending, only, now]);
+  const anything = live.length > 0 || pending.length > 0;
   const lastWeight = loaded ? latestWeight(loaded.events) : null;
   const weightUnit = loaded ? displayUnit(loaded.events) : "lb";
   const weightNote = lastWeight
@@ -283,6 +320,10 @@ export default function Journal() {
         Date.parse(lastWeight.at) >= since.getTime() ? "today" : shortDate(lastWeight.at)
       }`
     : null;
+  // On the Weight button's face (TEC-136): "7.2 lb".
+  const weightFace = lastWeight ? `${round1(asWeight(lastWeight).value)} ${asWeight(lastWeight).unit}` : null;
+  // A row's time under its day's heading: the clock, or nothing for a weight (it is a day).
+  const feedTime = (kind: string, at: string) => (kind === "weight" ? "" : clockTime(at));
 
   const tabClass = (t: Tab) =>
     `border-b-[3px] pb-2 pt-2.5 font-bold ${t === tab ? "border-pinstripe text-ink" : "border-transparent text-ink-soft"}`;
@@ -396,132 +437,150 @@ export default function Journal() {
           </section>
           {personError && !askWho && <p className="-mt-3 text-sm text-urgent">{personError}</p>}
 
-          {/* Four sections, each opening its form */}
+          {/* Five sections, each opening its form */}
           <section aria-label="Log">
             <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Log</h2>
-            {/* Four across on a phone, label only (TEC-123). The newest weight
-                is in the Weight button's title and for screen readers, and in
-                Analytics' growth chart. */}
-            <div className="grid grid-cols-4 gap-1.5">
-              {(["potty", "food", "exercise"] as const).map((k) => (
+            {/* Five across on a phone, one row (TEC-123, TEC-136): Fun and
+                Training replace Exercise. The Weight button wears the newest
+                weight; its date is in the title and for screen readers. */}
+            <div className="grid grid-cols-5 gap-1.5">
+              {(["potty", "food", "fun", "training"] as const).map((k) => (
                 <button
                   key={k}
                   type="button"
-                  onClick={() => setOpen({ kind: k })}
-                  className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-1 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
+                  onClick={() => setOpen({ form: k })}
+                  className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-0.5 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
                 >
-                  <b className="truncate text-[15px] leading-tight">{KIND_LABELS[k]}</b>
+                  <b className="truncate text-[13px] leading-tight">{FORM_LABELS[k]}</b>
                 </button>
               ))}
               <button
                 type="button"
-                onClick={() => setOpen({ kind: "weight" })}
+                onClick={() => setOpen({ form: "weight" })}
                 title={weightNote ?? undefined}
-                className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-raised px-1 py-2 text-ink shadow-[0_3px_0_rgb(var(--line-rgb))] active:translate-y-0.5 active:shadow-[0_1px_0_rgb(var(--line-rgb))]"
+                className="flex min-h-[52px] min-w-0 flex-col items-center justify-center rounded-xl bg-raised px-0.5 py-1.5 text-ink shadow-[0_3px_0_rgb(var(--line-rgb))] active:translate-y-0.5 active:shadow-[0_1px_0_rgb(var(--line-rgb))]"
               >
-                <b className="truncate text-[15px] leading-tight">Weight</b>
+                <b className="truncate text-[13px] leading-tight">Weight</b>
+                {weightFace && (
+                  <span aria-hidden="true" className="truncate text-[12px] leading-tight tabular-nums text-ink-soft">
+                    {weightFace}
+                  </span>
+                )}
                 {weightNote && <span className="sr-only">, {weightNote}</span>}
               </button>
             </div>
           </section>
 
-          {/* Today */}
-          <section aria-label="Today">
-            <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Today</h2>
-            {/* Filter by kind (TEC-129): tap one to show only it, tap it again for all. */}
+          {/* The feed: every loaded day, newest first, by when it happened (TEC-136) */}
+          <section aria-label="Feed">
+            <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Feed</h2>
+            {/* Filter (TEC-129, TEC-136): the chips match the buttons; tap one
+                to show only it, tap it again for all. Across every day. */}
             <div role="group" aria-label="Show only" className="mb-2 flex flex-wrap gap-1.5">
-              {LOG_KINDS.map((k) => (
+              {FORM_KINDS.map((k) => (
                 <button
                   key={k}
                   type="button"
                   aria-pressed={only === k}
                   onClick={() => setOnly(only === k ? null : k)}
-                  className={`min-h-[36px] whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm ${
+                  className={`min-h-[36px] whitespace-nowrap rounded-full border px-3 py-1.5 text-sm ${
                     only === k ? "border-accent bg-accent text-accent-ink" : "border-line bg-surface"
                   }`}
                 >
-                  {KIND_LABELS[k]}
+                  {FORM_LABELS[k]}
                 </button>
               ))}
             </div>
-            {shownUnsaved.length === 0 && shownToday.length === 0 && (
+            {days.length === 0 && (
               <p className="text-ink-soft">
-                {!loaded
-                  ? loadError
-                    ? ""
-                    : "Loading…"
-                  : only && (today.length > 0 || unsaved.length > 0)
-                    ? `No ${KIND_LABELS[only].toLowerCase()} entries yet today.`
-                    : "Nothing logged yet today."}
+                {!loaded ? (loadError ? "" : "Loading…") : emptyFeedText(anything ? only : null)}
               </p>
             )}
-            <ul className="flex flex-col gap-1">
-              {shownUnsaved.map((p) => {
-                const { title } = describe(p.body);
-                return (
-                  <li
-                    key={p.body.id}
-                    className="grid grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border border-dashed border-line bg-surface px-2.5 py-2"
-                  >
-                    <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{rowTime(p.body.kind, p.body.at, now)}</span>
-                    <b className="truncate">{title}</b>
-                    {p.status === "saving" ? (
-                      <span className="text-sm text-ink-soft">Saving…</span>
-                    ) : (
-                      <span className="flex items-center gap-3 text-sm">
-                        <span className="text-urgent" title={p.error}>
-                          Not saved
-                        </span>
-                        <button onClick={() => void save(p.body, true)} className="font-medium underline">
-                          Retry
-                        </button>
-                        <button
-                          onClick={() => updatePending((list) => list.filter((x) => x.body.id !== p.body.id))}
-                          className="text-ink-soft"
-                          aria-label="Discard"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-              {shownToday.map((e) => {
-                const { title, detail } = describe(e, dogs);
-                const accident = isAccident(e);
-                return (
-                  <li key={e.id}>
-                    <button
-                      type="button"
-                      onClick={() => setOpen({ kind: e.kind as LogKind, event: e })}
-                      className={`grid w-full grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border bg-surface px-2.5 py-2 text-left ${
-                        accident ? "border-danger" : "border-line"
-                      }`}
-                    >
-                      <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{rowTime(e.kind, e.at, now)}</span>
-                      <span className="min-w-0">
-                        <b className={`mr-1.5 ${accident ? "text-danger" : ""}`}>{title}</b>
-                        <span className="text-sm text-ink-soft">{detail}</span>
-                        {e.note && <span className="block text-sm text-ink-soft">“{e.note}”</span>}
-                      </span>
-                      <span className="whitespace-nowrap text-[13px] text-ink-soft">{nameOf(e.person_id)}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-            {shownToday.length > 0 && <p className="mt-1.5 text-xs text-ink-soft">Tap an entry to correct or delete it.</p>}
+            <div className="flex flex-col gap-3">
+              {days.map((d) => (
+                <section key={d.day} aria-label={d.label}>
+                  <h3 className="mb-1 text-[13px] font-bold text-ink">{d.label}</h3>
+                  <ul className="flex flex-col gap-1">
+                    {d.rows.map(({ item }) => {
+                      if ("pending" in item) {
+                        const p = item.pending;
+                        const { title } = describe(p.body);
+                        const treatCount = p.then?.length ?? 0;
+                        return (
+                          <li
+                            key={p.body.id}
+                            className="grid grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border border-dashed border-line bg-surface px-2.5 py-2"
+                          >
+                            <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{feedTime(p.body.kind, p.body.at)}</span>
+                            <span className="min-w-0 truncate">
+                              <b>{title}</b>
+                              {treatCount > 0 && (
+                                <span className="ml-1.5 text-sm text-ink-soft">
+                                  + {treatCount} {treatCount === 1 ? "treat" : "treats"}
+                                </span>
+                              )}
+                            </span>
+                            {p.status === "saving" ? (
+                              <span className="text-sm text-ink-soft">Saving…</span>
+                            ) : (
+                              <span className="flex items-center gap-3 text-sm">
+                                <span className="text-urgent" title={p.error}>
+                                  Not saved
+                                </span>
+                                <button onClick={() => void save(p.body, true, p.then)} className="font-medium underline">
+                                  Retry
+                                </button>
+                                <button
+                                  onClick={() => updatePending((list) => list.filter((x) => x.body.id !== p.body.id))}
+                                  className="text-ink-soft"
+                                  aria-label={treatCount ? "Discard, with its treats" : "Discard"}
+                                >
+                                  ✕
+                                </button>
+                              </span>
+                            )}
+                          </li>
+                        );
+                      }
+                      const e = item.saved;
+                      const { title, detail } = describe(e, dogs);
+                      const accident = isAccident(e);
+                      return (
+                        <li key={e.id}>
+                          <button
+                            type="button"
+                            onClick={() => setOpen({ form: formOf(e) ?? "potty", event: e })}
+                            className={`grid w-full grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border bg-surface px-2.5 py-2 text-left ${
+                              accident ? "border-danger" : "border-line"
+                            }`}
+                          >
+                            <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{feedTime(e.kind, e.at)}</span>
+                            <span className="min-w-0">
+                              <b className={`mr-1.5 ${accident ? "text-danger" : ""}`}>{title}</b>
+                              <span className="text-sm text-ink-soft">{detail}</span>
+                              {e.note && <span className="block text-sm text-ink-soft">“{e.note}”</span>}
+                            </span>
+                            <span className="whitespace-nowrap text-[13px] text-ink-soft">{nameOf(e.person_id)}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
+            {live.length > 0 && <p className="mt-1.5 text-xs text-ink-soft">Tap an entry to correct or delete it.</p>}
           </section>
         </div>
       </div>
 
       {open && !askWho && (
-        <Sheet title={open.event ? `Edit ${describe(open.event).title.toLowerCase()}` : KIND_LABELS[open.kind]} onClose={() => setOpen(null)}>
+        <Sheet title={open.event ? `Edit ${describe(open.event).title.toLowerCase()}` : FORM_LABELS[open.form]} onClose={() => setOpen(null)}>
           <LogForm
-            key={open.event?.id ?? open.kind}
-            kind={open.kind}
+            key={open.event?.id ?? open.form}
+            form={open.form}
             event={open.event}
+            sessionTreats={open.form === "training" && open.event && loaded ? treatsWith(loaded.events, open.event) : undefined}
             people={people}
             dogs={dogs}
             onAddDog={addDog}

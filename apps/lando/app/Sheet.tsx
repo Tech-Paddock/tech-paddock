@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * A bottom sheet: a scrim and a panel sliding up from the bottom edge, for one
@@ -9,46 +10,58 @@ import { useEffect, useRef } from "react";
  * Escape and a tap on the scrim close it unless `onClose` is omitted (the
  * first-open "Whose phone is this?" question must be answered). Focus moves
  * into the sheet on open and back to whatever opened it on close.
+ *
+ * `nested` is a sheet over a sheet (Training's Treats pop-up, TEC-136): it is
+ * drawn into `<body>` above the first, since the sheet below rises with a
+ * transform and would otherwise hold it, and its Escape closes it alone.
  */
 export default function Sheet({
   title,
   onClose,
   children,
+  nested = false,
 }: {
   title: string;
   onClose?: () => void;
   children: React.ReactNode;
+  nested?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     const first = panel.current?.querySelector<HTMLElement>("[data-autofocus]") ?? panel.current;
     first?.focus({ preventScroll: true });
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && onClose) onClose();
+      if (e.key !== "Escape") return;
+      // A nested sheet listens first (capture) and keeps the key from the one below.
+      if (nested) e.stopPropagation();
+      onClose?.();
     };
-    document.addEventListener("keydown", key);
+    document.addEventListener("keydown", key, nested);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("keydown", key);
+      document.removeEventListener("keydown", key, nested);
       document.body.style.overflow = overflow;
       opener?.focus?.({ preventScroll: true });
     };
     // Once per mount: onClose changing identity must not move focus again.
   }, []); // react-hooks/exhaustive-deps: deliberate
 
-  return (
+  const sheet = (
     <>
-      <div className="fixed inset-0 z-20 bg-bar/60" onClick={onClose} aria-hidden="true" />
+      <div className={`fixed inset-0 ${nested ? "z-40" : "z-20"} bg-bar/60`} onClick={onClose} aria-hidden="true" />
       <div
         ref={panel}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="sheet-title"
-        className="lando-sheet fixed inset-x-0 bottom-0 z-30 max-h-[88dvh] overflow-y-auto rounded-t-[18px] border-t-4 border-pinstripe bg-surface px-3 pt-3 outline-none"
+        aria-labelledby={titleId}
+        className={`lando-sheet fixed inset-x-0 bottom-0 ${
+          nested ? "z-50" : "z-30"
+        } max-h-[88dvh] overflow-y-auto rounded-t-[18px] border-t-4 border-pinstripe bg-surface px-3 pt-3 outline-none`}
         style={{
           paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))",
           paddingLeft: "max(12px, env(safe-area-inset-left, 0px))",
@@ -57,7 +70,7 @@ export default function Sheet({
       >
         <div className="mx-auto flex max-w-md flex-col gap-3">
           <header className="flex items-center justify-between gap-3">
-            <h3 id="sheet-title" className="text-xl font-bold leading-tight">
+            <h3 id={titleId} className="text-xl font-bold leading-tight">
               {title}
             </h3>
             {onClose && (
@@ -76,4 +89,5 @@ export default function Sheet({
       </div>
     </>
   );
+  return nested ? createPortal(sheet, document.body) : sheet;
 }

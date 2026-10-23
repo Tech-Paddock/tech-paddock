@@ -7,11 +7,13 @@ import {
   DOGS_KEPT,
   DOGS_MULTIPLE,
   DOGS_NONE,
-  EXERCISE_TYPES,
   EXERCISE_LABELS,
+  FORM_LABELS,
+  FUN_TYPES,
   InvalidEvent,
-  KIND_LABELS,
+  describe,
   dogsFromPick,
+  kindOfForm,
   dogsPickFor,
   LEASH,
   LEASH_LABELS,
@@ -22,18 +24,23 @@ import {
   food as asFood,
   parseDetails,
   potty as asPotty,
+  treatEntry,
   weight as asWeight,
+  type QueuedTreat,
   type CommandId,
   type Details,
   type Dog,
   type Leash,
   type ExerciseType,
+  type FormKind,
   type JournalEvent,
   type LogKind,
   type Unit,
 } from "@/lib/events";
-import { formatAmount, parseAmount, picklist, findFood, unitLabel, type FoodType } from "@/lib/foods";
+import { amountOptions, picklist, findFood, unitLabel, type FoodType } from "@/lib/foods";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
+import AmountScroller from "./AmountScroller";
+import Sheet from "./Sheet";
 import { dateLabel, fromDateInput, fromLocalInput, toDateInput, toLocalInput, whenLabel } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
 
@@ -51,9 +58,12 @@ export type LogBody = {
 };
 
 type Props = {
-  kind: LogKind;
+  /** Which of the five forms (TEC-136): Fun and Training both save `exercise`. */
+  form: FormKind;
   /** Set when correcting an entry; the form opens on its values. */
   event?: JournalEvent;
+  /** A training being corrected: the treats already logged with it (`treatsWith`), shown, not changed. */
+  sessionTreats?: JournalEvent[];
   people: Person[];
   /** Friends' dogs from `lando.dogs`, by name. */
   dogs: Dog[];
@@ -62,10 +72,13 @@ type Props = {
   phonePerson: string | null;
   remembered: Remembered;
   weightUnit: Unit;
-  /** A new entry: handed off at once, never awaited (charter, Never 5). */
-  onLog: (body: LogBody) => void;
-  /** A correction or a delete: awaited, and its error shown here. */
-  onChange: (body: Record<string, unknown>) => Promise<{ error: string | null }>;
+  /**
+   * A new entry: handed off at once, never awaited (charter, Never 5). `then`
+   * are the training's treats, saved once the entry itself is.
+   */
+  onLog: (body: LogBody, then?: LogBody[]) => void;
+  /** A correction or a delete: awaited, and its error shown here. `then` are saved once it succeeds. */
+  onChange: (body: Record<string, unknown>, then?: LogBody[]) => Promise<{ error: string | null }>;
 };
 
 /* ── Small parts ─────────────────────────────────────────────────────────── */
@@ -162,7 +175,20 @@ function Chips<T extends string>({
   );
 }
 
-export default function LogForm({ kind, event, people, dogs, onAddDog, phonePerson, remembered, weightUnit, onLog, onChange }: Props) {
+export default function LogForm({
+  form,
+  event,
+  sessionTreats = [],
+  people,
+  dogs,
+  onAddDog,
+  phonePerson,
+  remembered,
+  weightUnit,
+  onLog,
+  onChange,
+}: Props) {
+  const kind: LogKind = kindOfForm(form);
   const editing = !!event;
   const openedAt = useRef(new Date().toISOString());
   // A weight is a day, not a moment: its When picks a date, stored at local noon.
@@ -187,12 +213,20 @@ export default function LogForm({ kind, event, people, dogs, onAddDog, phonePers
   const f = event?.kind === "food" ? asFood(event) : null;
   const [foodType, setFoodType] = useState<FoodType>(f?.type ?? "meal");
   const [itemId, setItemId] = useState(f?.item_id ?? defaultFood("meal", remembered));
-  const firstAmount = f ? f.amount : defaultAmount("meal", remembered);
-  const [amount, setAmount] = useState(firstAmount === null ? "" : formatAmount(firstAmount));
+  // An amount from the ⅛ scroller (TEC-136). The amount it opened on stays on
+  // the list even when it is not an eighth (an older 1/3), so an untouched
+  // correction keeps it.
+  const [amount, setAmount] = useState<number | null>(f ? f.amount : defaultAmount("meal", remembered));
+  const [openedAmount] = useState(amount);
 
-  // Exercise
+  // Exercise: Fun is a walk or playtime; Training is always training (TEC-136).
   const x = event?.kind === "exercise" ? asExercise(event) : null;
-  const [exType, setExType] = useState<ExerciseType>(x?.type ?? "walk");
+  const [exType, setExType] = useState<ExerciseType>(form === "training" ? "training" : x?.type ?? "walk");
+  // Training's Treats pop-up: treats picked here are saved with the session.
+  const [treatQueue, setTreatQueue] = useState<QueuedTreat[]>([]);
+  const [treatOpen, setTreatOpen] = useState(false);
+  const [treatItem, setTreatItem] = useState(defaultFood("treat", remembered));
+  const [treatAmount, setTreatAmount] = useState<number | null>(defaultAmount("treat", remembered));
   // One pick (TEC-129): None, a dog, or Multiple; picking is the answer to
   // "with other dogs", there is no Yes/No. An entry with `with_dogs` and no
   // ids (Multiple, or from before the list) opens on Multiple, which saves
@@ -226,9 +260,33 @@ export default function LogForm({ kind, event, people, dogs, onAddDog, phonePers
   function pickFoodType(t: FoodType) {
     setFoodType(t);
     setItemId(defaultFood(t, remembered));
-    const a = defaultAmount(t, remembered);
-    setAmount(a === null ? "" : formatAmount(a));
+    setAmount(defaultAmount(t, remembered));
   }
+
+  function openTreat() {
+    setTreatItem(defaultFood("treat", remembered));
+    setTreatAmount(defaultAmount("treat", remembered));
+    setTreatOpen(true);
+  }
+
+  /** The pop-up's Add: queue the treat and count it on the session. */
+  function addTreat() {
+    setTreatQueue((q) => [...q, { id: crypto.randomUUID(), item_id: treatItem, amount: treatAmount }]);
+    setTreats((n) => String((Number(n) || 0) + 1));
+    setTreatOpen(false);
+  }
+
+  function dropTreat(id: string) {
+    setTreatQueue((q) => q.filter((t) => t.id !== id));
+    setTreats((n) => String(Math.max(0, (Number(n) || 0) - 1)));
+  }
+
+  /** "Freeze-dried beef hearts · 2 pieces", as the feed will read it. */
+  const treatLabel = (t: QueuedTreat) => {
+    const item = findFood("treat", t.item_id);
+    const details = { type: "treat", item_id: t.item_id, item_name: item?.name ?? "Treat", unit: item?.unit ?? null, amount: t.amount };
+    return describe({ kind: "food", details }).detail;
+  };
 
   async function addDog(e: { preventDefault(): void }) {
     e.preventDefault();
@@ -246,14 +304,15 @@ export default function LogForm({ kind, event, people, dogs, onAddDog, phonePers
   }
 
   const item = findFood(foodType, itemId);
-  const amountUnit = item?.unit ? unitLabel(item.unit, parseAmount(amount) ?? 2) : null;
+  const amountUnit = item?.unit ? unitLabel(item.unit, amount ?? 2) : null;
+  const treatFood = findFood("treat", treatItem);
 
   function rawDetails(): Record<string, unknown> {
     switch (kind) {
       case "potty":
         return { what, where, ...(where === "outside" && leash ? { leash } : {}) };
       case "food":
-        return { type: foodType, item_id: itemId, amount: parseAmount(amount) };
+        return { type: foodType, item_id: itemId, amount };
       case "exercise":
         return {
           type: exType,
@@ -271,10 +330,6 @@ export default function LogForm({ kind, event, people, dogs, onAddDog, phonePers
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (kind === "food" && amount.trim() && parseAmount(amount) === null) {
-      setError("amount must be a number, like 1, 0.5 or 1/3");
-      return;
-    }
     let details: Details;
     try {
       // The same check the server makes, so a mistake is caught before the sheet closes.
@@ -284,11 +339,13 @@ export default function LogForm({ kind, event, people, dogs, onAddDog, phonePers
       return;
     }
     // An untouched "when" on a new entry means the moment Save was pressed.
-    // A weight's is today, at local noon like every weight.
+    // A weight's is today, at local noon like every weight. An untouched
+    // correction keeps the entry's own time to the millisecond (the input
+    // holds minutes only), so the treats logged with a training still match it.
     const at = dateOnly
       ? fromDateInput(!editing && !whenTouched ? toDateInput(new Date().toISOString()) : day)
-      : !editing && !whenTouched
-        ? new Date().toISOString()
+      : !whenTouched
+        ? (event?.at ?? new Date().toISOString())
         : fromLocalInput(when);
     if (!at) {
       setError("pick a time");
@@ -302,12 +359,21 @@ export default function LogForm({ kind, event, people, dogs, onAddDog, phonePers
       details,
       note: note.trim() || null,
     };
+    // Treats from the pop-up: food entries at the session's time and person,
+    // saved after the session itself (TEC-136).
+    let then: LogBody[] = [];
+    try {
+      then = treatQueue.map((t) => treatEntry(t, at, body.person_id));
+    } catch (err) {
+      setError(err instanceof InvalidEvent ? err.message : "check the treats");
+      return;
+    }
     if (!editing) {
-      onLog(body);
+      onLog(body, then);
       return;
     }
     setBusy(true);
-    const { error } = await onChange({ ...body, voids: event.id });
+    const { error } = await onChange({ ...body, voids: event.id }, then);
     setBusy(false);
     if (error) setError(error);
   }
@@ -324,7 +390,8 @@ export default function LogForm({ kind, event, people, dogs, onAddDog, phonePers
     if (error) setError(error);
   }
 
-  const title = KIND_LABELS[kind];
+  // "Save walk", "Save playtime", "Save training", "Save potty"…
+  const title = form === "fun" ? EXERCISE_LABELS[exType] : FORM_LABELS[form];
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3" noValidate>
@@ -370,13 +437,12 @@ export default function LogForm({ kind, event, people, dogs, onAddDog, phonePers
               </select>
             </Field>
             <Field label={amountUnit ? `Amount (${amountUnit})` : "Amount"} htmlFor="f-amount">
-              <input
+              <AmountScroller
                 id="f-amount"
-                inputMode="decimal"
+                label={amountUnit ? `Amount in ${amountUnit}` : "Amount"}
+                options={amountOptions(openedAmount, defaultAmount("meal", remembered))}
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={foodType === "meal" ? "1/2" : "1"}
-                className={input}
+                onChange={setAmount}
               />
             </Field>
           </div>
@@ -386,15 +452,18 @@ export default function LogForm({ kind, event, people, dogs, onAddDog, phonePers
 
       {kind === "exercise" && (
         <>
-          <Field label="Type">
-            <Seg
-              name="type"
-              label="Type"
-              value={exType}
-              onChange={setExType}
-              options={EXERCISE_TYPES.map((t) => [t, EXERCISE_LABELS[t]] as const)}
-            />
-          </Field>
+          {/* Fun picks walk or playtime; Training has no Type (TEC-136). */}
+          {form === "fun" && (
+            <Field label="Type">
+              <Seg
+                name="type"
+                label="Type"
+                value={exType}
+                onChange={setExType}
+                options={FUN_TYPES.map((t) => [t, EXERCISE_LABELS[t]] as const)}
+              />
+            </Field>
+          )}
           <Field label="Where">
             <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
           </Field>
@@ -467,13 +536,79 @@ export default function LogForm({ kind, event, people, dogs, onAddDog, phonePers
               <input id="f-mins" type="number" inputMode="numeric" min={1} max={600} value={minutes} onChange={(e) => setMinutes(e.target.value)} className={input} />
             </Field>
             <Field label="Treats used" htmlFor="f-treats">
-              <input id="f-treats" type="number" inputMode="numeric" min={0} max={500} value={treats} onChange={(e) => setTreats(e.target.value)} className={input} />
+              <div className="flex min-w-0 gap-1.5">
+                <input id="f-treats" type="number" inputMode="numeric" min={0} max={500} value={treats} onChange={(e) => setTreats(e.target.value)} className={`${input} flex-1`} />
+                {form === "training" && (
+                  /* Training's Treats pop-up (TEC-136): pick what and how much;
+                     it is logged as a food treat when the session is saved. */
+                  <button
+                    type="button"
+                    onClick={openTreat}
+                    aria-label="Log a treat"
+                    className="shrink-0 rounded-[10px] bg-accent px-3 font-semibold text-accent-ink"
+                  >
+                    + Treat
+                  </button>
+                )}
+              </div>
             </Field>
           </div>
+          {form === "training" && (sessionTreats.length > 0 || treatQueue.length > 0) && (
+            <ul aria-label="Treats with this session" className="-mt-1 flex flex-col gap-1 text-[13px]">
+              {sessionTreats.map((t) => (
+                <li key={t.id} className="text-ink-soft">
+                  Logged: {describe(t).detail}
+                </li>
+              ))}
+              {treatQueue.map((t) => (
+                <li key={t.id} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate">To log on save: {treatLabel(t)}</span>
+                  <button type="button" onClick={() => dropTreat(t.id)} aria-label="Remove this treat" className="px-2 py-1 text-ink-soft">
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           {exType === "training" && (
             <Field label="Commands practised">
               <Chips label="Commands practised" options={COMMANDS} picked={commands} onChange={setCommands} />
             </Field>
+          )}
+          {treatOpen && (
+            <Sheet title="Treat" onClose={() => setTreatOpen(false)} nested>
+              <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2">
+                <Field label="What" htmlFor="t-item">
+                  <select id="t-item" value={treatItem} onChange={(e) => setTreatItem(e.target.value)} className={input}>
+                    {picklist("treat").map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label={treatFood?.unit ? `Amount (${unitLabel(treatFood.unit, treatAmount ?? 2)})` : "Amount"} htmlFor="t-amount">
+                  <AmountScroller
+                    id="t-amount"
+                    label={treatFood?.unit ? `Amount in ${unitLabel(treatFood.unit, treatAmount ?? 2)}` : "Amount"}
+                    options={amountOptions(defaultAmount("treat", remembered))}
+                    value={treatAmount}
+                    onChange={setTreatAmount}
+                  />
+                </Field>
+              </div>
+              <p className="text-[13px] text-ink-soft">
+                Logged as a treat at this session&apos;s time when you save it, and counted in Treats used.
+              </p>
+              <button
+                type="button"
+                data-autofocus
+                onClick={addTreat}
+                className="rounded-[14px] bg-[var(--tone-2-bg)] px-4 py-3 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)]"
+              >
+                Add treat
+              </button>
+            </Sheet>
           )}
         </>
       )}
