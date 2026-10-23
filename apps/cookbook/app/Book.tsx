@@ -6,7 +6,6 @@ import Menu from "./Menu";
 import MacroRow from "./MacroRow";
 import { useToast } from "./Toast";
 import { round, scale } from "@/lib/macros";
-import { DEFAULT_MODEL, type ModelId } from "@/lib/models";
 import { methodSteps, perServing, type Recipe, type RecipeOrigin } from "@/lib/recipes";
 import { formatMinutes, pillFacts } from "@/lib/metadata";
 import { localToday, menuDayLabel, parseDay } from "@/lib/menuDay";
@@ -47,8 +46,6 @@ export default function Book({
   const [readError, setReadError] = useState<string | null>(null);
   const toast = useToast();
   const [filter, setFilter] = useState<BookFilter>(NO_FILTER);
-  // The model an edit re-prices with. Drafting has its own, on the Add tab.
-  const [model, setModel] = useState<ModelId>(DEFAULT_MODEL);
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -257,8 +254,6 @@ export default function Book({
                 rating={rating === recipe.id}
                 onRate={(value) => rate(recipe, value)}
                 onRemove={() => remove(recipe)}
-                model={model}
-                onModel={setModel}
                 onEdited={edited}
               />
             ))}
@@ -279,8 +274,6 @@ function RecipeCard({
   onList,
   onRate,
   onRemove,
-  model,
-  onModel,
   onEdited,
 }: {
   recipe: Recipe;
@@ -291,8 +284,6 @@ function RecipeCard({
   onList: (day: string) => void;
   onRate: (value: number | null) => void;
   onRemove: () => void;
-  model: ModelId;
-  onModel: (model: ModelId) => void;
   onEdited: (recipe: Recipe, repriced: boolean) => void;
 }) {
   const [count, setCount] = useState("1");
@@ -355,8 +346,6 @@ function RecipeCard({
         <div className="border-t border-line p-3">
           <EditRecipe
             recipe={recipe}
-            model={model}
-            onModel={onModel}
             onCancel={() => setEditing(false)}
             onSaved={(updated, repriced) => {
               setEditing(false);

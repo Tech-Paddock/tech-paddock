@@ -1,12 +1,12 @@
 import type { MacroSource } from "@/lib/macros";
-import { MODELS, isModelId } from "@/lib/models";
+import { modelLabel } from "@/lib/models";
 
 /**
  * Where a number came from, said out loud on every recipe.
  *
  * **Not decoration.** It is what tells you which recipe to look twice at before
  * cooking from it, and it is the only thing distinguishing a figure you worked
- * out yourself from one a cheap model estimated in two seconds.
+ * out yourself from one a model estimated in seconds.
  *
  * **Two states, where Health's has three.** There is no "from the web" badge
  * because there is no `web` source in this app: an imported recipe's macros are
@@ -23,7 +23,8 @@ export default function Provenance({
   model?: string | null;
   url?: string | null;
 }) {
-  const modelLabel = model && isModelId(model) ? MODELS[model].label : model;
+  // A kept recipe names the model that priced it, even one no call uses now.
+  const modelName = model ? modelLabel(model) : null;
 
   // Yours is the quiet one because it is the trustworthy one; an estimate is the
   // loud one because it is the guess.
@@ -37,7 +38,7 @@ export default function Provenance({
       </span>
       {/* The model is part of the provenance, not a footnote to it. A number is
           only comparable against another number if you know what produced it. */}
-      {source !== "hand" && modelLabel ? <span className="text-ink-soft/80">{modelLabel}</span> : null}
+      {source !== "hand" && modelName ? <span className="text-ink-soft/80">{modelName}</span> : null}
       {url ? (
         <a
           href={url}

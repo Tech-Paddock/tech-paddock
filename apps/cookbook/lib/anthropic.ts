@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { MODELS, DEFAULT_MODEL, requestShape, type ModelId } from "./models";
+import { MODEL, WEB_FETCH_TOOL, modelLabel, requestShape } from "./models";
 import { parseMacros, type Macros } from "./macros";
 import { FILE_TYPES, type RecipeFile } from "./upload";
 import { unfetchedRead, type ResultBlock } from "./fetchRun";
@@ -8,17 +8,13 @@ import type { Picks } from "./tuning";
 import { META_JSON_HINT, META_KEYS, META_PROMPT, META_SCHEMA_PROPERTIES, readMeta, type RecipeMeta } from "./metadata";
 
 /**
- * The five model calls this app makes, and the reasoning for each one's model.
+ * The five model calls this app makes.
  *
- * `CLAUDE.md`: model choice is per task, and the choice and the reason are
- * recorded at the call site. These are those call sites.
- *
- * **The four calls without a tool send a JSON schema** (`output_config.format`),
- * and **every call's request shape comes from `requestShape` in `lib/models.ts`**:
- * an explicit effort and room to think for Sonnet 5, no effort for Haiku 4.5,
- * which rejects it but accepts the format (TEC-29 item 7 — this header said the
- * opposite until 2026-09-25). The import carries a server tool and keeps asking
- * for its JSON in the prompt. **Every response is still validated in code** — a
+ * **Every one runs on the one model at the one effort** (TEC-133): the model,
+ * its effort and its budget come from `requestShape` in `lib/models.ts`, and no
+ * call here names any of them. **The four calls without a tool send a JSON
+ * schema** (`output_config.format`); the import carries a server tool and keeps
+ * asking for its JSON in the prompt. **Every response is still validated in code** — a
  * model response is untrusted input whatever constrained it.
  *
  * **Every response's `stop_reason` is checked** (`finished`). A turn cut off at
@@ -32,15 +28,16 @@ import { META_JSON_HINT, META_KEYS, META_PROMPT, META_SCHEMA_PROPERTIES, readMet
 type ModelResponse = { stop_reason: string; content: { type: string; text?: string }[] };
 
 /** Refuse a response that did not finish, in a sentence rather than a parse failure. */
-function finished(response: ModelResponse, model: ModelId): ModelResponse {
+function finished(response: ModelResponse): ModelResponse {
+  const label = modelLabel(MODEL);
   if (response.stop_reason === "end_turn" || response.stop_reason === "stop_sequence") return response;
   if (response.stop_reason === "max_tokens") {
-    throw new Error(`${MODELS[model].label} ran out of room before it finished. Nothing was kept — try again.`);
+    throw new Error(`${label} ran out of room before it finished. Nothing was kept — try again.`);
   }
   if (response.stop_reason === "refusal") {
-    throw new Error(`${MODELS[model].label} declined that one. Nothing was kept.`);
+    throw new Error(`${label} declined that one. Nothing was kept.`);
   }
-  throw new Error(`${MODELS[model].label} stopped early (${response.stop_reason}). Nothing was kept.`);
+  throw new Error(`${label} stopped early (${response.stop_reason}). Nothing was kept.`);
 }
 
 let client: Anthropic | null = null;
@@ -92,7 +89,6 @@ function textOf(response: { content: { type: string; text?: string }[] }): strin
  * whether a page was really fetched is in the tool-result blocks, not the text.
  */
 async function runWithTools(params: {
-  model: ModelId;
   system: string;
   tools: unknown[];
   content: string;
@@ -103,8 +99,8 @@ async function runWithTools(params: {
 
   for (let i = 0; i < 6; i++) {
     const response = (await getClient().messages.create({
-      model: params.model,
-      ...requestShape(params.model, { maxTokens: params.maxTokens, effort: "low" }),
+      // A resumed turn is built the same way: same model, same effort.
+      ...requestShape({ maxTokens: params.maxTokens }),
       system: params.system,
       tools: params.tools,
       messages,
@@ -115,9 +111,9 @@ async function runWithTools(params: {
       messages.push({ role: "assistant", content: response.content });
       continue;
     }
-    return { text: textOf(finished(response, params.model)), blocks };
+    return { text: textOf(finished(response)), blocks };
   }
-  throw new Error(`${MODELS[params.model].label} kept pausing and never finished reading the page.`);
+  throw new Error(`${modelLabel(MODEL)} kept pausing and never finished reading the page.`);
 }
 
 /** `["string", "null"]` and friends, for the schemas below. */
@@ -219,25 +215,18 @@ const RECIPE_MACRO_SYSTEM = `You estimate the calories and macronutrients of a w
   A number you have quietly padded is worse than a number with a caveat beside it.`;
 
 /**
- * **The one judgement in this app, and so the one place the model picker means
- * anything.** Reading the book calls nothing; keeping a draft calls nothing.
+ * **The one judgement in this app.** Reading the book calls nothing; keeping a
+ * draft calls nothing.
  *
  * No tools: this is arithmetic over a list that is already in hand, and a search
  * here would invite exactly the published-panel number the whole design throws
  * away.
  */
-export async function estimateRecipeMacros(params: {
-  recipe: RecipeFields;
-  model?: ModelId;
-}): Promise<RecipeEstimate> {
-  const model = params.model ?? DEFAULT_MODEL;
+export async function estimateRecipeMacros(params: { recipe: RecipeFields }): Promise<RecipeEstimate> {
   const { recipe } = params;
 
   const response = (await getClient().messages.create({
-    model,
-    // Medium: this is the one judgement in the app, but it is arithmetic over a
-    // list in hand, not an open problem.
-    ...requestShape(model, { maxTokens: 2048, effort: "medium", schema: MACRO_SCHEMA }),
+    ...requestShape({ maxTokens: 2048, schema: MACRO_SCHEMA }),
     system: RECIPE_MACRO_SYSTEM,
     messages: [
       {
@@ -252,10 +241,10 @@ export async function estimateRecipeMacros(params: {
     ],
   } as never)) as ModelResponse;
 
-  const parsed = looseJson<Record<string, unknown>>(textOf(finished(response, model)));
+  const parsed = looseJson<Record<string, unknown>>(textOf(finished(response)));
   const macros = parseMacros(parsed);
   if (!macros) {
-    throw new Error(`${MODELS[model].label} did not return usable macros for "${recipe.name}".`);
+    throw new Error(`${modelLabel(MODEL)} did not return usable macros for "${recipe.name}".`);
   }
   return { macros, note: typeof parsed?.note === "string" ? parsed.note.trim() || null : null };
 }
@@ -281,18 +270,14 @@ ${META_PROMPT}`;
 /** Invent a recipe. Its macros are estimated separately, from what it produced. */
 export async function generateRecipe(params: {
   brief: string;
-  model?: ModelId;
   /** "Something else": drafts already turned down this session, and why (TEC-39 D). */
   turnedDown?: TurnedDown[];
   steer?: string;
   /** The tuning pickers (`lib/tuning.ts`): requirements, said in the prompt. */
   picks?: Picks;
 }): Promise<RecipeFields> {
-  const model = params.model ?? DEFAULT_MODEL;
-
   const response = (await getClient().messages.create({
-    model,
-    ...requestShape(model, { maxTokens: 3072, effort: "medium", schema: RECIPE_SCHEMA }),
+    ...requestShape({ maxTokens: 3072, schema: RECIPE_SCHEMA }),
     system: GENERATE_SYSTEM,
     messages: [
       {
@@ -302,8 +287,8 @@ export async function generateRecipe(params: {
     ],
   } as never)) as ModelResponse;
 
-  const fields = readRecipeFields(looseJson<Record<string, unknown>>(textOf(finished(response, model))));
-  if (!fields) throw new Error(`${MODELS[model].label} did not return a usable recipe.`);
+  const fields = readRecipeFields(looseJson<Record<string, unknown>>(textOf(finished(response))));
+  if (!fields) throw new Error(`${modelLabel(MODEL)} did not return a usable recipe.`);
   return fields;
 }
 
@@ -352,18 +337,11 @@ export type RecipeImport = { read: boolean; fields: RecipeFields | null; reason:
  * the book's numbers stay comparable with each other. So `source_url` records
  * where the method came from, never where a number did.
  */
-export async function importRecipe(params: {
-  url: string;
-  model?: ModelId;
-}): Promise<RecipeImport> {
-  const model = params.model ?? DEFAULT_MODEL;
-
+export async function importRecipe(params: { url: string }): Promise<RecipeImport> {
   const { text: raw, blocks } = await runWithTools({
-    model,
     system: IMPORT_SYSTEM,
-    // The fetch tool version differs between the two models; lib/models.ts is
-    // what stops a model swap becoming a 400.
-    tools: [{ type: MODELS[model].fetch, name: "web_fetch", max_uses: 3 }],
+    // Tool versions are per model; lib/models.ts keeps this one with the model.
+    tools: [{ type: WEB_FETCH_TOOL, name: "web_fetch", max_uses: 3 }],
     maxTokens: 4096,
     content:
       `Fetch this page and extract the recipe: ${params.url}\n\n` +
@@ -436,17 +414,9 @@ ${META_PROMPT}`;
  * file claimed as read that produced no ingredients. A photo of a finished dish
  * with its name in the corner is this path's version of a URL slug.
  *
- * **The model is the one you picked**, as for every other way in. Reading print
- * is well within Haiku; reading someone's handwriting is where Sonnet may earn
- * its cost, and the picker is already there for exactly that call.
- *
  * **The file goes to the model and nowhere else.** See `lib/upload.ts`.
  */
-export async function readRecipeFile(params: {
-  file: RecipeFile;
-  model?: ModelId;
-}): Promise<RecipeImport> {
-  const model = params.model ?? DEFAULT_MODEL;
+export async function readRecipeFile(params: { file: RecipeFile }): Promise<RecipeImport> {
   const { mediaType, data } = params.file;
 
   const block =
@@ -455,9 +425,7 @@ export async function readRecipeFile(params: {
       : { type: "image", source: { type: "base64", media_type: mediaType, data } };
 
   const response = (await getClient().messages.create({
-    model,
-    // Low: reading print off a page is transcription, not judgement.
-    ...requestShape(model, { maxTokens: 4096, effort: "low", schema: READ_SCHEMA }),
+    ...requestShape({ maxTokens: 4096, schema: READ_SCHEMA }),
     system: FILE_SYSTEM,
     messages: [
       {
@@ -478,7 +446,7 @@ export async function readRecipeFile(params: {
     ],
   } as never)) as ModelResponse;
 
-  const parsed = looseJson<Record<string, unknown>>(textOf(finished(response, model)));
+  const parsed = looseJson<Record<string, unknown>>(textOf(finished(response)));
   const reason = typeof parsed?.reason === "string" ? parsed.reason.trim() || null : null;
 
   if (!parsed || parsed.read !== true) {
@@ -530,16 +498,6 @@ function readRecipeFields(
 // 4 · Tidying the shopping list
 // ---------------------------------------------------------------------------
 
-/**
- * **Pinned to Haiku, and not under comparison.** Merging "2 cloves garlic" and
- * "1 tbsp minced garlic" into one line is recognition, not judgement, and
- * `validateTidy` checks the result in code either way — so a weaker model can
- * fail to tidy but cannot lose your eggs. That guard is exactly why this is the
- * cheap model: the risk of going cheap here is a list that stays messy, not one
- * that is wrong.
- */
-const TIDY_MODEL: ModelId = "claude-haiku-4-5";
-
 const TIDY_SYSTEM = `You consolidate a shopping list.
 
 - Merge lines that name the same thing, even when they are worded or measured differently — "2
@@ -555,6 +513,10 @@ const TIDY_SYSTEM = `You consolidate a shopping list.
 export type TidyProposal = { name: string; note: string | null; absorbed: string[] };
 
 /**
+ * **The same model as every other call** (TEC-133; it was pinned to Haiku until
+ * then). `validateTidy` checks the result in code either way, so a model can
+ * fail to tidy but cannot lose your eggs.
+ *
  * **Lines go to the model as short numbers, not their ids** (TEC-29 item 8). A
  * UUID is 36 characters the model has to echo back exactly, once per line, and on
  * a long list that alone ran out the output budget. The numbers are mapped back
@@ -565,8 +527,7 @@ export async function tidyList(
   items: { id: string; name: string; note: string | null }[]
 ): Promise<TidyProposal[]> {
   const response = (await getClient().messages.create({
-    model: TIDY_MODEL,
-    ...requestShape(TIDY_MODEL, { maxTokens: 4096, effort: "low", schema: TIDY_SCHEMA }),
+    ...requestShape({ maxTokens: 4096, schema: TIDY_SCHEMA }),
     system: TIDY_SYSTEM,
     messages: [
       {
@@ -581,7 +542,7 @@ export async function tidyList(
     ],
   } as never)) as ModelResponse;
 
-  const raw = looseJson<{ lines?: unknown }>(textOf(finished(response, TIDY_MODEL)));
+  const raw = looseJson<{ lines?: unknown }>(textOf(finished(response)));
   if (!Array.isArray(raw?.lines)) return [];
 
   return raw.lines

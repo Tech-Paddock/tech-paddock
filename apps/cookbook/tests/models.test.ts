@@ -1,31 +1,80 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { requestShape } from "@/lib/models";
+import * as models from "@/lib/models";
 import { fetchOutcomes, unfetchedRead } from "@/lib/fetchRun";
 import { idForNumber } from "@/lib/anthropic";
 
 /**
- * What each model's request has to carry, and the import's third refusal.
- * No API call is made anywhere in this file.
+ * The one model and its request shape (TEC-133), and the import's third
+ * refusal. No API call is made anywhere in this file; `anthropic.test.ts` reads
+ * every request the app would actually send.
  */
 
 const schema = { type: "object" };
 
-describe("requestShape (TEC-29 item 7)", () => {
-  it("never sends effort to Haiku, which rejects it with a 400", () => {
-    const shape = requestShape("claude-haiku-4-5", { maxTokens: 2048, effort: "medium", schema });
-    expect(shape.max_tokens).toBe(2048);
-    expect(shape.output_config).toEqual({ format: { type: "json_schema", schema } });
-    expect(JSON.stringify(shape)).not.toContain("effort");
+describe("the one model (TEC-133)", () => {
+  it("is Claude Sonnet 5.5 at effort medium", () => {
+    // Changing either is the owner's call; this test changes with it.
+    expect(models.MODEL).toBe("claude-sonnet-5-5");
+    expect(models.EFFORT).toBe("medium");
+    expect(models.WEB_FETCH_TOOL).toBe("web_fetch_20260209");
   });
 
-  it("sends Haiku no output_config at all when there is no schema", () => {
-    expect(requestShape("claude-haiku-4-5", { maxTokens: 4096, effort: "low" })).toEqual({ max_tokens: 4096 });
-  });
-
-  it("gives Sonnet 5 an explicit effort and room to think before it answers", () => {
-    const shape = requestShape("claude-sonnet-5", { maxTokens: 2048, effort: "medium", schema });
+  it("builds every request: the model, effort medium, and room to think", () => {
+    const shape = models.requestShape({ maxTokens: 2048, schema });
+    expect(shape.model).toBe("claude-sonnet-5-5");
     expect(shape.output_config).toEqual({ effort: "medium", format: { type: "json_schema", schema } });
-    expect(shape.max_tokens).toBeGreaterThan(2048 + 8000);
+    // Thinking counts against max_tokens; the JSON still needs its 2,048.
+    expect(shape.max_tokens).toBeGreaterThanOrEqual(2048 + 8000);
+    expect(models.requestShape({ maxTokens: 4096 }).output_config).toEqual({ effort: "medium" });
+  });
+
+  it("exports no registry to pick from", () => {
+    // The pickers derived from these. Their return would be a choice again.
+    for (const gone of ["MODELS", "MODEL_IDS", "DEFAULT_MODEL", "isModelId"]) {
+      expect(models, gone).not.toHaveProperty(gone);
+    }
+  });
+
+  it("still names the models older recipes recorded", () => {
+    expect(models.modelLabel("claude-sonnet-5-5")).toBe("Sonnet 5.5");
+    expect(models.modelLabel("claude-sonnet-5")).toBe("Sonnet 5");
+    expect(models.modelLabel("claude-haiku-4-5")).toBe("Haiku 4.5");
+    expect(models.modelLabel("claude-something-new")).toBe("claude-something-new");
+    expect(models.isRecordedModel("claude-haiku-4-5")).toBe(true);
+    expect(models.isRecordedModel("gpt-whatever")).toBe(false);
+  });
+});
+
+describe("only lib/models.ts names a model or an effort", () => {
+  const root = resolve(__dirname, "..");
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) walk(path);
+      else if (/\.(ts|tsx)$/.test(name)) files.push(path);
+    }
+  };
+  walk(join(root, "app"));
+  walk(join(root, "lib"));
+  const others = files.filter((f) => relative(root, f) !== join("lib", "models.ts"));
+
+  it("finds the app's source", () => {
+    expect(others.some((f) => f.endsWith(join("lib", "anthropic.ts")))).toBe(true);
+  });
+
+  it.each([
+    ["a model id", /claude-(haiku|sonnet|opus)/],
+    ["an effort", /\beffort\s*:/],
+    ["a thinking setting", /\bthinking\s*:|budget_tokens/],
+    ["a sampling parameter", /\b(temperature|top_p|top_k)\s*:/],
+    ["a forced tool choice", /tool_choice/],
+    ["a tool version", /web_(fetch|search)_\d{8}/],
+  ])("no other file names %s", (_what, pattern) => {
+    const hits = others.filter((f) => pattern.test(readFileSync(f, "utf8"))).map((f) => relative(root, f));
+    expect(hits).toEqual([]);
   });
 });
 

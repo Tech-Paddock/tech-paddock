@@ -1,6 +1,6 @@
 import { readMeta, type RecipeMeta } from "./metadata";
 import type { Macros } from "./macros";
-import type { ModelId } from "./models";
+import { MODEL, type ModelId } from "./models";
 import { ConflictError, InputError } from "./errors";
 
 /**
@@ -122,8 +122,7 @@ export type EditDeps<R> = {
 export async function applyEdit<R>(
   deps: EditDeps<R>,
   id: string,
-  edit: RecipeEdit,
-  model: ModelId
+  edit: RecipeEdit
 ): Promise<{ recipe: R; repriced: boolean }> {
   const current = await deps.getRecipe(id);
   if (!current) throw new InputError("That recipe is not in the book any more.");
@@ -136,7 +135,8 @@ export async function applyEdit<R>(
   if (changesThePot(current, edit)) {
     // Throws on any failure, and nothing below runs.
     const estimate = await deps.estimate(edit);
-    reprice = { macros: estimate.macros, model, note: estimate.note };
+    // The one model every call runs on (TEC-133), recorded as what priced it.
+    reprice = { macros: estimate.macros, model: MODEL, note: estimate.note };
   }
 
   return { recipe: await deps.update(id, edit, reprice), repriced: reprice !== null };

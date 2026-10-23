@@ -3,7 +3,7 @@ import { listRecipes, saveRecipe, deleteRecipe, setRating, type RecipeDraft, typ
 import { readMeta } from "@/lib/metadata";
 import { errorResponse } from "@/lib/respond";
 import { parseMacros } from "@/lib/macros";
-import { MODELS, type ModelId } from "@/lib/models";
+import { isRecordedModel } from "@/lib/models";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,9 @@ export async function POST(request: NextRequest) {
   const source = typeof raw.source === "string" && (SOURCES as readonly string[]).includes(raw.source)
     ? (raw.source as RecipeDraft["source"])
     : "estimate";
-  const model = typeof raw.model === "string" && raw.model in MODELS ? (raw.model as ModelId) : null;
+  // Today's model, or one used before TEC-133: a draft made before a deploy and
+  // kept after it names the model that really priced it.
+  const model = isRecordedModel(raw.model) ? raw.model : null;
 
   const draft: RecipeDraft = {
     name,

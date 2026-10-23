@@ -14,10 +14,9 @@ import {
 /**
  * The shopping list's pure half, and it is mostly one function.
  *
- * `validateTidy` is the guard that makes it safe to point a cheap model at your
- * list: the model can fail to tidy, but it cannot lose your eggs. That is the
- * reasoning `lib/anthropic.ts` gives for pinning Tidy to Haiku, so these tests are
- * what that reasoning rests on.
+ * `validateTidy` is the guard that makes it safe to point a model at your list:
+ * the model can fail to tidy, but it cannot lose your eggs. `lib/anthropic.ts`
+ * rests Tidy on that guard, so these tests are what that reasoning rests on.
  */
 
 function item(over: Partial<GroceryItem> & { id: string; name: string }): GroceryItem {
