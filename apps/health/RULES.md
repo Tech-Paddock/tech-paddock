@@ -23,7 +23,7 @@ this file wins.
 - Thumb-first: the primary action sits in the reachable half; assume one hand.
 - Opens in its working state, not a menu.
 - Home-screen install is part of the design. On iOS it is done from Safari.
-- `/admin` and `/debug` never appear in navigation and do not count as screens.
+- `/admin` never appears in navigation and does not count as a screen.
 - The log is the screen. A second earns its place by being a different moment, not a different
   noun.
 
@@ -46,7 +46,7 @@ would overwrite a hand correction. This is correctness, not cost.
 ## Lookup order
 
 - A line naming a Cookbook recipe asks the Cookbook first. Its numbers are never typed over here,
-  on a draft, a correction or `/debug`; the fix belongs in the Cookbook.
+  on a draft or a correction; the fix belongs in the Cookbook.
 - Everything else:
   1. Exact match in the `health` table.
   2. Near match on the normalised item name.
@@ -65,10 +65,10 @@ would overwrite a hand correction. This is correctness, not cost.
 
 ## Models
 
-- A registry, not two strings, following `apps/coffee/lib/models.ts`. Health's copy is its own.
-  Models differ in accepted parameters and web tool versions, so a bare swap is an error.
-- Haiku 4.5 is the default; Sonnet 5 is available. No effort dial.
-- Only the judgment call (the estimate) gets a model choice. The parse is pinned.
+- One model, Claude Sonnet 5.5 at effort medium, set in `lib/models.ts`. No picker, no effort
+  dial, no comparison.
+- A registry entry, not a bare string. Health's copy is its own. Models differ in accepted
+  parameters and web tool versions, so a bare swap is an error.
 - Every number carries its provenance: log, web or estimate, and the model that produced it.
   Cookbook numbers carry `cookbook` and no model.
 
@@ -80,7 +80,6 @@ would overwrite a hand correction. This is correctness, not cost.
 
 ## Traps
 
-- A new route needs no edit to the gate file: its matcher is a catch-all negative. The debug
-  surface must never need the gate file.
+- A new route needs no edit to the gate file: its matcher is a catch-all negative.
 - The Supabase exposed-schemas list is outside the repo. A missing schema fails as a permissions
   error that reads like a bad key; `/api/health` probes for it.

@@ -6,6 +6,15 @@ What is true now and its traps. Rules are in `RULES.md`; open work is in Linear 
 
 - Live at `coffee.techpaddock.io` on Next 16 and React 19, behind the gate in `proxy.ts` on the
   Node runtime. The flow has run end to end.
+- Every model call (label, search, recipe card, suggestion) sends `MODEL` at `output_config.effort:
+  EFFORT` from `lib/models.ts`: `claude-sonnet-5-5` at `medium` since TEC-133. No `thinking` is
+  sent, so Sonnet 5.5 thinks adaptively. `tests/anthropic.test.ts` pins every request.
+- `POST /api/search` ignores a `model` or `effort` in the body. Bags searched before TEC-133 keep
+  their recorded `guide_model`/`guide_effort` (Haiku 4.5, Sonnet 4.6 or Sonnet 5), and old
+  suggestions their `model`; `modelLabel` names them.
+- Each call refuses a turn that did not end in `end_turn`, `refusal` included: the label reader
+  throws (the page shows the error on the manual-entry screen), the suggestion records
+  `suggested_error`, the card read is a warning.
 - Only the search writes `guide_*`. `POST /api/bags` takes no guide; a bag is saved at
   `not_searched` through `guideColumns(null)`.
 - A guide needs a product page on an http(s) host, on the roaster's site, and on a host the run
@@ -24,8 +33,8 @@ What is true now and its traps. Rules are in `RULES.md`; open work is in Linear 
 - `myBrewerFor` feeds `openingBrew`. With the user's dose, the roaster's ratio sets the water.
 - A failed suggestion writes only `suggested_error`.
 - Image recipes: below tier 1 with a product page, `searchBrewGuide` fetches the page, takes up to
-  six product-gallery images (`og:image` only when no gallery is recognised), and one
-  `claude-sonnet-5` call at `effort: "low"`, without tools, copies out any printed recipe. Rules are
+  six product-gallery images (`og:image` only when no gallery is recognised), and one model call,
+  without tools, copies out any printed recipe. Rules are
   pure in `lib/recipeImage.ts`; fetches are in `anthropic.ts`.
 - The image URL is a key on each quote in `guide_quotes`. Tier 1 needs every image in the gallery.
   A text answer's `image` key is stripped.
@@ -39,6 +48,10 @@ What is true now and its traps. Rules are in `RULES.md`; open work is in Linear 
   lookup, search, label date. Check it on every new read path.
 - `guide_search_error` beside a fresh answer is a warning; with no new answer it is the failure.
   Read `guide_status` and `guide_fetched_at` before showing it.
+- Thinking counts toward `max_tokens`, and at `medium` Sonnet 5.5 thinks before almost every
+  reply. The budgets in `lib/anthropic.ts` were raised for it when the model changed; a lowered one
+  shows up as a `max_tokens` stop, never as an empty answer.
+- The web tool versions in `lib/models.ts` belong to the model. A model change rechecks them.
 - `maxDuration = 300` in `app/api/search/route.ts` is a literal Next reads statically. It must equal
   `SEARCH_STALE_MS`.
 - No model call runs from a sandbox. The image read has never met a real page; gallery detection is

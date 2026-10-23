@@ -1,8 +1,7 @@
 /**
- * Macros, their arithmetic, and what it means for two estimates to agree.
+ * Macros and their arithmetic.
  *
- * Nothing here touches the database or a model. It is the part the debug
- * harness's headline number depends on, so it is pure and it is tested.
+ * Nothing here touches the database or a model, so it is pure and it is tested.
  */
 
 export type Macros = {
@@ -72,52 +71,6 @@ export function round(m: Macros): Macros {
     carbs_g: Math.round(m.carbs_g),
     fat_g: Math.round(m.fat_g),
   };
-}
-
-/**
- * Two estimates agree when they are close enough that choosing between them
- * would be noise.
- *
- * **A numeric tolerance rather than string equality**, because two estimates of
- * the same sandwich will essentially never be byte-identical and a harness that
- * asks you to arbitrate 620 against 625 forty times a week is a harness you
- * stop reading by Thursday.
- *
- * Each threshold is a relative band with an absolute floor, and the floor is
- * the half that matters: 20% of 2g of fat is 0.4g, which would make every
- * low-fat item disagree over a rounding difference.
- */
-export const TOLERANCE = {
-  /** Calories: the headline number, so the tighter band. */
-  kcal: { relative: 0.1, floor: 25 },
-  /** Macros: noisier at source, and a few grams does not change a decision. */
-  macro: { relative: 0.2, floor: 5 },
-} as const;
-
-function within(a: number, b: number, band: { relative: number; floor: number }): boolean {
-  const allowed = Math.max(band.floor, Math.max(Math.abs(a), Math.abs(b)) * band.relative);
-  return Math.abs(a - b) <= allowed;
-}
-
-/**
- * Every field has to agree. One wildly wrong macro inside an otherwise close
- * estimate is exactly the disagreement worth surfacing — averaging it away
- * would hide the only interesting case.
- */
-export function agrees(a: Macros, b: Macros): boolean {
-  return (
-    within(a.kcal, b.kcal, TOLERANCE.kcal) &&
-    within(a.protein_g, b.protein_g, TOLERANCE.macro) &&
-    within(a.carbs_g, b.carbs_g, TOLERANCE.macro) &&
-    within(a.fat_g, b.fat_g, TOLERANCE.macro)
-  );
-}
-
-/** Which fields disagree, for a harness that should say what differs rather than that something does. */
-export function disagreements(a: Macros, b: Macros): (keyof Macros)[] {
-  return MACRO_KEYS.filter((k) =>
-    !within(a[k], b[k], k === "kcal" ? TOLERANCE.kcal : TOLERANCE.macro)
-  );
 }
 
 /** Reads a Macros off an untrusted object — a model response, or a jsonb column. */
