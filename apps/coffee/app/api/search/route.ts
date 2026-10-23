@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchBrewGuide } from "@/lib/anthropic";
-import { isSearchModel, isEffortFor, effortsFor, DEFAULT_SEARCH_MODEL } from "@/lib/models";
+import { MODEL, EFFORT } from "@/lib/models";
 import { guideColumns, hostOf } from "@/lib/bags";
 import { getServiceClient } from "@/lib/supabase";
 import { suggestOnBag } from "@/lib/suggestOnBag";
@@ -28,27 +28,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A roaster and a coffee name are needed to search." }, { status: 400 });
   }
 
-  // An unknown model is refused rather than quietly swapped: silently running
-  // a different model than the one under test is worse than not running.
-  if (body.model !== undefined && !isSearchModel(body.model)) {
-    return NextResponse.json({ error: `"${body.model}" isn't a search model.` }, { status: 400 });
-  }
-  const model = isSearchModel(body.model) ? body.model : DEFAULT_SEARCH_MODEL;
-
-  // Refused rather than dropped. Silently ignoring an effort level this model
-  // cannot take would report a comparison that never ran at that setting.
-  if (body.effort != null && !isEffortFor(model, body.effort)) {
-    const offered = effortsFor(model);
-    return NextResponse.json(
-      {
-        error: offered.length
-          ? `${model} takes effort ${offered.join(", ")} — not "${body.effort}".`
-          : `${model} has no effort control, so "${body.effort}" can't be set for it.`,
-      },
-      { status: 400 }
-    );
-  }
-  const effort = isEffortFor(model, body.effort) ? body.effort : null;
+  // **A `model` or `effort` in the body is ignored, whatever it says**
+  // (TEC-133). Every search runs `MODEL` at `EFFORT` from `lib/models.ts`, and
+  // the row and this response record what actually ran. Ignored rather than
+  // refused because the only sender was the scan screen's old picker, and an
+  // installed home-screen copy of that page can outlive the deploy: refusing
+  // would break its search until a reload, while ignoring it changes nothing
+  // the user can see except which model is recorded.
+  const model = MODEL;
+  const effort = EFFORT;
 
   const supabase = getServiceClient();
 
@@ -98,7 +86,7 @@ export async function POST(request: NextRequest) {
   const began = Date.now();
 
   try {
-    const { guide, warning } = await searchBrewGuide({ roaster, coffeeName, productUrl, model, effort });
+    const { guide, warning } = await searchBrewGuide({ roaster, coffeeName, productUrl });
 
     // The result lands in the row, not in this response. That is the whole
     // point: by now the page that asked for it may be long gone.
