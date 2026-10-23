@@ -107,7 +107,9 @@ go, go fully and do not reopen it.
   the cross-schema contracts and the new-schema steps.
 - **RLS on every table, zero policies.** Servers use the service role key.
 - **No secrets in the browser.** Supabase and Anthropic calls go through the app's server routes.
-  The model is chosen per task at the call site; changing it needs a test.
+  Every model call uses Claude Sonnet 5.5 (`claude-sonnet-5-5`) at effort `medium`, set once per
+  app in `lib/models.ts`. No app offers a model picker or effort dial. Changing either is the
+  owner's call and needs a test.
 - **One login across subdomains.** The session cookie is scoped to `.techpaddock.io`;
   `SESSION_SECRET` must be identical in every Vercel project. Apps send
   `frame-ancestors 'self' https://techpaddock.io https://*.techpaddock.io`.

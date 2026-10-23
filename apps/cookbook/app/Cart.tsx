@@ -3,48 +3,46 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CHECKOUT_URL, isKingSoopersProduct } from "@/lib/kingsoopers";
 import { refreshDue, scanDue } from "@/lib/refreshDue";
-import type { Candidate, CartLine, Outcome, ReviewLine } from "@/lib/cart";
+import type { Candidate, CartLine, Outcome, Plan, ReviewLine } from "@/lib/cart";
 import { describeDrift, sizeDrift } from "@/lib/sizeDrift";
-import { modalityWord, type Modality } from "@/lib/modality";
+import type { Modality } from "@/lib/modality";
 import type { Estimate, ScanRecord } from "@/lib/pricing";
-import type { SaleSources } from "@/lib/saleTag";
 import { describe as describeHeld, type TakeBackLine, type TakeBackOutcome } from "@/lib/takeBack";
-import { DealsPanel, EstimatePanel, ModeToggle } from "./Deals";
+import { DealsPanel, EstimatePanel } from "./Deals";
 import { useToast } from "./Toast";
 
 /**
- * Send to cart — King Soopers (TEC-90; `RULES.md`, *Send to cart*).
+ * Send to cart — King Soopers (TEC-90; `RULES.md`, *Send to cart*), on the
+ * list tab. Connect once, pick a store once, then **Send to cart** opens the
+ * review (TEC-135, the owner's mockup of 2026-10-23): **one list in three
+ * sections** —
+ * - **Pick one**: several saved products and no default; the most-bought is
+ *   pre-picked, and **Make default** (a plain checkbox) makes the pick the
+ *   name's default when it goes in.
+ * - **Going in**: one saved product, the name's default, or one the line
+ *   names; tap to change.
+ * - **Not saved yet**: Kroger's top match, ticked to add, or a pasted page.
  *
- * On the list tab, under the list: connect once, pick a store once, then
- * send. **Send puts every unsent line matching exactly one product in Your
- * brands straight in** (TEC-131), then shows the rest in three sections:
- * matched lines already sent, **Settle these** (several products match: one
- * pick, most counted first) and **No match** (Kroger's top match for the item
- * alone, or an exact product page instead); whichever goes in is remembered in
- * Your brands (TEC-128).
- * **No model picks anything.** Every line then reports added, skipped or failed,
- * and **a line already sent is not sent again without saying so**, because the
- * Cart API only adds. Checkout stays at King Soopers: the link opens their cart.
+ * **Nothing is skipped silently**: every line goes unless **Not this trip** is
+ * tapped, and after Send every unsent line stays listed under **Still on your
+ * list**. Whichever goes in is remembered in Your brands (TEC-128). **No model
+ * picks anything.** Every line reports added, skipped or failed, and **a line
+ * already sent is not sent again without saying so**, because the Cart API
+ * only adds. Checkout stays at King Soopers.
  *
- * **Refresh** (2026-10-20): opening this tab with the last refresh over a
- * week old starts one in the background; *Refresh now* starts one by hand.
- * Either way the result is said in words, and a failure is never silence.
+ * **Refresh** (2026-10-20): opening the tab with the last refresh over a week
+ * old starts one in the background; *Refresh now* starts one by hand.
+ * **Prices (TEC-121)**: Pickup/Delivery, the estimate and the deal scan.
+ * **Every request that borrows a Kroger token goes through `serial`**, one at
+ * a time: two at once can race the refresh token's rotation.
+ * **Take back (TEC-127)**: removes what Cookbook sent, after a second tap that
+ * shows what will come out. Never says the cart is empty.
  *
- * **Prices (TEC-121)**: a Pickup/Delivery toggle (remembered on the
- * connection, passed to Send), *Calculate estimated total*, and the deal scan,
- * which runs on the refresh's rule. **Every request that borrows a Kroger
- * token goes through `serial`**, one at a time: two at once can race the
- * refresh token's rotation, and opening the list can start a refresh and a
- * scan together.
- *
- * **Take back (TEC-127)**: removes what Cookbook sent — the products,
- * quantities and modes the ledger recorded — by negative quantities, after a
- * second tap that shows what will come out. Never says the cart is empty.
- *
- * Local patterns, named so they are a decision deferred rather than drift: the
- * per-line review rows (added / skipped / failed chips, and Take back's taken
- * back / skipped / failed), the Take back confirm and the store picker are this
- * file's own; they reuse the theme's tokens only.
+ * The state lives in `useCart`; `List.tsx` lays out `SendView`, `CartPanel`
+ * and `CartBar`. Local patterns, named so they are a decision deferred rather
+ * than drift: the review's line rows, option buttons (filled when picked) and
+ * section headings, the result chips, the Take back confirm and the store
+ * picker. They reuse the theme's tokens only.
  */
 
 type Status = {
@@ -58,8 +56,12 @@ type Status = {
 
 type Store = { locationId: string; name: string; address: string };
 
-/** What the user has decided for one line in the review; `pick` is the product number chosen under Settle these. */
-type Choice = { include: boolean; url: string; pick?: string };
+/**
+ * What the user has decided for one line in the review. `on` is false only
+ * after *Not this trip* (or for a line with nothing to add); `pick` is the
+ * product chosen among the options; `url` a pasted product page.
+ */
+export type Choice = { on: boolean; pick: string | null; url: string; pasting: boolean; makeDefault: boolean };
 
 type Results = {
   outcomes: Outcome[];
@@ -67,14 +69,6 @@ type Results = {
   recordError: string | null;
   modalityWarning: string | null;
 };
-
-/** "3 added, 1 failed" for the lines shown — the server's summary counts every open line. */
-function tally(outcomes: Outcome[]): string {
-  const n = (r: Outcome["result"]) => outcomes.filter((o) => o.result === r).length;
-  return [`${n("added")} added`, n("skipped") ? `${n("skipped")} skipped` : null, n("failed") ? `${n("failed")} failed` : null]
-    .filter(Boolean)
-    .join(", ");
-}
 
 const CALLBACK_WORDS: Record<string, string> = {
   connected: "King Soopers connected.",
@@ -84,6 +78,9 @@ const CALLBACK_WORDS: Record<string, string> = {
   unconfigured: "Send to cart isn't set up on this deployment.",
 };
 
+const LINK = "underline decoration-dotted underline-offset-2";
+const HEADING = "text-xs font-bold uppercase tracking-wider";
+
 function when(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
@@ -91,34 +88,87 @@ function when(iso: string): string {
     : d.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-function CheckoutLink() {
-  return (
-    <a
-      href={CHECKOUT_URL}
-      target="_blank"
-      rel="noreferrer"
-      className="rounded border border-line px-3 py-1.5 text-sm underline decoration-dotted underline-offset-2"
-    >
-      Go to checkout
-    </a>
-  );
+function money(n: number | null): string | null {
+  return n === null ? null : `$${n.toFixed(2)}`;
 }
 
-export default function Cart({
-  onBrandsChanged,
-  onSaleSources,
-}: {
-  onBrandsChanged: () => void;
-  /** The prices this panel already holds, handed up so the list can tag lines on sale (TEC-121 3a). No request of its own. */
-  onSaleSources?: (sources: SaleSources) => void;
-}) {
+/** "bought N×" — the times-bought count, never a quantity (TEC-135). */
+function bought(count: number): string {
+  return count > 0 ? `bought ${count}×` : "new";
+}
+
+/** The options a product plan offers, the one it goes in as first. */
+function optionsOf(plan: Plan): Candidate[] {
+  return plan.kind === "exact" ? plan.options : plan.kind === "settle" ? plan.options : [];
+}
+
+/** Which section a line sits in (TEC-135). A line already sent sits apart, because sending it again doubles it. */
+export function sectionOf(line: ReviewLine): "pick" | "going" | "new" | "sent" {
+  if (line.sent_at !== null) return "sent";
+  if (line.plan.kind === "settle") return "pick";
+  if (line.plan.kind === "exact") return "going";
+  return "new";
+}
+
+/** Before anyone taps: **every line goes**, Pick one with its most-bought pre-picked. A line already sent waits for a tap. */
+function startingChoice(line: ReviewLine): Choice {
+  const plan = line.plan;
+  const fresh = line.sent_at === null;
+  const pick = plan.kind === "exact" ? plan.upc : plan.kind === "settle" ? (plan.options[0]?.upc ?? null) : null;
+  const on = fresh && (plan.kind === "exact" || plan.kind === "settle" || plan.kind === "match");
+  return { on, pick, url: "", pasting: false, makeDefault: false };
+}
+
+type Pick = { id: string; upc?: string; url?: string; match?: string; size?: string; makeDefault?: true };
+
+/** What a line sends, or null for Not this trip. */
+export function pickFor(line: ReviewLine, choice: Choice): Pick | null {
+  const plan = line.plan;
+  if (choice.url.trim()) return { id: line.id, url: choice.url.trim() };
+  if (!choice.on) return null;
+  if (plan.kind === "exact" || plan.kind === "settle") {
+    const option = optionsOf(plan).find((o) => o.upc === choice.pick);
+    if (!option) return null;
+    const matched = plan.matched;
+    const defaulting = choice.makeDefault && matched && optionsOf(plan).length > 1 ? { makeDefault: true as const } : {};
+    // The product a Going in line went in as, untouched, is never re-saved.
+    if (plan.kind === "exact" && option.upc === plan.upc) return { id: line.id, upc: option.upc, ...defaulting };
+    // The pick's page goes with it, so it is remembered the way a match is (TEC-131).
+    return { id: line.id, upc: option.upc, match: option.url, ...defaulting };
+  }
+  if (plan.kind === "match") {
+    const p = plan.product;
+    return { id: line.id, upc: p.upc, match: p.url, ...(p.size ? { size: p.size } : {}) };
+  }
+  return null;
+}
+
+/**
+ * **One Kroger request at a time, for the whole page.** Each borrows the
+ * refresh token, and two at once can race its rotation (NOTES.md); opening
+ * the list can start a refresh and a deal scan together, and Your brands has
+ * its own Refresh now (TEC-135). Module-level, so every tab shares the one
+ * queue. A failed task does not stop the next.
+ */
+let krogerQueue: Promise<unknown> = Promise.resolve();
+export function serialKroger<T>(task: () => Promise<T>): Promise<T> {
+  const run = krogerQueue.then(task, task);
+  krogerQueue = run.catch(() => undefined);
+  return run;
+}
+
+export type CartState = ReturnType<typeof useCart>;
+
+export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: () => void; onListChanged: () => void }) {
   const toast = useToast();
   const toastRef = useRef(toast);
   toastRef.current = toast;
-  // A ref, so a parent re-render (every tick on the list) never re-runs the
+  // Refs, so a parent re-render (every tick on the list) never re-runs the
   // on-open effect below and re-reads the connection.
   const brandsChanged = useRef(onBrandsChanged);
   brandsChanged.current = onBrandsChanged;
+  const listChanged = useRef(onListChanged);
+  listChanged.current = onListChanged;
 
   const [status, setStatus] = useState<Status | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -138,11 +188,12 @@ export default function Cart({
   } | null>(null);
   const [review, setReview] = useState<ReviewLine[] | null>(null);
   const [choices, setChoices] = useState<Record<string, Choice>>({});
+  const [open, setOpen] = useState<string | null>(null);
   const [confirmAgain, setConfirmAgain] = useState(false);
   const [refused, setRefused] = useState<CartLine[] | null>(null);
+  // After Send (TEC-135): the results, and the review they came from, so every
+  // unsent line stays listed under Still on your list.
   const [results, setResults] = useState<Results | null>(null);
-  // What Send put straight in (TEC-131): every unsent line matching exactly one brand.
-  const [straightIn, setStraightIn] = useState<Results | null>(null);
 
   const [refreshing, setRefreshing] = useState(false);
   const [refreshNote, setRefreshNote] = useState<{ text: string; failed: boolean } | null>(null);
@@ -150,6 +201,7 @@ export default function Cart({
 
   const [estimating, setEstimating] = useState(false);
   const [estimate, setEstimate] = useState<{ estimate: Estimate; message: string } | null>(null);
+  const [showEstimate, setShowEstimate] = useState(false);
 
   const [latestScan, setLatestScan] = useState<ScanRecord | null>(null);
   const [scanLoaded, setScanLoaded] = useState(false);
@@ -157,17 +209,7 @@ export default function Cart({
   const [scanNote, setScanNote] = useState<{ text: string; failed: boolean } | null>(null);
   const autoScanned = useRef(false);
 
-  /**
-   * **One Kroger request at a time.** Each borrows the refresh token, and two
-   * at once can race its rotation (NOTES.md); opening the list can start a
-   * refresh and a deal scan together. A failed task does not stop the next.
-   */
-  const queue = useRef<Promise<unknown>>(Promise.resolve());
-  const serial = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
-    const run = queue.current.then(task, task);
-    queue.current = run.catch(() => undefined);
-    return run;
-  }, []);
+  const serial = serialKroger;
 
   const loadStatus = useCallback(async (): Promise<Status | null> => {
     try {
@@ -278,13 +320,6 @@ export default function Cart({
     });
   }, [loadStatus, refresh, loadScan, scan]);
 
-  // The list's on-sale tags read the latest scan and estimate held here, at
-  // the chosen store; nothing new is fetched for them.
-  const locationId = status?.connected ? (status.store?.locationId ?? null) : null;
-  useEffect(() => {
-    onSaleSources?.({ locationId, scan: latestScan, estimate: estimate?.estimate ?? null });
-  }, [onSaleSources, locationId, latestScan, estimate]);
-
   async function chooseModality(modality: Modality) {
     if (!status) return;
     const before = status.modality;
@@ -312,6 +347,7 @@ export default function Cart({
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "Couldn't calculate the estimate.");
       setEstimate(body as { estimate: Estimate; message: string });
+      setShowEstimate(true);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't calculate the estimate.");
     } finally {
@@ -364,7 +400,6 @@ export default function Cart({
       if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't disconnect.");
       setReview(null);
       setResults(null);
-      setStraightIn(null);
       await loadStatus();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't disconnect.");
@@ -373,27 +408,15 @@ export default function Cart({
     }
   }
 
-  function postSend(body: { picks: unknown[]; again: boolean }) {
-    return serial(() =>
-      fetch("/api/kroger/cart", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })
-    );
-  }
-
   /**
-   * **Send to cart** (TEC-131; RULES.md): look every line up, then **put each
-   * unsent line that matches exactly one brand straight in**, no tap. What is
-   * left is the review: Settle these (several brands match), No match (Kroger's
-   * top match), and matched lines already sent, which still warn.
+   * **Send to cart** (TEC-135; RULES.md): look every line up and open the
+   * review. Nothing goes in until **Send N to cart**: the review is one list,
+   * every line ticked, Pick one pre-picked to the most bought.
    */
   async function startReview() {
     if (busy) return;
     setBusy("review");
     setResults(null);
-    setStraightIn(null);
     setTakeBackPreview(null);
     setTakeBackResults(null);
     setRefused(null);
@@ -403,52 +426,11 @@ export default function Cart({
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't get the list ready.");
       const lines = body.lines as ReviewLine[];
-
-      const auto = lines.filter((l) => l.plan.kind === "exact" && l.sent_at === null);
-      let rest = lines.filter((l) => !auto.includes(l));
-      if (auto.length > 0) {
-        setBusy("send");
-        const autoIds = new Set(auto.map((l) => l.id));
-        let sent: Response | null = null;
-        try {
-          sent = await postSend({
-            picks: auto.map((l) => ({ id: l.id, upc: (l.plan as { upc: string }).upc })),
-            again: false,
-          });
-        } catch {
-          // Unknown whether anything went in: say so, and offer them again,
-          // where a second send of a line that did go in still warns.
-          toast.error("Lost touch with this app's server while sending the matched lines. Check the King Soopers cart before sending them again.");
-        }
-        const result = sent ? await sent.json().catch(() => ({})) : {};
-        if (!sent) {
-          rest = lines;
-        } else if (sent.ok) {
-          const outcomes = (result.outcomes as Outcome[]).filter((o) => autoIds.has(o.id));
-          setStraightIn({
-            outcomes,
-            summary: tally(outcomes),
-            recordError: result.recordError ?? null,
-            modalityWarning: result.modalityWarning ?? null,
-          });
-          brandsChanged.current();
-        } else {
-          // Nothing went in (a 409 means another tab sent them first): they
-          // join the review, ticked, so nothing is lost silently.
-          toast.error(result.error ?? "Couldn't put the matched lines in the cart.");
-          rest = lines;
-        }
-      }
-
-      setReview(rest);
-      // **Settle these and No match wait for a tap** (RULES.md). A matched line
-      // here is one already sent or one that failed to go in straight away: it
-      // starts ticked only if it has never been sent.
-      setChoices(
-        Object.fromEntries(
-          rest.map((l) => [l.id, { include: l.plan.kind === "exact" && l.sent_at === null, url: "" }])
-        )
-      );
+      setReview(lines);
+      setChoices(Object.fromEntries(lines.map((l) => [l.id, startingChoice(l)])));
+      // The first line to settle starts open, as on the mockup.
+      setOpen(lines.find((l) => sectionOf(l) === "pick")?.id ?? null);
+      window.scrollTo({ top: 0 });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't get the list ready.");
     } finally {
@@ -456,57 +438,61 @@ export default function Cart({
     }
   }
 
+  function closeReview() {
+    setReview(null);
+    setResults(null);
+    setRefused(null);
+  }
+
   function choose(id: string, change: Partial<Choice>) {
     setChoices((current) => ({ ...current, [id]: { ...current[id], ...change } }));
   }
 
-  const picks = (review ?? []).flatMap((line): { id: string; upc?: string; url?: string; match?: string }[] => {
+  const picks = (review ?? []).flatMap((line) => {
     const choice = choices[line.id];
-    if (!choice) return [];
-    if (choice.url.trim()) return [{ id: line.id, url: choice.url.trim() }];
-    if (line.plan.kind === "settle") {
-      // The pick's page goes with it, so it is remembered the way a match is (TEC-131).
-      const option = line.plan.options.find((o) => o.upc === choice.pick);
-      return option ? [{ id: line.id, upc: option.upc, match: option.url }] : [];
-    }
-    if (!choice.include) return [];
-    if (line.plan.kind === "exact") return [{ id: line.id, upc: line.plan.upc }];
-    // The match's page goes with it, so the server can remember it in Your brands (TEC-128).
-    if (line.plan.kind === "match") {
-      const p = line.plan.product;
-      return [{ id: line.id, upc: p.upc, match: p.url, ...(p.size ? { size: p.size } : {}) }];
-    }
-    return [];
+    const pick = choice ? pickFor(line, choice) : null;
+    if (pick) return [pick];
+    // A fresh line with nothing to add still asks, so the server reports it rather than calling it Not this trip.
+    return line.sent_at === null && line.plan.kind === "none" ? [{ id: line.id } as Pick] : [];
   });
-  const again = (review ?? []).filter((l) => l.sent_at !== null && picks.some((p) => p.id === l.id));
+  const going = picks.filter((p) => p.upc || p.url);
+  const again = (review ?? []).filter((l) => l.sent_at !== null && going.some((p) => p.id === l.id));
   const badUrl = (review ?? []).some((l) => {
     const url = choices[l.id]?.url.trim();
     return !!url && !isKingSoopersProduct(url);
   });
 
   async function send() {
-    if (busy || picks.length === 0) return;
+    if (busy || going.length === 0) return;
     setBusy("send");
     setRefused(null);
     try {
-      const response = await postSend({ picks, again: again.length > 0 && confirmAgain });
+      const response = await serial(() =>
+        fetch("/api/kroger/cart", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ picks, again: again.length > 0 && confirmAgain }),
+        })
+      );
       const body = await response.json();
       if (response.status === 409 && Array.isArray(body.alreadySent)) {
         setRefused(body.alreadySent as CartLine[]);
         return;
       }
       if (!response.ok) throw new Error(body.error ?? "Couldn't send to the cart.");
-      // Only the lines this review held: the ones that went straight in are reported above.
+      // Only the lines this review held; the server's summary counts every open line.
       const shown = new Set((review ?? []).map((l) => l.id));
       const outcomes = (body.outcomes as Outcome[]).filter((o) => shown.has(o.id));
       setResults({
         outcomes,
-        summary: tally(outcomes),
+        summary: body.summary as string,
         recordError: body.recordError ?? null,
         modalityWarning: body.modalityWarning ?? null,
       });
-      setReview(null);
+      setOpen(null);
+      window.scrollTo({ top: 0 });
       brandsChanged.current();
+      listChanged.current();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't send to the cart.");
     } finally {
@@ -559,10 +545,10 @@ export default function Cart({
         failed: body.failed === true,
       });
       setTakeBackPreview(null);
-      // What was sent has changed; a review or send result on screen is now stale.
+      // What was sent has changed; a review or send result held here is now stale.
       setReview(null);
       setResults(null);
-      setStraightIn(null);
+      listChanged.current();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't take back from the cart.");
     } finally {
@@ -570,22 +556,105 @@ export default function Cart({
     }
   }
 
-  // -------------------------------------------------------------------------
+  const ready = !!status?.configured && !!status.connected && !!status.store && !choosingStore;
 
+  return {
+    status,
+    statusError,
+    ready,
+    zip,
+    setZip,
+    stores,
+    choosingStore,
+    setChoosingStore,
+    busy,
+    takeBackPreview,
+    setTakeBackPreview,
+    takeBackResults,
+    review,
+    choices,
+    open,
+    setOpen,
+    choose,
+    picks,
+    going,
+    again,
+    badUrl,
+    confirmAgain,
+    setConfirmAgain,
+    refused,
+    results,
+    refreshing,
+    refreshNote,
+    estimating,
+    estimate,
+    showEstimate,
+    setShowEstimate,
+    latestScan,
+    scanLoaded,
+    scanning,
+    scanNote,
+    refresh,
+    scan,
+    chooseModality,
+    calculate,
+    findStores,
+    pickStore,
+    disconnect,
+    startReview,
+    closeReview,
+    send,
+    lookTakeBack,
+    confirmTakeBack,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The bottom bar: Send to cart and Take back stay at the bottom (TEC-135).
+// ---------------------------------------------------------------------------
+
+export function CartBar({ cart }: { cart: CartState }) {
+  if (!cart.ready) return null;
+  return (
+    <div className="sticky bottom-0 z-10 -mx-4 flex gap-2 border-t border-line bg-paper px-4 py-3">
+      <button
+        type="button"
+        onClick={() => void cart.startReview()}
+        disabled={cart.busy !== null}
+        className="min-h-12 flex-1 rounded-xl bg-accent text-base font-semibold text-accent-ink disabled:opacity-50"
+      >
+        {cart.busy === "review" ? "Looking up…" : "Send to cart"}
+      </button>
+      {/* **Says it leaves the rest** (RULES.md): Cookbook can only remove what it sent; the confirm says so. */}
+      <button
+        type="button"
+        onClick={() => void cart.lookTakeBack()}
+        disabled={cart.busy !== null || cart.takeBackPreview !== null}
+        className="min-h-12 rounded-xl border border-accent px-4 text-sm font-semibold text-accent disabled:opacity-50"
+      >
+        {cart.busy === "take-back-look" ? "Checking…" : "Take back"}
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The panel under the list: connection, store, refresh, estimate, Take back,
+// deals.
+// ---------------------------------------------------------------------------
+
+export function CartPanel({ cart }: { cart: CartState }) {
+  const { status } = cart;
   let body: ReactNode;
   if (status === null) {
-    body = statusError ? (
-      <p role="alert" className="text-sm text-danger">{statusError}</p>
+    body = cart.statusError ? (
+      <p role="alert" className="text-sm text-danger">{cart.statusError}</p>
     ) : (
       <p className="text-sm text-ink-soft">Checking the King Soopers connection…</p>
     );
   } else if (!status.configured) {
     // **In words, naming the variable** — never a dead button.
-    body = (
-      <p className="text-sm text-ink-soft">
-        Send to cart isn&rsquo;t set up on this deployment: {status.problems.join("; ")}.
-      </p>
-    );
+    body = <p className="text-sm text-ink-soft">Send to cart isn&rsquo;t set up on this deployment: {status.problems.join("; ")}.</p>;
   } else if (!status.connected) {
     body = (
       <div className="flex flex-col gap-2">
@@ -597,14 +666,14 @@ export default function Cart({
         </a>
       </div>
     );
-  } else if (!status.store || choosingStore) {
+  } else if (!status.store || cart.choosingStore) {
     body = (
       <div className="flex flex-col gap-2">
         <p className="text-sm text-ink-soft">Pick your store once, so matches are priced and stocked there.</p>
         <div className="flex gap-2">
           <input
-            value={zip}
-            onChange={(e) => setZip(e.target.value)}
+            value={cart.zip}
+            onChange={(e) => cart.setZip(e.target.value)}
             inputMode="numeric"
             placeholder="ZIP"
             aria-label="ZIP code"
@@ -612,34 +681,30 @@ export default function Cart({
           />
           <button
             type="button"
-            onClick={findStores}
-            disabled={!/^\d{5}$/.test(zip.trim()) || busy !== null}
+            onClick={() => void cart.findStores()}
+            disabled={!/^\d{5}$/.test(cart.zip.trim()) || cart.busy !== null}
             className="rounded-lg border border-line px-3 py-1.5 text-sm disabled:opacity-50"
           >
-            {busy === "stores" ? "Looking…" : "Find stores"}
+            {cart.busy === "stores" ? "Looking…" : "Find stores"}
           </button>
           {status.store ? (
-            <button type="button" onClick={() => setChoosingStore(false)} className="text-sm text-ink-soft">
+            <button type="button" onClick={() => cart.setChoosingStore(false)} className="text-sm text-ink-soft">
               Cancel
             </button>
           ) : null}
         </div>
-        {stores !== null ? (
-          stores.length === 0 ? (
+        {cart.stores !== null ? (
+          cart.stores.length === 0 ? (
             <p className="text-sm text-ink-soft">No King Soopers near that ZIP.</p>
           ) : (
             <ul className="flex flex-col divide-y divide-line rounded-lg border border-line">
-              {stores.map((s) => (
+              {cart.stores.map((s) => (
                 <li key={s.locationId} className="flex items-center gap-2 px-3 py-2 text-sm">
                   <span className="min-w-0 flex-1">
                     {s.name}
                     <span className="block text-[11px] text-ink-soft">{s.address}</span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => pickStore(s)}
-                    className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs"
-                  >
+                  <button type="button" onClick={() => void cart.pickStore(s)} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs">
                     Use this store
                   </button>
                 </li>
@@ -652,188 +717,110 @@ export default function Cart({
   } else {
     body = (
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-ink-soft">
-          <span>{status.store.name}</span>
-          <button type="button" onClick={() => setChoosingStore(true)} className="underline decoration-dotted underline-offset-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
+          <button type="button" onClick={() => cart.setChoosingStore(true)} className={LINK}>
             change store
           </button>
-          <button type="button" onClick={disconnect} className="underline decoration-dotted underline-offset-2">
+          <button type="button" onClick={() => void cart.disconnect()} className={LINK}>
             disconnect
           </button>
-          <span className="ml-auto">
-            {status.refreshedAt ? `prices checked ${when(status.refreshedAt)}` : "prices not checked yet"}
-          </span>
+          <a href={CHECKOUT_URL} target="_blank" rel="noreferrer" className={LINK}>
+            Go to checkout
+          </a>
+          <span className="ml-auto">{status.refreshedAt ? `prices checked ${when(status.refreshedAt)}` : "prices not checked yet"}</span>
           <button
             type="button"
-            onClick={() => void refresh()}
-            disabled={refreshing}
+            onClick={() => void cart.refresh()}
+            disabled={cart.refreshing}
             className="rounded border border-line px-2 py-1 disabled:opacity-50"
           >
-            {refreshing ? "Refreshing…" : "Refresh now"}
+            {cart.refreshing ? "Refreshing…" : "Refresh now"}
           </button>
         </div>
 
-        {/* Pickup or Delivery (TEC-121): remembered on the connection; Send
-            passes it to the cart and the estimate prices what it offers. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <ModeToggle value={status.modality} onChange={(m) => void chooseModality(m)} disabled={busy === "send" || busy === "take-back"} />
-          <span className="text-xs text-ink-soft">The time slot is picked at King Soopers checkout.</span>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={startReview}
-            disabled={busy !== null}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
-          >
-            {busy === "review" ? "Looking up…" : busy === "send" && !review ? "Sending matched…" : review ? "Look up again" : "Send to cart"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void calculate()}
-            disabled={estimating}
-            className="rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50"
-          >
-            {estimating ? "Calculating…" : `Calculate estimated total (${modalityWord(status.modality)})`}
-          </button>
-          <CheckoutLink />
-          {/* **Says it leaves the rest** (RULES.md): Cookbook can only remove what it sent. */}
-          <button
-            type="button"
-            onClick={() => void lookTakeBack()}
-            disabled={busy !== null || takeBackPreview !== null}
-            className="rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50"
-          >
-            {busy === "take-back-look" ? "Checking…" : "Take back only what Cookbook sent"}
-          </button>
-        </div>
-
-        {takeBackPreview ? (
+        {cart.takeBackPreview ? (
           <TakeBackConfirm
-            lines={takeBackPreview}
-            working={busy === "take-back"}
-            onConfirm={() => void confirmTakeBack()}
-            onCancel={() => setTakeBackPreview(null)}
+            lines={cart.takeBackPreview}
+            working={cart.busy === "take-back"}
+            onConfirm={() => void cart.confirmTakeBack()}
+            onCancel={() => cart.setTakeBackPreview(null)}
           />
         ) : null}
 
-        {takeBackResults ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
-            <h3 className="text-sm font-semibold">{takeBackResults.summary}</h3>
-            <ul className="flex flex-col gap-1 text-sm">
-              {takeBackResults.outcomes.map((o) => (
-                <li key={o.id} className="flex items-baseline gap-2">
-                  <span
-                    className={`shrink-0 rounded border px-1.5 text-[11px] ${
-                      o.result === "taken back" ? "border-accent text-accent" : o.result === "failed" ? "border-danger/60 text-danger" : "border-line text-ink-soft"
-                    }`}
-                  >
-                    {o.result}
-                  </span>
-                  <span className="min-w-0">
-                    {o.name} <span className="text-ink-soft">— {o.detail}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {takeBackResults.recordError ? <p className="text-xs text-danger">{takeBackResults.recordError}</p> : null}
-            {takeBackResults.failed ? (
-              <p role="alert" className="text-xs text-warn">
-                Not everything came back out.{" "}
-                <a href={CHECKOUT_URL} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
-                  Open the King Soopers cart
-                </a>{" "}
-                to remove the rest by hand.
-              </p>
-            ) : null}
-          </div>
+        {cart.takeBackResults ? <TakeBackResults results={cart.takeBackResults} /> : null}
+
+        {cart.estimate && cart.showEstimate ? (
+          <EstimatePanel estimate={cart.estimate.estimate} message={cart.estimate.message} onClose={() => cart.setShowEstimate(false)} />
         ) : null}
 
-        {estimate ? <EstimatePanel estimate={estimate.estimate} message={estimate.message} onClose={() => setEstimate(null)} /> : null}
-
-        {straightIn ? (
-          <SendResults
-            title={`Straight in from Your brands: ${straightIn.summary}`}
-            results={straightIn}
-            checkout={!review || review.length === 0}
-          />
-        ) : null}
-
-        {review && !(review.length === 0 && straightIn) ? (
-          <ReviewPanel
-            review={review}
-            choices={choices}
-            choose={choose}
-            again={again}
-            confirmAgain={confirmAgain}
-            setConfirmAgain={setConfirmAgain}
-            refused={refused}
-            badUrl={badUrl}
-            count={picks.length}
-            sending={busy === "send"}
-            onSend={send}
-            onCancel={() => setReview(null)}
-          />
-        ) : null}
-
-        {results ? <SendResults title={results.summary} results={results} checkout /> : null}
-
-        <DealsPanel latest={latestScan} loaded={scanLoaded} scanning={scanning} note={scanNote} onScan={() => void scan("manual")} />
+        <DealsPanel
+          latest={cart.latestScan}
+          loaded={cart.scanLoaded}
+          scanning={cart.scanning}
+          note={cart.scanNote}
+          onScan={() => void cart.scan("manual")}
+        />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
-      <h2 className="text-base font-semibold">Send to cart</h2>
+    <div className="flex flex-col gap-2 rounded-xl bg-surface p-3">
+      <h2 className="text-sm font-semibold">King Soopers</h2>
       {body}
-      {refreshing && !refreshNote ? <p className="text-xs text-ink-soft">Checking prices and stock in the background…</p> : null}
-      {refreshNote ? (
-        <p role={refreshNote.failed ? "alert" : undefined} className={`text-xs ${refreshNote.failed ? "text-danger" : "text-ink-soft"}`}>
-          {refreshNote.text}
+      {cart.refreshing && !cart.refreshNote ? <p className="text-xs text-ink-soft">Checking prices and stock in the background…</p> : null}
+      {cart.refreshNote ? (
+        <p role={cart.refreshNote.failed ? "alert" : undefined} className={`text-xs ${cart.refreshNote.failed ? "text-danger" : "text-ink-soft"}`}>
+          {cart.refreshNote.text}
         </p>
       ) : null}
     </div>
   );
 }
 
-/** A send's per-line outcomes: added, skipped or failed, never a partial send read as whole. */
-function SendResults(props: { title: string; results: Results; checkout: boolean }) {
-  const { results } = props;
+function TakeBackResults({ results }: { results: { outcomes: TakeBackOutcome[]; summary: string; recordError: string | null; failed: boolean } }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
-      <h3 className="text-sm font-semibold">{props.title}</h3>
+      <h3 className="text-sm font-semibold">{results.summary}</h3>
       <ul className="flex flex-col gap-1 text-sm">
         {results.outcomes.map((o) => (
           <li key={o.id} className="flex items-baseline gap-2">
-            <span
-              className={`shrink-0 rounded border px-1.5 text-[11px] ${
-                o.result === "added" ? "border-accent text-accent" : o.result === "failed" ? "border-danger/60 text-danger" : "border-line text-ink-soft"
-              }`}
-            >
-              {o.result}
-            </span>
+            <ResultChip result={o.result} good="taken back" />
             <span className="min-w-0">
               {o.name} <span className="text-ink-soft">— {o.detail}</span>
             </span>
           </li>
         ))}
       </ul>
-      {results.modalityWarning ? <p role="alert" className="text-xs text-warn">{results.modalityWarning}</p> : null}
       {results.recordError ? <p className="text-xs text-danger">{results.recordError}</p> : null}
-      {props.checkout ? (
-        <div>
-          <CheckoutLink />
-        </div>
+      {results.failed ? (
+        <p role="alert" className="text-xs text-warn">
+          Not everything came back out.{" "}
+          <a href={CHECKOUT_URL} target="_blank" rel="noreferrer" className={LINK}>
+            Open the King Soopers cart
+          </a>{" "}
+          to remove the rest by hand.
+        </p>
       ) : null}
     </div>
   );
 }
 
+function ResultChip({ result, good }: { result: string; good: string }) {
+  return (
+    <span
+      className={`shrink-0 rounded border px-1.5 text-[11px] ${
+        result === good ? "border-accent text-accent" : result === "failed" ? "border-danger/60 text-danger" : "border-line text-ink-soft"
+      }`}
+    >
+      {result}
+    </span>
+  );
+}
+
 /**
  * Take back's confirm (TEC-127): **what will come out, before it does**, and
- * that nothing else in the cart is touched. A local pattern, like the review.
+ * that nothing else in the cart is touched.
  */
 function TakeBackConfirm(props: { lines: TakeBackLine[]; working: boolean; onConfirm: () => void; onCancel: () => void }) {
   const recorded = props.lines.filter((l) => l.held.length > 0);
@@ -843,7 +830,7 @@ function TakeBackConfirm(props: { lines: TakeBackLine[]; working: boolean; onCon
     return (
       <div className="flex items-baseline gap-2 rounded-lg border border-line p-3 text-sm text-ink-soft">
         <span className="flex-1">Cookbook hasn&rsquo;t sent anything on this list to the cart, so there&rsquo;s nothing to take back.</span>
-        <button type="button" onClick={props.onCancel} className="text-xs underline decoration-dotted underline-offset-2">
+        <button type="button" onClick={props.onCancel} className={`text-xs ${LINK}`}>
           OK
         </button>
       </div>
@@ -864,13 +851,13 @@ function TakeBackConfirm(props: { lines: TakeBackLine[]; working: boolean; onCon
       ) : null}
       {unrecorded.length > 0 ? (
         <p className="text-xs text-ink-soft">
-          Skipped — sent before Cookbook recorded what went in: {unrecorded.map((l) => l.name).join(", ")}. Remove those on the
-          King Soopers cart page.
+          Skipped — sent before Cookbook recorded what went in: {unrecorded.map((l) => l.name).join(", ")}. Remove those on the King
+          Soopers cart page.
         </p>
       ) : null}
       <p className="text-xs text-ink-soft">
-        Only what Cookbook sent comes out; anything added to the cart elsewhere stays. This can&rsquo;t be undone from here — send
-        again to put them back.
+        Only what Cookbook sent comes out; anything added to the cart elsewhere stays. This can&rsquo;t be undone from here — send again
+        to put them back.
       </p>
       <div className="flex gap-2">
         <button type="button" onClick={props.onCancel} className="rounded-lg border border-line px-3 py-2 text-sm text-ink-soft">
@@ -889,220 +876,341 @@ function TakeBackConfirm(props: { lines: TakeBackLine[]; working: boolean; onCon
   );
 }
 
+// ---------------------------------------------------------------------------
+// Send to cart, the review (TEC-135; the mockup's SendFinal)
+// ---------------------------------------------------------------------------
+
 /** "was 12 oz, now 10 oz" on a saved product whose size changed since it was first bought (TEC-131). */
 function DriftNote({ candidate }: { candidate: Candidate }) {
   const drift = sizeDrift(candidate.sizeFirst, candidate.size, candidate.price);
-  return drift ? <span className="ml-1 text-[11px] text-warn">· {describeDrift(drift)}</span> : null;
+  return drift ? <span className="block text-[11px] text-warn">{describeDrift(drift)}</span> : null;
+}
+
+/** A tick box, drawn: filled with a ✓ when on. */
+function Box({ on }: { on: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`flex size-[22px] shrink-0 items-center justify-center rounded-md text-sm font-bold ${
+        on ? "bg-accent text-accent-ink" : "border-2 border-ink-soft"
+      }`}
+    >
+      {on ? "✓" : ""}
+    </span>
+  );
+}
+
+function optionLabel(o: Candidate): string {
+  return o.description ?? o.names[0] ?? `Product ${o.upc}`;
+}
+
+function detailOf(o: Candidate): string {
+  return [o.size, money(o.price)].filter(Boolean).join(" · ");
+}
+
+/** One line of the review: the row (tap to open), and when open its options, Make default, Not this trip and a page box. */
+function ReviewRow({ cart, line }: { cart: CartState; line: ReviewLine }) {
+  const choice = cart.choices[line.id];
+  if (!choice) return null;
+  const plan = line.plan;
+  const options = optionsOf(plan);
+  const picked = options.find((o) => o.upc === choice.pick) ?? null;
+  const pasted = choice.url.trim();
+  const isOpen = cart.open === line.id;
+  const fresh = plan.kind === "match" || plan.kind === "none";
+  const on = !!pasted || choice.on;
+
+  let summary: string;
+  if (pasted) summary = "A pasted page — remembered when it goes in";
+  else if (!choice.on) summary = plan.kind === "none" ? plan.reason : line.sent_at ? `Sent ${when(line.sent_at)} — tap to send again` : "Not this trip";
+  else if (picked) summary = [optionLabel(picked), detailOf(picked), line.note].filter(Boolean).join(" · ");
+  else if (plan.kind === "match")
+    summary = `Kroger's pick: ${[plan.product.description, plan.product.size, money(plan.product.price)].filter(Boolean).join(" · ")}${
+      plan.product.inStock === false ? " · out of stock" : ""
+    }`;
+  else summary = "";
+
+  let badge = "";
+  let strong = false;
+  if (plan.kind === "exact" && choice.pick === plan.upc && plan.chosen === "default") {
+    badge = "★ default";
+    strong = true;
+  } else if (plan.kind === "exact" && choice.pick === plan.upc && plan.chosen === "named") badge = "named";
+  else if (plan.kind === "settle") badge = `${options.length} options`;
+  else if (picked) badge = bought(picked.count);
+
+  // A Not saved yet line ticks on and off; the rest open.
+  const tap = () => {
+    if (fresh && plan.kind === "match" && !pasted) cart.choose(line.id, { on: !choice.on });
+    else cart.setOpen(isOpen ? null : line.id);
+  };
+
+  return (
+    <li className="flex flex-col border-t border-line/40 first:border-t-0">
+      <button type="button" onClick={tap} aria-expanded={fresh ? undefined : isOpen} className="flex min-h-11 items-center gap-2.5 px-3.5 py-3 text-left">
+        <Box on={on} />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[15px] font-semibold">{line.name}</span>
+          <span className="truncate text-xs text-ink-soft">{summary}</span>
+        </span>
+        {badge ? <span className={`shrink-0 text-xs ${strong ? "font-bold text-accent" : "text-ink-soft"}`}>{badge}</span> : null}
+        <span className="min-w-7 shrink-0 text-right text-[15px] font-semibold">×{line.quantity}</span>
+      </button>
+
+      {fresh && plan.kind === "match" ? (
+        <div className="-mt-1 flex gap-4 pb-2 pl-12 pr-3.5 text-[13px]">
+          <a href={plan.product.url} target="_blank" rel="noreferrer" className={`text-accent ${LINK}`}>
+            See it at King Soopers
+          </a>
+          <button type="button" onClick={() => cart.choose(line.id, { pasting: !choice.pasting })} className={`text-accent ${LINK}`}>
+            Paste a product page
+          </button>
+        </div>
+      ) : null}
+      {fresh && plan.kind === "none" && !pasted ? (
+        <div className="-mt-1 pb-2 pl-12 pr-3.5 text-[13px]">
+          <button type="button" onClick={() => cart.choose(line.id, { pasting: !choice.pasting })} className={`text-accent ${LINK}`}>
+            Paste a product page
+          </button>
+        </div>
+      ) : null}
+
+      {isOpen && !fresh ? (
+        <div className="flex flex-col gap-1.5 pb-3 pl-12 pr-3.5">
+          <div role="radiogroup" aria-label={`Which ${line.name}`} className="flex flex-col gap-1.5">
+            {options.map((o) => {
+              const sel = choice.on && !pasted && o.upc === choice.pick;
+              return (
+                <button
+                  key={o.upc}
+                  type="button"
+                  role="radio"
+                  aria-checked={sel}
+                  onClick={() => cart.choose(line.id, { pick: o.upc, on: true, url: "" })}
+                  className={`flex min-h-11 items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left ${
+                    sel ? "bg-accent text-accent-ink" : "border border-line bg-raised text-ink"
+                  }`}
+                >
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-sm font-semibold">{optionLabel(o)}</span>
+                    <span className="text-xs opacity-85">{detailOf(o) || "not priced yet"}</span>
+                    {o.missing ? <span className="text-[11px]">Kroger stopped returning it at the last refresh</span> : null}
+                    {!sel ? <DriftNote candidate={o} /> : null}
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold">
+                    {o.isDefault ? "★ " : ""}
+                    {bought(o.count)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {options.length > 1 && (plan.kind === "exact" || plan.kind === "settle") && plan.matched ? (
+            <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm">
+              <input
+                type="checkbox"
+                checked={choice.makeDefault}
+                onChange={(e) => cart.choose(line.id, { makeDefault: e.target.checked })}
+                className="size-[22px] accent-accent"
+              />
+              Make default
+            </label>
+          ) : null}
+          <div className="flex gap-4 text-[13px]">
+            <button
+              type="button"
+              onClick={() => {
+                cart.choose(line.id, { on: false, url: "", pasting: false });
+                cart.setOpen(null);
+              }}
+              className={`text-accent ${LINK}`}
+            >
+              Not this trip
+            </button>
+            <button type="button" onClick={() => cart.choose(line.id, { pasting: !choice.pasting })} className={`text-accent ${LINK}`}>
+              Paste a product page
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {choice.pasting || pasted ? (
+        <div className="px-3.5 pb-3 pl-12">
+          <input
+            value={choice.url}
+            onChange={(e) => cart.choose(line.id, { url: e.target.value })}
+            placeholder="https://www.kingsoopers.com/p/… — remembered when it goes in"
+            aria-label={`Exact product page for ${line.name}`}
+            className="w-full rounded-lg border border-line bg-surface p-2 text-sm"
+          />
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+function Section(props: { title: string; count: number; hint?: string; strong?: boolean; footnote?: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-1.5">
+      <div className="flex items-baseline justify-between px-2">
+        <h3 className={`${HEADING} ${props.strong ? "text-accent" : "text-ink-soft"}`}>
+          {props.title} · {props.count}
+        </h3>
+        {props.hint ? <span className="text-xs text-ink-soft">{props.hint}</span> : null}
+      </div>
+      <ul className="flex flex-col overflow-hidden rounded-xl bg-surface">{props.children}</ul>
+      {props.footnote ? <p className="px-2 text-xs text-ink-soft">{props.footnote}</p> : null}
+    </section>
+  );
 }
 
 /**
- * Settle these (TEC-131): **one line, several saved products** — sizes,
- * flavours — most counted first, for one pick. Nothing is preselected: the
- * count ranks, it does not choose. Tapping
- * the picked one again clears it. A local pattern: a radio list of chips.
+ * The review, and after Send the results (TEC-135). Shown in place of the
+ * list, with *← Back to the list*. One page, no new route.
  */
-function SettleOptions(props: { line: ReviewLine; options: Candidate[]; picked: string | undefined; onPick: (upc: string) => void }) {
+export function SendView({ cart }: { cart: CartState }) {
+  const review = cart.review ?? [];
+  const results = cart.results;
+  const byId = new Map(review.map((l) => [l.id, l]));
+
+  if (results) {
+    const added = results.outcomes.filter((o) => o.result === "added");
+    // **Still on your list**: every line this send left unsent. A line sent before stays sent.
+    const left = results.outcomes.filter((o) => o.result !== "added" && byId.get(o.id)?.sent_at === null);
+    const defaults = results.outcomes.filter((o) => o.detail.includes("Now your default.")).length;
+    return (
+      <div className="flex flex-col gap-3">
+        <BackLink cart={cart} />
+        <div className="flex flex-col gap-1 px-2">
+          <h2 className="text-xl font-bold">Send to cart</h2>
+          <p className="text-[13px] text-ink-soft">
+            Sent {added.length} item{added.length === 1 ? "" : "s"}.{defaults > 0 ? " Defaults saved." : ""} Go to checkout on King Soopers.
+          </p>
+        </div>
+        <section className="flex flex-col gap-1.5">
+          <h3 className={`${HEADING} px-2 text-ink-soft`}>{results.summary}</h3>
+          <ul className="flex flex-col overflow-hidden rounded-xl bg-surface">
+            {results.outcomes.map((o) => (
+              <li key={o.id} className="flex items-baseline gap-2 border-t border-line/40 px-3.5 py-2.5 text-sm first:border-t-0">
+                <ResultChip result={o.result} good="added" />
+                <span className="min-w-0">
+                  {o.name} <span className="text-ink-soft">— {o.detail}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {results.modalityWarning ? <p role="alert" className="px-2 text-xs text-warn">{results.modalityWarning}</p> : null}
+          {results.recordError ? <p className="px-2 text-xs text-danger">{results.recordError}</p> : null}
+        </section>
+        {left.length > 0 ? (
+          <section className="flex flex-col gap-1.5">
+            <h3 className={`${HEADING} px-2 text-ink-soft`}>Still on your list · {left.length}</h3>
+            <p className="rounded-xl bg-surface px-3.5 py-3 text-sm text-ink-soft">
+              {left.map((o) => o.name).join(", ")}. These stay here until you pick or remove them.
+            </p>
+          </section>
+        ) : null}
+        <div className="sticky bottom-0 z-10 -mx-4 border-t border-line bg-paper px-4 py-3">
+          <a
+            href={CHECKOUT_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-accent text-base font-semibold text-accent-ink"
+          >
+            Open King Soopers cart
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  const pick = review.filter((l) => sectionOf(l) === "pick");
+  const goingIn = review.filter((l) => sectionOf(l) === "going");
+  const fresh = review.filter((l) => sectionOf(l) === "new");
+  const sent = review.filter((l) => sectionOf(l) === "sent");
+  const left = review.filter((l) => l.sent_at === null && !cart.going.some((p) => p.id === l.id));
+  const row = (l: ReviewLine) => <ReviewRow key={l.id} cart={cart} line={l} />;
+
   return (
-    <div role="radiogroup" aria-label={`Which ${props.line.name}`} className="flex flex-wrap gap-1.5">
-      {props.options.map((o) => {
-        const on = props.picked === o.upc;
-        const label = [o.description ?? `Product ${o.upc}`, o.size, o.price !== null ? `$${o.price.toFixed(2)}` : null]
-          .filter(Boolean)
-          .join(" · ");
-        return (
-          <span key={o.upc} className="flex items-baseline gap-1">
-            <button
-              type="button"
-              role="radio"
-              aria-checked={on}
-              onClick={() => props.onPick(o.upc)}
-              className={`rounded-lg border px-2 py-1 text-left text-xs ${on ? "border-accent text-accent" : "border-line text-ink-soft"}`}
-            >
-              {label}
-              <span className="ml-1 text-[11px] text-ink-soft">×{o.count}</span>
-              {o.missing ? <span className="ml-1 text-[11px] text-danger">· Kroger stopped returning it</span> : null}
-              <DriftNote candidate={o} />
-            </button>
-            <a
-              href={o.url}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={`Open ${label} at King Soopers`}
-              className="text-[11px] text-ink-soft underline decoration-dotted underline-offset-2"
-            >
-              page
-            </a>
-          </span>
-        );
-      })}
+    <div className="flex flex-col gap-3.5">
+      <BackLink cart={cart} />
+      <div className="flex flex-col gap-1 px-2">
+        <h2 className="text-xl font-bold">Send to cart</h2>
+        <p className="text-[13px] text-ink-soft">
+          {review.length === 0
+            ? "Nothing on the list to send — ticked lines are already bought."
+            : `${pick.length} to pick · ${cart.going.length} of ${review.length} lines going in`}
+        </p>
+      </div>
+
+      {pick.length > 0 ? (
+        <Section title="Pick one" count={pick.length} hint="most-bought is pre-picked" strong>
+          {pick.map(row)}
+        </Section>
+      ) : null}
+      {goingIn.length > 0 ? (
+        <Section title="Going in" count={goingIn.length} hint="tap to change">
+          {goingIn.map(row)}
+        </Section>
+      ) : null}
+      {fresh.length > 0 ? (
+        <Section title="Not saved yet" count={fresh.length} footnote="Ticked items are saved to Your brands when they go in.">
+          {fresh.map(row)}
+        </Section>
+      ) : null}
+      {/* **A second send warns and shows what was already sent** (RULES.md). */}
+      {sent.length > 0 ? (
+        <Section title="Already sent" count={sent.length} hint="the cart only adds">
+          {sent.map(row)}
+        </Section>
+      ) : null}
+
+      {left.length > 0 ? (
+        <section className="flex flex-col gap-1.5">
+          <h3 className={`${HEADING} px-2 text-ink-soft`}>Still on your list · {left.length}</h3>
+          <p className="rounded-xl bg-surface px-3.5 py-3 text-sm text-ink-soft">
+            {left.map((l) => l.name).join(", ")}. These stay here until you pick or remove them.
+          </p>
+        </section>
+      ) : null}
+
+      {cart.refused ? (
+        <p role="alert" className="px-2 text-xs text-danger">
+          Not sent — already in the cart: {cart.refused.map((l) => l.name).join(", ")}. Tick the box below to send them again.
+        </p>
+      ) : null}
+      {cart.again.length > 0 ? (
+        <label className="flex items-center gap-2 px-2 text-xs text-warn">
+          <input type="checkbox" checked={cart.confirmAgain} onChange={(e) => cart.setConfirmAgain(e.target.checked)} className="size-4 accent-accent" />
+          Yes, add {cart.again.map((l) => l.name).join(", ")} again — the cart only adds, so this doubles them
+        </label>
+      ) : null}
+      {cart.badUrl ? <p className="px-2 text-xs text-danger">A pasted address isn&rsquo;t a King Soopers product page.</p> : null}
+
+      <p className="px-2 text-xs text-ink-soft">
+        ★ your default · ✓ the one product saved for that line · other options only when you name them on the line
+      </p>
+
+      <div className="sticky bottom-0 z-10 -mx-4 border-t border-line bg-paper px-4 py-3">
+        <button
+          type="button"
+          onClick={() => void cart.send()}
+          disabled={cart.going.length === 0 || cart.busy !== null || cart.badUrl || (cart.again.length > 0 && !cart.confirmAgain)}
+          className="min-h-12 w-full rounded-xl bg-accent text-base font-semibold text-accent-ink disabled:opacity-50"
+        >
+          {cart.busy === "send" ? "Sending…" : `Send ${cart.going.length} to cart`}
+        </button>
+      </div>
     </div>
   );
 }
 
-function ReviewPanel(props: {
-  review: ReviewLine[];
-  choices: Record<string, Choice>;
-  choose: (id: string, change: Partial<Choice>) => void;
-  again: ReviewLine[];
-  confirmAgain: boolean;
-  setConfirmAgain: (v: boolean) => void;
-  refused: CartLine[] | null;
-  badUrl: boolean;
-  count: number;
-  sending: boolean;
-  onSend: () => void;
-  onCancel: () => void;
-}) {
-  const { review, choices, choose, again } = props;
-  const sentBefore = review.filter((l) => l.sent_at !== null);
-
-  if (review.length === 0) {
-    return <p className="text-sm text-ink-soft">Nothing on the list to send — ticked lines are already bought.</p>;
-  }
-
-  const matched = review.filter((l) => l.plan.kind === "exact");
-  const settle = review.filter((l) => l.plan.kind === "settle");
-  const noMatch = review.filter((l) => l.plan.kind === "match" || l.plan.kind === "none");
-
-  const row = (line: ReviewLine) => {
-    const choice = choices[line.id] ?? { include: false, url: "" };
-    const plan = line.plan;
-    const pasted = !!choice.url.trim();
-    return (
-      <li key={line.id} className="flex flex-col gap-1 py-2 text-sm">
-        <div className="flex items-baseline gap-2">
-          <span className="min-w-0 flex-1">
-            <b>{line.name}</b> <span className="text-ink-soft">×{line.quantity}</span>
-            {line.note ? <span className="text-ink-soft"> — {line.note}</span> : null}
-          </span>
-          {(plan.kind === "exact" || plan.kind === "match") && !pasted ? (
-            <label className="flex shrink-0 items-center gap-1 text-xs">
-              <input
-                type="checkbox"
-                checked={choice.include}
-                onChange={(e) => choose(line.id, { include: e.target.checked })}
-                className="size-4 accent-accent"
-              />
-              {plan.kind === "exact" ? "Send" : "Add"}
-            </label>
-          ) : null}
-        </div>
-
-        {plan.kind === "exact" ? (
-          <span className="text-xs text-ink-soft">
-            Your brand ({plan.phrase}) —{" "}
-            <a href={plan.url} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
-              {plan.option.description ?? "the exact product"}
-            </a>
-            {plan.via === "description" ? <span> · its Kroger name matches this line</span> : null}
-            {plan.via === "code" ? <span> · by its product code</span> : null}
-            {plan.missing ? <span className="text-danger"> · Kroger stopped returning it at the last refresh</span> : null}
-            <DriftNote candidate={plan.option} />
-          </span>
-        ) : plan.kind === "settle" ? (
-          <SettleOptions
-            line={line}
-            options={plan.options}
-            picked={pasted ? undefined : choice.pick}
-            onPick={(upc) => choose(line.id, { pick: choice.pick === upc ? undefined : upc, url: "" })}
-          />
-        ) : plan.kind === "match" ? (
-          <span className="text-xs text-ink-soft">
-            Kroger&rsquo;s top match:{" "}
-            <a href={plan.product.url} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
-              {plan.product.description}
-            </a>
-            {plan.product.size ? ` · ${plan.product.size}` : ""}
-            {plan.product.price !== null ? ` · $${plan.product.price.toFixed(2)}` : ""}
-            {plan.product.inStock === false ? " · out of stock" : ""}
-          </span>
-        ) : (
-          <span className="text-xs text-ink-soft">{plan.reason}</span>
-        )}
-
-        {plan.kind !== "exact" ? (
-          <input
-            value={choice.url}
-            onChange={(e) => choose(line.id, { url: e.target.value })}
-            placeholder="Or paste the exact product page — it will be remembered"
-            aria-label={`Exact product page for ${line.name}`}
-            className="rounded-lg border border-line bg-surface p-2 text-xs"
-          />
-        ) : null}
-      </li>
-    );
-  };
-
+function BackLink({ cart }: { cart: CartState }) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-accent bg-surface p-3">
-      {/* **A second send warns and shows what was already sent** (RULES.md). */}
-      {sentBefore.length > 0 ? (
-        <div className="rounded-lg border border-warn/60 p-2 text-xs">
-          <p className="font-semibold text-warn">Already sent — the cart only adds, so sending these again doubles them:</p>
-          <ul className="mt-1">
-            {sentBefore.map((l) => (
-              <li key={l.id}>
-                {l.name} ×{l.quantity} <span className="text-ink-soft">— {when(l.sent_at as string)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {/* **Three sections** (TEC-131; RULES.md): matched lines still here (already
-          sent, or not taken straight in), Settle these, then No match. */}
-      {matched.length > 0 ? (
-        <section className="flex flex-col gap-1">
-          <h3 className="text-xs font-semibold text-ink-soft">Matched in Your brands</h3>
-          <ul className="flex flex-col divide-y divide-line">{matched.map(row)}</ul>
-        </section>
-      ) : null}
-      {settle.length > 0 ? (
-        <section className="flex flex-col gap-1">
-          <h3 className="text-xs font-semibold text-ink-soft">Settle these — pick one, most bought first</h3>
-          <ul className="flex flex-col divide-y divide-line">{settle.map(row)}</ul>
-        </section>
-      ) : null}
-      {noMatch.length > 0 ? (
-        <section className="flex flex-col gap-1">
-          <h3 className="text-xs font-semibold text-ink-soft">No match in Your brands</h3>
-          <ul className="flex flex-col divide-y divide-line">{noMatch.map(row)}</ul>
-        </section>
-      ) : null}
-
-      {props.refused ? (
-        <p role="alert" className="text-xs text-danger">
-          Not sent — already in the cart: {props.refused.map((l) => l.name).join(", ")}. Tick the box below to send them again.
-        </p>
-      ) : null}
-
-      {again.length > 0 ? (
-        <label className="flex items-center gap-2 text-xs text-warn">
-          <input
-            type="checkbox"
-            checked={props.confirmAgain}
-            onChange={(e) => props.setConfirmAgain(e.target.checked)}
-            className="size-4 accent-accent"
-          />
-          Yes, add {again.map((l) => l.name).join(", ")} again
-        </label>
-      ) : null}
-
-      {props.badUrl ? <p className="text-xs text-danger">A pasted address isn&rsquo;t a King Soopers product page.</p> : null}
-
-      <div className="flex gap-2">
-        <button type="button" onClick={props.onCancel} className="rounded-lg border border-line px-3 py-2 text-sm">
-          Not now
-        </button>
-        <button
-          type="button"
-          onClick={props.onSend}
-          disabled={props.count === 0 || props.sending || props.badUrl || (again.length > 0 && !props.confirmAgain)}
-          className="ml-auto rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
-        >
-          {props.sending ? "Sending…" : `Send ${props.count} to the cart`}
-        </button>
-      </div>
+    <div>
+      <button type="button" onClick={cart.closeReview} className="inline-block px-2 py-2.5 text-sm text-accent underline-offset-2 hover:underline">
+        ← Back to the list
+      </button>
     </div>
   );
 }

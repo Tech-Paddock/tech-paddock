@@ -6,6 +6,8 @@ import type { Preference } from "@/lib/preferences";
 import type { PreviewEntry } from "@/lib/brandBatch";
 import { isKingSoopersProduct } from "@/lib/kingsoopers";
 import { describeDrift, sizeDrift } from "@/lib/sizeDrift";
+import { brandGroups, defaultNames, fixThese, shortName, type BrandGroup, type GroupMember } from "@/lib/brandGroups";
+import { serialKroger } from "./Cart";
 
 /**
  * Your brands — its own tab since TEC-131, at `/brands`.
@@ -15,20 +17,23 @@ import { describeDrift, sizeDrift } from "@/lib/sizeDrift";
  * bought beside the size Kroger reports now, and what the last refresh saw.
  * Search words stay their own kind: a phrase and the words to search.
  *
+ * **As the owner's mockup of 2026-10-23 (TEC-135)**: products grouped by the
+ * names they share, the default starred, **Make default** on the others and
+ * *when the line says "…"* under each; **Fix these** above them (a size that
+ * shrank, a product Kroger no longer returns with **Replace**, and rows whose
+ * note starts `check:`); the filters **All · Pick a default · Fix these**.
+ * The grouping is `lib/brandGroups.ts`.
+ *
  * **Why remembering cannot read the product you picked.** A line's link opens
  * King Soopers in a new tab, cross-origin, and this project's proxy refuses
  * kingsoopers.com server-side, so nothing here can see where you ended up. Copy
  * the product page's address there, then **Paste** here.
  *
  * Local patterns, named so they are a decision deferred rather than drift: the
- * product rows with their drift and successor lines, the batch review's status
- * chips, and the filter box. They reuse the theme's tokens only.
+ * group cards and their product rows, the Fix these panel, the three-way
+ * filter, the batch review's status chips and the search box. They reuse the
+ * theme's tokens only.
  */
-
-function day(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
 
 function money(n: number | null): string | null {
   return n === null ? null : `$${n.toFixed(2)}`;
@@ -230,79 +235,82 @@ function WordsForm({ existing, onSaved, onCancel }: { existing: Preference | nul
   );
 }
 
-/** One product: names, count, what Kroger last said, drift, and the successor on offer. */
-function ProductRow(props: { p: SavedProduct; onEdit: () => void; onForget: () => void; onReplace: () => void; replacing: boolean }) {
-  const { p } = props;
+
+/** "bought N×" — the times-bought count, never a quantity (TEC-135). */
+function bought(count: number): string {
+  return `bought ${count}×`;
+}
+
+/** "checked 2 days ago", from the most recent check of any product. */
+function checkedAgo(products: SavedProduct[]): string {
+  const latest = products.reduce<string | null>((best, p) => (p.checked_at && (!best || p.checked_at > best) ? p.checked_at : best), null);
+  if (!latest) return "not checked yet";
+  const days = Math.floor((Date.now() - new Date(latest).getTime()) / 86_400_000);
+  return days <= 0 ? "checked today" : days === 1 ? "checked yesterday" : `checked ${days} days ago`;
+}
+
+const LINK = "text-[13px] text-accent underline-offset-2 hover:underline disabled:opacity-50";
+
+/** One product in its group: ★ when it is the default, what it is, and Make default on the others. */
+function MemberRow(props: {
+  member: GroupMember;
+  multi: boolean;
+  onMakeDefault: () => void;
+  making: boolean;
+  onEdit: () => void;
+  onForget: () => void;
+}) {
+  const { product: p, isDefault, hint } = props.member;
   const drift = sizeDrift(p.size_first, p.size, p.price);
-  const seen = [
-    p.description,
-    p.size,
-    money(p.price),
-    p.in_stock === false ? "out of stock" : p.in_stock ? "in stock" : null,
-  ].filter(Boolean);
+  const detail = [
+    [p.size ?? p.size_first, money(p.price)].filter(Boolean).join(" · ") || null,
+    bought(p.count),
+    props.multi ? (isDefault ? "default" : hint ? `when the line says “${hint}”` : null) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
-    <li className="flex flex-col gap-0.5 py-2 text-sm">
-      <div className="flex items-baseline gap-3">
-        <span className="min-w-0 flex-1">
-          <b>{p.names.join(", ")}</b>
-          <span className="text-ink-soft"> · ×{p.count}</span>
-        </span>
-        <button type="button" onClick={props.onEdit} className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2">
-          edit
-        </button>
-        <button type="button" onClick={props.onForget} className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2">
-          forget
-        </button>
-      </div>
-      <span className="text-[11px] text-ink-soft">
-        {p.url ? (
-          <a href={p.url} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
-            {p.product_id}
-          </a>
-        ) : (
-          p.product_id
-        )}
-        {seen.length > 0 ? ` · ${seen.join(" · ")}` : ""}
-        {p.checked_at ? ` — checked ${day(p.checked_at)}` : " — not checked yet"}
-        {p.size_first && !drift ? ` · first bought ${p.size_first}` : ""}
+    <li className={`flex items-center gap-2.5 border-t border-line/40 px-3.5 py-2.5 ${isDefault && props.multi ? "bg-accent/10" : ""}`}>
+      <span aria-hidden="true" className={`text-[15px] ${isDefault ? "text-accent" : "text-line/60"}`}>
+        ★
       </span>
-      {p.pack_label || p.pack_size ? (
-        <span className="text-[11px] text-ink-soft">
-          Shown as {p.pack_label ?? p.names[0]}
-          {p.pack_size ? ` · 1 holds ${p.pack_size} ${p.pack_unit}` : ""}
-        </span>
-      ) : null}
-      {drift ? <span className="text-xs text-warn">Size changed: {describeDrift(drift)}</span> : null}
-      {p.missing_since ? (
-        <span className="text-xs text-danger">
-          Kroger no longer returns this product (since {day(p.missing_since)}).
-          {p.successor ? (
-            <>
-              {" "}
-              Closest now:{" "}
-              <a href={p.successor.url} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2">
-                {p.successor.description}
-              </a>
-              {p.successor.size ? ` · ${p.successor.size}` : ""}
-              {p.successor.price !== null ? ` · $${p.successor.price.toFixed(2)}` : ""}{" "}
-              <button
-                type="button"
-                onClick={props.onReplace}
-                disabled={props.replacing}
-                className="ml-1 rounded border border-danger/60 px-2 py-0.5 text-[11px] disabled:opacity-50"
-              >
-                {props.replacing ? "Replacing…" : "Replace with it"}
-              </button>{" "}
-              <span className="text-ink-soft">Keeps the names and count.</span>
-            </>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-sm font-semibold">
+          {p.url ? (
+            <a href={p.url} target="_blank" rel="noreferrer" className="underline-offset-2 hover:underline">
+              {shortName(p)}
+            </a>
           ) : (
-            " Edit it with a new product page, or forget it."
+            shortName(p)
           )}
         </span>
+        <span className="text-xs text-ink-soft">{detail}</span>
+        {drift ? <span className="text-xs text-warn">Size changed: {describeDrift(drift)}</span> : null}
+        <span className="flex gap-3 text-[11px] text-ink-soft">
+          <span>{p.product_id}</span>
+          <button type="button" onClick={props.onEdit} className="underline decoration-dotted underline-offset-2">
+            edit
+          </button>
+          <button type="button" onClick={props.onForget} className="underline decoration-dotted underline-offset-2">
+            forget
+          </button>
+        </span>
+      </span>
+      {props.multi && !isDefault ? (
+        <button
+          type="button"
+          onClick={props.onMakeDefault}
+          disabled={props.making}
+          className="min-h-9 shrink-0 rounded-full border border-accent px-3 text-xs font-semibold text-accent disabled:opacity-50"
+        >
+          {props.making ? "Saving…" : "Make default"}
+        </button>
       ) : null}
     </li>
   );
 }
+
+type View = "all" | "pick" | "fix";
 
 const STATUS_WORDS: Record<PreviewEntry["status"], string> = {
   new: "new",
@@ -406,8 +414,13 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
   const [words, setWords] = useState<Preference[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [view, setView] = useState<View>("all");
+  const [panel, setPanel] = useState<null | "batch" | "words">(null);
   const [editing, setEditing] = useState<{ kind: "product"; row: SavedProduct | null } | { kind: "words"; row: Preference | null } | null>(null);
   const [replacing, setReplacing] = useState<string | null>(null);
+  const [making, setMaking] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshNote, setRefreshNote] = useState<{ text: string; failed: boolean } | null>(null);
   const [paste, setPaste] = useState("");
   const [outcome, setOutcome] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewEntry[] | null>(null);
@@ -433,17 +446,20 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
     void load();
   }, [load, refreshKey]);
 
-  const sorted = useMemo(
-    () => [...(products ?? [])].sort((a, b) => (a.names[0] ?? "").toLowerCase().localeCompare((b.names[0] ?? "").toLowerCase())),
-    [products]
-  );
+  const groups = useMemo(() => brandGroups(products ?? []), [products]);
+  const fixes = useMemo(() => fixThese(products ?? []), [products]);
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    if (!q) return sorted;
-    return sorted.filter((p) => [...p.names, p.description ?? "", p.product_id].some((t) => t.toLowerCase().includes(q)));
-  }, [sorted, filter]);
-  const flagged = sorted.filter((p) => p.missing_since).length;
-  const drifted = sorted.filter((p) => sizeDrift(p.size_first, p.size, p.price)).length;
+    const matches = (g: BrandGroup) =>
+      !q ||
+      g.title.toLowerCase().includes(q) ||
+      g.members.some(({ product: p }) => [...p.names, p.description ?? "", p.product_id].some((t) => t.toLowerCase().includes(q)));
+    return groups.filter((g) => (view === "pick" ? g.needsDefault : true) && matches(g));
+  }, [groups, filter, view]);
+  const shownFixes = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return fixes.filter((f) => !q || f.title.toLowerCase().includes(q) || f.product.names.some((n) => n.toLowerCase().includes(q)));
+  }, [fixes, filter]);
 
   async function changed() {
     await load();
@@ -479,6 +495,46 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
       setError(e instanceof Error ? e.message : "Couldn't replace it.");
     } finally {
       setReplacing(null);
+    }
+  }
+
+  /** **Make default** (TEC-135): this product, for every name its group shares that it carries. */
+  async function makeDefault(group: BrandGroup, p: SavedProduct) {
+    if (making) return;
+    setMaking(p.id);
+    try {
+      const response = await fetch("/api/brands/default", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: p.id, names: defaultNames(group, p) }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Couldn't make it the default.");
+      await changed();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't make it the default.");
+    } finally {
+      setMaking(null);
+    }
+  }
+
+  /** Refresh now: the same refresh as the list's, in the page's one Kroger queue. Said in words either way. */
+  async function refresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const response = await serialKroger(() => fetch("/api/kroger/refresh", { method: "POST" }));
+      const body = await response.json().catch(() => ({}));
+      setRefreshNote(
+        response.ok
+          ? { text: body.message as string, failed: false }
+          : { text: `Refresh failed: ${body.error ?? "Kroger or the database didn't answer."}`, failed: true }
+      );
+      await changed();
+    } catch {
+      setRefreshNote({ text: "Refresh failed: couldn't reach this app's server.", failed: true });
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -570,161 +626,248 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
       />
     ) : null;
 
+  const views: [View, string][] = [
+    ["all", "All"],
+    ["pick", "Pick a default"],
+    ["fix", `Fix these · ${fixes.length}`],
+  ];
+
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-base font-semibold">Your brands</h2>
-        <p className="text-xs text-ink-soft">
-          One row per King Soopers product, with every name a list line may use for it. Send to cart puts a line that matches one
-          product straight in, and asks when it matches several.
-        </p>
-        {products ? (
-          <p className="text-xs text-ink-soft">
-            {products.length} product{products.length === 1 ? "" : "s"} · {words.length} search-word phrase{words.length === 1 ? "" : "s"}
-            {drifted > 0 ? <span className="text-warn"> · {drifted} changed size</span> : null}
-            {flagged > 0 ? <span className="text-danger"> · {flagged} Kroger no longer returns</span> : null}
+    <section className="flex flex-col gap-3">
+      <div className="flex items-end justify-between gap-3 px-2">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-xl font-bold">Your brands</h2>
+          <p className="text-[13px] text-ink-soft">
+            {products ? `${products.length} product${products.length === 1 ? "" : "s"} · ${checkedAgo(products)}` : "Looking…"}
           </p>
-        ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          disabled={refreshing}
+          className="min-h-10 shrink-0 rounded-[10px] border border-accent px-3.5 text-[13px] font-semibold text-accent disabled:opacity-50"
+        >
+          {refreshing ? "Refreshing…" : "Refresh now"}
+        </button>
+      </div>
+      {refreshNote ? (
+        <p role={refreshNote.failed ? "alert" : undefined} className={`px-2 text-xs ${refreshNote.failed ? "text-danger" : "text-ink-soft"}`}>
+          {refreshNote.text}
+        </p>
+      ) : null}
+
+      {error ? <p role="alert" className="px-2 text-xs text-danger">{error}</p> : null}
+
+      <div className="flex flex-col gap-2">
+        <input
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Search names or products"
+          aria-label="Search Your brands"
+          className="min-h-11 rounded-xl border border-line bg-surface px-3.5 text-base"
+        />
+        <div role="group" aria-label="Show" className="grid grid-cols-3 gap-1 rounded-xl bg-raised p-1">
+          {views.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={view === id}
+              onClick={() => setView(id)}
+              className={`min-h-11 rounded-[9px] text-[13px] ${view === id ? "bg-surface font-bold text-ink" : "text-ink-soft"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {error ? <p role="alert" className="text-xs text-danger">{error}</p> : null}
-
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => setEditing({ kind: "product", row: null })} className="rounded-lg border border-line px-3 py-1.5 text-xs">
-          Remember a product
-        </button>
-        <button type="button" onClick={() => setEditing({ kind: "words", row: null })} className="rounded-lg border border-line px-3 py-1.5 text-xs">
-          Add search words
-        </button>
-        {/* **Export**: the batch format, so the file pastes back in. */}
-        <a href="/api/brands/export" download className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-soft">
-          Export
-        </a>
-      </div>
-
-      {editing && !editing.row ? form : null}
-
-      {products === null && !error ? <p className="text-xs text-ink-soft">Looking…</p> : null}
+      {editing?.kind === "product" && (!editing.row || view === "fix") ? form : null}
 
       {products && products.length === 0 && words.length === 0 ? (
-        <p className="text-xs text-ink-soft">
+        <p className="px-2 text-xs text-ink-soft">
           Nothing yet. Paste a batch below, or <b>Remember a product</b>; Send to cart remembers what goes in, too.
         </p>
       ) : null}
 
-      {products && products.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          <input
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter by name, Kroger's name or code"
-            aria-label="Filter your brands"
-            className="rounded-lg border border-line bg-surface p-2 text-base"
-          />
-          <ul className="flex flex-col divide-y divide-line">
-            {shown.map((p) =>
-              editing?.kind === "product" && editing.row?.id === p.id ? (
-                <li key={p.id} className="py-2">
-                  {form}
-                </li>
-              ) : (
-                <ProductRow
-                  key={p.id}
-                  p={p}
-                  onEdit={() => setEditing({ kind: "product", row: p })}
-                  onForget={() => void forget(p.id, "product")}
-                  onReplace={() => void replace(p.id)}
-                  replacing={replacing === p.id}
-                />
-              )
-            )}
-          </ul>
-          {shown.length === 0 ? <p className="text-xs text-ink-soft">Nothing matches that filter.</p> : null}
-        </div>
-      ) : null}
-
-      {words.length > 0 ? (
-        <div className="flex flex-col gap-1">
-          <h3 className="text-xs font-semibold text-ink-soft">Search words</h3>
-          <ul className="flex flex-col divide-y divide-line">
-            {words.map((w) =>
-              editing?.kind === "words" && editing.row?.id === w.id ? (
-                <li key={w.id} className="py-2">
-                  {form}
-                </li>
-              ) : (
-                <li key={w.id} className="flex items-baseline gap-3 py-2 text-sm">
-                  <span className="min-w-0 flex-1">
-                    <b>{w.phrase}</b>
-                    <span className="text-ink-soft">{w.kind === "plain" ? " — searched plainly, on purpose" : ` — “${w.terms}”`}</span>
-                  </span>
-                  {w.kind === "terms" ? (
-                    <button
-                      type="button"
-                      onClick={() => setEditing({ kind: "words", row: w })}
-                      className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2"
-                    >
-                      edit
-                    </button>
-                  ) : null}
+      {/* **Fix these** (TEC-135): shrank, discontinued, or seeded wrong (a note starting "check:"). */}
+      {view !== "pick" && shownFixes.length > 0 ? (
+        <div className="overflow-hidden rounded-xl border-2 border-warn bg-surface">
+          <h3 className="px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider text-warn">
+            Fix these · {fixes.length} · shrank, discontinued or seeded wrong
+          </h3>
+          <ul>
+            {shownFixes.map((f) => (
+              <li key={`${f.kind}:${f.product.id}`} className="flex items-center gap-2.5 border-t border-line/40 px-3.5 py-2.5">
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-sm font-semibold">{f.title}</span>
+                  <span className="text-xs text-ink-soft">{f.detail}</span>
+                </span>
+                {f.kind === "gone" && f.product.successor ? (
                   <button
                     type="button"
-                    onClick={() => void forget(w.id, "terms")}
-                    className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2"
+                    onClick={() => void replace(f.product.id)}
+                    disabled={replacing === f.product.id}
+                    title="Keeps the names and count."
+                    className="min-h-9 shrink-0 rounded-full bg-accent px-3 text-xs font-semibold text-accent-ink disabled:opacity-50"
                   >
-                    forget
+                    {replacing === f.product.id ? "Replacing…" : "Replace"}
                   </button>
-                </li>
-              )
-            )}
+                ) : f.kind === "check" || f.kind === "gone" ? (
+                  <button type="button" onClick={() => setEditing({ kind: "product", row: f.product })} className={LINK}>
+                    edit
+                  </button>
+                ) : null}
+              </li>
+            ))}
           </ul>
+        </div>
+      ) : null}
+      {view === "fix" && shownFixes.length === 0 && products ? <p className="px-2 text-xs text-ink-soft">Nothing to fix.</p> : null}
+
+      {view !== "fix"
+        ? shown.map((g) => (
+            <div key={g.key} className="overflow-hidden rounded-xl bg-surface">
+              <div className="flex items-baseline justify-between gap-3 px-3.5 py-3">
+                <h3 className="text-[15px] font-bold">{g.title.charAt(0).toUpperCase() + g.title.slice(1)}</h3>
+                <span className="truncate text-xs text-ink-soft">{groupNames(g)}</span>
+              </div>
+              <ul>
+                {g.members.map((m) =>
+                  editing?.kind === "product" && editing.row?.id === m.product.id ? (
+                    <li key={m.product.id} className="border-t border-line/40 p-2">
+                      {form}
+                    </li>
+                  ) : (
+                    <MemberRow
+                      key={m.product.id}
+                      member={m}
+                      multi={g.members.length > 1}
+                      making={making === m.product.id}
+                      onMakeDefault={() => void makeDefault(g, m.product)}
+                      onEdit={() => setEditing({ kind: "product", row: m.product })}
+                      onForget={() => void forget(m.product.id, "product")}
+                    />
+                  )
+                )}
+              </ul>
+            </div>
+          ))
+        : null}
+      {view !== "fix" && products && products.length > 0 && shown.length === 0 ? (
+        <p className="px-2 text-xs text-ink-soft">{view === "pick" ? "Every name with several products has a default." : "Nothing matches that search."}</p>
+      ) : null}
+
+      <div className="flex flex-wrap gap-4 px-2">
+        <button type="button" onClick={() => setEditing({ kind: "product", row: null })} className={LINK}>
+          Remember a product
+        </button>
+        <button type="button" onClick={() => setPanel(panel === "batch" ? null : "batch")} className={LINK}>
+          Paste a batch
+        </button>
+        {/* **Export**: the batch format, so the file pastes back in. */}
+        <a href="/api/brands/export" download className={LINK}>
+          Export
+        </a>
+        <button type="button" onClick={() => setPanel(panel === "words" ? null : "words")} className={LINK}>
+          Search words{words.length > 0 ? ` · ${words.length}` : ""}
+        </button>
+      </div>
+
+      {panel === "words" ? (
+        <div className="flex flex-col gap-2 rounded-xl bg-surface p-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-soft">Search words</h3>
+          {words.length > 0 ? (
+            <ul className="flex flex-col divide-y divide-line/40">
+              {words.map((w) =>
+                editing?.kind === "words" && editing.row?.id === w.id ? (
+                  <li key={w.id} className="py-2">
+                    {form}
+                  </li>
+                ) : (
+                  <li key={w.id} className="flex items-baseline gap-3 py-2 text-sm">
+                    <span className="min-w-0 flex-1">
+                      <b>{w.phrase}</b>
+                      <span className="text-ink-soft">{w.kind === "plain" ? " — searched plainly, on purpose" : ` — “${w.terms}”`}</span>
+                    </span>
+                    {w.kind === "terms" ? (
+                      <button type="button" onClick={() => setEditing({ kind: "words", row: w })} className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2">
+                        edit
+                      </button>
+                    ) : null}
+                    <button type="button" onClick={() => void forget(w.id, "terms")} className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2">
+                      forget
+                    </button>
+                  </li>
+                )
+              )}
+            </ul>
+          ) : (
+            <p className="text-xs text-ink-soft">None yet: a phrase, and the words to search instead.</p>
+          )}
+          {editing?.kind === "words" && !editing.row ? (
+            form
+          ) : (
+            <button type="button" onClick={() => setEditing({ kind: "words", row: null })} className={`self-start ${LINK}`}>
+              Add search words
+            </button>
+          )}
         </div>
       ) : null}
 
       {/* The purchase-history path. The aggregation happens in a session that
           has the history; this only ever sees the rows it produced, and the
           history itself never reaches this app or the repo. Format: NOTES.md. */}
-      <details>
-        <summary className="cursor-pointer text-xs text-ink-soft">Paste a batch</summary>
-        <textarea
-          value={paste}
-          onChange={(e) => {
-            setPaste(e.target.value);
-            setPreview(null);
-          }}
-          rows={4}
-          placeholder={'[{"product":"0001111000001","names":["oat milk"],"count":3}]'}
-          aria-label="A batch of products as JSON"
-          className="mt-2 w-full rounded-lg border border-line bg-surface p-2 font-mono text-xs"
-        />
-        {preview ? (
-          <BatchReview
-            entries={preview}
-            ticked={ticked}
-            toggle={(i) =>
-              setTicked((current) => {
-                const next = new Set(current);
-                if (next.has(i)) next.delete(i);
-                else next.add(i);
-                return next;
-              })
-            }
-            writing={writing}
-            onWrite={() => void writeTicked()}
-            onCancel={() => setPreview(null)}
+      {panel === "batch" ? (
+        <div className="flex flex-col gap-2 rounded-xl bg-surface p-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-soft">Paste a batch</h3>
+          <textarea
+            value={paste}
+            onChange={(e) => {
+              setPaste(e.target.value);
+              setPreview(null);
+            }}
+            rows={4}
+            placeholder={'[{"product":"0001111000001","names":["oat milk"],"count":3}]'}
+            aria-label="A batch of products as JSON"
+            className="w-full rounded-lg border border-line bg-surface p-2 font-mono text-xs"
           />
-        ) : (
-          <button
-            type="button"
-            onClick={() => void reviewRows()}
-            disabled={paste.trim() === ""}
-            className="mt-2 rounded-lg border border-line px-3 py-1.5 text-xs text-ink-soft disabled:opacity-50"
-          >
-            Review
-          </button>
-        )}
-        {outcome ? <p className="mt-2 text-xs text-ink-soft">{outcome}</p> : null}
-      </details>
+          {preview ? (
+            <BatchReview
+              entries={preview}
+              ticked={ticked}
+              toggle={(i) =>
+                setTicked((current) => {
+                  const next = new Set(current);
+                  if (next.has(i)) next.delete(i);
+                  else next.add(i);
+                  return next;
+                })
+              }
+              writing={writing}
+              onWrite={() => void writeTicked()}
+              onCancel={() => setPreview(null)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => void reviewRows()}
+              disabled={paste.trim() === ""}
+              className="self-start rounded-lg border border-line px-3 py-1.5 text-xs text-ink-soft disabled:opacity-50"
+            >
+              Review
+            </button>
+          )}
+          {outcome ? <p className="text-xs text-ink-soft">{outcome}</p> : null}
+        </div>
+      ) : null}
     </section>
   );
+}
+
+/** The names under a group's title: the names its products share, or a lone product's names and pack conversion. */
+function groupNames(g: BrandGroup): string {
+  if (g.members.length > 1) return g.shared.join(" · ");
+  const p = g.members[0].product;
+  const pack = p.pack_size ? `1 holds ${p.pack_size} ${p.pack_unit}` : null;
+  return [...p.names, pack].filter(Boolean).join(" · ");
 }

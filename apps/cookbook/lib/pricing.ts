@@ -26,12 +26,16 @@ export type Target =
 
 /**
  * What a line is looked up as. The same choice `planLine` makes for Send: the
- * top-ranked saved product when products decide it (Settle these is priced as
- * its most-counted choice), else Kroger's top match for a phrase's words or
- * for the item alone (TEC-131).
+ * saved product it goes in as — the only one, its default or the one it names,
+ * else the most counted (Pick one's pre-pick) — or Kroger's top match for a
+ * phrase's words or for the item alone (TEC-131). **A product found only by
+ * its Kroger name is unconfirmed until Send checks it** (TEC-135), so it is
+ * priced as Kroger's top match for the item, what Send falls back to.
  */
 export function targetFor(name: string, decision: Decision): Target {
-  if (decision?.kind === "products" && decision.candidates[0]) return { kind: "id", productId: decision.candidates[0].upc };
+  if (decision?.kind === "products" && decision.via !== "description" && decision.candidates[0]) {
+    return { kind: "id", productId: decision.candidates[0].upc };
+  }
   const term = decision?.kind === "terms" ? searchTerm(decision.terms) : lineTerm(name);
   return term ? { kind: "term", term } : { kind: "none", reason: "too short for Kroger's search" };
 }

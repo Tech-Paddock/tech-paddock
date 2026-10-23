@@ -50,12 +50,16 @@ export type ResolvedLink = {
 
 /**
  * Where a line's link goes: the saved product's page when one product decides
- * it (the top-ranked when several do), a search for a phrase's words, else a
- * search for **the item alone** (`lib/itemWords.ts`, TEC-131) — "6 cloves of
- * garlic" links to a search for "garlic cloves".
+ * it (its default or the one it names, else the top-ranked, when several do),
+ * a search for a phrase's words, else a search for **the item alone**
+ * (`lib/itemWords.ts`, TEC-131) — "6 cloves of garlic" links to a search for
+ * "garlic cloves". A product found only by its Kroger name is unconfirmed
+ * (TEC-135), so that line links to the search too.
  */
 export function linkFor(name: string, decision: Decision): ResolvedLink {
-  if (decision?.kind === "products" && decision.candidates[0]) return { href: decision.candidates[0].url, via: decision };
+  if (decision?.kind === "products" && decision.via !== "description" && decision.candidates[0]) {
+    return { href: decision.candidates[0].url, via: decision };
+  }
   if (decision?.kind === "terms") return { href: searchFor(decision.terms), via: decision };
   return { href: searchFor(itemWords(name) || name), via: decision };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import AddRecipe from "./AddRecipe";
 import Book from "./Book";
 import List from "./List";
@@ -43,10 +43,16 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
   const [listVersion, setListVersion] = useState(0);
   const [bookVersion, setBookVersion] = useState(0);
   const [cuisines, setCuisines] = useState<string[]>([]);
+  // The book's names by id, for the list's Cooking this week (TEC-135).
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const recipeNames = useMemo(() => new Map(recipes.map((r) => [r.id, r.name])), [recipes]);
   // Your brands and the list each change what the other shows: a send or a
   // refresh changes Your brands, and an edit there changes the list's links.
   const [brandsVersion, setBrandsVersion] = useState(0);
-  const onRead = useCallback((recipes: Recipe[]) => setCuisines(cuisinesIn(recipes)), []);
+  const onRead = useCallback((read: Recipe[]) => {
+    setCuisines(cuisinesIn(read));
+    setRecipes(read);
+  }, []);
 
   function choose(next: Tab) {
     setTab(next);
@@ -60,7 +66,8 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
   return (
     <ToastProvider>
       <div className="flex flex-col gap-6">
-        <div role="tablist" aria-label="Cookbook" className="flex gap-1 rounded-lg border border-line bg-surface p-1">
+        {/* Pills in one scrolling row (TEC-135, the owner's mockup): the chosen tab filled with the accent. */}
+        <div role="tablist" aria-label="Cookbook" className="-mx-1 flex gap-1 overflow-x-auto px-1">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -70,8 +77,8 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
               aria-selected={tab === t.id}
               aria-controls={`panel-${t.id}`}
               onClick={() => choose(t.id)}
-              className={`flex-1 rounded px-3 py-2 text-sm ${
-                tab === t.id ? "bg-accent font-semibold text-accent-ink" : "text-ink-soft"
+              className={`whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] ${
+                tab === t.id ? "bg-accent font-semibold text-accent-ink" : "text-ink"
               }`}
             >
               {t.label}
@@ -94,7 +101,7 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
         </div>
         <div role="tabpanel" id="panel-shop" aria-labelledby="tab-shop" hidden={tab !== "shop"}>
           <div className="mx-auto w-full max-w-2xl">
-            <List refreshKey={listVersion} onBrandsChanged={() => setBrandsVersion((n) => n + 1)} />
+            <List refreshKey={listVersion} onBrandsChanged={() => setBrandsVersion((n) => n + 1)} recipeNames={recipeNames} />
           </div>
         </div>
         <div role="tabpanel" id="panel-brands" aria-labelledby="tab-brands" hidden={tab !== "brands"}>

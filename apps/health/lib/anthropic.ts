@@ -1,23 +1,24 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { MODELS, DEFAULT_MODEL, type ModelId } from "./models";
+import { MODEL_SPEC, requestBase } from "./models";
 import { MEALS, mealForHour, isMeal, type Meal } from "./meals";
 import { parseMacros, type Macros } from "./macros";
 import { urlsReadIn, earnedUrl, type ResultBlock } from "./webEvidence";
 
 /**
- * The two model calls this app makes, and the reasoning for each one's model.
+ * The two model calls this app makes. Both go out as the one model in
+ * `lib/models.ts` (Sonnet 5.5, effort `medium`) through `requestBase()`; neither
+ * call site names a model or an effort (TEC-133).
  *
- * `CLAUDE.md`: model choice is per task and the choice and the reason are
- * recorded at the call site. These are those call sites.
+ * **Neither call asks for a response format.** `output_config` carries only the
+ * effort. The JSON shape is asked for in the prompt and validated in code
+ * afterwards: the estimate call carries server tools where a response format is
+ * awkward, and validating in code is required regardless — a model response is
+ * untrusted input — so the structured-output parameter would buy tidiness
+ * rather than safety. Nothing is prefilled, and thinking is left adaptive.
  *
- * **Neither call sends `output_config`.** The JSON shape is asked for in the
- * prompt and validated in code afterwards. That is deliberately the
- * conservative path: `effort` moving under `output_config` has already caught
- * this project once, Haiku 4.5 rejects that key outright where Sonnet 5 accepts
- * it, and the estimate call carries server tools where a response format is
- * awkward anyway. Validating in code is required regardless — a model response
- * is untrusted input — so the structured-output parameter would buy tidiness
- * rather than safety.
+ * `max_tokens` covers the adaptive thinking as well as the answer, which is why
+ * it is well above what the JSON alone needs: a turn that hits the cap is a
+ * `max_tokens` stop and fails the line rather than truncating it.
  */
 
 let client: Anthropic | null = null;
@@ -62,7 +63,9 @@ export function textOf(content: { type: string; text?: string }[]): string {
 /**
  * A turn that stopped for any reason but finishing has no answer worth reading:
  * `max_tokens` is a truncated JSON, `refusal` is no JSON at all. Say which,
- * rather than letting it surface as "did not return usable macros".
+ * rather than letting it surface as "did not return usable macros". There is no
+ * fallback model: a refusal fails the line, so no number is stamped with a model
+ * that did not make it.
  */
 function assertFinished(stop: string | null, what: string): void {
   if (stop === "end_turn" || stop === "stop_sequence") return;
@@ -75,20 +78,6 @@ function assertFinished(stop: string | null, what: string): void {
 
 export type ParsedItem = { name: string; quantity: number };
 export type ParsedDictation = { meal: Meal; items: ParsedItem[] };
-
-/**
- * **Pinned to Haiku, and not under comparison.**
- *
- * Turning "a number one from Chick-fil-A and a cookie" into two named items is
- * transcription with a little structure, not judgement — it is a Haiku job at
- * any setting, and offering Sonnet for it would buy nothing while doubling the
- * latency of the one step you actually wait on. Coffee draws the same line,
- * putting its model toggle on `/api/search` and never on `/api/identify`.
- *
- * The judgement in this app is entirely in the macro estimate below, which is
- * where the comparison lives.
- */
-const PARSE_MODEL: ModelId = "claude-haiku-4-5";
 
 const PARSE_SYSTEM = `You turn a spoken food log into a list of items.
 
@@ -113,8 +102,8 @@ export async function parseDictation(params: {
   const fallbackMeal = mealForHour(params.hour);
 
   const response = await getClient().messages.create({
-    model: PARSE_MODEL,
-    max_tokens: 2048,
+    ...requestBase(),
+    max_tokens: 8192,
     system: PARSE_SYSTEM,
     messages: [
       {
@@ -174,28 +163,17 @@ Never report a URL you did not actually read, and never attach a URL to a number
 from that page. A plain estimate honestly labelled is worth more here than a figure wearing a
 citation it did not earn.`;
 
-/**
- * **This is the call the model toggle exists for**, and the only judgement in
- * the app. Haiku by default; the debug harness runs both and is how that
- * default gets validated rather than assumed.
- */
-export async function estimateMacros(params: {
-  name: string;
-  model?: ModelId;
-}): Promise<Estimate> {
-  const model = params.model ?? DEFAULT_MODEL;
-  const spec = MODELS[model];
-
-  // Spelled out per version rather than built from the registry's string, so
-  // the SDK's own types check each tool instead of a cast silencing them.
-  const search: Anthropic.ToolUnion = spec.search === "web_search_20260209"
-    ? { type: "web_search_20260209", name: "web_search", max_uses: 4 }
-    : { type: "web_search_20250305", name: "web_search", max_uses: 4 };
+/** The only judgement in the app: the numbers for a food the table has never seen. */
+export async function estimateMacros(params: { name: string }): Promise<Estimate> {
+  // The registry's tool versions, typed by the SDK rather than cast. The
+  // `_20260209` tools filter results dynamically on this model. `tool_choice`
+  // stays the default `auto`: a forced choice is a 400 on Sonnet 5.5.
+  const search: Anthropic.ToolUnion = { type: MODEL_SPEC.search, name: "web_search", max_uses: 4 };
   // A nutrition page is a table, not a book. Capping what one fetch brings into
   // context bounds the cost of a page that turns out to be a whole menu.
-  const fetchTool: Anthropic.ToolUnion = spec.fetch === "web_fetch_20260209"
-    ? { type: "web_fetch_20260209", name: "web_fetch", max_uses: 4, max_content_tokens: 20000 }
-    : { type: "web_fetch_20250910", name: "web_fetch", max_uses: 4, max_content_tokens: 20000 };
+  const fetchTool: Anthropic.ToolUnion = {
+    type: MODEL_SPEC.fetch, name: "web_fetch", max_uses: 4, max_content_tokens: 20000,
+  };
   const tools = [search, fetchTool];
 
   const messages: Anthropic.MessageParam[] = [
@@ -221,8 +199,8 @@ export async function estimateMacros(params: {
   // confidently wrong number instead of a visible failure.
   for (let i = 0; i < 6; i++) {
     const response = await getClient().messages.create({
-      model,
-      max_tokens: 4096,
+      ...requestBase(),
+      max_tokens: 16000,
       system: ESTIMATE_SYSTEM,
       tools,
       messages,
@@ -237,12 +215,12 @@ export async function estimateMacros(params: {
     raw = textOf(response.content);
     break;
   }
-  assertFinished(stop, `${MODELS[model].label}'s estimate for "${params.name}"`);
+  assertFinished(stop, `The estimate for "${params.name}"`);
 
   const parsed = looseJson<Record<string, unknown>>(raw);
   const macros = parseMacros(parsed);
   if (!macros) {
-    throw new Error(`${MODELS[model].label} did not return usable macros for "${params.name}".`);
+    throw new Error(`${MODEL_SPEC.label} did not return usable macros for "${params.name}".`);
   }
 
   const claimed = typeof parsed?.source_url === "string" ? parsed.source_url.trim() : "";

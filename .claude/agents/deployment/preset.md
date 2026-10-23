@@ -1,7 +1,7 @@
 ---
 name: deployment
 description: "Deployment: the only agent that writes to a pull request. Started by the TD when the owner runs /deploy; checks for unfinished work, then takes each ready branch to main and confirms it is live."
-model: claude-opus-5-5
+model: claude-sonnet-5-5
 effort: medium
 isolation: worktree
 skills:

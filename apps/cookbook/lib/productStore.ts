@@ -4,6 +4,8 @@ import { pageFor } from "./kingsoopers";
 import {
   cleanName,
   countBumps,
+  defaultPatches,
+  keptDefaults,
   placeProduct,
   rememberPlacement,
   successorPatch,
@@ -21,7 +23,7 @@ import {
  */
 
 const COLUMNS =
-  "id, product_id, names, count, size_first, brand, note, description, kroger_brand, size, url, price, in_stock, checked_at, missing_since, successor, pack_label, pack_size, pack_unit, created_at, updated_at";
+  "id, product_id, names, count, size_first, brand, note, description, kroger_brand, size, url, price, in_stock, checked_at, missing_since, successor, pack_label, pack_size, pack_unit, default_for, created_at, updated_at";
 
 function hydrate(r: Record<string, unknown>): SavedProduct {
   return {
@@ -32,6 +34,7 @@ function hydrate(r: Record<string, unknown>): SavedProduct {
     price: r.price === null || r.price === undefined ? null : Number(r.price),
     successor: r.successor && typeof r.successor === "object" ? (r.successor as Successor) : null,
     pack_size: r.pack_size === null || r.pack_size === undefined ? null : Number(r.pack_size),
+    default_for: Array.isArray(r.default_for) ? (r.default_for as string[]) : [],
   };
 }
 
@@ -46,6 +49,8 @@ function payload(draft: ProductDraft, existing: SavedProduct | null, mode: "edit
   const out: Record<string, unknown> = { product_id: draft.product_id, updated_at: new Date().toISOString() };
   // The editor's names are the whole list; a batch adds to what is saved.
   out.names = mode === "merge" && existing ? unionNames(existing.names, draft.names) : draft.names;
+  // **A removed name takes its default with it** (TEC-135).
+  if (existing && (existing.default_for ?? []).length > 0) out.default_for = keptDefaults(existing.default_for, out.names as string[]);
   if (draft.count !== undefined) out.count = draft.count;
   if (draft.size_first !== undefined) {
     // **A batch never overwrites the size first bought**; the editor can correct it.
@@ -121,6 +126,24 @@ export async function rememberProduct(name: string, upc: string, page: string, s
     .from("products")
     .insert({ product_id: upc, names: [cleanName(name)], url: page, size_first: size });
   if (error) throw new LookupError(`Couldn't save the product: ${error.message}`);
+}
+
+/**
+ * **Make default** (TEC-135; `RULES.md`, *Send to cart*): the product with
+ * this code becomes the one default for each name, and every other row gives
+ * those names up — cleared first, so a failure part-way leaves no default
+ * rather than two. One user, one tap at a time, like `bumpCounts`.
+ */
+export async function setDefault(names: string[], upc: string, known?: SavedProduct[]): Promise<void> {
+  const all = known ?? (await readProducts());
+  const result = defaultPatches(all, names, upc);
+  if ("error" in result) throw new ConflictError(result.error);
+  const target = all.find((p) => p.product_id === upc);
+  const ordered = [...result.patches].sort((a, b) => Number(a.id === target?.id) - Number(b.id === target?.id));
+  for (const { id, default_for } of ordered) {
+    const { error } = await getServiceClient().from("products").update({ default_for }).eq("id", id);
+    if (error) throw new LookupError(`Couldn't save the default: ${error.message}`);
+  }
 }
 
 /**

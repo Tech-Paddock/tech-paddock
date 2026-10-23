@@ -86,7 +86,7 @@ describe("the on-sale tag on a list line", () => {
   it("says sale, never coupon", () => {
     expect(saleText({ percentOff: 5, endsAt: "2026-10-27" })).not.toMatch(/coupon/i);
     const list = readFileSync(resolve(__dirname, "../app/List.tsx"), "utf8");
-    const at = list.indexOf("onSale.has(item.id)");
+    const at = list.indexOf("saleText(props.sale)");
     expect(at).toBeGreaterThan(0);
     expect(list.slice(at, at + 400)).not.toMatch(/coupon/i);
   });

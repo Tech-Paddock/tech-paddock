@@ -164,13 +164,11 @@ When the search finds no recipe, a model generates a suggested one. It never tou
   constraint. `web_fetch` reaches only URLs search has surfaced, so pinning starves it.
 - Search again from the shelf re-derives `product_url` and `guide_url` through `guideColumns`.
 - The freshest successful result replaces the old one, even when it finds less.
-- Search again uses the default model, offers no picker, and polls the row.
-- The first search offers every model in `SEARCH_MODELS` (`lib/models.ts`), with effort where the
-  model supports it. Both are recorded on the bag.
-- Both controls derive from that registry. An unsupported level is refused by the route and absent
-  from the page, not disabled.
-- The label reader is one fixed model, `effort: "low"`, with a JSON schema. Its prompt forbids
-  guessing a roaster from the design or completing a partly visible word.
+- Search again runs the same search as the first, and polls the row.
+- Every call uses one model, Claude Sonnet 5.5 at effort medium, set in `lib/models.ts`. No picker
+  or effort dial. The model and effort a search ran with are recorded on the bag.
+- The label reader has a JSON schema. Its prompt forbids guessing a roaster from the design or
+  completing a partly visible word.
 
 ## Client
 
