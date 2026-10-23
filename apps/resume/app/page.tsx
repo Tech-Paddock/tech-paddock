@@ -7,6 +7,7 @@ import { KIND_LABEL, type ResumeFile, type ResumeKind } from "@/lib/resumes";
 import { verdictFor } from "@/lib/verdict";
 import ThemeControl, { LiveryBadge } from "./ThemeControl";
 import LogoutControl from "./LogoutControl";
+import MessageGuide from "./MessageGuide";
 
 /**
  * Three tabs, not four.
@@ -254,7 +255,11 @@ function Stat({ value, label, tone = "plain" }: { value: string; label: string; 
 function Workbench({ rail, children }: { rail: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="grid gap-5 lg:grid-cols-[20rem_minmax(0,1fr)] items-start">
-      <div className="border border-line rounded-xl p-3 flex flex-col gap-3 lg:sticky lg:top-4">{rail}</div>
+      {/* Scrolls inside itself on desktop: a sticky rail taller than the window
+          (the Diagnostics message guide, opened) would hide its own bottom. */}
+      <div className="border border-line rounded-xl p-3 flex flex-col gap-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+        {rail}
+      </div>
       <div className="border border-line rounded-xl p-3 flex flex-col gap-4 min-w-0">{children}</div>
     </div>
   );
@@ -1036,6 +1041,7 @@ function ReformatShell() {
                   }}
                 />
                 {busy && <p className="text-xs opacity-60">{busy}</p>}
+                <MessageGuide />
               </>
             }
           >
