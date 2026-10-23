@@ -10,7 +10,12 @@ import {
   splitLine,
 } from "@/lib/grocery";
 import { errorResponse } from "@/lib/respond";
-import { readPreferences, resolveLink } from "@/lib/preferences";
+import { linkFor, readPreferences } from "@/lib/preferences";
+import { readProducts } from "@/lib/productStore";
+import { decider } from "@/lib/decide";
+import { lineMark } from "@/lib/brands";
+import { lineView } from "@/lib/lineView";
+import { packOf, quantityRule } from "@/lib/lineQuantity";
 
 export const dynamic = "force-dynamic";
 
@@ -27,15 +32,24 @@ export const dynamic = "force-dynamic";
  * A failed read is a 503, never an empty list — an empty list means "buy nothing".
  *
  * **Each line comes back carrying the link it should have.** The match against
- * remembered brands is resolved here rather than in the browser: the preferences
- * are the whole table on every render, and a phone in a shop should be handed an
+ * Your brands is resolved here rather than in the browser (`lib/brands.ts`
+ * `decide`, the same rule Send uses): the products are the whole table on
+ * every render, and a phone in a shop should be handed an
  * answer rather than the data to work one out.
  */
 export async function GET() {
   try {
-    const [items, preferences] = await Promise.all([readList(), readPreferences()]);
+    const [items, words, products] = await Promise.all([readList(), readPreferences(), readProducts()]);
+    const decide = decider(products, words);
     return NextResponse.json({
-      items: items.map((item) => ({ ...item, ...resolveLink(item, preferences) })),
+      items: items.map((item) => {
+        const decision = decide(item.name);
+        // **What you buy** (TEC-131): the item, its amount, the note unless it
+        // was only amounts. Display only; the stored line is not rewritten.
+        const { quantity: _rule, ...view } = lineView(item, packOf(decision));
+        // ★ / ? / + (TEC-135): what Send will do with it, said before Send.
+        return { ...item, ...linkFor(item.name, decision), view, mark: lineMark(decision) };
+      }),
     });
   } catch (e) {
     return errorResponse(e, "Couldn't read the list.");
@@ -55,7 +69,14 @@ export async function POST(request: NextRequest) {
 
   try {
     // "Milk — the small tin" is a name and a note; only the name is searched.
-    const items = await addItems(lines.map((line: string) => ({ ...splitLine(line), source: "manual" as const })));
+    // The cart quantity by the fixed rules (TEC-131): "2 onions" goes in as 2.
+    const quantityOf = await quantityRule();
+    const items = await addItems(
+      lines.map((line: string) => {
+        const split = splitLine(line);
+        return { ...split, source: "manual" as const, quantity: quantityOf(split) };
+      })
+    );
     return NextResponse.json({ items }, { status: 201 });
   } catch (e) {
     return errorResponse(e, "Couldn't add that.");

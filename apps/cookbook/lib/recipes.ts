@@ -2,6 +2,7 @@ import { getServiceClient } from "./supabase";
 import { ConflictError, InputError, LookupError } from "./errors";
 import { round, type Macros, type MacroSource } from "./macros";
 import { addItems } from "./grocery";
+import { quantityRule } from "./lineQuantity";
 import { readMeta, readRating, type RecipeMeta } from "./metadata";
 import type { RecipeEdit, Reprice } from "./edit";
 
@@ -416,7 +417,12 @@ export async function toGroceryList(recipe: Recipe): Promise<number> {
 
   // Each line names the recipe it came from, as the recipe is called now: a
   // snapshot, so renaming the recipe later leaves the line alone (TEC-39 B).
-  const added = await addItems(lines.map((name) => ({ name, source: "recipe" as const, recipes: [recipe.name] })));
+  // The cart quantity by the fixed rules (TEC-131): 14 cloves of garlic at
+  // 10 to a head goes in as 2 heads; a measure is one container.
+  const quantityOf = await quantityRule();
+  const added = await addItems(
+    lines.map((name) => ({ name, source: "recipe" as const, recipes: [recipe.name], quantity: quantityOf({ name, note: null }) }))
+  );
   return added.length;
 }
 

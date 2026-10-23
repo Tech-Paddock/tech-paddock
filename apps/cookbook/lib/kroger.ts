@@ -1,6 +1,7 @@
 import { keyProblem, readKey } from "./krogerCrypto";
 import { SetupError, UpstreamError } from "./errors";
 import type { Modality } from "./modality";
+import { pageFor } from "./kingsoopers";
 
 /**
  * Kroger's public API, as this app uses it (TEC-90). **Server-side only.**
@@ -246,13 +247,7 @@ export function productPage(productId: string, description: string, given: unkno
   if (typeof given === "string" && /^\/p\/[^/?#]+\/\d{8,14}(?:[?#].*)?$/.test(given)) {
     return SITE + given.replace(/[?#].*$/, "");
   }
-  const slug =
-    description
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "product";
-  return `${SITE}/p/${slug}/${productId}`;
+  return pageFor(productId, description);
 }
 
 /** Kroger's stock level, as yes, no, or not said. */
@@ -374,6 +369,20 @@ export async function productsByIds(accessToken: string, productIds: string[], l
 export function searchTerm(words: string): string | null {
   const term = words.trim().replace(/\s+/g, " ").split(" ").slice(0, 8).join(" ");
   return term.length >= 3 ? term : null;
+}
+
+/**
+ * Kroger's matches at the store, best first, up to `limit` (TEC-131: the
+ * successor search reads several and keeps the closest by name).
+ */
+export async function searchProducts(accessToken: string, term: string, locationId: string, limit = 10): Promise<Product[]> {
+  const url = new URL(`${KROGER_API}/products`);
+  url.searchParams.set("filter.term", term);
+  url.searchParams.set("filter.locationId", locationId);
+  url.searchParams.set("filter.limit", String(limit));
+  const response = await call(url.toString(), { headers: bearer(accessToken) });
+  if (!response.ok) throw new KrogerError(`Kroger's search failed (${await errorCode(response)}).`, response.status);
+  return readProducts(await response.json().catch(() => ({})));
 }
 
 /** Kroger's top match at the store, or null when it has nothing. */

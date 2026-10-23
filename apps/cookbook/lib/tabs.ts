@@ -1,5 +1,5 @@
 /**
- * The three tabs and their addresses. No React, so the tests can hold the one
+ * The tabs and their addresses. No React, so the tests can hold the one
  * address another app depends on.
  *
  * **`/list` is load-bearing.** Health's `/list` redirects to
@@ -7,10 +7,11 @@
  * (TEC-15), so renaming it breaks a redirect in an app this one cannot see.
  *
  * **Add is a tab of its own** (2026-10-05, replacing the two-tab index
- * of 2026-09-24). Still one verb each: browse, add, shop.
+ * of 2026-09-24). **Your brands is the fourth** (TEC-131, 2026-10-22), after
+ * the list, at `/brands`. Still one verb each: browse, add, shop, remember.
  */
 
-export type Tab = "recipes" | "add" | "shop";
+export type Tab = "recipes" | "add" | "shop" | "brands";
 
 export const TABS: { id: Tab; label: string; path: string }[] = [
   { id: "recipes", label: "Recipes", path: "/" },
@@ -18,6 +19,7 @@ export const TABS: { id: Tab; label: string; path: string }[] = [
   // Named for where it actually goes. Every link on it is a King Soopers search,
   // so "Shopping list" was one word vaguer than the thing deserves.
   { id: "shop", label: "King Soopers list", path: "/list" },
+  { id: "brands", label: "Your brands", path: "/brands" },
 ];
 
 export function pathFor(tab: Tab): string {
