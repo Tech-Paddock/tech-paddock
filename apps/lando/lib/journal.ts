@@ -7,8 +7,10 @@ import {
   parseNewEvent,
   type Dog,
   type ExerciseDetails,
+  type HealthDetails,
   type JournalEvent,
 } from "./events";
+import { missingPhotos } from "./storage";
 
 /**
  * The database half. Every failure throws: a failed read must never render as
@@ -73,6 +75,13 @@ export async function writeEvent(db: SupabaseClient, body: unknown, now = new Da
     const { data, error } = await db.from("dogs").select("id").in("id", dogIds);
     if (error) throw new Error(`couldn't read dogs: ${error.message}`);
     if ((data ?? []).length !== dogIds.length) throw new InvalidEvent("that dog is no longer in the list — reload");
+  }
+
+  // A photo is stored as a path, so nothing but the bucket knows it is there:
+  // an entry is never saved naming one that did not upload (charter, Never 5).
+  const photos = next.kind === "health" ? ((next.details as HealthDetails).photos ?? []) : [];
+  if (photos.length && (await missingPhotos(db, photos)).length) {
+    throw new InvalidEvent("a photo didn't finish uploading — retry it, or remove it");
   }
 
   let at: string | undefined = next.at ?? undefined;

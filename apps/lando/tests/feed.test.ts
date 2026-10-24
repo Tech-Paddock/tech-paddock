@@ -85,8 +85,8 @@ describe("feed days — a heading per local day", () => {
 });
 
 describe("Fun and Training — two forms, one kind", () => {
-  it("has five forms in the button order", () => {
-    expect(FORM_KINDS).toEqual(["potty", "food", "fun", "training", "weight"]);
+  it("has six forms in the button order (Health added, TEC-137)", () => {
+    expect(FORM_KINDS).toEqual(["potty", "food", "fun", "training", "weight", "health"]);
   });
 
   it("saves both as exercise", () => {

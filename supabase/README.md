@@ -60,10 +60,13 @@ via the `merge` skill. Then:
 
 A matching version is something to read back, never to assume.
 
-**A drop does not go through the connector:** destructive SQL times out there. The owner runs the
-file in the SQL Editor inside `begin; … commit;`, with
-`insert into supabase_migrations.schema_migrations (version, name)` for the file's own version in
-the same transaction, as `drop_editor_tracker_shared` was.
+**Agents apply migrations; avoid the DROP instead of handing it to the owner** (owner, 2026-10-24).
+A DROP has timed out through the connector, so design around it: put a widening check in a function
+(`lando.details_ok`) and widen with `create or replace function`, and start any constraint swap
+with `set local lock_timeout = '5s'`. Only if a DROP still times out, and a read-back shows it did
+not land, does the owner run the file once in the SQL Editor inside `begin; … commit;` with
+`insert into supabase_migrations.schema_migrations (version, name)` for its version, as
+`drop_editor_tracker_shared` was. A drop of data stays a destructive migration (CLAUDE.md).
 
 ## Dropping a schema
 

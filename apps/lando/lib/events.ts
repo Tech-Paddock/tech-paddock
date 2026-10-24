@@ -6,17 +6,17 @@
  * replaces, and a delete is a `void` event naming it. An event is **live** when
  * nothing voids it. Every screen reads live events only.
  *
- * Four kinds, each logged through a short form with defaults: potty, food,
- * exercise, weight. The shapes of `details` below are also enforced by the
- * database (migrations `lando_people_and_events`, then
- * `widen_lando_events_details_shape`, then `widen_lando_potty_none`); change
- * both together.
+ * Five kinds, each logged through a short form with defaults: potty, food,
+ * exercise, weight, health. The shapes of `details` below are also enforced by
+ * the database (migrations `lando_people_and_events`, then
+ * `widen_lando_events_details_shape`, then `widen_lando_potty_none`, then
+ * `lando_health_events`); change both together.
  */
 
 import { FOOD_TYPES, findFood, formatAmount, unitLabel, type FoodType } from "./foods";
 import { dateLabel, fromDateInput, toDateInput } from "./localtime";
 
-export const LOG_KINDS = ["potty", "food", "exercise", "weight"] as const;
+export const LOG_KINDS = ["potty", "food", "exercise", "weight", "health"] as const;
 export type LogKind = (typeof LOG_KINDS)[number];
 export type Kind = LogKind | "void";
 
@@ -25,14 +25,15 @@ export const KIND_LABELS: Record<LogKind, string> = {
   food: "Food",
   exercise: "Exercise",
   weight: "Weight",
+  health: "Health",
 };
 
 /**
- * The five forms on the Log tab (TEC-136): Fun and Training replace Exercise.
+ * The six forms on the Log tab (TEC-136): Fun and Training replace Exercise.
  * Both save as kind `exercise` with the existing `type`; the data shape is
  * unchanged. Fun is walk or playtime, Training is `type: "training"`.
  */
-export const FORM_KINDS = ["potty", "food", "fun", "training", "weight"] as const;
+export const FORM_KINDS = ["potty", "food", "fun", "training", "weight", "health"] as const;
 export type FormKind = (typeof FORM_KINDS)[number];
 export const FORM_LABELS: Record<FormKind, string> = {
   potty: "Potty",
@@ -40,6 +41,7 @@ export const FORM_LABELS: Record<FormKind, string> = {
   fun: "Fun",
   training: "Training",
   weight: "Weight",
+  health: "Health",
 };
 
 /** The kind a form saves. */
@@ -174,6 +176,77 @@ export type Unit = (typeof UNITS)[number];
 const KG_PER_LB = 0.45359237;
 export type WeightDetails = { value: number; unit: Unit };
 
+/* ── Health (TEC-137) ────────────────────────────────────────────────────── */
+
+/** A vet visit, or a medical issue noticed at home. Photos can go on either. */
+export const HEALTH_TYPES = ["vet", "issue"] as const;
+export type HealthType = (typeof HEALTH_TYPES)[number];
+export const HEALTH_LABELS: Record<HealthType, string> = { vet: "Vet visit", issue: "Medical issue" };
+
+/**
+ * Why we went to the vet, pick several. Fixed in code and in the database
+ * check (`lando_health_events`), like COMMANDS: add to both. Display order.
+ */
+export const VET_REASONS = [
+  ["checkup", "Wellness check-up"],
+  ["vaccines", "Vaccines"],
+  ["deworming", "Deworming / fecal test"],
+  ["flea-tick-heartworm", "Flea, tick & heartworm"],
+  ["spay-neuter", "Spay / neuter"],
+  ["dental", "Dental"],
+  ["microchip", "Microchip"],
+  ["sick", "Sick visit"],
+  ["injury", "Injury"],
+  ["skin-ears", "Skin or ears"],
+  ["stomach", "Stomach upset"],
+  ["recheck", "Recheck / follow-up"],
+  ["other", "Other"],
+] as const;
+
+/** What the medical issue is, pick several. Fixed in code and in the check. */
+export const ISSUE_PICKS = [
+  ["vomiting", "Vomiting"],
+  ["diarrhea", "Diarrhea"],
+  ["limping", "Limping"],
+  ["itching-skin", "Itching / skin"],
+  ["ear", "Ear"],
+  ["eye", "Eye"],
+  ["cough-sneeze", "Cough / sneeze"],
+  ["not-eating", "Not eating"],
+  ["low-energy", "Low energy"],
+  ["wound", "Cut / wound"],
+  ["ate-something", "Ate something"],
+  ["other", "Other"],
+] as const;
+
+/** The pick list a health type offers. */
+export function healthOptions(type: HealthType): readonly (readonly [string, string])[] {
+  return type === "vet" ? VET_REASONS : ISSUE_PICKS;
+}
+
+/** A pick's label, else the stored id as it is. */
+export function healthReasonLabel(type: HealthType, id: string): string {
+  return healthOptions(type).find(([v]) => v === id)?.[1] ?? id;
+}
+
+/** At most this many photos on one entry. */
+export const MAX_PHOTOS = 6;
+
+/**
+ * A photo's storage path in the private bucket: `health/<id>.<ext>`, the id
+ * chosen by the phone and the extension by the upload's type. Only this path
+ * is stored in the event, never the picture or a URL (a signed URL expires).
+ */
+export const PHOTO_PATH = /^health\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/;
+
+export type HealthDetails = {
+  type: HealthType;
+  /** At least one, from the type's list, in the list's order. */
+  reasons: string[];
+  /** Storage paths, 1 to MAX_PHOTOS; no key when there are none. */
+  photos?: string[];
+};
+
 export type Details = Record<string, unknown>;
 
 export type JournalEvent = {
@@ -192,6 +265,7 @@ export const potty = (e: Pick<JournalEvent, "details">) => e.details as PottyDet
 export const food = (e: Pick<JournalEvent, "details">) => e.details as FoodDetails;
 export const exercise = (e: Pick<JournalEvent, "details">) => e.details as ExerciseDetails;
 export const weight = (e: Pick<JournalEvent, "details">) => e.details as WeightDetails;
+export const health = (e: Pick<JournalEvent, "details">) => e.details as HealthDetails;
 
 /**
  * Inside is an accident: warned in the form, red in the timeline, counted
@@ -437,6 +511,15 @@ export function describe(
       const w = weight(e);
       return { title: "Weight", detail: `${round1(w.value)} ${w.unit}` };
     }
+    case "health": {
+      const h = health(e);
+      const n = h.photos?.length ?? 0;
+      const parts = [
+        (h.reasons ?? []).map((id) => healthReasonLabel(h.type, id)).join(", "),
+        n ? `${n} ${n === 1 ? "photo" : "photos"}` : "",
+      ];
+      return { title: HEALTH_LABELS[h.type] ?? "Health", detail: parts.filter(Boolean).join(" · ") };
+    }
     default:
       return { title: "", detail: "" };
   }
@@ -551,6 +634,28 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
         throw new InvalidEvent("weight must be a number above 0");
       }
       return { value, unit: oneOf(r.unit, UNITS, "unit") } satisfies WeightDetails;
+    }
+    case "health": {
+      const type = oneOf(r.type, HEALTH_TYPES, "type");
+      const list = healthOptions(type);
+      const picked = r.reasons;
+      if (!Array.isArray(picked) || picked.some((c) => typeof c !== "string" || !list.some(([id]) => id === c))) {
+        throw new InvalidEvent("reasons must come from the list");
+      }
+      // Kept in the list's order, once each.
+      const reasons = list.map(([id]) => id as string).filter((id) => picked.includes(id));
+      if (!reasons.length) throw new InvalidEvent(type === "vet" ? "pick why you went to the vet" : "pick what the issue is");
+      const out: HealthDetails = { type, reasons };
+      if (r.photos !== undefined && r.photos !== null) {
+        if (!Array.isArray(r.photos) || r.photos.some((p) => typeof p !== "string" || !PHOTO_PATH.test(p))) {
+          throw new InvalidEvent("photos must be ones uploaded here");
+        }
+        // Once each, in the order given; none is no key at all.
+        const photos = [...new Set(r.photos as string[])];
+        if (photos.length > MAX_PHOTOS) throw new InvalidEvent(`at most ${MAX_PHOTOS} photos on one entry`);
+        if (photos.length) out.photos = photos;
+      }
+      return out;
     }
   }
 }
