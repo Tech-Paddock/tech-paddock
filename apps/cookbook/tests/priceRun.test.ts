@@ -73,6 +73,7 @@ function world(opts: { codes?: string[]; store?: { locationId: string; name: str
       return written;
     },
     readNightsBetween: async (from, to) => [...nights.values()].filter((n) => n.night >= from && n.night <= to),
+    rolledWeeks: async (from) => new Set([...weeks.values()].map((r) => r.week_start).filter((w) => w >= from)),
     insertWeeks: async (rows) => {
       calls.insertWeeks += 1;
       let written = 0;
@@ -107,7 +108,7 @@ describe("recording a night", () => {
     });
     const report = await recordNight(w.deps);
 
-    expect(report).toMatchObject({ night: "2026-10-27", store: "Test Store", saved: 2, written: 2, alreadyRecorded: 0, notReturned: 0, noPrice: 0, rollup: null });
+    expect(report).toMatchObject({ night: "2026-10-27", store: "Test Store", saved: 2, written: 2, alreadyRecorded: 0, notReturned: 0, noPrice: 0, rollup: [] });
     expect(w.nights.get(`${code(1)}|${STORE}|2026-10-27`)).toEqual({
       product_id: code(1),
       location_id: STORE,
@@ -190,7 +191,7 @@ describe("recording a night", () => {
     };
     await expect(recordNight(w.deps)).rejects.toBeInstanceOf(UpstreamError);
     expect(w.nights.size).toBe(0);
-    expect(w.calls.insertWeeks).toBe(0); // not a Monday
+    expect(w.calls.insertWeeks).toBe(0); // no finished week had nights
   });
 
   it("one code is looked up once however many times it is saved", async () => {
@@ -235,7 +236,7 @@ describe("the Monday roll-up", () => {
     const report = await recordNight(w.deps);
 
     expect(report.night).toBe("2026-10-26");
-    expect(report.rollup).toEqual({ week_start: "2026-10-19", rows: 1, written: 1 });
+    expect(report.rollup).toEqual([{ week_start: "2026-10-19", rows: 1, written: 1 }]);
     expect(w.weeks.get(`${code(1)}|${STORE}|2026-10-19`)).toEqual({
       product_id: code(1),
       location_id: STORE,
@@ -260,15 +261,52 @@ describe("the Monday roll-up", () => {
     const w = world({ now: MONDAY, codes: [code(1)] });
     seed(w);
     await recordNight(w.deps);
+    const writes = w.calls.insertWeeks;
     const again = await recordNight(w.deps);
-    expect(again.rollup).toEqual({ week_start: "2026-10-19", rows: 1, written: 0 });
+    // The week already has its row, so it is not looked at again.
+    expect(again.rollup).toEqual([]);
+    expect(w.calls.insertWeeks).toBe(writes);
     expect(w.weeks.size).toBe(1);
   });
 
-  it("on any other day there is no roll-up", async () => {
+  it("a missed Monday is caught up the next day, from the nights that exist", async () => {
+    // The cron did not roll up on Monday 10-26 (it may not have run at all):
+    // there are seven nights and no week row when Tuesday's run comes.
     const w = world({ now: TUESDAY, codes: [code(1)] });
     seed(w);
-    expect((await recordNight(w.deps)).rollup).toBeNull();
+    const report = await recordNight(w.deps);
+    expect(report.rollup).toEqual([{ week_start: "2026-10-19", rows: 1, written: 1 }]);
+    expect(w.weeks.get(`${code(1)}|${STORE}|2026-10-19`)).toMatchObject({ low: 3, high: 5, nights_seen: 7, nights_on_sale: 2 });
+  });
+
+  it("a catch-up is idempotent: the next run writes nothing more", async () => {
+    const w = world({ now: TUESDAY, codes: [code(1)] });
+    seed(w);
+    await recordNight(w.deps);
+    w.setNow(new Date("2026-10-28T09:00:00Z"));
+    const next = await recordNight(w.deps);
+    expect(next.rollup).toEqual([]);
+    expect(w.weeks.size).toBe(1);
+  });
+
+  it("catches up several missed weeks at once, and never fills a missed night", async () => {
+    const w = world({ now: new Date("2026-11-03T09:00:00Z"), codes: [code(1)] });
+    seed(w); // week of 10-19: seven nights
+    // Week of 10-26: only two nights were recorded; the rest are gaps.
+    for (const night of ["2026-10-27", "2026-10-30"]) {
+      w.nights.set(`${code(1)}|${STORE}|${night}`, { product_id: code(1), location_id: STORE, night, regular: 4, sale: null, in_stock: true, aisle: null });
+    }
+    const report = await recordNight(w.deps);
+    expect(report.rollup.map((r) => r.week_start)).toEqual(["2026-10-19", "2026-10-26"]);
+    expect(w.weeks.get(`${code(1)}|${STORE}|2026-10-26`)).toMatchObject({ nights_seen: 2, mean: 4 });
+  });
+
+  it("the current week is never rolled up, and a week with no nights makes no row", async () => {
+    const w = world({ now: new Date("2026-10-28T09:00:00Z"), codes: [code(1)] });
+    // Only nights in the current week (10-26 onward).
+    w.nights.set(`${code(1)}|${STORE}|2026-10-26`, { product_id: code(1), location_id: STORE, night: "2026-10-26", regular: 5, sale: null, in_stock: true, aisle: null });
+    const report = await recordNight(w.deps);
+    expect(report.rollup).toEqual([]);
     expect(w.weeks.size).toBe(0);
   });
 

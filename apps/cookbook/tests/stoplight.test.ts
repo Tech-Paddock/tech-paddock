@@ -83,8 +83,18 @@ describe("green", () => {
     expect(stoplight(4.5, mixed, AS_OF).light).toBe("neutral"); // above the 3.99 low, and only 10% under the mean
   });
 
-  it("a product whose price never moves is at its low, so it is green (as the rule is written)", () => {
-    expect(stoplight(3.99, weeks(12, 3.99, 3.99), AS_OF)).toMatchObject({ light: "green", note: "at its 12-week low of $3.99" });
+  it("a product whose price never moves reads neutral: at its low, but not below its mean", () => {
+    expect(stoplight(3.99, weeks(12, 3.99, 3.99), AS_OF)).toMatchObject({ light: "neutral", note: "about its usual" });
+  });
+
+  it("at the low needs to be below the mean as well: a cent under the mean is enough, equal is not", () => {
+    // Low 4.00, mean 4.00 and 4.01: a price at the low is below the second mean only.
+    expect(stoplight(4, weeks(8, 4, 4), AS_OF).light).toBe("neutral");
+    expect(stoplight(4, weeks(8, 4, 4.01), AS_OF).light).toBe("green");
+  });
+
+  it("15% under the mean is still green on its own, whatever the low", () => {
+    expect(stoplight(4.25, weeks(8, 3, 5), AS_OF).light).toBe("green");
   });
 });
 

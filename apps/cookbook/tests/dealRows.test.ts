@@ -307,12 +307,17 @@ describe("the filters", () => {
     expect(ids({ kind: "sale", light: "green", aisle: "Pantry" })).toEqual([]);
   });
 
-  it("a new product has no colour: it shows under Any and under none of the three", () => {
+  it("a new product has no colour: it shows under Any and under New, and under none of the three colours", () => {
     const fresh = board({ products, nights, weeks: [] }).rows;
     expect(fresh.every((r) => r.light === "new")).toBe(true);
     for (const light of ["green", "neutral", "red"] as const) {
       expect(fresh.filter((r) => matchesFilter(r, { ...NO_FILTER, light }))).toEqual([]);
     }
     expect(fresh.filter((r) => matchesFilter(r, NO_FILTER))).toHaveLength(3);
+    expect(fresh.filter((r) => matchesFilter(r, { ...NO_FILTER, light: "new" }))).toHaveLength(3);
+  });
+
+  it("New holds only the products still building history", () => {
+    expect(ids({ light: "new" })).toEqual([]);
   });
 });

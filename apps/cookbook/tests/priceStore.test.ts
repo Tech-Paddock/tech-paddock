@@ -109,6 +109,13 @@ describe("reading", () => {
     expect(db.reads[0].filters).toEqual([["eq", "location_id", "01400999"], ["gte", "week_start", "2026-08-03"]]);
   });
 
+  it("reads which Mondays already have a roll-up, at any store", async () => {
+    const { readRolledWeeks } = await import("@/lib/priceStore");
+    db.pages = [[{ week_start: "2026-10-12" }, { week_start: "2026-10-12" }, { week_start: "2026-10-19" }]];
+    expect([...(await readRolledWeeks("2026-08-03"))]).toEqual(["2026-10-12", "2026-10-19"]);
+    expect(db.reads[0].filters).toEqual([["gte", "week_start", "2026-08-03"]]);
+  });
+
   it("reads a week's nights across stores, both ends inclusive", async () => {
     const { readNightsBetween } = await import("@/lib/priceStore");
     db.pages = [[{ ...night, regular: "5.00", sale: null }]];

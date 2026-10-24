@@ -35,10 +35,11 @@ export function mondayOf(date: string): string {
 }
 
 /**
- * The Monday of the week to roll up when the run is on this date, or null when
- * it is not a Monday. **Only Mondays roll up**, and the week is the one that
- * just ended: Monday to Sunday, seven days back.
+ * The Mondays of the finished weeks a run on `runDate` may roll up, oldest
+ * first: the `count` weeks before the current one, each Monday to Sunday and
+ * ended. The current week is never finished.
  */
-export function weekToRollUp(runDate: string): string | null {
-  return isoWeekday(runDate) === 1 ? addDays(runDate, -7) : null;
+export function finishedWeeks(runDate: string, count: number): string[] {
+  const thisMonday = mondayOf(runDate);
+  return Array.from({ length: count }, (_, i) => addDays(thisMonday, -7 * (count - i)));
 }

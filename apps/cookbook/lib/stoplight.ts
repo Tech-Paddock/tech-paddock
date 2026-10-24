@@ -6,7 +6,8 @@ import { addDays } from "./priceDates";
  * function, no imports beyond date arithmetic**, so the tests hold its edges
  * and the browser can run it.
  *
- * - **green**: at or below the 12-week low, or at least 15% under the mean;
+ * - **green**: at least 15% under the mean, or at or below the 12-week low
+ *   while also below the mean;
  * - **red**: at least 10% over the mean, even when Kroger calls it a sale;
  * - **neutral**: anything else, which shows no colour;
  * - **new**: under four weeks of history, which says "new: building history"
@@ -19,9 +20,8 @@ import { addDays } from "./priceDates";
  * as it had nights seen, so a week with four nights does not weigh as much as
  * a full one. The low is the lowest weekly low.
  *
- * **A product whose price never moves reads green**, because its price is
- * always at its own 12-week low. That follows the rule as written; whether
- * it should is a TEC-138 question.
+ * **A product whose price never moves reads neutral**: it is at its own low
+ * but not below its own mean (the owner's amendment of 2026-10-24).
  */
 
 /** Green: this fraction under the mean or more. */
@@ -86,7 +86,7 @@ export function stoplight(today: number, weeks: WeekStat[], asOf: string): Verdi
   const versusMean = (today - mean) / mean;
   const base = { weeks: used.length, low, mean, versusMean };
 
-  if (today <= low + EPS) {
+  if (today < mean - EPS && today <= low + EPS) {
     return { ...base, light: "green", note: `at its ${used.length}-week low of ${money(low)}` };
   }
   if (today <= mean * (1 - GREEN_UNDER_MEAN) + EPS) {

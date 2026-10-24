@@ -3,7 +3,8 @@
 -- The nightly rows in `cookbook.price_nights` are the record; this table is
 -- the compact shape the Deals tab's stoplight reads. On a Monday the same
 -- cron route (`/api/cron/prices`, `lib/priceRun.ts`) rolls up the week that
--- just ended, Monday to Sunday, into one row per product and store. The maths
+-- just ended, Monday to Sunday, into one row per product and store; and every
+-- run rolls up any earlier finished week that has nightly rows but no row here. The maths
 -- is `rollUpWeek` in `lib/priceWeeks.ts`.
 --
 -- Shape: **additive.** One new table. It must exist before the nightly route
@@ -18,10 +19,10 @@
 -- re-tuned later (TEC-138) against the real nights.
 --
 -- `week_start` is the **Monday** of the week rolled up (the check refuses any
--- other day). A week is rolled up once, on the Monday after it. **A Monday the
--- cron missed leaves that week without a row**: the roll-up is derived, but the
--- run is a schedule, not a repair job, and nothing here quietly fills it in
--- later.
+-- other day). A week is rolled up once, normally on the Monday after it. **A
+-- Monday the cron missed is caught up on the next run** (owner, 2026-10-24),
+-- from the nightly rows that exist: the roll-up is derived, so catching up
+-- invents nothing, and a night that was missed stays a gap.
 --
 -- ## Columns
 --
@@ -78,6 +79,6 @@ alter table cookbook.price_weeks enable row level security;
 comment on table cookbook.price_weeks is
   'One row per saved product, store and Monday-to-Sunday week (TEC-132): low, high, mean and regular mean of the price, nights on sale and nights seen. Rolled up from price_nights on Mondays; insert only; the nightly rows are kept.';
 comment on column cookbook.price_weeks.week_start is
-  'The Monday of the week rolled up. A Monday the cron missed leaves that week without a row.';
+  'The Monday of the week rolled up. Normally rolled up on the Monday after; a missed Monday is caught up on the next run.';
 
 notify pgrst, 'reload schema';

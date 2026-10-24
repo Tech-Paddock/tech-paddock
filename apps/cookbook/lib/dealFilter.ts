@@ -5,12 +5,12 @@ import type { DealRow } from "./dealRows";
  * Coupon · Stacks, and Green · Neutral · Red. **Pure and type-only imports**,
  * because the browser runs it (`lib/dealRows.ts` pulls in server code).
  *
- * The colour filter is by colour: a product that is **new** (under four weeks
- * of history) has none yet, so it shows under Any and under none of the three.
+ * The colour filter is by light: a product that is **new** (under four weeks
+ * of history) has no colour yet, so it shows under Any and under New only.
  */
 
 export type Kind = "all" | "sale" | "coupon" | "stack";
-export type LightFilter = "any" | "green" | "neutral" | "red";
+export type LightFilter = "any" | "green" | "neutral" | "red" | "new";
 
 export type DealFilter = { query: string; kind: Kind; aisle: string; light: LightFilter };
 

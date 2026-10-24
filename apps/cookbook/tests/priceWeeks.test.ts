@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, denverDate, isoWeekday, mondayOf, weekToRollUp } from "@/lib/priceDates";
+import { addDays, denverDate, finishedWeeks, isoWeekday, mondayOf } from "@/lib/priceDates";
 import { effectivePrice, nightOnSale, rollUpWeek, type NightPrice } from "@/lib/priceWeeks";
 
 /** The Monday roll-up's maths (TEC-132). Made-up products and prices. */
@@ -40,11 +40,12 @@ describe("Denver dates", () => {
     expect(mondayOf("2026-10-26")).toBe("2026-10-26");
   });
 
-  it("rolls up only on a Monday, and the week that just ended", () => {
-    expect(weekToRollUp("2026-10-26")).toBe("2026-10-19");
-    for (const d of ["2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"]) {
-      expect(weekToRollUp(d)).toBeNull();
+  it("lists the finished weeks before the current one, oldest first, whatever day it is", () => {
+    // Monday to Sunday of the week of 10-26 are all in that week, which is not finished.
+    for (const d of ["2026-10-26", "2026-10-28", "2026-11-01"]) {
+      expect(finishedWeeks(d, 2)).toEqual(["2026-10-12", "2026-10-19"]);
     }
+    expect(finishedWeeks("2026-11-02", 2)).toEqual(["2026-10-19", "2026-10-26"]);
   });
 });
 

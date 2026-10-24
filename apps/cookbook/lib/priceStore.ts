@@ -116,6 +116,14 @@ export async function readWeeksSince(locationId: string, from: string): Promise<
   return rows.map(hydrateWeek);
 }
 
+/** The Mondays from `from` on that have at least one roll-up row, at any store. */
+export async function readRolledWeeks(from: string): Promise<Set<string>> {
+  const rows = await readAll("the weekly prices", (a, b) =>
+    getServiceClient().from("price_weeks").select("week_start").gte("week_start", from).order("week_start", { ascending: true }).range(a, b)
+  );
+  return new Set(rows.map((r) => String(r.week_start)));
+}
+
 /** One store's nights from `from` on (the Deals tab reads the last few). */
 export async function readNightsSince(locationId: string, from: string): Promise<NightRow[]> {
   const rows = await readAll("the nightly prices", (a, b) =>

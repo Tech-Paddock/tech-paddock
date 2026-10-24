@@ -11,7 +11,7 @@ import { ALL_AISLES, NO_FILTER, groupByAisle, matchesFilter, type DealFilter, ty
  * recorded; nothing here calls Kroger.**
  *
  * - search, the aisle chips (Kroger's own categories), **All · On sale ·
- *   Coupon · Stacks**, and **Any · Green · Neutral · Red**;
+ *   Coupon · Stacks**, and **Any · Green · Neutral · Red · New**;
  * - each row: the name, its usual price, the sale and coupon tags, today's
  *   price, the stoplight's reason and an 8-week trend (the last bar is today);
  * - a product with under four weeks of history reads "new: building history",
@@ -38,6 +38,7 @@ const LIGHTS: [LightFilter, string][] = [
   ["green", "Green"],
   ["neutral", "Neutral"],
   ["red", "Red"],
+  ["new", "New"],
 ];
 
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -205,7 +206,7 @@ export default function DealsTab({ refreshKey = 0 }: { refreshKey?: number }) {
             </button>
           ))}
         </div>
-        <div role="group" aria-label="Colour" className="grid grid-cols-4 gap-1 rounded-xl bg-raised p-1">
+        <div role="group" aria-label="Colour" className="grid grid-cols-5 gap-1 rounded-xl bg-raised p-1">
           {LIGHTS.map(([id, label]) => (
             <button
               key={id}
@@ -258,7 +259,7 @@ export default function DealsTab({ refreshKey = 0 }: { refreshKey?: number }) {
 
       <p className="px-2 text-[11px] text-ink-soft">
         Prices are Kroger&rsquo;s at your store, recorded every night about 3 a.m. Denver time; a missed night is a gap, never filled in.
-        Green is at or below a product&rsquo;s 12-week low, or 15% or more under its usual; red is 10% or more over, even on sale.
+        Green is 15% or more under a product&rsquo;s usual price, or at its 12-week low and under its usual; red is 10% or more over, even on sale.
         Coupons come only from your own Chrome task, once it has run.
       </p>
     </section>

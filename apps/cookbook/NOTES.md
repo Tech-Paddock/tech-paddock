@@ -251,9 +251,13 @@ Reasoning is in the migration headers.
   counts only.
 - **Rerun the same night is a no-op**: the first reading stands, and the body says
   `alreadyRecorded`. A missed night is never backfilled.
-- **Monday roll-up**: on a Monday (Denver) the same run rolls up the week that just ended
-  (Monday to Sunday; `weekToRollUp`, `rollUpWeek`), also when Kroger failed that night. **A missed
-  Monday leaves that week without a row**; nothing fills it in later.
+- **Roll-up** (`rollUpWeek`): every run rolls up each finished Monday-to-Sunday week, looking back
+  `CATCH_UP_WEEKS` (12), that has nightly rows and no `price_weeks` row at all (`readRolledWeeks`,
+  one read; the check is per week, not per product). Normally that is the week that ended
+  yesterday; **a missed Monday is caught up on the next run** from the nights that exist, and a
+  missed night stays a gap (owner, 2026-10-24). Idempotent (insert ignores a conflict, and a
+  rolled week is skipped). It runs even when Kroger failed. The current week is never rolled up. A
+  week with no nights makes no row and is looked at again until it ages out of the look-back.
 - **The gate carries the one exception**: `proxy.ts` (every app, byte-identical) lets exactly
   `/api/cron/prices` through without a session only with the bearer secret, refuses when
   `CRON_SECRET` is unset or under 32 characters, and 401s everything else on that path, a session
@@ -270,7 +274,7 @@ Reasoning is in the migration headers.
   as unpriced, never shown. Before the first nightly run, the list tab's latest deal scan fills in
   the products it found on sale (same store, within three days), with no history. No Kroger call.
   `lib/dealFilter.ts` is the browser's half (search, All / On sale / Coupon / Stacks, Any / Green /
-  Neutral / Red, aisle); a **new** product shows under Any and under none of the colours. A coupon
+  Neutral / Red / New, aisle); a **new** product shows under Any and under New, none of the three colours. A coupon
   matches by product code only. Coupon and Stacks say "no coupons staged yet" until a coupon row
   exists.
 - The tab's rows, chips, colour mark and trend bars are local patterns in `app/DealsTab.tsx`; the
@@ -448,8 +452,8 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 - **`CRON_SECRET` must be set in `tp-cookbook` (32+ characters)**: unset or short, the gate and the
   route both refuse, and Vercel Cron's call is a 401 every night. Nothing else breaks, so it is easy
   to miss; the first Deals tab is simply empty.
-- **A product whose price never moves reads green** (it is always at its own 12-week low). That is
-  the rule as approved; whether it should is TEC-138's.
+- **A product whose price never moves reads neutral**: green needs it below its mean as well as at
+  its low (owner's amendment, 2026-10-24).
 - Vercel Cron does not retry a failed run, and it may fire anywhere inside its hour on some plans:
   09:00 UTC stays on the same Denver date either way. The Denver clock change moves the run between
   03:00 and 02:00 local, not the night.
