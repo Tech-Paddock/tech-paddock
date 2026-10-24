@@ -46,8 +46,9 @@ What is true now, and the traps. Branch and pull request state is never written 
   branch; a stacked branch carrying the old name brings it back.
 - **The Supabase connector cannot run destructive SQL.** `apply_migration` or `execute_sql` with a
   `DROP` times out at 60s, while additive DDL goes through at once; a timed-out drop may still
-  land later. The owner runs drops in the SQL Editor, with the `schema_migrations` row in the same
-  transaction (`supabase/README.md`).
+  land later. Design around the DROP (a function-backed check, widened by `create or replace`, as
+  `lando.details_ok`) and give a swap `lock_timeout`; the owner's SQL Editor run is the last resort,
+  after a read-back shows it did not land (`supabase/README.md`, owner 2026-10-24).
 - **Dropping an exposed schema takes down every app** (PGRST002) until the API's schema list loses
   it. The live list is under Project Settings → API; the Integrations → Data API page can show a
   clean list while the API still serves the old one. Clean that list first, prove it (rename the
