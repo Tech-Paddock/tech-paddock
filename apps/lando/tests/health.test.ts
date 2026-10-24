@@ -147,18 +147,33 @@ describe("the fixed lists", () => {
     ]);
   });
 
-  it("are the same lists the migration's check holds (a value in the app alone fails every save)", () => {
-    const dir = resolve(__dirname, "../../../supabase/migrations");
+  const dir = resolve(__dirname, "../../../supabase/migrations");
+  const migration = () => {
     const file = readdirSync(dir).find((f) => f.endsWith("_lando_health_events.sql"));
     expect(file).toBeDefined();
-    const sql = readFileSync(resolve(dir, file!), "utf8");
+    return readFileSync(resolve(dir, file!), "utf8");
+  };
+
+  it("are the same lists lando.details_ok holds (a value in the app alone fails every save)", () => {
+    const sql = migration();
+    // Read from the function body, not the header comments.
+    const start = sql.indexOf("create or replace function lando.details_ok(kind");
+    expect(start).toBeGreaterThan(0);
+    const fn = sql.slice(start, sql.indexOf("$fn$;", start));
     const quoted = (ids: readonly string[]) => `[${ids.map((id) => `"${id}"`).join(", ")}]`;
-    expect(sql).toContain(quoted(VET_REASONS.map(([id]) => id)));
-    expect(sql).toContain(quoted(ISSUE_PICKS.map(([id]) => id)));
-    expect(sql).toContain(`BETWEEN 1 AND ${MAX_PHOTOS}`);
-    expect(sql).toContain("'health'");
-    // The path pattern in the check is the code's, with the dot as [.] for jsonpath.
-    expect(sql).toContain(PHOTO_PATH.source.replace(/\\\//g, "/").replace("\\.", "[.]"));
+    expect(fn).toContain(quoted(VET_REASONS.map(([id]) => id)));
+    expect(fn).toContain(quoted(ISSUE_PICKS.map(([id]) => id)));
+    expect(fn).toContain(`BETWEEN 1 AND ${MAX_PHOTOS}`);
+    expect(fn).toContain("WHEN 'health' THEN");
+    // The path pattern in the function is the code's, with the dot as [.] for jsonpath.
+    expect(fn).toContain(PHOTO_PATH.source.replace(/\\\//g, "/").replace("\\.", "[.]"));
+  });
+
+  it("the migration can apply through the connector: fails fast, and drops no table, column or function", () => {
+    const code = migration().replace(/--.*$/gm, "");
+    expect(code.trimStart().startsWith("set local lock_timeout = '5s';")).toBe(true);
+    expect(code).not.toMatch(/drop\s+(table|column|function|schema)/i);
+    expect(code).toMatch(/CHECK \(lando\.details_ok\(kind, details\)\)/);
   });
 });
 

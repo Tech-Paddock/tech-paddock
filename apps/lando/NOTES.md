@@ -123,10 +123,10 @@
   `{type: walk|playtime|training, where, with_dogs, minutes, treats, commands?, dogs?}` (commands
   on training only, from the fixed list `COMMANDS`; `dogs` is 1 to 20 `lando.dogs` ids, only when
   `with_dogs` is true); weight `{value, unit}`. `parseDetails` checks these on the phone (before
-  the sheet closes) and again on the server; the database's `events_details_shape` check
-  (migration `widen_lando_potty_none`, which replaced `widen_lando_events_details_shape`'s) holds
-  the same shapes (`health` was added by migration `lando_health_events`, which replaced both
-  that check and the kind check). Entries from before
+  the sheet closes) and again on the server; the database holds the same shapes in the SQL
+  function `lando.details_ok(kind, details)`, which `events_details_shape` calls (migration
+  `lando_health_events` moved the check there, from `widen_lando_potty_none`'s, and added
+  `health`; the kind test is inside the function, and `events_kind_check` is gone). Entries from before
   `leash` and `dogs` (TEC-125) have neither: "pee", and "with several dogs" (see Other dogs).
 - **No potty** (`what: "none"`, TEC-129; the owner's label, POTTY_WHAT_LABELS): a trip out with
   nothing done. It keeps Where and, outside, Leash, like any potty. It resets neither the pee nor
@@ -232,20 +232,26 @@
   `retired: true`, or its old entries can no longer be corrected (the server refuses an unknown
   `item_id`). Changing a name or calorie figure is safe; old entries keep their snapshot. A new id
   must match `^[a-z0-9-]{1,60}$` or the database refuses it.
-- **A new detail field needs three edits:** `parseDetails` in `lib/events.ts`, the
-  `events_details_shape` check (a new migration; see the swap trap below), and the tests. The
-  check allows no unknown key, so a field added in the app alone fails every save with a 503.
-- **`events_details_shape` is replaced by a DROP and an ADD in one ALTER**, and the connector
-  cannot run a DROP. Any further widening is a new migration the owner runs in the SQL Editor
-  inside `begin; … commit;` with its `schema_migrations` row, as
-  `widen_lando_events_details_shape` and `widen_lando_potty_none` were. Copy the whole current
-  check into it (now `lando_health_events`'s): the ADD replaces every shape, not just the one
-  that changes.
-- **The health lists are in two places:** `VET_REASONS` and `ISSUE_PICKS` in `lib/events.ts` and the
-  `events_details_shape` check in `lando_health_events`; `tests/health.test.ts` reads the migration
-  and fails if they differ. The kind list is in a third, `events_kind_check`, which that migration
-  replaces too (its name was read back from a scratch Postgres, not from production). Add a
-  reason as a new migration that copies the whole current check.
+- **A new detail field needs three edits:** `parseDetails` in `lib/events.ts`, `lando.details_ok`
+  (a new migration; see the next trap), and the tests. The function allows no unknown key, so a
+  field added in the app alone fails every save with a 503. A new kind is a branch in the same
+  function: an unknown kind has none, so it is refused.
+- **Widen `lando.details_ok` with `create or replace function`, and only ever widen.** The
+  constraint `events_details_shape` just calls it, so a widening is a new migration holding the
+  function's whole current body (`lando_health_events`'s, or the latest after it) with the one
+  list or shape grown: no DROP, no constraint swap, and it goes through the connector. Replacing
+  the function does **not** re-check existing rows, so a function that narrows would leave rows the
+  database now calls invalid, and nothing would say so. Narrowing (removing a value, requiring a
+  new key) needs a validated swap: a NOT VALID constraint calling a new function, the failing rows
+  fixed or voided, VALIDATE, then drop the old one. Start a migration with
+  `set local lock_timeout = '5s';` so a busy table fails fast. The older swaps
+  (`widen_lando_events_details_shape`, `widen_lando_potty_none`) were DROP and ADD in one ALTER run
+  by the owner in the SQL Editor; that path is retired.
+- **The health lists are in two places:** `VET_REASONS` and `ISSUE_PICKS` in `lib/events.ts` and
+  `lando.details_ok` (in `lando_health_events`, or its latest replacement);
+  `tests/health.test.ts` reads the lists out of the function body in that migration file and fails
+  if they differ. If a later migration widens a list, update the lists that test reads (point it
+  at the latest file defining the function).
 - **Photos are not rewritten or deleted:** the event holds paths only, and an entry never changes,
   so no code path removes an object. Anything that would (a cleanup of unreferenced photos) must
   first check every event, voided ones included, since a voided entry still names its photos.
@@ -253,8 +259,7 @@
   bucket cap at 4MB). The canvas downscale is what keeps a phone shot under it. If a browser
   cannot decode the file (a HEIC on a browser that cannot read it), the photo fails with the
   reason and Retry will fail again until it is removed.
-- **The potty `what` list is in two places:** `POTTY_WHAT` in `lib/events.ts` and the
-  `events_details_shape` check. A value in the app alone fails every save of it with a 503.
+- **The potty `what` list is in two places:** `POTTY_WHAT` in `lib/events.ts` and `lando.details_ok`. A value in the app alone fails every save of it with a 503.
 - **The dogs check is a jsonpath filter in `strict` mode.** A CHECK cannot hold a subquery, so each
   id is tested with `jsonb_path_exists`; lax mode unwraps nested arrays and would let `[[id]]`
   through.
@@ -266,8 +271,7 @@
   table is fine.
 - **Never parse a weight's date with `new Date("YYYY-MM-DD")`**: that is UTC midnight, the day
   before west of Greenwich. `fromDateInput` builds local noon from the parts.
-- The training command list is in two places: `COMMANDS` in `lib/events.ts` and the
-  `events_details_shape` check. Add a command to both.
+- The training command list is in two places: `COMMANDS` in `lib/events.ts` and `lando.details_ok`. Add a command to both.
 - Tailwind's `flex` beats the `hidden` attribute, so the tab panels also switch their class.
 - **The When field is a label over a transparent `datetime-local`** (`app/LogForm.tsx`). The native
   control is wider than half a phone and pushed into Human, so the form shows `whenLabel`
