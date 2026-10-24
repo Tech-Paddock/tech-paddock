@@ -15,6 +15,7 @@ import {
   feedDays,
   food as asFood,
   formOf,
+  health as asHealth,
   formatAgo,
   isAccident,
   latestWeight,
@@ -72,9 +73,9 @@ const isLogBody = (b: unknown): b is LogBody =>
 
 /**
  * Two tabs, Log and Analytics, opening on Log (charter, Scope: the owner's
- * override, 2026-10-20). Log: since-last pills, who is logging, five section
+ * override, 2026-10-20). Log: since-last pills, who is logging, six section
  * buttons that each open a short form with defaults (Potty, Food, Fun,
- * Training, Weight; TEC-136), and a feed of every loaded day, by when each
+ * Training, Weight, Health; TEC-136, TEC-137), and a feed of every loaded day, by when each
  * entry happened, with a filter matching the buttons. Analytics: the last
  * fourteen days and the growth chart.
  *
@@ -96,6 +97,8 @@ export default function Journal() {
   const [open, setOpen] = useState<Open>(null);
   // The feed shows one form's entries, or all when null (TEC-129, TEC-136). Not remembered.
   const [only, setOnly] = useState<FormKind | null>(null);
+  // Signed URLs of health photos by storage path: the read's, plus every upload this session made.
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
@@ -112,6 +115,7 @@ export default function Journal() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setLoaded({ events: data.events, people: data.people, dogs: data.dogs ?? [] });
+      setPhotoUrls((prev) => ({ ...prev, ...(data.photos ?? {}) }));
       setLoadError(null);
     } catch (e) {
       // Keep whatever was on screen; say it may be stale. Never blank it.
@@ -247,6 +251,10 @@ export default function Journal() {
       return { dog: null, error: e instanceof TypeError ? "no connection" : (e as Error).message };
     }
   }
+
+  const rememberPhotoUrl = useCallback((path: string, url: string) => {
+    setPhotoUrls((prev) => ({ ...prev, [path]: url }));
+  }, []);
 
   function remember(body: LogBody) {
     const next = { ...remembered };
@@ -437,13 +445,12 @@ export default function Journal() {
           </section>
           {personError && !askWho && <p className="-mt-3 text-sm text-urgent">{personError}</p>}
 
-          {/* Five sections, each opening its form */}
+          {/* Six sections, each opening its form, two rows of three (TEC-137):
+              Potty, Food, Fun / Training, Weight, Health. The Weight button
+              wears the newest weight; its date is in the title and for screen readers. */}
           <section aria-label="Log">
             <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Log</h2>
-            {/* Five across on a phone, one row (TEC-123, TEC-136): Fun and
-                Training replace Exercise. The Weight button wears the newest
-                weight; its date is in the title and for screen readers. */}
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               {(["potty", "food", "fun", "training"] as const).map((k) => (
                 <button
                   key={k}
@@ -451,7 +458,7 @@ export default function Journal() {
                   onClick={() => setOpen({ form: k })}
                   className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-0.5 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
                 >
-                  <b className="truncate text-[13px] leading-tight">{FORM_LABELS[k]}</b>
+                  <b className="truncate text-[15px] leading-tight">{FORM_LABELS[k]}</b>
                 </button>
               ))}
               <button
@@ -460,13 +467,20 @@ export default function Journal() {
                 title={weightNote ?? undefined}
                 className="flex min-h-[52px] min-w-0 flex-col items-center justify-center rounded-xl bg-raised px-0.5 py-1.5 text-ink shadow-[0_3px_0_rgb(var(--line-rgb))] active:translate-y-0.5 active:shadow-[0_1px_0_rgb(var(--line-rgb))]"
               >
-                <b className="truncate text-[13px] leading-tight">Weight</b>
+                <b className="truncate text-[15px] leading-tight">Weight</b>
                 {weightFace && (
                   <span aria-hidden="true" className="truncate text-[12px] leading-tight tabular-nums text-ink-soft">
                     {weightFace}
                   </span>
                 )}
                 {weightNote && <span className="sr-only">, {weightNote}</span>}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen({ form: "health" })}
+                className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-0.5 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
+              >
+                <b className="truncate text-[15px] leading-tight">{FORM_LABELS.health}</b>
               </button>
             </div>
           </section>
@@ -559,6 +573,23 @@ export default function Journal() {
                               <b className={`mr-1.5 ${accident ? "text-danger" : ""}`}>{title}</b>
                               <span className="text-sm text-ink-soft">{detail}</span>
                               {e.note && <span className="block text-sm text-ink-soft">“{e.note}”</span>}
+                              {e.kind === "health" && (asHealth(e).photos?.length ?? 0) > 0 && (
+                                <span className="mt-1 flex gap-1">
+                                  {asHealth(e).photos!.slice(0, 4).map((path, i) =>
+                                    photoUrls[path] ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img key={path} src={photoUrls[path]} alt={`Photo ${i + 1}`} loading="lazy" className="h-10 w-10 rounded-md border border-line object-cover" />
+                                    ) : (
+                                      <span key={path} className="grid h-10 w-10 place-items-center rounded-md border border-line text-[10px] leading-tight text-ink-soft">
+                                        No photo
+                                      </span>
+                                    )
+                                  )}
+                                  {asHealth(e).photos!.length > 4 && (
+                                    <span className="self-center text-[13px] text-ink-soft">+{asHealth(e).photos!.length - 4}</span>
+                                  )}
+                                </span>
+                              )}
                             </span>
                             <span className="whitespace-nowrap text-[13px] text-ink-soft">{nameOf(e.person_id)}</span>
                           </button>
@@ -585,6 +616,8 @@ export default function Journal() {
             dogs={dogs}
             onAddDog={addDog}
             phonePerson={person?.id ?? null}
+            photoUrls={photoUrls}
+            onPhotoUrl={rememberPhotoUrl}
             remembered={remembered}
             weightUnit={weightUnit}
             onLog={logNew}

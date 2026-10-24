@@ -10,6 +10,8 @@ import {
   EXERCISE_LABELS,
   FORM_LABELS,
   FUN_TYPES,
+  HEALTH_LABELS,
+  HEALTH_TYPES,
   InvalidEvent,
   describe,
   dogsFromPick,
@@ -22,6 +24,8 @@ import {
   UNITS,
   exercise as asExercise,
   food as asFood,
+  health as asHealth,
+  healthOptions,
   parseDetails,
   potty as asPotty,
   treatEntry,
@@ -33,6 +37,7 @@ import {
   type Leash,
   type ExerciseType,
   type FormKind,
+  type HealthType,
   type JournalEvent,
   type LogKind,
   type Unit,
@@ -40,6 +45,7 @@ import {
 import { amountOptions, picklist, findFood, unitLabel, type FoodType } from "@/lib/foods";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import AmountScroller from "./AmountScroller";
+import PhotoPicker, { usePhotos } from "./Photos";
 import Sheet from "./Sheet";
 import { dateLabel, fromDateInput, fromLocalInput, toDateInput, toLocalInput, whenLabel } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
@@ -70,6 +76,10 @@ type Props = {
   /** Other dogs' "Add dog…": adds one to `lando.dogs` (or finds it) and hands it back. */
   onAddDog: (name: string) => Promise<{ dog: Dog | null; error: string | null }>;
   phonePerson: string | null;
+  /** Signed URLs by storage path, for the photos an entry being corrected already has. */
+  photoUrls: Record<string, string>;
+  /** A photo just uploaded: its signed URL, kept so the feed can show it once the entry is saved. */
+  onPhotoUrl: (path: string, url: string) => void;
   remembered: Remembered;
   weightUnit: Unit;
   /**
@@ -183,6 +193,8 @@ export default function LogForm({
   dogs,
   onAddDog,
   phonePerson,
+  photoUrls,
+  onPhotoUrl,
   remembered,
   weightUnit,
   onLog,
@@ -248,6 +260,19 @@ export default function LogForm({
   const w = event?.kind === "weight" ? asWeight(event) : null;
   const [value, setValue] = useState(w ? String(w.value) : "");
   const [unit, setUnit] = useState<Unit>(w?.unit ?? remembered.unit ?? weightUnit);
+
+  // Health (TEC-137): a vet visit or a medical issue, picks from a fixed list, photos on both.
+  const h = event?.kind === "health" ? asHealth(event) : null;
+  const [healthType, setHealthType] = useState<HealthType>(h?.type ?? "vet");
+  const [reasons, setReasons] = useState<string[]>(h?.reasons ?? []);
+  // A correction opens with the photos the entry has and keeps whatever is not removed.
+  const photos = usePhotos(h?.photos ?? [], photoUrls, onPhotoUrl);
+
+  function pickHealthType(t: HealthType) {
+    setHealthType(t);
+    // The lists differ; a pick both lists share ("Other") survives the switch.
+    setReasons((r) => r.filter((id) => healthOptions(t).some(([v]) => v === id)));
+  }
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -324,12 +349,19 @@ export default function LogForm({
         };
       case "weight":
         return { value: Number(value.replace(",", ".")), unit };
+      case "health":
+        return { type: healthType, reasons, ...(photos.paths.length ? { photos: photos.paths } : {}) };
     }
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    // Never saved around a photo: it is uploaded, or the person removes it.
+    if (kind === "health" && (photos.working || photos.failed)) {
+      setError(photos.failed ? "A photo didn't upload — retry it, or remove it." : "A photo is still uploading.");
+      return;
+    }
     let details: Details;
     try {
       // The same check the server makes, so a mistake is caught before the sheet closes.
@@ -391,7 +423,9 @@ export default function LogForm({
   }
 
   // "Save walk", "Save playtime", "Save training", "Save potty"…
-  const title = form === "fun" ? EXERCISE_LABELS[exType] : FORM_LABELS[form];
+  const title =
+    form === "fun" ? EXERCISE_LABELS[exType] : form === "health" ? HEALTH_LABELS[healthType] : FORM_LABELS[form];
+  const photoBlock = kind === "health" && (photos.working || photos.failed);
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3" noValidate>
@@ -634,6 +668,30 @@ export default function LogForm({
         </div>
       )}
 
+      {kind === "health" && (
+        <>
+          <Field label="Type">
+            <Seg
+              name="health-type"
+              label="Type"
+              value={healthType}
+              onChange={pickHealthType}
+              options={HEALTH_TYPES.map((t) => [t, HEALTH_LABELS[t]] as const)}
+            />
+          </Field>
+          <Field label={healthType === "vet" ? "Why (pick any)" : "What (pick any)"}>
+            <Chips
+              key={healthType}
+              label={healthType === "vet" ? "Reasons for the vet visit" : "Medical issue"}
+              options={healthOptions(healthType)}
+              picked={reasons}
+              onChange={setReasons}
+            />
+          </Field>
+          <PhotoPicker photos={photos} />
+        </>
+      )}
+
       {/* When takes the row; Human is as wide as the longest name (TEC-129). */}
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
         <Field label="When" htmlFor="f-when">
@@ -699,11 +757,19 @@ export default function LogForm({
 
       <button
         type="submit"
-        disabled={busy}
+        disabled={busy || photoBlock}
         data-autofocus={kind === "weight" && !editing ? undefined : true}
         className="rounded-[14px] bg-[var(--tone-2-bg)] px-4 py-3 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)] disabled:opacity-60"
       >
-        {busy ? "Saving…" : editing ? "Save changes" : `Save ${title.toLowerCase()}`}
+        {busy
+          ? "Saving…"
+          : photos.working && kind === "health"
+            ? "Uploading photo…"
+            : photos.failed && kind === "health"
+              ? "Fix the photo to save"
+              : editing
+                ? "Save changes"
+                : `Save ${title.toLowerCase()}`}
       </button>
       {editing ? (
         <button type="button" onClick={remove} disabled={busy} className="self-start py-1 font-semibold text-danger disabled:opacity-60">

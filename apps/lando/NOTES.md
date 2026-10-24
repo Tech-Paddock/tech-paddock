@@ -5,17 +5,41 @@
 - v2 on Next.js 16: two tabs under the app bar, **Log** and **Analytics**, sticky, opening on Log
   (the owner's override of the one-screen rule, in RULES.md).
 - **Log**: four since-last pills in one row (pee, poop, food, exercise; label over value, the
-  clock time in the title and for screen readers; unchanged by TEC-136), "Logging as", five
-  section buttons in one row (TEC-136: Potty, Food, Fun, Training, Weight; 13px labels, 52px
-  tall; the Weight button shows the newest weight on its face, "7.3 lb", with its date still in
-  the title and screen-reader text), then the **Feed** under five filter chips. No growth chart
+  clock time in the title and for screen readers; unchanged by TEC-136), "Logging as", six
+  section buttons in two rows of three (TEC-137: Potty, Food, Fun / Training, Weight, Health;
+  15px labels, 52px tall; the Weight button shows the newest weight on its face, "7.3 lb", with
+  its date still in the title and screen-reader text), then the **Feed** under six filter chips. No growth chart
   on Log since TEC-129: it lives in Analytics only. Each button opens a bottom sheet
   (`app/Sheet.tsx`) with that form (`app/LogForm.tsx`, prop `form`), defaults filled in, so Save
   is usually the only other tap. Tapping a feed row opens the matching form on that entry to
   correct or delete it.
+- **Health** (TEC-137): a sixth form, kind `health`, with a Type of **Vet visit** or **Medical
+  issue**, reasons to pick (several, at least one) from a fixed list per type (`VET_REASONS`,
+  `ISSUE_PICKS` in `lib/events.ts`), up to `MAX_PHOTOS` (6) photos, and the usual When, Human and
+  Note. Switching the Type keeps only the picks the other list shares ("Other"). The feed reads
+  "Vet visit  Wellness check-up, Vaccines · 2 photos" with up to four 40px thumbnails; the chip
+  is Health; a correction opens the form on the entry's type, picks and photos. Analytics and the
+  since-last pills ignore it. `details`: `{type: vet|issue, reasons[], photos?[]}`; the note is the
+  event's own `note`.
+- **Health photos** (TEC-137): private Storage bucket `lando-photos` (migration
+  `create_lando_photos_bucket`), written only by `POST /api/photos` with the service role and
+  shown only through signed URLs; an event stores only the path, `health/<uuid>.<jpg|png|webp>`
+  (`PHOTO_PATH`). The phone shrinks each photo through a canvas first (`lib/image.ts`, a local
+  copy of Coffee's; 1568px, jpeg) and uploads it the moment it is picked (`app/Photos.tsx`, a
+  local pattern: Take photo opens the camera, Choose photos the library). Each photo is
+  uploading, failed (it stays on screen with Retry and ✕) or done; **Save is disabled until every
+  photo is done**, and the server refuses an entry naming a path with no object behind it
+  (`writeEvent` -> `missingPhotos`), so an entry never shows as saved without its photos. The
+  phone chooses each photo's id, so a retry is the same object (upload is an upsert). `GET
+  /api/journal` returns `photos`, a path -> signed URL map for the live health entries (an hour);
+  the screen adds each upload's URL as it happens, and a path that could not be signed reads "No
+  photo" / "Photo unavailable", never a blank. A correction keeps the photos it does not remove
+  and the voided entry keeps all of its own; a delete is a void. **Nothing is ever deleted from
+  the bucket**, so a photo removed in a correction, discarded with an unsaved entry, or uploaded
+  and abandoned stays there, unreferenced.
 - **Fun and Training** (TEC-136) replace the Exercise button. Both save kind `exercise` with the
   existing `type`; the data shape did not change. `FORM_KINDS`, `kindOfForm` and `formOf`
-  (`lib/events.ts`) map between the five forms and the four kinds: a walk or playtime is Fun, a
+  (`lib/events.ts`) map between the six forms and the five kinds: a walk or playtime is Fun, a
   training is Training. Fun's Type offers Walk and Playtime only (`FUN_TYPES`); Training has no
   Type and always has Commands practised. A correction opens the form its entry belongs to, so a
   walk cannot be corrected into a training or back. Pills and Analytics still say "exercise".
@@ -27,7 +51,7 @@
   (`happenedAt`), whatever time an older one was logged at, and shows no clock time (the heading
   is its day). Ties: unsaved rows first, then the later save. Unsaved rows sit in their day like
   any other, with Saving… or Not saved, Retry and ✕.
-- **The feed's filter**: chips Potty, Food, Fun, Training, Weight (`FORM_KINDS`, matching the
+- **The feed's filter**: chips Potty, Food, Fun, Training, Weight, Health (`FORM_KINDS`, matching the
   buttons), across every day. Tap one to show only that form's entries (unsaved rows too), tap
   it again for all. Food covers meals and treats. Held in memory, not remembered. Empty reads
   "Nothing logged yet." or, under a chip, "No training entries yet." (`emptyFeedText`).
@@ -92,7 +116,7 @@
 
 ## How it works
 
-- **Four kinds plus `void`** (`lib/events.ts`). `details` per kind, every key required unless
+- **Five kinds plus `void`** (`lib/events.ts`; `health` is described under State). `details` per kind, every key required unless
   marked `?`: potty `{what: pee|poop|both|none, where: outside|inside, leash?: leashed|unleashed|pen}`
   (inside = an accident: warned in the form, red in the feed, counted apart in Analytics;
   `leash` only when outside); food `{type, item_id, item_name, kcal_per, unit, amount}`; exercise
@@ -101,7 +125,8 @@
   `with_dogs` is true); weight `{value, unit}`. `parseDetails` checks these on the phone (before
   the sheet closes) and again on the server; the database's `events_details_shape` check
   (migration `widen_lando_potty_none`, which replaced `widen_lando_events_details_shape`'s) holds
-  the same shapes. Entries from before
+  the same shapes (`health` was added by migration `lando_health_events`, which replaced both
+  that check and the kind check). Entries from before
   `leash` and `dogs` (TEC-125) have neither: "pee", and "with several dogs" (see Other dogs).
 - **No potty** (`what: "none"`, TEC-129; the owner's label, POTTY_WHAT_LABELS): a trip out with
   nothing done. It keeps Where and, outside, Leash, like any potty. It resets neither the pee nor
@@ -214,8 +239,20 @@
   cannot run a DROP. Any further widening is a new migration the owner runs in the SQL Editor
   inside `begin; … commit;` with its `schema_migrations` row, as
   `widen_lando_events_details_shape` and `widen_lando_potty_none` were. Copy the whole current
-  check into it (now `widen_lando_potty_none`'s): the ADD replaces every shape, not just the one
+  check into it (now `lando_health_events`'s): the ADD replaces every shape, not just the one
   that changes.
+- **The health lists are in two places:** `VET_REASONS` and `ISSUE_PICKS` in `lib/events.ts` and the
+  `events_details_shape` check in `lando_health_events`; `tests/health.test.ts` reads the migration
+  and fails if they differ. The kind list is in a third, `events_kind_check`, which that migration
+  replaces too (its name was read back from a scratch Postgres, not from production). Add a
+  reason as a new migration that copies the whole current check.
+- **Photos are not rewritten or deleted:** the event holds paths only, and an entry never changes,
+  so no code path removes an object. Anything that would (a cleanup of unreferenced photos) must
+  first check every event, voided ones included, since a voided entry still names its photos.
+- **The photo upload is one request under Vercel's body limit** (about 4.5MB; the route and the
+  bucket cap at 4MB). The canvas downscale is what keeps a phone shot under it. If a browser
+  cannot decode the file (a HEIC on a browser that cannot read it), the photo fails with the
+  reason and Retry will fail again until it is removed.
 - **The potty `what` list is in two places:** `POTTY_WHAT` in `lib/events.ts` and the
   `events_details_shape` check. A value in the app alone fails every save of it with a 503.
 - **The dogs check is a jsonpath filter in `strict` mode.** A CHECK cannot hold a subquery, so each
