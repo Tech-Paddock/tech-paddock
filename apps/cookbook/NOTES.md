@@ -7,13 +7,14 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 - Next 16, React 19. Gate: `proxy.ts`, Node runtime, base copy; `drift` fails a `middleware.ts`.
 - Tabs in `lib/tabs.ts`, rendered by `app/Cookbook.tsx` as one scrolling row of pills: `/`
   Recipes, `/add` (`AddRecipe.tsx`), `/list` (signed out, it round-trips `/login?from=/list`),
-  `/brands` Your brands (`Brands.tsx`, TEC-131). All panels stay mounted; a send or refresh on the
+  `/brands` Your brands (`Brands.tsx`, TEC-131), `/deals` Deals (`DealsTab.tsx`, TEC-132). All panels stay mounted; a send or refresh on the
   list bumps Your brands, and an edit in Your brands reloads the list. Results are toasts; a failed
   read stays inline.
 - **The look is the owner's mockup of 2026-10-23** (TEC-135; the canvas is linked from TEC-135):
   bold headings with a one-line count under them, cards on `bg-surface` with no border, segmented
   switches on `bg-raised`, uppercase section headings, sticky action bars at the bottom. Theme
-  tokens only; the mock's peach and green stood in for the livery. Deals (TEC-132) is not built.
+  tokens only; the mock's peach and green stood in for the livery. Deals (TEC-132) follows the same
+  look (`Deals.dc.html` in the same canvas): green is the livery's accent, red its danger.
 - Install icon: `app/apple-touch-icon.png` (No. 12, full-bleed) with `appleWebApp` metadata; its
   colours are fixed in dark mode too.
 - No GET route is cached; caching would serve Health stale servings.
@@ -94,6 +95,18 @@ Reasoning is in the migration headers.
   which a Tidy moves onto the merged line before deleting the old ones. Signed quantity: `sent`
   and `refused` positive, `taken_back` negative; the sum per line, UPC and modality is what Take
   back removes. `item_id` is set null when a line is cleared, and those rows are never taken back.
+- `price_nights` (TEC-132): one row per saved product, **store and Denver night**, insert only,
+  unique on all three (`lib/priceStore.ts`, `on conflict do nothing`). `regular` and `sale`
+  (Kroger sends 0 for no promo; read as null), `in_stock`, `aisle` (Kroger's first category, which
+  the Deals tab groups by). A row needs a price (check); no product code foreign key, so forgetting
+  a product keeps its history.
+- `price_weeks` (TEC-132): the Monday roll-up, one row per product, store and Monday, insert only:
+  `low`, `high`, `mean` (4 places), `regular_mean`, `nights_on_sale`, `nights_seen`. Nightly rows
+  are never deleted.
+- `coupons` (TEC-132): **read path only** (`lib/couponStore.ts`; nothing writes it yet): `title`,
+  `amount` text as shown, `expires_on`, `week_seen` (a Monday), `product_ids` text[] (codes; may be
+  empty). Unique per week seen, title and amount. No expiry counts as active for two weeks
+  (`lib/couponRules.ts`).
 - `deal_scans`: one row per deal scan, insert only (`lib/dealStore.ts`). Deals, unpriced names and
   failures are jsonb arrays; the store is copied onto the row, so a store change never rewrites
   an old scan.
@@ -180,7 +193,7 @@ Reasoning is in the migration headers.
   before the ledger and is skipped, with a pointer to the cart page. The summary always says
   anything added elsewhere is still there; any failure shows the `CHECKOUT_URL` link. The button
   and confirm are local patterns in `app/Cart.tsx`.
-- Refresh: `lib/refresh.ts`, `POST /api/kroger/refresh`, triggered by `lib/refreshDue.ts`. No cron.
+- Refresh: `lib/refresh.ts`, `POST /api/kroger/refresh`, triggered by `lib/refreshDue.ts`. No cron of its own (the nightly price scan, below, is separate).
   Every saved code in one `productsByIds` (50 per request); a code absent from the answer is
   flagged (`missing_since` kept from the first time) and Kroger is searched by its `description`
   (else its first name), ten results, for the **closest by name** (`closestProduct`: shared words
@@ -223,6 +236,45 @@ Reasoning is in the migration headers.
 - `Cart.tsx` runs every token-borrowing request through `serial`, one at a time: opening the list
   can start a refresh and a scan together. The toggle, estimate panel and deal rows are local
   patterns in `app/Deals.tsx`.
+
+## Deals (TEC-132)
+
+- **Nightly scan.** `vercel.json` has the cron `0 9 * * *` on `/api/cron/prices`: 09:00 UTC, which
+  is **03:00 Denver in daylight time and 02:00 in standard**, always the same Denver date. A
+  *night* is that Denver date (`denverDate`, `lib/priceDates.ts`). The route is GET only (what
+  Vercel Cron sends, with `Authorization: Bearer <CRON_SECRET>`); `lib/priceRun.ts` does the work.
+  It reads the connection row for the **store only** and signs in with Kroger's client-credentials
+  token (`appToken`, scope `product.compact`; needs `KROGER_CLIENT_ID` and `KROGER_CLIENT_SECRET`,
+  not `KROGER_TOKEN_KEY`). Every saved code goes to `productsByIds` (fifty a request); a product
+  Kroger does not return, or returns with no price, gets **no row** (a gap, counted in the body).
+  A Kroger failure writes nothing and answers 502, so Vercel shows the run failed. The body is
+  counts only.
+- **Rerun the same night is a no-op**: the first reading stands, and the body says
+  `alreadyRecorded`. A missed night is never backfilled.
+- **Monday roll-up**: on a Monday (Denver) the same run rolls up the week that just ended
+  (Monday to Sunday; `weekToRollUp`, `rollUpWeek`), also when Kroger failed that night. **A missed
+  Monday leaves that week without a row**; nothing fills it in later.
+- **The gate carries the one exception**: `proxy.ts` (every app, byte-identical) lets exactly
+  `/api/cron/prices` through without a session only with the bearer secret, refuses when
+  `CRON_SECRET` is unset or under 32 characters, and 401s everything else on that path, a session
+  cookie included. The route checks again (`lib/cronAuth.ts`). `tests/gate.test.ts` is the same file
+  in every app.
+- **The stoplight** is `stoplight` (`lib/stoplight.ts`), one pure function: today's effective
+  price (sale if present, else regular) against the product's last 12 weeks of `price_weeks` at the
+  chosen store. Named constants `GREEN_UNDER_MEAN` (0.15), `RED_OVER_MEAN` (0.10), `MIN_WEEKS` (4),
+  `HISTORY_WEEKS` (12); TEC-138 reviews them. The mean is over nights (each week weighs its
+  `nights_seen`); the low is the lowest weekly low. Under four weeks is `new: building history`
+  with no colour. The note says the weeks it has ("at its 8-week low").
+- **The board** (`GET /api/deals`, `lib/dealBoard.ts` reads, `lib/dealRows.ts` builds): every saved
+  product whose latest night is within three nights of today at the chosen store; older is counted
+  as unpriced, never shown. Before the first nightly run, the list tab's latest deal scan fills in
+  the products it found on sale (same store, within three days), with no history. No Kroger call.
+  `lib/dealFilter.ts` is the browser's half (search, All / On sale / Coupon / Stacks, Any / Green /
+  Neutral / Red, aisle); a **new** product shows under Any and under none of the colours. A coupon
+  matches by product code only. Coupon and Stacks say "no coupons staged yet" until a coupon row
+  exists.
+- The tab's rows, chips, colour mark and trend bars are local patterns in `app/DealsTab.tsx`; the
+  trend is the last eight weekly means with today as the last bar.
 
 ## Your brands (TEC-131)
 
@@ -390,4 +442,18 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   total*; a line renamed by Tidy loses its tag the same way.
 - `withAccessToken` is per request: two tabs open at once can still race token rotation, because
   `serial` covers one page.
+- **`cookbook_price_nights`, `cookbook_price_weeks` and `cookbook_coupons` must be applied before
+  this code runs**: the nightly route writes the first two (and reads the first on Mondays), and the
+  Deals tab reads all three, so without them `/api/deals` answers 503 and the cron fails.
+- **`CRON_SECRET` must be set in `tp-cookbook` (32+ characters)**: unset or short, the gate and the
+  route both refuse, and Vercel Cron's call is a 401 every night. Nothing else breaks, so it is easy
+  to miss; the first Deals tab is simply empty.
+- **A product whose price never moves reads green** (it is always at its own 12-week low). That is
+  the rule as approved; whether it should is TEC-138's.
+- Vercel Cron does not retry a failed run, and it may fire anywhere inside its hour on some plans:
+  09:00 UTC stays on the same Denver date either way. The Denver clock change moves the run between
+  03:00 and 02:00 local, not the night.
+- Kroger sends categories as a list; the aisle is the first. A product with none is under "Other".
+- The cron route must stay GET and must stay out of any other gate exception; adding a second path
+  to the gate is shared auth plumbing (owner approval).
 - Never revive a merged `claude/cookbook-*` branch.
