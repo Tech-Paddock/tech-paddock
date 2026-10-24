@@ -5,6 +5,7 @@ import AddRecipe from "./AddRecipe";
 import Book from "./Book";
 import List from "./List";
 import Brands from "./Brands";
+import DealsTab from "./DealsTab";
 import { ToastProvider } from "./Toast";
 import { TABS, pathFor, type Tab } from "@/lib/tabs";
 import { cuisinesIn } from "@/lib/tuning";
@@ -107,6 +108,11 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
         <div role="tabpanel" id="panel-brands" aria-labelledby="tab-brands" hidden={tab !== "brands"}>
           <div className="mx-auto w-full max-w-2xl">
             <Brands refreshKey={brandsVersion} onChanged={() => setListVersion((n) => n + 1)} />
+          </div>
+        </div>
+        <div role="tabpanel" id="panel-deals" aria-labelledby="tab-deals" hidden={tab !== "deals"}>
+          <div className="mx-auto w-full max-w-2xl">
+            <DealsTab refreshKey={brandsVersion} />
           </div>
         </div>
       </div>
