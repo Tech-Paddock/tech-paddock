@@ -116,15 +116,16 @@ section and closing comment before changing anything in this file.
   No model runs.
 - **Every Monday, the past week rolls up** into one row per product: low, high, mean, regular mean,
   nights on sale and nights seen. Nightly rows are kept, never deleted.
-- **A missed night is a gap.** It is never backfilled or guessed.
+- **A missed night is a gap.** It is never backfilled or guessed. A week whose Monday roll-up was
+  missed is rolled up on the next run, from the nightly rows that exist.
 - **A deal's colour compares today's price with that product's last 12 weeks:**
-  - **green** at or below the 12-week low, or at least 15% under the mean;
+  - **green** at least 15% under the mean, or at or below the 12-week low while also below the mean;
   - **red** at least 10% over the mean, even when Kroger calls it a sale;
   - otherwise no colour.
   - Under 4 weeks of history it reads "new: building history".
   - The thresholds are reviewed in TEC-138.
 - **Deals shows every deal, coloured,** with search, aisle groups, All · On sale · Coupon · Stacks,
-  and a Green · Neutral · Red filter. Each deal shows its usual price and an 8-week trend.
+  and a Green · Neutral · Red · New filter. Each deal shows its usual price and an 8-week trend.
 - **Coupons come only from the owner's own Chrome task (TEC-126),** reviewed before saving. Until it
   runs, Coupon and Stacks say "no coupons staged yet". **Stacks** marks a product with both a sale
   and a coupon.
