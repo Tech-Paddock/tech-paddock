@@ -5,18 +5,26 @@ import type { getServiceClient } from "@/lib/supabase";
 import {
   FORM_KINDS,
   FORM_LABELS,
+  HEALTH_KEPT,
   ISSUE_PICKS,
+  ISSUE_RETIRED,
   InvalidEvent,
   LOG_KINDS,
   MAX_PHOTOS,
   PHOTO_PATH,
   VET_REASONS,
+  VET_RETIRED,
+  checkHealthReasons,
   describe as describeEvent,
+  eventPhotos,
   feedDays,
+  healthPickFor,
+  healthReasonsFromPick,
   formOf,
   kindOfForm,
   liveEvents,
   parseDetails,
+  treatEntry,
   parseNewEvent,
   type FeedRow,
   type JournalEvent,
@@ -43,21 +51,29 @@ describe("the Health form", () => {
 });
 
 describe("parseDetails — health", () => {
-  it("takes a vet visit with several reasons, kept in the list's order, once each", () => {
-    const d = parseDetails("health", { type: "vet", reasons: ["dental", "vaccines", "dental", "checkup"] });
-    expect(d).toEqual({ type: "vet", reasons: ["checkup", "vaccines", "dental"] });
+  it("takes one reason from the type's list", () => {
+    expect(parseDetails("health", { type: "vet", reasons: ["procedure"] })).toEqual({ type: "vet", reasons: ["procedure"] });
+    expect(parseDetails("health", { type: "issue", reasons: ["breathing-cough"] })).toEqual({
+      type: "issue",
+      reasons: ["breathing-cough"],
+    });
   });
 
-  it("takes a medical issue from its own list", () => {
+  it("still accepts the retired detailed ids, several at a time, once each in the order given (old entries)", () => {
+    expect(parseDetails("health", { type: "vet", reasons: ["dental", "vaccines", "dental", "checkup"] })).toEqual({
+      type: "vet",
+      reasons: ["dental", "vaccines", "checkup"],
+    });
     expect(parseDetails("health", { type: "issue", reasons: ["wound", "limping"] })).toEqual({
       type: "issue",
-      reasons: ["limping", "wound"],
+      reasons: ["wound", "limping"],
     });
   });
 
   it("refuses a reason from the other type's list, an unknown one, and none at all", () => {
     expect(() => parseDetails("health", { type: "vet", reasons: ["vomiting"] })).toThrow(InvalidEvent);
     expect(() => parseDetails("health", { type: "issue", reasons: ["vaccines"] })).toThrow(InvalidEvent);
+    expect(() => parseDetails("health", { type: "issue", reasons: ["procedure"] })).toThrow(InvalidEvent);
     expect(() => parseDetails("health", { type: "vet", reasons: ["spa-day"] })).toThrow(InvalidEvent);
     expect(() => parseDetails("health", { type: "vet", reasons: [] })).toThrow(/why you went/);
     expect(() => parseDetails("health", { type: "issue", reasons: [] })).toThrow(/what the issue/);
@@ -115,65 +131,101 @@ describe("the fixed lists", () => {
     }
   });
 
-  it("match the issue's agreed picks", () => {
+  it("offer the owner's high-level picks, six each, Other last", () => {
     expect(VET_REASONS.map(([, l]) => l)).toEqual([
-      "Wellness check-up",
+      "Check-up",
       "Vaccines",
-      "Deworming / fecal test",
-      "Flea, tick & heartworm",
-      "Spay / neuter",
-      "Dental",
-      "Microchip",
-      "Sick visit",
-      "Injury",
-      "Skin or ears",
-      "Stomach upset",
-      "Recheck / follow-up",
+      "Sick or injured",
+      "Procedure (spay/neuter, dental)",
+      "Follow-up",
       "Other",
     ]);
     expect(ISSUE_PICKS.map(([, l]) => l)).toEqual([
-      "Vomiting",
-      "Diarrhea",
-      "Limping",
-      "Itching / skin",
-      "Ear",
-      "Eye",
-      "Cough / sneeze",
-      "Not eating",
-      "Low energy",
-      "Cut / wound",
-      "Ate something",
+      "Stomach & appetite",
+      "Skin, ears & eyes",
+      "Limping or injury",
+      "Breathing or cough",
+      "Energy or behaviour",
       "Other",
     ]);
   });
 
+  it("keep every TEC-137 id: either still offered or retired, never gone", () => {
+    const oldVet = ["checkup", "vaccines", "deworming", "flea-tick-heartworm", "spay-neuter", "dental", "microchip", "sick", "injury", "skin-ears", "stomach", "recheck", "other"];
+    const oldIssue = ["vomiting", "diarrhea", "limping", "itching-skin", "ear", "eye", "cough-sneeze", "not-eating", "low-energy", "wound", "ate-something", "other"];
+    const vet = new Set([...VET_REASONS, ...VET_RETIRED].map(([id]) => id as string));
+    const issue = new Set([...ISSUE_PICKS, ...ISSUE_RETIRED].map(([id]) => id as string));
+    for (const id of oldVet) expect(vet.has(id)).toBe(true);
+    for (const id of oldIssue) expect(issue.has(id)).toBe(true);
+    // A retired id is not offered, and is not also in the offered list.
+    for (const [id] of VET_RETIRED) expect((VET_REASONS as readonly (readonly [string, string])[]).some(([o]) => o === id)).toBe(false);
+    for (const [id] of ISSUE_RETIRED) expect((ISSUE_PICKS as readonly (readonly [string, string])[]).some(([o]) => o === id)).toBe(false);
+  });
+
   const dir = resolve(__dirname, "../../../supabase/migrations");
-  const migration = () => {
-    const file = readdirSync(dir).find((f) => f.endsWith("_lando_health_events.sql"));
+  const read = (suffix: string) => {
+    const file = readdirSync(dir).find((f) => f.endsWith(suffix));
     expect(file).toBeDefined();
     return readFileSync(resolve(dir, file!), "utf8");
   };
-
-  it("are the same lists lando.details_ok holds (a value in the app alone fails every save)", () => {
-    const sql = migration();
-    // Read from the function body, not the header comments.
+  /** The latest migration that defines the function, by version: the one that is true now. */
+  const latest = () => {
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql") && readFileSync(resolve(dir, f), "utf8").includes("create or replace function lando.details_ok(kind"))
+      .sort();
+    expect(files.length).toBeGreaterThan(1);
+    return { name: files.at(-1)!, sql: readFileSync(resolve(dir, files.at(-1)!), "utf8") };
+  };
+  const body = (sql: string) => {
     const start = sql.indexOf("create or replace function lando.details_ok(kind");
     expect(start).toBeGreaterThan(0);
-    const fn = sql.slice(start, sql.indexOf("$fn$;", start));
-    const quoted = (ids: readonly string[]) => `[${ids.map((id) => `"${id}"`).join(", ")}]`;
-    expect(fn).toContain(quoted(VET_REASONS.map(([id]) => id)));
-    expect(fn).toContain(quoted(ISSUE_PICKS.map(([id]) => id)));
+    return sql.slice(start, sql.indexOf("$fn$;", start));
+  };
+  const arrays = (fn: string) => [...fn.matchAll(/details -> 'reasons' <@ '(\[[^']*\])'::jsonb/g)].map((m) => JSON.parse(m[1]) as string[]);
+
+  it("are the same lists lando.details_ok holds, offered and retired (a value in the app alone fails every save)", () => {
+    const sql = latest().sql;
+    expect(latest().name).toMatch(/_lando_health_picklist\.sql$/);
+    const fn = body(sql);
+    const [vet, issue] = arrays(fn);
+    expect(new Set(vet)).toEqual(new Set([...VET_REASONS, ...VET_RETIRED].map(([id]) => id)));
+    expect(new Set(issue)).toEqual(new Set([...ISSUE_PICKS, ...ISSUE_RETIRED].map(([id]) => id)));
     expect(fn).toContain(`BETWEEN 1 AND ${MAX_PHOTOS}`);
     expect(fn).toContain("WHEN 'health' THEN");
     // The path pattern in the function is the code's, with the dot as [.] for jsonpath.
     expect(fn).toContain(PHOTO_PATH.source.replace(/\\\//g, "/").replace("\\.", "[.]"));
   });
 
-  it("the migration can apply through the connector: fails fast, and drops no table, column or function", () => {
-    const code = migration().replace(/--.*$/gm, "");
+  it("only widens: the new function holds everything the first one did", () => {
+    const first = arrays(body(read("_lando_health_events.sql")));
+    const now = arrays(body(latest().sql));
+    first.forEach((list, i) => list.forEach((id) => expect(now[i]).toContain(id)));
+    expect(now[0].length).toBeGreaterThan(first[0].length);
+    expect(now[1].length).toBeGreaterThan(first[1].length);
+  });
+
+  it("gives Fun and Training the photos key, the same shape as Health's", () => {
+    const fn = body(latest().sql);
+    const exercise = fn.slice(fn.indexOf("WHEN 'exercise' THEN"), fn.indexOf("WHEN 'weight' THEN"));
+    expect(exercise).toContain("'commands', 'dogs', 'photos'] = '{}'::jsonb");
+    expect(exercise).toContain("jsonb_array_length(details -> 'photos') BETWEEN 1 AND 6");
+    expect(exercise).toContain("^health/[0-9a-f]{8}");
+  });
+
+  it("the first migration applies through the connector: fails fast, and drops no table, column or function", () => {
+    const code = read("_lando_health_events.sql").replace(/--.*$/gm, "");
     expect(code.trimStart().startsWith("set local lock_timeout = '5s';")).toBe(true);
     expect(code).not.toMatch(/drop\s+(table|column|function|schema)/i);
     expect(code).toMatch(/CHECK \(lando\.details_ok\(kind, details\)\)/);
+  });
+
+  it("the widening is one file: lock_timeout, then the function, and nothing else (no DROP, no ALTER)", () => {
+    const code = latest().sql.replace(/--.*$/gm, "").trim();
+    expect(code.startsWith("set local lock_timeout = '5s';")).toBe(true);
+    const statements = code.replace(/\$fn\$[\s\S]*?\$fn\$/, "$fn$").split(";").map((x) => x.trim()).filter(Boolean);
+    expect(statements).toHaveLength(2);
+    expect(statements[1]).toMatch(/^create or replace function lando\.details_ok/);
+    expect(code).not.toMatch(/\b(drop|alter|truncate|delete|update|insert)\b/i);
   });
 });
 
@@ -181,15 +233,21 @@ describe("describe — health", () => {
   it("titles by type and lists the reasons by label, with a photo count", () => {
     expect(describeEvent({ kind: "health", details: { type: "vet", reasons: ["checkup", "vaccines"] } })).toEqual({
       title: "Vet visit",
-      detail: "Wellness check-up, Vaccines",
+      detail: "Check-up, Vaccines",
     });
     expect(describeEvent({ kind: "health", details: { type: "issue", reasons: ["wound"], photos: [P1] } })).toEqual({
       title: "Medical issue",
-      detail: "Cut / wound · 1 photo",
+      detail: "Cut / wound · 1 photo", // a retired id still reads in words
     });
     expect(describeEvent({ kind: "health", details: { type: "issue", reasons: ["eye", "ear"], photos: [P1, P2] } }).detail).toBe(
       "Eye, Ear · 2 photos"
     );
+  });
+
+  it("labels the new picks and the retired ones", () => {
+    expect(describeEvent({ kind: "health", details: { type: "vet", reasons: ["procedure"] } }).detail).toBe("Procedure (spay/neuter, dental)");
+    expect(describeEvent({ kind: "health", details: { type: "issue", reasons: ["stomach-appetite"] } }).detail).toBe("Stomach & appetite");
+    expect(describeEvent({ kind: "health", details: { type: "vet", reasons: ["spay-neuter", "dental"] } }).detail).toBe("Spay / neuter, Dental");
   });
 
   it("does not break on a reason it no longer knows", () => {
@@ -258,7 +316,12 @@ function fakeDb(stored: string[], opts: { signFails?: boolean } = {}) {
 }
 
 describe("writeEvent — health photos", () => {
-  const body = (photos: string[], id = ID) => ({ id, kind: "health", details: { type: "issue", reasons: ["wound"], photos } });
+  const body = (photos: string[], id = ID) => ({
+    id,
+    kind: "health",
+    details: { type: "issue", reasons: ["limping-injury"], photos },
+    note: "Cut his paw on the fence",
+  });
 
   it("saves an entry whose photos are in storage", async () => {
     const { db, events } = fakeDb([P1, P2]);
@@ -282,7 +345,7 @@ describe("writeEvent — health photos", () => {
 
   it("does not touch storage for an entry without photos", async () => {
     const { db, events, signCalls } = fakeDb([]);
-    await writeEvent(db, { id: ID, kind: "health", details: { type: "vet", reasons: ["checkup"] } });
+    await writeEvent(db, { id: ID, kind: "health", details: { type: "vet", reasons: ["checkup"] }, note: "Annual" });
     expect(events).toHaveLength(1);
     expect(signCalls).toHaveLength(0);
   });
@@ -352,5 +415,159 @@ describe("lib/storage", () => {
     expect([...urls.keys()]).toEqual([P1]);
     expect(await missingPhotos(db, [P1, P2])).toEqual([P2]);
     expect(await missingPhotos(db, [])).toEqual([]);
+  });
+});
+
+/* ── TEC-139: one pick, a required note, old entries kept ────────────────── */
+
+describe("the Health pick", () => {
+  it("opens a new entry on nothing, an entry with one offered reason on it", () => {
+    expect(healthPickFor(null)).toEqual({ pick: "", kept: null });
+    expect(healthPickFor({ type: "vet", reasons: ["procedure"] })).toEqual({ pick: "procedure", kept: null });
+    expect(healthPickFor({ type: "issue", reasons: ["other"] })).toEqual({ pick: "other", kept: null });
+  });
+
+  it("opens an old entry on its reasons as a kept option, several or retired, and saves them unchanged", () => {
+    const several = healthPickFor({ type: "vet", reasons: ["checkup", "vaccines"] });
+    expect(several).toEqual({ pick: HEALTH_KEPT, kept: ["checkup", "vaccines"] });
+    expect(healthReasonsFromPick(several.pick, several.kept)).toEqual(["checkup", "vaccines"]);
+    const retired = healthPickFor({ type: "issue", reasons: ["vomiting"] });
+    expect(retired).toEqual({ pick: HEALTH_KEPT, kept: ["vomiting"] });
+    expect(healthReasonsFromPick(retired.pick, retired.kept)).toEqual(["vomiting"]);
+  });
+
+  it("saves one id for a pick, and nothing for no pick", () => {
+    expect(healthReasonsFromPick("sick-injured", null)).toEqual(["sick-injured"]);
+    expect(healthReasonsFromPick("", null)).toEqual([]);
+    expect(() => parseDetails("health", { type: "vet", reasons: healthReasonsFromPick("", null) })).toThrow(/why you went/);
+  });
+});
+
+describe("the Health note is required", () => {
+  const now = new Date("2026-10-25T12:00:00Z");
+  const base = { id: ID, kind: "health", details: { type: "vet", reasons: ["checkup"] } };
+
+  it("refuses a missing, empty or whitespace-only note", () => {
+    for (const note of [undefined, null, "", "   ", "\n\t "]) {
+      expect(() => parseNewEvent({ ...base, note }, now)).toThrow(/note is required/);
+    }
+  });
+
+  it("takes a note and trims it", () => {
+    expect(parseNewEvent({ ...base, note: "  Shots, he was brave " }, now).note).toBe("Shots, he was brave");
+  });
+
+  it("applies to a correction as well, but not to a delete", () => {
+    expect(() => parseNewEvent({ ...base, id: ID2, voids: ID }, now)).toThrow(/note is required/);
+    expect(parseNewEvent({ id: ID2, kind: "void", voids: ID }, now).note).toBeNull();
+  });
+
+  it("no other kind needs one", () => {
+    expect(parseNewEvent({ id: ID, kind: "weight", details: { value: 7, unit: "lb" } }, now).note).toBeNull();
+  });
+
+  it("is refused by the write path, with nothing saved", async () => {
+    const { db, events } = fakeDb([]);
+    await expect(writeEvent(db, { ...base, note: " " })).rejects.toThrow(/note is required/);
+    expect(events).toHaveLength(0);
+  });
+});
+
+describe("writeEvent — one reason on a new entry, old ones kept on a correction", () => {
+  const entry = (reasons: string[], extra: Record<string, unknown> = {}, type = "vet") => ({
+    id: ID,
+    kind: "health",
+    details: { type, reasons },
+    note: "Why",
+    ...extra,
+  });
+
+  it("refuses a new entry with two reasons or a retired one", async () => {
+    const { db, events } = fakeDb([]);
+    await expect(writeEvent(db, entry(["checkup", "vaccines"]))).rejects.toThrow(/pick one/);
+    await expect(writeEvent(db, entry(["dental"]))).rejects.toThrow(/pick one/);
+    await expect(writeEvent(db, entry(["vomiting"], {}, "issue"))).rejects.toThrow(/pick one/);
+    expect(events).toHaveLength(0);
+    await writeEvent(db, entry(["follow-up"]));
+    expect(events).toHaveLength(1);
+  });
+
+  it("lets a correction keep an old entry's reasons unchanged, and no other old set", async () => {
+    const { db, events } = fakeDb([]);
+    // An entry as TEC-137 stored it: several reasons, no note needed then.
+    events.push({
+      id: ID,
+      kind: "health",
+      at: "2026-10-24T15:00:00.000Z",
+      created_at: "2026-10-24T15:00:00.000Z",
+      person_id: null,
+      details: { type: "vet", reasons: ["checkup", "vaccines"] },
+      note: null,
+      voids: null,
+    });
+    await expect(writeEvent(db, entry(["vaccines", "dental"], { id: ID2, voids: ID }))).rejects.toThrow(/pick one/);
+    await expect(writeEvent(db, entry(["checkup", "vaccines"], { id: ID2, voids: ID, note: "" }))).rejects.toThrow(/note is required/);
+    const kept = await writeEvent(db, entry(["vaccines", "checkup"], { id: ID2, voids: ID }));
+    expect(kept.id).toBe(ID2);
+    expect(liveEvents(events as JournalEvent[]).map((e) => e.id)).toEqual([ID2]);
+  });
+
+  it("checkHealthReasons: one offered always passes; the same old set passes only against that entry", () => {
+    const old = { kind: "health", details: { type: "issue", reasons: ["eye", "ear"] } };
+    expect(() => checkHealthReasons({ details: { type: "issue", reasons: ["breathing-cough"] } }, null)).not.toThrow();
+    expect(() => checkHealthReasons({ details: { type: "issue", reasons: ["eye", "ear"] } }, null)).toThrow(InvalidEvent);
+    expect(() => checkHealthReasons({ details: { type: "issue", reasons: ["ear", "eye"] } }, old)).not.toThrow();
+    expect(() => checkHealthReasons({ details: { type: "issue", reasons: ["eye"] } }, old)).toThrow(InvalidEvent);
+    expect(() => checkHealthReasons({ details: { type: "vet", reasons: ["eye", "ear"] } }, old)).toThrow(InvalidEvent);
+  });
+});
+
+describe("photos on Fun and Training (TEC-139)", () => {
+  const ex = { type: "walk", where: "outside", with_dogs: false, minutes: 20, treats: 0 };
+
+  it("parseDetails keeps exercise photos, once each in the order given, none is no key", () => {
+    expect(parseDetails("exercise", { ...ex, photos: [P2, P1, P2] })).toEqual({ ...ex, photos: [P2, P1] });
+    expect(parseDetails("exercise", { ...ex, photos: [] })).toEqual(ex);
+    expect(parseDetails("exercise", { ...ex, photos: null })).toEqual(ex);
+    expect(parseDetails("exercise", ex)).toEqual(ex); // old entries stay valid
+  });
+
+  it("refuses what is not a path this app wrote, and a seventh", () => {
+    expect(() => parseDetails("exercise", { ...ex, photos: ["https://example.com/a.jpg"] })).toThrow(InvalidEvent);
+    expect(() => parseDetails("exercise", { ...ex, photos: P1 })).toThrow(InvalidEvent);
+    const many = Array.from({ length: MAX_PHOTOS + 1 }, (_, i) => `health/aaaaaaaa-aaaa-4aaa-8aaa-${String(i).padStart(12, "0")}.jpg`);
+    expect(() => parseDetails("exercise", { ...ex, photos: many })).toThrow(/at most/);
+  });
+
+  it("a training keeps commands and photos together", () => {
+    const d = parseDetails("exercise", { ...ex, type: "training", commands: ["sit"], photos: [P1] }) as any;
+    expect(d.commands).toEqual(["sit"]);
+    expect(d.photos).toEqual([P1]);
+  });
+
+  it("describe counts them", () => {
+    expect(describeEvent({ kind: "exercise", details: { ...ex, photos: [P1, P2] } }).detail).toContain("2 photos");
+    expect(describeEvent({ kind: "exercise", details: { ...ex, photos: [P1] } }).detail).toContain("1 photo");
+  });
+
+  it("eventPhotos reads Health's, Fun's and Training's, and nothing else's", () => {
+    expect(eventPhotos({ kind: "health", details: { type: "vet", reasons: ["other"], photos: [P1] } })).toEqual([P1]);
+    expect(eventPhotos({ kind: "exercise", details: { ...ex, photos: [P2] } })).toEqual([P2]);
+    expect(eventPhotos({ kind: "exercise", details: ex })).toEqual([]);
+    expect(eventPhotos({ kind: "potty", details: { photos: [P1] } })).toEqual([]);
+  });
+
+  it("writeEvent refuses an exercise naming a photo that never uploaded, and saves one that did", async () => {
+    const training = (photos: string[]) => ({ id: ID, kind: "exercise", details: { ...ex, photos } });
+    const { db, events } = fakeDb([P1]);
+    await expect(writeEvent(db, training([P1, P2]))).rejects.toThrow(/didn't finish uploading/);
+    expect(events).toHaveLength(0);
+    await writeEvent(db, training([P1]));
+    expect(events).toHaveLength(1);
+  });
+
+  it("a treat queued from Training carries no photos", () => {
+    const t = treatEntry({ id: ID2, item_id: "misc", amount: 1 }, "2026-10-25T12:00:00.000Z", null);
+    expect((t.details as any).photos).toBeUndefined();
   });
 });

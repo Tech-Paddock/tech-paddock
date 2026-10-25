@@ -13,25 +13,44 @@
   (`app/Sheet.tsx`) with that form (`app/LogForm.tsx`, prop `form`), defaults filled in, so Save
   is usually the only other tap. Tapping a feed row opens the matching form on that entry to
   correct or delete it.
-- **Health** (TEC-137): a sixth form, kind `health`, with a Type of **Vet visit** or **Medical
-  issue**, reasons to pick (several, at least one) from a fixed list per type (`VET_REASONS`,
-  `ISSUE_PICKS` in `lib/events.ts`), up to `MAX_PHOTOS` (6) photos, and the usual When, Human and
-  Note. Switching the Type keeps only the picks the other list shares ("Other"). The feed reads
-  "Vet visit  Wellness check-up, Vaccines · 2 photos" with up to four 40px thumbnails; the chip
-  is Health; a correction opens the form on the entry's type, picks and photos. Analytics and the
-  since-last pills ignore it. `details`: `{type: vet|issue, reasons[], photos?[]}`; the note is the
-  event's own `note`.
-- **Health photos** (TEC-137): private Storage bucket `lando-photos` (migration
+- **Health** (TEC-137, reworked by TEC-139): a sixth form, kind `health`, with a Type of **Vet
+  visit** or **Medical issue**, then **one plain full-width `<select>`** of high-level picks
+  (styled like Other dogs'), a required **Note** under it ("What happened?"), up to `MAX_PHOTOS`
+  (6) photos, and the usual When and Human. Vet visit: Check-up, Vaccines, Sick or injured,
+  Procedure (spay/neuter, dental), Follow-up, Other (`VET_REASONS`). Medical issue: Stomach &
+  appetite, Skin, ears & eyes, Limping or injury, Breathing or cough, Energy or behaviour, Other
+  (`ISSUE_PICKS`, both in `lib/events.ts`). A new entry opens on "Pick one…" and Save without a
+  pick says so. Switching the Type keeps the pick only if the other list shares it ("Other").
+  Stored shape unchanged: `{type: vet|issue, reasons[], photos?[]}`, `reasons` an array of one for
+  every new entry; the story is the event's own `note`. Feed: "Vet visit  Check-up · 2 photos"
+  with up to four 40px thumbnails and the note after it; the chip is Health. Analytics and the
+  since-last pills ignore it.
+- **The Health note is required** (TEC-139), for a new entry and a correction alike: the phone
+  blocks Save on a blank or whitespace-only note with "Say what happened — the note is required."
+  and the server refuses it too (`parseNewEvent`, so `writeEvent`; a delete is exempt, and no
+  other kind needs a note). An old Health entry saved without one therefore needs a note typed
+  before its correction can save.
+- **Retired Health reasons** (TEC-139): TEC-137's detailed ids (`VET_RETIRED`, `ISSUE_RETIRED`)
+  are retired the way the food catalogue retires items: the form does not offer them, but
+  `parseDetails` and `lando.details_ok` accept them, the feed labels them (`healthReasonLabel`),
+  and a correction on an entry holding several reasons or a retired one opens the select on an
+  extra option listing them (`HEALTH_KEPT`, `healthPickFor`, like `DOGS_KEPT`), saved unchanged
+  until another pick is made. `checkHealthReasons` (called from `writeEvent`) makes the rule
+  server-side: a new entry takes exactly one offered reason; a correction may also repeat the
+  entry it replaces, same type and same set. `checkup`, `vaccines` and `other` are ids both
+  generations share, so old entries with them read with the new labels ("Check-up", not
+  "Wellness check-up"). Never delete a retired id or change an id.
+- **Health photos** (TEC-137, and Fun and Training since TEC-139): private Storage bucket `lando-photos` (migration
   `create_lando_photos_bucket`), written only by `POST /api/photos` with the service role and
   shown only through signed URLs; an event stores only the path, `health/<uuid>.<jpg|png|webp>`
-  (`PHOTO_PATH`). The phone shrinks each photo through a canvas first (`lib/image.ts`, a local
+  (`PHOTO_PATH`; the `health/` prefix stays for exercise photos too, one pattern, one bucket). The phone shrinks each photo through a canvas first (`lib/image.ts`, a local
   copy of Coffee's; 1568px, jpeg) and uploads it the moment it is picked (`app/Photos.tsx`, a
   local pattern: Take photo opens the camera, Choose photos the library). Each photo is
   uploading, failed (it stays on screen with Retry and ✕) or done; **Save is disabled until every
   photo is done**, and the server refuses an entry naming a path with no object behind it
   (`writeEvent` -> `missingPhotos`), so an entry never shows as saved without its photos. The
   phone chooses each photo's id, so a retry is the same object (upload is an upsert). `GET
-  /api/journal` returns `photos`, a path -> signed URL map for the live health entries (an hour);
+  /api/journal` returns `photos`, a path -> signed URL map for the live health and exercise entries (an hour; `eventPhotos`);
   the screen adds each upload's URL as it happens, and a path that could not be signed reads "No
   photo" / "Photo unavailable", never a blank. A correction keeps the photos it does not remove
   and the voided entry keeps all of its own; a delete is a void. **Nothing is ever deleted from
@@ -41,7 +60,13 @@
   existing `type`; the data shape did not change. `FORM_KINDS`, `kindOfForm` and `formOf`
   (`lib/events.ts`) map between the six forms and the five kinds: a walk or playtime is Fun, a
   training is Training. Fun's Type offers Walk and Playtime only (`FUN_TYPES`); Training has no
-  Type and always has Commands practised. A correction opens the form its entry belongs to, so a
+  Type and always has Commands practised.
+  **Photos on both** (TEC-139): the same Photos block as Health (Take photo, Choose photos, upload
+  on pick, Save waits for every photo, `missingPhotos` refuses an entry whose photo is not in the
+  bucket), stored as an optional `photos` on the exercise details (1 to `MAX_PHOTOS`, same
+  `PHOTO_PATH`; no key when none). Old exercise entries have none and stay valid. A correction
+  keeps the photos it does not remove. A treat queued from Training carries none (`treatEntry`
+  builds a food entry); the feed row shows the thumbnails and "2 photos" like Health. A correction opens the form its entry belongs to, so a
   walk cannot be corrected into a training or back. Pills and Analytics still say "exercise".
 - **The feed** (TEC-136): every live entry in the read's window (today and the `HORIZON_DAYS`
   before it, the server's own cut; weights older than that stay in Analytics' growth chart) plus
@@ -49,7 +74,10 @@
   short date (`feedDays`). Newest first, days and rows, by **when it happened** (`at`, the When
   picked in the form), never by `created_at`; a weight orders at noon of its day
   (`happenedAt`), whatever time an older one was logged at, and shows no clock time (the heading
-  is its day). Ties: unsaved rows first, then the later save. Unsaved rows sit in their day like
+  is its day). Ties: unsaved rows first, then the later save. **A row is one line** (TEC-139): the title,
+  detail and note run on one line and are cut off with an ellipsis (`truncate` on a `min-w-0`
+  column), so a long note never wraps; the clock time, the person and the 40px thumbnails
+  (`shrink-0`) keep their size. The whole text is the row's `title` and the entry one tap away. Unsaved rows sit in their day like
   any other, with Saving… or Not saved, Retry and ✕.
 - **The feed's filter**: chips Potty, Food, Fun, Training, Weight, Health (`FORM_KINDS`, matching the
   buttons), across every day. Tap one to show only that form's entries (unsaved rows too), tap
@@ -120,7 +148,7 @@
   marked `?`: potty `{what: pee|poop|both|none, where: outside|inside, leash?: leashed|unleashed|pen}`
   (inside = an accident: warned in the form, red in the feed, counted apart in Analytics;
   `leash` only when outside); food `{type, item_id, item_name, kcal_per, unit, amount}`; exercise
-  `{type: walk|playtime|training, where, with_dogs, minutes, treats, commands?, dogs?}` (commands
+  `{type: walk|playtime|training, where, with_dogs, minutes, treats, commands?, dogs?, photos?}` (commands
   on training only, from the fixed list `COMMANDS`; `dogs` is 1 to 20 `lando.dogs` ids, only when
   `with_dogs` is true); weight `{value, unit}`. `parseDetails` checks these on the phone (before
   the sheet closes) and again on the server; the database holds the same shapes in the SQL
@@ -238,7 +266,7 @@
   function: an unknown kind has none, so it is refused.
 - **Widen `lando.details_ok` with `create or replace function`, and only ever widen.** The
   constraint `events_details_shape` just calls it, so a widening is a new migration holding the
-  function's whole current body (`lando_health_events`'s, or the latest after it) with the one
+  function's whole current body (`lando_health_picklist`'s, the latest) with the one
   list or shape grown: no DROP, no constraint swap, and it goes through the connector. Replacing
   the function does **not** re-check existing rows, so a function that narrows would leave rows the
   database now calls invalid, and nothing would say so. Narrowing (removing a value, requiring a
@@ -247,11 +275,14 @@
   `set local lock_timeout = '5s';` so a busy table fails fast. The older swaps
   (`widen_lando_events_details_shape`, `widen_lando_potty_none`) were DROP and ADD in one ALTER run
   by the owner in the SQL Editor; that path is retired.
-- **The health lists are in two places:** `VET_REASONS` and `ISSUE_PICKS` in `lib/events.ts` and
-  `lando.details_ok` (in `lando_health_events`, or its latest replacement);
-  `tests/health.test.ts` reads the lists out of the function body in that migration file and fails
-  if they differ. If a later migration widens a list, update the lists that test reads (point it
-  at the latest file defining the function).
+- **The health lists are in two places:** `VET_REASONS` + `VET_RETIRED` and `ISSUE_PICKS` +
+  `ISSUE_RETIRED` in `lib/events.ts` and `lando.details_ok`. The database holds the union.
+  `tests/health.test.ts` finds the latest migration defining the function (by version), reads
+  the two reason arrays out of its body and fails if they differ from the code's unions, if it
+  drops an id the first migration held, or if that file holds anything but `set local
+  lock_timeout` and the function. The next widening is simply a newer file; the test follows it.
+  A new offered pick is a new id in the code and the function (never a reused retired one with
+  a new meaning, since old entries hold it).
 - **Photos are not rewritten or deleted:** the event holds paths only, and an entry never changes,
   so no code path removes an object. Anything that would (a cleanup of unreferenced photos) must
   first check every event, voided ones included, since a voided entry still names its photos.
