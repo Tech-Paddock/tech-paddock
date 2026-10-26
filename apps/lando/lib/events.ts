@@ -70,11 +70,17 @@ export const WHERE = ["outside", "inside"] as const;
 export const LEASH = ["leashed", "unleashed", "pen"] as const;
 export type Leash = (typeof LEASH)[number];
 export const LEASH_LABELS: Record<Leash, string> = { leashed: "Leashed", unleashed: "Unleashed", pen: "In pen" };
+/** Where an inside potty happened: the crate, the pen, or loose in the house. Inside only. */
+export const SPOT = ["crate", "pen", "loose"] as const;
+export type Spot = (typeof SPOT)[number];
+export const SPOT_LABELS: Record<Spot, string> = { crate: "Crate", pen: "Pen", loose: "Loose" };
 export type PottyDetails = {
   what: PottyWhat;
   where: (typeof WHERE)[number];
   /** Outside only; entries from before it existed have none. */
   leash?: Leash;
+  /** Inside only; optional, and entries from before it existed have none. */
+  spot?: Spot;
   /** A medical issue this relates to (TEC-142): the id of a Health issue event, possibly a superseded copy; `resolveIssue` finds the live one. */
   issue?: string;
   /** Storage paths of photos (TEC-142), 1 to MAX_PHOTOS; no key when there are none. */
@@ -825,7 +831,11 @@ export function describe(
       const p = potty(e);
       const what = p.what === "both" ? "pee + poop" : p.what === "none" ? "no potty" : p.what;
       const base =
-        p.where === "inside" ? `${what}, inside` : p.leash ? `${what} · ${LEASH_LABELS[p.leash].toLowerCase()}` : what;
+        p.where === "inside"
+          ? p.spot
+            ? `${what}, inside · ${SPOT_LABELS[p.spot].toLowerCase()}`
+            : `${what}, inside`
+          : p.leash ? `${what} · ${LEASH_LABELS[p.leash].toLowerCase()}` : what;
       const n = p.photos?.length ?? 0;
       const detail = [
         base,
@@ -963,6 +973,10 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
       if (r.leash !== undefined && r.leash !== null) {
         if (out.where !== "outside") throw new InvalidEvent("leashed, unleashed or in pen is for outside only");
         out.leash = oneOf(r.leash, LEASH, "leash");
+      }
+      if (r.spot !== undefined && r.spot !== null) {
+        if (out.where !== "inside") throw new InvalidEvent("crate, pen or loose is for inside only");
+        out.spot = oneOf(r.spot, SPOT, "spot");
       }
       const issue = parseIssue(r.issue);
       if (issue) out.issue = issue;

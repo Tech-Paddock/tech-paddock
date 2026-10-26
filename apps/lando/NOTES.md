@@ -76,15 +76,17 @@
   deleted entries do not count). The bar is the page's server component, so `app/Meals.tsx` is a
   small context: `Journal` reports the count (`useReportMeals`), `MealsBadge` shows it, and
   nothing shows until the journal has loaded. The bar wraps rather than clips on a very narrow phone.
-- **Related issue** (TEC-142), on **Potty** and on a **vet visit** (not on a medical issue): a plain
-  `<select>` of None and the newest 20 live medical issues, labelled by date and pick ("Oct 24 ·
+- **Related issue** (TEC-142), on **Potty** and on a **vet visit** (not on a medical issue), behind a
+  **Medical issue** checkbox (TEC-161): unticked, the select is hidden and no `issue` is saved;
+  ticked, a plain `<select>` of None and the newest 20 live medical issues, labelled by date and pick ("Oct 24 ·
   Stomach & appetite", `issueChoices`). Stored as an optional `issue` (the linked event's id) in
   details. A link is an id, and a correction creates a new event, so it is **resolved when read**
   (`resolveIssue`, pure): follow the `voids` chain to the live version; a chain that ends in a
   delete is `removed`; an id no event read holds is `unknown`. The feed reads "re: Stomach &
   appetite, Oct 24" (the live version's first pick and date), "removed issue" for a deleted one, and
   "re: earlier issue" for an unknown one (an issue older than the read's 30 days whose correction
-  was not read). A correction opens on its stored link and keeps it unless it is changed;
+  was not read). A correction with a stored link opens ticked on it and keeps it unless it is changed;
+  unticking it and saving removes the link (a new event, as any correction);
   when the list would not show it (a superseded copy, a deleted or an old issue) `issueChoices`
   adds it as the first option, so an untouched correction saves it unchanged. The **server refuses a
   link to an id that is not a Health issue event** (`writeEvent` -> `checkIssueTarget`, the dogs
@@ -244,9 +246,9 @@
 ## How it works
 
 - **Five kinds plus `void`** (`lib/events.ts`; `health` is described under State). `details` per kind, every key required unless
-  marked `?`: potty `{what: pee|poop|both|none, where: outside|inside, leash?: leashed|unleashed|pen, issue?: uuid, photos?[]}`
+  marked `?`: potty `{what: pee|poop|both|none, where: outside|inside, leash?: leashed|unleashed|pen, spot?: crate|pen|loose, issue?: uuid, photos?[]}`
   (inside = an accident: warned in the form, red in the feed, counted apart in Analytics;
-  `leash` only when outside); food `{type, item_id, item_name, kcal_per, unit, amount}`; exercise
+  `leash` only when outside, `spot` only when inside); food `{type, item_id, item_name, kcal_per, unit, amount}`; exercise
   `{type: walk|playtime|training, where, with_dogs, minutes, treats, commands?, dogs?, photos?}` (commands
   on training only, from the fixed list `COMMANDS`; `dogs` is 1 to 20 `lando.dogs` ids, only when
   `with_dogs` is true); weight `{value, unit, visit?: uuid}` (TEC-151: only a vet visit's Weight sets `visit`). `parseDetails` checks these on the phone (before
@@ -264,7 +266,12 @@
   defaults to Leashed on a new entry. It is not remembered per phone. Correcting an old outside
   entry that has none opens with nothing picked, so a correction never invents one. The feed
   shows it after the what: "pee · unleashed".
-- **Potty's photos and Related issue** (TEC-142): below Leash, the Related issue select, then the
+- **Potty's Spot pick** (Crate / Pen / Loose, TEC-161) shows only while Where is Inside, the twin of
+  Leash. Nothing is picked by default (a new or old inside entry never gets one unless tapped);
+  switching Where to Outside drops it from the save, as Inside drops Leash. Optional `spot` in
+  details, inside only (`parseDetails` and `details_ok`, migration `lando_potty_inside_spot`). The
+  feed reads "pee, inside · crate". Inside is still an accident; Analytics is unchanged.
+- **Potty's photos and Related issue** (TEC-142): below Leash and Spot, the Medical issue checkbox and its select, then the
   same Photos block as Health, Fun and Training (Take photo, Choose photos, Save waits for each,
   `missingPhotos` backs it), stored as optional `photos` on the potty details. Feed: "poop,
   inside · re: Stomach & appetite, Oct 24 · 1 photo" with the thumbnails. The note stays optional.
