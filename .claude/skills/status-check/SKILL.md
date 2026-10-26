@@ -75,7 +75,7 @@ Hot topics
 - main CI: … · drift: … · TEC-n in progress (title)
 
 Archive this chat
-- Safe to archive now.  |  Not yet: what is lost, and what clears it
+- Archive: clear  |  Archive: not clear — what is lost, and what clears it
 ```
 
 ```
