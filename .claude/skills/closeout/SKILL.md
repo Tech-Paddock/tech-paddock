@@ -5,7 +5,8 @@ description: Finish a session so it is safe to archive — nothing left only in 
 
 # Closeout
 
-End with one line: **"Safe to archive once `<branch>` is on `main`"** or **"Safe to archive now."**
+End with one line: **Archive: clear**, or **Archive: not clear — <reason>**, the reason naming what
+archiving would lose: an unpushed commit, a running helper, a check-in scheduled in this chat, or a step only this chat can take.
 
 ## 1. Find what is not saved
 
@@ -33,4 +34,4 @@ What is now true; what you verified and what you could not; the blast radius (ap
 the Deployment section (on merge, manual steps in order, how to verify, what breaks if skipped);
 any migration by name and shape (additive or destructive).
 
-Last line: **"Safe to archive once `<branch>` is on `main`"** or **"Safe to archive now."**
+Last line: **Archive: clear**, or **Archive: not clear — <reason>** (section 1 says what counts).

@@ -35,7 +35,8 @@ with your brief, go in the report with what clears each but do not hold the depl
 
 Use the `/status-check` format. Held: header **Deploy held**, only the sections with findings, then
 what clears each one. Deployed: header **Deployed**, each branch with its merge commit and live
-state, then anything left over.
+state, then anything left over. Last line: **Archive: clear**, or **Archive: not clear — <reason>**
+(the `closeout` skill).
 
 ## Merging
 

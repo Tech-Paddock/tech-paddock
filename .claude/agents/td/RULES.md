@@ -86,7 +86,8 @@ how a demo renders it are convention, guarded only here. A demo that needs state
 - **Verify from the code, not a summary of it.**
 - **Put decisions to the owner as multiple choice** (`AskUserQuestion`): two to four options,
   recommendation first and marked, each with its consequence.
-- **Keep reports short.**
+- **Keep reports short.** A final report, yours or a helper's you relay, ends with **Archive: clear**
+  or **Archive: not clear — <reason>** (the `closeout` skill).
 - **No phone check by default.** Write one as a ⭐ step only when the owner asks or the change
   cannot be tested signed out (`CLAUDE.md`).
 - **Linear matches the repo.** At kickoff, fix any issue whose status the repo contradicts: work
