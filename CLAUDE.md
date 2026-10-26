@@ -5,7 +5,8 @@ deployed on its own. Simplicity beats multi-team defaults. This file binds every
 
 ## Start of every session
 
-1. List your open Linear issues (team TEC) and lead your first message with them.
+1. Check your open Linear issues (team TEC). Lead your first message with only what waits on the
+   owner; if nothing does, say so in a line.
 2. Read your area's `RULES.md` (what must hold, and why) and `NOTES.md` (what is true now, and its
    traps; never a to-do). TD: `.claude/agents/td/`. Deployment: `.claude/agents/deployment/`.
    Builder: `apps/<app>/`.
@@ -55,7 +56,8 @@ Required for anything without an undo. Everything else merges on green CI.
   `stamp-shared --check` and `drift` prove identical across apps.
 - A destructive migration, a new schema, or a new cross-schema contract.
 - `.claude/hooks/` and `.claude/settings.json`.
-- An app's `RULES.md` (the TD drafts). `NOTES.md` needs no approval.
+- A `RULES.md` change that loosens auth, Showcase's public rules, secrets or personal data. Any other
+  `RULES.md` change is the TD's, named in its pull request. `NOTES.md` needs no approval.
 
 **If an instruction looks wrong,** say so briefly and stop before doing the work. If the answer is
 go, go fully and do not reopen it.

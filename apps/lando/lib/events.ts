@@ -10,11 +10,11 @@
  * exercise, weight, health. The shapes of `details` below are also enforced by
  * the database (migrations `lando_people_and_events`, then
  * `widen_lando_events_details_shape`, then `widen_lando_potty_none`, then
- * `lando_health_events`); change both together.
+ * `lando_health_events`, `lando_health_picklist`, `lando_issue_links`, `lando_vet_weight`); change both together.
  */
 
 import { FOOD_TYPES, findFood, formatAmount, unitLabel, type FoodType } from "./foods";
-import { dateLabel, fromDateInput, toDateInput } from "./localtime";
+import { dateLabel, fromDateInput, localMidnight, shortDate, toDateInput } from "./localtime";
 
 export const LOG_KINDS = ["potty", "food", "exercise", "weight", "health"] as const;
 export type LogKind = (typeof LOG_KINDS)[number];
@@ -75,6 +75,10 @@ export type PottyDetails = {
   where: (typeof WHERE)[number];
   /** Outside only; entries from before it existed have none. */
   leash?: Leash;
+  /** A medical issue this relates to (TEC-142): the id of a Health issue event, possibly a superseded copy; `resolveIssue` finds the live one. */
+  issue?: string;
+  /** Storage paths of photos (TEC-142), 1 to MAX_PHOTOS; no key when there are none. */
+  photos?: string[];
 };
 
 /** A snapshot of the catalogue item at log time, plus how much. */
@@ -176,7 +180,12 @@ export function dogsPickFor(
 export const UNITS = ["lb", "kg"] as const;
 export type Unit = (typeof UNITS)[number];
 const KG_PER_LB = 0.45359237;
-export type WeightDetails = { value: number; unit: Unit };
+export type WeightDetails = {
+  value: number;
+  unit: Unit;
+  /** Set when a vet visit's Weight field saved it (TEC-151): the id of that visit, possibly a superseded copy; `resolveVisit` finds the live one. */
+  visit?: string;
+};
 
 /* ── Health (TEC-137) ────────────────────────────────────────────────────── */
 
@@ -314,6 +323,8 @@ export type HealthDetails = {
   reasons: string[];
   /** Storage paths, 1 to MAX_PHOTOS; no key when there are none. */
   photos?: string[];
+  /** Vet visits only (TEC-142): the id of the Health issue event it relates to; `resolveIssue` finds the live one. */
+  issue?: string;
 };
 
 export type Details = Record<string, unknown>;
@@ -336,9 +347,9 @@ export const exercise = (e: Pick<JournalEvent, "details">) => e.details as Exerc
 export const weight = (e: Pick<JournalEvent, "details">) => e.details as WeightDetails;
 export const health = (e: Pick<JournalEvent, "details">) => e.details as HealthDetails;
 
-/** The photo paths an entry names: Health's, and Fun's and Training's (TEC-139); none for any other kind. */
+/** The photo paths an entry names: Health's, Fun's, Training's and Potty's (TEC-139, TEC-142); none for any other kind. */
 export function eventPhotos(e: Pick<JournalEvent, "kind" | "details">): string[] {
-  if (e.kind !== "health" && e.kind !== "exercise") return [];
+  if (e.kind !== "health" && e.kind !== "exercise" && e.kind !== "potty") return [];
   const p = (e.details as { photos?: unknown }).photos;
   return Array.isArray(p) ? (p as string[]) : [];
 }
@@ -465,6 +476,10 @@ function countsFor(e: JournalEvent, clock: Clock): boolean {
       const w = potty(e).what;
       return w === clock || w === "both";
     }
+    case "food":
+      // The food clock is the last meal (TEC-142): a treat is not a meal and
+      // does not reset it.
+      return e.kind === "food" && food(e).type === "meal";
     default:
       return e.kind === clock;
   }
@@ -510,6 +525,256 @@ export function formatAgo(fromIso: string, now: Date): string {
   return rh ? `${d}d ${rh}h` : `${d}d`;
 }
 
+/* ── Pill status (TEC-142) ───────────────────────────────────────────────── */
+
+const HOUR_MS = 3_600_000;
+
+/** Pee and poop: green under 1 h, yellow from 1 h up to and including 3 h, red over 3 h. */
+export const POTTY_YELLOW_MS = 1 * HOUR_MS;
+export const POTTY_RED_MS = 3 * HOUR_MS;
+/** Food, the last meal only: green under 3 h, yellow from 3 h, red at 5 h or more. */
+export const MEAL_YELLOW_MS = 3 * HOUR_MS;
+export const MEAL_RED_MS = 5 * HOUR_MS;
+
+export type PillStatus = "green" | "yellow" | "red";
+export const PILL_STATUS_WORDS: Record<PillStatus, string> = {
+  green: "green, recent",
+  yellow: "yellow, getting long",
+  red: "red, overdue",
+};
+
+/**
+ * The colour of a since-last pill, from the time since its last event.
+ * Exercise is never coloured, and neither is a pill with nothing in it
+ * (`elapsedMs` null): "none" stays neutral. A time in the future reads as 0.
+ */
+export function pillStatus(clock: Clock, elapsedMs: number | null): PillStatus | null {
+  if (elapsedMs === null || clock === "exercise") return null;
+  const ms = Math.max(0, elapsedMs);
+  if (clock === "food") return ms >= MEAL_RED_MS ? "red" : ms >= MEAL_YELLOW_MS ? "yellow" : "green";
+  return ms > POTTY_RED_MS ? "red" : ms >= POTTY_YELLOW_MS ? "yellow" : "green";
+}
+
+/**
+ * Meals logged on the phone's local day of `now` (TEC-142): live meals only.
+ * Treats are not meals, and a voided or deleted meal is not live. Midnights
+ * come from the calendar, so a DST day is 23 or 25 hours and still one day.
+ */
+export function mealsToday(events: JournalEvent[], now: Date): number {
+  const start = localMidnight(now).getTime();
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+  return liveEvents(events).filter((e) => {
+    if (e.kind !== "food" || food(e).type !== "meal") return false;
+    const t = Date.parse(e.at);
+    return t >= start && t < end;
+  }).length;
+}
+
+/* ── Linking to a medical issue (TEC-142) ────────────────────────────────── */
+
+const isIssueEvent = (e: Pick<JournalEvent, "kind" | "details">) => e.kind === "health" && health(e).type === "issue";
+
+/** Where a link ends up: the live version of the target, a deleted one, or an id nothing read knows. */
+export type Link = { state: "live"; event: JournalEvent } | { state: "removed" } | { state: "unknown" };
+export type IssueLink = Link;
+
+type LinkIndex = { byId: Map<string, JournalEvent>; voiderOf: Map<string, JournalEvent> };
+
+function linkIndex(events: JournalEvent[]): LinkIndex {
+  const byId = new Map(events.map((e) => [e.id, e]));
+  const voiderOf = new Map<string, JournalEvent>();
+  for (const e of events) if (e.voids) voiderOf.set(e.voids, e);
+  return { byId, voiderOf };
+}
+
+/** Follow `id` through the `voids` chain; the end must satisfy `isTarget` to be live. Shared by issue and visit links. */
+function followLink(ix: LinkIndex, id: string, isTarget: (e: JournalEvent) => boolean): Link {
+  let cur = id;
+  // A chain is never longer than the events, so a cycle (impossible, but) ends.
+  for (let i = 0; i <= ix.byId.size; i++) {
+    const next = ix.voiderOf.get(cur);
+    if (!next) {
+      const e = ix.byId.get(cur);
+      return e && isTarget(e) ? { state: "live", event: e } : { state: "unknown" };
+    }
+    if (next.kind === "void") return { state: "removed" };
+    cur = next.id;
+  }
+  return { state: "unknown" };
+}
+
+/**
+ * Follow a link through the `voids` chain to the live version of the issue.
+ * An issue corrected once or twice resolves to its newest copy; one whose
+ * chain ends in a delete is `removed`; an id that is not a Health issue in
+ * `events` (older than the read, or never there) is `unknown`. `events` holds
+ * everything read, voids included. Pure.
+ */
+export function resolveIssue(events: JournalEvent[], id: string): IssueLink {
+  return followLink(linkIndex(events), id, isIssueEvent);
+}
+
+/** An issue's first reason as its label: "Stomach & appetite". */
+function issuePick(e: JournalEvent): string {
+  const h = health(e);
+  return healthReasonLabel("issue", h.reasons?.[0] ?? "") || "Issue";
+}
+
+/** The feed's words for a link: "re: Stomach & appetite, Oct 24", "removed issue", "re: earlier issue". */
+export function issueLinkText(events: JournalEvent[], id: string): string {
+  const link = resolveIssue(events, id);
+  if (link.state === "removed") return "removed issue";
+  if (link.state === "unknown") return "re: earlier issue";
+  return `re: ${issuePick(link.event)}, ${shortDate(link.event.at)}`;
+}
+
+/** How many recent issues the Related issue select lists. */
+export const ISSUE_CHOICES_MAX = 20;
+
+/**
+ * The Related issue select's options: recent live medical issues, newest
+ * first, labelled by date and pick ("Oct 24 · Stomach & appetite"). When the
+ * entry being corrected already links somewhere the list would not show (a
+ * superseded copy, a deleted or an old issue), that link is kept as an extra
+ * first option so an untouched correction keeps it. `current` is the stored id.
+ */
+export function issueChoices(events: JournalEvent[], current: string | null): { id: string; label: string }[] {
+  const live = liveEvents(events)
+    .filter(isIssueEvent)
+    .sort(newestFirst)
+    .slice(0, ISSUE_CHOICES_MAX)
+    .map((e) => ({ id: e.id, label: `${shortDate(e.at)} · ${issuePick(e)}` }));
+  if (!current || live.some((c) => c.id === current)) return live;
+  const link = resolveIssue(events, current);
+  const label =
+    link.state === "removed"
+      ? "Removed issue"
+      : link.state === "unknown"
+        ? "Earlier issue"
+        : `${shortDate(link.event.at)} · ${issuePick(link.event)}`;
+  return [{ id: current, label }, ...live];
+}
+
+/**
+ * The server's check on a link: the id must be a Health issue event. It may
+ * be a voided one, since an old link can point at a superseded copy. `target`
+ * is the row with that id, or null. Throws `InvalidEvent`.
+ */
+export function checkIssueTarget(target: Pick<JournalEvent, "kind" | "details"> | null): void {
+  if (!target || !isIssueEvent(target)) throw new InvalidEvent("that medical issue doesn't exist — reload");
+}
+
+/* ── A vet visit's weight (TEC-151) ──────────────────────────────────────── */
+
+const isVisitEvent = (e: Pick<JournalEvent, "kind" | "details">) => e.kind === "health" && health(e).type === "vet";
+
+/** The live version of a vet visit a weight links to, resolved the way an issue link is. */
+export function resolveVisit(events: JournalEvent[], id: string): Link {
+  return followLink(linkIndex(events), id, isVisitEvent);
+}
+
+/**
+ * The live weight a vet visit's Weight field saved: a live weight whose
+ * `visit` resolves, through the `voids` chain, to the live visit `visitId`.
+ * A weight corrected from the Weight form keeps its `visit`; one deleted is
+ * gone (so the field opens empty); a deleted visit leaves its weight. If more
+ * than one qualified, the newest `at`. Pure.
+ */
+export function linkedWeight(events: JournalEvent[], visitId: string): JournalEvent | null {
+  const ix = linkIndex(events);
+  return (
+    liveEvents(events)
+      .filter((e) => {
+        if (e.kind !== "weight") return false;
+        const v = weight(e).visit;
+        if (typeof v !== "string") return false;
+        const end = followLink(ix, v, isVisitEvent);
+        return end.state === "live" && end.event.id === visitId;
+      })
+      .sort(newestFirst)[0] ?? null
+  );
+}
+
+/**
+ * The server's check on a weight's `visit`: the id must be a vet visit event
+ * (type `vet`). A voided copy passes, since the link may name a superseded
+ * one. `target` is the row with that id, or null. Throws `InvalidEvent`.
+ */
+export function checkVisitTarget(target: Pick<JournalEvent, "kind" | "details"> | null): void {
+  if (!target || !isVisitEvent(target)) throw new InvalidEvent("that vet visit doesn't exist — reload");
+}
+
+/** An entry saved after another (a training's treat, a vet visit's weight): the shape of a form's body. */
+export type FollowUp = {
+  id: string;
+  kind: LogKind;
+  at: string;
+  person_id: string | null;
+  details: Details;
+  note: string | null;
+  voids?: string;
+};
+
+/**
+ * What a vet visit's Weight field adds to Save, to be saved **after** the
+ * visit (like a training's treats). `typed` is the field as typed, `linked`
+ * the weight already saved with the visit being corrected (`linkedWeight`).
+ *
+ *  - Blank, nothing linked: no weight. Blank with one linked is refused: the
+ *    field opened on it, and a weight that was measured is removed from the
+ *    feed, not by a blank box.
+ *  - Filled, nothing linked: a new weight on the visit's day (local noon, as
+ *    every weight), `visit` the id this visit is saved under.
+ *  - Filled, same value and unit as the linked one: nothing; the link follows
+ *    the correction by itself.
+ *  - Filled, different: a correction of the linked weight (it `voids` it), its
+ *    `visit` the corrected visit's new id, so a second weight is never added.
+ *
+ * Throws `InvalidEvent` on a weight the weight form would refuse.
+ */
+export function visitWeightPlan(x: {
+  typed: string;
+  unit: Unit;
+  linked: JournalEvent | null;
+  weightId: string;
+  visitId: string;
+  visitAt: string;
+  personId: string | null;
+}): FollowUp[] {
+  const text = x.typed.trim().replace(",", ".");
+  if (!text) {
+    if (x.linked) throw new InvalidEvent("this visit has a weight — change it here, or delete that weight from the feed");
+    return [];
+  }
+  const value = Number(text);
+  const details = parseDetails("weight", { value, unit: x.unit, visit: x.visitId });
+  if (x.linked && weight(x.linked).value === value && weight(x.linked).unit === x.unit) return [];
+  const at = fromDateInput(toDateInput(x.visitAt));
+  if (!at) throw new InvalidEvent("pick a time");
+  return [
+    {
+      id: x.weightId,
+      kind: "weight",
+      at,
+      person_id: x.personId,
+      details,
+      note: x.linked?.note ?? null,
+      ...(x.linked ? { voids: x.linked.id } : {}),
+    },
+  ];
+}
+
+/** A pending row's "+ 2 treats" or "+ 7.6 lb": what is saved after it, so a failed row says what Retry and ✕ carry. */
+export function followText(then: readonly Pick<FollowUp, "kind" | "details">[]): string {
+  const treats = then.filter((t) => t.kind === "food").length;
+  return [
+    treats ? `+ ${treats} ${treats === 1 ? "treat" : "treats"}` : "",
+    ...then.filter((t) => t.kind === "weight").map((t) => `+ ${round1(weight(t).value)} ${weight(t).unit}`),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export type GrowthPoint = { at: string; kg: number; id: string };
 
 export function toKg(value: number, unit: Unit): number {
@@ -551,15 +816,24 @@ export const round1 = (n: number) => Math.round(n * 10) / 10;
  * reads "another dog".
  */
 export function describe(
-  e: Pick<JournalEvent, "kind" | "details">,
-  dogs: readonly Dog[] = []
+  e: Pick<JournalEvent, "kind" | "details"> & { id?: string },
+  dogs: readonly Dog[] = [],
+  events: JournalEvent[] = []
 ): { title: string; detail: string } {
   switch (e.kind) {
     case "potty": {
       const p = potty(e);
       const what = p.what === "both" ? "pee + poop" : p.what === "none" ? "no potty" : p.what;
-      const detail =
+      const base =
         p.where === "inside" ? `${what}, inside` : p.leash ? `${what} · ${LEASH_LABELS[p.leash].toLowerCase()}` : what;
+      const n = p.photos?.length ?? 0;
+      const detail = [
+        base,
+        p.issue ? issueLinkText(events, p.issue) : "",
+        n ? `${n} ${n === 1 ? "photo" : "photos"}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
       return { title: isAccident(e) ? "Accident" : "Potty", detail };
     }
     case "food": {
@@ -591,8 +865,12 @@ export function describe(
     case "health": {
       const h = health(e);
       const n = h.photos?.length ?? 0;
+      // A vet visit's linked weight (TEC-151): "Check-up · 7.6 lb".
+      const w = h.type === "vet" && e.id ? linkedWeight(events, e.id) : null;
       const parts = [
         (h.reasons ?? []).map((id) => healthReasonLabel(h.type, id)).join(", "),
+        w ? `${round1(weight(w).value)} ${weight(w).unit}` : "",
+        h.issue ? issueLinkText(events, h.issue) : "",
         n ? `${n} ${n === 1 ? "photo" : "photos"}` : "",
       ];
       return { title: HEALTH_LABELS[h.type] ?? "Health", detail: parts.filter(Boolean).join(" · ") };
@@ -638,6 +916,20 @@ function parsePhotos(raw: unknown): string[] | undefined {
   return photos.length ? photos : undefined;
 }
 
+/** A linked issue's id, lowercased; none is undefined (no key). That it is a Health issue is the server's check (`checkIssueTarget`). */
+function parseIssue(raw: unknown): string | undefined {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  if (!isUuid(raw)) throw new InvalidEvent("the related issue must be one from the list");
+  return raw.toLowerCase();
+}
+
+/** A weight's linked vet visit id, lowercased; none is undefined (no key). That it is a vet visit is the server's check (`checkVisitTarget`). */
+function parseVisit(raw: unknown): string | undefined {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  if (!isUuid(raw)) throw new InvalidEvent("the vet visit must be one that was saved");
+  return raw.toLowerCase();
+}
+
 function oneOf<T extends string>(v: unknown, options: readonly T[], field: string): T {
   if (typeof v !== "string" || !options.includes(v as T)) throw new InvalidEvent(`${field} must be ${options.join(" or ")}`);
   return v as T;
@@ -672,6 +964,10 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
         if (out.where !== "outside") throw new InvalidEvent("leashed, unleashed or in pen is for outside only");
         out.leash = oneOf(r.leash, LEASH, "leash");
       }
+      const issue = parseIssue(r.issue);
+      if (issue) out.issue = issue;
+      const photos = parsePhotos(r.photos);
+      if (photos) out.photos = photos;
       return out;
     }
     case "food": {
@@ -723,7 +1019,10 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
       if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value >= 200) {
         throw new InvalidEvent("weight must be a number above 0");
       }
-      return { value, unit: oneOf(r.unit, UNITS, "unit") } satisfies WeightDetails;
+      const out: WeightDetails = { value, unit: oneOf(r.unit, UNITS, "unit") };
+      const visit = parseVisit(r.visit);
+      if (visit) out.visit = visit;
+      return out;
     }
     case "health": {
       const type = oneOf(r.type, HEALTH_TYPES, "type");
@@ -737,6 +1036,11 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
       const reasons = [...new Set(picked as string[])];
       if (!reasons.length) throw new InvalidEvent(type === "vet" ? "pick why you went to the vet" : "pick what the issue is");
       const out: HealthDetails = { type, reasons };
+      const issue = parseIssue(r.issue);
+      if (issue) {
+        if (type !== "vet") throw new InvalidEvent("only a vet visit links to an issue");
+        out.issue = issue;
+      }
       const photos = parsePhotos(r.photos);
       if (photos) out.photos = photos;
       return out;
