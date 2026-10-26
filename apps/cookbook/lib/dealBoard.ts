@@ -1,0 +1,54 @@
+import { readConnectionRow } from "./krogerStore";
+import { readProducts } from "./productStore";
+import { readNightsSince, readWeeksSince } from "./priceStore";
+import { readCoupons } from "./couponStore";
+import { readLatestScan } from "./dealStore";
+import { addDays, denverDate } from "./priceDates";
+import { buildDealBoard, FRESH_NIGHTS, type DealBoard } from "./dealRows";
+import { HISTORY_WEEKS } from "./stoplight";
+
+/**
+ * The Deals tab's read (TEC-132): the saved products, their latest nightly
+ * prices, their last twelve weeks, the staged coupons and the list tab's latest
+ * deal scan, handed to `buildDealBoard` (`lib/dealRows.ts`, pure). **No Kroger
+ * call and no model call**: everything shown was recorded by the nightly scan
+ * or the existing deal scan. Any failed read throws, so a broken table can
+ * never read as "no deals".
+ */
+export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> {
+  const asOf = denverDate(now);
+  const connection = await readConnectionRow();
+  const store = connection?.location_id
+    ? { locationId: connection.location_id, name: connection.store_name ?? connection.location_id }
+    : null;
+
+  if (!store) {
+    const { staged } = await readCoupons();
+    return buildDealBoard({ asOf, store: null, products: [], nights: [], weeks: [], coupons: [], couponsStaged: staged, scan: null });
+  }
+
+  const [products, nights, weeks, { coupons, staged }, latest] = await Promise.all([
+    readProducts(),
+    readNightsSince(store.locationId, addDays(asOf, -FRESH_NIGHTS)),
+    readWeeksSince(store.locationId, addDays(asOf, -7 * HISTORY_WEEKS)),
+    readCoupons(),
+    readLatestScan(),
+  ]);
+
+  return buildDealBoard({
+    asOf,
+    store,
+    products,
+    nights,
+    weeks,
+    coupons,
+    couponsStaged: staged,
+    scan: latest
+      ? {
+          ranOn: denverDate(new Date(latest.ran_at)),
+          locationId: latest.location_id,
+          deals: latest.deals.map((d) => ({ productId: d.productId, regular: d.regular, promo: d.promo })),
+        }
+      : null,
+  });
+}

@@ -22,7 +22,7 @@ section and closing comment before changing anything in this file.
 - No home-screen install unless the owner grants one; the shape does not change.
 - `/admin` and `/debug` never appear in navigation and do not count as screens.
 - The tabs Recipes · Add · King Soopers list · Your brands · Deals are the verb index: browse,
-  add, shop, remember, save. Deals arrives with TEC-132. Installable is a shortcut, granted by the
+  add, shop, remember, save. Installable is a shortcut, granted by the
   owner; becoming an app is TEC-109.
 
 ## Recipes
@@ -95,7 +95,7 @@ section and closing comment before changing anything in this file.
 - **A line that is a product code goes in as that product.** A line that matches none of the saved
   names is matched against each saved product's official Kroger name, and that product is offered
   only when Kroger's own search for the item also returns it, so "spaghetti" never matches a sauce.
-  One hit goes straight in; several go to Settle these.
+  One hit goes straight in; several go to Pick one.
 - No model picks a product or runs anywhere in this flow.
 - Every line reports added, skipped or failed; a partial send never reads as whole.
 - A second send warns and shows what was already sent, because the Cart API only adds.
@@ -107,6 +107,28 @@ section and closing comment before changing anything in this file.
   replacing keeps the names and count, and happens only on a tap. A failed refresh says so.
 - The API cannot read the account; nothing here claims to know what was bought.
 - Kroger is mocked in tests.
+
+## Deals
+
+- **Every night, about 03:00 Denver time,** Vercel Cron calls `/api/cron/prices`. It records each
+  saved product's regular and sale price and stock at the chosen store: one row per product per
+  night, insert only. It uses Kroger's app token (product read), never the owner's account token.
+  No model runs.
+- **Every Monday, the past week rolls up** into one row per product: low, high, mean, regular mean,
+  nights on sale and nights seen. Nightly rows are kept, never deleted.
+- **A missed night is a gap.** It is never backfilled or guessed. A week whose Monday roll-up was
+  missed is rolled up on the next run, from the nightly rows that exist.
+- **A deal's colour compares today's price with that product's last 12 weeks:**
+  - **green** at least 15% under the mean, or at or below the 12-week low while also below the mean;
+  - **red** at least 10% over the mean, even when Kroger calls it a sale;
+  - otherwise no colour.
+  - Under 4 weeks of history it reads "new: building history".
+  - The thresholds are reviewed in TEC-138.
+- **Deals shows every deal, coloured,** with search, aisle groups, All · On sale · Coupon · Stacks,
+  and a Green · Neutral · Red · New filter. Each deal shows its usual price and an 8-week trend.
+- **Coupons come only from the owner's own Chrome task (TEC-126),** reviewed before saving. Until it
+  runs, Coupon and Stacks say "no coupons staged yet". **Stacks** marks a product with both a sale
+  and a coupon.
 
 ## Health↔Cookbook contract
 

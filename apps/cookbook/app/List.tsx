@@ -65,10 +65,13 @@ const MARK_WORDS: Record<LineMark, string> = { "★": "Your default", "?": "Need
 export default function List({
   refreshKey,
   onBrandsChanged,
+  onOpenLines,
   recipeNames,
 }: {
   refreshKey: number;
   onBrandsChanged?: () => void;
+  /** The open (unticked) lines, or null until read, for the Deals tab's On my list (TEC-132). */
+  onOpenLines?: (lines: string[] | null) => void;
   /** Recipe names by id, from the book, for Cooking this week. */
   recipeNames?: Map<string, string>;
 }) {
@@ -108,6 +111,11 @@ export default function List({
   useEffect(() => {
     void load();
   }, [load, refreshKey, reloads]);
+
+  // The Deals tab matches these; the list is read once, here, and handed up.
+  useEffect(() => {
+    onOpenLines?.(items === null ? null : items.filter((i) => !i.checked).map((i) => i.name));
+  }, [items, onOpenLines]);
 
   // A refresh or a send changes Your brands, which is its own tab since
   // TEC-131; the tab is told so it reads again. A send changes what is sent here.
@@ -439,7 +447,7 @@ export default function List({
         <p className="px-2 text-xs text-ink-soft">★ default saved · ? needs a pick at Send · + not saved yet</p>
       </div>
 
-      {/* Send to cart, King Soopers (TEC-90): connection, store, estimate, Take back, deals. */}
+      {/* Send to cart, King Soopers (TEC-90): connection, store, estimate, Take back. */}
       <CartPanel cart={cart} />
       <CartBar cart={cart} />
     </section>

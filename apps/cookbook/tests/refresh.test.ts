@@ -92,6 +92,7 @@ function found(over: Partial<Product> = {}): Product {
     regular: 4.99,
     promo: null,
     promoEnds: null,
+    aisle: null,
     pickup: true,
     delivery: true,
     inStock: true,

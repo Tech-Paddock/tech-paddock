@@ -39,7 +39,8 @@ describe("the Add tab (2026-10-05)", () => {
 
 describe("Your brands, its own tab (TEC-131)", () => {
   it("comes after the King Soopers list, at /brands, and the list keeps /list", () => {
-    expect(TABS.map((t) => t.label)).toEqual(["Recipes", "Add", "King Soopers list", "Your brands"]);
+    // Deals (TEC-132) is the fifth tab, so the whole list is now five.
+    expect(TABS.map((t) => t.label)).toEqual(["Recipes", "Add", "King Soopers list", "Your brands", "Deals"]);
     expect(pathFor("brands")).toBe("/brands");
     expect(pathFor("shop")).toBe("/list");
   });
@@ -49,6 +50,21 @@ describe("Your brands, its own tab (TEC-131)", () => {
     expect(existsSync(page)).toBe(true);
     expect(readFileSync(page, "utf8")).toMatch(/<Shell tab="brands" \/>/);
     expect(readFileSync(resolve(__dirname, "../app/List.tsx"), "utf8")).not.toMatch(/<Brands/);
+  });
+});
+
+describe("Deals, its own tab (TEC-132)", () => {
+  it("comes right after Your brands, at /deals, and /list is unchanged", () => {
+    const labels = TABS.map((t) => t.label);
+    expect(labels[labels.indexOf("Your brands") + 1]).toBe("Deals");
+    expect(pathFor("deals")).toBe("/deals");
+    expect(pathFor("shop")).toBe("/list");
+  });
+
+  it("has a route that opens on it", () => {
+    const page = resolve(__dirname, "../app/deals/page.tsx");
+    expect(existsSync(page)).toBe(true);
+    expect(readFileSync(page, "utf8")).toMatch(/<Shell tab="deals" \/>/);
   });
 });
 
