@@ -31,9 +31,12 @@ import {
   healthPickFor,
   healthReasonLabel,
   healthReasonsFromPick,
+  issueChoices,
+  linkedWeight,
   parseDetails,
   potty as asPotty,
   treatEntry,
+  visitWeightPlan,
   weight as asWeight,
   type QueuedTreat,
   type CommandId,
@@ -81,6 +84,8 @@ type Props = {
   /** Other dogs' "Add dog…": adds one to `lando.dogs` (or finds it) and hands it back. */
   onAddDog: (name: string) => Promise<{ dog: Dog | null; error: string | null }>;
   phonePerson: string | null;
+  /** Everything the journal read, voids included: the Related issue select lists its recent medical issues (TEC-142). */
+  events: JournalEvent[];
   /** Signed URLs by storage path, for the photos an entry being corrected already has. */
   photoUrls: Record<string, string>;
   /** A photo just uploaded: its signed URL, kept so the feed can show it once the entry is saved. */
@@ -198,6 +203,7 @@ export default function LogForm({
   dogs,
   onAddDog,
   phonePerson,
+  events,
   photoUrls,
   onPhotoUrl,
   remembered,
@@ -210,8 +216,8 @@ export default function LogForm({
   const openedAt = useRef(new Date().toISOString());
   // A weight is a day, not a moment: its When picks a date, stored at local noon.
   const dateOnly = kind === "weight";
-  // Health, Fun and Training take photos (TEC-137, TEC-139).
-  const hasPhotos = kind === "health" || kind === "exercise";
+  // Health, Fun, Training and Potty take photos (TEC-137, TEC-139, TEC-142).
+  const hasPhotos = kind === "health" || kind === "exercise" || kind === "potty";
 
   // Common
   const [when, setWhen] = useState(toLocalInput(event?.at ?? openedAt.current));
@@ -270,7 +276,19 @@ export default function LogForm({
 
   // Health (TEC-137): a vet visit or a medical issue, picks from a fixed list, photos on both.
   const h = event?.kind === "health" ? asHealth(event) : null;
+  // A vet visit's optional Weight (TEC-151). It opens empty, in this phone's last
+  // unit; a correction opens on the weight already saved with the visit, and
+  // changing it corrects that entry rather than adding a second.
+  const [linked] = useState(() => (event && h?.type === "vet" ? linkedWeight(events, event.id) : null));
+  const [visitValue, setVisitValue] = useState(linked ? String(asWeight(linked).value) : "");
+  const [visitUnit, setVisitUnit] = useState<Unit>(linked ? asWeight(linked).unit : remembered.unit ?? weightUnit);
   const [healthType, setHealthType] = useState<HealthType>(h?.type ?? "vet");
+  // Related issue (TEC-142), on Potty and on a vet visit: the id of a medical
+  // issue, or none. A correction opens on the stored link and keeps it unless
+  // it is changed; `issueChoices` adds it as an option when the list would not.
+  const [firstIssue] = useState(p?.issue ?? h?.issue ?? "");
+  const [issue, setIssue] = useState(firstIssue);
+  const issueOptions = issueChoices(events, firstIssue || null);
   // One high-level pick (TEC-139). An entry from before it, with several or
   // retired reasons, opens on them as a kept option and saves them unchanged
   // until another pick is made.
@@ -294,6 +312,8 @@ export default function LogForm({
   // is the same row, never a second one.
   const saveId = useRef(crypto.randomUUID());
   const deleteId = useRef(crypto.randomUUID());
+  // The visit's weight is its own entry; its id is fixed too, so a retry is the same row.
+  const visitWeightId = useRef(crypto.randomUUID());
 
   function pickFoodType(t: FoodType) {
     setFoodType(t);
@@ -348,7 +368,13 @@ export default function LogForm({
   function rawDetails(): Record<string, unknown> {
     switch (kind) {
       case "potty":
-        return { what, where, ...(where === "outside" && leash ? { leash } : {}) };
+        return {
+          what,
+          where,
+          ...(where === "outside" && leash ? { leash } : {}),
+          ...(issue ? { issue } : {}),
+          ...(photos.paths.length ? { photos: photos.paths } : {}),
+        };
       case "food":
         return { type: foodType, item_id: itemId, amount };
       case "exercise":
@@ -362,11 +388,13 @@ export default function LogForm({
           ...(photos.paths.length ? { photos: photos.paths } : {}),
         };
       case "weight":
-        return { value: Number(value.replace(",", ".")), unit };
+        // A weight saved from a vet visit keeps its link when corrected here (TEC-151).
+        return { value: Number(value.replace(",", ".")), unit, ...(w?.visit ? { visit: w.visit } : {}) };
       case "health":
         return {
           type: healthType,
           reasons: healthReasonsFromPick(reason === HEALTH_KEPT && h?.type !== healthType ? "" : reason, keptReasons),
+          ...(healthType === "vet" && issue ? { issue } : {}),
           ...(photos.paths.length ? { photos: photos.paths } : {}),
         };
     }
@@ -419,8 +447,20 @@ export default function LogForm({
     let then: LogBody[] = [];
     try {
       then = treatQueue.map((t) => treatEntry(t, at, body.person_id));
+      // A vet visit's Weight, saved after the visit (TEC-151); a Medical issue has none.
+      if (kind === "health" && healthType === "vet") {
+        then = visitWeightPlan({
+          typed: visitValue,
+          unit: visitUnit,
+          linked,
+          weightId: visitWeightId.current,
+          visitId: body.id,
+          visitAt: at,
+          personId: body.person_id,
+        });
+      }
     } catch (err) {
-      setError(err instanceof InvalidEvent ? err.message : "check the treats");
+      setError(err instanceof InvalidEvent ? err.message : "check the form");
       return;
     }
     if (!editing) {
@@ -450,6 +490,21 @@ export default function LogForm({
     form === "fun" ? EXERCISE_LABELS[exType] : form === "health" ? HEALTH_LABELS[healthType] : FORM_LABELS[form];
   const photoBlock = hasPhotos && (photos.working || photos.failed);
 
+  // The Related issue select, on Potty and on a vet visit (TEC-142): None, then
+  // recent live medical issues, newest first, by date and pick.
+  const relatedIssue = (
+    <Field label="Related issue" htmlFor="f-issue">
+      <select id="f-issue" value={issue} onChange={(e) => setIssue(e.target.value)} className={input}>
+        <option value="">None</option>
+        {issueOptions.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+
   return (
     <form onSubmit={submit} className="flex flex-col gap-3" noValidate>
       {kind === "potty" && (
@@ -474,6 +529,8 @@ export default function LogForm({
           {where === "inside" && what !== "none" && (
             <p className="text-[13px] font-semibold text-danger">Inside counts as an accident.</p>
           )}
+          {relatedIssue}
+          <PhotoPicker photos={photos} />
         </>
       )}
 
@@ -717,6 +774,26 @@ export default function LogForm({
               ))}
             </select>
           </Field>
+          {healthType === "vet" && relatedIssue}
+          {healthType === "vet" && (
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Weight (optional)" htmlFor="f-visit-weight">
+                <input
+                  id="f-visit-weight"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.1"
+                  value={visitValue}
+                  onChange={(e) => setVisitValue(e.target.value)}
+                  placeholder="7.0"
+                  className={input}
+                />
+              </Field>
+              <Field label="Unit">
+                <Seg name="visit-unit" label="Unit" value={visitUnit} onChange={setVisitUnit} options={UNITS.map((u) => [u, u] as const)} />
+              </Field>
+            </div>
+          )}
           <Field label="Note" htmlFor="f-note">
             <input
               id="f-note"
