@@ -276,13 +276,14 @@ test("GitHub, for Deployment: merging and updating go through; auto-merge, revie
   assert.equal(mcp("mcp__github__push_files", { branch: "claude/x", files: [] }), "ask");
 });
 
-test("starting Deployment waits for the owner from a main session and is refused to a helper; other helpers start freely", () => {
+test("starting Deployment or a builder waits for the owner from a main session and is refused to a helper; other helpers start freely", () => {
   const start = (subagent_type, who = {}) => verdict(decide({ tool_name: "Agent", tool_input: { subagent_type, prompt: "x" }, ...who }));
-  assert.equal(start("deployment"), "ask");
-  assert.equal(start("Deployment"), "ask");
-  assert.equal(start("deployment", HELPER), "deny");
-  assert.equal(start("deployment", DEPLOY), "deny");
-  for (const t of ["builder", "Explore", undefined]) {
+  for (const t of ["deployment", "Deployment", "builder", "Builder"]) {
+    assert.equal(start(t), "ask", t);
+    assert.equal(start(t, HELPER), "deny", t);
+    assert.equal(start(t, DEPLOY), "deny", t);
+  }
+  for (const t of ["Explore", "general-purpose", undefined]) {
     assert.equal(start(t), "allow", String(t));
     assert.equal(start(t, HELPER), "allow", String(t));
   }
@@ -466,7 +467,9 @@ test("end to end: the real commands deny, ask and allow", () => {
     const start = run(hookFor("Agent"), { tool_name: "Agent", tool_input: { subagent_type: "deployment", prompt: "x" } }, { shell });
     assert.equal(start.decision, "ask", shell);
     const builder = run(hookFor("Agent"), { tool_name: "Agent", tool_input: { subagent_type: "builder", prompt: "x" } }, { shell });
-    assert.equal(builder.decision, "allow", shell);
+    assert.equal(builder.decision, "ask", shell);
+    const explore = run(hookFor("Agent"), { tool_name: "Agent", tool_input: { subagent_type: "Explore", prompt: "x" } }, { shell });
+    assert.equal(explore.decision, "allow", shell);
   }
 });
 

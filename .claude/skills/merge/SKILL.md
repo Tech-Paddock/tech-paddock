@@ -64,6 +64,13 @@ follow the pull request's Verify line.
   an A record on purpose; every subdomain is a CNAME.
 - **Check a red status against `main` first.** Red there too is not the branch's.
 
+## If it breaks production
+
+Revert, don't roll back: a Vercel rollback is a Vercel write and the owner's. Open a pull request
+reverting the squash commit (`git revert <merge commit>` on a fresh `claude/<app>-revert-<change>`
+branch), request line quoting the owner's go, and merge it like any other. A migration it shipped
+stays: say so, and what the old code does with the new column. Reopen the issue.
+
 ## 6. After
 
 **Close what shipped, once it is live.** For each issue the branch names:

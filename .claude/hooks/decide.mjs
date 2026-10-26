@@ -79,13 +79,22 @@ export const isDeployment = (input) =>
 const MAIN_ONLY =
   "Every write to a pull request is Deployment's. Push your branch, report, and stop; the owner runs `/deploy`.";
 
-/* Starting Deployment: never from a helper; from a main session, only with the
-   owner's approval. A hook cannot tell the TD's session from another, so the
-   approval is what makes it the owner's `/deploy`. */
+/* Starting Deployment or a builder: never from a helper; from a main session,
+   only with the owner's approval. A hook cannot tell the TD's session from
+   another, so the approval is what makes it the owner's `/deploy` or `/build`
+   (TEC-156). */
+const BUILDER = "builder";
 function startAgent(a, input) {
-  if (String(a.subagent_type ?? "").toLowerCase() !== DEPLOYMENT) return null;
-  if (input?.agent_id) return deny("Only the TD starts Deployment, on the owner's `/deploy`. Report what is ready and stop.");
-  return ask("Starting Deployment waits for the owner's approval. Approve it only if you ran `/deploy`.");
+  const type = String(a.subagent_type ?? "").toLowerCase();
+  if (type === DEPLOYMENT) {
+    if (input?.agent_id) return deny("Only the TD starts Deployment, on the owner's `/deploy`. Report what is ready and stop.");
+    return ask("Starting Deployment waits for the owner's approval. Approve it only if you ran `/deploy`.");
+  }
+  if (type === BUILDER) {
+    if (input?.agent_id) return deny("Only the TD starts a builder, on the owner's `/build`. Put the work in your report and stop.");
+    return ask("Starting a builder waits for the owner's approval. Approve it only if you ran `/build`.");
+  }
+  return null;
 }
 
 /* ------------------------------------------------------------------------- */

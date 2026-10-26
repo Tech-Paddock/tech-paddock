@@ -25,6 +25,6 @@ The owner's only. This is the owner's go on the work; nothing else starts a buil
    brief: "app: X", the issue, the slice, the files that are its alone, the branch name
    (`claude/<app>-<change>`), whether it owns `NOTES.md`, the owner's words where they matter, and
    where to stop. Describe the job, not the code; a line-by-line brief is building.
-5. **One report to the owner** when they are all back: each branch as a link, the merge order
-   (migration first), the combined blast radius, and their questions as one multiple-choice
+5. **One report to the owner** when they are all back: each branch as a link, whether it deploys
+   alone or what it waits on, the merge order (migration first), the combined blast radius, and their questions as one multiple-choice
    question. Record the branches on the issue.

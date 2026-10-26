@@ -67,7 +67,8 @@ go, go fully and do not reopen it.
 - **One fresh branch per change:** `claude/<area>-<description>`, where area is an app folder or
   `ci`, `db`, `docs`, `platform`. Never reuse a branch. The TD's own docs and rules changes in one
   chat share one branch, a commit per request.
-- **Builder report:** blast radius (apps, shared files) and the Deployment section. `NOTES.md` is
+- **Builder report:** blast radius (apps, shared files), whether it deploys alone or what it waits
+  on, and the Deployment section. `NOTES.md` is
   updated on the same branch to what is true after merge.
 - **Deployment merges, on `/deploy` only:** pull request, CI green on the current head, migration,
   squash merge, deploy confirmed. The TD's own changes take the same path.
@@ -153,7 +154,7 @@ are the owner's.
 1. **`main` is protected:** `gate`, `drift` and `request-line` required, branches up to date.
 2. **The guard** (`.claude/hooks/guard.mjs`, fails closed) refuses a push to `main`, a non-squash
    merge, migration-history rewrites, and pull-request writes from anyone but Deployment; holds
-   starting Deployment, and Vercel and Supabase writes, for the owner; refuses a Linear issue
+   starting Deployment or a builder, and Vercel and Supabase writes, for the owner; refuses a Linear issue
    without labels or Next steps.
    `guard.test.mjs` proves each in CI.
 3. **CI `gate`:** every app typechecks, tests and builds, and `drift` passes

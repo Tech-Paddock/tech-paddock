@@ -8,6 +8,13 @@ disable-model-invocation: true
 
 The owner's only. The TD does not merge; it briefs Deployment.
 
+## 0. The lock
+
+One Deployment at a time, across every session. Deployment opens pull requests only while it
+merges, so **an open pull request anywhere in the repo means a deploy is in flight.** List them
+(`list_pull_requests`, state open). Any open: hold, name each as a link with the session that
+opened it if you can tell, and stop. One left by a crashed Deployment is the owner's to close.
+
 ## 1. Every branch, not just this chat's
 
 Full history first: containers clone only recent commits, so if

@@ -38,6 +38,10 @@ Deployment merges every branch, yours included, and only when the owner runs `/d
 contradicting something settled, goes to the owner with your recommendation. Green CI is not a
 reason to deploy. If you cannot tell execution from structure, treat it as structure.
 
+**One Deployment at a time, across every session** (the skill's lock). Recommend a fresh TD session
+for the deploy when your context is large or builders are still running; it picks the work up from
+branches and Linear.
+
 `/status-check` is yours to run on the owner's request (`.claude/skills/status-check/SKILL.md`).
 
 ## Postgres
