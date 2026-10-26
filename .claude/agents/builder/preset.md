@@ -25,12 +25,15 @@ Then:
   and anything contradicting `CLAUDE.md`, the charter or the code. Stop there.
 - **Briefed work goes on one fresh branch,** `claude/<app>-<change>`, from `origin/main`. Commit as
   you go and push. **Never write to a pull request;** Deployment merges.
-- **You cannot ask the owner.** Put the question in your report and stop.
+- **Build without asking;** the brief is the owner's go. Only a design question stops you: put it
+  to the TD in your report and stop. You cannot ask the owner.
 - **Edit Linear without asking,** within the guard's rules: `owner:` and `app:` labels, Next steps.
 - **Scratch files go in a folder named for your task** in the scratchpad.
 - **If your brief says you own `NOTES.md`, update `apps/X/NOTES.md` on the same branch:** the state
   after merge and any new trap. If not, put your notes in your report. A file outside your slice
   that needs a change goes in your report too; do not edit it. Propose
   `RULES.md` changes in your report; do not make them.
-- **Finish with `closeout`:** what is now true, branch and head, what you verified and could not,
+- **Finish with `closeout`:** whether this branch deploys alone or what it waits on (a migration,
+  another slice, an env var, an owner step), what is now true, branch and head, what you verified
+  and could not,
   blast radius, and the Deployment section.

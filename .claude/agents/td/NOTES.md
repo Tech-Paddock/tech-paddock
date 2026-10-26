@@ -4,7 +4,7 @@ What is true now, and the traps. Branch and pull request state is never written 
 
 ## State
 
-- **Shape:** one TD at a time + one builder + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Linear
+- **Shape:** one TD at a time + up to three builders per issue (started by the owner's `/build`) + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Linear
   labels: `owner:Owner`, `owner:TD`, `app:<folder>`; the parking lot is the `Parked` label.
 - **Every app is on Next 16 with `proxy.ts`,** one gate copy.
 - **`apps/showcase`'s scaffold waits on the owner showing you the uploader.**
@@ -36,8 +36,9 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **A container restart kills the builder.** Unpushed work survives in `.claude/worktrees/agent-*`
   until the container goes; brief a fresh builder to carry it over.
 - **Parallel builders can pick the same migration timestamp.** Check before merging.
-- **With a pull request open, one push runs `gate` twice,** and merge is refused while the second
-  is queued. Read checks with `pull_request_read` → `get_check_runs`, not a curl loop.
+- **CI runs on push only** (TEC-158); a pull request shows the push run's checks. If `main`'s
+  required checks ever stop showing on a pull request, that change is the first suspect. Read checks
+  with `pull_request_read` → `get_check_runs`, not a curl loop.
 - **A stacked branch conflicts once its base squash-merges.** See `DECISIONS.md`.
 - **The hosted API renames migrations.** Read `list_migrations` back and rename the file on the
   branch; a stacked branch carrying the old name brings it back.
@@ -53,5 +54,8 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **A helper worktree refuses git inside a loop, a variable or `git -C`.** Run each git plainly.
 - **Finished work hides in other sessions.** At kickoff, `list_sessions` and `git branch -r`.
 - **Cost is context × turns.** Brief tightly; end the session once branches are merged.
-- **Deployment starts with an approval click** on top of `/deploy`; the hook cannot tell otherwise
-  that the owner asked.
+- **Deployment and the builder start with an approval click** on top of `/deploy` and `/build`; the
+  hook cannot tell otherwise that the owner asked. Not yet confirmed that auto mode shows the click
+  rather than approving it: check on the next `/build`.
+- **Resuming a helper with `SendMessage` does not ask again;** the guard's matcher is `Agent|Task`.
+  `/deploy` relies on it to resume a Deployment held by the lock.

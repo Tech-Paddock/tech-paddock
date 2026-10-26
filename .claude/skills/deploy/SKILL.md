@@ -8,10 +8,20 @@ disable-model-invocation: true
 
 The owner's only. The TD does not merge; it briefs Deployment.
 
+## 0. The lock
+
+One Deployment at a time, across every session. Deployment opens pull requests only while it
+merges, so **an open pull request anywhere in the repo means a deploy is in flight.** List them
+(`list_pull_requests`, state open) and note the holder: the `Claude-Session` trailer on each one's
+head commit, or `list_sessions`. Then sort as below either way; step 4 says what a held lock
+changes.
+
 ## 1. Every branch, not just this chat's
 
-`git fetch`, then every remote branch not on `main` (`git branch -r --no-merged origin/main`),
-whichever session cut it. For each: its Linear issue (from its commits), the session that cut it
+Full history first: containers clone only recent commits, so if
+`git rev-parse --is-shallow-repository` says `true`, run `git fetch --unshallow` (it adds history
+and changes nothing else). Then `git fetch`, and every remote branch not on `main`
+(`git branch -r --no-merged origin/main`), whichever session cut it. For each: its Linear issue (from its commits), the session that cut it
 (the `Claude-Session` trailer, read with `get_session`), and `gate` on its head.
 
 ## 2. What is in flight
@@ -34,18 +44,41 @@ Look before sorting; in-flight work holds only the branches it touches.
 - **Not ready:** anything else, with the one thing that clears it (red `gate`, no Deployment
   section, a step waiting on the owner, an approval-list item without approval).
 - **Stale:** its issue Done or Canceled with the work not wanted, or its diff against `main` empty.
-  Recommend `stale_<name>`; never merge it.
+  List it as a link for the owner to delete; never merge it.
 
 If you cannot tell whether a branch is finished, it is not ready; say what you would need.
 
-## 4. Start Deployment
+## 4. Start Deployment now
 
-`subagent_type: deployment`, with the ready branches as its brief: for each, its name, the request
-line (`Requested on YYYY-MM-DD — "…"`, the owner's words), the Linear issue, the blast radius, the
+**The owner's `/deploy` is the green light, and its approval click lands here, now,** while they
+are in this chat. So start Deployment (`subagent_type: deployment`) straight away, lock or not,
+with the ready branches as its brief: for each, its name, the request line
+(`Requested on YYYY-MM-DD — "…"`, the owner's words), the Linear issue, the blast radius, the
 Deployment section and the merge order (migrations first, slices of one issue together). Add the
 other three lists so its report carries them. Nothing ready: still start it, so the check runs.
 
-## 5. Relay its report unchanged
+**Lock held:** tell Deployment so in its brief; it runs its pre-deploy check, reports held, and
+stops without opening anything. Then, TD to TD with `send_message` (a Deployment helper cannot be
+messaged across sessions, so its TD speaks for it):
 
-In the `/status-check` format, under **Deploy held** or **Deployed**, with the in-flight, not-ready
-and stale branches after it, each with what clears it.
+1. **Offer the holder your ready branches** with their briefs, and ask it to fold them into its run
+   or to message you when its Deployment stops.
+2. **The holder folds them in** if they are ready and touch nothing its own branches touch: it
+   `SendMessage`s them to its running Deployment, which merges them last. No new approval: the
+   owner's `/deploy` in your chat already covers them, and order changes are not the owner's.
+   Otherwise it replies with why. Either way it reports each of your branches back to you, and
+   messages every session waiting on it when its Deployment stops.
+3. **Not folded in:** when the holder says it has stopped, or a `send_later` check-in at 20 minutes
+   finds no pull request open, **resume your own Deployment with `SendMessage`.** Resuming a
+   helper starts nothing new, so the owner is not asked again.
+4. **No holder:** a pull request no session claims (a crashed Deployment) is the owner's to close;
+   name it as a link and stop.
+
+## 5. What reaches the owner
+
+Relay Deployment's report, or the holder's report on your branches, in the `/status-check` format
+under **Deploy held** or **Deployed**. Tell the owner, in this chat, everything that needs them: a
+clash (two runs touching the same files, a merge conflict), a failure, a hold, a revert, or a step
+only they can take. A clean merge is one line: shipped, live. Who held the lock and how it was
+resolved is one line too; a changed order is not news. If you held the lock, message every session
+that asked to hear when your Deployment stopped.

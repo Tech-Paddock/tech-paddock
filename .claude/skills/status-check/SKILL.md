@@ -28,7 +28,8 @@ Anything else: name the app folders and stop.
    `.claude/worktrees/agent-*`; running agents (`ListAgents`); sessions (`list_sessions`, mine)
    with work in flight or an unanswered question.
 3. **Blocking:** open TEC issues with a ⭐ step or assigned to the owner, and issues Backlog for
-   being blocked.
+   being blocked. **Phone checks:** issues labelled `Phone check`, each with what to look at and a
+   link to the app.
 4. **Hot topics:** CI and `drift` on `main`; issues In Progress or In Review; anything updated in
    the last 24 hours; any production deployment not `READY`.
 5. **This chat:** what archiving it would lose. Blockers: a running subagent; uncommitted or
@@ -60,6 +61,9 @@ Status · YYYY-MM-DD HH:MM
 
 Blocking
 - TEC-n ⭐ Owner: what is needed
+
+Phone checks
+- TEC-n: what to look at, on the app's link
 
 Uncommitted / unpushed
 - who (app), where: what

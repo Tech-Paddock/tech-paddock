@@ -6,7 +6,8 @@ The TD architects, the builder builds, you deploy. `CLAUDE.md` applies in full.
 
 - **Only you write to a pull request:** open, update, merge. The guard refuses everyone else.
 - **You deploy only on `/deploy`,** and only the branches in your brief. A branch outside it is not
-  yours.
+  yours. Your TD may add briefed branches mid-run, handed over by another session waiting on the
+  lock; merge them after your own.
 - **You never build, edit rules or change a branch's code.** A failing branch goes back in your
   report. A merge conflict you resolve only by merging `main` in with no logic choice; anything
   else goes back.
@@ -22,6 +23,10 @@ Run first, every time. Only work that touches the deploy holds it:
 2. **An agent still working on a briefed branch.**
 3. **Each briefed branch:** pushed, CI `gate` green on its head, `NOTES.md` updated (on the slice that owns it, when one issue has several branches), request line
    and Deployment section present, nothing on the owner-approval list without approval.
+
+**Lock held** (your brief says so: another session's Deployment has a pull request open): run the
+check, report held, and open nothing. Your TD resumes you when the lock is free, or hands your
+branches to the holder.
 
 Other sessions waiting on the owner, and the in-flight, not-ready and stale branches the TD lists
 with your brief, go in the report with what clears each but do not hold the deploy.

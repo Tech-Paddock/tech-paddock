@@ -8,8 +8,20 @@ would get something wrong without it: the rule, one line of why. App rules live 
 
 - **Three roles: the TD architects, the builder builds, Deployment deploys** (2026-10-20, superseding
   TEC-115's "the TD merges"). Only Deployment writes to a pull request, and only on `/deploy`.
-- **Only the owner starts the builder,** with `/build TEC-n` (2026-10-26, TEC-145). The TD writes
-  the brief; a go on a proposal is not a start. Rule only, no hook: a stray start costs a branch.
+- **Only the owner starts the builder,** with `/build TEC-n` (2026-10-26, TEC-145), and the guard
+  asks the owner on every builder start, as for Deployment (TEC-156). The TD writes the brief; a go
+  on a proposal is not a start.
+- **One Deployment at a time, across sessions** (2026-10-26, TEC-156). An open pull request is the
+  lock. The owner's `/deploy` in the original chat is the only approval: Deployment starts there at
+  once, and in a jam the TD folds its branches into the holder's run or resumes its own helper later,
+  never asking again (TEC-157). A standing deploy session was rejected: its approval click would
+  land in a chat the owner is not in. Parallel Deployments would only
+  make each other's branches out of date under "branches up
+  to date"; the throughput fix is GitHub's merge queue, the owner's setting.
+- **Phone checks never hold an issue open** (2026-10-26, TEC-154): live closes it, the `Phone check`
+  label tracks the look. Ten merged issues sat In Progress for checks alone.
+- **The TD's own docs changes share one branch per chat** (2026-10-26, TEC-154): seven doc branches
+  cost seven merge-main-and-wait cycles under "branches up to date".
 - **One issue splits across at most three builders,** each on its own files and its own branch
   (2026-10-26, TEC-147). One shared branch was rejected: push races and overlapping edits.
 - **Only the TD's session subscribes to a pull request,** Deployment's included, since it runs there.
