@@ -174,8 +174,12 @@
     from the feed), and they then no longer show on it.
 - **Analytics** (`app/Analytics.tsx`, rebuilt by TEC-143; all aggregation is pure, in
   `lib/analytics.ts`, tested in `tests/timeline.test.ts`; no model call, no data change). The last 14
-  local days, six cards:
-  - **Day by day** (`app/DayTimeline.tsx`): a row per day, newest first, hours 0-24 across (ticks
+  local days, six cards,
+  **except Day by day, which shows the last 5** (`TIMELINE_DAYS`, TEC-153, next to `ANALYTICS_DAYS`;
+  `dayTimeline` builds its marks and counts from it, so the two always cover the same days; the
+  owner's "for scatter plot only go back 5 days"). Time between pees, meal to poop, food against weight
+  and the heading stay on 14 days, exercise on 4 weeks:
+  - **Day by day** (`app/DayTimeline.tsx`): a row per day (5), newest first, hours 0-24 across (ticks
     12a 6a 12p 6p 12a). Potty marks on a top lane, food marks below; each kind has its own shape
     (`app/Glyph.tsx`: pee circle, poop square, accident triangle, meal diamond, treat plus) and a
     legend, so colour is never the only cue. Pee, poop, accident (inside), meal, treat; "No potty"

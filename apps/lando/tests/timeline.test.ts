@@ -4,7 +4,9 @@ process.env.TZ = "America/New_York";
 
 import { describe, expect, it } from "vitest";
 import {
+  TIMELINE_DAYS,
   dayMarks,
+  dayTimeline,
   foodAgainstWeight,
   formatSpan,
   mealToPoop,
@@ -357,5 +359,35 @@ describe("weeklyExercise", () => {
     const w = weeklyExercise([session(local(10, 30, 8), "walk", 10), session(local(11, 7, 8), "walk", 5)], local(11, 10, 9));
     expect(w.map((x) => x.end.getDate())).toEqual([20, 27, 3, 10].slice(4 - w.length));
     expect(w[w.length - 1]).toMatchObject({ fun: 5 });
+  });
+});
+
+describe("the timeline window (TEC-153)", () => {
+  // An old event 10 days back: outside the timeline's 5 days, inside the other cards' 14.
+  const old = local(10, 10, 9);
+  const events = [potty(old, "pee"), meal(old), potty(local(10, 20, 8), "pee"), meal(local(10, 20, 8))];
+
+  it("shows the last 5 local days, today included, in marks and counts alike", () => {
+    expect(TIMELINE_DAYS).toBe(5);
+    const t = dayTimeline(events, NOW);
+    expect(t.marks).toHaveLength(5);
+    expect(t.rows).toHaveLength(5);
+    expect(t.marks[4].start).toEqual(new Date(2026, 9, 20));
+    expect(t.marks[0].start).toEqual(new Date(2026, 9, 16));
+    expect(t.rows.map((r) => r.start)).toEqual(t.marks.map((m) => m.start));
+    expect(t.marks.flatMap((m) => m.marks)).toHaveLength(2); // the 10 Oct entries are not plotted
+  });
+
+  it("leaves every other aggregation on 14 days", () => {
+    expect(perDay(events, NOW)).toHaveLength(14);
+    expect(peeGaps(events, NOW)).toHaveLength(14);
+    expect(mealToPoop(events, NOW).days).toHaveLength(14);
+    expect(foodAgainstWeight(events, NOW, "lb").days).toHaveLength(14);
+    expect(perDay(events, NOW).reduce((a, r) => a + r.pee, 0)).toBe(2); // the 10 Oct pee is counted
+  });
+
+  it("is 5 calendar days across the DST change", () => {
+    const now = new Date(2026, 10, 3, 15); // 3 Nov; clocks fell back on 1 Nov
+    expect(dayTimeline([], now).marks.map((m) => m.start.getDate())).toEqual([30, 31, 1, 2, 3]);
   });
 });

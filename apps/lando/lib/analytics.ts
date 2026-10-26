@@ -21,6 +21,8 @@ import {
 } from "./events";
 
 export const ANALYTICS_DAYS = 14;
+/** The Day by day timeline alone looks back this many local days, today included (TEC-153). */
+export const TIMELINE_DAYS = 5;
 
 export type DayRow = {
   /** Local midnight that starts the day. */
@@ -120,10 +122,10 @@ export function dailyAverage(rows: DayRow[], keys: Count[]): number | null {
   return sum(span, keys) / span.length;
 }
 
-/** One line on accidents: this week against the week before. */
+/** One line on accidents: the recent half of the days against the half before it. */
 export function accidentTrend(rows: DayRow[]): string {
   const half = Math.floor(rows.length / 2);
-  const before = sum(rows.slice(0, rows.length - half), ["accident"]);
+  const before = sum(rows.slice(rows.length - 2 * half, rows.length - half), ["accident"]);
   const recent = sum(rows.slice(rows.length - half), ["accident"]);
   const n = (k: number) => `${k} ${k === 1 ? "accident" : "accidents"}`;
   if (before === 0 && recent === 0) return `No accidents in ${rows.length} days.`;
@@ -219,6 +221,11 @@ export function dayMarks(events: JournalEvent[], now: Date, days = ANALYTICS_DAY
  * last is reused (a fourth mark within the gap overlaps; the row's tap text
  * lists every time).
  */
+/** What the Day by day card draws: `TIMELINE_DAYS` days of marks and of counts, the same days, oldest first. */
+export function dayTimeline(events: JournalEvent[], now: Date): { marks: DayMarks[]; rows: DayRow[] } {
+  return { marks: dayMarks(events, now, TIMELINE_DAYS), rows: perDay(events, now, TIMELINE_DAYS) };
+}
+
 export function stackLevels(hours: number[], gap: number, levels = 3): number[] {
   const lastAt: number[] = Array(levels).fill(-Infinity);
   return hours.map((h) => {

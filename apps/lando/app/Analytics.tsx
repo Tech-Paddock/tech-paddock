@@ -3,18 +3,18 @@
 import { useMemo } from "react";
 import {
   ANALYTICS_DAYS,
+  TIMELINE_DAYS,
   EXERCISE_WEEKS,
   MEAL_POOP_WINDOW_MS,
   about,
   accidentTrend,
   dailyAverage,
-  dayMarks,
+  dayTimeline,
   dayStarts,
   foodAgainstWeight,
   formatSpan,
   mealToPoop,
   peeGaps,
-  perDay,
   typicalGaps,
   weeklyExercise,
 } from "@/lib/analytics";
@@ -39,7 +39,7 @@ function Card({ title, summary, children }: { title: string; summary?: React.Rea
 }
 
 /**
- * The last fourteen of the phone's days, from the same read as the Log tab
+ * The last fourteen of the phone's days (the timeline alone, five: TEC-153), from the same read as the Log tab
  * (TEC-143): a timeline of potty and food by the hour, the gaps between pees,
  * meal to poop, food against weight, the growth chart, and exercise by week.
  * Calories are recorded with every food and deliberately not shown. No model
@@ -52,8 +52,7 @@ export default function Analytics({ events, now }: { events: JournalEvent[]; now
   const dayKey = now.toDateString();
   const minute = Math.floor(now.getTime() / MIN);
   const midnight = useMemo(() => new Date(dayKey), [dayKey]);
-  const rows = useMemo(() => perDay(events, midnight), [events, midnight]);
-  const marks = useMemo(() => dayMarks(events, midnight), [events, midnight]);
+  const { marks, rows } = useMemo(() => dayTimeline(events, midnight), [events, midnight]);
   const gaps = useMemo(() => peeGaps(events, midnight), [events, midnight]);
   const mealPoop = useMemo(() => mealToPoop(events, new Date(minute * MIN)), [events, minute]);
   const unit = displayUnit(events);
@@ -96,7 +95,7 @@ export default function Analytics({ events, now }: { events: JournalEvent[]; now
 
       <Card
         title="Day by day"
-        summary={`${outside === null ? tooSoon : `About ${about(outside)} trips outside a day.`} ${accidentTrend(rows)}`}
+        summary={`Last ${TIMELINE_DAYS} days. ${outside === null ? tooSoon : `About ${about(outside)} trips outside a day.`} ${accidentTrend(rows)}`}
       >
         <DayTimeline days={marks} rows={rows} />
       </Card>
