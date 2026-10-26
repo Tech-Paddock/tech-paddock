@@ -31,22 +31,6 @@ export function isKingSoopersProduct(text: string): boolean {
 export const CHECKOUT_URL = "https://www.kingsoopers.com/cart";
 
 /**
- * King Soopers' digital coupons, searched for an item (TEC-121). **A constant
- * and a link, never a request**: Kroger's public API has no coupons (every
- * coupon route is a 404) and kingsoopers.com is bot-protected, so the deal
- * scan never reads coupons; it offers this link beside each sale instead.
- *
- * **The query parameter is unconfirmed**: no session here can load the page.
- * A wrong parameter still lands on the coupons page, unsearched.
- */
-export const COUPONS_SEARCH_URL = "https://www.kingsoopers.com/savings/cl/coupons/";
-
-export function couponsUrl(item: string): string {
-  const words = item.trim().replace(/\s+/g, " ");
-  return words ? `${COUPONS_SEARCH_URL}?query=${encodeURIComponent(words)}` : COUPONS_SEARCH_URL;
-}
-
-/**
  * The product number a King Soopers product page carries, or null.
  *
  * **What Send to cart puts in the cart for a line tied to an exact product**

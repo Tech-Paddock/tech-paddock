@@ -174,7 +174,8 @@ Reasoning is in the migration headers.
   brands"); the line stays added.
 - A line left out of the picks reports skipped, "Not this trip — still on your list."
 - The state is `useCart` (`app/Cart.tsx`); `List.tsx` lays out `SendView`, `CartPanel`
-  (connection, store, refresh, Take back's confirm, the estimate, deals) and `CartBar` (sticky
+  (connection, store, refresh, Take back's confirm, the estimate; **no deals since TEC-132**, they
+  live on the Deals tab) and `CartBar` (sticky
   **Send to cart** and **Take back**). `serialKroger` is module-level, so the list and Your
   brands' Refresh now share one Kroger queue.
 - **Searching by the item alone** (TEC-131): `lineTerm` (`lib/cart.ts`) is
@@ -229,9 +230,11 @@ Reasoning is in the migration headers.
   Exact IDs go in one `productsByIds` call (50 per request); searches run four at a time.
 - Deal scan: `GET`/`POST /api/kroger/deals`. Every saved product (by code), every search-word phrase, plus every open line; a deal is
   `promo < regular`, sorted by percent off, then dollars. Runs when the list opens and the latest
-  scan is over seven days old (`scanDue`), or on *Scan for deals*. A scan that throws saves
-  nothing, so the next open retries.
-- Coupons are never read. *Find coupons* is `couponsUrl` (`lib/kingsoopers.ts`), a constant.
+  scan is over seven days old (`scanDue`). **No panel shows it and there is no Scan button
+  (TEC-132)**: it feeds the list lines' sale tags and the Deals board's first day. A scan that
+  throws saves nothing, so the next open retries, and the King Soopers panel says so in red.
+- Coupons are never read here. The *Find coupons* link left with the panel (TEC-132), and
+  `couponsUrl` with it.
 - Estimate: `POST /api/kroger/estimate`, computed and not stored. The list header shows "about
   $N" (rounded) from the last one, or *estimate it*. Promo first, in cents. A line not
   offered for the chosen mode, with no price or with no match is unpriced and named; with nothing
@@ -248,7 +251,7 @@ Reasoning is in the migration headers.
 - Picking a store clears the estimate but does not start a scan; the old store's scan stays shown
   under its store name and tags nothing until the next scan.
 - `Cart.tsx` runs every token-borrowing request through `serial`, one at a time: opening the list
-  can start a refresh and a scan together. The toggle, estimate panel and deal rows are local
+  can start a refresh and a scan together. The toggle and estimate panel are local
   patterns in `app/Deals.tsx`.
 
 ## Deals (TEC-132)
@@ -291,6 +294,17 @@ Reasoning is in the migration headers.
   Neutral / Red / New, aisle); a **new** product shows under Any and under New, none of the three colours. A coupon
   matches by product code only. Coupon and Stacks say "no coupons staged yet" until a coupon row
   exists.
+- **On my list** (TEC-132, owner 2026-10-26) is the first section of the tab, above the filters
+  and not affected by them. `lib/listDeals.ts` (pure) takes the board's rows and the list's open
+  (unticked) lines; `List.tsx` hands the lines up through `onOpenLines` and `Cookbook.tsx` passes
+  them down, so it is the one read of the list and **no request of its own**. A line finds a row the
+  way the list finds products (`decide`): a product code; else a saved name as whole words, the
+  longest winning; only if none, the line's item words in the official name. A **deal** is a sale,
+  a staged coupon or a green light; a matched row that is none of those is not listed. Each row
+  says which line found it. Empty: "Nothing on your list has a deal right now." (and "Reading your
+  list…" until the list is read). The edge: `decide` weighs every saved product, this only the board
+  (products with a recent price), so a longer name on an unpriced product cannot outrank a
+  shorter one here. The rows also stay in their aisle below.
 - The tab's rows, chips, colour mark and trend bars are local patterns in `app/DealsTab.tsx`; the
   trend is the last eight weekly means with today as the last bar.
 
@@ -454,10 +468,9 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 - The two Kroger migrations and `cookbook_deal_scans_and_modality` must be applied before this
   code runs; the connection read selects `modality`, so without it the whole list tab's King
   Soopers panel fails.
-- The coupons search's `?query=` parameter is unconfirmed (kingsoopers.com is unreachable from
-  here). A wrong one still lands on the coupons page, unsearched; it is one constant.
 - A line added since the last scan has no sale tag until the next scan or *Calculate estimated
-  total*; a line renamed by Tidy loses its tag the same way.
+  total*; a line renamed by Tidy loses its tag the same way. With no Scan button, the next scan is
+  the weekly one on opening the list.
 - `withAccessToken` is per request: two tabs open at once can still race token rotation, because
   `serial` covers one page.
 - **`cookbook_price_nights`, `cookbook_price_weeks` and `cookbook_coupons` must be applied before

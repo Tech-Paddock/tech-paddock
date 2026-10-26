@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DealBoard, DealRow } from "@/lib/dealRows";
+import { listDeals } from "@/lib/listDeals";
 import { ALL_AISLES, NO_FILTER, groupByAisle, matchesFilter, type DealFilter, type Kind, type LightFilter } from "@/lib/dealFilter";
 
 /**
@@ -10,6 +11,9 @@ import { ALL_AISLES, NO_FILTER, groupByAisle, matchesFilter, type DealFilter, ty
  * 2026-10-23. **It reads `/api/deals`, which reads what the nightly scan
  * recorded; nothing here calls Kroger.**
  *
+ * - **On my list** at the top: the rows that match an open line on the
+ *   shopping list (`lib/listDeals.ts`), from the board and the list already
+ *   read; no request of its own;
  * - search, the aisle chips (Kroger's own categories), **All · On sale ·
  *   Coupon · Stacks**, and **Any · Green · Neutral · Red · New**;
  * - each row: the name, its usual price, the sale and coupon tags, today's
@@ -86,7 +90,7 @@ function Mark({ row }: { row: DealRow }) {
   return <div className="text-xs text-ink-soft">{row.note}</div>;
 }
 
-function Row({ row }: { row: DealRow }) {
+function Row({ row, forLines }: { row: DealRow; forLines?: string[] }) {
   const edge = row.light === "green" ? "border-l-4 border-l-accent" : row.light === "red" ? "border-l-4 border-l-danger" : "";
   return (
     <li className={`flex items-center gap-3 border-t border-line/40 px-3.5 py-3 first:border-t-0 ${edge}`}>
@@ -98,6 +102,7 @@ function Row({ row }: { row: DealRow }) {
           {row.bought > 1 ? <span className="text-[11px] font-semibold text-accent">★ bought {row.bought}×</span> : null}
         </div>
         <div className="text-xs text-ink-soft">
+          {forLines ? `for ${forLines.join(", ")} · ` : ""}
           {row.size ? `${row.size} · ` : ""}usually {money(row.usual)}
           {row.priceDate ? ` · ${row.source === "scan" ? "last scan" : "as of"} ${day(row.priceDate)}` : ""}
         </div>
@@ -122,7 +127,7 @@ function Row({ row }: { row: DealRow }) {
   );
 }
 
-export default function DealsTab({ refreshKey = 0 }: { refreshKey?: number }) {
+export default function DealsTab({ refreshKey = 0, openLines = null }: { refreshKey?: number; openLines?: string[] | null }) {
   const [board, setBoard] = useState<DealBoard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<DealFilter>(NO_FILTER);
@@ -148,6 +153,7 @@ export default function DealsTab({ refreshKey = 0 }: { refreshKey?: number }) {
   const aisles = useMemo(() => [ALL_AISLES, ...Array.from(new Set((board?.rows ?? []).map((r) => r.aisle))).sort()], [board]);
   const shown = useMemo(() => (board?.rows ?? []).filter((r) => matchesFilter(r, filter)), [board, filter]);
   const groups = useMemo(() => groupByAisle(shown), [shown]);
+  const mine = useMemo(() => (board && openLines ? listDeals(board.rows, openLines) : []), [board, openLines]);
   const set = (patch: Partial<DealFilter>) => setFilter((f) => ({ ...f, ...patch }));
 
   const wantsCoupons = filter.kind === "coupon" || filter.kind === "stack";
@@ -235,6 +241,25 @@ export default function DealsTab({ refreshKey = 0 }: { refreshKey?: number }) {
           ))}
         </div>
       </div>
+
+      {board?.store ? (
+        <div className="flex flex-col gap-1.5" aria-label="On my list">
+          <h3 className="px-2 text-xs font-bold uppercase tracking-wider text-ink-soft">
+            On my list{mine.length > 0 ? ` · ${mine.length}` : ""}
+          </h3>
+          {mine.length > 0 ? (
+            <ul className="overflow-hidden rounded-xl bg-surface">
+              {mine.map((d) => (
+                <Row key={d.row.productId} row={d.row} forLines={d.lines} />
+              ))}
+            </ul>
+          ) : (
+            <p className="rounded-xl bg-surface p-4 text-sm text-ink-soft">
+              {openLines === null ? "Reading your list…" : "Nothing on your list has a deal right now."}
+            </p>
+          )}
+        </div>
+      ) : null}
 
       {board && groups.length === 0 ? <p className="rounded-xl bg-surface p-4 text-sm text-ink-soft">{empty()}</p> : null}
 

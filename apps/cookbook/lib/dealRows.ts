@@ -34,6 +34,8 @@ export const NO_AISLE = "Other";
 export type DealRow = {
   productId: string;
   name: string;
+  /** The names the product is saved under (Your brands), for matching list lines. */
+  names: string[];
   size: string | null;
   url: string;
   aisle: string;
@@ -167,6 +169,7 @@ export function buildDealBoard(input: BoardInput): DealBoard {
     rows.push({
       productId: p.product_id,
       name: p.description ?? p.names[0] ?? p.product_id,
+      names: p.names,
       size: p.size ?? p.size_first,
       url: p.url ?? pageFor(p.product_id, p.names[0] ?? ""),
       aisle: aisle ?? NO_AISLE,

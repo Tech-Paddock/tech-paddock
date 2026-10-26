@@ -50,6 +50,8 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
   // Your brands and the list each change what the other shows: a send or a
   // refresh changes Your brands, and an edit there changes the list's links.
   const [brandsVersion, setBrandsVersion] = useState(0);
+  // The list's open lines, for the Deals tab's On my list (TEC-132); null until the list is read.
+  const [openLines, setOpenLines] = useState<string[] | null>(null);
   const onRead = useCallback((read: Recipe[]) => {
     setCuisines(cuisinesIn(read));
     setRecipes(read);
@@ -102,7 +104,7 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
         </div>
         <div role="tabpanel" id="panel-shop" aria-labelledby="tab-shop" hidden={tab !== "shop"}>
           <div className="mx-auto w-full max-w-2xl">
-            <List refreshKey={listVersion} onBrandsChanged={() => setBrandsVersion((n) => n + 1)} recipeNames={recipeNames} />
+            <List refreshKey={listVersion} onBrandsChanged={() => setBrandsVersion((n) => n + 1)} onOpenLines={setOpenLines} recipeNames={recipeNames} />
           </div>
         </div>
         <div role="tabpanel" id="panel-brands" aria-labelledby="tab-brands" hidden={tab !== "brands"}>
@@ -112,7 +114,7 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
         </div>
         <div role="tabpanel" id="panel-deals" aria-labelledby="tab-deals" hidden={tab !== "deals"}>
           <div className="mx-auto w-full max-w-2xl">
-            <DealsTab refreshKey={brandsVersion} />
+            <DealsTab refreshKey={brandsVersion} openLines={openLines} />
           </div>
         </div>
       </div>
