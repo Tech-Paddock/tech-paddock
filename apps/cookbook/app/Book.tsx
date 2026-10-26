@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Provenance from "./Provenance";
 import Menu from "./Menu";
 import MacroRow from "./MacroRow";
+import MacroBreakdown from "./MacroBreakdown";
 import { useToast } from "./Toast";
 import { round, scale } from "@/lib/macros";
 import { methodSteps, perServing, type Recipe, type RecipeOrigin } from "@/lib/recipes";
@@ -22,6 +22,9 @@ import { NO_FILTER, cuisinesIn, filterActive, matchesFilter, type BookFilter } f
  * stay mounted side by side, so a recipe kept there reaches this one through
  * `version` rather than through shared state.
  */
+
+/** The open recipe's section headings: the uppercase heading of TEC-135, copied locally. */
+const SECTION = "text-xs font-bold uppercase tracking-wider text-ink-soft";
 
 const ORIGIN_LABELS: Record<RecipeOrigin, string> = {
   manual: "Yours",
@@ -354,14 +357,13 @@ function RecipeCard({
           />
         </div>
       ) : open ? (
+        // **The recipe leads** (TEC-140): one serving's macros, the metadata
+        // line, the ingredients, the method; then the Macro breakdown
+        // (collapsed: pot and serving, the % split, provenance), the rating
+        // you give after cooking, and the helpings and actions.
         <div className="flex flex-col gap-3 border-t border-line/40 px-3.5 py-3">
           <MacroRow macros={serving} per="one serving" />
-          <Provenance source={recipe.source} model={recipe.model} url={recipe.source_url} />
           <MetaSummary meta={recipe} />
-          <div className="flex items-center gap-2 text-xs text-ink-soft">
-            <span>Your rating</span>
-            <Stars rating={recipe.rating} onRate={onRate} busy={rating} />
-          </div>
 
           {/* **`recipe.note` is stored and deliberately not shown here.** It is the
               estimate's own caveat — "assumed a tablespoon of oil" — which is what
@@ -370,21 +372,34 @@ function RecipeCard({
               happens, and it is still on the row for anything that wants it. */}
 
           {recipe.ingredients.length > 0 ? (
-            <ul className="flex flex-col gap-1 text-sm">
-              {recipe.ingredients.map((i, n) => (
-                <li key={n}>{i}</li>
-              ))}
-            </ul>
+            <div className="flex flex-col gap-1.5">
+              <h3 className={SECTION}>Ingredients</h3>
+              <ul className="flex flex-col gap-1 text-sm">
+                {recipe.ingredients.map((i, n) => (
+                  <li key={n}>{i}</li>
+                ))}
+              </ul>
+            </div>
           ) : null}
           {methodSteps(recipe.method).length > 0 ? (
-            <ol className="flex list-inside list-decimal flex-col gap-1.5 text-sm text-ink-soft">
-              {methodSteps(recipe.method).map((step, n) => (
-                // The marker the author wrote is stripped so the list's own
-                // numbering does not print "1. 1. Chop the onion".
-                <li key={n}>{step.replace(/^\d{1,2}[.)]\s*/, "")}</li>
-              ))}
-            </ol>
+            <div className="flex flex-col gap-1.5">
+              <h3 className={SECTION}>Method</h3>
+              <ol className="flex list-inside list-decimal flex-col gap-1.5 text-sm text-ink-soft">
+                {methodSteps(recipe.method).map((step, n) => (
+                  // The marker the author wrote is stripped so the list's own
+                  // numbering does not print "1. 1. Chop the onion".
+                  <li key={n}>{step.replace(/^\d{1,2}[.)]\s*/, "")}</li>
+                ))}
+              </ol>
+            </div>
           ) : null}
+
+          <MacroBreakdown recipe={recipe} />
+
+          <div className="flex items-center gap-2 text-xs text-ink-soft">
+            <span>Your rating</span>
+            <Stars rating={recipe.rating} onRate={onRate} busy={rating} />
+          </div>
 
           {/* **Pricing helpings, and deliberately not logging them.**
               Multiplying a stored serving is arithmetic in this browser — no
