@@ -230,6 +230,11 @@ jobs:
       - name: Gate-file checks catch what they say they catch
         run: node --test scripts/gate-file.test.mjs
 
+      # The signed-out smoke check runs only after a deploy (smoke.yml), so its
+      # probing logic is held to a mocked fetch here, before it can mislead.
+      - name: Smoke-check probes catch what they say they catch
+        run: node --test scripts/smoke-check.test.mjs
+
       # The hooks are the rules that hold whether or not an agent complies, so
       # what they refuse is tested like code: every push spelling that once got
       # past them, every harmless command they once refused, and the commands
