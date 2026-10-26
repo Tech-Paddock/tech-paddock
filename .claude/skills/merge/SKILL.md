@@ -66,5 +66,13 @@ follow the pull request's Verify line.
 
 ## 6. After
 
-Reopen any Linear issue the merge closed with Next steps left, and set each touched issue's status
-per `CLAUDE.md`. List merged branches still on the remote; agents cannot delete them.
+**Close what shipped, once it is live.** For each issue the branch names:
+
+- Mark the Next step it delivered `Done YYYY-MM-DD`.
+- **Every step done:** status Done, unassigned. When one issue has several branches, only the last
+  one to go live closes it.
+- **Steps left:** reopen it if the merge closed it; status per `CLAUDE.md`; assigned to the owner
+  only while a ⭐ step waits on them.
+- Put each issue and what you set it to in your report.
+
+List merged branches still on the remote; agents cannot delete them.
