@@ -18,8 +18,10 @@ narrate them.
 
 1. **Linear, team TEC:** issues labelled `owner:TD` or assigned to the owner, open ones first.
 2. **`.claude/agents/td/RULES.md`** in full, then **`NOTES.md`**.
-3. **The repo:** `git fetch`; every remote branch not on `main`, how far behind it is, and whether
-   a pull request is open; `node scripts/drift-check.mjs`.
+3. **The repo:** full history first: containers clone only recent commits, so if
+   `git rev-parse --is-shallow-repository` says `true`, run `git fetch --unshallow` (it adds history
+   and changes nothing else). Then `git fetch`; every remote branch not on `main`, how far behind
+   it is, and whether a pull request is open; `node scripts/drift-check.mjs`.
 4. **Other sessions:** `list_sessions` for unmerged finished work and unanswered questions. Read the
    last assistant message of any idle session with work in flight.
 5. **`PADDOCK_ROLE`:** check it is `td`. TD sessions start from the Paddock_td environment.

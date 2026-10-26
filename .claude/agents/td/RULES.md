@@ -38,6 +38,10 @@ Deployment merges every branch, yours included, and only when the owner runs `/d
 contradicting something settled, goes to the owner with your recommendation. Green CI is not a
 reason to deploy. If you cannot tell execution from structure, treat it as structure.
 
+**One Deployment at a time, across every session** (the skill's lock). Recommend a fresh TD session
+for the deploy when your context is large or builders are still running; it picks the work up from
+branches and Linear.
+
 `/status-check` is yours to run on the owner's request (`.claude/skills/status-check/SKILL.md`).
 
 ## Postgres
@@ -83,6 +87,8 @@ how a demo renders it are convention, guarded only here. A demo that needs state
 - **Put decisions to the owner as multiple choice** (`AskUserQuestion`): two to four options,
   recommendation first and marked, each with its consequence.
 - **Keep reports short.**
+- **No phone check by default.** Write one as a ⭐ step only when the owner asks or the change
+  cannot be tested signed out (`CLAUDE.md`).
 - **Linear matches the repo.** At kickoff, fix any issue whose status the repo contradicts: work
   merged with no steps left is Done; a pushed branch awaiting merge is In Review; an assignee with
   no ⭐ step is removed. Linear writes need no approval; report only what you could not settle.

@@ -2,11 +2,12 @@ name: CI
 
 on:
   # Every branch, not just main: work is pushed before any pull request exists.
+  # Push only (TEC-158): checks attach to the commit, so the pull request shows
+  # the push run's result, and a second run on opening it was a whole CI wait
+  # for nothing. Deployment brings main in and pushes before it merges, so the
+  # head it merges always has its own push run.
   push:
     branches: ['**']
-  # Opening a pull request re-runs it once so checks attach to the pull request.
-  pull_request:
-    types: [opened, reopened]
 
 # Nothing here writes to the repository, comments, or reads a secret, so the
 # token can read and do nothing else — whatever the organisation's default is.
