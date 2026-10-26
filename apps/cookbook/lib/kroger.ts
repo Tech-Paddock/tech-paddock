@@ -126,7 +126,7 @@ async function call(input: string, init: RequestInit): Promise<Response> {
 
 export type Tokens = { accessToken: string; refreshToken: string | null };
 
-async function token(config: KrogerConfig, form: Record<string, string>, failure: string): Promise<Tokens> {
+async function token(config: Pick<KrogerConfig, "clientId" | "clientSecret">, form: Record<string, string>, failure: string): Promise<Tokens> {
   const response = await call(TOKEN_URL, {
     method: "POST",
     headers: {
@@ -162,6 +162,29 @@ export function exchangeCode(config: KrogerConfig, code: string): Promise<Tokens
  */
 export function refresh(config: KrogerConfig, refreshToken: string): Promise<Tokens> {
   return token(config, { grant_type: "refresh_token", refresh_token: refreshToken }, "Kroger refused the stored sign-in — connect King Soopers again");
+}
+
+/** What the nightly price scan signs in with: the app's own client credentials, product read only. */
+export const APP_SCOPE = "product.compact";
+
+/**
+ * The app's own token (TEC-132): Kroger's **client-credentials** grant, scope
+ * `product.compact`, for the nightly price scan, which has no session and must
+ * never touch the owner's account token. It needs only the client ID and
+ * secret, not `KROGER_TOKEN_KEY`, and it reads and writes no stored token.
+ */
+export async function appToken(env: Record<string, string | undefined> = process.env): Promise<string> {
+  const clientId = env.KROGER_CLIENT_ID;
+  const clientSecret = env.KROGER_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new SetupError(
+      `The nightly price scan isn't set up on this deployment: ${[!clientId && "KROGER_CLIENT_ID is not set", !clientSecret && "KROGER_CLIENT_SECRET is not set"]
+        .filter(Boolean)
+        .join("; ")}.`
+    );
+  }
+  const tokens = await token({ clientId, clientSecret }, { grant_type: "client_credentials", scope: APP_SCOPE }, "Kroger refused the app sign-in");
+  return tokens.accessToken;
 }
 
 function bearer(accessToken: string): HeadersInit {
@@ -234,6 +257,8 @@ export type Product = {
   inStock: boolean | null;
   /** The product's King Soopers page: Kroger's own when it gives one, else built from the description and ID. */
   url: string;
+  /** Kroger's first product category ("Dairy"), which the Deals tab groups by (TEC-132). Null when Kroger gave none. */
+  aisle: string | null;
 };
 
 const SITE = "https://www.kingsoopers.com";
@@ -282,6 +307,12 @@ function readFulfilment(item: Record<string, unknown> | null, keys: string[]): b
   return null;
 }
 
+/** Kroger's first category, trimmed, or null. A product can list several; the first is the aisle it is shelved in. */
+function readAisle(raw: unknown): string | null {
+  const first = Array.isArray(raw) ? raw.find((c) => typeof c === "string" && c.trim()) : null;
+  return typeof first === "string" ? first.trim() : null;
+}
+
 export function isUpc(value: unknown): value is string {
   return typeof value === "string" && /^\d{8,14}$/.test(value);
 }
@@ -314,6 +345,7 @@ export function readProducts(body: unknown): Product[] {
       delivery: readFulfilment(item, ["delivery"]),
       inStock: readStock(item),
       url: productPage(productId, description, row.productPageURI),
+      aisle: readAisle(row.categories),
     });
   }
   return products;

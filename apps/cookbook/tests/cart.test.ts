@@ -52,6 +52,7 @@ function product(over: Partial<Product> = {}): Product {
     regular: 3.49,
     promo: null,
     promoEnds: null,
+    aisle: null,
     pickup: true,
     delivery: true,
     inStock: true,

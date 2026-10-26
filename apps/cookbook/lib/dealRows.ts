@@ -1,0 +1,198 @@
+import { pageFor } from "./kingsoopers";
+import { addDays } from "./priceDates";
+import { percentOff } from "./pricing";
+import { couponActive, type Coupon } from "./couponRules";
+import { effectivePrice, type NightRow, type WeekRow } from "./priceWeeks";
+import { stoplight, weeksInWindow, type Light } from "./stoplight";
+import type { SavedProduct } from "./brands";
+
+/**
+ * What the Deals tab shows (TEC-132), built from rows already read: **pure**,
+ * so the tests hold it without a database or Kroger. `lib/dealBoard.ts` reads
+ * and calls this.
+ *
+ * **Every saved product with a recent price is a row**, coloured by the
+ * stoplight (`lib/stoplight.ts`), with its usual price, an 8-week trend, and
+ * any active coupon that lists its code. A **stack** is a product with both a
+ * sale and a coupon. Coupons match by product code, never by name.
+ *
+ * **Today's price** is the product's latest nightly row from the last
+ * `FRESH_NIGHTS` nights; an older one is not today's price and the product is
+ * counted as unpriced instead. **Before the first nightly run**, the latest
+ * deal scan (`deal_scans`, the list tab's) fills in the products it found on
+ * sale, at the same store, so the tab is not empty on the first day; those rows
+ * have no history and read "new: building history".
+ */
+
+/** A night this old or older is not today's price. */
+export const FRESH_NIGHTS = 3;
+/** The trend shows this many weekly means. */
+export const TREND_WEEKS = 8;
+/** What an aisle-less product is grouped under. */
+export const NO_AISLE = "Other";
+
+export type DealRow = {
+  productId: string;
+  name: string;
+  /** The names the product is saved under (Your brands), for matching list lines. */
+  names: string[];
+  size: string | null;
+  url: string;
+  aisle: string;
+  /** How many times it has gone in the cart (Your brands' count). */
+  bought: number;
+  /** Today's effective price: the sale if there is one, else the regular. */
+  now: number;
+  /** The regular price over the last twelve weeks, or today's when there is no history. */
+  usual: number;
+  onSale: boolean;
+  percentOff: number | null;
+  inStock: boolean | null;
+  /** The night (or scan day) the price is from. */
+  priceDate: string;
+  source: "nightly" | "scan";
+  light: Light;
+  /** The stoplight's reason, or "new: building history". */
+  note: string;
+  weeks: number;
+  /** Up to eight weekly means, oldest first. */
+  trend: number[];
+  coupons: { title: string; amount: string; expires_on: string | null }[];
+  /** On sale and with a coupon. */
+  stacks: boolean;
+};
+
+export type DealBoard = {
+  store: string | null;
+  /** Today's Denver date. */
+  asOf: string;
+  rows: DealRow[];
+  /** Whether any coupon has ever been staged; false says "no coupons staged yet". */
+  couponsStaged: boolean;
+  /** Saved products with no recent price. */
+  unpriced: number;
+  /** Whether the nightly scan has recorded anything yet at this store. */
+  hasNights: boolean;
+};
+
+export type ScanDeals = {
+  /** The Denver date the scan ran. */
+  ranOn: string;
+  locationId: string;
+  deals: { productId: string; regular: number; promo: number }[];
+};
+
+export type BoardInput = {
+  asOf: string;
+  store: { locationId: string; name: string } | null;
+  products: SavedProduct[];
+  nights: NightRow[];
+  weeks: WeekRow[];
+  coupons: Coupon[];
+  couponsStaged: boolean;
+  scan: ScanDeals | null;
+};
+
+const weighted = (parts: { value: number; weight: number }[]): number | null => {
+  const total = parts.reduce((n, p) => n + p.weight, 0);
+  return total === 0 ? null : parts.reduce((s, p) => s + p.value * p.weight, 0) / total;
+};
+
+export function buildDealBoard(input: BoardInput): DealBoard {
+  const { asOf, store, products } = input;
+  const empty: DealBoard = { store: store?.name ?? null, asOf, rows: [], couponsStaged: input.couponsStaged, unpriced: 0, hasNights: false };
+  if (!store) return empty;
+
+  const freshFrom = addDays(asOf, -FRESH_NIGHTS);
+  const latest = new Map<string, NightRow>();
+  for (const n of input.nights) {
+    if (n.location_id !== store.locationId || n.night < freshFrom || n.night > asOf) continue;
+    const seen = latest.get(n.product_id);
+    if (!seen || n.night > seen.night) latest.set(n.product_id, n);
+  }
+
+  const scan = input.scan && input.scan.locationId === store.locationId && input.scan.ranOn >= freshFrom ? input.scan : null;
+  const scanned = new Map((scan?.deals ?? []).map((d) => [d.productId, d] as const));
+
+  const weeksBy = new Map<string, WeekRow[]>();
+  for (const w of input.weeks) {
+    if (w.location_id !== store.locationId) continue;
+    weeksBy.set(w.product_id, [...(weeksBy.get(w.product_id) ?? []), w]);
+  }
+
+  const active = input.coupons.filter((c) => couponActive(c, asOf));
+  const couponsBy = new Map<string, Coupon[]>();
+  for (const c of active) {
+    for (const code of new Set(c.product_ids)) couponsBy.set(code, [...(couponsBy.get(code) ?? []), c]);
+  }
+
+  const rows: DealRow[] = [];
+  let unpriced = 0;
+  for (const p of products) {
+    const night = latest.get(p.product_id);
+    const deal = scanned.get(p.product_id);
+    let regular: number | null;
+    let sale: number | null;
+    let inStock: boolean | null;
+    let aisle: string | null;
+    let priceDate: string;
+    let source: DealRow["source"];
+    if (night) {
+      ({ regular, sale, in_stock: inStock, aisle } = night);
+      priceDate = night.night;
+      source = "nightly";
+    } else if (deal && scan) {
+      regular = deal.regular;
+      sale = deal.promo;
+      inStock = null;
+      aisle = null;
+      priceDate = scan.ranOn;
+      source = "scan";
+    } else {
+      unpriced += 1;
+      continue;
+    }
+
+    const now = effectivePrice({ regular, sale });
+    if (now === null) {
+      unpriced += 1;
+      continue;
+    }
+
+    const history = weeksInWindow(weeksBy.get(p.product_id) ?? [], asOf);
+    const verdict = stoplight(now, history, asOf);
+    const usual = weighted(history.flatMap((w) => (w.regular_mean === null ? [] : [{ value: w.regular_mean, weight: w.nights_seen }])));
+    const coupons = (couponsBy.get(p.product_id) ?? []).map((c) => ({ title: c.title, amount: c.amount, expires_on: c.expires_on }));
+    const off = regular !== null && sale !== null ? percentOff({ regular, promo: sale }) : null;
+    const onSale = sale !== null && (regular === null || sale < regular);
+
+    rows.push({
+      productId: p.product_id,
+      name: p.description ?? p.names[0] ?? p.product_id,
+      names: p.names,
+      size: p.size ?? p.size_first,
+      url: p.url ?? pageFor(p.product_id, p.names[0] ?? ""),
+      aisle: aisle ?? NO_AISLE,
+      bought: p.count,
+      now,
+      usual: Math.round((usual ?? regular ?? now) * 100) / 100,
+      onSale,
+      percentOff: off,
+      inStock,
+      priceDate,
+      source,
+      light: verdict.light,
+      note: verdict.note,
+      weeks: verdict.weeks,
+      trend: [...history]
+        .sort((a, b) => a.week_start.localeCompare(b.week_start))
+        .slice(-TREND_WEEKS)
+        .map((w) => w.mean),
+      coupons,
+      stacks: onSale && coupons.length > 0,
+    });
+  }
+
+  rows.sort((a, b) => a.aisle.localeCompare(b.aisle) || b.bought - a.bought || a.name.localeCompare(b.name));
+  return { ...empty, rows, unpriced, hasNights: input.nights.some((n) => n.location_id === store.locationId) };
+}

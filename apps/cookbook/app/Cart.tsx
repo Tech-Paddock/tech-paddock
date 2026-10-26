@@ -8,7 +8,7 @@ import { describeDrift, sizeDrift } from "@/lib/sizeDrift";
 import type { Modality } from "@/lib/modality";
 import type { Estimate, ScanRecord } from "@/lib/pricing";
 import { describe as describeHeld, type TakeBackLine, type TakeBackOutcome } from "@/lib/takeBack";
-import { DealsPanel, EstimatePanel } from "./Deals";
+import { EstimatePanel } from "./Deals";
 import { useToast } from "./Toast";
 
 /**
@@ -204,8 +204,8 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   const [showEstimate, setShowEstimate] = useState(false);
 
   const [latestScan, setLatestScan] = useState<ScanRecord | null>(null);
-  const [scanLoaded, setScanLoaded] = useState(false);
-  const [scanning, setScanning] = useState(false);
+  // Only a failure is shown (TEC-132): the scan feeds the list lines' sale tags and the Deals
+  // board's first day, and the panel that showed its results is gone.
   const [scanNote, setScanNote] = useState<{ text: string; failed: boolean } | null>(null);
   const autoScanned = useRef(false);
 
@@ -252,7 +252,6 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't read the last deal scan.");
       setLatestScan(body.latest as ScanRecord | null);
-      setScanLoaded(true);
       return body.latest as ScanRecord | null;
     } catch (e) {
       setScanNote({ text: e instanceof Error ? e.message : "Couldn't read the last deal scan.", failed: true });
@@ -261,14 +260,13 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   }, []);
 
   const scan = useCallback(
-    async (trigger: "opened" | "manual") => {
-      setScanning(true);
+    async () => {
       try {
         const response = await serial(() =>
           fetch("/api/kroger/deals", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ trigger }),
+            body: JSON.stringify({ trigger: "opened" }),
           })
         );
         const body = await response.json().catch(() => ({}));
@@ -277,13 +275,10 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
           setScanNote({ text: `Deal scan failed: ${body.error ?? "Kroger or the database didn't answer."}`, failed: true });
         } else {
           setLatestScan(body.scan as ScanRecord);
-          setScanLoaded(true);
-          setScanNote({ text: body.message as string, failed: false });
+          setScanNote(null);
         }
       } catch {
         setScanNote({ text: "Deal scan failed: couldn't reach this app's server.", failed: true });
-      } finally {
-        setScanning(false);
       }
     },
     [serial]
@@ -314,7 +309,7 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
         const latest = await loadScan();
         if (latest !== undefined && !autoScanned.current && scanDue({ ...s, hasStore: true }, latest?.ran_at ?? null)) {
           autoScanned.current = true;
-          void scan("opened");
+          void scan();
         }
       }
     });
@@ -591,11 +586,8 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     showEstimate,
     setShowEstimate,
     latestScan,
-    scanLoaded,
-    scanning,
     scanNote,
     refresh,
-    scan,
     chooseModality,
     calculate,
     findStores,
@@ -639,8 +631,9 @@ export function CartBar({ cart }: { cart: CartState }) {
 }
 
 // ---------------------------------------------------------------------------
-// The panel under the list: connection, store, refresh, estimate, Take back,
-// deals.
+// The panel under the list: connection, store, refresh, estimate, Take back.
+// Deals are not here since TEC-132: they live on the Deals tab, and the list
+// keeps only each line's sale tag.
 // ---------------------------------------------------------------------------
 
 export function CartPanel({ cart }: { cart: CartState }) {
@@ -753,13 +746,6 @@ export function CartPanel({ cart }: { cart: CartState }) {
           <EstimatePanel estimate={cart.estimate.estimate} message={cart.estimate.message} onClose={() => cart.setShowEstimate(false)} />
         ) : null}
 
-        <DealsPanel
-          latest={cart.latestScan}
-          loaded={cart.scanLoaded}
-          scanning={cart.scanning}
-          note={cart.scanNote}
-          onScan={() => void cart.scan("manual")}
-        />
       </div>
     );
   }
@@ -769,6 +755,11 @@ export function CartPanel({ cart }: { cart: CartState }) {
       <h2 className="text-sm font-semibold">King Soopers</h2>
       {body}
       {cart.refreshing && !cart.refreshNote ? <p className="text-xs text-ink-soft">Checking prices and stock in the background…</p> : null}
+      {cart.scanNote?.failed ? (
+        <p role="alert" className="text-xs text-danger">
+          {cart.scanNote.text}
+        </p>
+      ) : null}
       {cart.refreshNote ? (
         <p role={cart.refreshNote.failed ? "alert" : undefined} className={`text-xs ${cart.refreshNote.failed ? "text-danger" : "text-ink-soft"}`}>
           {cart.refreshNote.text}

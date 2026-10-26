@@ -15,7 +15,7 @@ import { LIVERY } from "@/lib/livery";
  * `/list` opens on the King Soopers list. The list needed one because Health's
  * `/list` redirects onto it while the grocery list moves here (TEC-15), and a
  * redirect needs somewhere to land that is the list rather than the book. `/add`
- * is the Add tab (2026-10-05) and `/brands` is Your brands (TEC-131). Every route renders this one component, so they
+ * is the Add tab (2026-10-05) and `/brands` is Your brands (TEC-131) and `/deals` is Deals (TEC-132). Every route renders this one component, so they
  * cannot drift into separate pages.
  *
  * **On the home screen since 2026-10-05**, overriding the site ruling's

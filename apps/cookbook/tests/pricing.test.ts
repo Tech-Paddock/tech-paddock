@@ -13,7 +13,6 @@ import {
   type EstimateLine,
 } from "@/lib/pricing";
 import { modalityWarning, sendLines, type CartLine, type Decision } from "@/lib/cart";
-import { COUPONS_SEARCH_URL, couponsUrl } from "@/lib/kingsoopers";
 import { scanDue, REFRESH_EVERY_MS } from "@/lib/refreshDue";
 
 /**
@@ -48,6 +47,7 @@ function product(over: Partial<Product> = {}): Product {
     regular: 3.49,
     promo: null,
     promoEnds: null,
+    aisle: null,
     pickup: true,
     delivery: true,
     inStock: true,
@@ -247,9 +247,7 @@ describe("the deal scan", () => {
     expect(scanDue({ ...on, connected: false }, null, now)).toBe(false);
   });
 
-  it("the coupons link is the constant King Soopers search, never a request", () => {
-    expect(couponsUrl("greek yogurt")).toBe(`${COUPONS_SEARCH_URL}?query=greek%20yogurt`);
-    expect(couponsUrl(" ")).toBe(COUPONS_SEARCH_URL);
+  it("the deal scan never reads kingsoopers.com or calls a model", () => {
     for (const file of ["../lib/pricing.ts", "../lib/dealRun.ts", "../app/Deals.tsx"]) {
       const source = readFileSync(resolve(__dirname, file), "utf8");
       expect(source).not.toMatch(/kingsoopers\.com/);
