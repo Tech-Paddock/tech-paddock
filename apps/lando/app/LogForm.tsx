@@ -19,6 +19,8 @@ import {
   dogsPickFor,
   LEASH,
   LEASH_LABELS,
+  SPOT,
+  SPOT_LABELS,
   POTTY_WHAT,
   POTTY_WHAT_LABELS,
   UNITS,
@@ -43,6 +45,7 @@ import {
   type Details,
   type Dog,
   type Leash,
+  type Spot,
   type ExerciseType,
   type FormKind,
   type HealthType,
@@ -233,6 +236,9 @@ export default function LogForm({
   // Leashed by default. An outside entry from before the pick existed opens
   // with nothing picked, so a correction never invents one.
   const [leash, setLeash] = useState<Leash | "">(p ? (p.leash ?? (p.where === "inside" ? "leashed" : "")) : "leashed");
+  // Inside only, nothing picked by default: a new or old inside entry never
+  // gets a spot unless one is tapped.
+  const [spot, setSpot] = useState<Spot | "">(p?.spot ?? "");
 
   // Food
   const f = event?.kind === "food" ? asFood(event) : null;
@@ -288,6 +294,10 @@ export default function LogForm({
   // it is changed; `issueChoices` adds it as an option when the list would not.
   const [firstIssue] = useState(p?.issue ?? h?.issue ?? "");
   const [issue, setIssue] = useState(firstIssue);
+  // The "Medical issue" checkbox (TEC-161) gates the select: a correction with a
+  // stored link opens ticked; unticked, no link is saved (the pick is kept, so
+  // ticking again brings it back).
+  const [hasIssue, setHasIssue] = useState(firstIssue !== "");
   const issueOptions = issueChoices(events, firstIssue || null);
   // One high-level pick (TEC-139). An entry from before it, with several or
   // retired reasons, opens on them as a kept option and saves them unchanged
@@ -372,7 +382,8 @@ export default function LogForm({
           what,
           where,
           ...(where === "outside" && leash ? { leash } : {}),
-          ...(issue ? { issue } : {}),
+          ...(where === "inside" && spot ? { spot } : {}),
+          ...(hasIssue && issue ? { issue } : {}),
           ...(photos.paths.length ? { photos: photos.paths } : {}),
         };
       case "food":
@@ -394,7 +405,7 @@ export default function LogForm({
         return {
           type: healthType,
           reasons: healthReasonsFromPick(reason === HEALTH_KEPT && h?.type !== healthType ? "" : reason, keptReasons),
-          ...(healthType === "vet" && issue ? { issue } : {}),
+          ...(healthType === "vet" && hasIssue && issue ? { issue } : {}),
           ...(photos.paths.length ? { photos: photos.paths } : {}),
         };
     }
@@ -493,16 +504,29 @@ export default function LogForm({
   // The Related issue select, on Potty and on a vet visit (TEC-142): None, then
   // recent live medical issues, newest first, by date and pick.
   const relatedIssue = (
-    <Field label="Related issue" htmlFor="f-issue">
-      <select id="f-issue" value={issue} onChange={(e) => setIssue(e.target.value)} className={input}>
-        <option value="">None</option>
-        {issueOptions.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </Field>
+    <>
+      <label className="flex items-center gap-2.5 py-1">
+        <input
+          type="checkbox"
+          checked={hasIssue}
+          onChange={(e) => setHasIssue(e.target.checked)}
+          className="h-5 w-5 accent-accent"
+        />
+        <span>Medical issue</span>
+      </label>
+      {hasIssue && (
+        <Field label="Related issue" htmlFor="f-issue">
+          <select id="f-issue" value={issue} onChange={(e) => setIssue(e.target.value)} className={input}>
+            <option value="">None</option>
+            {issueOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+    </>
   );
 
   return (
@@ -523,6 +547,17 @@ export default function LogForm({
                 value={leash}
                 onChange={setLeash}
                 options={LEASH.map((l) => [l, LEASH_LABELS[l]] as const)}
+              />
+            </Field>
+          )}
+          {where === "inside" && (
+            <Field label="Spot">
+              <Seg
+                name="spot"
+                label="Spot"
+                value={spot}
+                onChange={setSpot}
+                options={SPOT.map((l) => [l, SPOT_LABELS[l]] as const)}
               />
             </Field>
           )}
