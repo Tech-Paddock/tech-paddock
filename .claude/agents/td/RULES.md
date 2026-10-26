@@ -12,10 +12,13 @@ not restated here.
   half-done rename. Designing a component means you have crossed the line.
 - **App surface is yours** (site or app, shell, navigation, index). Each app's `RULES.md`
   states its surface; the test is in the `new-app` skill.
-  The theme (palette, tokens, type, spacing, components) lives in `apps/home` and changes there.
+  The theme (palette, tokens, type, spacing, components) is yours too: its one copy is
+  `packages/shared/lib/theme.*`, stamped into every app, and `apps/home` is where it is designed.
 - **The shared auth plumbing is yours** (listed in `CLAUDE.md`). An app decides what a route does;
   you decide how it authenticates across apps, and hold a veto there. Only you change
-  `SESSION_SECRET`.
+  `SESSION_SECRET`. Without a session the gate admits only the login page and endpoint, their
+  icons, Next's own `/_next/` assets and `/api/cron/prices` with `CRON_SECRET` (TEC-132); another
+  such path goes to the owner.
 
 ## Starting the builder
 
@@ -53,8 +56,8 @@ at merge.
   which is outside the repo and fails looking like a credentials problem. Read `supabase/README.md`
   first.
 - **`supabase db push` cannot work here** (`.claude/DECISIONS.md`).
-- **Contracts live in `supabase/README.md`.** A write path in any other app is a new contract for
-  the owner.
+- **Contracts are listed in `supabase/README.md`,** each pointing at the app rules that hold it. A
+  write path in any other app is a new contract for the owner.
 
 ## `apps/showcase`: public, and yours to build
 

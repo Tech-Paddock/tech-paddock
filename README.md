@@ -9,16 +9,12 @@ One repo and one Supabase project. Each tool is its own app with its own `packag
 Vercel project (Root Directory set to its folder).
 
 ```
-apps/
-  home/      → hub               → techpaddock.io
-  resume/    → Resume Formatter  → resume.techpaddock.io
-  coffee/    → Coffee            → coffee.techpaddock.io
-  health/    → Health            → health.techpaddock.io
-  cookbook/  → Cookbook          → cookbook.techpaddock.io
+apps/<app>/  → one tool  → its subdomain
 ```
 
-The hub frames each tool and shows what is live. It holds no database credential; its only tokens
-are for Linear (the Pit Wall) and GitHub deployment state (The Garage).
+The subdomain table in [CLAUDE.md](./CLAUDE.md) maps each one. The hub, `apps/home` at
+`techpaddock.io`, frames each tool and shows what is live. It holds no database credential; its
+only tokens are for Linear (the Pit Wall) and GitHub deployment state (The Garage).
 
 There is no root `package.json`; work inside an app (`cd apps/<app> && npm install`). Each app's
 `.env.example` lists its variables and how to generate them.
@@ -34,5 +30,6 @@ One Postgres schema per tool; never `public`. Migrations live in
 
 ## Live state
 
-Not written here; it goes stale. The Garage (`/admin` on the hub) probes each project live and shows
-`drift` as of the hub's last build.
+Not written here; it goes stale. The Garage, the hub's Garage tab
+([`techpaddock.io/?tab=garage`](https://techpaddock.io/?tab=garage)), probes each project live and
+shows `drift` as of the hub's last build.

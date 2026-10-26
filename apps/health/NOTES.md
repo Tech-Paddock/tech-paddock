@@ -39,7 +39,8 @@
   refuses a date more than a day from UTC's. A target, none (`{ target: null }`) and a failed read
   (503, shown as an error; `/targets` then offers no form) stay distinct. "Left today" is signed;
   the clamp at zero belongs to the `/targets` split (`setCalories`, `setMacro`).
-- **Deleting a meal** (`lib/entries.ts`) cascades to its lines; items and versions stay.
+- **Deleting a meal** (`lib/entries.ts`) is a hard delete until TEC-165: it cascades to its lines;
+  items and versions stay.
 - **Cookbook** (`lib/cookbook.ts`): `/list` redirects to Cookbook's list. A food whose normalised
   name equals a recipe's is the Cookbook's. `GET /api/servings` is read once per request,
   forwarding only `paddock_session` to `COOKBOOK_BASE_URL`. Approving re-reads it, refuses a draft
@@ -49,20 +50,21 @@
 ## Traps
 
 - `lib/supabase.ts` sends `cache: "no-store"`; keep it. On Next 14 a GET-only route served its
-  first read all day. While Cookbook is on 14, its `/api/servings` does the same (TEC-114).
+  first read all day.
 - Turbopack refuses an ICO whose PNG frame is not RGBA.
 - Next 16 drops `apple-mobile-web-app-capable` unless `metadata.other` in `app/layout.tsx` writes it.
 - An unreadable Cookbook fails only lines stored with a `cookbook` version; a recipe never logged
   here falls through. A `SESSION_SECRET` mismatch looks exactly like an outage.
 - `normalizeName` is the item key (folds accents, apostrophes, simple plurals). Changing it once
   `health.items` has rows splits foods and needs a re-keying migration.
-- `lib/models.ts` is a flagged copy of Coffee's; they have diverged. No third copy.
+- `lib/models.ts` started as a flagged copy of Coffee's. Coffee, Cookbook and Health each keep
+  their own, and they differ; none is stamped.
 - `max_tokens` covers adaptive thinking as well as the JSON (parse 8192, estimate 16000). Lowering
   it toward the JSON's size turns a thinking turn into a `max_tokens` failure.
 - A refusal fails the line by design: no `fallbacks`, no second model (owner, 2026-10-22: "No
   fallback, fail visibly"). Adding one would stamp a number with a model that did not make it.
-- `health.comparisons` stays in the schema with nothing reading or writing it since TEC-133.
-  Dropping it is a destructive migration and the owner's call.
+- `health.comparisons` stays in the schema, unused since TEC-133. Whether to drop it is open in
+  TEC-162.
 - Every livery maps `--sev-warn` onto the accent, so over-target uses `--danger` locally
   (`app/LeftToday.tsx`).
 - `eaten_at` is never set by the app and duplicates `created_at`; a day's total reads `eaten_on`.

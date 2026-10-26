@@ -4,7 +4,8 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 
 ## Shape
 
-- Next 16, React 19. Gate: `proxy.ts`, Node runtime, base copy; `drift` fails a `middleware.ts`.
+- Next 16, React 19. Gate: `proxy.ts`, Node runtime, the one gate every app runs; `drift` fails a
+  `middleware.ts`.
 - Tabs in `lib/tabs.ts`, rendered by `app/Cookbook.tsx` as one scrolling row of pills: `/`
   Recipes, `/add` (`AddRecipe.tsx`), `/list` (signed out, it round-trips `/login?from=/list`),
   `/brands` Your brands (`Brands.tsx`, TEC-131), `/deals` Deals (`DealsTab.tsx`, TEC-132). All panels stay mounted; a send or refresh on the
@@ -60,10 +61,10 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 - Metadata sits flat on `recipes`, read by `lib/metadata.ts`. `meal` and `diet` are
   check-constrained to `MEALS` and `DIETS`; `readMeta` drops free-of claims and macro tags. The
   rating is read only from this app's forms. Older rows read "not set" until supplied (TEC-52).
-- Editing (`lib/edit.ts`) re-prices only changed ingredients, in one call before the one write;
-  servings alone re-divides the pot. Card pill: rating and time; meal · main · cuisine when wide.
-  Confirmed for TEC-140: changing ingredients updates the macros, and the breakdown reads the row
-  that comes back, so it follows.
+- Editing (`lib/edit.ts`) re-estimates the whole pot whenever the ingredient list changes at all
+  (reordering counts), in one call before the one write; servings alone re-divides the pot. Card
+  pill: rating and time; meal · main · cuisine when wide. Confirmed for TEC-140: changing
+  ingredients updates the macros, and the breakdown reads the row that comes back, so it follows.
 - `methodSteps` splits only on the next number in a run ("gas mark 4" stays); its tests hold the
   edges.
 
@@ -96,7 +97,7 @@ Reasoning is in the migration headers.
   leaves it out and Paste a batch never sets it.
 - `brand_preferences`: since TEC-131 **only its `terms` and old `plain` rows are read**
   (`readPreferences` filters `kind <> 'product'`). Its `product` rows were copied to `products` by
-  the migration and are kept, unread, until the drop pull request; their phrases still hold the
+  the migration and are kept, unread (their drop is TEC-131, parked); their phrases still hold the
   unique phrase index, so search words on such a phrase are refused with a sentence.
 - `menu`: one row per recipe with a `day`, set only beside *Add to list*; re-adding moves it.
   Shown per serving. Nothing expires; ✕ or Clear all.
@@ -104,7 +105,7 @@ Reasoning is in the migration headers.
   (refused without `v1:`), the store, `refreshed_at`, `modality` (PICKUP or DELIVERY, default
   PICKUP; a disconnect deletes the row and the choice with it).
 - `brand_products`: no longer read or written (TEC-131); its fields were copied onto `products`.
-  Dropped with the old product rows in a later, owner-approved pull request.
+  Its drop, with the old product rows, is TEC-131 (parked).
 - `cart_sends` (TEC-127): the cart ledger, insert only (`lib/cartSends.ts`) except `item_id`,
   which a Tidy moves onto the merged line before deleting the old ones. Signed quantity: `sent`
   and `refused` positive, `taken_back` negative; the sum per line, UPC and modality is what Take
@@ -217,7 +218,7 @@ Reasoning is in the migration headers.
   false between `size_first` and the size now; "1 lb" equals "16 oz") is named in the report.
   Search-word phrases are counted, not checked. `refreshed_at` moves only when products were
   checked.
-- **Replace with it** (`POST /api/brands/successor`): moves the code, page, description, size and
+- **Replace** (`POST /api/brands/successor`): moves the code, page, description, size and
   price to the successor's; keeps names, count and `size_first` (so a smaller successor shows as
   drift); refused when another row holds the successor's code. Only on the tap.
 
@@ -228,11 +229,13 @@ Reasoning is in the migration headers.
   (its default or named product first). A line decided only by a product's Kroger name is priced
   as Kroger's top match for the item (`targetFor`), because only Send checks that product.
   Exact IDs go in one `productsByIds` call (50 per request); searches run four at a time.
-- Deal scan: `GET`/`POST /api/kroger/deals`. Every saved product (by code), every search-word phrase, plus every open line; a deal is
-  `promo < regular`, sorted by percent off, then dollars. Runs when the list opens and the latest
-  scan is over seven days old (`scanDue`). **No panel shows it and there is no Scan button
-  (TEC-132)**: it feeds the list lines' sale tags and the Deals board's first day. A scan that
-  throws saves nothing, so the next open retries, and the King Soopers panel says so in red.
+- Deal scan: `GET`/`POST /api/kroger/deals`. Every saved product (by code), every search-word
+  phrase, plus every open line; a deal is `promo < regular`, sorted by percent off, then dollars.
+  Runs when any Cookbook page loads and the latest scan is over seven days old (`scanDue`): every
+  tab panel is mounted, and the cart hook's mount effect starts it. **No panel shows it and there
+  is no Scan button (TEC-132)**: it feeds the list lines' sale tags and the Deals board's products
+  with no fresh night. A scan that throws saves nothing, so the next page load retries, and the
+  King Soopers panel says so in red.
 - Coupons are never read here. The *Find coupons* link left with the panel (TEC-132), and
   `couponsUrl` with it.
 - Estimate: `POST /api/kroger/estimate`, computed and not stored. The list header shows "about
@@ -243,16 +246,16 @@ Reasoning is in the migration headers.
   puts `modality` on each `/cart/add` item; a 400 or 422 is retried once without it, the rest of
   that send goes without, and `modalityWarning` says so. Not retried on 401, 403 or an outage.
 - On-sale tag on a list line: "On sale, N% off until <date>" (`lib/saleTag.ts`, type-only
-  imports). No Kroger call of its own: `Cart.tsx` hands the latest scan and the last estimate up
-  through `onSaleSources`. The scan matches open lines by name, case-insensitive, and only when its
-  `location_id` is the chosen store; the estimate overrides for the lines it priced. A passed end
-  date tags nothing; no end date drops "until". Says sale, never coupon (TEC-126). The chip is a
-  local pattern in `app/List.tsx`.
-- Picking a store clears the estimate but does not start a scan; the old store's scan stays shown
-  under its store name and tags nothing until the next scan.
-- `Cart.tsx` runs every token-borrowing request through `serial`, one at a time: opening the list
-  can start a refresh and a scan together. The toggle and estimate panel are local
-  patterns in `app/Deals.tsx`.
+  imports). No Kroger call of its own: `List.tsx` computes the tags (`saleTags`) from the cart
+  hook's latest scan and last estimate. The scan matches open lines by name, case-insensitive, and
+  only when its `location_id` is the chosen store; the estimate overrides for the lines it priced.
+  A passed end date tags nothing; no end date drops "until". Says sale, never coupon (TEC-126). The
+  chip is a local pattern in `app/List.tsx`.
+- Picking a store clears the estimate but does not start a scan; the old store's scan tags nothing
+  until the next scan.
+- `Cart.tsx` runs every token-borrowing request through `serial`, one at a time: any page load can
+  start a refresh and a scan together. The estimate panel is a local pattern in `app/Deals.tsx`;
+  the Pickup/Delivery switch (`ModeSwitch`) is one in `app/List.tsx`.
 
 ## Deals (TEC-132)
 
@@ -264,8 +267,8 @@ Reasoning is in the migration headers.
   token (`appToken`, scope `product.compact`; needs `KROGER_CLIENT_ID` and `KROGER_CLIENT_SECRET`,
   not `KROGER_TOKEN_KEY`). Every saved code goes to `productsByIds` (fifty a request); a product
   Kroger does not return, or returns with no price, gets **no row** (a gap, counted in the body).
-  A Kroger failure writes nothing and answers 502, so Vercel shows the run failed. The body is
-  counts only.
+  A Kroger failure writes nothing and answers 502, so Vercel shows the run failed. The body is the
+  night, the store's name, counts and the weeks rolled up; no token or secret.
 - **Rerun the same night is a no-op**: the first reading stands, and the body says
   `alreadyRecorded`. A missed night is never backfilled.
 - **Roll-up** (`rollUpWeek`): every run rolls up each finished Monday-to-Sunday week, looking back
@@ -287,9 +290,10 @@ Reasoning is in the migration headers.
   `nights_seen`); the low is the lowest weekly low. Under four weeks is `new: building history`
   with no colour. The note says the weeks it has ("at its 8-week low").
 - **The board** (`GET /api/deals`, `lib/dealBoard.ts` reads, `lib/dealRows.ts` builds): every saved
-  product whose latest night is within three nights of today at the chosen store; older is counted
-  as unpriced, never shown. Before the first nightly run, the list tab's latest deal scan fills in
-  the products it found on sale (same store, within three days), with no history. No Kroger call.
+  product whose latest night is within three nights of today at the chosen store. A product with
+  no fresh night, at any time, is filled in from the list tab's latest deal scan when that scan
+  (same store, within three days) found it on sale, its colour from whatever weeks it has;
+  otherwise it is counted as unpriced, never shown. No Kroger call.
   `lib/dealFilter.ts` is the browser's half (search, All / On sale / Coupon / Stacks, Any / Green /
   Neutral / Red / New, aisle); a **new** product shows under Any and under New, none of the three colours. A coupon
   matches by product code only. Coupon and Stacks say "no coupons staged yet" until a coupon row
@@ -406,11 +410,15 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 
 ## Traps
 
-- **"Invalid API key" comes from Supabase.** Only drafting and Tidy call a model.
+- **"Invalid API key" comes from Supabase.** Only drafting, an ingredient edit and Tidy call a
+  model.
 - Health reads a 503, or a `SESSION_SECRET` mismatch, as "couldn't reach the Cookbook".
 - `tests/servings.test.ts` holds the contract's exact fields; metadata never enters it.
 - **`/list` is depended on by Health's redirect** (`tests/tabs.test.ts`); renaming it is cross-app.
-- A client component must not import a lib that imports `supabase.ts`.
+- **Client components import libs that import `./supabase`**: `Book.tsx`, `AddRecipe.tsx` and
+  `Menu.tsx` take pure helpers from `lib/recipes.ts`, and `List.tsx` from `lib/grocery.ts`. That is
+  safe only because the service key is not `NEXT_PUBLIC_` and is read inside `getServiceClient`;
+  never read it at module top level.
 - Empty-vs-unread is in `DECISIONS.md`. `lint` is unconfigured.
 - Read Vercel and Supabase live before writing a deployment step.
 - **`api.kroger.com` is reachable from a session; `developer.kroger.com` and `kingsoopers.com`
@@ -426,11 +434,11 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   with or without `modality`) is unconfirmed until the first production Send. **A negative
   `quantity` on `/cart/add` is unconfirmed too** (Take back rests on it): untested until the first
   production Take back. A refusal is handled (the line fails, stays sent, the cart page is
-  offered). A 2xx that Kroger ignores, or treats as a positive add, would not be noticed here:
-  check the cart page after the first one.
-- **`cookbook_cart_sends` must be applied before this code runs**: without it a send can't record
-  what went in (the items still go in, and `recordError` says so), Take back fails to read, and
-  **Tidy fails before deleting**, which leaves the list duplicated.
+  offered). A 2xx that Kroger ignores, or treats as a positive add, would not be noticed here
+  (TEC-162).
+- The code reads every table and column the `cookbook_*` migrations add, so a database missing one
+  fails those reads; without `cart_sends`, a Tidy fails before deleting and leaves the list
+  duplicated.
 - Lines sent before `cookbook_cart_sends` have no ledger rows; Take back skips them and says so.
 - **Changing `KROGER_TOKEN_KEY` orphans the token**; the list asks to connect again. That is the
   rotation path.
@@ -438,9 +446,6 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 - A remembered match or replacement's name is the line's whole name (less any note), so "2 cups
   whole milk 2%" is added as that name, not "milk"; edit the names in Your brands. Tapping a poor
   top match saves it too: untick it or paste a page instead, or fix it in Your brands.
-- **`cookbook_products` must be applied before this code runs**: the list's links, Your brands,
-  Send to cart, the estimate, the deal scan, the refresh and adding lines (for the quantity) all
-  read `products`. Adding lines degrades to no conversions; the others fail to read.
 - A product name equal to a search-word phrase: the product wins, and the phrase row is dead
   until one of them is renamed or forgotten.
 - Matching by official name only runs when no saved name matched, and only after a refresh has
@@ -448,9 +453,6 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   TEC-135 Send offers such a match only when Kroger's top `CHECK_RESULTS` for the item include
   its code, so a real match that Kroger ranks lower falls to Not saved yet; tap the right product
   (it is remembered) or add the name in Your brands.
-- **`cookbook_product_defaults` must be applied before this code runs**: `readProducts` selects
-  `default_for`, so without it every reader of `products` fails (the list's links, Your brands,
-  Send, the estimate, the scan, the refresh).
 - A Pick one pick is remembered, so the line's whole name joins that product's names; the next
   time that exact line has one match and goes straight in, whatever the default.
 - The list's link and the estimate for a line decided by default follow the default; changing the
@@ -465,20 +467,18 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   lines written after. A pack conversion added later does not change lines already on the list.
 - A Tidy can raise a quantity lowered by hand, when the merged line's rule says more.
 - Preview and local deployments cannot complete Kroger sign-in; the redirect URI is production's.
-- The two Kroger migrations and `cookbook_deal_scans_and_modality` must be applied before this
-  code runs; the connection read selects `modality`, so without it the whole list tab's King
-  Soopers panel fails.
-- A line added since the last scan has no sale tag until the next scan or *Calculate estimated
-  total*; a line renamed by Tidy loses its tag the same way. With no Scan button, the next scan is
-  the weekly one on opening the list.
+- A line added since the last scan has no sale tag until the next scan or *estimate it*; a line
+  renamed by Tidy loses its tag the same way. With no Scan button, the next scan is the weekly one
+  when any Cookbook page loads.
 - `withAccessToken` is per request: two tabs open at once can still race token rotation, because
   `serial` covers one page.
-- **`cookbook_price_nights`, `cookbook_price_weeks` and `cookbook_coupons` must be applied before
-  this code runs**: the nightly route writes the first two (and reads the first on Mondays), and the
-  Deals tab reads all three, so without them `/api/deals` answers 503 and the cron fails.
 - **`CRON_SECRET` must be set in `tp-cookbook` (32+ characters)**: unset or short, the gate and the
   route both refuse, and Vercel Cron's call is a 401 every night. Nothing else breaks, so it is easy
   to miss; the first Deals tab is simply empty.
+- **Disconnect (`DELETE /api/kroger`) deletes the connection row, and the chosen store with it.**
+  Until King Soopers is connected and a store picked again, every nightly price run answers 409
+  "Pick a store first" (`lib/priceRun.ts`), and those nights stay gaps forever. Missing
+  `KROGER_CLIENT_ID` or `KROGER_CLIENT_SECRET` makes the run a 501 (`appToken`).
 - **A product whose price never moves reads neutral**: green needs it below its mean as well as at
   its low (owner's amendment, 2026-10-24).
 - Vercel Cron does not retry a failed run, and it may fire anywhere inside its hour on some plans:
@@ -487,4 +487,3 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 - Kroger sends categories as a list; the aisle is the first. A product with none is under "Other".
 - The cron route must stay GET and must stay out of any other gate exception; adding a second path
   to the gate is shared auth plumbing (owner approval).
-- Never revive a merged `claude/cookbook-*` branch.

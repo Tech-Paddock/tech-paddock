@@ -13,8 +13,9 @@ Pipeline: upload the tailored `.docx` → read its text → rewrite the template
 
 ## Surface: site
 
-- A thin index grouped by verb, not entity. A tab bar is fine when each tab is a verb and one long
-  page.
+- A thin index grouped by verb, not entity: the tabs Reformat · Resumes · Diagnostics
+  (`app/page.tsx`) stand for reformat, keep and check. A tab bar is fine when each tab is a verb
+  and one long page.
 - One long page over many routes.
 - Works on a phone, but is not designed around one-handed use.
 - No home-screen install unless the owner grants one; the shape does not change.
@@ -24,10 +25,10 @@ Pipeline: upload the tailored `.docx` → read its text → rewrite the template
 
 - **No model calls.** A saved render must be reproducible. When a document defeats the rules,
   the report names what it could not account for and a human fixes it.
-- **Every string in a render comes from a document** (the source, or the template for passthrough
-  sections), never from this app. Labelling assigns roles and
-  the content check reports arrival; neither rewrites a word. Jobright's wording is the ATS
-  optimisation.
+- **Every word in a render comes from a document** (the source, or the template for passthrough
+  sections), never from this app. The renderer adds only a label's colon and the template's list
+  separator. Labelling assigns roles and the content check reports arrival; neither rewrites a
+  word. Jobright's wording is the ATS optimisation.
 - **Coverage and the verdict never overstate what arrived.** A dropped line counted as placed is
   the failure this design exists to prevent.
 - **Coverage does not false-alarm either.** It matches the longest run of consecutive words, not
@@ -35,7 +36,8 @@ Pipeline: upload the tailored `.docx` → read its text → rewrite the template
   words occur elsewhere). Both cases have named tests in `tests/compare.test.ts`.
 - **Never lose a field to keep its formatting.** Run-granular replacement (company/title/date
   lines, `Label:⇥items` rows) needs one non-empty run per field; where the template lacks them,
-  compose the line whole and log the lost formatting.
+  compose the line whole and log the lost formatting. A one-paragraph header that is not company,
+  title and date on one line (`looksLikeInlineHeaderLine`) is composed whole, with no log.
 
 ## The renderer
 
@@ -51,9 +53,12 @@ Pipeline: upload the tailored `.docx` → read its text → rewrite the template
 
 - **Static sections are the template's:** Education, Certifications, Hobbies, and the name and
   contact block pass through untouched (`passthrough`). Edit them in the template.
-- **Career Highlights:** if the input matches the template, the table is not written at all.
-- **Count mismatches resolve positionally:** surplus input clones the template's last bullet or
-  row; unmatched template entries are dropped. Each is a change-log line.
+- **Career Highlights:** if the input matches the template, the table is not written at all. It
+  never adds or removes a cell: a surplus highlight is logged `input-dropped` and fails, and a
+  template cell the input does not reach keeps the template's own text as `not-found-in-input`,
+  which fails as a partly filled section.
+- **Every other count mismatch resolves positionally:** surplus input clones the template's last
+  bullet or row; unmatched template entries are dropped. Each is a change-log line.
 - **Professional Experience is the only section that feathers.** An input line with no slot goes
   in after the line that precedes it in the input, as a copy of the nearest template bullet
   paragraph, glyph included. The header line is the fallback only for a layout with no bullet; it
@@ -72,17 +77,22 @@ Schema `resume`. Columns are in the migrations under `supabase/`; never put a mi
 - **Templates:** `is_active` follows the newest upload; pinning an older one shows a persistent
   banner naming both versions.
 - Archiving keeps the row and its `.docx`; deleting removes both. Archived and active are disjoint
-  by constraint: never make the archived one active. The active template cannot be deleted.
+  by constraint: never make the archived one active. The active template cannot be archived or
+  deleted (`app/api/templates/[id]/route.ts`).
 - Deleting a template keeps its renders (`renders.template_id` is `on delete set null`); each
   render's `template_snapshot` records engine, template id, version and sha256.
 - The original template bytes are kept and served by `GET /api/templates/[id]/file`, archived or
   not; the template is also the general-purpose resume.
 - **Renders** delete one at a time with both stored files. No cascade, no bulk delete.
 - **Append-only artifacts:** parsed content, coverage and the rendered file never change.
-  `GET /api/renders/[id]/file` returns stored bytes, never a re-render. Application metadata stays
-  editable; `submitted_at` stays null until the resume is sent.
+  `GET /api/renders/[id]/file` returns stored bytes, never a re-render. Only `submitted_at` is
+  editable (**Mark as sent**), and it stays null until the resume is sent.
 - **Storage:** private bucket `resume-files`, under `templates/`, `sources/`, `renders/`. Write the
   file before the row that points at it.
+- **Uploads:** each upload route caps a file at 4 MB and accepts it by its `.docx` file name. An
+  archive that inflates past 64 MB is refused, counted while streaming and before any part is read
+  (`lib/docx/read.ts`, `lib/reskin/container.ts`). `/api/inspect` writes nothing, so a document
+  dropped on Diagnostics is never kept.
 
 ## Parsing traps
 
@@ -99,14 +109,20 @@ Schema `resume`. Columns are in the migrations under `supabase/`; never put a mi
 - Heading size is the largest size that recurs among heading candidates, not a fixed value or
   a rank over the whole document. Table and list text is excluded from ranking.
 - Jobright pastes Career Highlights as a markdown table. Transpose only when cell counts line up;
-  otherwise render verbatim. The `| :--- |` row counts on neither side of coverage.
+  otherwise it is refused: it becomes `unreadableHighlights`, is logged `input-not-read`, and the
+  template's own highlights are kept. `coverage.notRead` names the refused cells, and the verdict
+  notes it without failing. The `| :--- |` row counts on neither side of coverage.
 
 ## ATS rules
 
-- One table at most (Career Highlights). No text boxes, no images (use paragraph borders), no
-  contact details in a header or footer, headings from the known vocabulary, a plain bullet glyph.
+- One table at most (Career Highlights). No text boxes, no `<w:sdt>` content controls, no images
+  (use paragraph borders), no text in a header or footer, headings from the known vocabulary, a
+  plain bullet glyph.
 - These are a lint on the template (`auditAts`), not a constraint on the renderer. A finding on a
   render is a finding about the template: fix it there.
+- Blocking, so the render fails: two or more tables, any header or footer text, a `<w:sdt>`, a
+  text box. Warning only: an image, an unknown heading. Nothing checks the bullet glyph yet; that
+  check is filed in TEC-168.
 - The renderer never adds a table, text box, image, or header or footer content, and never
   rewrites the document to clear a finding.
 - A finding must be believable: a false positive teaches the reader to ignore the warning.
@@ -126,8 +142,8 @@ Schema `resume`. Columns are in the migrations under `supabase/`; never put a mi
   unless a test needs a defect.
 - The Diagnostics message guide (`lib/messageGuide.ts`) moves with `lib/verdict.ts`;
   `tests/message-guide.test.ts` holds them together.
-- `GET /api/health` probes database, bucket and active template. A missing
-  template reports not-ok at status 200.
+- `GET /api/health` probes database, bucket and active template. A missing template leaves the
+  top-level `ok` true at status 200; only the `active_template` check is false.
 
 ## Boundaries
 

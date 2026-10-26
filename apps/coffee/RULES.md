@@ -30,7 +30,9 @@ there are none, and keep a library of bags bought and brews made.
   sentence's page.
 - This is enforced in code, in `lib/guide.ts`, never in the prompt; a prompt can only ask.
 - Do not weaken it, move it into the prompt, or add a write path around it.
-- An empty result and an unread result never render the same.
+- An empty result and an unread result never render the same. One known exception: a product
+  gallery the detector misses, on a page with no `og:image`, comes back as a clean read with no
+  images (`lib/anthropic.ts`). Its warning is filed in TEC-167.
 
 ## Flow
 
@@ -48,26 +50,32 @@ there are none, and keep a library of bags bought and brews made.
 
 - drops any parameter with no backing quote;
 - rejects a quote citing a page the model did not report reading;
-- refuses anything read off a site that is not the roaster's;
+- refuses a guide unless it is on the same site as the product page the model named, and on a host
+  the run reached (nothing ties that page to the roaster);
 - demotes `coffee_specific` to `roaster_generic` unless the instructions were read on the product
   page itself;
 - never throws; a malformed response becomes `status: "none"`.
 
 Display:
 
-- Dropped values are shown beside the kept ones, never silently discarded.
-- Quotes render beside the parsed values.
+- Dropped values are shown beside the kept ones, never silently discarded. Today only their count
+  shows, and Search again discards them; the fix is filed in TEC-167.
 
 ### Recipe printed as an image
 
 - A value read off an image reaches `guide_*` on the same terms as a sentence.
 - Its quote is the text read off the image. Its URL is the page the image was on, and that page gets
-  the roaster-site check. The image URL is stored beside it.
-- The image's own host is not checked.
+  `validateGuide`'s site check. The image URL is stored beside it.
+- The server fetches only the product page the model named and the images in that page's gallery,
+  and only on public hosts (`isFetchableUrl` in `lib/recipeImage.ts`). The image's own host is
+  vetted as public, not as the roaster's.
+- Every redirect hop must pass the same check. Today `fetch` follows redirects unchecked
+  (`lib/anthropic.ts`); the fix is filed in TEC-167.
 - The copy-out takes only what is printed. It never fills in or infers.
 - The image always renders beside the values it backs. A value with no stored image is dropped.
-- `coffee_specific` only for an image in this coffee's own product gallery; anywhere else on the
-  site is `roaster_generic`.
+- `coffee_specific` needs an image in this coffee's own product gallery. The page's `og:image`,
+  read when no gallery is recognised, counts as in the gallery, so an image read is never
+  `roaster_generic`.
 
 ### Suggested recipe
 
@@ -97,7 +105,10 @@ When the search finds no recipe, a model generates a suggested one. It never tou
   "No Recipe Found" (red). The word always carries what the colour does.
 - Labels live in `lib/guideDisplay.ts`, separate from `lib/guide.ts`; presentation must not reach
   validation. A test refuses any label claiming a recipe was written for this coffee.
-- The quote sits one tap under the indicator. There is no caveat text.
+- Every quote, from a page's text or copied off an image, sits one tap under the indicator; the
+  image itself stays on screen beside the values. No caveat text sits with the tier. The image's
+  caption is the exception: it asks for the numbers to be checked against the image
+  (`lib/guideDisplay.ts`).
 
 ## Rule 3: the roaster's values stay separate from the user's
 
@@ -108,28 +119,32 @@ When the search finds no recipe, a model generates a suggested one. It never tou
 ## Data model
 
 - A bag is a purchase. It holds identity, purchased date, photo, the `guide_*` block and `my_notes`.
-- A brew is one attempt: brewer, brew method, grinder, grind setting, dose, water, brew time,
-  beverage mass, TDS, rating, notes.
+- A brew is one attempt: brewer, brew method (free text), grinder, grind setting, dose, water,
+  brew time, beverage mass, TDS, rating, notes.
 - Each purchase is its own row. "Had this before" is a lookup on
   `(lower(roaster), lower(coffee_name))`, not a uniqueness constraint.
-- `findPreviousBag` carries forward only method, grinder and grind setting.
+- `findPreviousBag` returns brewer, method, grinder and grind setting from the previous purchase's
+  last brew. They are shown only as a hint; nothing is prefilled from them.
 - Deleting a bag cascades to its brews and deletes its photo. The confirm names the brew count.
 - `product_url` and `guide_url` are separate columns; they differ at tier 2.
-- One guide per bag. When a roaster prints filter (pour-over, batch, immersion) and espresso, store
-  filter. Espresso only when it is the only recipe. The unchosen recipe is neither `dropped` nor a
-  failure.
+- One guide per bag. When a recipe card read off an image prints filter (pour-over, batch,
+  immersion) and espresso, store filter, and an espresso-only card never displaces a filter recipe
+  the text search found (`lib/recipeImage.ts`). Espresso only when it is the only recipe. The
+  unchosen recipe is neither `dropped` nor a failure.
 - Purchase date is required at the save step, in `lib/patch.ts`, with an error naming the field.
   The column stays nullable and `POST` does not demand it, because the row is written before the
   search.
 
 ## Vocabularies
 
-- `guide_method` records the roaster's method and stays broad. `my_brewer` names the five brewers
-  the user owns.
+- `guide_method` records the roaster's method and stays broad. `MY_BREWERS` (`lib/brewers.ts`)
+  lists the brewers the user owns, stored in `brews.brewer`.
 - `myBrewerFor` maps only on an exact correspondence. Origami, Chemex, espresso and a bare "V60"
   leave the brewer blank. Never round to the nearest owned brewer.
-- Brew method is a fixed enum. `normalizeMethod` matches longest phrase first; generic filter
-  language wins only if nothing specific matched. It runs against the stored quote.
+- `guide_method` and the suggestion's method are a fixed enum (`lib/methods.ts`). A brew's method
+  is free text (settled 2026-10-26, TEC-162). `normalizeMethod` matches longest phrase first;
+  generic filter language wins only if nothing specific matched. On a guide it runs against the
+  stored quote.
 - `null` means the roaster said nothing; `"other"` means they said something unplaceable. Keep both.
 
 ## Measurements
@@ -139,19 +154,20 @@ When the search finds no recipe, a model generates a suggested one. It never tou
 - Ratio is not stored. It is `water_g / dose_g`, derived in `lib/brews.ts`, shown in the form and
   dropped before the `POST`.
 - `water_g` is water in; `beverage_g` is liquid out. Never fill one from the other.
-- The user's water and ratio round to whole numbers. `parseRatio` reports the roaster's ratio
-  unrounded.
+- The user's water and ratio round to whole numbers. `parseRatio` rounds the roaster's ratio to
+  0.1.
 - Brew time is stored as whole seconds and typed as `m:ss`. A bare number is refused.
 - Brew time is a reading: it does not carry into the next brew or prefill from `guide_time`.
   `guide_time` is the roaster's free text, verbatim.
-- The refractometer fields are commented out of the form. Their columns, comments and tests stay,
-  and a logged brew still shows any reading it carries.
-  Restore by uncommenting, never by migration.
+- Beverage mass, TDS and the extraction read-out (the refractometer half) are commented out of the
+  brew form. Their columns, comments and tests stay, and a logged brew still shows any reading it
+  carries. Restore by uncommenting, never by migration.
 
 ## Brew form
 
 - A new brew opens as a repeat of the last. `repeatOf` carries brewer, brew method, grinder, grind
-  setting, dose, water and ratio. Beverage mass, TDS, rating and notes start empty.
+  setting, dose, water and ratio. Rating and notes start empty, and so do beverage mass and TDS,
+  which are commented out of the form.
 - `openingBrew` fills what remains blank from `guide_dose`, `guide_water` and `guide_ratio`. The
   last brew wins field by field.
 - Grind is never filled from the guide; a particle size is not a dial position.
@@ -177,8 +193,9 @@ When the search finds no recipe, a model generates a suggested one. It never tou
 - No web app manifest. It is fetched without credentials, so the gate would redirect it, and
   allowing it means editing `proxy.ts`, which is not Coffee's to change. Installability for every
   app belongs to the theme in `apps/home`.
-- The icon is a static import served from `/_next/static`. Never use Next's `app/apple-icon.png`
-  convention; that route sits behind the gate.
+- The icon must load signed out: iOS fetches it without credentials, and a login redirect becomes
+  a screenshot icon. It is a static import from `/_next/static`, which the gate's matcher skips.
+  Since TEC-27 the gate also passes the exact icon paths, so `app/apple-icon.png` would load too.
 - The installed app has its own cookie jar; signing in there is expected. It is reached directly,
   not through the hub's iframe.
 
@@ -194,4 +211,5 @@ When the search finds no recipe, a model generates a suggested one. It never tou
   recorded response shapes.
 - The search is verified in production with a real bag after merge; previews are skipped by every
   `ignoreCommand`. Passing tests do not show it works.
-- A new guide field gets its test first. Every field in `GUIDE_FIELDS` has one.
+- A new guide field gets its test first. Every field in `GUIDE_FIELDS` has one but `grind`, whose
+  test is filed in TEC-167.

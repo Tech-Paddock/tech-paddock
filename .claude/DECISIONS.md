@@ -35,6 +35,10 @@ would get something wrong without it: the rule, one line of why. App rules live 
   credential for the hub, and no shared counter a stranger could fill to lock the owner out.
 - **Agents test live apps signed out only:** the login redirect, 401 on `/api/*`, a forged cookie,
   the headers. Agents never get the password.
+- **The gate has one scheduler path** (TEC-132): `/api/cron/prices`, exact path, opened only by
+  `Authorization: Bearer <CRON_SECRET>` of 32+ characters and never by a session cookie. It fails
+  closed. It exists because a nightly price record cannot wait for someone to open the app, and
+  Vercel Cron cannot sign in. Another sessionless path is the owner's call.
 - **A `drift` check must fail the case it exists for and pass the next legitimate edit.**
 - **`RULES.md` changes are the TD's** (2026-10-26, TEC-149): a revert undoes them and `/build` already
   gates the work. Loosening auth, Showcase, secrets or personal data still asks; so do `CLAUDE.md`
@@ -68,13 +72,12 @@ would get something wrong without it: the rule, one line of why. App rules live 
   touching GitHub.
 - **A `SESSION_SECRET` mismatch doesn't throw;** it silently rejects sessions on the other apps.
 - **Vercel aliases the build that finishes last,** not the newest commit. After close merges to one
-  app, check and promote the right build.
-- **Branches cut before 2026-09-15 carry seven real names** (tracker fixtures). Never push one under
-  its own name. Test with
-  `git diff --name-only origin/main <branch> -- apps/tracker/lib/matchMeetings.ts apps/tracker/tests/`
-  (empty means clean).
+  app, check which build is live; promoting the right one is the owner's.
+- **A scheduled task with no repositories or connectors still reports Succeeded,** having done
+  nothing (TEC-162). Read what a run did, not its status.
 
 ## Known, not fixed
 
-- **Nine git objects in `refs/pull/*` carry those seven names, and the repo is public.** Only
-  GitHub Support's sensitive-data removal clears them (TEC-116).
+- **Nine git objects in `refs/pull/*` carry seven real names** from early tracker test fixtures,
+  scrubbed from `main` on 2026-09-15, and the repo is public. Only GitHub Support's sensitive-data
+  removal clears them (TEC-116).

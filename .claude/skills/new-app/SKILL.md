@@ -28,14 +28,17 @@ undo. Design first, scaffold second, then hand the owner only what the owner alo
 ## In the repo: one branch
 
 - **The app folder,** copied from the nearest app. Stamp shared files with
-  `node scripts/stamp-shared.mjs`; a hand copy fails `drift`. Use the **base** gate file for its
-  Next major; a fourth variant fails `drift`.
+  `node scripts/stamp-shared.mjs`; a hand copy fails `drift`. Copy the gate file (`proxy.ts` on Next
+  16) byte for byte: every app runs the one gate, and a second version fails `drift`.
 - **`RULES.md`** (approved) and an empty **`NOTES.md`**.
 - **`.env.example`:** names and how to generate them, never values.
-- **`/api/health`,** probed by The Garage.
+- **`/api/health`:** a signed-in check that probes a real table. The Garage probes `/login`, which is
+  public; `/api/health` sits behind the gate.
+- **A schema of its own** also goes in `supabase/config.toml`'s `[api] schemas`, or the local stack
+  cannot see its tables.
 - **A row in `CLAUDE.md`'s domain map** (needs owner approval).
-- CI and branch protection need nothing. Adding to `TOOLS` in `apps/home/lib/platform.ts` is a
-  separate home change.
+- CI and branch protection need nothing. Adding it to `TOOLS` in `apps/home/lib/platform.ts` is a
+  separate home change, and that is also what puts it in Smoke's probes.
 
 ## Outside the repo: the owner's, in order
 
@@ -45,11 +48,16 @@ Send one message; each line says what breaks if skipped.
 2. **Environment variables.** `SESSION_SECRET` byte-identical to the others, or the shared cookie
    silently fails on every app.
 3. **DNS record:** a CNAME like the rest.
-4. **Supabase exposed-schemas list,** if it has a schema. This is the step that gets missed.
-5. **Rebuild with `FORCE_BUILD`,** then remove it: vars bake in at build time and the ignore step
+4. **The login rate limit:** a per-IP rule on `POST /api/login` in the project's Vercel Firewall.
+   Without it, the password can be guessed at full speed. No agent can read or set the Firewall, so
+   only the owner can confirm it.
+5. **Supabase exposed-schemas list,** if it has a schema. This is the step that gets missed.
+6. **Rebuild with `FORCE_BUILD`,** then remove it: vars bake in at build time and the ignore step
    cancels a bare redeploy.
 
 ## Verify
 
-`drift` 0 fail; the app's probe in The Garage once `TOOLS` has it; the subdomain asks for the
-password in a private window.
+- `drift` 0 fail.
+- The app's probe in The Garage, and its Smoke run, once `TOOLS` has it.
+- The subdomain asks for the password in a private window.
+- The owner confirms the Firewall rule.

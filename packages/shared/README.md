@@ -13,19 +13,24 @@ node scripts/stamp-shared.mjs --check  # verify, write nothing
 
 | File | Why it is shared |
 |---|---|
-| `lib/auth.ts` | Session cookie, advisory attempts counter, `safeEqual`. A mismatch silently rejects valid sessions elsewhere. |
+| `lib/auth.ts` | Session cookie and advisory attempts counter. A mismatch silently rejects valid sessions elsewhere. Its `safeEqual` has had no caller since TEC-117. |
 | `lib/password.ts` | bcrypt wrapper. Node-only; never import it from the gate file. |
-| `lib/login.ts` | Handler behind every `POST /api/login` (re-exported by each route). Node-only. |
+| `lib/login.ts` | Handler behind every `POST /api/login`. Node-only. |
 | `lib/logout.ts` | Handler behind every `POST /api/logout`. Clears the domain-wide cookie, so it logs out of every app. |
 | `lib/safe-redirect.ts` | Where a successful login may redirect. Pure; imported by client login pages. |
-| `lib/theme.css` | The token system. |
+| `lib/theme.css` | The token system. Hand-written, its contrast measured by hand; the "GENERATED" header is wrong (TEC-169). |
 | `lib/theme.ts` | The other half of the theme; drifts silently if unstamped. |
 | `next.config.mjs` | Security headers, including `frame-ancestors`. |
 | `app/ThemeControl.tsx` | Light/dark switch and the message that carries it into the hub's frames. |
 | `app/LogoutControl.tsx` | The header's Log out; reports a failure. |
 
 Each copy lands at the same path under `apps/<app>/`. The login path is stamped because a fix
-applied to some copies of the password gate is a hole that looks closed.
+applied to some copies of the password gate is a hole that looks closed. The routes that re-export
+the two handlers (`app/api/login/route.ts`, `app/api/logout/route.ts`) are byte-identical in every
+app today, but neither stamped nor checked by `drift`.
+
+A public app (`PUBLIC_APPS` in `scripts/stamp-shared.mjs`) is stamped only with the entries marked
+`public`, today only the theme tokens (`lib/theme.css`).
 
 ## Not shared, deliberately
 
@@ -51,4 +56,5 @@ Only if it is byte-identical in every app today (measure it), or if its copies d
 Add a row to `MANIFEST` in `scripts/stamp-shared.mjs`, move the canonical copy here, stamp, run
 `drift`. Manifest files are `.ts`, `.tsx`, `.css` or `.mjs`; another type needs a case in `banner()`.
 
-Every app's `ignoreCommand` watches `packages`, so a change here rebuilds every app.
+Every tool's `ignoreCommand` watches `packages`, and home's builds every production merge, so a
+change here rebuilds every app.

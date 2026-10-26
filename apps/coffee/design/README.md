@@ -2,8 +2,9 @@
 
 `apple-touch-icon.svg` is the source of `app/apple-touch-icon.png`.
 
-- Keep it out of `app/`. A file there named `icon.svg` or `apple-icon.svg` becomes a metadata route
-  behind the gate, and iOS then uses a screenshot of the login page as the icon.
+- Keep it out of `app/`: it is a source, not a served file. A file there named for a Next metadata
+  convention (`icon.svg`, say; there is no `apple-icon.svg`) becomes a route and a `<link>` on every
+  page. The gate is not the reason: since TEC-27 it passes the exact icon paths.
 
 ## Rendering
 

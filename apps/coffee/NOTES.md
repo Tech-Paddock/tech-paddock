@@ -17,11 +17,13 @@ What is true now and its traps. Rules are in `RULES.md`; open work is in Linear 
   `suggested_error`, the card read is a warning.
 - Only the search writes `guide_*`. `POST /api/bags` takes no guide; a bag is saved at
   `not_searched` through `guideColumns(null)`.
-- A guide needs a product page on an http(s) host, on the roaster's site, and on a host the run
-  reached. Reached hosts are read from tool result blocks by `reachedUrlsIn` (`lib/searchRun.ts`),
-  never from the answer. `webHost` refuses `javascript:`.
-- `lib/searchRun.ts` maps a response to a stored outcome, pure and tested: `readTurn` accepts only
-  `end_turn` (anything else throws; split text rejoins with nothing between), then `concludeSearch`.
+- A guide needs a product page on an http(s) host, and must sit on that page's site and on a host
+  the run reached. Nothing ties the product page to the roaster. Reached hosts are read from tool
+  result blocks by `reachedUrlsIn` (`lib/searchRun.ts`), never from the answer. `webHost` refuses
+  `javascript:`.
+- `lib/searchRun.ts` maps a response to a stored outcome, pure and tested: `readTurn` answers on
+  `end_turn` and resumes on `pause_turn` (anything else throws; split text rejoins with nothing
+  between), then `concludeSearch`.
 - Service failures (`too_many_requests`, `unavailable`, any code not on the model-level list) record
   no `none`. A model-caused failure records `none` with a warning in `guide_search_error`. A product
   link whose fetch failed is cleared.
@@ -54,9 +56,9 @@ What is true now and its traps. Rules are in `RULES.md`; open work is in Linear 
 - The web tool versions in `lib/models.ts` belong to the model. A model change rechecks them.
 - `maxDuration = 300` in `app/api/search/route.ts` is a literal Next reads statically. It must equal
   `SEARCH_STALE_MS`.
-- No model call runs from a sandbox. The image read has never met a real page; gallery detection is
-  a class/id pattern (`GALLERY`), and a theme it misses reads as "no card" with no warning.
-  Middlestate's José Ramirez bag is the live test.
+- No model call runs from a sandbox, so the image read is untested on a real page. Gallery
+  detection is a class/id pattern (`GALLERY`), and a theme it misses reads as "no card" with no
+  warning.
 - TDS, extraction, beverage yield and grinder have no `guide_*` column. The copy-out is told not to
   put a yield in `water`.
 - `parseRatio` reads larger over smaller: "16:1" and "1:16" are both 16; "2:1" is 2.

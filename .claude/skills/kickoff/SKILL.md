@@ -21,10 +21,12 @@ narrate them.
 3. **The repo:** full history first: containers clone only recent commits, so if
    `git rev-parse --is-shallow-repository` says `true`, run `git fetch --unshallow` (it adds history
    and changes nothing else). Then `git fetch`; every remote branch not on `main`, how far behind
-   it is, and whether a pull request is open; `node scripts/drift-check.mjs`.
+   it is, and whether a pull request is open; `node scripts/drift-check.mjs`. Compare against
+   `origin/main`: a container's local `main` can be far behind, and checking it out swaps the guard.
 4. **Other sessions:** `list_sessions` for unmerged finished work and unanswered questions. Read the
    last assistant message of any idle session with work in flight.
-5. **`PADDOCK_ROLE`:** check it is `td`. TD sessions start from the Paddock_td environment.
+5. **The environment:** `get_session` (no id) gives this session's `environment_id`, and
+   `list_environments` names it. TD sessions run in the one named `PADDOCK_ROLE=td`.
 6. **Title the session** with `set_session_title`: `TD · YYYY-MM-DD · <brief>`, the brief being the
    owner's kickoff argument or first request in a few words, omitted if there is none.
 
@@ -34,8 +36,8 @@ Report only what needs the owner, each as a link, and leave out any heading with
 
 - **Waiting on you:** issues with a ⭐ step.
 - **Ready to deploy**, and branches gone stale (their issue Done or Canceled).
-- **Broken:** a `drift` warning or failure, a wrong `PADDOCK_ROLE`, anything in the charter or notes
-  the repo now contradicts.
+- **Broken:** a `drift` warning or failure, a session outside the TD environment, anything in the
+  charter or notes the repo now contradicts.
 - **Sessions waiting** on an answer from the owner.
 
 If every check came back clean, say so in one line. Then answer the owner's request, or say what

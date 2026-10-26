@@ -16,7 +16,8 @@ pull requests, each branch head against `main`, `list_migrations`.
 - **Read the diff:** blast radius as stated, no personal information, no weakened check, and
   `NOTES.md` describes the state after merge. A stale `NOTES.md` goes back to the builder.
 - **Run locally:** `node scripts/drift-check.mjs` (0 fail), `node scripts/stamp-shared.mjs --check`,
-  `node --test .claude/hooks/guard.test.mjs`, and the touched app's tests.
+  `node --test .claude/hooks/guard.test.mjs`, `node --test scripts/gate-file.test.mjs`,
+  `node --test scripts/smoke-check.test.mjs`, and the touched app's tests.
 
 ## 2. Open it
 
@@ -34,6 +35,9 @@ migration by name and shape. Write only what you checked.
 - **CI green on the current head:** `gate`, from the push (CI runs on push only). After every
   merge, merge `main` into the remaining branches (merge commit, never rebase), rerun step 1's
   checks, push, wait for green. A branch with a migration does step 4 first, in the same push.
+- **With the merge queue on for `main`,** nothing is brought up to date by hand: the queue runs CI
+  on each branch merged on top of the ones queued ahead of it. A migration's rename is still pushed
+  before the branch is queued.
 - **Several at once: state the order first.** A rule change goes after the work it would turn red;
   a correction others wait on goes first; when two touch one file, the conflict falls on the branch
   still in progress. A conflict between two versions of logic goes back to its author.
@@ -51,7 +55,11 @@ migration by name and shape. Write only what you checked.
 
 ## 5. Merge and confirm
 
-**Squash merge.** Then read the production deployment of every project the change rebuilds, and
+**Squash merge** (`merge_pull_request`, `merge_method: "squash"`). With the merge queue on, queue
+it instead with `gh pr merge <n> --squash`, which adds it to the queue; GitHub merges it once its
+merge group is green. Don't count on a direct API merge while the queue is on. Then read the production deployment of every project the change
+rebuilds, read the Smoke run for the merge commit (`.github/workflows/smoke.yml`, one run per
+production deployment; red means the live gate is broken, so see *If it breaks production*), and
 follow the pull request's Verify line.
 
 - **Read deployment state, not a project field.** `READY` at `target: production` is live,

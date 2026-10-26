@@ -7,20 +7,34 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **Shape:** one TD at a time + up to three builders per issue (started by the owner's `/build`) + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Linear
   labels: `owner:Owner`, `owner:TD`, `app:<folder>`; the parking lot is the `Parked` label.
 - **Every app is on Next 16 with `proxy.ts`,** one gate copy.
-- **`apps/showcase`'s scaffold waits on the owner showing you the uploader.**
+- **Without a session, the gate lets through** the login page, its endpoint, its icons and Next's
+  `/_next/` assets, and `/api/cron/prices` with `Authorization: Bearer <CRON_SECRET>` (TEC-132,
+  owner-approved). The cron path is in every app's gate and fails closed; only `tp-cookbook` has
+  the secret and the route.
+- **`apps/showcase` is yours to scaffold when the owner wants it** (TEC-99). The owner cleared reading
+  `Tech-Paddock/teamusauploader` on 2026-10-18; the demo uses fake data and a neutral name.
 - **Linear writes don't prompt.** Deletes, label retirement and diff tools still ask.
 - **Health prices recipe lines from Cookbook's `GET /api/servings`**, forwarding only
   `paddock_session`. A `SESSION_SECRET` mismatch between `tp-health` and `tp-cookbook` reads as
   "Couldn't reach the Cookbook", not a login bug.
-- **The guard tells the main session from a helper by `agent_id`;** only the main session writes to
-  a pull request.
+- **The guard knows Deployment by `agent_type: "deployment"` with an `agent_id`;** only Deployment
+  writes to a pull request. The main session, the builder and a main session claiming the type are
+  all refused.
 - **Migration history is clean:** repo and `list_migrations` differ by exactly `20260908235234`,
   withheld because it seeds personal data.
 - **This container cannot reach `*.techpaddock.io`.** Use Vercel runtime logs, or ask the owner.
+- **TD sessions run in the environment named `PADDOCK_ROLE=td`.** The name sets no variable;
+  kickoff reads the environment with `get_session`.
+- **A scheduled task carries its own repositories and connectors,** set in its edit dialog at
+  claude.ai/code/routines. A run with neither still reports Succeeded and does nothing. The Weekly
+  rules-drift audit says "Audit did not run" when it cannot audit (TEC-162).
 
 ## Traps
 
 - **The guard runs from this session's checkout.** Edit `.claude/hooks/` in a separate worktree.
+- **A container's local `main` can sit far behind `origin/main`.** Sessions start detached at the
+  remote head; `git checkout main` in the main checkout swaps the guard and the skills for old
+  copies. Cut branches from `origin/main` (`git switch -c <branch> origin/main`).
 - **A project env read cannot see team-shared variables.** `list_user_events` (the audit log) shows
   every change, shared ones included.
 - **The firewall cannot be read or written through the API** (`Seawall Config not found`).

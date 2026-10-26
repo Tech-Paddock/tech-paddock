@@ -4,6 +4,17 @@ One project (`qyclakzsupyxgnqfgpiq`, `tech-paddock`) backs every app. Each tool 
 `resume`, `coffee`, `health`, `cookbook`, `lando` — never `public`. One
 migration history, here at the repo root.
 
+## Contracts
+
+No app reads or writes another app's schema. An app that needs another's data calls that app's own
+route, and the contract is written in the rules of the app that serves it:
+
+- **Health → Cookbook:** Health prices recipe lines from Cookbook's `GET /api/servings`,
+  forwarding only `paddock_session`. The contract is *Health↔Cookbook contract* in
+  `apps/cookbook/RULES.md`.
+
+A new contract, or a write path into another app's data, is the owner's call (CLAUDE.md).
+
 ## History
 
 The directory is the list; each file's header says what it does. What the files cannot say:
@@ -12,7 +23,8 @@ The directory is the list; each file's header says what it does. What the files 
   `supabase_migrations.schema_migrations`. From `20260911202805` on, files are written first and
   applied second.
 - `20260906152749` created four tables before `20260910051549` set default privileges; their grants
-  were applied outside the history. `record_original_table_grants` records them.
+  were applied outside the history. `record_original_table_grants` records them. All four went with
+  their schemas in `drop_editor_tracker_shared` (TEC-117).
 - **Recorded versions win over filenames.** The hosted API stamps its own version; when a file's
   name differs from what ran, the file is renamed, never the database. The database records what
   ran; the repo records intent. `supabase migration repair` is never used.
@@ -63,7 +75,9 @@ A matching version is something to read back, never to assume.
 **Agents apply migrations; avoid the DROP instead of handing it to the owner** (owner, 2026-10-24).
 A DROP has timed out through the connector, so design around it: put a widening check in a function
 (`lando.details_ok`) and widen with `create or replace function`, and start any constraint swap
-with `set local lock_timeout = '5s'`. Only if a DROP still times out, and a read-back shows it did
+with `set local lock_timeout = '5s'`. Each replacement copies the newest file's whole body, and the
+function pins `set search_path = ''`; without it the security advisor warns, as it does for
+`lando.details_ok` today (TEC-164). Only if a DROP still times out, and a read-back shows it did
 not land, does the owner run the file once in the SQL Editor inside `begin; … commit;` with
 `insert into supabase_migrations.schema_migrations (version, name)` for its version, as
 `drop_editor_tracker_shared` was. A drop of data stays a destructive migration (CLAUDE.md).
@@ -104,9 +118,17 @@ reload; a 200 for the schema in `edge_logs`; or the app's `/api/health`, which p
 ALTER DEFAULT PRIVILEGES IN SCHEMA <each> GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ```
 
-Every new table is granted to `anon`, including DELETE and TRUNCATE. (The `20260906152749` tables
-hold SELECT, INSERT, UPDATE and DELETE only.) **RLS is the only control between a leaked publishable
-key and the data.** Every table has RLS enabled with zero policies (deny-by-default); the advisor's
-`rls_enabled_no_policy` notices are the design working.
+Every new table is granted to `anon`, including DELETE and TRUNCATE. **RLS is the only control
+between a leaked publishable key and the data.** Every table has RLS enabled with zero policies
+(deny-by-default); the advisor's `rls_enabled_no_policy` notices are the design working.
 
 **Enable RLS in the same migration that creates a table.**
+
+## Storage
+
+Files live in private buckets: `resume-files`, `coffee-files` and `lando-photos`, each created by
+its app's migration with `public` false. `storage.objects` has RLS on and no policy for any of
+them, so only the service role reads or writes a file. An app uploads through its own server route
+and serves a file through that route or a short-lived signed URL; a row stores only the object's
+path. A new bucket
+follows the same shape: private, no policy, created in a migration.
