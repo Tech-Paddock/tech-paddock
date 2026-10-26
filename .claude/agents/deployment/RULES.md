@@ -23,8 +23,8 @@ Run first, every time. Only work that touches the deploy holds it:
 3. **Each briefed branch:** pushed, CI `gate` green on its head, `NOTES.md` updated (on the slice that owns it, when one issue has several branches), request line
    and Deployment section present, nothing on the owner-approval list without approval.
 
-Other sessions waiting on the owner, and branches outside the brief, are listed in the report but
-do not hold the deploy.
+Other sessions waiting on the owner, and the in-flight, not-ready and stale branches the TD lists
+with your brief, go in the report with what clears each but do not hold the deploy.
 
 ## Report
 
