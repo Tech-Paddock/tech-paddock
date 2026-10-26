@@ -20,7 +20,8 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
-/* Analytics chart series (app/StackedBars.tsx), a local pattern. Read from the
+/* Analytics chart series (app/Glyph.tsx, DayTimeline.tsx, DailyChart.tsx,
+   FoodWeight.tsx; TEC-143), a local pattern. Read from the
    theme's tokens, never hex: papaya, then a second orange that differs from it
    in both polarities (burnt in light, peach in dark, where the accent itself is
    papaya), then the soft ink. Accidents use --danger directly. The dark rule is
