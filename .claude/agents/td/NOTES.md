@@ -56,3 +56,5 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **Deployment and the builder start with an approval click** on top of `/deploy` and `/build`; the
   hook cannot tell otherwise that the owner asked. Not yet confirmed that auto mode shows the click
   rather than approving it: check on the next `/build`.
+- **Resuming a helper with `SendMessage` does not ask again;** the guard's matcher is `Agent|Task`.
+  `/deploy` relies on it to resume a Deployment held by the lock.

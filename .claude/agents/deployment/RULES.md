@@ -24,6 +24,10 @@ Run first, every time. Only work that touches the deploy holds it:
 3. **Each briefed branch:** pushed, CI `gate` green on its head, `NOTES.md` updated (on the slice that owns it, when one issue has several branches), request line
    and Deployment section present, nothing on the owner-approval list without approval.
 
+**Lock held** (your brief says so: another session's Deployment has a pull request open): run the
+check, report held, and open nothing. Your TD resumes you when the lock is free, or hands your
+branches to the holder.
+
 Other sessions waiting on the owner, and the in-flight, not-ready and stale branches the TD lists
 with your brief, go in the report with what clears each but do not hold the deploy.
 
