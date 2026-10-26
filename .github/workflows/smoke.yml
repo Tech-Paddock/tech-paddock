@@ -1,0 +1,55 @@
+name: Smoke
+
+# The signed-out check of a live app (TEC-159). It runs after a merge has
+# deployed, so it can never block one: nothing requires it, and it only reports
+# on a commit that is already on main.
+on:
+  # Vercel's GitHub integration posts a deployment status for each deploy. This
+  # event only ever runs the workflow file on the default branch.
+  deployment_status:
+  # By hand: all apps, or one by slug.
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'App slug as in apps/home/lib/platform.ts, or "all"'
+        default: all
+        required: false
+
+# Reads the repository to find the app list. No secret, no Vercel token, no
+# write anywhere; the result is the run's own pass or fail.
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    # Only a successful production deploy. Previews are skipped here so they
+    # leave no run behind; the script checks the same thing again, because the
+    # environment's exact name is not confirmed until the first real deploy.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       startsWith(github.event.deployment_status.environment, 'Production'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Event fields reach the script through `env:`, never spliced into it.
+      - name: Probe the app signed out
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_APP: ${{ github.event.inputs.app }}
+          SMOKE_ENVIRONMENT: ${{ github.event.deployment_status.environment }}
+          SMOKE_TARGET_URL: ${{ github.event.deployment_status.target_url }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            node scripts/smoke-check.mjs "${INPUT_APP:-all}"
+          else
+            echo "Deployment: environment=$SMOKE_ENVIRONMENT url=$SMOKE_TARGET_URL"
+            node scripts/smoke-check.mjs --deployment
+          fi
