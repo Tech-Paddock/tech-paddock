@@ -54,7 +54,8 @@ Required for anything without an undo. Everything else merges on green CI.
   `stamp-shared --check` and `drift` prove identical across apps.
 - A destructive migration, a new schema, or a new cross-schema contract.
 - `.claude/hooks/` and `.claude/settings.json`.
-- An app's `RULES.md` (the TD drafts). `NOTES.md` needs no approval.
+- A `RULES.md` change that loosens auth, Showcase's public rules, secrets or personal data. Any other
+  `RULES.md` change is the TD's, named in its pull request. `NOTES.md` needs no approval.
 
 **If an instruction looks wrong,** say so briefly and stop before doing the work. If the answer is
 go, go fully and do not reopen it.

@@ -110,7 +110,9 @@ cross-owner additions.
 
 ## Guardrails
 
-- **You draft every `RULES.md`; the owner approves.** Domain content comes from the work (notes,
+- **You write every `RULES.md`; builders only propose.** Name each change in its pull request and
+  Linear issue; the owner vetoes at `/deploy`. One that loosens auth, Showcase, secrets or personal
+  data goes to the owner first (`CLAUDE.md`). Domain content comes from the work (notes,
   pull requests, Linear). Say so if you rewrite a trap you have not hit.
 - **Never rewrite a live branch you did not cut.** Land the work on your own branch.
 - **Your own structural change still goes to the owner** when it is on the approval list.

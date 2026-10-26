@@ -20,6 +20,9 @@ would get something wrong without it: the rule, one line of why. App rules live 
 - **Agents test live apps signed out only:** the login redirect, 401 on `/api/*`, a forged cookie,
   the headers. Agents never get the password.
 - **A `drift` check must fail the case it exists for and pass the next legitimate edit.**
+- **`RULES.md` changes are the TD's** (2026-10-26, TEC-149): a revert undoes them and `/build` already
+  gates the work. Loosening auth, Showcase, secrets or personal data still asks; so do `CLAUDE.md`
+  and hooks, which bind the TD itself.
 
 ## Mistakes
 
