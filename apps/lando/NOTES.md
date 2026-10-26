@@ -145,10 +145,44 @@
     live food treats at the session's exact `at`, to the millisecond. There is no link column.
     Moving the session's When in a correction leaves its treats at the old time (correct them
     from the feed), and they then no longer show on it.
-- **Analytics** (`app/Analytics.tsx`): the last 14 of the phone's local days: weight trend (the
-  growth chart over the window, with its table), potty per day (pee, poop, accidents stacked, plus an accident-trend
-  line), food per day (meals, treats), exercise per day (walks, playtime, training, plus average
-  sessions and minutes). Plain SVG (`app/StackedBars.tsx`); tap a day for its numbers.
+- **Analytics** (`app/Analytics.tsx`, rebuilt by TEC-143; all aggregation is pure, in
+  `lib/analytics.ts`, tested in `tests/timeline.test.ts`; no model call, no data change). The last 14
+  local days, six cards:
+  - **Day by day** (`app/DayTimeline.tsx`): a row per day, newest first, hours 0-24 across (ticks
+    12a 6a 12p 6p 12a). Potty marks on a top lane, food marks below; each kind has its own shape
+    (`app/Glyph.tsx`: pee circle, poop square, accident triangle, meal diamond, treat plus) and a
+    legend, so colour is never the only cue. Pee, poop, accident (inside), meal, treat; "No potty"
+    is not plotted; both outside is a pee and a poop mark; inside is one accident mark, exactly as
+    `perDay` counts (a test holds the two equal). Day totals at the row's end (potty trips with a
+    triangle if any accident, then meals + treats). Marks within 0.9 h in one lane step aside
+    (`stackLevels`). A row is one button: tap near a mark for that entry, anywhere else for the
+    day's counts and every time, in words under the row. Local pattern: HTML rows with absolutely
+    placed inline-SVG glyphs, not a scaled SVG, so shapes and text keep their size at 360px
+    (checked at 360px, light and dark).
+  - **Time between pees** (`app/DailyChart.tsx`, `peeGaps`): per day the average (dot) and longest
+    (bar) gap. A pee is a pee or both, outside or inside (an accident is still a pee). **A gap is
+    assigned to the day it ends on. A gap whose two pees fall on different local days is the
+    overnight gap: it is shown on its own ("overnight" in the day's tap text, and the window's median in
+    the card's summary) and is left out of the average and the longest**, so a night's sleep does
+    not swamp the daytime numbers. The last pee before the window still anchors the first day's
+    overnight. Fewer than two pees in a day means no daytime gap (blank, not zero).
+  - **Meal to poop** (`mealToPoop`): minutes from each meal to the next poop (poop or both, outside
+    or inside), only if within `MEAL_POOP_WINDOW_MS` (6 h); the median over the window, and per day
+    a diamond per meal and a dot for the day's median. A meal with no poop in the window is left out
+    and counted; a meal under 6 h old with no poop yet is "pending" (also left out). The poop may be
+    on the next day; the meal's day owns the number. Treats are not meals.
+  - **Food and weight** (`app/FoodWeight.tsx`, `foodAgainstWeight`): two panels on the same day
+    columns, the day's weight (line) above the day's total meal amount (bars). Amounts only. Meals
+    come in different units, so the **most common unit** among the window's meals with an amount is
+    summed (a meal with no unit, Misc, is its own group; ties go to the unit that sorts first);
+    meals in another unit and meals with no amount are left out and the card says how many. Weight
+    is in the newest weight's unit, the day's last weigh-in; its axis is the window's own range,
+    not from zero (the Weight card keeps the zero baseline).
+  - **Weight** (`GrowthChart`, unchanged) and **Exercise per week** (`weeklyExercise`): minutes in
+    rolling seven-day weeks ending today, **four weeks (28 days, inside the 30-day read) rather than
+    the 14-day window**, as stacked Fun (walk, playtime) and Training bars with the numbers beside;
+    leading weeks before the journal's first entry are dropped. The old per-day potty, food and
+    exercise bar cards and `StackedBars` are gone.
 - The design is the prototype artifact `https://claude.ai/artifact/XdiVZzBqyzeQEVxwXyqAfv`, built
   with the theme's tokens; its sample data and made-up history are not in the app.
 - The gate file is `proxy.ts`, the base copy. Not yet in the hub's `TOOLS`
@@ -266,7 +300,9 @@
   returned, not duplicated.
 - **Per-day aggregation** (`lib/analytics.ts:perDay`): days are built with the calendar
   (`new Date(y, m, d - i)`), never by subtracting 24 h, so a DST change cannot shift an evening.
-  Averages count complete days only, from the first day anything was logged.
+  Averages count complete days only, from the first day anything was logged. Every Analytics
+  function takes the day's midnight as `now`, except `mealToPoop`, which needs the real clock to
+  tell "pending" from "missed" (the screen passes it by the minute).
 - **Growth chart** (`app/GrowthChart.tsx`): live weights in the newest weight's unit, y axis from
   zero, tap for the nearest point, a table underneath; `since` limits it to a window. Shown in
   Analytics only.
