@@ -4,7 +4,7 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 ## Scope
 
-- Potty, food, fun, training (both stored as exercise), weight and health (vet visits and medical issues, with photos), with photos on Fun and Training too, each logged through a short form with defaults; analytics over the same events.
+- Potty, food, fun, training (both stored as exercise), weight and health (vet visits and medical issues, with photos), with photos on Potty, Fun and Training too, each logged through a short form with defaults; analytics over the same events.
 - App surface, by the owner's override (2026-10-20): two tabs, Log and Analytics, opening on Log; one-handed, thumb-first.
 - Who logged it is a person picked from names stored in the database, never in the repo.
 
@@ -22,5 +22,5 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 - Livery: McLaren '25 (`mcl39`), the theme's own; changed only in the theme.
 - The food catalogue is fixed in code; an item is retired (`retired: true`), never deleted or re-id'd,
   because old entries are keyed by its id.
-- Photos (on Health, Fun and Training entries) live in the private `lando-photos` bucket, shown through
+- Photos (on Health, Potty, Fun and Training entries) live in the private `lando-photos` bucket, shown through
   signed URLs; an event stores only the path.
