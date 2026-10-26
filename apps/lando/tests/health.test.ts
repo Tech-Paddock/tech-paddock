@@ -185,7 +185,8 @@ describe("the fixed lists", () => {
 
   it("are the same lists lando.details_ok holds, offered and retired (a value in the app alone fails every save)", () => {
     const sql = latest().sql;
-    expect(latest().name).toMatch(/_lando_health_picklist\.sql$/);
+    // The newest file is the one that is true now (this sync follows it, TEC-142 onward): at least the picklist one.
+    expect(latest().name >= "20261026021027").toBe(true);
     const fn = body(sql);
     const [vet, issue] = arrays(fn);
     expect(new Set(vet)).toEqual(new Set([...VET_REASONS, ...VET_RETIRED].map(([id]) => id)));
@@ -554,7 +555,7 @@ describe("photos on Fun and Training (TEC-139)", () => {
     expect(eventPhotos({ kind: "health", details: { type: "vet", reasons: ["other"], photos: [P1] } })).toEqual([P1]);
     expect(eventPhotos({ kind: "exercise", details: { ...ex, photos: [P2] } })).toEqual([P2]);
     expect(eventPhotos({ kind: "exercise", details: ex })).toEqual([]);
-    expect(eventPhotos({ kind: "potty", details: { photos: [P1] } })).toEqual([]);
+    expect(eventPhotos({ kind: "weight", details: { photos: [P1] } })).toEqual([]);
   });
 
   it("writeEvent refuses an exercise naming a photo that never uploaded, and saves one that did", async () => {

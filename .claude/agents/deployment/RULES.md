@@ -20,7 +20,7 @@ Run first, every time. Only work that touches the deploy holds it:
 1. **Uncommitted or unpushed work in this repo:** `git status` and unpushed commits in the main
    checkout and every `.claude/worktrees/agent-*`. The TD runs this when your worktree cannot.
 2. **An agent still working on a briefed branch.**
-3. **Each briefed branch:** pushed, CI `gate` green on its head, `NOTES.md` updated, request line
+3. **Each briefed branch:** pushed, CI `gate` green on its head, `NOTES.md` updated (on the slice that owns it, when one issue has several branches), request line
    and Deployment section present, nothing on the owner-approval list without approval.
 
 Other sessions waiting on the owner, and branches outside the brief, are listed in the report but

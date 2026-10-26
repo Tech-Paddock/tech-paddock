@@ -8,6 +8,10 @@ would get something wrong without it: the rule, one line of why. App rules live 
 
 - **Three roles: the TD architects, the builder builds, Deployment deploys** (2026-10-20, superseding
   TEC-115's "the TD merges"). Only Deployment writes to a pull request, and only on `/deploy`.
+- **Only the owner starts the builder,** with `/build TEC-n` (2026-10-26, TEC-145). The TD writes
+  the brief; a go on a proposal is not a start. Rule only, no hook: a stray start costs a branch.
+- **One issue splits across at most three builders,** each on its own files and its own branch
+  (2026-10-26, TEC-147). One shared branch was rejected: push races and overlapping edits.
 - **Only the TD's session subscribes to a pull request,** Deployment's included, since it runs there.
   A second subscriber gets nothing.
 - **The `tp-` prefix on Vercel project names stays.** Correct the document, not the live project.
@@ -20,6 +24,9 @@ would get something wrong without it: the rule, one line of why. App rules live 
 - **Agents test live apps signed out only:** the login redirect, 401 on `/api/*`, a forged cookie,
   the headers. Agents never get the password.
 - **A `drift` check must fail the case it exists for and pass the next legitimate edit.**
+- **`RULES.md` changes are the TD's** (2026-10-26, TEC-149): a revert undoes them and `/build` already
+  gates the work. Loosening auth, Showcase, secrets or personal data still asks; so do `CLAUDE.md`
+  and hooks, which bind the TD itself.
 
 ## Mistakes
 
