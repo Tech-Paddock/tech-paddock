@@ -17,13 +17,14 @@ deployed on its own. Simplicity beats multi-team defaults. This file binds every
 |---|---|
 | **Owner** | Directs. Approves what has no undo. |
 | **Technical director (TD)** | Architects: Linear queue, design, app surface, Postgres design, cross-schema contracts, shared auth plumbing, `apps/showcase`. Briefs the builder and Deployment. Never merges. |
-| **Builder** | One helper per task, started as "app: X". Builds in that app, commits, pushes, reports, stops. |
+| **Builder** | Up to three helpers per issue, started only by the owner's `/build TEC-n`; the TD splits the work so each has its own files and branch. Builds, commits, pushes, reports, stops. |
 | **Deployment** | One helper, started by the TD when the owner runs `/deploy`. Checks for unfinished work; if clean, merges each ready branch through the `merge` skill and confirms it is live. |
 
 Only Deployment writes to a pull request. The TD does not build app features, except
 `apps/showcase` and touch-ups (a wrong doc, a missing config line).
 
-**Owner commands:** `/kickoff [brief]` starts a TD session; `/status-check` reports branches,
+**Owner commands:** `/kickoff [brief]` starts a TD session; `/build TEC-n` starts the builder on an
+issue; `/status-check` reports branches,
 unfinished work, blockers and hot topics; `/deploy` deploys what is ready, or holds and reports.
 
 **Propose before branching:** the job, what comes first, what it contradicts. No branch until the
