@@ -150,5 +150,9 @@ describe("summaries", () => {
       "1 accident in the last 7 days, the same as the 7 before."
     );
     expect(accidentTrend(days(() => ({})))).toBe("No accidents in 14 days.");
+    // Five days (the timeline card, TEC-153): the last 2 against the 2 before.
+    const five = Array.from({ length: 5 }, (_, i) => row(i === 4 ? { accident: 2 } : i === 2 ? { accident: 1 } : {}, i));
+    expect(accidentTrend(five)).toBe("2 accidents in the last 2 days, up from 1 the 2 before.");
+    expect(accidentTrend(five.map((r) => ({ ...r, accident: 0 })))).toBe("No accidents in 5 days.");
   });
 });

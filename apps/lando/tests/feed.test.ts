@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   FORM_KINDS,
@@ -193,5 +195,24 @@ describe("Training's Treats pop-up — a food treat at the session's time", () =
     const later = treat("2026-10-23T16:04:32.250Z");
     const meal = ev({ kind: "food", at, details: { type: "meal", item_id: "misc", item_name: "Misc", kcal_per: null, unit: null, amount: null } });
     expect(treatsWith([training, a, b, voided, del, later, meal], training).map((e) => e.id)).toEqual([a.id, b.id]);
+  });
+});
+
+describe("a feed row is one line (TEC-139)", () => {
+  // The screen has no DOM test; this holds the classes that make the row one
+  // line, so a refactor cannot quietly bring the wrapping back.
+  const src = readFileSync(resolve(__dirname, "../app/Journal.tsx"), "utf8");
+  const row = src.slice(src.indexOf("setOpen({ form: formOf(e)"), src.indexOf("nameOf(e.person_id)}</span>"));
+
+  it("truncates the text with an ellipsis in a column that can shrink, and never wraps it", () => {
+    expect(row).toContain('className="block truncate"');
+    expect(row).toContain('<span className="min-w-0">');
+    expect(row).toContain("grid-cols-[4rem_minmax(0,1fr)_auto]");
+    expect(row).not.toMatch(/block text-sm text-ink-soft/); // the note no longer sits on its own line
+  });
+
+  it("keeps the full text on the row (its title) and the thumbnails at size", () => {
+    expect(row).toMatch(/title=\{\[feedTime\(e\.kind, e\.at\), title, detail/);
+    expect(row).toContain("h-10 w-10 shrink-0");
   });
 });
