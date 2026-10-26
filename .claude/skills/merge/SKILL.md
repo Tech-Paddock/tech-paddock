@@ -69,8 +69,9 @@ follow the pull request's Verify line.
 **Close what shipped, once it is live.** For each issue the branch names:
 
 - Mark the Next step it delivered `Done YYYY-MM-DD`.
-- **Every step done:** status Done, unassigned. When one issue has several branches, only the last
-  one to go live closes it.
+- **Every step done, or only an owner phone check left:** status Done, unassigned. A phone check
+  left gets the `Phone check` label instead of holding it open. When one issue has several
+  branches, only the last one to go live closes it.
 - **Steps left:** reopen it if the merge closed it; status per `CLAUDE.md`; assigned to the owner
   only while a ⭐ step waits on them.
 - Put each issue and what you set it to in your report.

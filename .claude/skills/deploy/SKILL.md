@@ -34,7 +34,7 @@ Look before sorting; in-flight work holds only the branches it touches.
 - **Not ready:** anything else, with the one thing that clears it (red `gate`, no Deployment
   section, a step waiting on the owner, an approval-list item without approval).
 - **Stale:** its issue Done or Canceled with the work not wanted, or its diff against `main` empty.
-  Recommend `stale_<name>`; never merge it.
+  List it as a link for the owner to delete; never merge it.
 
 If you cannot tell whether a branch is finished, it is not ready; say what you would need.
 

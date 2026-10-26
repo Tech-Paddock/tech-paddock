@@ -10,6 +10,10 @@ would get something wrong without it: the rule, one line of why. App rules live 
   TEC-115's "the TD merges"). Only Deployment writes to a pull request, and only on `/deploy`.
 - **Only the owner starts the builder,** with `/build TEC-n` (2026-10-26, TEC-145). The TD writes
   the brief; a go on a proposal is not a start. Rule only, no hook: a stray start costs a branch.
+- **Phone checks never hold an issue open** (2026-10-26, TEC-154): live closes it, the `Phone check`
+  label tracks the look. Ten merged issues sat In Progress for checks alone.
+- **The TD's own docs changes share one branch per chat** (2026-10-26, TEC-154): seven doc branches
+  cost seven merge-main-and-wait cycles under "branches up to date".
 - **One issue splits across at most three builders,** each on its own files and its own branch
   (2026-10-26, TEC-147). One shared branch was rejected: push races and overlapping edits.
 - **Only the TD's session subscribes to a pull request,** Deployment's included, since it runs there.

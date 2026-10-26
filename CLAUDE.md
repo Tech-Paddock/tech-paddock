@@ -65,7 +65,8 @@ go, go fully and do not reopen it.
 ## How work moves
 
 - **One fresh branch per change:** `claude/<area>-<description>`, where area is an app folder or
-  `ci`, `db`, `docs`, `platform`. Never reuse a branch.
+  `ci`, `db`, `docs`, `platform`. Never reuse a branch. The TD's own docs and rules changes in one
+  chat share one branch, a commit per request.
 - **Builder report:** blast radius (apps, shared files) and the Deployment section. `NOTES.md` is
   updated on the same branch to what is true after merge.
 - **Deployment merges, on `/deploy` only:** pull request, CI green on the current head, migration,
@@ -81,7 +82,8 @@ go, go fully and do not reopen it.
 - **Migrations land before the code that needs them.** Additive changes ride with their code.
   Destructive changes take two pull requests: stop using it, then drop it. Deployment applies them
   at merge. Cite a migration by name, not number.
-- **Stale branches are renamed `stale_<name>`.** Agents cannot delete remote branches.
+- **Stale branches are the owner's to delete.** Agents cannot delete or rename remote branches;
+  the TD lists them as links.
 - **One session per working directory.** The builder uses its own worktree.
 - **Check a red status against `main` first.** A red check on `main` too is not the branch's.
 
@@ -94,6 +96,10 @@ go, go fully and do not reopen it.
   (pushed, awaiting merge) · Done (every Next step done; reopen a merge-closed issue if steps
   remain).
 - **Assign an issue only while a step waits on the owner,** and mark that step ⭐.
+- **Live closes an issue.** A phone check is a step only when the owner asks for one or the change
+  cannot be tested signed out. It never holds the issue open: Deployment closes it with the
+  `Phone check` label, `/status-check` lists them, and the TD removes the label when the owner says
+  it passed.
 - **Open every message to the owner with a `---` line.**
 - **Anything the owner should open outside the chat is a clickable link:** an app, a Linear issue,
   a pull request, a dashboard page. Never a bare name, subdomain or path. Linear issues carry the
