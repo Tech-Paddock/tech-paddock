@@ -1,6 +1,6 @@
 ---
 name: builder
-description: "The builder: one helper that builds in whichever app its brief names (\"app: X\"). Started by the technical director after the owner's go on the work; pushes its branch and reports back."
+description: "The builder: one helper that builds in whichever app its brief names (\"app: X\"). Started only by the owner's /build TEC-n, which the technical director runs; pushes its branch and reports back."
 model: claude-sonnet-5-5
 effort: medium
 isolation: worktree

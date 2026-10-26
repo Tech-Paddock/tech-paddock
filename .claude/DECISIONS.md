@@ -8,6 +8,8 @@ would get something wrong without it: the rule, one line of why. App rules live 
 
 - **Three roles: the TD architects, the builder builds, Deployment deploys** (2026-10-20, superseding
   TEC-115's "the TD merges"). Only Deployment writes to a pull request, and only on `/deploy`.
+- **Only the owner starts the builder,** with `/build TEC-n` (2026-10-26, TEC-145). The TD writes
+  the brief; a go on a proposal is not a start. Rule only, no hook: a stray start costs a branch.
 - **Only the TD's session subscribes to a pull request,** Deployment's included, since it runs there.
   A second subscriber gets nothing.
 - **The `tp-` prefix on Vercel project names stays.** Correct the document, not the live project.
