@@ -12,8 +12,25 @@ The owner's only. The TD does not merge; it briefs Deployment.
 
 One Deployment at a time, across every session. Deployment opens pull requests only while it
 merges, so **an open pull request anywhere in the repo means a deploy is in flight.** List them
-(`list_pull_requests`, state open). Any open: hold, name each as a link with the session that
-opened it if you can tell, and stop. One left by a crashed Deployment is the owner's to close.
+(`list_pull_requests`, state open). None: go on.
+
+**A jam: coordinate, don't stop.** Sessions talk TD to TD with `send_message`; a Deployment helper
+cannot be messaged, so its TD speaks for it.
+
+1. **Find the holder:** the `Claude-Session` trailer on the open pull request's head commit, or
+   `list_sessions`.
+2. **Offer your ready branches** with their briefs (request line, issue, blast radius, Deployment
+   section, merge order) and ask the holder to take them into its run, or to message you when its
+   Deployment has stopped.
+3. **The holder decides:** it takes them if they are ready and touch nothing its own branches touch
+   (it `SendMessage`s them to its running Deployment, which merges them last); otherwise it replies
+   with what it is waiting on. It messages every session that asked when its Deployment stops.
+4. **The waiter waits:** no reply, or "not yet", and you arm a `send_later` check-in at 20 minutes.
+   Never start while any pull request is open.
+5. **No holder:** a pull request no session claims (a crashed Deployment) is the owner's to close;
+   name it as a link and stop.
+
+Tell the owner in one line who holds the lock and which of the two ways it went.
 
 ## 1. Every branch, not just this chat's
 
@@ -57,4 +74,5 @@ other three lists so its report carries them. Nothing ready: still start it, so 
 ## 5. Relay its report unchanged
 
 In the `/status-check` format, under **Deploy held** or **Deployed**, with the in-flight, not-ready
-and stale branches after it, each with what clears it.
+and stale branches after it, each with what clears it. Then message every session that asked to
+hear when this Deployment stopped (step 0).

@@ -12,7 +12,9 @@ would get something wrong without it: the rule, one line of why. App rules live 
   asks the owner on every builder start, as for Deployment (TEC-156). The TD writes the brief; a go
   on a proposal is not a start.
 - **One Deployment at a time, across sessions** (2026-10-26, TEC-156). An open pull request is the
-  lock. Parallel Deployments would only make each other's branches out of date under "branches up
+  lock. In a jam the waiting TD offers its branches to the holder's run or waits for its message
+  (`/deploy` step 0); TDs coordinate, Deployments cannot be messaged. Parallel Deployments would only
+  make each other's branches out of date under "branches up
   to date"; the throughput fix is GitHub's merge queue, the owner's setting.
 - **Phone checks never hold an issue open** (2026-10-26, TEC-154): live closes it, the `Phone check`
   label tracks the look. Ten merged issues sat In Progress for checks alone.
