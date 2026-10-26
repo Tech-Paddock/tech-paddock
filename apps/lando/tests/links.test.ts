@@ -394,12 +394,15 @@ describe("migration lando_issue_links", () => {
   const fn = sql.slice(sql.indexOf("create or replace function lando.details_ok(kind"), sql.indexOf("$fn$;"));
   const block = (from: string, to: string) => fn.slice(fn.indexOf(from), fn.indexOf(to));
 
-  it("exists, and is the newest file defining the function", () => {
+  it("exists, and defines the function (a newer widening, like lando_vet_weight, may follow it)", () => {
+    // Was "the newest file defining the function" until TEC-151 added a newer
+    // widening. The newest file's own shape is held by its test (vetweight.test.ts).
     expect(file).toBeDefined();
     const defining = readdirSync(dir)
       .filter((f) => readFileSync(resolve(dir, f), "utf8").includes("create or replace function lando.details_ok(kind"))
       .sort();
-    expect(defining.at(-1)).toBe(file);
+    expect(defining).toContain(file);
+    expect(defining.at(-1)! >= file!).toBe(true);
   });
   it("widens potty with issue and photos, and health with a vet-only issue", () => {
     const potty = block("WHEN 'potty' THEN", "WHEN 'food' THEN");

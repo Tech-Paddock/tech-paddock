@@ -90,6 +90,33 @@
   link to an id that is not a Health issue event** (`writeEvent` -> `checkIssueTarget`, the dogs
   check's twin), voided copies included, since an old link may name a superseded one. Changing
   an issue's pick or note never touches the entries that link to it.
+- **A vet visit's Weight** (TEC-151), on **Vet visit** only (not Medical issue): an optional Weight
+  and Unit under Related issue. A new visit opens it empty, in this phone's last weight unit
+  (`remembered.unit`, else the newest weight's). A filled one is **its own ordinary weight entry**:
+  local noon of the visit's day (`fromDateInput`, as every weight), the visit's person, no note, and
+  `visit: <the visit's id>` in its details (`visitWeightPlan`, pure, in `lib/events.ts`). It shows in
+  the growth chart and on the Weight button like any weigh-in, and as its own Weight row in the feed.
+  The vet line also carries it: "Vet visit  Check-up · 7.6 lb" (`describe` -> `linkedWeight`).
+  - **Saved after the visit**, the treats' pattern: the weight rides in the pending row's `then` and
+    in `lando.unsaved` with it (`saveThen`, `lib/saveOrder.ts`, runs the visit and only then each
+    follower). If the visit fails, its row reads "Not saved  + 7.6 lb": Retry saves both, ✕ discards
+    both (`followText`), so no weight is logged for a visit that never saved. The weight then has its
+    own row and its own Retry.
+  - **Resolved when read**, like the issue link: the `visit` id may name a superseded copy, and
+    `resolveVisit` / `linkedWeight` follow the `voids` chain to the live visit (a delete ends it as
+    `removed`). Both share one walker (`followLink`) with `resolveIssue`.
+  - **A correction** of the visit opens the field on its linked weight. Unchanged (same value and
+    unit): nothing is saved, the link follows the correction by itself. Changed: the weight is
+    **voided and replaced**, never a second one, the new entry's `visit` the corrected visit's *new*
+    id, saved after the correction succeeds (if the correction fails the form stays open, nothing
+    queued). Same day rule: the replacement sits at noon of the corrected visit's day, and keeps the
+    old one's note. A **blank** field on a visit that has a weight is refused ("change it here, or
+    delete that weight from the feed"): a measured weight is deleted from the feed, not by a blank box.
+    Switching a corrected visit's Type to Medical issue leaves its weight where it was.
+  - **Deleting the visit leaves the weight** (it was measured); it keeps its `visit` and resolves to
+    `removed`. Correcting a linked weight from the Weight form keeps its `visit`.
+  - **The server refuses** a `visit` that is not a vet visit event (`writeEvent` -> `checkVisitTarget`,
+    the issue check's twin), a voided copy allowed.
 - **Fun and Training** (TEC-136) replace the Exercise button. Both save kind `exercise` with the
   existing `type`; the data shape did not change. `FORM_KINDS`, `kindOfForm` and `formOf`
   (`lib/events.ts`) map between the six forms and the five kinds: a walk or playtime is Fun, a
@@ -145,10 +172,48 @@
     live food treats at the session's exact `at`, to the millisecond. There is no link column.
     Moving the session's When in a correction leaves its treats at the old time (correct them
     from the feed), and they then no longer show on it.
-- **Analytics** (`app/Analytics.tsx`): the last 14 of the phone's local days: weight trend (the
-  growth chart over the window, with its table), potty per day (pee, poop, accidents stacked, plus an accident-trend
-  line), food per day (meals, treats), exercise per day (walks, playtime, training, plus average
-  sessions and minutes). Plain SVG (`app/StackedBars.tsx`); tap a day for its numbers.
+- **Analytics** (`app/Analytics.tsx`, rebuilt by TEC-143; all aggregation is pure, in
+  `lib/analytics.ts`, tested in `tests/timeline.test.ts`; no model call, no data change). The last 14
+  local days, six cards,
+  **except Day by day, which shows the last 5** (`TIMELINE_DAYS`, TEC-153, next to `ANALYTICS_DAYS`;
+  `dayTimeline` builds its marks and counts from it, so the two always cover the same days; the
+  owner's "for scatter plot only go back 5 days"). Time between pees, meal to poop, food against weight
+  and the heading stay on 14 days, exercise on 4 weeks:
+  - **Day by day** (`app/DayTimeline.tsx`): a row per day (5), newest first, hours 0-24 across (ticks
+    12a 6a 12p 6p 12a). Potty marks on a top lane, food marks below; each kind has its own shape
+    (`app/Glyph.tsx`: pee circle, poop square, accident triangle, meal diamond, treat plus) and a
+    legend, so colour is never the only cue. Pee, poop, accident (inside), meal, treat; "No potty"
+    is not plotted; both outside is a pee and a poop mark; inside is one accident mark, exactly as
+    `perDay` counts (a test holds the two equal). Day totals at the row's end (potty trips with a
+    triangle if any accident, then meals + treats). Marks within 0.9 h in one lane step aside
+    (`stackLevels`). A row is one button: tap near a mark for that entry, anywhere else for the
+    day's counts and every time, in words under the row. Local pattern: HTML rows with absolutely
+    placed inline-SVG glyphs, not a scaled SVG, so shapes and text keep their size at 360px
+    (checked at 360px, light and dark).
+  - **Time between pees** (`app/DailyChart.tsx`, `peeGaps`): per day the average (dot) and longest
+    (bar) gap. A pee is a pee or both, outside or inside (an accident is still a pee). **A gap is
+    assigned to the day it ends on. A gap whose two pees fall on different local days is the
+    overnight gap: it is shown on its own ("overnight" in the day's tap text, and the window's median in
+    the card's summary) and is left out of the average and the longest**, so a night's sleep does
+    not swamp the daytime numbers. The last pee before the window still anchors the first day's
+    overnight. Fewer than two pees in a day means no daytime gap (blank, not zero).
+  - **Meal to poop** (`mealToPoop`): minutes from each meal to the next poop (poop or both, outside
+    or inside), only if within `MEAL_POOP_WINDOW_MS` (6 h); the median over the window, and per day
+    a diamond per meal and a dot for the day's median. A meal with no poop in the window is left out
+    and counted; a meal under 6 h old with no poop yet is "pending" (also left out). The poop may be
+    on the next day; the meal's day owns the number. Treats are not meals.
+  - **Food and weight** (`app/FoodWeight.tsx`, `foodAgainstWeight`): two panels on the same day
+    columns, the day's weight (line) above the day's total meal amount (bars). Amounts only. Meals
+    come in different units, so the **most common unit** among the window's meals with an amount is
+    summed (a meal with no unit, Misc, is its own group; ties go to the unit that sorts first);
+    meals in another unit and meals with no amount are left out and the card says how many. Weight
+    is in the newest weight's unit, the day's last weigh-in; its axis is the window's own range,
+    not from zero (the Weight card keeps the zero baseline).
+  - **Weight** (`GrowthChart`, unchanged) and **Exercise per week** (`weeklyExercise`): minutes in
+    rolling seven-day weeks ending today, **four weeks (28 days, inside the 30-day read) rather than
+    the 14-day window**, as stacked Fun (walk, playtime) and Training bars with the numbers beside;
+    leading weeks before the journal's first entry are dropped. The old per-day potty, food and
+    exercise bar cards and `StackedBars` are gone.
 - The design is the prototype artifact `https://claude.ai/artifact/XdiVZzBqyzeQEVxwXyqAfv`, built
   with the theme's tokens; its sample data and made-up history are not in the app.
 - The gate file is `proxy.ts`, the base copy. Not yet in the hub's `TOOLS`
@@ -184,7 +249,7 @@
   `leash` only when outside); food `{type, item_id, item_name, kcal_per, unit, amount}`; exercise
   `{type: walk|playtime|training, where, with_dogs, minutes, treats, commands?, dogs?, photos?}` (commands
   on training only, from the fixed list `COMMANDS`; `dogs` is 1 to 20 `lando.dogs` ids, only when
-  `with_dogs` is true); weight `{value, unit}`. `parseDetails` checks these on the phone (before
+  `with_dogs` is true); weight `{value, unit, visit?: uuid}` (TEC-151: only a vet visit's Weight sets `visit`). `parseDetails` checks these on the phone (before
   the sheet closes) and again on the server; the database holds the same shapes in the SQL
   function `lando.details_ok(kind, details)`, which `events_details_shape` calls (migration
   `lando_health_events` moved the check there, from `widen_lando_potty_none`'s, and added
@@ -266,7 +331,9 @@
   returned, not duplicated.
 - **Per-day aggregation** (`lib/analytics.ts:perDay`): days are built with the calendar
   (`new Date(y, m, d - i)`), never by subtracting 24 h, so a DST change cannot shift an evening.
-  Averages count complete days only, from the first day anything was logged.
+  Averages count complete days only, from the first day anything was logged. Every Analytics
+  function takes the day's midnight as `now`, except `mealToPoop`, which needs the real clock to
+  tell "pending" from "missed" (the screen passes it by the minute).
 - **Growth chart** (`app/GrowthChart.tsx`): live weights in the newest weight's unit, y axis from
   zero, tap for the nearest point, a table underneath; `since` limits it to a window. Shown in
   Analytics only.
@@ -304,7 +371,7 @@
   function: an unknown kind has none, so it is refused.
 - **Widen `lando.details_ok` with `create or replace function`, and only ever widen.** The
   constraint `events_details_shape` just calls it, so a widening is a new migration holding the
-  function's whole current body (`lando_issue_links`'s, the latest) with the one
+  function's whole current body (`lando_vet_weight`'s, the latest) with the one
   list or shape grown: no DROP, no constraint swap, and it goes through the connector. Replacing
   the function does **not** re-check existing rows, so a function that narrows would leave rows the
   database now calls invalid, and nothing would say so. Narrowing (removing a value, requiring a
@@ -316,7 +383,7 @@
 - **The health lists are in two places:** `VET_REASONS` + `VET_RETIRED` and `ISSUE_PICKS` +
   `ISSUE_RETIRED` in `lib/events.ts` and `lando.details_ok`. The database holds the union.
   `tests/health.test.ts` finds the latest migration defining the function (by version, now
-  `lando_issue_links`; it only requires it to be at least `lando_health_picklist`'s), reads
+  `lando_vet_weight`; it only requires it to be at least `lando_health_picklist`'s), reads
   the two reason arrays out of its body and fails if they differ from the code's unions, if it
   drops an id the first migration held, or if that file holds anything but `set local
   lock_timeout` and the function. The next widening is simply a newer file; the test follows it.
@@ -325,7 +392,15 @@
 - **`issue` and potty `photos` are in two places:** `parseDetails` and `lando.details_ok`
   (migration `lando_issue_links`). `tests/links.test.ts` reads that file: the potty branch must allow
   `issue` and `photos`, the health branch an `issue` for `type = 'vet'` only, every other branch must
-  equal `lando_health_picklist`'s, and the file is only `lock_timeout` and the function.
+  equal `lando_health_picklist`'s, and the file is only `lock_timeout` and the function. It no longer
+  asserts it is the *newest* file (TEC-151 added a newer widening); the newest file's own shape is
+  `tests/vetweight.test.ts`'s.
+- **A weight's `visit` is in two places:** `parseDetails` and `lando.details_ok` (migration
+  `lando_vet_weight`, whose test reads it: weight allows an optional `visit` uuid, every other branch
+  equals `lando_issue_links`'s). The database does not check the target is a vet visit; `writeEvent` does.
+  A weight's `visit` is never rewritten, so after a visit is corrected it still names the old id:
+  always read it through `linkedWeight` / `resolveVisit`, never by `id ===`. A visit older than the
+  read's 30 days is never opened, so a linked weight is always in the read (every weight is).
 - **A link to an issue outside the read reads "re: earlier issue".** The read is the last 30 days
   plus every void, so a vet visit that links to an issue older than that cannot name it. A correction
   of that old issue is read (it carries the old time and `voids`), but not the issue itself. Widening
