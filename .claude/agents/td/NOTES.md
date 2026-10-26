@@ -4,7 +4,7 @@ What is true now, and the traps. Branch and pull request state is never written 
 
 ## State
 
-- **Shape:** one TD at a time + one builder + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Linear
+- **Shape:** one TD at a time + up to three builders per issue (started by the owner's `/build`) + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Linear
   labels: `owner:Owner`, `owner:TD`, `app:<folder>`; the parking lot is the `Parked` label.
 - **Every app is on Next 16 with `proxy.ts`,** one gate copy.
 - **`apps/showcase`'s scaffold waits on the owner showing you the uploader.**
