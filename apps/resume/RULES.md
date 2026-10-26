@@ -124,6 +124,8 @@ Schema `resume`. Columns are in the migrations under `supabase/`; never put a mi
 - Fixtures: `template-sample.docx` carries two blocking findings on purpose (a second table and a
   `<w:sdt>`); `tests/reformat-route.test.ts` asserts they survive. Use `template-flat-sample.docx`
   unless a test needs a defect.
+- The Diagnostics message guide (`lib/messageGuide.ts`) moves with `lib/verdict.ts`;
+  `tests/message-guide.test.ts` holds them together.
 - `GET /api/health` probes database, bucket and active template. A missing
   template reports not-ok at status 200.
 
