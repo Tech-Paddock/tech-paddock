@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"Open items live in Linear, team TEC. List the ones on your plate before anything else and lead your first message with them. Then read your RULES.md and NOTES.md: .claude/agents/td/ for the technical director, .claude/agents/deployment/ for Deployment, apps/<app>/ for the builder.\"}}'",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"Open items live in Linear, team TEC. Check the ones on your plate before anything else; lead your first message with only what waits on the owner. Then read your RULES.md and NOTES.md: .claude/agents/td/ for the technical director, .claude/agents/deployment/ for Deployment, apps/<app>/ for the builder.\"}}'",
             "timeout": 10,
             "statusMessage": "Pointing at Linear…"
           }
