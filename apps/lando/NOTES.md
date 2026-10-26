@@ -90,6 +90,33 @@
   link to an id that is not a Health issue event** (`writeEvent` -> `checkIssueTarget`, the dogs
   check's twin), voided copies included, since an old link may name a superseded one. Changing
   an issue's pick or note never touches the entries that link to it.
+- **A vet visit's Weight** (TEC-151), on **Vet visit** only (not Medical issue): an optional Weight
+  and Unit under Related issue. A new visit opens it empty, in this phone's last weight unit
+  (`remembered.unit`, else the newest weight's). A filled one is **its own ordinary weight entry**:
+  local noon of the visit's day (`fromDateInput`, as every weight), the visit's person, no note, and
+  `visit: <the visit's id>` in its details (`visitWeightPlan`, pure, in `lib/events.ts`). It shows in
+  the growth chart and on the Weight button like any weigh-in, and as its own Weight row in the feed.
+  The vet line also carries it: "Vet visit  Check-up · 7.6 lb" (`describe` -> `linkedWeight`).
+  - **Saved after the visit**, the treats' pattern: the weight rides in the pending row's `then` and
+    in `lando.unsaved` with it (`saveThen`, `lib/saveOrder.ts`, runs the visit and only then each
+    follower). If the visit fails, its row reads "Not saved  + 7.6 lb": Retry saves both, ✕ discards
+    both (`followText`), so no weight is logged for a visit that never saved. The weight then has its
+    own row and its own Retry.
+  - **Resolved when read**, like the issue link: the `visit` id may name a superseded copy, and
+    `resolveVisit` / `linkedWeight` follow the `voids` chain to the live visit (a delete ends it as
+    `removed`). Both share one walker (`followLink`) with `resolveIssue`.
+  - **A correction** of the visit opens the field on its linked weight. Unchanged (same value and
+    unit): nothing is saved, the link follows the correction by itself. Changed: the weight is
+    **voided and replaced**, never a second one, the new entry's `visit` the corrected visit's *new*
+    id, saved after the correction succeeds (if the correction fails the form stays open, nothing
+    queued). Same day rule: the replacement sits at noon of the corrected visit's day, and keeps the
+    old one's note. A **blank** field on a visit that has a weight is refused ("change it here, or
+    delete that weight from the feed"): a measured weight is deleted from the feed, not by a blank box.
+    Switching a corrected visit's Type to Medical issue leaves its weight where it was.
+  - **Deleting the visit leaves the weight** (it was measured); it keeps its `visit` and resolves to
+    `removed`. Correcting a linked weight from the Weight form keeps its `visit`.
+  - **The server refuses** a `visit` that is not a vet visit event (`writeEvent` -> `checkVisitTarget`,
+    the issue check's twin), a voided copy allowed.
 - **Fun and Training** (TEC-136) replace the Exercise button. Both save kind `exercise` with the
   existing `type`; the data shape did not change. `FORM_KINDS`, `kindOfForm` and `formOf`
   (`lib/events.ts`) map between the six forms and the five kinds: a walk or playtime is Fun, a
@@ -218,7 +245,7 @@
   `leash` only when outside); food `{type, item_id, item_name, kcal_per, unit, amount}`; exercise
   `{type: walk|playtime|training, where, with_dogs, minutes, treats, commands?, dogs?, photos?}` (commands
   on training only, from the fixed list `COMMANDS`; `dogs` is 1 to 20 `lando.dogs` ids, only when
-  `with_dogs` is true); weight `{value, unit}`. `parseDetails` checks these on the phone (before
+  `with_dogs` is true); weight `{value, unit, visit?: uuid}` (TEC-151: only a vet visit's Weight sets `visit`). `parseDetails` checks these on the phone (before
   the sheet closes) and again on the server; the database holds the same shapes in the SQL
   function `lando.details_ok(kind, details)`, which `events_details_shape` calls (migration
   `lando_health_events` moved the check there, from `widen_lando_potty_none`'s, and added
@@ -340,7 +367,7 @@
   function: an unknown kind has none, so it is refused.
 - **Widen `lando.details_ok` with `create or replace function`, and only ever widen.** The
   constraint `events_details_shape` just calls it, so a widening is a new migration holding the
-  function's whole current body (`lando_issue_links`'s, the latest) with the one
+  function's whole current body (`lando_vet_weight`'s, the latest) with the one
   list or shape grown: no DROP, no constraint swap, and it goes through the connector. Replacing
   the function does **not** re-check existing rows, so a function that narrows would leave rows the
   database now calls invalid, and nothing would say so. Narrowing (removing a value, requiring a
@@ -352,7 +379,7 @@
 - **The health lists are in two places:** `VET_REASONS` + `VET_RETIRED` and `ISSUE_PICKS` +
   `ISSUE_RETIRED` in `lib/events.ts` and `lando.details_ok`. The database holds the union.
   `tests/health.test.ts` finds the latest migration defining the function (by version, now
-  `lando_issue_links`; it only requires it to be at least `lando_health_picklist`'s), reads
+  `lando_vet_weight`; it only requires it to be at least `lando_health_picklist`'s), reads
   the two reason arrays out of its body and fails if they differ from the code's unions, if it
   drops an id the first migration held, or if that file holds anything but `set local
   lock_timeout` and the function. The next widening is simply a newer file; the test follows it.
@@ -361,7 +388,15 @@
 - **`issue` and potty `photos` are in two places:** `parseDetails` and `lando.details_ok`
   (migration `lando_issue_links`). `tests/links.test.ts` reads that file: the potty branch must allow
   `issue` and `photos`, the health branch an `issue` for `type = 'vet'` only, every other branch must
-  equal `lando_health_picklist`'s, and the file is only `lock_timeout` and the function.
+  equal `lando_health_picklist`'s, and the file is only `lock_timeout` and the function. It no longer
+  asserts it is the *newest* file (TEC-151 added a newer widening); the newest file's own shape is
+  `tests/vetweight.test.ts`'s.
+- **A weight's `visit` is in two places:** `parseDetails` and `lando.details_ok` (migration
+  `lando_vet_weight`, whose test reads it: weight allows an optional `visit` uuid, every other branch
+  equals `lando_issue_links`'s). The database does not check the target is a vet visit; `writeEvent` does.
+  A weight's `visit` is never rewritten, so after a visit is corrected it still names the old id:
+  always read it through `linkedWeight` / `resolveVisit`, never by `id ===`. A visit older than the
+  read's 30 days is never opened, so a linked weight is always in the read (every weight is).
 - **A link to an issue outside the read reads "re: earlier issue".** The read is the last 30 days
   plus every void, so a vet visit that links to an issue older than that cannot name it. A correction
   of that old issue is read (it carries the old time and `voids`), but not the issue itself. Widening
