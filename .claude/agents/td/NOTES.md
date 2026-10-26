@@ -26,8 +26,8 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **The firewall cannot be read or written through the API** (`Seawall Config not found`).
 - **Runtime logs hold no request lines.** To see whether a feature ran, count rows with
   `execute_sql`: counts and sources only, never content.
-- **The GitHub integration moves Linear issues:** In Progress when a linked pull request opens,
-  Done when one naming it merges. Reopen any with Next steps left.
+- **Linear's pull request automations are off** (every row No action, owner, 2026-10-26). A pull
+  request still links its issue, but only Deployment and the TD set statuses.
 - **The auto-mode classifier can refuse work under `.claude/`.** It clears once the owner's own
   words name the change. Never route around it or probe the guard by editing it live.
 - **A Linear patch matches stored text.** Copy the anchor from `get_issue`, tags and all.
@@ -55,7 +55,10 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **Finished work hides in other sessions.** At kickoff, `list_sessions` and `git branch -r`.
 - **Cost is context × turns.** Brief tightly; end the session once branches are merged.
 - **Deployment and the builder start with an approval click** on top of `/deploy` and `/build`; the
-  hook cannot tell otherwise that the owner asked. Not yet confirmed that auto mode shows the click
-  rather than approving it: check on the next `/build`.
+  hook cannot tell otherwise that the owner asked. Auto mode shows the owner the click (seen on a
+  Deployment start, 2026-10-26).
+- **Smoke** (`.github/workflows/smoke.yml`) probes each app signed out after every production
+  deploy and on demand (Actions → Smoke → Run workflow). All apps passed on 2026-10-26. A red run
+  is post-merge news, not a blocked merge.
 - **Resuming a helper with `SendMessage` does not ask again;** the guard's matcher is `Agent|Task`.
   `/deploy` relies on it to resume a Deployment held by the lock.
