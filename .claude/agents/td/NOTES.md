@@ -4,7 +4,7 @@ What is true now, and the traps. Branch and pull request state is never written 
 
 ## State
 
-- **Shape:** TD + one builder + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Linear
+- **Shape:** one TD at a time + one builder + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Linear
   labels: `owner:Owner`, `owner:TD`, `app:<folder>`; the parking lot is the `Parked` label.
 - **Every app is on Next 16 with `proxy.ts`,** one gate copy.
 - **`apps/showcase`'s scaffold waits on the owner showing you the uploader.**
@@ -20,9 +20,6 @@ What is true now, and the traps. Branch and pull request state is never written 
 
 ## Traps
 
-- **Two TD sessions cannot see each other.** A second TD starts from `/kickoff second-opinion` and
-  writes nothing. Before calling a branch abandoned, check its commit's `Claude-Session` with
-  `get_session`.
 - **The guard runs from this session's checkout.** Edit `.claude/hooks/` in a separate worktree.
 - **A project env read cannot see team-shared variables.** `list_user_events` (the audit log) shows
   every change, shared ones included.

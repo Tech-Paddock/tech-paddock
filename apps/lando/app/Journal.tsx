@@ -9,10 +9,12 @@ import {
   HORIZON_DAYS,
   KIND_LABELS,
   LOG_KINDS,
+  PILL_STATUS_WORDS,
   describe,
   displayUnit,
   emptyFeedText,
   feedDays,
+  followText,
   food as asFood,
   formOf,
   eventPhotos,
@@ -20,6 +22,8 @@ import {
   isAccident,
   latestWeight,
   liveEvents,
+  mealsToday,
+  pillStatus,
   round1,
   sinceLast,
   treatsWith,
@@ -39,7 +43,9 @@ import {
 } from "@/lib/defaults";
 import { clockTime, localMidnight, shortDate } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
+import { saveThen } from "@/lib/saveOrder";
 import Analytics from "./Analytics";
+import { useReportMeals } from "./Meals";
 import LogForm, { type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
 
@@ -149,20 +155,28 @@ export default function Journal() {
   const save = useCallback(
     async function save(body: LogBody, announce: boolean, then?: LogBody[]): Promise<void> {
       const after = then?.length ? then : undefined;
-      updatePending((list) => [...list.filter((p) => p.body.id !== body.id), { body, status: "saving", then: after }]);
-      try {
-        const { ok, data } = await postJson("/api/events", body);
-        if (!ok) throw new Error(data.error ?? "the server refused it");
-        mergeEvent(data.event);
-        updatePending((list) => list.filter((p) => p.body.id !== body.id));
-        if (announce) say(`${describe(body).title || KIND_LABELS[body.kind]} logged`);
-      } catch (e) {
-        const error = e instanceof TypeError ? "no connection" : (e as Error).message;
-        updatePending((list) => list.map((p) => (p.body.id === body.id ? { ...p, status: "failed", error } : p)));
-        return;
-      }
-      // The training is in: now its treats, each its own row with its own Retry.
-      for (const t of after ?? []) void save(t, false);
+      // The entry first; only once it is in, what follows it (a training's
+      // treats, a vet visit's weight), each its own row with its own Retry.
+      await saveThen(
+        async (b) => {
+          updatePending((list) => [...list.filter((p) => p.body.id !== b.id), { body: b, status: "saving", then: after }]);
+          try {
+            const { ok, data } = await postJson("/api/events", b);
+            if (!ok) throw new Error(data.error ?? "the server refused it");
+            mergeEvent(data.event);
+            updatePending((list) => list.filter((p) => p.body.id !== b.id));
+            if (announce) say(`${describe(b).title || KIND_LABELS[b.kind]} logged`);
+            return true;
+          } catch (e) {
+            const error = e instanceof TypeError ? "no connection" : (e as Error).message;
+            updatePending((list) => list.map((p) => (p.body.id === b.id ? { ...p, status: "failed", error } : p)));
+            return false;
+          }
+        },
+        (t) => void save(t, false),
+        body,
+        after
+      );
     },
     [mergeEvent, updatePending, say]
   );
@@ -256,23 +270,26 @@ export default function Journal() {
     setPhotoUrls((prev) => ({ ...prev, [path]: url }));
   }, []);
 
-  function remember(body: LogBody) {
+  function remember(bodies: LogBody[]) {
     const next = { ...remembered };
-    // A meal's item and amount are remembered; a treat always opens on Misc.
-    if (body.kind === "food") {
-      const f = asFood(body);
-      if (f.type === "meal") {
-        next.meal = f.item_id;
-        if (f.amount !== null) next.mealAmount = f.amount;
+    for (const body of bodies) {
+      // A meal's item and amount are remembered; a treat always opens on Misc.
+      if (body.kind === "food") {
+        const f = asFood(body);
+        if (f.type === "meal") {
+          next.meal = f.item_id;
+          if (f.amount !== null) next.mealAmount = f.amount;
+        }
       }
+      // A weight's unit, also when it was typed on a vet visit (TEC-151).
+      if (body.kind === "weight") next.unit = asWeight(body).unit;
     }
-    if (body.kind === "weight") next.unit = asWeight(body).unit;
     setRemembered(next);
     writeStore(DEFAULTS_KEY, next);
   }
 
   function logNew(body: LogBody, then?: LogBody[]) {
-    remember(body);
+    remember([body, ...(then ?? [])]);
     setOpen(null);
     void save(body, true, then);
   }
@@ -301,6 +318,8 @@ export default function Journal() {
   }
 
   const clocks = useMemo(() => (loaded ? sinceLast(loaded.events, now) : null), [loaded, now]);
+  // "Meals today: N" in the app bar (TEC-142): the phone's day, live meals only.
+  useReportMeals(loaded ? mealsToday(loaded.events, now) : null);
   // The feed (TEC-136): every live entry in the read's window (today and the
   // HORIZON_DAYS before it; older weights stay in Analytics' growth chart),
   // plus anything not saved yet, under one chip's filter.
@@ -383,11 +402,18 @@ export default function Journal() {
           <section aria-label="Since last" className="grid grid-cols-4 gap-1.5">
             {CLOCKS.map((c) => {
               const last = clocks?.[c] ?? null;
+              // Green, yellow or red by how long ago (TEC-142); exercise and "none" stay plain.
+              const status = last ? pillStatus(c, now.getTime() - Date.parse(last.at)) : null;
               return (
                 <div
                   key={c}
-                  title={last ? `${CLOCK_LABELS[c]} at ${clockTime(last.at)}` : undefined}
-                  className="min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center"
+                  title={
+                    last
+                      ? `${CLOCK_LABELS[c]} at ${clockTime(last.at)}${status ? ` — ${PILL_STATUS_WORDS[status]}` : ""}`
+                      : undefined
+                  }
+                  data-status={status ?? undefined}
+                  className="lando-pill min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center"
                 >
                   <div className="truncate text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] text-ink-soft">
                     {CLOCK_LABELS[c]}
@@ -396,7 +422,11 @@ export default function Journal() {
                     {!clocks ? "—" : last ? formatAgo(last.at, now) : "none"}
                   </div>
                   <span className="sr-only">
-                    {last ? ` ago, at ${clockTime(last.at)}` : clocks ? ` in ${HORIZON_DAYS} days` : ""}
+                    {last
+                      ? ` ago, at ${clockTime(last.at)}${status ? `, ${PILL_STATUS_WORDS[status]}` : ""}`
+                      : clocks
+                        ? ` in ${HORIZON_DAYS} days`
+                        : ""}
                   </span>
                 </div>
               );
@@ -490,14 +520,14 @@ export default function Journal() {
             <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Feed</h2>
             {/* Filter (TEC-129, TEC-136): the chips match the buttons; tap one
                 to show only it, tap it again for all. Across every day. */}
-            <div role="group" aria-label="Show only" className="mb-2 flex flex-wrap gap-1.5">
+            <div role="group" aria-label="Show only" className="mb-2 grid grid-cols-3 gap-1.5">
               {FORM_KINDS.map((k) => (
                 <button
                   key={k}
                   type="button"
                   aria-pressed={only === k}
                   onClick={() => setOnly(only === k ? null : k)}
-                  className={`min-h-[36px] whitespace-nowrap rounded-full border px-3 py-1.5 text-sm ${
+                  className={`min-h-[44px] min-w-0 truncate rounded-xl border px-1 py-1.5 text-[15px] font-semibold ${
                     only === k ? "border-accent bg-accent text-accent-ink" : "border-line bg-surface"
                   }`}
                 >
@@ -519,7 +549,8 @@ export default function Journal() {
                       if ("pending" in item) {
                         const p = item.pending;
                         const { title } = describe(p.body);
-                        const treatCount = p.then?.length ?? 0;
+                        // What Retry and ✕ carry with it: "+ 2 treats", or "+ 7.6 lb" (TEC-151).
+                        const after = p.then?.length ? followText(p.then) : "";
                         return (
                           <li
                             key={p.body.id}
@@ -528,11 +559,7 @@ export default function Journal() {
                             <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{feedTime(p.body.kind, p.body.at)}</span>
                             <span className="min-w-0 truncate">
                               <b>{title}</b>
-                              {treatCount > 0 && (
-                                <span className="ml-1.5 text-sm text-ink-soft">
-                                  + {treatCount} {treatCount === 1 ? "treat" : "treats"}
-                                </span>
-                              )}
+                              {after && <span className="ml-1.5 text-sm text-ink-soft">{after}</span>}
                             </span>
                             {p.status === "saving" ? (
                               <span className="text-sm text-ink-soft">Saving…</span>
@@ -547,7 +574,7 @@ export default function Journal() {
                                 <button
                                   onClick={() => updatePending((list) => list.filter((x) => x.body.id !== p.body.id))}
                                   className="text-ink-soft"
-                                  aria-label={treatCount ? "Discard, with its treats" : "Discard"}
+                                  aria-label={after ? `Discard, with its ${p.then?.some((t) => t.kind === "weight") ? "weight" : "treats"}` : "Discard"}
                                 >
                                   ✕
                                 </button>
@@ -557,7 +584,7 @@ export default function Journal() {
                         );
                       }
                       const e = item.saved;
-                      const { title, detail } = describe(e, dogs);
+                      const { title, detail } = describe(e, dogs, loaded?.events);
                       const accident = isAccident(e);
                       return (
                         <li key={e.id}>
@@ -621,6 +648,7 @@ export default function Journal() {
             dogs={dogs}
             onAddDog={addDog}
             phonePerson={person?.id ?? null}
+            events={loaded?.events ?? []}
             photoUrls={photoUrls}
             onPhotoUrl={rememberPhotoUrl}
             remembered={remembered}
