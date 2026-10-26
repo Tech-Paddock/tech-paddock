@@ -37,7 +37,19 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 - **Add's order is Ask Claude · Link · File · Type it, and it opens on Ask Claude** (TEC-135,
   `MODES` in `AddRecipe.tsx`). The modes' behaviour is unchanged.
 - Recipes cards (TEC-135): name with rating · time, the facts line, and four macro tiles per
-  serving; opening one is unchanged. *On the menu* stays beside the book.
+  serving. *On the menu* stays beside the book.
+- **An open recipe leads with the recipe** (TEC-140, `Book.tsx`): the per-serving `MacroRow`, the
+  metadata line (`MetaSummary`), **Ingredients**, **Method**, then **Macro breakdown**
+  (`app/MacroBreakdown.tsx`, a native `<details>`, collapsed), Your rating, then helpings and the
+  actions. The breakdown holds the whole pot beside one serving (`potAndServing`), the share of
+  calories from protein, carbs and fat (`calorieSplit`, both in `lib/breakdown.ts`, tests in
+  `tests/breakdown.test.ts`) and the provenance, which moved in from the top. Stored numbers only;
+  nothing is called. The section headings and the breakdown's summary, table and bar are local
+  patterns.
+- **The split divides by the macros' own calories at 4/4/9, not the stored kcal**, rounded by
+  largest remainder so it adds to 100, and is labelled approximate. The High protein filter
+  (`isHighProtein`) divides by the stored kcal, so a recipe near 30% can read either side of it in
+  the breakdown.
 - The typed path runs a name check before its pricing call.
 - An import is also refused when no fetch returned a page (`lib/fetchRun.ts`).
 - **Something else** re-asks with every turned-down draft and its reason (`lib/reroll.ts`); **Bin
@@ -50,6 +62,8 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   rating is read only from this app's forms. Older rows read "not set" until supplied (TEC-52).
 - Editing (`lib/edit.ts`) re-prices only changed ingredients, in one call before the one write;
   servings alone re-divides the pot. Card pill: rating and time; meal · main · cuisine when wide.
+  Confirmed for TEC-140: changing ingredients updates the macros, and the breakdown reads the row
+  that comes back, so it follows.
 - `methodSteps` splits only on the next number in a run ("gas mark 4" stays); its tests hold the
   edges.
 

@@ -9,16 +9,21 @@ import {
   HORIZON_DAYS,
   KIND_LABELS,
   LOG_KINDS,
+  PILL_STATUS_WORDS,
   describe,
   displayUnit,
   emptyFeedText,
   feedDays,
+  followText,
   food as asFood,
   formOf,
+  eventPhotos,
   formatAgo,
   isAccident,
   latestWeight,
   liveEvents,
+  mealsToday,
+  pillStatus,
   round1,
   sinceLast,
   treatsWith,
@@ -38,7 +43,9 @@ import {
 } from "@/lib/defaults";
 import { clockTime, localMidnight, shortDate } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
+import { saveThen } from "@/lib/saveOrder";
 import Analytics from "./Analytics";
+import { useReportMeals } from "./Meals";
 import LogForm, { type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
 
@@ -72,9 +79,9 @@ const isLogBody = (b: unknown): b is LogBody =>
 
 /**
  * Two tabs, Log and Analytics, opening on Log (charter, Scope: the owner's
- * override, 2026-10-20). Log: since-last pills, who is logging, five section
+ * override, 2026-10-20). Log: since-last pills, who is logging, six section
  * buttons that each open a short form with defaults (Potty, Food, Fun,
- * Training, Weight; TEC-136), and a feed of every loaded day, by when each
+ * Training, Weight, Health; TEC-136, TEC-137), and a feed of every loaded day, by when each
  * entry happened, with a filter matching the buttons. Analytics: the last
  * fourteen days and the growth chart.
  *
@@ -96,6 +103,8 @@ export default function Journal() {
   const [open, setOpen] = useState<Open>(null);
   // The feed shows one form's entries, or all when null (TEC-129, TEC-136). Not remembered.
   const [only, setOnly] = useState<FormKind | null>(null);
+  // Signed URLs of health photos by storage path: the read's, plus every upload this session made.
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
@@ -112,6 +121,7 @@ export default function Journal() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setLoaded({ events: data.events, people: data.people, dogs: data.dogs ?? [] });
+      setPhotoUrls((prev) => ({ ...prev, ...(data.photos ?? {}) }));
       setLoadError(null);
     } catch (e) {
       // Keep whatever was on screen; say it may be stale. Never blank it.
@@ -145,20 +155,28 @@ export default function Journal() {
   const save = useCallback(
     async function save(body: LogBody, announce: boolean, then?: LogBody[]): Promise<void> {
       const after = then?.length ? then : undefined;
-      updatePending((list) => [...list.filter((p) => p.body.id !== body.id), { body, status: "saving", then: after }]);
-      try {
-        const { ok, data } = await postJson("/api/events", body);
-        if (!ok) throw new Error(data.error ?? "the server refused it");
-        mergeEvent(data.event);
-        updatePending((list) => list.filter((p) => p.body.id !== body.id));
-        if (announce) say(`${describe(body).title || KIND_LABELS[body.kind]} logged`);
-      } catch (e) {
-        const error = e instanceof TypeError ? "no connection" : (e as Error).message;
-        updatePending((list) => list.map((p) => (p.body.id === body.id ? { ...p, status: "failed", error } : p)));
-        return;
-      }
-      // The training is in: now its treats, each its own row with its own Retry.
-      for (const t of after ?? []) void save(t, false);
+      // The entry first; only once it is in, what follows it (a training's
+      // treats, a vet visit's weight), each its own row with its own Retry.
+      await saveThen(
+        async (b) => {
+          updatePending((list) => [...list.filter((p) => p.body.id !== b.id), { body: b, status: "saving", then: after }]);
+          try {
+            const { ok, data } = await postJson("/api/events", b);
+            if (!ok) throw new Error(data.error ?? "the server refused it");
+            mergeEvent(data.event);
+            updatePending((list) => list.filter((p) => p.body.id !== b.id));
+            if (announce) say(`${describe(b).title || KIND_LABELS[b.kind]} logged`);
+            return true;
+          } catch (e) {
+            const error = e instanceof TypeError ? "no connection" : (e as Error).message;
+            updatePending((list) => list.map((p) => (p.body.id === b.id ? { ...p, status: "failed", error } : p)));
+            return false;
+          }
+        },
+        (t) => void save(t, false),
+        body,
+        after
+      );
     },
     [mergeEvent, updatePending, say]
   );
@@ -248,23 +266,30 @@ export default function Journal() {
     }
   }
 
-  function remember(body: LogBody) {
+  const rememberPhotoUrl = useCallback((path: string, url: string) => {
+    setPhotoUrls((prev) => ({ ...prev, [path]: url }));
+  }, []);
+
+  function remember(bodies: LogBody[]) {
     const next = { ...remembered };
-    // A meal's item and amount are remembered; a treat always opens on Misc.
-    if (body.kind === "food") {
-      const f = asFood(body);
-      if (f.type === "meal") {
-        next.meal = f.item_id;
-        if (f.amount !== null) next.mealAmount = f.amount;
+    for (const body of bodies) {
+      // A meal's item and amount are remembered; a treat always opens on Misc.
+      if (body.kind === "food") {
+        const f = asFood(body);
+        if (f.type === "meal") {
+          next.meal = f.item_id;
+          if (f.amount !== null) next.mealAmount = f.amount;
+        }
       }
+      // A weight's unit, also when it was typed on a vet visit (TEC-151).
+      if (body.kind === "weight") next.unit = asWeight(body).unit;
     }
-    if (body.kind === "weight") next.unit = asWeight(body).unit;
     setRemembered(next);
     writeStore(DEFAULTS_KEY, next);
   }
 
   function logNew(body: LogBody, then?: LogBody[]) {
-    remember(body);
+    remember([body, ...(then ?? [])]);
     setOpen(null);
     void save(body, true, then);
   }
@@ -293,6 +318,8 @@ export default function Journal() {
   }
 
   const clocks = useMemo(() => (loaded ? sinceLast(loaded.events, now) : null), [loaded, now]);
+  // "Meals today: N" in the app bar (TEC-142): the phone's day, live meals only.
+  useReportMeals(loaded ? mealsToday(loaded.events, now) : null);
   // The feed (TEC-136): every live entry in the read's window (today and the
   // HORIZON_DAYS before it; older weights stay in Analytics' growth chart),
   // plus anything not saved yet, under one chip's filter.
@@ -375,11 +402,18 @@ export default function Journal() {
           <section aria-label="Since last" className="grid grid-cols-4 gap-1.5">
             {CLOCKS.map((c) => {
               const last = clocks?.[c] ?? null;
+              // Green, yellow or red by how long ago (TEC-142); exercise and "none" stay plain.
+              const status = last ? pillStatus(c, now.getTime() - Date.parse(last.at)) : null;
               return (
                 <div
                   key={c}
-                  title={last ? `${CLOCK_LABELS[c]} at ${clockTime(last.at)}` : undefined}
-                  className="min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center"
+                  title={
+                    last
+                      ? `${CLOCK_LABELS[c]} at ${clockTime(last.at)}${status ? ` — ${PILL_STATUS_WORDS[status]}` : ""}`
+                      : undefined
+                  }
+                  data-status={status ?? undefined}
+                  className="lando-pill min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center"
                 >
                   <div className="truncate text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] text-ink-soft">
                     {CLOCK_LABELS[c]}
@@ -388,7 +422,11 @@ export default function Journal() {
                     {!clocks ? "—" : last ? formatAgo(last.at, now) : "none"}
                   </div>
                   <span className="sr-only">
-                    {last ? ` ago, at ${clockTime(last.at)}` : clocks ? ` in ${HORIZON_DAYS} days` : ""}
+                    {last
+                      ? ` ago, at ${clockTime(last.at)}${status ? `, ${PILL_STATUS_WORDS[status]}` : ""}`
+                      : clocks
+                        ? ` in ${HORIZON_DAYS} days`
+                        : ""}
                   </span>
                 </div>
               );
@@ -437,13 +475,12 @@ export default function Journal() {
           </section>
           {personError && !askWho && <p className="-mt-3 text-sm text-urgent">{personError}</p>}
 
-          {/* Five sections, each opening its form */}
+          {/* Six sections, each opening its form, two rows of three (TEC-137):
+              Potty, Food, Fun / Training, Weight, Health. The Weight button
+              wears the newest weight; its date is in the title and for screen readers. */}
           <section aria-label="Log">
             <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Log</h2>
-            {/* Five across on a phone, one row (TEC-123, TEC-136): Fun and
-                Training replace Exercise. The Weight button wears the newest
-                weight; its date is in the title and for screen readers. */}
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               {(["potty", "food", "fun", "training"] as const).map((k) => (
                 <button
                   key={k}
@@ -451,7 +488,7 @@ export default function Journal() {
                   onClick={() => setOpen({ form: k })}
                   className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-0.5 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
                 >
-                  <b className="truncate text-[13px] leading-tight">{FORM_LABELS[k]}</b>
+                  <b className="truncate text-[15px] leading-tight">{FORM_LABELS[k]}</b>
                 </button>
               ))}
               <button
@@ -460,13 +497,20 @@ export default function Journal() {
                 title={weightNote ?? undefined}
                 className="flex min-h-[52px] min-w-0 flex-col items-center justify-center rounded-xl bg-raised px-0.5 py-1.5 text-ink shadow-[0_3px_0_rgb(var(--line-rgb))] active:translate-y-0.5 active:shadow-[0_1px_0_rgb(var(--line-rgb))]"
               >
-                <b className="truncate text-[13px] leading-tight">Weight</b>
+                <b className="truncate text-[15px] leading-tight">Weight</b>
                 {weightFace && (
                   <span aria-hidden="true" className="truncate text-[12px] leading-tight tabular-nums text-ink-soft">
                     {weightFace}
                   </span>
                 )}
                 {weightNote && <span className="sr-only">, {weightNote}</span>}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen({ form: "health" })}
+                className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-0.5 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
+              >
+                <b className="truncate text-[15px] leading-tight">{FORM_LABELS.health}</b>
               </button>
             </div>
           </section>
@@ -476,14 +520,14 @@ export default function Journal() {
             <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Feed</h2>
             {/* Filter (TEC-129, TEC-136): the chips match the buttons; tap one
                 to show only it, tap it again for all. Across every day. */}
-            <div role="group" aria-label="Show only" className="mb-2 flex flex-wrap gap-1.5">
+            <div role="group" aria-label="Show only" className="mb-2 grid grid-cols-3 gap-1.5">
               {FORM_KINDS.map((k) => (
                 <button
                   key={k}
                   type="button"
                   aria-pressed={only === k}
                   onClick={() => setOnly(only === k ? null : k)}
-                  className={`min-h-[36px] whitespace-nowrap rounded-full border px-3 py-1.5 text-sm ${
+                  className={`min-h-[44px] min-w-0 truncate rounded-xl border px-1 py-1.5 text-[15px] font-semibold ${
                     only === k ? "border-accent bg-accent text-accent-ink" : "border-line bg-surface"
                   }`}
                 >
@@ -505,7 +549,8 @@ export default function Journal() {
                       if ("pending" in item) {
                         const p = item.pending;
                         const { title } = describe(p.body);
-                        const treatCount = p.then?.length ?? 0;
+                        // What Retry and ✕ carry with it: "+ 2 treats", or "+ 7.6 lb" (TEC-151).
+                        const after = p.then?.length ? followText(p.then) : "";
                         return (
                           <li
                             key={p.body.id}
@@ -514,11 +559,7 @@ export default function Journal() {
                             <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{feedTime(p.body.kind, p.body.at)}</span>
                             <span className="min-w-0 truncate">
                               <b>{title}</b>
-                              {treatCount > 0 && (
-                                <span className="ml-1.5 text-sm text-ink-soft">
-                                  + {treatCount} {treatCount === 1 ? "treat" : "treats"}
-                                </span>
-                              )}
+                              {after && <span className="ml-1.5 text-sm text-ink-soft">{after}</span>}
                             </span>
                             {p.status === "saving" ? (
                               <span className="text-sm text-ink-soft">Saving…</span>
@@ -533,7 +574,7 @@ export default function Journal() {
                                 <button
                                   onClick={() => updatePending((list) => list.filter((x) => x.body.id !== p.body.id))}
                                   className="text-ink-soft"
-                                  aria-label={treatCount ? "Discard, with its treats" : "Discard"}
+                                  aria-label={after ? `Discard, with its ${p.then?.some((t) => t.kind === "weight") ? "weight" : "treats"}` : "Discard"}
                                 >
                                   ✕
                                 </button>
@@ -543,22 +584,44 @@ export default function Journal() {
                         );
                       }
                       const e = item.saved;
-                      const { title, detail } = describe(e, dogs);
+                      const { title, detail } = describe(e, dogs, loaded?.events);
                       const accident = isAccident(e);
                       return (
                         <li key={e.id}>
                           <button
                             type="button"
                             onClick={() => setOpen({ form: formOf(e) ?? "potty", event: e })}
+                            title={[feedTime(e.kind, e.at), title, detail, e.note ? `“${e.note}”` : "", nameOf(e.person_id)].filter(Boolean).join(" ")}
                             className={`grid w-full grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border bg-surface px-2.5 py-2 text-left ${
                               accident ? "border-danger" : "border-line"
                             }`}
                           >
                             <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{feedTime(e.kind, e.at)}</span>
+                            {/* One line, cut off with an ellipsis (TEC-139); the full text is the
+                                row's title and its entry, one tap away. */}
                             <span className="min-w-0">
-                              <b className={`mr-1.5 ${accident ? "text-danger" : ""}`}>{title}</b>
-                              <span className="text-sm text-ink-soft">{detail}</span>
-                              {e.note && <span className="block text-sm text-ink-soft">“{e.note}”</span>}
+                              <span className="block truncate">
+                                <b className={`mr-1.5 ${accident ? "text-danger" : ""}`}>{title}</b>
+                                <span className="text-sm text-ink-soft">{detail}</span>
+                                {e.note && <span className="ml-1.5 text-sm text-ink-soft">“{e.note}”</span>}
+                              </span>
+                              {eventPhotos(e).length > 0 && (
+                                <span className="mt-1 flex gap-1">
+                                  {eventPhotos(e).slice(0, 4).map((path, i) =>
+                                    photoUrls[path] ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img key={path} src={photoUrls[path]} alt={`Photo ${i + 1}`} loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-line object-cover" />
+                                    ) : (
+                                      <span key={path} className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-line text-[10px] leading-tight text-ink-soft">
+                                        No photo
+                                      </span>
+                                    )
+                                  )}
+                                  {eventPhotos(e).length > 4 && (
+                                    <span className="self-center text-[13px] text-ink-soft">+{eventPhotos(e).length - 4}</span>
+                                  )}
+                                </span>
+                              )}
                             </span>
                             <span className="whitespace-nowrap text-[13px] text-ink-soft">{nameOf(e.person_id)}</span>
                           </button>
@@ -585,6 +648,9 @@ export default function Journal() {
             dogs={dogs}
             onAddDog={addDog}
             phonePerson={person?.id ?? null}
+            events={loaded?.events ?? []}
+            photoUrls={photoUrls}
+            onPhotoUrl={rememberPhotoUrl}
             remembered={remembered}
             weightUnit={weightUnit}
             onLog={logNew}

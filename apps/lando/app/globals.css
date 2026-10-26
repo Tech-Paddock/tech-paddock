@@ -20,7 +20,8 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
-/* Analytics chart series (app/StackedBars.tsx), a local pattern. Read from the
+/* Analytics chart series (app/Glyph.tsx, DayTimeline.tsx, DailyChart.tsx,
+   FoodWeight.tsx; TEC-143), a local pattern. Read from the
    theme's tokens, never hex: papaya, then a second orange that differs from it
    in both polarities (burnt in light, peach in dark, where the accent itself is
    papaya), then the soft ink. Accidents use --danger directly. The dark rule is
@@ -38,6 +39,43 @@ body {
 }
 :root[data-mode="dark"] {
   --lando-series-2: var(--tone-1-bg);
+}
+
+/* Since-last pill status (app/Journal.tsx, TEC-142), a local pattern. Green and
+   yellow are Lando's own; red is the theme's --danger. A status pill keeps its
+   ink text on a faint tint of its colour and wears the colour as a 2px edge
+   (the border plus an inset ring, so the pill does not change size); the
+   status is also in words, in the pill's title and for screen readers. Checked
+   against the mcl39 tokens: each edge colour is at least 4.4:1 on the surface
+   and the paper in light and dark, and the ink on a tint at least 11:1. */
+:root {
+  --lando-status-green: rgb(27 124 61);
+  --lando-status-yellow: rgb(166 98 0);
+  --lando-status-red: var(--danger);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode="light"]) {
+    --lando-status-green: rgb(102 187 106);
+    --lando-status-yellow: rgb(242 190 60);
+  }
+}
+:root[data-mode="dark"] {
+  --lando-status-green: rgb(102 187 106);
+  --lando-status-yellow: rgb(242 190 60);
+}
+.lando-pill[data-status] {
+  border-color: var(--status);
+  background-color: color-mix(in srgb, var(--status) 16%, var(--surface));
+  box-shadow: inset 0 0 0 1px var(--status);
+}
+.lando-pill[data-status="green"] {
+  --status: var(--lando-status-green);
+}
+.lando-pill[data-status="yellow"] {
+  --status: var(--lando-status-yellow);
+}
+.lando-pill[data-status="red"] {
+  --status: var(--lando-status-red);
 }
 
 /* The bottom sheet rises rather than appears, unless motion is reduced. */
