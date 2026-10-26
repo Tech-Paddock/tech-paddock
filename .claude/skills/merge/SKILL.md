@@ -31,9 +31,9 @@ migration by name and shape. Write only what you checked.
 
 ## 3. The gate
 
-- **CI green on the current head:** `gate`, both runs (a push with a pull request open runs it
-  twice). After every merge, merge `main` into the remaining branches (merge commit, never rebase),
-  rerun step 1's checks, push, wait for green.
+- **CI green on the current head:** `gate`, from the push (CI runs on push only). After every
+  merge, merge `main` into the remaining branches (merge commit, never rebase), rerun step 1's
+  checks, push, wait for green. A branch with a migration does step 4 first, in the same push.
 - **Several at once: state the order first.** A rule change goes after the work it would turn red;
   a correction others wait on goes first; when two touch one file, the conflict falls on the branch
   still in progress. A conflict between two versions of logic goes back to its author.
@@ -43,8 +43,9 @@ migration by name and shape. Write only what you checked.
 1. **Read its shape.** Unstated means destructive until the SQL says otherwise; destructive ships
    in two pull requests.
 2. **Apply with `apply_migration`** from the file's exact contents.
-3. **Read `list_migrations` back,** rename the file on the branch to the stamped version, push,
-   wait for green.
+3. **Read `list_migrations` back** and rename the file on the branch to the stamped version.
+4. **Do this before you bring `main` in,** so the rename and the merge go up in one push and CI
+   runs once (TEC-158).
 
 `supabase db push` cannot work here; `migration repair` is refused.
 

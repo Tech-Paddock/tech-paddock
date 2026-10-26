@@ -36,8 +36,9 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **A container restart kills the builder.** Unpushed work survives in `.claude/worktrees/agent-*`
   until the container goes; brief a fresh builder to carry it over.
 - **Parallel builders can pick the same migration timestamp.** Check before merging.
-- **With a pull request open, one push runs `gate` twice,** and merge is refused while the second
-  is queued. Read checks with `pull_request_read` → `get_check_runs`, not a curl loop.
+- **CI runs on push only** (TEC-158); a pull request shows the push run's checks. If `main`'s
+  required checks ever stop showing on a pull request, that change is the first suspect. Read checks
+  with `pull_request_read` → `get_check_runs`, not a curl loop.
 - **A stacked branch conflicts once its base squash-merges.** See `DECISIONS.md`.
 - **The hosted API renames migrations.** Read `list_migrations` back and rename the file on the
   branch; a stacked branch carrying the old name brings it back.
