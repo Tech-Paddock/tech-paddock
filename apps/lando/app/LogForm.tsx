@@ -25,7 +25,12 @@ import {
   exercise as asExercise,
   food as asFood,
   health as asHealth,
+  HEALTH_KEPT,
+  eventPhotos,
   healthOptions,
+  healthPickFor,
+  healthReasonLabel,
+  healthReasonsFromPick,
   parseDetails,
   potty as asPotty,
   treatEntry,
@@ -205,6 +210,8 @@ export default function LogForm({
   const openedAt = useRef(new Date().toISOString());
   // A weight is a day, not a moment: its When picks a date, stored at local noon.
   const dateOnly = kind === "weight";
+  // Health, Fun and Training take photos (TEC-137, TEC-139).
+  const hasPhotos = kind === "health" || kind === "exercise";
 
   // Common
   const [when, setWhen] = useState(toLocalInput(event?.at ?? openedAt.current));
@@ -264,14 +271,20 @@ export default function LogForm({
   // Health (TEC-137): a vet visit or a medical issue, picks from a fixed list, photos on both.
   const h = event?.kind === "health" ? asHealth(event) : null;
   const [healthType, setHealthType] = useState<HealthType>(h?.type ?? "vet");
-  const [reasons, setReasons] = useState<string[]>(h?.reasons ?? []);
-  // A correction opens with the photos the entry has and keeps whatever is not removed.
-  const photos = usePhotos(h?.photos ?? [], photoUrls, onPhotoUrl);
+  // One high-level pick (TEC-139). An entry from before it, with several or
+  // retired reasons, opens on them as a kept option and saves them unchanged
+  // until another pick is made.
+  const [{ pick: firstReason, kept: keptReasons }] = useState(() => healthPickFor(h));
+  const [reason, setReason] = useState(firstReason);
+  // Photos (TEC-137, and Fun and Training since TEC-139). A correction opens
+  // with the photos the entry has and keeps whatever is not removed.
+  const photos = usePhotos(event ? eventPhotos(event) : [], photoUrls, onPhotoUrl);
 
   function pickHealthType(t: HealthType) {
     setHealthType(t);
-    // The lists differ; a pick both lists share ("Other") survives the switch.
-    setReasons((r) => r.filter((id) => healthOptions(t).some(([v]) => v === id)));
+    // The lists differ; "Other" is in both and survives the switch. The kept
+    // reasons belong to the type the entry had, so they do not.
+    setReason((r) => (healthOptions(t).some(([v]) => v === r) ? r : ""));
   }
 
   const [busy, setBusy] = useState(false);
@@ -346,11 +359,16 @@ export default function LogForm({
           treats: Number(treats || 0),
           ...(exType === "training" ? { commands } : {}),
           ...dogsFromPick(dogPick, keptDogs),
+          ...(photos.paths.length ? { photos: photos.paths } : {}),
         };
       case "weight":
         return { value: Number(value.replace(",", ".")), unit };
       case "health":
-        return { type: healthType, reasons, ...(photos.paths.length ? { photos: photos.paths } : {}) };
+        return {
+          type: healthType,
+          reasons: healthReasonsFromPick(reason === HEALTH_KEPT && h?.type !== healthType ? "" : reason, keptReasons),
+          ...(photos.paths.length ? { photos: photos.paths } : {}),
+        };
     }
   }
 
@@ -358,8 +376,13 @@ export default function LogForm({
     e.preventDefault();
     setError(null);
     // Never saved around a photo: it is uploaded, or the person removes it.
-    if (kind === "health" && (photos.working || photos.failed)) {
+    if (hasPhotos && (photos.working || photos.failed)) {
       setError(photos.failed ? "A photo didn't upload — retry it, or remove it." : "A photo is still uploading.");
+      return;
+    }
+    // The pick is the headline; the note is the story, and it is required (TEC-139).
+    if (kind === "health" && !note.trim()) {
+      setError("Say what happened — the note is required.");
       return;
     }
     let details: Details;
@@ -425,7 +448,7 @@ export default function LogForm({
   // "Save walk", "Save playtime", "Save training", "Save potty"…
   const title =
     form === "fun" ? EXERCISE_LABELS[exType] : form === "health" ? HEALTH_LABELS[healthType] : FORM_LABELS[form];
-  const photoBlock = kind === "health" && (photos.working || photos.failed);
+  const photoBlock = hasPhotos && (photos.working || photos.failed);
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3" noValidate>
@@ -609,6 +632,7 @@ export default function LogForm({
               <Chips label="Commands practised" options={COMMANDS} picked={commands} onChange={setCommands} />
             </Field>
           )}
+          <PhotoPicker photos={photos} />
           {treatOpen && (
             <Sheet title="Treat" onClose={() => setTreatOpen(false)} nested>
               <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2">
@@ -679,13 +703,30 @@ export default function LogForm({
               options={HEALTH_TYPES.map((t) => [t, HEALTH_LABELS[t]] as const)}
             />
           </Field>
-          <Field label={healthType === "vet" ? "Why (pick any)" : "What (pick any)"}>
-            <Chips
-              key={healthType}
-              label={healthType === "vet" ? "Reasons for the vet visit" : "Medical issue"}
-              options={healthOptions(healthType)}
-              picked={reasons}
-              onChange={setReasons}
+          {/* One plain select, like Other dogs (TEC-139); the detail goes in the note. */}
+          <Field label={healthType === "vet" ? "Why" : "What"} htmlFor="f-reason">
+            <select id="f-reason" value={reason} onChange={(e) => setReason(e.target.value)} className={input}>
+              <option value="">Pick one…</option>
+              {keptReasons && h?.type === healthType && (
+                <option value={HEALTH_KEPT}>{keptReasons.map((id) => healthReasonLabel(healthType, id)).join(", ")}</option>
+              )}
+              {healthOptions(healthType).map(([id, label]) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Note" htmlFor="f-note">
+            <input
+              id="f-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              maxLength={500}
+              required
+              aria-required="true"
+              placeholder="What happened?"
+              className={input}
             />
           </Field>
           <PhotoPicker photos={photos} />
@@ -745,9 +786,12 @@ export default function LogForm({
           </select>
         </Field>
       </div>
-      <Field label="Note" htmlFor="f-note">
-        <input id="f-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Optional" className={input} />
-      </Field>
+      {/* Health has its Note under the pick, and requires it. */}
+      {kind !== "health" && (
+        <Field label="Note" htmlFor="f-note">
+          <input id="f-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Optional" className={input} />
+        </Field>
+      )}
 
       {error && (
         <p role="alert" className="text-sm font-semibold text-danger">
@@ -763,9 +807,9 @@ export default function LogForm({
       >
         {busy
           ? "Saving…"
-          : photos.working && kind === "health"
+          : photos.working && hasPhotos
             ? "Uploading photo…"
-            : photos.failed && kind === "health"
+            : photos.failed && hasPhotos
               ? "Fix the photo to save"
               : editing
                 ? "Save changes"

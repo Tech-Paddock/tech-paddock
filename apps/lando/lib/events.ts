@@ -124,6 +124,8 @@ export type ExerciseDetails = {
    * `with_dogs` alone. The form has no Yes/No: picking a dog is the answer.
    */
   dogs?: string[];
+  /** Storage paths of photos (TEC-139), 1 to MAX_PHOTOS; no key when there are none. Same bucket and path as Health's. */
+  photos?: string[];
 };
 
 /** A friend's dog, from `lando.dogs`. Names live in the database, never in the repo. */
@@ -184,12 +186,38 @@ export type HealthType = (typeof HEALTH_TYPES)[number];
 export const HEALTH_LABELS: Record<HealthType, string> = { vet: "Vet visit", issue: "Medical issue" };
 
 /**
- * Why we went to the vet, pick several. Fixed in code and in the database
- * check (`lando_health_events`), like COMMANDS: add to both. Display order.
+ * Why we went to the vet: one high-level pick (TEC-139), the detail goes in
+ * the note. Fixed in code and in the database check (`lando.details_ok`,
+ * widened by `lando_health_picklist`), like COMMANDS: add to both. Display
+ * order. A retired id stays valid (below), so none is ever removed.
  */
 export const VET_REASONS = [
-  ["checkup", "Wellness check-up"],
+  ["checkup", "Check-up"],
   ["vaccines", "Vaccines"],
+  ["sick-injured", "Sick or injured"],
+  ["procedure", "Procedure (spay/neuter, dental)"],
+  ["follow-up", "Follow-up"],
+  ["other", "Other"],
+] as const;
+
+/** What the medical issue is, one high-level pick. Fixed in code and in the check. */
+export const ISSUE_PICKS = [
+  ["stomach-appetite", "Stomach & appetite"],
+  ["skin-ears-eyes", "Skin, ears & eyes"],
+  ["limping-injury", "Limping or injury"],
+  ["breathing-cough", "Breathing or cough"],
+  ["energy-behaviour", "Energy or behaviour"],
+  ["other", "Other"],
+] as const;
+
+/**
+ * TEC-137's detailed reasons, retired by TEC-139 the way the food catalogue
+ * retires items: the form no longer offers them, but `parseDetails` and the
+ * database still accept them, the feed still labels them, and a correction
+ * opens on them as a kept option. Never delete one or change its id: old
+ * entries (several reasons each) are keyed by them.
+ */
+export const VET_RETIRED = [
   ["deworming", "Deworming / fecal test"],
   ["flea-tick-heartworm", "Flea, tick & heartworm"],
   ["spay-neuter", "Spay / neuter"],
@@ -200,11 +228,9 @@ export const VET_REASONS = [
   ["skin-ears", "Skin or ears"],
   ["stomach", "Stomach upset"],
   ["recheck", "Recheck / follow-up"],
-  ["other", "Other"],
 ] as const;
 
-/** What the medical issue is, pick several. Fixed in code and in the check. */
-export const ISSUE_PICKS = [
+export const ISSUE_RETIRED = [
   ["vomiting", "Vomiting"],
   ["diarrhea", "Diarrhea"],
   ["limping", "Limping"],
@@ -216,17 +242,60 @@ export const ISSUE_PICKS = [
   ["low-energy", "Low energy"],
   ["wound", "Cut / wound"],
   ["ate-something", "Ate something"],
-  ["other", "Other"],
 ] as const;
 
+type Pair = readonly (readonly [string, string])[];
+
 /** The pick list a health type offers. */
-export function healthOptions(type: HealthType): readonly (readonly [string, string])[] {
+export function healthOptions(type: HealthType): Pair {
   return type === "vet" ? VET_REASONS : ISSUE_PICKS;
 }
 
-/** A pick's label, else the stored id as it is. */
+/** Every id the type accepts: the offered picks, then the retired ones. */
+export function healthAccepted(type: HealthType): Pair {
+  return type === "vet" ? [...VET_REASONS, ...VET_RETIRED] : [...ISSUE_PICKS, ...ISSUE_RETIRED];
+}
+
+/** A reason's label, offered or retired, else the stored id as it is. */
 export function healthReasonLabel(type: HealthType, id: string): string {
-  return healthOptions(type).find(([v]) => v === id)?.[1] ?? id;
+  return healthAccepted(type).find(([v]) => v === id)?.[1] ?? id;
+}
+
+/** The select's extra option for an entry's retired or several reasons, kept unchanged until another pick is made. */
+export const HEALTH_KEPT = "__kept";
+
+/**
+ * What the Health select opens on. A new entry has no pick; an entry with
+ * exactly one offered reason opens on it; anything else (several reasons, or
+ * a retired one) opens on `HEALTH_KEPT` carrying those reasons as they were.
+ */
+export function healthPickFor(h: Pick<HealthDetails, "type" | "reasons"> | null): { pick: string; kept: string[] | null } {
+  if (!h) return { pick: "", kept: null };
+  const [only] = h.reasons;
+  if (h.reasons.length === 1 && healthOptions(h.type).some(([id]) => id === only)) return { pick: only, kept: null };
+  return { pick: HEALTH_KEPT, kept: [...h.reasons] };
+}
+
+/** The `reasons` a pick saves: one id, the kept ones unchanged, or none. */
+export function healthReasonsFromPick(pick: string, kept: readonly string[] | null): string[] {
+  if (pick === HEALTH_KEPT) return kept ? [...kept] : [];
+  return pick ? [pick] : [];
+}
+
+/**
+ * A new entry takes exactly one offered reason. A correction may also keep the
+ * entry it replaces unchanged, when that one is older (several reasons, or a
+ * retired one). Throws `InvalidEvent`.
+ */
+export function checkHealthReasons(next: { details: Details }, target: { kind: string; details: Details } | null): void {
+  const d = next.details as HealthDetails;
+  if (d.reasons.length === 1 && healthOptions(d.type).some(([id]) => id === d.reasons[0])) return;
+  if (target?.kind === "health") {
+    const t = target.details as HealthDetails;
+    const same = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
+    if (t.type === d.type && same(t.reasons, d.reasons)) return;
+  }
+  throw new InvalidEvent(d.type === "vet" ? "pick one reason for the vet visit" : "pick one thing for the issue");
 }
 
 /** At most this many photos on one entry. */
@@ -241,7 +310,7 @@ export const PHOTO_PATH = /^health\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 
 export type HealthDetails = {
   type: HealthType;
-  /** At least one, from the type's list, in the list's order. */
+  /** One from the type's list; an entry from before TEC-139 may hold several, or retired ids. */
   reasons: string[];
   /** Storage paths, 1 to MAX_PHOTOS; no key when there are none. */
   photos?: string[];
@@ -266,6 +335,13 @@ export const food = (e: Pick<JournalEvent, "details">) => e.details as FoodDetai
 export const exercise = (e: Pick<JournalEvent, "details">) => e.details as ExerciseDetails;
 export const weight = (e: Pick<JournalEvent, "details">) => e.details as WeightDetails;
 export const health = (e: Pick<JournalEvent, "details">) => e.details as HealthDetails;
+
+/** The photo paths an entry names: Health's, and Fun's and Training's (TEC-139); none for any other kind. */
+export function eventPhotos(e: Pick<JournalEvent, "kind" | "details">): string[] {
+  if (e.kind !== "health" && e.kind !== "exercise") return [];
+  const p = (e.details as { photos?: unknown }).photos;
+  return Array.isArray(p) ? (p as string[]) : [];
+}
 
 /**
  * Inside is an accident: warned in the form, red in the timeline, counted
@@ -504,6 +580,7 @@ export function describe(
             : "",
         x.treats ? `${x.treats} ${x.treats === 1 ? "treat" : "treats"}` : "",
         (x.commands ?? []).map((c) => COMMAND_LABEL[c] ?? c).join(", "),
+        x.photos?.length ? `${x.photos.length} ${x.photos.length === 1 ? "photo" : "photos"}` : "",
       ];
       return { title: EXERCISE_LABELS[x.type] ?? "Exercise", detail: parts.filter(Boolean).join(" · ") };
     }
@@ -548,6 +625,17 @@ function text(v: unknown, field: string, max: number): string | undefined {
   const t = v.trim();
   if (t.length > max) throw new InvalidEvent(`${field} is longer than ${max} characters`);
   return t || undefined;
+}
+
+/** A `photos` value checked into storage paths: once each, in the order given; none is undefined (no key). */
+function parsePhotos(raw: unknown): string[] | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (!Array.isArray(raw) || raw.some((p) => typeof p !== "string" || !PHOTO_PATH.test(p))) {
+    throw new InvalidEvent("photos must be ones uploaded here");
+  }
+  const photos = [...new Set(raw as string[])];
+  if (photos.length > MAX_PHOTOS) throw new InvalidEvent(`at most ${MAX_PHOTOS} photos on one entry`);
+  return photos.length ? photos : undefined;
 }
 
 function oneOf<T extends string>(v: unknown, options: readonly T[], field: string): T {
@@ -626,6 +714,8 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
           out.dogs = ids;
         }
       }
+      const photos = parsePhotos(r.photos);
+      if (photos) out.photos = photos;
       return out;
     }
     case "weight": {
@@ -637,24 +727,18 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
     }
     case "health": {
       const type = oneOf(r.type, HEALTH_TYPES, "type");
-      const list = healthOptions(type);
+      const accepted = healthAccepted(type);
       const picked = r.reasons;
-      if (!Array.isArray(picked) || picked.some((c) => typeof c !== "string" || !list.some(([id]) => id === c))) {
+      if (!Array.isArray(picked) || picked.some((c) => typeof c !== "string" || !accepted.some(([id]) => id === c))) {
         throw new InvalidEvent("reasons must come from the list");
       }
-      // Kept in the list's order, once each.
-      const reasons = list.map(([id]) => id as string).filter((id) => picked.includes(id));
+      // Once each, in the order given. How many is `checkHealthReasons`'s, on a write:
+      // old entries hold several, and a correction may keep them.
+      const reasons = [...new Set(picked as string[])];
       if (!reasons.length) throw new InvalidEvent(type === "vet" ? "pick why you went to the vet" : "pick what the issue is");
       const out: HealthDetails = { type, reasons };
-      if (r.photos !== undefined && r.photos !== null) {
-        if (!Array.isArray(r.photos) || r.photos.some((p) => typeof p !== "string" || !PHOTO_PATH.test(p))) {
-          throw new InvalidEvent("photos must be ones uploaded here");
-        }
-        // Once each, in the order given; none is no key at all.
-        const photos = [...new Set(r.photos as string[])];
-        if (photos.length > MAX_PHOTOS) throw new InvalidEvent(`at most ${MAX_PHOTOS} photos on one entry`);
-        if (photos.length) out.photos = photos;
-      }
+      const photos = parsePhotos(r.photos);
+      if (photos) out.photos = photos;
       return out;
     }
   }
@@ -690,13 +774,17 @@ export function parseNewEvent(body: unknown, now: Date): NewEvent {
 
   if (b.person_id !== undefined && b.person_id !== null && !isUuid(b.person_id)) throw new InvalidEvent("person_id must be a UUID");
 
+  // Health needs the story: the pick is only the headline (TEC-139).
+  const note = kind === "void" ? null : (text(b.note, "note", 500) ?? null);
+  if (kind === "health" && !note) throw new InvalidEvent("say what happened — the note is required");
+
   return {
     id: b.id,
     kind: kind as Kind,
     at,
     person_id: (b.person_id as string | null | undefined) ?? null,
     details: parseDetails(kind as Kind, b.details),
-    note: kind === "void" ? null : (text(b.note, "note", 500) ?? null),
+    note,
     voids,
   };
 }

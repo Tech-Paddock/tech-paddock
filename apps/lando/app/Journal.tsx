@@ -15,7 +15,7 @@ import {
   feedDays,
   food as asFood,
   formOf,
-  health as asHealth,
+  eventPhotos,
   formatAgo,
   isAccident,
   latestWeight,
@@ -564,29 +564,34 @@ export default function Journal() {
                           <button
                             type="button"
                             onClick={() => setOpen({ form: formOf(e) ?? "potty", event: e })}
+                            title={[feedTime(e.kind, e.at), title, detail, e.note ? `“${e.note}”` : "", nameOf(e.person_id)].filter(Boolean).join(" ")}
                             className={`grid w-full grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border bg-surface px-2.5 py-2 text-left ${
                               accident ? "border-danger" : "border-line"
                             }`}
                           >
                             <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{feedTime(e.kind, e.at)}</span>
+                            {/* One line, cut off with an ellipsis (TEC-139); the full text is the
+                                row's title and its entry, one tap away. */}
                             <span className="min-w-0">
-                              <b className={`mr-1.5 ${accident ? "text-danger" : ""}`}>{title}</b>
-                              <span className="text-sm text-ink-soft">{detail}</span>
-                              {e.note && <span className="block text-sm text-ink-soft">“{e.note}”</span>}
-                              {e.kind === "health" && (asHealth(e).photos?.length ?? 0) > 0 && (
+                              <span className="block truncate">
+                                <b className={`mr-1.5 ${accident ? "text-danger" : ""}`}>{title}</b>
+                                <span className="text-sm text-ink-soft">{detail}</span>
+                                {e.note && <span className="ml-1.5 text-sm text-ink-soft">“{e.note}”</span>}
+                              </span>
+                              {eventPhotos(e).length > 0 && (
                                 <span className="mt-1 flex gap-1">
-                                  {asHealth(e).photos!.slice(0, 4).map((path, i) =>
+                                  {eventPhotos(e).slice(0, 4).map((path, i) =>
                                     photoUrls[path] ? (
                                       // eslint-disable-next-line @next/next/no-img-element
-                                      <img key={path} src={photoUrls[path]} alt={`Photo ${i + 1}`} loading="lazy" className="h-10 w-10 rounded-md border border-line object-cover" />
+                                      <img key={path} src={photoUrls[path]} alt={`Photo ${i + 1}`} loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-line object-cover" />
                                     ) : (
-                                      <span key={path} className="grid h-10 w-10 place-items-center rounded-md border border-line text-[10px] leading-tight text-ink-soft">
+                                      <span key={path} className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-line text-[10px] leading-tight text-ink-soft">
                                         No photo
                                       </span>
                                     )
                                   )}
-                                  {asHealth(e).photos!.length > 4 && (
-                                    <span className="self-center text-[13px] text-ink-soft">+{asHealth(e).photos!.length - 4}</span>
+                                  {eventPhotos(e).length > 4 && (
+                                    <span className="self-center text-[13px] text-ink-soft">+{eventPhotos(e).length - 4}</span>
                                   )}
                                 </span>
                               )}
