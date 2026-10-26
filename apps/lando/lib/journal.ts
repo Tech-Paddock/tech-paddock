@@ -9,6 +9,7 @@ import {
   type ExerciseDetails,
   checkHealthReasons,
   checkIssueTarget,
+  checkVisitTarget,
   eventPhotos,
   type JournalEvent,
 } from "./events";
@@ -91,6 +92,11 @@ export async function writeEvent(db: SupabaseClient, body: unknown, now = new Da
   // old link may point at a superseded copy; the screen follows `voids`.
   const issueId = (next.details as { issue?: string }).issue;
   if (issueId) checkIssueTarget(await findEvent(db, issueId));
+
+  // A weight saved from a vet visit (TEC-151) names it the same way: it must be
+  // a vet visit event, a voided copy included.
+  const visitId = next.kind === "weight" ? (next.details as { visit?: string }).visit : undefined;
+  if (visitId) checkVisitTarget(await findEvent(db, visitId));
 
   if (next.kind === "health" && !next.voids) checkHealthReasons(next, null);
 

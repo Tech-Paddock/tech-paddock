@@ -10,7 +10,7 @@
  * exercise, weight, health. The shapes of `details` below are also enforced by
  * the database (migrations `lando_people_and_events`, then
  * `widen_lando_events_details_shape`, then `widen_lando_potty_none`, then
- * `lando_health_events`, `lando_health_picklist`, `lando_issue_links`); change both together.
+ * `lando_health_events`, `lando_health_picklist`, `lando_issue_links`, `lando_vet_weight`); change both together.
  */
 
 import { FOOD_TYPES, findFood, formatAmount, unitLabel, type FoodType } from "./foods";
@@ -180,7 +180,12 @@ export function dogsPickFor(
 export const UNITS = ["lb", "kg"] as const;
 export type Unit = (typeof UNITS)[number];
 const KG_PER_LB = 0.45359237;
-export type WeightDetails = { value: number; unit: Unit };
+export type WeightDetails = {
+  value: number;
+  unit: Unit;
+  /** Set when a vet visit's Weight field saved it (TEC-151): the id of that visit, possibly a superseded copy; `resolveVisit` finds the live one. */
+  visit?: string;
+};
 
 /* ── Health (TEC-137) ────────────────────────────────────────────────────── */
 
@@ -569,8 +574,34 @@ export function mealsToday(events: JournalEvent[], now: Date): number {
 
 const isIssueEvent = (e: Pick<JournalEvent, "kind" | "details">) => e.kind === "health" && health(e).type === "issue";
 
-/** Where a link ends up: the live version of the issue, a deleted one, or an id nothing read knows. */
-export type IssueLink = { state: "live"; event: JournalEvent } | { state: "removed" } | { state: "unknown" };
+/** Where a link ends up: the live version of the target, a deleted one, or an id nothing read knows. */
+export type Link = { state: "live"; event: JournalEvent } | { state: "removed" } | { state: "unknown" };
+export type IssueLink = Link;
+
+type LinkIndex = { byId: Map<string, JournalEvent>; voiderOf: Map<string, JournalEvent> };
+
+function linkIndex(events: JournalEvent[]): LinkIndex {
+  const byId = new Map(events.map((e) => [e.id, e]));
+  const voiderOf = new Map<string, JournalEvent>();
+  for (const e of events) if (e.voids) voiderOf.set(e.voids, e);
+  return { byId, voiderOf };
+}
+
+/** Follow `id` through the `voids` chain; the end must satisfy `isTarget` to be live. Shared by issue and visit links. */
+function followLink(ix: LinkIndex, id: string, isTarget: (e: JournalEvent) => boolean): Link {
+  let cur = id;
+  // A chain is never longer than the events, so a cycle (impossible, but) ends.
+  for (let i = 0; i <= ix.byId.size; i++) {
+    const next = ix.voiderOf.get(cur);
+    if (!next) {
+      const e = ix.byId.get(cur);
+      return e && isTarget(e) ? { state: "live", event: e } : { state: "unknown" };
+    }
+    if (next.kind === "void") return { state: "removed" };
+    cur = next.id;
+  }
+  return { state: "unknown" };
+}
 
 /**
  * Follow a link through the `voids` chain to the live version of the issue.
@@ -580,21 +611,7 @@ export type IssueLink = { state: "live"; event: JournalEvent } | { state: "remov
  * everything read, voids included. Pure.
  */
 export function resolveIssue(events: JournalEvent[], id: string): IssueLink {
-  const byId = new Map(events.map((e) => [e.id, e]));
-  const voiderOf = new Map<string, JournalEvent>();
-  for (const e of events) if (e.voids) voiderOf.set(e.voids, e);
-  let cur = id;
-  // A chain is never longer than the events, so a cycle (impossible, but) ends.
-  for (let i = 0; i <= events.length; i++) {
-    const next = voiderOf.get(cur);
-    if (!next) {
-      const e = byId.get(cur);
-      return e && isIssueEvent(e) ? { state: "live", event: e } : { state: "unknown" };
-    }
-    if (next.kind === "void") return { state: "removed" };
-    cur = next.id;
-  }
-  return { state: "unknown" };
+  return followLink(linkIndex(events), id, isIssueEvent);
 }
 
 /** An issue's first reason as its label: "Stomach & appetite". */
@@ -647,6 +664,117 @@ export function checkIssueTarget(target: Pick<JournalEvent, "kind" | "details"> 
   if (!target || !isIssueEvent(target)) throw new InvalidEvent("that medical issue doesn't exist — reload");
 }
 
+/* ── A vet visit's weight (TEC-151) ──────────────────────────────────────── */
+
+const isVisitEvent = (e: Pick<JournalEvent, "kind" | "details">) => e.kind === "health" && health(e).type === "vet";
+
+/** The live version of a vet visit a weight links to, resolved the way an issue link is. */
+export function resolveVisit(events: JournalEvent[], id: string): Link {
+  return followLink(linkIndex(events), id, isVisitEvent);
+}
+
+/**
+ * The live weight a vet visit's Weight field saved: a live weight whose
+ * `visit` resolves, through the `voids` chain, to the live visit `visitId`.
+ * A weight corrected from the Weight form keeps its `visit`; one deleted is
+ * gone (so the field opens empty); a deleted visit leaves its weight. If more
+ * than one qualified, the newest `at`. Pure.
+ */
+export function linkedWeight(events: JournalEvent[], visitId: string): JournalEvent | null {
+  const ix = linkIndex(events);
+  return (
+    liveEvents(events)
+      .filter((e) => {
+        if (e.kind !== "weight") return false;
+        const v = weight(e).visit;
+        if (typeof v !== "string") return false;
+        const end = followLink(ix, v, isVisitEvent);
+        return end.state === "live" && end.event.id === visitId;
+      })
+      .sort(newestFirst)[0] ?? null
+  );
+}
+
+/**
+ * The server's check on a weight's `visit`: the id must be a vet visit event
+ * (type `vet`). A voided copy passes, since the link may name a superseded
+ * one. `target` is the row with that id, or null. Throws `InvalidEvent`.
+ */
+export function checkVisitTarget(target: Pick<JournalEvent, "kind" | "details"> | null): void {
+  if (!target || !isVisitEvent(target)) throw new InvalidEvent("that vet visit doesn't exist — reload");
+}
+
+/** An entry saved after another (a training's treat, a vet visit's weight): the shape of a form's body. */
+export type FollowUp = {
+  id: string;
+  kind: LogKind;
+  at: string;
+  person_id: string | null;
+  details: Details;
+  note: string | null;
+  voids?: string;
+};
+
+/**
+ * What a vet visit's Weight field adds to Save, to be saved **after** the
+ * visit (like a training's treats). `typed` is the field as typed, `linked`
+ * the weight already saved with the visit being corrected (`linkedWeight`).
+ *
+ *  - Blank, nothing linked: no weight. Blank with one linked is refused: the
+ *    field opened on it, and a weight that was measured is removed from the
+ *    feed, not by a blank box.
+ *  - Filled, nothing linked: a new weight on the visit's day (local noon, as
+ *    every weight), `visit` the id this visit is saved under.
+ *  - Filled, same value and unit as the linked one: nothing; the link follows
+ *    the correction by itself.
+ *  - Filled, different: a correction of the linked weight (it `voids` it), its
+ *    `visit` the corrected visit's new id, so a second weight is never added.
+ *
+ * Throws `InvalidEvent` on a weight the weight form would refuse.
+ */
+export function visitWeightPlan(x: {
+  typed: string;
+  unit: Unit;
+  linked: JournalEvent | null;
+  weightId: string;
+  visitId: string;
+  visitAt: string;
+  personId: string | null;
+}): FollowUp[] {
+  const text = x.typed.trim().replace(",", ".");
+  if (!text) {
+    if (x.linked) throw new InvalidEvent("this visit has a weight — change it here, or delete that weight from the feed");
+    return [];
+  }
+  const value = Number(text);
+  const details = parseDetails("weight", { value, unit: x.unit, visit: x.visitId });
+  if (x.linked && weight(x.linked).value === value && weight(x.linked).unit === x.unit) return [];
+  const at = fromDateInput(toDateInput(x.visitAt));
+  if (!at) throw new InvalidEvent("pick a time");
+  return [
+    {
+      id: x.weightId,
+      kind: "weight",
+      at,
+      person_id: x.personId,
+      details,
+      note: x.linked?.note ?? null,
+      ...(x.linked ? { voids: x.linked.id } : {}),
+    },
+  ];
+}
+
+/** A pending row's "+ 2 treats" or "+ 7.6 lb": what is saved after it, so a failed row says what Retry and ✕ carry. */
+export function followText(then: readonly Pick<FollowUp, "kind" | "details">[]): string {
+  const treats = then.filter((t) => t.kind === "food").length;
+  return [
+    treats ? `+ ${treats} ${treats === 1 ? "treat" : "treats"}` : "",
+    ...then.filter((t) => t.kind === "weight").map((t) => `+ ${round1(weight(t).value)} ${weight(t).unit}`),
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export type GrowthPoint = { at: string; kg: number; id: string };
 
 export function toKg(value: number, unit: Unit): number {
@@ -688,7 +816,7 @@ export const round1 = (n: number) => Math.round(n * 10) / 10;
  * reads "another dog".
  */
 export function describe(
-  e: Pick<JournalEvent, "kind" | "details">,
+  e: Pick<JournalEvent, "kind" | "details"> & { id?: string },
   dogs: readonly Dog[] = [],
   events: JournalEvent[] = []
 ): { title: string; detail: string } {
@@ -737,8 +865,11 @@ export function describe(
     case "health": {
       const h = health(e);
       const n = h.photos?.length ?? 0;
+      // A vet visit's linked weight (TEC-151): "Check-up · 7.6 lb".
+      const w = h.type === "vet" && e.id ? linkedWeight(events, e.id) : null;
       const parts = [
         (h.reasons ?? []).map((id) => healthReasonLabel(h.type, id)).join(", "),
+        w ? `${round1(weight(w).value)} ${weight(w).unit}` : "",
         h.issue ? issueLinkText(events, h.issue) : "",
         n ? `${n} ${n === 1 ? "photo" : "photos"}` : "",
       ];
@@ -789,6 +920,13 @@ function parsePhotos(raw: unknown): string[] | undefined {
 function parseIssue(raw: unknown): string | undefined {
   if (raw === undefined || raw === null || raw === "") return undefined;
   if (!isUuid(raw)) throw new InvalidEvent("the related issue must be one from the list");
+  return raw.toLowerCase();
+}
+
+/** A weight's linked vet visit id, lowercased; none is undefined (no key). That it is a vet visit is the server's check (`checkVisitTarget`). */
+function parseVisit(raw: unknown): string | undefined {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  if (!isUuid(raw)) throw new InvalidEvent("the vet visit must be one that was saved");
   return raw.toLowerCase();
 }
 
@@ -881,7 +1019,10 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
       if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value >= 200) {
         throw new InvalidEvent("weight must be a number above 0");
       }
-      return { value, unit: oneOf(r.unit, UNITS, "unit") } satisfies WeightDetails;
+      const out: WeightDetails = { value, unit: oneOf(r.unit, UNITS, "unit") };
+      const visit = parseVisit(r.visit);
+      if (visit) out.visit = visit;
+      return out;
     }
     case "health": {
       const type = oneOf(r.type, HEALTH_TYPES, "type");
