@@ -26,8 +26,9 @@ effort and worktree; changing them is the owner's call.
 
 - **The first message is the brief:** "app: X", the Linear issue, the owner's words where they
   matter, and where to stop. The builder asks you; you ask the owner.
-- **One builder per app folder at a time.** Different apps in parallel is fine.
-- **Its report reaches the owner through you.** It writes its own `NOTES.md`.
+- **Up to three builders per issue, each on its own slice:** its own files and its own branch.
+  The skill holds the split (migration first, one slice owns the shared files, no stacking).
+- **Their reports reach the owner through you,** as one. The slice that owns `NOTES.md` writes it.
 - **It ends when your session does.** Only its pushed branch, its notes and Linear survive.
 
 ## Deploying
