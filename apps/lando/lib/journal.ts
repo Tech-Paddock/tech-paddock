@@ -8,6 +8,7 @@ import {
   type Dog,
   type ExerciseDetails,
   checkHealthReasons,
+  checkIssueTarget,
   eventPhotos,
   type JournalEvent,
 } from "./events";
@@ -84,6 +85,12 @@ export async function writeEvent(db: SupabaseClient, body: unknown, now = new Da
   if (photos.length && (await missingPhotos(db, photos)).length) {
     throw new InvalidEvent("a photo didn't finish uploading — retry it, or remove it");
   }
+
+  // A linked medical issue (TEC-142) is an id in jsonb, so no foreign key
+  // holds it: it must be a Health issue event. A voided one passes, since an
+  // old link may point at a superseded copy; the screen follows `voids`.
+  const issueId = (next.details as { issue?: string }).issue;
+  if (issueId) checkIssueTarget(await findEvent(db, issueId));
 
   if (next.kind === "health" && !next.voids) checkHealthReasons(next, null);
 

@@ -9,6 +9,7 @@ import {
   HORIZON_DAYS,
   KIND_LABELS,
   LOG_KINDS,
+  PILL_STATUS_WORDS,
   describe,
   displayUnit,
   emptyFeedText,
@@ -20,6 +21,8 @@ import {
   isAccident,
   latestWeight,
   liveEvents,
+  mealsToday,
+  pillStatus,
   round1,
   sinceLast,
   treatsWith,
@@ -40,6 +43,7 @@ import {
 import { clockTime, localMidnight, shortDate } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
 import Analytics from "./Analytics";
+import { useReportMeals } from "./Meals";
 import LogForm, { type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
 
@@ -301,6 +305,8 @@ export default function Journal() {
   }
 
   const clocks = useMemo(() => (loaded ? sinceLast(loaded.events, now) : null), [loaded, now]);
+  // "Meals today: N" in the app bar (TEC-142): the phone's day, live meals only.
+  useReportMeals(loaded ? mealsToday(loaded.events, now) : null);
   // The feed (TEC-136): every live entry in the read's window (today and the
   // HORIZON_DAYS before it; older weights stay in Analytics' growth chart),
   // plus anything not saved yet, under one chip's filter.
@@ -383,11 +389,18 @@ export default function Journal() {
           <section aria-label="Since last" className="grid grid-cols-4 gap-1.5">
             {CLOCKS.map((c) => {
               const last = clocks?.[c] ?? null;
+              // Green, yellow or red by how long ago (TEC-142); exercise and "none" stay plain.
+              const status = last ? pillStatus(c, now.getTime() - Date.parse(last.at)) : null;
               return (
                 <div
                   key={c}
-                  title={last ? `${CLOCK_LABELS[c]} at ${clockTime(last.at)}` : undefined}
-                  className="min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center"
+                  title={
+                    last
+                      ? `${CLOCK_LABELS[c]} at ${clockTime(last.at)}${status ? ` — ${PILL_STATUS_WORDS[status]}` : ""}`
+                      : undefined
+                  }
+                  data-status={status ?? undefined}
+                  className="lando-pill min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center"
                 >
                   <div className="truncate text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] text-ink-soft">
                     {CLOCK_LABELS[c]}
@@ -396,7 +409,11 @@ export default function Journal() {
                     {!clocks ? "—" : last ? formatAgo(last.at, now) : "none"}
                   </div>
                   <span className="sr-only">
-                    {last ? ` ago, at ${clockTime(last.at)}` : clocks ? ` in ${HORIZON_DAYS} days` : ""}
+                    {last
+                      ? ` ago, at ${clockTime(last.at)}${status ? `, ${PILL_STATUS_WORDS[status]}` : ""}`
+                      : clocks
+                        ? ` in ${HORIZON_DAYS} days`
+                        : ""}
                   </span>
                 </div>
               );
@@ -490,14 +507,14 @@ export default function Journal() {
             <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Feed</h2>
             {/* Filter (TEC-129, TEC-136): the chips match the buttons; tap one
                 to show only it, tap it again for all. Across every day. */}
-            <div role="group" aria-label="Show only" className="mb-2 flex flex-wrap gap-1.5">
+            <div role="group" aria-label="Show only" className="mb-2 grid grid-cols-3 gap-1.5">
               {FORM_KINDS.map((k) => (
                 <button
                   key={k}
                   type="button"
                   aria-pressed={only === k}
                   onClick={() => setOnly(only === k ? null : k)}
-                  className={`min-h-[36px] whitespace-nowrap rounded-full border px-3 py-1.5 text-sm ${
+                  className={`min-h-[44px] min-w-0 truncate rounded-xl border px-1 py-1.5 text-[15px] font-semibold ${
                     only === k ? "border-accent bg-accent text-accent-ink" : "border-line bg-surface"
                   }`}
                 >
@@ -557,7 +574,7 @@ export default function Journal() {
                         );
                       }
                       const e = item.saved;
-                      const { title, detail } = describe(e, dogs);
+                      const { title, detail } = describe(e, dogs, loaded?.events);
                       const accident = isAccident(e);
                       return (
                         <li key={e.id}>
@@ -621,6 +638,7 @@ export default function Journal() {
             dogs={dogs}
             onAddDog={addDog}
             phonePerson={person?.id ?? null}
+            events={loaded?.events ?? []}
             photoUrls={photoUrls}
             onPhotoUrl={rememberPhotoUrl}
             remembered={remembered}

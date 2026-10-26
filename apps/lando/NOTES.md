@@ -5,10 +5,11 @@
 - v2 on Next.js 16: two tabs under the app bar, **Log** and **Analytics**, sticky, opening on Log
   (the owner's override of the one-screen rule, in RULES.md).
 - **Log**: four since-last pills in one row (pee, poop, food, exercise; label over value, the
-  clock time in the title and for screen readers; unchanged by TEC-136), "Logging as", six
+  clock time in the title and for screen readers; coloured by TEC-142, below), "Logging as", six
   section buttons in two rows of three (TEC-137: Potty, Food, Fun / Training, Weight, Health;
   15px labels, 52px tall; the Weight button shows the newest weight on its face, "7.3 lb", with
-  its date still in the title and screen-reader text), then the **Feed** under six filter chips. No growth chart
+  its date still in the title and screen-reader text), then the **Feed** under six filter chips (two
+  rows of three, TEC-142). No growth chart
   on Log since TEC-129: it lives in Analytics only. Each button opens a bottom sheet
   (`app/Sheet.tsx`) with that form (`app/LogForm.tsx`, prop `form`), defaults filled in, so Save
   is usually the only other tap. Tapping a feed row opens the matching form on that entry to
@@ -40,7 +41,7 @@
   entry it replaces, same type and same set. `checkup`, `vaccines` and `other` are ids both
   generations share, so old entries with them read with the new labels ("Check-up", not
   "Wellness check-up"). Never delete a retired id or change an id.
-- **Health photos** (TEC-137, and Fun and Training since TEC-139): private Storage bucket `lando-photos` (migration
+- **Health photos** (TEC-137, Fun and Training since TEC-139, Potty since TEC-142): private Storage bucket `lando-photos` (migration
   `create_lando_photos_bucket`), written only by `POST /api/photos` with the service role and
   shown only through signed URLs; an event stores only the path, `health/<uuid>.<jpg|png|webp>`
   (`PHOTO_PATH`; the `health/` prefix stays for exercise photos too, one pattern, one bucket). The phone shrinks each photo through a canvas first (`lib/image.ts`, a local
@@ -50,12 +51,45 @@
   photo is done**, and the server refuses an entry naming a path with no object behind it
   (`writeEvent` -> `missingPhotos`), so an entry never shows as saved without its photos. The
   phone chooses each photo's id, so a retry is the same object (upload is an upsert). `GET
-  /api/journal` returns `photos`, a path -> signed URL map for the live health and exercise entries (an hour; `eventPhotos`);
+  /api/journal` returns `photos`, a path -> signed URL map for the live health, exercise and potty entries (an hour; `eventPhotos`);
   the screen adds each upload's URL as it happens, and a path that could not be signed reads "No
   photo" / "Photo unavailable", never a blank. A correction keeps the photos it does not remove
   and the voided entry keeps all of its own; a delete is a void. **Nothing is ever deleted from
   the bucket**, so a photo removed in a correction, discarded with an unsaved entry, or uploaded
   and abandoned stays there, unreferenced.
+- **Pill status colours** (TEC-142). Each pill but Exercise wears a status from how long ago its
+  last event was (`pillStatus`, with the thresholds as named constants, all in `lib/events.ts`):
+  **pee and poop** green under 1 h, yellow from 1 h up to and including 3 h, red over 3 h
+  (`POTTY_YELLOW_MS`, `POTTY_RED_MS`); **food** green under 3 h, yellow from 3 h, red at 5 h or more
+  (`MEAL_YELLOW_MS`, `MEAL_RED_MS`). Exercise stays plain, and so does "none". The status is also in
+  words, in the pill's `title` and in its screen-reader text (`PILL_STATUS_WORDS`: "green, recent",
+  "yellow, getting long", "red, overdue"). The colour is a local pattern in `app/globals.css`, next
+  to `--lando-series-*`: `--lando-status-green` and `--lando-status-yellow` (own values, one pair
+  for light and one for dark) and `--lando-status-red` (the theme's `--danger`); `.lando-pill
+  [data-status]` draws a 2px edge (border plus an inset ring, so no size change) and a 16% tint,
+  with the ink text unchanged. Contrast, checked against the mcl39 tokens: each edge at least 4.4:1
+  on both the surface and the paper in light and dark; ink on a tint at least 11:1.
+  **The food clock is the last meal** (`sinceLast`): a treat no longer resets it (before TEC-142 a
+  treat did). The pill is still labelled Food.
+- **Meals today** (TEC-142): "Meals today: N" at the right of the app bar, beside the livery badge
+  (`mealsToday`: live `meal` entries whose `at` falls in the phone's local day; treats, voided and
+  deleted entries do not count). The bar is the page's server component, so `app/Meals.tsx` is a
+  small context: `Journal` reports the count (`useReportMeals`), `MealsBadge` shows it, and
+  nothing shows until the journal has loaded. The bar wraps rather than clips on a very narrow phone.
+- **Related issue** (TEC-142), on **Potty** and on a **vet visit** (not on a medical issue): a plain
+  `<select>` of None and the newest 20 live medical issues, labelled by date and pick ("Oct 24 ·
+  Stomach & appetite", `issueChoices`). Stored as an optional `issue` (the linked event's id) in
+  details. A link is an id, and a correction creates a new event, so it is **resolved when read**
+  (`resolveIssue`, pure): follow the `voids` chain to the live version; a chain that ends in a
+  delete is `removed`; an id no event read holds is `unknown`. The feed reads "re: Stomach &
+  appetite, Oct 24" (the live version's first pick and date), "removed issue" for a deleted one, and
+  "re: earlier issue" for an unknown one (an issue older than the read's 30 days whose correction
+  was not read). A correction opens on its stored link and keeps it unless it is changed;
+  when the list would not show it (a superseded copy, a deleted or an old issue) `issueChoices`
+  adds it as the first option, so an untouched correction saves it unchanged. The **server refuses a
+  link to an id that is not a Health issue event** (`writeEvent` -> `checkIssueTarget`, the dogs
+  check's twin), voided copies included, since an old link may name a superseded one. Changing
+  an issue's pick or note never touches the entries that link to it.
 - **Fun and Training** (TEC-136) replace the Exercise button. Both save kind `exercise` with the
   existing `type`; the data shape did not change. `FORM_KINDS`, `kindOfForm` and `formOf`
   (`lib/events.ts`) map between the six forms and the five kinds: a walk or playtime is Fun, a
@@ -80,7 +114,7 @@
   (`shrink-0`) keep their size. The whole text is the row's `title` and the entry one tap away. Unsaved rows sit in their day like
   any other, with Saving… or Not saved, Retry and ✕.
 - **The feed's filter**: chips Potty, Food, Fun, Training, Weight, Health (`FORM_KINDS`, matching the
-  buttons), across every day. Tap one to show only that form's entries (unsaved rows too), tap
+  buttons: two rows of three, `grid-cols-3`, 44px tall, rounded like them), across every day. Tap one to show only that form's entries (unsaved rows too), tap
   it again for all. Food covers meals and treats. Held in memory, not remembered. Empty reads
   "Nothing logged yet." or, under a chip, "No training entries yet." (`emptyFeedText`).
 - **Food amount is a scroll picker in ⅛ steps** (TEC-136, `app/AmountScroller.tsx`, a local
@@ -145,7 +179,7 @@
 ## How it works
 
 - **Five kinds plus `void`** (`lib/events.ts`; `health` is described under State). `details` per kind, every key required unless
-  marked `?`: potty `{what: pee|poop|both|none, where: outside|inside, leash?: leashed|unleashed|pen}`
+  marked `?`: potty `{what: pee|poop|both|none, where: outside|inside, leash?: leashed|unleashed|pen, issue?: uuid, photos?[]}`
   (inside = an accident: warned in the form, red in the feed, counted apart in Analytics;
   `leash` only when outside); food `{type, item_id, item_name, kcal_per, unit, amount}`; exercise
   `{type: walk|playtime|training, where, with_dogs, minutes, treats, commands?, dogs?, photos?}` (commands
@@ -165,6 +199,10 @@
   defaults to Leashed on a new entry. It is not remembered per phone. Correcting an old outside
   entry that has none opens with nothing picked, so a correction never invents one. The feed
   shows it after the what: "pee · unleashed".
+- **Potty's photos and Related issue** (TEC-142): below Leash, the Related issue select, then the
+  same Photos block as Health, Fun and Training (Take photo, Choose photos, Save waits for each,
+  `missingPhotos` backs it), stored as optional `photos` on the potty details. Feed: "poop,
+  inside · re: Stomach & appetite, Oct 24 · 1 photo" with the thumbnails. The note stays optional.
 - **Exercise's Other dogs** is one pick (TEC-129, replacing TEC-125's multi-select): a plain
   full-width `<select>`: None, every row in `lando.dogs` by name, Multiple, "Add dog…". There is
   no Yes/No. `dogsFromPick` (`lib/events.ts`) maps the pick: a dog saves `with_dogs: true,
@@ -266,7 +304,7 @@
   function: an unknown kind has none, so it is refused.
 - **Widen `lando.details_ok` with `create or replace function`, and only ever widen.** The
   constraint `events_details_shape` just calls it, so a widening is a new migration holding the
-  function's whole current body (`lando_health_picklist`'s, the latest) with the one
+  function's whole current body (`lando_issue_links`'s, the latest) with the one
   list or shape grown: no DROP, no constraint swap, and it goes through the connector. Replacing
   the function does **not** re-check existing rows, so a function that narrows would leave rows the
   database now calls invalid, and nothing would say so. Narrowing (removing a value, requiring a
@@ -277,12 +315,21 @@
   by the owner in the SQL Editor; that path is retired.
 - **The health lists are in two places:** `VET_REASONS` + `VET_RETIRED` and `ISSUE_PICKS` +
   `ISSUE_RETIRED` in `lib/events.ts` and `lando.details_ok`. The database holds the union.
-  `tests/health.test.ts` finds the latest migration defining the function (by version), reads
+  `tests/health.test.ts` finds the latest migration defining the function (by version, now
+  `lando_issue_links`; it only requires it to be at least `lando_health_picklist`'s), reads
   the two reason arrays out of its body and fails if they differ from the code's unions, if it
   drops an id the first migration held, or if that file holds anything but `set local
   lock_timeout` and the function. The next widening is simply a newer file; the test follows it.
   A new offered pick is a new id in the code and the function (never a reused retired one with
   a new meaning, since old entries hold it).
+- **`issue` and potty `photos` are in two places:** `parseDetails` and `lando.details_ok`
+  (migration `lando_issue_links`). `tests/links.test.ts` reads that file: the potty branch must allow
+  `issue` and `photos`, the health branch an `issue` for `type = 'vet'` only, every other branch must
+  equal `lando_health_picklist`'s, and the file is only `lock_timeout` and the function.
+- **A link to an issue outside the read reads "re: earlier issue".** The read is the last 30 days
+  plus every void, so a vet visit that links to an issue older than that cannot name it. A correction
+  of that old issue is read (it carries the old time and `voids`), but not the issue itself. Widening
+  the read to Health issues is the fix if the owner wants the name.
 - **Photos are not rewritten or deleted:** the event holds paths only, and an entry never changes,
   so no code path removes an object. Anything that would (a cleanup of unreferenced photos) must
   first check every event, voided ones included, since a voided entry still names its photos.
