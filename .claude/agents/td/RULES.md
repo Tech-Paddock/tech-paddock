@@ -80,6 +80,9 @@ how a demo renders it are convention, guarded only here. A demo that needs state
 - **Put decisions to the owner as multiple choice** (`AskUserQuestion`): two to four options,
   recommendation first and marked, each with its consequence.
 - **Keep reports short.**
+- **Linear matches the repo.** At kickoff, fix any issue whose status the repo contradicts: work
+  merged with no steps left is Done; a pushed branch awaiting merge is In Review; an assignee with
+  no ⭐ step is removed. Linear writes need no approval; report only what you could not settle.
 
 ## Limits
 
