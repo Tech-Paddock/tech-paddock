@@ -111,8 +111,8 @@ jobs:
             #
             # It used to build every app on every merge, on the reasoning that a
             # merge can break an app it did not touch. Here it cannot. Merges are
-            # squashed and branch protection requires a branch to be up to date,
-            # so the tree main lands on is the tree the branch already built; an
+            # squashed and go through the merge queue (TEC-156), so the tree main
+            # lands on is the tree its merge group already built; an
             # app the merge did not touch is byte-identical to the last build of
             # it; apps share no code except through packages/, which is in every
             # scope; and .github/workflows and supabase still rebuild everything.

@@ -249,7 +249,7 @@ test("GitHub: every write to a pull request is Deployment's, and reading is anyo
   }
 });
 
-test("GitHub, for Deployment: merging and updating go through; auto-merge, reviews and API commits wait; nothing commits to main", () => {
+test("GitHub, for Deployment: merging, squash auto-merge and updating go through; reviews and API commits wait; nothing commits to main", () => {
   const body = 'Requested on 2026-09-24 — "close out"\n\n## Deployment\nNothing.';
   expectAll(
     [
@@ -257,7 +257,9 @@ test("GitHub, for Deployment: merging and updating go through; auto-merge, revie
       [["merge_pull_request", { pullNumber: 1, merge_method: "squash" }], "allow"],
       [["merge_pull_request", { pullNumber: 1 }], "deny"],
       [["merge_pull_request", { pullNumber: 1, merge_method: "merge" }], "deny"],
-      [["enable_pr_auto_merge", { pullNumber: 1 }], "ask"], // got through
+      [["enable_pr_auto_merge", { pullNumber: 1, mergeMethod: "SQUASH" }], "allow"], // the merge queue (TEC-156)
+      [["enable_pr_auto_merge", { pullNumber: 1 }], "deny"], // the repo default may not be squash
+      [["enable_pr_auto_merge", { pullNumber: 1, mergeMethod: "MERGE" }], "deny"],
       [["update_pull_request", { pullNumber: 1, title: "y" }], "allow"],
       [["update_pull_request", { pullNumber: 1, body }], "allow"],
       [["update_pull_request", { pullNumber: 1, body: "rewritten without the line" }], "deny"],
@@ -538,7 +540,9 @@ test("end to end: the real commands deny, ask and allow", () => {
     const pr = run(hookFor("mcp__github__merge_pull_request"), { tool_name: "mcp__github__merge_pull_request", tool_input: { merge_method: "rebase" } }, { shell });
     assert.equal(pr.decision, "deny", shell);
     const auto = run(hookFor("mcp__github__enable_pr_auto_merge"), { tool_name: "mcp__github__enable_pr_auto_merge", tool_input: {}, ...DEPLOY }, { shell });
-    assert.equal(auto.decision, "ask", shell);
+    assert.equal(auto.decision, "deny", shell);
+    const queued = run(hookFor("mcp__github__enable_pr_auto_merge"), { tool_name: "mcp__github__enable_pr_auto_merge", tool_input: { mergeMethod: "SQUASH" }, ...DEPLOY }, { shell });
+    assert.equal(queued.decision, "allow", shell);
     const open = run(hookFor("mcp__github__create_pull_request"), { tool_name: "mcp__github__create_pull_request", tool_input: {}, ...HELPER }, { shell });
     assert.equal(open.decision, "deny", shell);
     const ghpr = run(hookFor("Bash"), { tool_name: "Bash", tool_input: { command: "gh pr merge 1" }, cwd: FEATURE, ...HELPER }, { shell });

@@ -157,7 +157,8 @@ are the owner's.
 
 ## Enforcement
 
-1. **`main` is protected:** `gate`, `drift` and `request-line` required, branches up to date.
+1. **`main` is protected:** `gate`, `drift` and `request-line` required, through the merge queue
+   (squash).
 2. **The guard** (`.claude/hooks/guard.mjs`, fails closed) refuses a push to `main`, a non-squash
    merge, migration-history rewrites, pull-request writes from anyone but Deployment, and app-code
    edits from any helper but a builder; holds starting Deployment or a builder, the TD's own
