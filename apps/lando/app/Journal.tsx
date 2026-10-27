@@ -80,8 +80,8 @@ const isLogBody = (b: unknown): b is LogBody =>
   !!b && typeof b === "object" && LOG_KINDS.includes((b as LogBody).kind) && typeof (b as LogBody).details === "object";
 
 /**
- * Two tabs, Log and Analytics, opening on Log (charter, Scope: the owner's
- * override, 2026-10-20). Log: since-last pills, who is logging, six section
+ * Two tabs, Log and Analytics, opening on Log (RULES.md, Surface: app, the
+ * owner's override, 2026-10-20). Log: since-last pills, who is logging, six section
  * buttons that each open a short form with defaults (Potty, Food, Fun,
  * Training, Weight, Health; TEC-136, TEC-137), and a feed of every loaded day, by when each
  * entry happened, with a filter matching the buttons. Analytics: the last
@@ -89,7 +89,7 @@ const isLogBody = (b: unknown): b is LogBody =>
  *
  * **Save never waits.** The sheet closes at once and the entry shows as
  * "Saving…", then joins the feed, or stays as "Not saved" with Retry
- * (charter, Never 5). Unsaved entries are mirrored to storage and retried on
+ * (RULES.md, Never 5). Unsaved entries are mirrored to storage and retried on
  * the next open.
  */
 export default function Journal() {

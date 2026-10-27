@@ -7,8 +7,8 @@ import { LIVERY } from "@/lib/livery";
 export const dynamic = "force-dynamic";
 
 /**
- * The app bar, then two tabs, Log and Analytics, opening on Log (charter,
- * Scope: the owner's override, 2026-10-20). One-handed, thumb-first. The tabs
+ * The app bar, then two tabs, Log and Analytics, opening on Log (RULES.md,
+ * Surface: app, the owner's override, 2026-10-20). One-handed, thumb-first. The tabs
  * and both panels are `Journal`, so they share one read of the journal; the
  * bar shows its count of today's meals (TEC-142).
  */

@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   try {
     const db = getServiceClient();
     const [events, people, dogs] = await Promise.all([readJournal(db, since), listPeople(db), listDogs(db)]);
-    // Signed URLs for the live entries' photos (Health, Fun, Training), by
+    // Signed URLs for the live entries' photos (Health, Potty, Fun, Training), by
     // path. A path that could not be signed is absent and the screen says so
     // on that photo.
     const paths = liveEvents(events).flatMap((e) => eventPhotos(e));
