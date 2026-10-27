@@ -29,8 +29,9 @@ effort and worktree; changing them is the owner's call.
 
 - **The first message is the brief:** "app: X", the Linear issue, the owner's words where they
   matter, and where to stop. The builder asks you; you ask the owner.
-- **Up to three builders per issue, each on its own slice:** its own files and its own branch.
-  The skill holds the split (migration first, one slice owns the shared files, no stacking).
+- **How the work splits is yours:** each builder gets its own files and its own branch, and most
+  issues need one. The skill holds the rest (migration first, one slice owns the shared files, no
+  stacking).
 - **Their reports reach the owner through you,** as one. The slice that owns `NOTES.md` writes it.
 - **It ends when your session does.** Only its pushed branch, its notes and Linear survive.
 
@@ -90,8 +91,8 @@ how a demo renders it are convention, guarded only here. A demo that needs state
 - **Verify from the code, not a summary of it.**
 - **Put decisions to the owner as multiple choice** (`AskUserQuestion`): two to four options,
   recommendation first and marked, each with its consequence.
-- **Keep reports short.** A final report, yours or a helper's you relay, ends with **Archive: clear**
-  or **Archive: not clear — <reason>** (the `closeout` skill).
+- **Keep reports short.** A final report, yours or a helper's you relay, ends with a
+  `### Ready to Archive` or `### Do Not Archive` heading and its reasons below (the `closeout` skill).
 - **No phone check by default.** Write one as a ⭐ step only when the owner asks or the change
   cannot be tested signed out (`CLAUDE.md`).
 - **Linear matches the repo.** At kickoff, fix any issue whose status the repo contradicts: work
