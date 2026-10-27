@@ -3,11 +3,11 @@
  *
  * Downscale a photo in the browser before it is uploaded.
  *
- * Three problems, one fix: an iPhone shot is 3-5MB of HEIC, the Anthropic API
- * accepts only jpeg/png/webp/gif, and Vercel rejects request bodies over about
- * 4.5MB with an opaque error. Re-encoding through a canvas solves all three,
- * and 1568px on the long edge is Claude's optimal image size — larger is
- * downscaled server-side anyway, so this costs no accuracy.
+ * Two problems, one fix: an iPhone shot is 3-5MB of HEIC, which not every
+ * browser can show, and Vercel rejects request bodies over about 4.5MB with an
+ * opaque error. Re-encoding through a canvas gives a small jpeg that fits under
+ * the limit. Lando calls no model; 1568px on the long edge is the size Coffee
+ * chose for its model, kept here because it is plenty for a phone screen.
  */
 const MAX_EDGE = 1568;
 const QUALITY = 0.85;

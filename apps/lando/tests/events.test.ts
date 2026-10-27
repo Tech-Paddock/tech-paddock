@@ -439,7 +439,7 @@ describe("checkVoid — what may replace what", () => {
 });
 
 describe("Other dogs — one pick (TEC-129)", () => {
-  // Invented: no real dog's name is in the repo (charter, Never 2).
+  // Invented: no real dog's name is in the repo (RULES.md, Never 2).
   const A = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Dog A" };
   const B = { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Dog B" };
   const GONE = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";

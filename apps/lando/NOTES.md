@@ -51,7 +51,7 @@
   uploading, failed (it stays on screen with Retry and ✕) or done; **Save is disabled until every
   photo is done**, and the server refuses an entry naming a path with no object behind it
   (`writeEvent` -> `missingPhotos`), so an entry never shows as saved without its photos. The
-  phone chooses each photo's id, so a retry is the same object (upload is an upsert). `GET
+  phone chooses each photo's id, so a retry is the same object (the upload is not an upsert: see the photos trap). `GET
   /api/journal` returns `photos`, a path -> signed URL map for the live health, exercise and potty entries (an hour; `eventPhotos`);
   the screen adds each upload's URL as it happens, and a path that could not be signed reads "No
   photo" / "Photo unavailable", never a blank. A correction keeps the photos it does not remove
@@ -409,8 +409,9 @@
 - **Widen `lando.details_ok` with `create or replace function`, and only ever widen.** The
   constraint `events_details_shape` just calls it, so a widening is a new migration holding the
   function's whole current body with the one list or shape grown: copy the whole body from the
-  newest migration file that defines `lando.details_ok`, sorting `supabase/migrations` by version.
-  No DROP, no constraint swap, and it goes through the connector. Replacing
+  newest migration file that defines `lando.details_ok`, sorting `supabase/migrations` by version
+  (today `lando_details_ok_search_path`, which is `lando_potty_inside_spot`'s body plus
+  `set search_path = ''`; keep that line in every copy). No DROP, no constraint swap, and it goes through the connector. Replacing
   the function does **not** re-check existing rows, so a function that narrows would leave rows the
   database now calls invalid, and nothing would say so. Narrowing (removing a value, requiring a
   new key) needs a validated swap: a NOT VALID constraint calling a new function, the failing rows
@@ -418,10 +419,12 @@
   `set local lock_timeout = '5s';` so a busy table fails fast. The older swaps
   (`widen_lando_events_details_shape`, `widen_lando_potty_none`) were DROP and ADD in one ALTER run
   by the owner in the SQL Editor; that path is retired.
-- **Nothing in CI catches a widening that drops a key.** Each widening's test reads its own
-  migration file, and `tests/health.test.ts` holds the newest one only to what the next trap lists,
-  so a body copied from an older file (one without potty `spot`, say) passes. A superset test is
-  filed in TEC-164.
+- **`tests/details-ok-superset.test.ts` guards widenings** (TEC-164): the newest migration defining
+  `lando.details_ok` must keep every `ARRAY[...]` key, `IN (...)` value and `<@ '[...]'` list value of
+  the one before it, and the same holds at each step from `lando_health_picklist` on. A body copied
+  from an older file fails it. It compares lists, not rules: a changed bound (`BETWEEN 1 AND 6`) or a
+  regex is not seen, so a narrowing of those still needs the validated swap above. Each widening's
+  own test still holds its own file's shape.
 - **The health lists are in two places:** `VET_REASONS` + `VET_RETIRED` and `ISSUE_PICKS` +
   `ISSUE_RETIRED` in `lib/events.ts` and `lando.details_ok`. The database holds the union.
   `tests/health.test.ts` reads the newest migration defining the function (by version; it must be
@@ -450,8 +453,11 @@
 - **Photos are never replaced or deleted** (RULES.md, Never 6): the event holds paths only, and an
   entry never changes, so no code path removes an object. Anything that would (a cleanup of
   unreferenced photos) must first check every event, voided ones included, since a voided entry
-  still names its photos. **But `uploadPhoto` upserts** (`lib/storage.ts`) so that a retry is the
-  same object: until TEC-164's fix, an upload under a stored photo's path (a reused id) replaces it.
+  still names its photos. `uploadPhoto` (`lib/storage.ts`) uploads with `upsert: false`, so the bucket
+  refuses a taken path; it then reads the stored bytes back. The same bytes are a retry and succeed;
+  different bytes are a `PhotoConflict`, answered 409 by `POST /api/photos`, and the stored photo
+  stays. Retry re-sends the blob `Photos.tsx` kept, so it is byte-identical; a re-encode under the
+  same id would be a conflict.
 - **The photo upload is one request under Vercel's body limit** (about 4.5MB; the route and the
   bucket cap at 4MB). The canvas downscale is what keeps a phone shot under it. If a browser
   cannot decode the file (a HEIC on a browser that cannot read it), the photo fails with the
