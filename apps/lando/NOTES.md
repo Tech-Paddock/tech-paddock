@@ -160,9 +160,24 @@
   first, then Potty, Food, Fun, Training, Weight, Health (`FORM_KINDS`), across every day. Unselected:
   1px `line` outline, soft ink, 13px; selected: filled `ink` with `ink-invert` text. Each
   `<button>` is the 44px-tall hit area and the pill is its inner span (the pill itself is about
-  28px). `aria-pressed` on every button, All pressed when nothing is picked. Tap a form's pill to show only
-  that form's entries (unsaved rows too), tap it again, or All, for everything. Food covers meals and treats. Held in memory, not remembered. Empty reads
-  "Nothing logged yet." or, under a chip, "No training entries yet." (`emptyFeedText`).
+  28px). `aria-pressed` on every button, All pressed when nothing is picked. **The filter is multi-select**
+  (TEC-177): each form's pill toggles on its own and the feed shows the rows of every picked form (unsaved
+  rows too); All clears the picks; picking all six reads as All (`toggleForm`, `inPicks`). Food covers meals
+  and treats; Health covers vet visits and medical issues. Held in memory, not remembered. Empty reads
+  "Nothing logged yet.", under one pick "No training entries yet.", under several "No entries yet for those."
+  (`emptyFeedText`).
+- **Feed colours** (TEC-177, owner: "Let's give the entire feed some color"). A **local pattern** in
+  `app/globals.css`, beside `--lando-status-*`: `--lando-kind-*`, one hue per filter form, each with a light
+  and a dark value (Potty blue, Food burnt papaya, Fun teal, Training purple, Weight slate, Health pink;
+  Health is one colour for vet visits and medical issues). A row (`.lando-row`, `data-kind` from `feedTone`)
+  keeps its ink text on a 16% tint of its colour with a 4px left edge of it; an unsaved row (dashed) wears its
+  form's colour beside Saving… or Not saved. **An accident stays red** (`data-kind="accident"` uses
+  `--lando-status-red`, the theme's `--danger`) over Potty's blue, with its red border and title. The filter
+  pills carry a dot of the colour (`.lando-kind-dot`, `aria-hidden`), so they are the legend; colour is never
+  the only cue, every title names its form. Contrast, against the mcl39 tokens (`tests/feedcolours.test.ts`
+  computes it from the CSS): each edge at least 4.4:1 on the paper and the surface, light and dark; ink on a
+  tint at least 11:1. Food's light burnt papaya is the nearest to the yellow status; the two never sit side
+  by side. The Log buttons, Analytics and the day timeline keep their own colours.
 - **Food amount is a scroll picker in ⅛ steps** (TEC-136, `app/AmountScroller.tsx`, a local
   pattern): three rows show, the middle one is the pick, it snaps a step at a time; one
   `spinbutton` for screen readers (arrows step, Page keys a whole unit, Home and End). It offers

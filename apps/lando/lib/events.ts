@@ -430,9 +430,38 @@ export function feedDays<T>(rows: FeedRow<T>[], now: Date): FeedDay<T>[] {
   return out;
 }
 
-/** The empty feed's line: "Nothing logged yet." or, under a chip, "No training entries yet." */
-export function emptyFeedText(only: FormKind | null): string {
-  return only ? `No ${FORM_LABELS[only].toLowerCase()} entries yet.` : "Nothing logged yet.";
+/**
+ * The feed filter's picks (TEC-177): none is All. Tapping a form's pill adds it
+ * or takes it off; picking all six reads as All, so the picks clear.
+ */
+export function toggleForm(picks: readonly FormKind[], k: FormKind): FormKind[] {
+  const next = picks.includes(k) ? picks.filter((x) => x !== k) : [...picks, k];
+  return next.length >= FORM_KINDS.length ? [] : next;
+}
+
+/** Whether an entry of this form shows under the picks: everything when none is picked. */
+export function inPicks(picks: readonly FormKind[], form: FormKind | null): boolean {
+  return picks.length === 0 || (form !== null && picks.includes(form));
+}
+
+/**
+ * What colours a feed row (TEC-177): its form, or `accident` for an inside
+ * potty, which stays red over Potty's colour (`--lando-kind-*` in globals.css).
+ */
+export type FeedTone = FormKind | "accident";
+export function feedTone(e: Pick<JournalEvent, "kind" | "details">): FeedTone | null {
+  if (isAccident(e)) return "accident";
+  return formOf(e);
+}
+
+/**
+ * The empty feed's line: "Nothing logged yet." or, under one pick, "No training
+ * entries yet."; under several, "No entries yet for those."
+ */
+export function emptyFeedText(picks: FormKind | readonly FormKind[] | null): string {
+  const list = picks === null ? [] : typeof picks === "string" ? [picks] : picks;
+  if (list.length === 0) return "Nothing logged yet.";
+  return list.length === 1 ? `No ${FORM_LABELS[list[0]].toLowerCase()} entries yet.` : "No entries yet for those.";
 }
 
 /**
