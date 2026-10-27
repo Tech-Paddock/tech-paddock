@@ -47,6 +47,9 @@ for the deploy when your context is large or builders are still running; it pick
 branches and Linear. A fresh session has cut no branch, so its `/deploy` asks the owner about each
 one (TEC-173).
 
+**A plan run** (`/execute-plan`, the owner's only) runs the builds and deploys `/summarize-plan`
+showed, in order, on one approval; its skill says where it stops.
+
 `/status-check` is yours to run on the owner's request (`.claude/skills/status-check/SKILL.md`).
 
 ## Postgres
