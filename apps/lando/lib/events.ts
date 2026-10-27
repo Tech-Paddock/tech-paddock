@@ -11,7 +11,7 @@
  * the database (migrations `lando_people_and_events`, then
  * `widen_lando_events_details_shape`, then `widen_lando_potty_none`, then
  * `lando_health_events`, `lando_health_picklist`, `lando_issue_links`, `lando_vet_weight`,
- * `lando_potty_inside_spot`, `lando_details_ok_search_path`); change both together.
+ * `lando_potty_inside_spot`, `lando_details_ok_search_path`, `lando_potty_minutes`); change both together.
  */
 
 import { FOOD_TYPES, findFood, formatAmount, unitLabel, type FoodType } from "./foods";
@@ -75,6 +75,10 @@ export const LEASH_LABELS: Record<Leash, string> = { leashed: "Leashed", unleash
 export const SPOT = ["crate", "pen", "loose"] as const;
 export type Spot = (typeof SPOT)[number];
 export const SPOT_LABELS: Record<Spot, string> = { crate: "Crate", pen: "Pen", loose: "Loose" };
+/** Time outside: the form's chips and number step (TEC-176). The stored value is any whole 1 to the max. */
+export const OUT_MINUTES_CHIPS = [5, 10, 15, 20, 25, 30] as const;
+export const OUT_MINUTES_STEP = 5;
+export const OUT_MINUTES_MAX = 120;
 export type PottyDetails = {
   what: PottyWhat;
   where: (typeof WHERE)[number];
@@ -82,6 +86,8 @@ export type PottyDetails = {
   leash?: Leash;
   /** Inside only; optional, and entries from before it existed have none. */
   spot?: Spot;
+  /** Time outside, whole minutes 1 to OUT_MINUTES_MAX (TEC-176); outside only, optional. */
+  minutes?: number;
   /** A medical issue this relates to (TEC-142): the id of a Health issue event, possibly a superseded copy; `resolveIssue` finds the live one. */
   issue?: string;
   /** Storage paths of photos (TEC-142), 1 to MAX_PHOTOS; no key when there are none. */
@@ -899,7 +905,13 @@ export function describe(
       const base =
         p.where === "inside"
           ? `${isAccident(e) ? "accident, " : ""}inside${p.spot ? ` · ${SPOT_LABELS[p.spot].toLowerCase()}` : ""}`
-          : p.leash ? `outside · ${LEASH_LABELS[p.leash].toLowerCase()}` : "outside";
+          : [
+              "outside",
+              p.leash ? LEASH_LABELS[p.leash].toLowerCase() : "",
+              p.minutes ? `${p.minutes} min` : "",
+            ]
+              .filter(Boolean)
+              .join(" · ");
       const n = p.photos?.length ?? 0;
       const detail = [
         base,
@@ -1041,6 +1053,10 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
       if (r.spot !== undefined && r.spot !== null) {
         if (out.where !== "inside") throw new InvalidEvent("crate, pen or loose is for inside only");
         out.spot = oneOf(r.spot, SPOT, "spot");
+      }
+      if (r.minutes !== undefined && r.minutes !== null) {
+        if (out.where !== "outside") throw new InvalidEvent("time outside is for outside only");
+        out.minutes = wholeNumber(r.minutes, "time outside", 1, OUT_MINUTES_MAX);
       }
       const issue = parseIssue(r.issue);
       if (issue) out.issue = issue;
