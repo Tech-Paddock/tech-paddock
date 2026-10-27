@@ -22,6 +22,8 @@ import {
   isAccident,
   latestWeight,
   liveEvents,
+  mealGapText,
+  mealGaps,
   mealsToday,
   pillStatus,
   round1,
@@ -318,6 +320,8 @@ export default function Journal() {
   }
 
   const clocks = useMemo(() => (loaded ? sinceLast(loaded.events, now) : null), [loaded, now]);
+  // The second line under pee, poop and food (TEC-172): meal to pee, meal to poop, meal to meal.
+  const gaps = useMemo(() => (loaded ? mealGaps(loaded.events, now) : null), [loaded, now]);
   // "Meals today: N" in the app bar (TEC-142): the phone's day, live meals only.
   useReportMeals(loaded ? mealsToday(loaded.events, now) : null);
   // The feed (TEC-136): every live entry in the read's window (today and the
@@ -404,9 +408,10 @@ export default function Journal() {
               const last = clocks?.[c] ?? null;
               // Green, yellow or red by how long ago (TEC-142); exercise and "none" stay plain.
               const status = last ? pillStatus(c, now.getTime() - Date.parse(last.at)) : null;
+              const gapLine = gaps && c !== "exercise" ? mealGapText(c, gaps[c]) : null;
               return (
+                <div key={c} className="flex min-w-0 flex-col gap-0.5">
                 <div
-                  key={c}
                   title={
                     last
                       ? `${CLOCK_LABELS[c]} at ${clockTime(last.at)}${status ? ` — ${PILL_STATUS_WORDS[status]}` : ""}`
@@ -428,6 +433,14 @@ export default function Journal() {
                         ? ` in ${HORIZON_DAYS} days`
                         : ""}
                   </span>
+                </div>
+                {/* Second line (TEC-172): plain, no status colour; the pill above keeps its own. */}
+                {gapLine && (
+                  <div title={gapLine.words} className="truncate text-center text-[10px] leading-tight tabular-nums text-ink-soft">
+                    <span aria-hidden="true">{gapLine.short}</span>
+                    <span className="sr-only">{gapLine.words}</span>
+                  </div>
+                )}
                 </div>
               );
             })}
@@ -518,22 +531,36 @@ export default function Journal() {
           {/* The feed: every loaded day, newest first, by when it happened (TEC-136) */}
           <section aria-label="Feed">
             <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Feed</h2>
-            {/* Filter (TEC-129, TEC-136): the chips match the buttons; tap one
-                to show only it, tap it again for all. Across every day. */}
-            <div role="group" aria-label="Show only" className="mb-2 grid grid-cols-3 gap-1.5">
-              {FORM_KINDS.map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  aria-pressed={only === k}
-                  onClick={() => setOnly(only === k ? null : k)}
-                  className={`min-h-[44px] min-w-0 truncate rounded-xl border px-1 py-1.5 text-[15px] font-semibold ${
-                    only === k ? "border-accent bg-accent text-accent-ink" : "border-line bg-surface"
-                  }`}
-                >
-                  {FORM_LABELS[k]}
-                </button>
-              ))}
+            {/* Filter (TEC-129, TEC-136, TEC-171): small outlined pills in one row that
+                scrolls sideways, so they do not read as the Log tiles above. All first,
+                selected when nothing is picked; tap a form's pill to show only it, tap it
+                again (or All) for everything. Across every day. The button is the 44px
+                hit area; the pill is its inner span. */}
+            <div
+              role="group"
+              aria-label="Show only"
+              className="-mx-3 mb-2 flex gap-1 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {([null, ...FORM_KINDS] as const).map((k) => {
+                const selected = only === k;
+                return (
+                  <button
+                    key={k ?? "all"}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setOnly(k === null || only === k ? null : k)}
+                    className="flex min-h-[44px] shrink-0 items-center"
+                  >
+                    <span
+                      className={`whitespace-nowrap rounded-full border px-3 py-1 text-[13px] font-semibold ${
+                        selected ? "border-ink bg-ink text-ink-invert" : "border-line bg-transparent text-ink-soft"
+                      }`}
+                    >
+                      {k === null ? "All" : FORM_LABELS[k]}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             {days.length === 0 && (
               <p className="text-ink-soft">

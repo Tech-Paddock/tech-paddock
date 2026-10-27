@@ -18,6 +18,44 @@ import { createClient } from "@supabase/supabase-js";
  */
 export const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: "no-store" });
 
+/**
+ * The one 401 that is retried (TEC-175). Supabase's gateway mints a short-lived
+ * token per request, and a backend whose clock runs slightly behind the
+ * gateway's rejects it as "JWT issued at future". It is intermittent, it hits
+ * one of several concurrent reads, and the next request succeeds. Clock drift
+ * inside Supabase is not ours to fix, so the request is sent once more.
+ *
+ * Any other 401 (a real credentials failure) and every other status passes
+ * through untouched, so a wrong key still shows.
+ */
+export const JWT_FUTURE = "JWT issued at future";
+export const RETRY_PAUSE_MS = 300;
+
+async function isJwtFuture(res: Response): Promise<boolean> {
+  if (res.status !== 401) return false;
+  try {
+    // A clone, so the caller's copy of the body is never consumed.
+    return (await res.clone().text()).includes(JWT_FUTURE);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Retries a request exactly once, after a short pause, when Supabase answers
+ * 401 "JWT issued at future"; the second response is returned as it is.
+ * A 401 is rejected before PostgREST runs the request, so a write is safe to
+ * resend (and `writeEvent` is idempotent on `id` anyway).
+ */
+export const retryingFetch: typeof fetch = async (input, init) => {
+  // A Request's body can be read once, so keep a clone to send again.
+  const again = input instanceof Request ? input.clone() : input;
+  const res = await noStoreFetch(input, init);
+  if (!(await isJwtFuture(res))) return res;
+  await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS));
+  return noStoreFetch(again, init);
+};
+
 // Server-side only: uses the service role key, which bypasses RLS.
 // Never import this file from a client component.
 export function getServiceClient() {
@@ -31,6 +69,6 @@ export function getServiceClient() {
   return createClient(url, key, {
     auth: { persistSession: false },
     db: { schema: "lando" },
-    global: { fetch: noStoreFetch },
+    global: { fetch: retryingFetch },
   });
 }

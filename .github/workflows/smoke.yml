@@ -23,8 +23,8 @@ permissions:
 jobs:
   smoke:
     # Only a successful production deploy. Previews are skipped here so they
-    # leave no run behind; the script checks the same thing again, because the
-    # environment's exact name is not confirmed until the first real deploy.
+    # leave no run behind; the script checks the same thing again, in case
+    # Vercel ever renames the environment (`Production – <project>`, seen 2026-10-26).
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.deployment_status.state == 'success' &&

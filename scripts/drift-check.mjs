@@ -183,8 +183,7 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
 
 /* 2b ── The password gate EXISTS in every app, which check 2 cannot see, and it
    is the file the app's Next.js actually runs. An app with no gate serves every
-   route in public, its service-role API routes included — the "Vercel project
-   serving an unprotected page" incident in CLAUDE.md.
+   route in public, its service-role API routes included.
 
    Exactly one gate file, chosen by the app's Next major (scripts/gate-file.mjs
    has the reasoning): middleware.ts on 14/15, proxy.ts on 16. The silent case is
@@ -638,7 +637,7 @@ for (const app of PUBLIC_APPS) {
   /* The same question of the apps' own code. A comment or error message citing
      a migration by version is an instruction to the next reader, and a version
      with no file behind it sends them looking for something that is not there.
-     A warn naming the line: the app's own agent fixes the code, not this check.
+     A warn naming the line: a builder on that app fixes the code, not this check.
      Generated files are skipped — drift.generated.ts carries this check's own
      output and would cite every version it reports. */
   const { files, how } = trackedFiles((f) => f.startsWith("apps/") && /\.tsx?$/.test(f) && !f.endsWith(".generated.ts"), ["apps"]);
@@ -656,7 +655,7 @@ for (const app of PUBLIC_APPS) {
 
 /* 7 ── Structures that were retired, staying retired. */
 add("worklogs stay retired", existsSync(R(".claude/worklogs")) ? "fail" : "ok",
-  existsSync(R(".claude/worklogs")) ? ".claude/worklogs/ is back — see the communication layer in CLAUDE.md" : "absent");
+  existsSync(R(".claude/worklogs")) ? ".claude/worklogs/ is back — state lives in each area's NOTES.md, open items in Linear" : "absent");
 add("KICKOFF.md stays retired", existsSync(R(".claude/agents/KICKOFF.md")) ? "fail" : "ok",
   existsSync(R(".claude/agents/KICKOFF.md")) ? ".claude/agents/KICKOFF.md is back — the TD starts from the kickoff skill, the builder from its preset (TEC-108)" : "absent; kickoff and closeout are skills");
 /* One builder replaced the per-app agents (TEC-115). A HANDOFF.md coming back
@@ -704,7 +703,6 @@ add("ledger stays retired", existsSync(R(".claude/OPEN-ITEMS.md")) ? "fail" : "o
         hits.push(`${rel}:${i + 1} says "the other ${other[1]}"; apps/ holds ${APPS.length}, so the rest is ${APPS.length - 1}`);
         return;
       }
-      else if (/\b[0-9a-f]{7,40}\b/.test(line) && /commit|sha|serves|deployed/i.test(line)) hits.push(`${rel}:${i + 1} names a commit`);
       /* A ROSTER count — "all five apps", "the four tools", "in five projects".
          These go stale the day an app is added or deprecated, which now happens
          routinely, so they are claims with a shelf life.

@@ -8,8 +8,8 @@
   clock time in the title and for screen readers; coloured by TEC-142, below), "Logging as", six
   section buttons in two rows of three (TEC-137: Potty, Food, Fun / Training, Weight, Health;
   15px labels, 52px tall; the Weight button shows the newest weight on its face, "7.3 lb", with
-  its date still in the title and screen-reader text), then the **Feed** under six filter chips (two
-  rows of three, TEC-142). No growth chart
+  its date still in the title and screen-reader text), then the **Feed** under a row of filter pills
+  (TEC-171, below). No growth chart
   on Log since TEC-129: it lives in Analytics only. Each button opens a bottom sheet
   (`app/Sheet.tsx`) with that form (`app/LogForm.tsx`, prop `form`), defaults filled in, so Save
   is usually the only other tap. Tapping a feed row opens the matching form on that entry to
@@ -72,6 +72,18 @@
   on both the surface and the paper in light and dark; ink on a tint at least 11:1.
   **The food clock is the last meal** (`sinceLast`): a treat no longer resets it (before TEC-142 a
   treat did). The pill is still labelled Food.
+- **Meal gaps under the pills** (TEC-172): under Pee, Poop and Food (not Exercise), a small plain
+  second line, stacked beneath the pill (outside its coloured box, so the status colour never
+  applies to it; 10px, soft ink, truncating). `mealGaps` / `mealGapText` / `formatGap` in
+  `lib/events.ts`, tested in `tests/mealgaps.test.ts`. **Pee: "meal→ 40m"** is the latest meal to the first
+  pee at or after it (pee or both, inside counts, the pills' own rule; No potty does not); **Poop** the same for poop; **Food: "gap
+  4h 10m"** is the latest meal minus the one before it. Meals only, never treats. If nothing
+  followed the latest meal the line reads **"not yet"**; it never borrows an older meal's pee.
+  One meal ever: the Food line is blank; no meal in the read: all three are blank. Under a minute
+  is "<1m". Live events only, the future ignored, and it reads the same 30-day window as the pills.
+  Each line has screen-reader text and a title ("First pee came 40m after the latest meal", "4h 10m
+  between the last two meals", "No pee since the latest meal yet"). Longest line ("meal→ 9h 59m")
+  fits a quarter of 375px; changing the wording means re-checking that.
 - **Meals today** (TEC-142): "Meals today: N" at the right of the app bar, beside the livery badge
   (`mealsToday`: live `meal` entries whose `at` falls in the phone's local day; treats, voided and
   deleted entries do not count). The bar is the page's server component, so `app/Meals.tsx` is a
@@ -143,9 +155,13 @@
   column), so a long note never wraps; the clock time, the person and the 40px thumbnails
   (`shrink-0`) keep their size. The whole text is the row's `title` and the entry one tap away. Unsaved rows sit in their day like
   any other, with Saving… or Not saved, Retry and ✕.
-- **The feed's filter**: chips Potty, Food, Fun, Training, Weight, Health (`FORM_KINDS`, matching the
-  buttons: two rows of three, `grid-cols-3`, 44px tall, rounded like them), across every day. Tap one to show only that form's entries (unsaved rows too), tap
-  it again for all. Food covers meals and treats. Held in memory, not remembered. Empty reads
+- **The feed's filter** (TEC-171, the owner's option B): **small outlined pills in one row that
+  scrolls sideways**, so they cannot be mistaken for the Log tiles (big, orange, lipped). **All**
+  first, then Potty, Food, Fun, Training, Weight, Health (`FORM_KINDS`), across every day. Unselected:
+  1px `line` outline, soft ink, 13px; selected: filled `ink` with `ink-invert` text. Each
+  `<button>` is the 44px-tall hit area and the pill is its inner span (the pill itself is about
+  28px). `aria-pressed` on every button, All pressed when nothing is picked. Tap a form's pill to show only
+  that form's entries (unsaved rows too), tap it again, or All, for everything. Food covers meals and treats. Held in memory, not remembered. Empty reads
   "Nothing logged yet." or, under a chip, "No training entries yet." (`emptyFeedText`).
 - **Food amount is a scroll picker in ⅛ steps** (TEC-136, `app/AmountScroller.tsx`, a local
   pattern): three rows show, the middle one is the pick, it snaps a step at a time; one
@@ -260,7 +276,7 @@
   nothing done. It keeps Where and, outside, Leash, like any potty. It resets neither the pee nor
   the poop clock, is never an accident (`isAccident`; inside hides the accident warning and the
   row is not red), and counts as nothing in Analytics' per-day rows. The feed reads
-  "no potty · leashed" or "no potty, inside".
+  **No potty** with "outside · leashed" or "inside".
 - **Potty's Leash pick** (Leashed / Unleashed / In pen) shows only while Where is Outside, and
   defaults to Leashed on a new entry. It is not remembered per phone. Correcting an old outside
   entry that has none opens with nothing picked, so a correction never invents one. The feed
@@ -269,11 +285,19 @@
   Leash. Nothing is picked by default (a new or old inside entry never gets one unless tapped);
   switching Where to Outside drops it from the save, as Inside drops Leash. Optional `spot` in
   details, inside only (`parseDetails` and `details_ok`, migration `lando_potty_inside_spot`). The
-  feed reads "pee, inside · crate". Inside is still an accident; Analytics is unchanged.
-- **Potty's photos and Related issue** (TEC-142): below Leash and Spot, the Medical issue checkbox and its select, then the
+  feed reads **Pee** with "accident, inside · crate". Inside is still an accident; Analytics is unchanged.
+- **A potty row's title is the what** (TEC-174; `describe()`): **Pee**, **Poop**, **Both** or **No potty**
+  (`POTTY_WHAT_LABELS`), never "Potty" or "Accident". The detail never repeats it: "outside · leashed",
+  "outside" (no leash picked), "inside · crate", then the issue link and photo count. An accident (`isAccident`)
+  keeps the red row and leads its detail with "accident, " ("accident, inside · crate"). The filter pill, Log
+  button and form keep the word Potty. Analytics' day timeline has its own labels (`MARK_LABELS`) and is unchanged.
+- **Photos sit below the Note** (TEC-172) on Potty, Fun and Training: `LogForm` renders one
+  `PhotoPicker` after the shared Note field (When and Human, then Note, then Photos), not inside each
+  kind's block. Health keeps its own Note and then its Photos, as before.
+- **Potty's photos and Related issue** (TEC-142): below Leash and Spot, the Medical issue checkbox and its select; the
   same Photos block as Health, Fun and Training (Take photo, Choose photos, Save waits for each,
-  `missingPhotos` backs it), stored as optional `photos` on the potty details. Feed: "poop,
-  inside · re: Stomach & appetite, Oct 24 · 1 photo" with the thumbnails. The note stays optional.
+  `missingPhotos` backs it) comes after the Note; stored as optional `photos` on the potty details. Feed: "Poop"
+  "accident, inside · re: Stomach & appetite, Oct 24 · 1 photo" with the thumbnails. The note stays optional.
 - **Exercise's Other dogs** is one pick (TEC-129, replacing TEC-125's multi-select): a plain
   full-width `<select>`: None, every row in `lando.dogs` by name, Multiple, "Add dog…". There is
   no Yes/No. `dogsFromPick` (`lib/events.ts`) maps the pick: a dog saves `with_dogs: true,
@@ -353,6 +377,13 @@
 
 ## Traps
 
+- **"JWT issued at future" is Supabase's, intermittent, and retried.** "Couldn't load the journal.
+  (couldn't read the journal: JWT issued at future)" is a 401 from Supabase's own clock drift:
+  its gateway mints a token per request and a backend a little behind rejects it. It hits one of
+  the three concurrent reads, mostly on the first open after idle, and the next request succeeds.
+  `retryingFetch` in `lib/supabase.ts` sends such a request once more after 300ms and returns
+  the second answer as it is; any other 401 or status passes through, so a real key failure still
+  shows. Do not widen it to other 401s, and do not swap it out of `getServiceClient`.
 - **A training's treats are found by its exact `at`** (`treatsWith`). Anything that rounds a
   correction's time (the `datetime-local` input holds minutes only) unlinks them: an untouched
   When must keep sending `event.at` as it is. Compare with `Date.parse`, never as strings: the
