@@ -51,6 +51,7 @@ export function decide(input) {
   const args = input?.tool_input ?? {};
   const deploy = isDeployment(input);
   if (tool === "Agent" || tool === "Task") return startAgent(args, input);
+  if (EDIT_TOOLS.has(tool)) return editApp(args, input);
   if (tool === "Bash") return bash(String(args.command ?? ""), input?.cwd || process.cwd(), 0, deploy);
   if (!tool.startsWith("mcp__")) return null;
   const cut = tool.lastIndexOf("__");
@@ -95,6 +96,24 @@ function startAgent(a, input) {
     return ask("Starting a builder waits for the owner's approval. Approve it only if you ran `/build`.");
   }
   return null;
+}
+
+/* App code is the builder's: the TD does not build app features (CLAUDE.md).
+   An edit to a file under `apps/<app>/` that is not Markdown, Showcase aside,
+   goes ahead for a builder, waits for the owner from a main session (a
+   touch-up is a click; a feature is a `/build`), and is refused to any other
+   helper. A shell write (`sed -i`, a heredoc) is not seen here: this is a rail
+   on the edit tools, not a wall around the folder. */
+const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
+const APP_CODE = /(^|\/)apps\/(?!showcase\/)[^/]+\/.+/;
+function editApp(a, input) {
+  const path = String(a.file_path ?? a.notebook_path ?? "").replace(/\\/g, "/");
+  if (!APP_CODE.test(path) || /\.md$/i.test(path)) return null;
+  if (!input?.agent_id) {
+    return ask("App code is the builder's. Approve this edit only if it is a touch-up (a wrong doc or a missing config line); a feature waits for `/build`.");
+  }
+  if (String(input.agent_type ?? "").toLowerCase() === BUILDER) return null;
+  return deny("App code is the builder's alone. Put the change in your report and stop.");
 }
 
 /* ------------------------------------------------------------------------- */
@@ -615,10 +634,10 @@ export function stripSql(sql) {
 
 const HELD =
   "It waits for the owner's approval.";
-/* Every write to a pull request is the main session's, and refused to a
-   helper (above). For the main session nothing is held but what no gate
-   covers: a squash merge, a body edit that keeps the request line, and
-   bringing a branch up to date go through. Auto-merge still asks, because it
+/* Every write to a pull request is Deployment's, and refused to everyone else
+   (above). For Deployment nothing is held but what no gate covers: a squash
+   merge, a body edit that keeps the request line, and bringing a branch up to
+   date go through. Auto-merge still asks, because it
    merges on a timer with nobody reading the result; so does a review, which
    can approve, a human's act; and so do the API commit tools below, which
    write past the local push guard whoever calls them. request-line in CI
@@ -673,8 +692,8 @@ function github(name, a, deploy = false) {
 /* Supabase and Vercel: the changes that are the owner's                    */
 /* ------------------------------------------------------------------------- */
 
-/* Reads go ahead. So does apply_migration: the technical director applies each
-   migration at merge time, from its file, before merging. Everything else —
+/* Reads go ahead. So does apply_migration: Deployment applies each migration
+   at merge time, from its file, before merging. Everything else —
    creating, pausing or restoring the project, branches, edge functions, and any
    tool added later that is not a read — waits for the owner. */
 const SUPABASE_READ = /^(get|list|search|generate)_|^query_logs$/;
@@ -722,7 +741,7 @@ const KINDS = ["owner:"];
 const OPTIONAL_KINDS = ["app:"];
 /* Who can act on a step: the roster by name, and the words for everyone or
    no one. Names are case-sensitive so a path does not count as an actor. */
-const ACTOR = /\b(Owner|TD|Builder)\b/;
+const ACTOR = /\b(Owner|TD|Builder|Deployment)\b/;
 const ACTOR_WORDS = /\b(technical director|every ?one|every ?body|no ?one|nobody|each agent|every agent|each owner|whoever)\b/i;
 // A finished step has nobody left to act.
 const DONE = /^(~~|\*\*Done\b|Done\b)/;
@@ -732,8 +751,8 @@ const RULE =
 const listOf = (v) => (Array.isArray(v) ? v.map(String) : typeof v === "string" ? [v] : []);
 
 /* Linear's diff tools act on the GitHub pull request behind a diff: merging one
-   merges the pull request. They are the main session's like every other pull
-   request write, and settings.json still asks the owner for them on top. */
+   merges the pull request. They are Deployment's like every other pull request
+   write, and settings.json still asks the owner for them on top. */
 const LINEAR_PR_WRITES = new Set(["merge_diff", "update_diff", "submit_diff_review", "save_diff_comment", "resolve_diff_thread"]);
 
 function linear(name, a, deploy = false) {
@@ -820,7 +839,7 @@ export function nextSteps(body) {
     .filter((it) => !DONE.test(it.text) && !ACTOR.test(it.text) && !ACTOR_WORDS.test(it.text))
     .map((it) => it.n);
   if (nameless.length) {
-    return [`step ${nameless.join(", ")} of Next steps does not name who acts (start it with the actor: Owner, TD or Builder)`];
+    return [`step ${nameless.join(", ")} of Next steps does not name who acts (start it with the actor: Owner, TD, Builder or Deployment)`];
   }
   return [];
 }

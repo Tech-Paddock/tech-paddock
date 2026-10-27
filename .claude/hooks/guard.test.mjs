@@ -289,6 +289,24 @@ test("starting Deployment or a builder waits for the owner from a main session a
   }
 });
 
+test("app code: a builder edits it, the TD's session waits for the owner, any other helper is refused", () => {
+  const edit = (file_path, who = {}, tool_name = "Edit") => verdict(decide({ tool_name, tool_input: { file_path }, ...who }));
+  const code = "/home/user/tech-paddock/apps/lando/lib/events.ts";
+  assert.equal(edit(code), "ask");
+  assert.equal(edit(code, {}, "Write"), "ask");
+  assert.equal(edit("/home/user/tech-paddock/.claude/worktrees/agent-1/apps/coffee/app/page.tsx", HELPER), "allow");
+  assert.equal(edit(code, DEPLOY), "deny");
+  assert.equal(edit(code, { agent_id: "a3", agent_type: "general-purpose" }), "deny");
+  assert.equal(edit(code, { agent_id: "a4" }), "deny");
+  // Markdown, Showcase and everything outside apps/ are not app code.
+  assert.equal(edit("/home/user/tech-paddock/apps/lando/NOTES.md"), "allow");
+  assert.equal(edit("/home/user/tech-paddock/apps/lando/RULES.md", { agent_id: "a3", agent_type: "general-purpose" }), "allow");
+  assert.equal(edit("/home/user/tech-paddock/apps/showcase/app/page.tsx"), "allow");
+  assert.equal(edit("/home/user/tech-paddock/.claude/skills/build/SKILL.md"), "allow");
+  assert.equal(edit("/home/user/tech-paddock/scripts/drift-check.mjs"), "allow");
+  assert.equal(verdict(decide({ tool_name: "NotebookEdit", tool_input: { notebook_path: "/r/apps/health/x.ipynb" } })), "ask");
+});
+
 test("a pull request from a shell is Deployment's too", () => {
   const sh = (command, who = {}) => verdict(decide({ tool_name: "Bash", tool_input: { command }, cwd: FEATURE, ...who }));
   for (const c of ["gh pr create --fill", "gh -R o/r pr merge 3 --squash", "gh pr edit 3 --body x", "gh pr close 3", "gh pr comment 3 -b x", "gh pr review 3 --approve", "gh pr ready 3", "hub pull-request -m x", "cd /tmp && gh pr create", "bash -c 'gh pr merge 1'"]) {
@@ -362,7 +380,7 @@ test("Linear: an issue has an owner, at most one app, and ends with Next steps t
   assert.equal(create({ description: "## Next steps\n\n1. **TD:** x\n2. Verify it in the logs." }), "deny");
   assert.equal(create({ description: "## Next steps\n\n1. The technical director builds it." }), "allow");
   assert.equal(create({ description: "## Next steps\n\n1. **Builder:** build it on a fresh branch." }), "allow");
-  assert.equal(create({ description: "## Next steps\n\n1. **Deployment:** take it to merge." }), "deny"); // retired
+  assert.equal(create({ description: "## Next steps\n\n1. **Deployment:** take it to merge." }), "allow");
   assert.equal(create({ description: "## Next steps\n\n1. **Nobody:** nothing until it is un-parked." }), "allow");
   assert.equal(create({ description: "```\n## Next steps\n1. TD: x\n```\n" }), "deny");
   assert.equal(create({ description: "## Next steps\n\n1. Check /api/health answers." }), "deny");
@@ -426,7 +444,8 @@ test("settings.json sends each tool to the guard it needs, and no other", () => 
   for (const t of ["Bash", "Agent", "Task", "mcp__github__create_pull_request", "mcp__github__merge_pull_request", "mcp__github__enable_pr_auto_merge", "mcp__github__disable_pr_auto_merge", "mcp__github__pull_request_review_write", "mcp__github__add_comment_to_pending_review", "mcp__github__add_reply_to_pull_request_comment", "mcp__github__request_copilot_review", "mcp__github__resolve_review_thread", "mcp__github__unresolve_review_thread", "mcp__github__push_files", "mcp__github__create_or_update_file", "mcp__github__delete_file", "mcp__github__update_pull_request_branch", "mcp__Supabase__execute_sql", "mcp__Supabase__create_project", "mcp__Vercel__create_project_env", "mcp__Linear__save_issue", "mcp__Linear__merge_diff", "mcp__Linear__update_diff", "mcp__Linear__submit_diff_review", "mcp__Linear__save_diff_comment", "mcp__Linear__resolve_diff_thread"]) {
     assert.ok(hookFor(t), `${t} has no hook`);
   }
-  for (const t of ["Read", "Edit", "mcp__github__get_me", "mcp__github__list_branches", "mcp__Linear__list_issues", "mcp__Linear__save_comment", "mcp__Notion__notion-search"]) {
+  for (const t of ["Edit", "Write", "MultiEdit", "NotebookEdit"]) assert.ok(hookFor(t), `${t} has no hook`);
+  for (const t of ["Read", "Glob", "mcp__github__get_me", "mcp__github__list_branches", "mcp__Linear__list_issues", "mcp__Linear__save_comment", "mcp__Notion__notion-search"]) {
     assert.equal(hookFor(t), undefined, `${t} should not be guarded`);
   }
 });

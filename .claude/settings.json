@@ -53,6 +53,16 @@
         ]
       },
       {
+        "matcher": "^(Edit|Write|MultiEdit|NotebookEdit)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "g=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard.mjs\"; if ! command -v node >/dev/null 2>&1 || [ ! -f \"$g\" ]; then echo \"The repo's guard needs node and $g, and one is missing, so this call is refused rather than run unchecked.\" >&2; exit 2; fi; node \"$g\" || exit 2",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "^(Agent|Task)$",
         "hooks": [
           {

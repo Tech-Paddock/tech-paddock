@@ -1,6 +1,6 @@
 ---
 name: builder
-description: "The builder: a helper that builds one slice of an issue, in the app its brief names (\"app: X\"), on its own files and branch. Started only by the owner's /build TEC-n, which the technical director runs; pushes its branch and reports back."
+description: "The builder: a helper that builds one slice of an issue, in the app its brief names (\"app: X\"), on its own files and branch. Started only by the owner's /build, which the technical director runs; pushes its branch and reports back."
 model: claude-sonnet-5-5
 effort: medium
 isolation: worktree

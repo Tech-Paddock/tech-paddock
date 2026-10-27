@@ -74,8 +74,8 @@ Open branches
 Hot topics
 - main CI: … · drift: … · TEC-n in progress (title)
 
-Archive this chat
-- Archive: clear  |  Archive: not clear — what is lost, and what clears it
+### Ready to Archive  |  ### Do Not Archive
+- what was checked  |  what is lost, and what clears it
 ```
 
 ```
@@ -94,7 +94,7 @@ Open Next steps
 - Owner: TEC-n step n — what
 - TD: …  ·  Builder: …  ·  Deployment: …
 
-Archive this chat
+### Ready to Archive  |  ### Do Not Archive
 - …
 ```
 
@@ -108,7 +108,7 @@ Done here
 Waiting
 - TEC-n ⭐ Owner: what  ·  subagent: what, still running
 
-Archive this chat
+### Ready to Archive  |  ### Do Not Archive
 - …
 ```
 
