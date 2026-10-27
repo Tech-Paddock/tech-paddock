@@ -2,27 +2,27 @@
 
 ## What is live
 
-- Next.js 16, React 19, `proxy.ts` (the base copy, function renamed). Every server `fetch` is
-  `no-store` in a `force-dynamic` page.
+- Next.js 16, React 19, `proxy.ts`: the one gate every app runs, byte-identical in each. Every
+  server `fetch` is `no-store` in a `force-dynamic` page.
 - Tabs: the Pit Wall at `/` (id `board`) and The Garage at `/?tab=garage`; `/admin` redirects
   there. Each loads in its own Suspense boundary; `?app=` renders a tool's frame and loads neither.
 - Pit Wall: open Linear issues, team TEC (`lib/linear.ts`). *By status* puts assigned, unparked
   issues in a *Waiting on you* band, then In Progress, In Review, Todo, with the rest folded. *By
   app* follows the roster, Platform last (`lib/pitgroups.ts`); `?group=app` keeps it.
 - The Garage: one stoplight row per item — green, amber (could not test), red, grey (parked). Each
-  failure is a sentence plus its raw code (`lib/diagnostics.ts`). Rules drift is baked at build
-  (`lib/drift-explain.ts`).
+  failure is a sentence plus its raw code (`lib/diagnostics.ts`). Rules drift is baked at build by
+  `scripts/collect-drift.mjs` into `lib/drift.generated.ts`; `lib/drift-explain.ts` supplies only
+  the wording.
 - Bar controls, all stamped: `LiveryBadge` on every bar, framed or not; `ThemeControl` and
   `LogoutControl` hidden in a frame.
 - `PARKED` is empty. A parked app would be probed and shown grey.
-- `TOOLS`: resume, coffee, health, cookbook, lando (TEC-119). Lando went last as the neutral
-  choice; the order is still the owner's. It is also in the Pit Wall's `ROSTER`, before showcase.
+- `TOOLS`: resume, coffee, health, cookbook, lando (TEC-119); Lando went last as the neutral
+  choice. It is also in the Pit Wall's `ROSTER`, before showcase.
 - Sidebar icons are emoji, except Lando's: `image: "/lando-icon.svg"` in `app/apps.ts`, rendered
   as an `<img class="icon-image">` sized to the emoji box. Every sidebar icon is in full colour
   (owner, 2026-10-21); nothing greys `.icon`. Parked grey is The Garage's stoplight only.
 - Liveries in `packages/shared/lib/theme.*`: `martini`, `clark`, `senna`, `mp44`, `jps`, `mcl39`
-  (McLaren '25, MCL39, papaya and anthracite; TEC-120). `mcl39` is worn by no app until Lando
-  switches to it.
+  (McLaren '25, MCL39, papaya and anthracite; TEC-120). `mcl39` is Lando's.
 
 ## Traps
 
@@ -43,17 +43,14 @@
 - A framed tool hides its Light/Dark control and follows home's `{type:"paddock-mode"}` message,
   checked by `isPaddockOrigin()`. A tool without `ThemeControl.tsx` ignores home's switch.
 - `LogoutControl` goes to `/login` only on a 2xx or 401.
-- No `tailwind.config.ts` holds a colour; alpha works only as `rgb(var(--token-rgb) / <alpha-value>)`.
-- `PROBED` is the live projects plus `PARKED`. Never key anything off a slug literal.
+- In a tool's `tailwind.config.ts`, alpha works only as `rgb(var(--token-rgb) / <alpha-value>)`.
+- `PROBED` is the live projects plus `PARKED`.
 - `public/lando-icon.svg` is a byte copy of `apps/lando/app/icon.svg`, not stamped and not checked
   by drift. Re-copy it when Lando's logo changes. It sits behind home's gate (not in
   `PUBLIC_ICONS`), which is fine: only a signed-in page shows the sidebar.
 - Drift's JSON shape is the TD's. A renamed check family loses its sentence until the check emits
-  `explain`.
-- "Hub" remains in stamped comments and `proxy.ts` (TEC-85).
+  `explain`. It has fired: the `fresh:` and owning-agent families match no check, and some checks
+  have no sentence (TEC-163).
 - `theme.css` says it is generated from "the palette set the contrast gate checks". No such gate
-  or palette source is in the repo; a new livery is hand-written and measured by hand. Hold each
-  token pair at or above the lowest any existing livery holds for that pair.
-- A livery's bar must be dark. The shared header CSS paints bar ink at 0.72 and 0.4 alpha and the
-  failed-logout border in `--sev-urgent`; on a bright bar (papaya was tried) those fall under
-  4.5:1 and 3:1. A bright bar needs those shared rules changed first.
+  or palette source is in the repo; a new livery is hand-written and measured by hand (header fix:
+  TEC-169).

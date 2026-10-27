@@ -1,7 +1,7 @@
 # Parse fixtures
 
-Three real `.docx` files, **scrubbed of all personal information**, used by the parser and
-spec-extraction tests.
+Three real `.docx` files, **scrubbed of all personal information**, used by the parser, renderer
+and ATS tests.
 
 | File | What it is |
 |---|---|
@@ -43,4 +43,5 @@ actually reads:
 - The empty `styles.xml` in the Jobright export (no named styles at all)
 - Content nested inside `<w:sdt>` content controls in the template
 
-Regenerate by re-running the scrubber against a fresh export; never commit an unscrubbed file.
+There is no scrubber in the repo. A new fixture is scrubbed by hand, to the rules above; never
+commit an unscrubbed file.

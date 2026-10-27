@@ -19,15 +19,15 @@ Current state and traps. Rules are in `RULES.md`; open work is in Linear under `
 - **Verdict FAIL:** a missing source line, a blocking ATS finding, `input-dropped`, or a section
   filled partly (`not-found-in-input` beside an entry that wrote source text to that section).
   **Notes only:** `template-trimmed`, `input-not-read`, `feathered`, a wholly empty section.
-- A FAIL returns no `docxBase64`, stores no output, and hides the job form. It still records
-  source, coverage, change log and findings (`template_snapshot.findings`); Diagnostics lists each
-  missing line from `coverage.missingDetail`.
+- A FAIL returns no `docxBase64`, stores no output, and hides the **Sent it?** panel with its
+  **Mark as sent** button. It still records source, coverage, change log and findings
+  (`template_snapshot.findings`); Diagnostics lists each missing line from `coverage.missingDetail`.
 - A source heading with no section is `input-dropped`; its text is in `unplacedSections[].texts`.
 - Career Highlights cells that do not pair as one metric and one description are `input-not-read`.
 - *Open* reopens a render from its stored record, never a re-render. An unreadable record is NO
   VERDICT (`lib/storedRender.ts`).
 - `templates.spec` is nullable and unused. Activation is one transaction,
-  `resume.activate_template`. No client for `shared`.
+  `resume.activate_template`.
 - No tracker. The `tracker` schema and `renders.thread_id` are dropped, and
   `tests/no-tracker.test.ts` keeps them out; a render records only `submitted_at`, set by **Mark as sent**
   (`PATCH /api/renders/[id]`, which takes nothing else). The Resumes list shows no company or stage.
@@ -38,8 +38,10 @@ Current state and traps. Rules are in `RULES.md`; open work is in Linear under `
 
 - `templates.version` is max+1 over all rows, so deleting the newest lets its number be reused.
   Harmless: renders keep `template_snapshot`.
-- A reopened render's verdict and ATS findings are recomputed now, so it can read differently
-  from when it ran. Coverage and the change log do not change.
+- A reopened render's verdict is recomputed, so it can read differently from when it ran. Its ATS
+  findings have been stored since TEC-105 (`template_snapshot.findings`), and a reopened FAIL shows
+  those; they are recomputed only when the stored output file exists. Coverage and the change log
+  do not change.
 - `input-not-read` passes; only its log line, `notRead` and the note show it.
 - `template-sample.docx` FAILs and returns no bytes; read output through
   `template-flat-sample.docx`.

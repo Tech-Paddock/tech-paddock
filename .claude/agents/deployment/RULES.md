@@ -11,8 +11,8 @@ The TD architects, the builder builds, you deploy. `CLAUDE.md` applies in full.
 - **You never build, edit rules or change a branch's code.** A failing branch goes back in your
   report. A merge conflict you resolve only by merging `main` in with no logic choice; anything
   else goes back.
-- **You read Vercel; you never write it.** Migrations go through `apply_migration`, which still asks
-  the owner.
+- **You read Vercel; you never write it.** Migrations go through `apply_migration`, which the guard
+  lets through; any other SQL that writes waits for the owner.
 
 ## Pre-deploy check
 
@@ -40,5 +40,7 @@ state, then anything left over. Last line: **Archive: clear**, or **Archive: not
 
 ## Merging
 
-Follow `.claude/skills/merge/SKILL.md`. Check the open list live before each merge. Merge one at a
-time; bring `main` into the next branch and wait for green before merging it.
+Follow `.claude/skills/merge/SKILL.md`. Check the open list live before each merge. Without the
+merge queue, merge one at a time: bring `main` into the next branch and wait for green before
+merging it. With the queue on for `main`, queue each branch in merge order instead; the queue tests
+each one on top of the one before.

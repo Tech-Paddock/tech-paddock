@@ -3,7 +3,7 @@
 ## State
 
 - v2 on Next.js 16: two tabs under the app bar, **Log** and **Analytics**, sticky, opening on Log
-  (the owner's override of the one-screen rule, in RULES.md).
+  (RULES.md holds the owner's override of the one-screen rule).
 - **Log**: four since-last pills in one row (pee, poop, food, exercise; label over value, the
   clock time in the title and for screen readers; coloured by TEC-142, below), "Logging as", six
   section buttons in two rows of three (TEC-137: Potty, Food, Fun / Training, Weight, Health;
@@ -22,8 +22,9 @@
   appetite, Skin, ears & eyes, Limping or injury, Breathing or cough, Energy or behaviour, Other
   (`ISSUE_PICKS`, both in `lib/events.ts`). A new entry opens on "Pick one…" and Save without a
   pick says so. Switching the Type keeps the pick only if the other list shares it ("Other").
-  Stored shape unchanged: `{type: vet|issue, reasons[], photos?[]}`, `reasons` an array of one for
-  every new entry; the story is the event's own `note`. Feed: "Vet visit  Check-up · 2 photos"
+  Stored shape: `{type: vet|issue, reasons[], photos?[], issue?: uuid}` (`issue` on a vet visit
+  only, migration `lando_issue_links`), `reasons` an array of one for every new entry; the story is
+  the event's own `note`. Feed: "Vet visit  Check-up · 2 photos"
   with up to four 40px thumbnails and the note after it; the chip is Health. Analytics and the
   since-last pills ignore it.
 - **The Health note is required** (TEC-139), for a new entry and a correction alike: the phone
@@ -234,11 +235,8 @@
     exercise bar cards and `StackedBars` are gone.
 - The design is the prototype artifact `https://claude.ai/artifact/XdiVZzBqyzeQEVxwXyqAfv`, built
   with the theme's tokens; its sample data and made-up history are not in the app.
-- The gate file is `proxy.ts`, the base copy. Not yet in the hub's `TOOLS`
-  (`apps/home/lib/platform.ts`); that is a separate home change, and until it lands The Garage
-  does not probe `/api/health`.
-- Livery `mcl39` (McLaren '25: papaya on anthracite), worn by Lando alone. The theme files carry
-  it because this branch merged `claude/home-papaya-livery`.
+- The gate file is `proxy.ts`, the base copy.
+- Livery `mcl39` (McLaren '25: papaya on anthracite), worn by Lando alone.
 - The icon is Lando in a racing helmet, visor down (`app/icon.svg`, concept A, the owner's pick),
   wearing "the blob" (TEC-124, the owner's ask): a neon lime shell (`#D7FF1E`, shaded `#A9CC00`)
   with a few thick black contour loops and squiggles (`#0E0F11`, stroke 18) clipped to the shell,
@@ -251,7 +249,8 @@
   anthracite from `lib/theme.css`; the helmet no longer wears the livery's papaya. `favicon.ico`
   (16, 32, 48, RGBA PNG frames), `apple-touch-icon.png` (180, full-bleed, opaque) and
   `manifest-192/512.png` (rounded, RGBA) are rendered from it with headless Chromium (Playwright,
-  browsers at `/opt/pw-browsers`) and packed with Pillow; re-render all four when it changes. The
+  browsers at `/opt/pw-browsers`) and packed with Pillow; re-render all four when it changes, and
+  re-copy it to `apps/home/public/lando-icon.svg` (the hub's sidebar icon, a byte copy). The
   favicon's 16px frame alone is drawn from a variant: visor tint 0.22, no streak or reflection,
   and only the three largest blob shapes at stroke 30 with no smiley or cheek lines. At 16px the
   full pattern turns to green mush and at 0.35 the face greys out. The SVG's header comment
@@ -326,7 +325,7 @@
   today at noon, also when saved before noon. The feed puts a weight under its day's heading
   with no clock time and orders it at noon (`happenedAt`); the growth chart was already by day.
   Weights from before this keep their logged time in the database. Every other form keeps date
-  and time. (`rowTime` in `lib/localtime.ts` is no longer used by the screen.)
+  and time. (`rowTime` in `lib/localtime.ts` is used only by `tests/localtime.test.ts`.)
 - **Food catalogue** (`lib/foods.ts`), fixed in code; Misc last in each list, no "add another".
   The server builds the food snapshot (name, kcal-per, unit) from the catalogue by `item_id`;
   whatever the phone sends for those is ignored. **Calories are recorded and never shown.** Each
@@ -409,8 +408,9 @@
   function: an unknown kind has none, so it is refused.
 - **Widen `lando.details_ok` with `create or replace function`, and only ever widen.** The
   constraint `events_details_shape` just calls it, so a widening is a new migration holding the
-  function's whole current body (`lando_vet_weight`'s, the latest) with the one
-  list or shape grown: no DROP, no constraint swap, and it goes through the connector. Replacing
+  function's whole current body with the one list or shape grown: copy the whole body from the
+  newest migration file that defines `lando.details_ok`, sorting `supabase/migrations` by version.
+  No DROP, no constraint swap, and it goes through the connector. Replacing
   the function does **not** re-check existing rows, so a function that narrows would leave rows the
   database now calls invalid, and nothing would say so. Narrowing (removing a value, requiring a
   new key) needs a validated swap: a NOT VALID constraint calling a new function, the failing rows
@@ -418,21 +418,25 @@
   `set local lock_timeout = '5s';` so a busy table fails fast. The older swaps
   (`widen_lando_events_details_shape`, `widen_lando_potty_none`) were DROP and ADD in one ALTER run
   by the owner in the SQL Editor; that path is retired.
+- **Nothing in CI catches a widening that drops a key.** Each widening's test reads its own
+  migration file, and `tests/health.test.ts` holds the newest one only to what the next trap lists,
+  so a body copied from an older file (one without potty `spot`, say) passes. A superset test is
+  filed in TEC-164.
 - **The health lists are in two places:** `VET_REASONS` + `VET_RETIRED` and `ISSUE_PICKS` +
   `ISSUE_RETIRED` in `lib/events.ts` and `lando.details_ok`. The database holds the union.
-  `tests/health.test.ts` finds the latest migration defining the function (by version, now
-  `lando_vet_weight`; it only requires it to be at least `lando_health_picklist`'s), reads
-  the two reason arrays out of its body and fails if they differ from the code's unions, if it
-  drops an id the first migration held, or if that file holds anything but `set local
-  lock_timeout` and the function. The next widening is simply a newer file; the test follows it.
+  `tests/health.test.ts` reads the newest migration defining the function (by version; it must be
+  no older than `lando_health_picklist`) and fails if its two reason arrays differ from the code's
+  unions or drop an id `lando_health_events` held, if it lacks the health branch, the
+  `MAX_PHOTOS` bound, the `PHOTO_PATH` pattern or exercise's `photos` key, or if that file holds
+  anything but `set local lock_timeout` and the function. The next widening is simply a newer
+  file; the test follows it.
   A new offered pick is a new id in the code and the function (never a reused retired one with
   a new meaning, since old entries hold it).
 - **`issue` and potty `photos` are in two places:** `parseDetails` and `lando.details_ok`
   (migration `lando_issue_links`). `tests/links.test.ts` reads that file: the potty branch must allow
   `issue` and `photos`, the health branch an `issue` for `type = 'vet'` only, every other branch must
-  equal `lando_health_picklist`'s, and the file is only `lock_timeout` and the function. It no longer
-  asserts it is the *newest* file (TEC-151 added a newer widening); the newest file's own shape is
-  `tests/vetweight.test.ts`'s.
+  equal `lando_health_picklist`'s, and the file is only `lock_timeout` and the function. It does
+  not assert it is the newest file: each later widening's test holds its own file's shape.
 - **A weight's `visit` is in two places:** `parseDetails` and `lando.details_ok` (migration
   `lando_vet_weight`, whose test reads it: weight allows an optional `visit` uuid, every other branch
   equals `lando_issue_links`'s). The database does not check the target is a vet visit; `writeEvent` does.
@@ -441,11 +445,13 @@
   read's 30 days is never opened, so a linked weight is always in the read (every weight is).
 - **A link to an issue outside the read reads "re: earlier issue".** The read is the last 30 days
   plus every void, so a vet visit that links to an issue older than that cannot name it. A correction
-  of that old issue is read (it carries the old time and `voids`), but not the issue itself. Widening
-  the read to Health issues is the fix if the owner wants the name.
-- **Photos are not rewritten or deleted:** the event holds paths only, and an entry never changes,
-  so no code path removes an object. Anything that would (a cleanup of unreferenced photos) must
-  first check every event, voided ones included, since a voided entry still names its photos.
+  of that old issue is read (it carries the old time and `voids`), but not the issue itself. Whether
+  to show the name is open in Linear, TEC-148.
+- **Photos are never replaced or deleted** (RULES.md, Never 6): the event holds paths only, and an
+  entry never changes, so no code path removes an object. Anything that would (a cleanup of
+  unreferenced photos) must first check every event, voided ones included, since a voided entry
+  still names its photos. **But `uploadPhoto` upserts** (`lib/storage.ts`) so that a retry is the
+  same object: until TEC-164's fix, an upload under a stored photo's path (a reused id) replaces it.
 - **The photo upload is one request under Vercel's body limit** (about 4.5MB; the route and the
   bucket cap at 4MB). The canvas downscale is what keeps a phone shot under it. If a browser
   cannot decode the file (a HEIC on a browser that cannot read it), the photo fails with the
@@ -480,11 +486,8 @@
 - Turbopack refuses an ICO whose PNG frame is not RGBA; `app/favicon.ico` is RGBA.
 - The three lando migrations were edited in place on 2026-10-20 because none was applied anywhere.
   Once applied, never again: any change is a new migration.
-- **Merge order: `claude/home-papaya-livery` before `claude/lando-scaffold-v1`.** This branch
-  carries that one's theme files byte-identical, so once it is on `main` this branch's diff is
-  Lando's own. Merged the other way round, Lando would bring the livery with it and the livery
-  branch would be a no-op to close. `mcl39` must exist in `lib/theme.ts` or `lib/livery.ts` fails
-  the typecheck.
+- `mcl39` must exist in the theme (`packages/shared/lib/theme.ts`, stamped into `lib/theme.ts`) or
+  `lib/livery.ts` fails the typecheck.
 - The manifest sits behind the gate, so `layout.tsx` links it with
   `crossOrigin="use-credentials"`. Next's `app/manifest.ts` writes the link without it outside
   Vercel previews, and the browser would get the login redirect instead. Its icons are static

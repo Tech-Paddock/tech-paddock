@@ -21,8 +21,9 @@ on other files at the same time.
 
 Then:
 
-- **New work goes back to the TD first:** your understanding of the job, what you would do first,
-  and anything contradicting `CLAUDE.md`, the charter or the code. Stop there.
+- **Work outside your brief goes back to the TD first:** your understanding of the job, what you
+  would do first, and anything contradicting `CLAUDE.md`, the app's `RULES.md` or the code. Stop
+  there.
 - **Briefed work goes on one fresh branch,** `claude/<app>-<change>`, from `origin/main`. Commit as
   you go and push. **Never write to a pull request;** Deployment merges.
 - **Build without asking;** the brief is the owner's go. Only a design question stops you: put it
