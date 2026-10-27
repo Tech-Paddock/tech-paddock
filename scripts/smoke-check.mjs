@@ -61,8 +61,8 @@ const containsProject = (text, project) =>
  * Which app a GitHub `deployment_status` is about.
  *
  * Vercel names the environment `Production`, or `Production – <project>` when
- * one repository holds several projects, which this one does. That naming is
- * not confirmed from here, so this is defensive: the Vercel project name is
+ * one repository holds several projects, which this one does (seen on the
+ * first real run, 2026-10-26). It stays defensive all the same: the project name is
  * looked for in the environment first, then in the deployment's own URL
  * (`<project>-<hash>-<team>.vercel.app`) or the app's own host. The longest
  * project name wins, so `tp-coffee` could never swallow `tp-coffee-app`.

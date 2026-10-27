@@ -6,6 +6,10 @@ name: Pull request
 on:
   pull_request:
     types: [opened, reopened, edited, synchronize]
+  # The merge queue (TEC-156). request-line is a required check, so it must also
+  # report on each merge group, or a queued merge waits forever. The group's ref
+  # names the pull request it was built for, and the body is read from there.
+  merge_group:
 
 permissions:
   pull-requests: read
@@ -17,7 +21,20 @@ jobs:
       - uses: actions/github-script@v7
         with:
           script: |
-            const body = context.payload.pull_request.body || '';
+            let body = '';
+            if (context.eventName === 'merge_group') {
+              // gh-readonly-queue/<base>/pr-<number>-<head sha>
+              const ref = context.payload.merge_group?.head_ref || '';
+              const pr = ref.match(/\/pr-(\d+)-[0-9a-f]+$/);
+              if (!pr) {
+                core.setFailed(`Cannot tell which pull request the merge group ${ref || '(no ref)'} was built for.`);
+                return;
+              }
+              const { data } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(pr[1]) });
+              body = data.body || '';
+            } else {
+              body = context.payload.pull_request.body || '';
+            }
 
             // Only rendered text counts: skip HTML comments and code fences.
             const visible = [];

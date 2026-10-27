@@ -2,12 +2,21 @@ name: CI
 
 on:
   # Every branch, not just main: work is pushed before any pull request exists.
-  # Push only (TEC-158): checks attach to the commit, so the pull request shows
-  # the push run's result, and a second run on opening it was a whole CI wait
-  # for nothing. Deployment brings main in and pushes before it merges, so the
-  # head it merges always has its own push run.
+  # No pull_request trigger (TEC-158): checks attach to the commit, so the pull
+  # request shows the push run's result, and a second run on opening it was a
+  # whole CI wait for nothing. Deployment brings main in and pushes before it
+  # merges, so the head it merges always has its own push run.
+  #
+  # The merge queue's own branches are left out of `push`: they are tested by
+  # the merge_group run below, and a push run on the same ref would share its
+  # concurrency group and could cancel it.
   push:
-    branches: ['**']
+    branches: ['**', '!gh-readonly-queue/**']
+  # The merge queue (TEC-156). A queued pull request merges only when the
+  # required checks pass on its merge group, the commit GitHub builds from main
+  # plus everything queued ahead of it. Without this trigger nothing reports
+  # there, and every queued merge waits forever.
+  merge_group:
 
 # Nothing here writes to the repository, comments, or reads a secret, so the
 # token can read and do nothing else — whatever the organisation's default is.
@@ -197,25 +206,22 @@ jobs:
 
   # The mechanical half of the weekly rules-drift audit, run on every push.
   #
-  # Every one of these files grew monotonically for five days: the ledger from
-  # 76 lines to 588, of which 401 were an archive of finished work that every
-  # agent read at the start of every session. "Overwrite it" was already the
-  # written rule and it failed, because nothing bounded it. This is the bound —
-  # and it now also measures the facts CLAUDE.md asserts, rather than trusting
-  # the document that asserts them.
+  # It began as a bound on files that grew without one: the retired ledger went
+  # from 76 lines to 588 in five days, mostly an archive every agent read at the
+  # start of every session. "Overwrite it" was already the written rule and it
+  # failed, because nothing bounded it. Today it holds CLAUDE.md to its budget
+  # and measures the facts CLAUDE.md asserts, rather than trusting the document
+  # that asserts them.
   #
-  # The ceilings are deliberately generous. You cannot hit one writing a real
-  # handoff, only by letting a file become a log again. A check that fires on
-  # good work teaches agents to route around checks, which costs more than it
-  # catches.
+  # The ceiling is deliberately generous. A check that fires on good work
+  # teaches agents to route around checks, which costs more than it catches.
+  #
+  # No check reads history (drift lists files with `git ls-files` and builds its
+  # own throwaway repo to run the ignoreCommands), so a shallow checkout will do.
   drift:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          # The handoff-staleness check compares each file's stated date against
-          # the newest commit in that agent's area, so it needs real history.
-          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
