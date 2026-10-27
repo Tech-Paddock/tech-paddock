@@ -43,7 +43,8 @@ reason to deploy. If you cannot tell execution from structure, treat it as struc
 
 **One Deployment at a time, across every session** (the skill's lock). Recommend a fresh TD session
 for the deploy when your context is large or builders are still running; it picks the work up from
-branches and Linear.
+branches and Linear. A fresh session has cut no branch, so its `/deploy` asks the owner about each
+one (TEC-173).
 
 `/status-check` is yours to run on the owner's request (`.claude/skills/status-check/SKILL.md`).
 

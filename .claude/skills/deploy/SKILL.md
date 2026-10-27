@@ -24,6 +24,10 @@ and changes nothing else). Then `git fetch`, and every remote branch not on `mai
 (`git branch -r --no-merged origin/main`), whichever session cut it. For each: its Linear issue (from its commits), the session that cut it
 (the `Claude-Session` trailer, read with `get_session`), and `gate` on its head.
 
+A branch is **this session's** when its commits beyond `main` carry this session's
+`Claude-Session` trailer, as the TD's and its builders' do; a merge of `main` into it decides
+nothing. Every branch is still sorted; only this session's deploy without asking (TEC-173).
+
 ## 2. What is in flight
 
 Look before sorting; in-flight work holds only the branches it touches.
@@ -48,6 +52,10 @@ Look before sorting; in-flight work holds only the branches it touches.
 
 If you cannot tell whether a branch is finished, it is not ready; say what you would need.
 
+**Another session's ready branch waits for the owner** (TEC-173). Before step 4, ask once, listing
+each as a link with the session that cut it and its issue. Only the ones the owner picks join the
+brief; the rest are listed as held, "not this session's".
+
 ## 4. Start Deployment now
 
 **The owner's `/deploy` is the green light, and its approval click lands here, now,** while they
@@ -65,7 +73,8 @@ messaged across sessions, so its TD speaks for it):
    or to message you when its Deployment stops.
 2. **The holder folds them in** if they are ready and touch nothing its own branches touch: it
    `SendMessage`s them to its running Deployment, which merges them last. No new approval: the
-   owner's `/deploy` in your chat already covers them, and order changes are not the owner's.
+   owner's `/deploy` in your chat already covers them (each is that chat's own or one the owner
+   picked there), and order changes are not the owner's.
    Otherwise it replies with why. Either way it reports each of your branches back to you, and
    messages every session waiting on it when its Deployment stops.
 3. **Not folded in:** when the holder says it has stopped, or a `send_later` check-in at 20 minutes
