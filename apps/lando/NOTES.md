@@ -261,9 +261,9 @@
 ## How it works
 
 - **Five kinds plus `void`** (`lib/events.ts`; `health` is described under State). `details` per kind, every key required unless
-  marked `?`: potty `{what: pee|poop|both|none, where: outside|inside, leash?: leashed|unleashed|pen, spot?: crate|pen|loose, issue?: uuid, photos?[]}`
+  marked `?`: potty `{what: pee|poop|both|none, where: outside|inside, leash?: leashed|unleashed|pen, spot?: crate|pen|loose, minutes?: 1-120, issue?: uuid, photos?[]}`
   (inside = an accident: warned in the form, red in the feed, counted apart in Analytics;
-  `leash` only when outside, `spot` only when inside); food `{type, item_id, item_name, kcal_per, unit, amount}`; exercise
+  `leash` and `minutes` only when outside, `spot` only when inside); food `{type, item_id, item_name, kcal_per, unit, amount}`; exercise
   `{type: walk|playtime|training, where, with_dogs, minutes, treats, commands?, dogs?, photos?}` (commands
   on training only, from the fixed list `COMMANDS`; `dogs` is 1 to 20 `lando.dogs` ids, only when
   `with_dogs` is true); weight `{value, unit, visit?: uuid}` (TEC-151: only a vet visit's Weight sets `visit`). `parseDetails` checks these on the phone (before
@@ -286,9 +286,17 @@
   switching Where to Outside drops it from the save, as Inside drops Leash. Optional `spot` in
   details, inside only (`parseDetails` and `details_ok`, migration `lando_potty_inside_spot`). The
   feed reads **Pee** with "accident, inside · crate". Inside is still an accident; Analytics is unchanged.
+- **Potty's Time outside** (TEC-176, owner: "Build duration into potty", "5 min increment") shows only while
+  Where is Outside, below Leash: chips 5 to 30 in fives (`OUT_MINUTES_CHIPS`) and a number box in 5-minute
+  steps up to 120 (`OUT_MINUTES_STEP`, `OUT_MINUTES_MAX`). Time from going out to coming back in. Optional: nothing
+  is picked on a new entry, it is never remembered per phone, and a correction opens with the entry's own
+  or nothing. Tapping the picked chip again clears it. Switching Where to Inside drops it from the save. No
+  potty keeps it. Stored as optional `minutes` in potty details, outside only (`parseDetails` for any whole 1
+  to 120, and `details_ok`, migration `lando_potty_minutes`; the 5-minute step is the form's, so changing it
+  needs no migration). It shows on the feed row only; Analytics is unchanged.
 - **A potty row's title is the what** (TEC-174; `describe()`): **Pee**, **Poop**, **Both** or **No potty**
   (`POTTY_WHAT_LABELS`), never "Potty" or "Accident". The detail never repeats it: "outside · leashed",
-  "outside" (no leash picked), "inside · crate", then the issue link and photo count. An accident (`isAccident`)
+  "outside" (no leash picked), "outside · leashed · 5 min" (Time outside, after the leash), "inside · crate", then the issue link and photo count. An accident (`isAccident`)
   keeps the red row and leads its detail with "accident, " ("accident, inside · crate"). The filter pill, Log
   button and form keep the word Potty. Analytics' day timeline has its own labels (`MARK_LABELS`) and is unchanged.
 - **Photos sit below the Note** (TEC-172) on Potty, Fun and Training: `LogForm` renders one
@@ -410,8 +418,8 @@
   constraint `events_details_shape` just calls it, so a widening is a new migration holding the
   function's whole current body with the one list or shape grown: copy the whole body from the
   newest migration file that defines `lando.details_ok`, sorting `supabase/migrations` by version
-  (today `lando_details_ok_search_path`, which is `lando_potty_inside_spot`'s body plus
-  `set search_path = ''`; keep that line in every copy). No DROP, no constraint swap, and it goes through the connector. Replacing
+  (today `lando_potty_minutes`, which is `lando_details_ok_search_path`'s body plus potty's optional
+  `minutes`; that one is `lando_potty_inside_spot`'s plus `set search_path = ''`; keep that line in every copy). No DROP, no constraint swap, and it goes through the connector. Replacing
   the function does **not** re-check existing rows, so a function that narrows would leave rows the
   database now calls invalid, and nothing would say so. Narrowing (removing a value, requiring a
   new key) needs a validated swap: a NOT VALID constraint calling a new function, the failing rows

@@ -19,6 +19,9 @@ import {
   dogsPickFor,
   LEASH,
   LEASH_LABELS,
+  OUT_MINUTES_CHIPS,
+  OUT_MINUTES_MAX,
+  OUT_MINUTES_STEP,
   SPOT,
   SPOT_LABELS,
   POTTY_WHAT,
@@ -239,6 +242,9 @@ export default function LogForm({
   // Inside only, nothing picked by default: a new or old inside entry never
   // gets a spot unless one is tapped.
   const [spot, setSpot] = useState<Spot | "">(p?.spot ?? "");
+  // Time outside (TEC-176): optional, outside only, never remembered. Nothing on a new entry, and a
+  // correction opens with the entry's own or nothing. Text, so the number box can be empty or half typed.
+  const [outMin, setOutMin] = useState(p?.minutes ? String(p.minutes) : "");
 
   // Food
   const f = event?.kind === "food" ? asFood(event) : null;
@@ -383,6 +389,7 @@ export default function LogForm({
           where,
           ...(where === "outside" && leash ? { leash } : {}),
           ...(where === "inside" && spot ? { spot } : {}),
+          ...(where === "outside" && outMin.trim() ? { minutes: Number(outMin) } : {}),
           ...(hasIssue && issue ? { issue } : {}),
           ...(photos.paths.length ? { photos: photos.paths } : {}),
         };
@@ -548,6 +555,36 @@ export default function LogForm({
                 onChange={setLeash}
                 options={LEASH.map((l) => [l, LEASH_LABELS[l]] as const)}
               />
+            </Field>
+          )}
+          {where === "outside" && (
+            <Field label="Time outside" htmlFor="f-outmin">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {OUT_MINUTES_CHIPS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    aria-pressed={outMin === String(m)}
+                    onClick={() => setOutMin(outMin === String(m) ? "" : String(m))}
+                    className="block cursor-pointer whitespace-nowrap rounded-full border border-line bg-surface px-3.5 py-2 aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-ink focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-pinstripe"
+                  >
+                    {m}
+                  </button>
+                ))}
+                <input
+                  id="f-outmin"
+                  type="number"
+                  inputMode="numeric"
+                  min={OUT_MINUTES_STEP}
+                  max={OUT_MINUTES_MAX}
+                  step={OUT_MINUTES_STEP}
+                  value={outMin}
+                  onChange={(e) => setOutMin(e.target.value)}
+                  placeholder="min"
+                  aria-label="Minutes outside"
+                  className={`${input} !w-20`}
+                />
+              </div>
             </Field>
           )}
           {where === "inside" && (
