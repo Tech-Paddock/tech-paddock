@@ -698,13 +698,14 @@ const HELD =
 /* Every write to a pull request is Deployment's, and refused to everyone else
    (above). For Deployment nothing is held but what no gate covers: a squash
    merge, a body edit that keeps the request line, and bringing a branch up to
-   date go through. Auto-merge still asks, because it
-   merges on a timer with nobody reading the result; so does a review, which
-   can approve, a human's act; and so do the API commit tools below, which
+   date go through. So does turning on auto-merge with SQUASH: with the merge
+   queue on for `main` it is how a pull request joins the queue, and the queue's
+   own CI run is what reads the result (TEC-156). Any other method is refused.
+   A review still asks, because it can approve, a human's act; and so do the
+   API commit tools below, which
    write past the local push guard whoever calls them. request-line in CI
    still reads the body for the record of who asked. */
 const PR_ASK = {
-  enable_pr_auto_merge: "Turning on auto-merge, which merges with no click once checks pass,",
   pull_request_review_write: "Writing a pull request review, which can approve it,",
 };
 const API_COMMITS = new Set(["push_files", "create_or_update_file", "delete_file"]);
@@ -744,6 +745,9 @@ function github(name, a, deploy = false) {
   }
   if (name === "merge_pull_request" && a.merge_method !== "squash") {
     return deny('Merges here are squash merges (CLAUDE.md). Pass `merge_method: "squash"`.');
+  }
+  if (name === "enable_pr_auto_merge" && String(a.mergeMethod ?? "").toUpperCase() !== "SQUASH") {
+    return deny('Merges here are squash merges (CLAUDE.md). Pass `mergeMethod: "SQUASH"`; without it GitHub uses the repository default.');
   }
   if (name in PR_ASK) return ask(`${PR_ASK[name]} ${HELD}`);
   return null;

@@ -42,5 +42,6 @@ state, then anything left over. It ends with a
 
 Follow `.claude/skills/merge/SKILL.md`. Check the open list live before each merge. Without the
 merge queue, merge one at a time: bring `main` into the next branch and wait for green before
-merging it. With the queue on for `main`, queue each branch in merge order instead; the queue tests
+merging it. With the queue on for `main`, queue each branch in merge order instead (`enable_pr_auto_merge`,
+squash); the queue tests
 each one on top of the one before.
