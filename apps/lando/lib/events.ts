@@ -894,13 +894,11 @@ export function describe(
   switch (e.kind) {
     case "potty": {
       const p = potty(e);
-      const what = p.what === "both" ? "pee + poop" : p.what === "none" ? "no potty" : p.what;
+      // The title says what happened (the form's own words); the detail says where, never the what again.
       const base =
         p.where === "inside"
-          ? p.spot
-            ? `${what}, inside · ${SPOT_LABELS[p.spot].toLowerCase()}`
-            : `${what}, inside`
-          : p.leash ? `${what} · ${LEASH_LABELS[p.leash].toLowerCase()}` : what;
+          ? `${isAccident(e) ? "accident, " : ""}inside${p.spot ? ` · ${SPOT_LABELS[p.spot].toLowerCase()}` : ""}`
+          : p.leash ? `outside · ${LEASH_LABELS[p.leash].toLowerCase()}` : "outside";
       const n = p.photos?.length ?? 0;
       const detail = [
         base,
@@ -909,7 +907,7 @@ export function describe(
       ]
         .filter(Boolean)
         .join(" · ");
-      return { title: isAccident(e) ? "Accident" : "Potty", detail };
+      return { title: POTTY_WHAT_LABELS[p.what], detail };
     }
     case "food": {
       const f = food(e);

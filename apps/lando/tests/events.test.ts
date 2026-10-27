@@ -207,8 +207,8 @@ describe("describe — a timeline row", () => {
   it("says an inside potty is an accident", () => {
     const acc = { kind: "potty" as const, details: { what: "both", where: "inside" } };
     expect(isAccident(acc)).toBe(true);
-    expect(describeEvent(acc)).toEqual({ title: "Accident", detail: "pee + poop, inside" });
-    expect(describeEvent({ kind: "potty", details: { what: "pee", where: "outside" } })).toEqual({ title: "Potty", detail: "pee" });
+    expect(describeEvent(acc)).toEqual({ title: "Both", detail: "accident, inside" });
+    expect(describeEvent({ kind: "potty", details: { what: "pee", where: "outside" } })).toEqual({ title: "Pee", detail: "outside" });
   });
 
   it("names the food and its amount in its own unit, never calories", () => {
@@ -236,18 +236,18 @@ describe("describe — a timeline row", () => {
   });
 
   it("shows an outside potty's leash pick; an old entry without one reads as before", () => {
-    expect(describeEvent({ kind: "potty", details: { what: "pee", where: "outside", leash: "unleashed" } }).detail).toBe("pee · unleashed");
-    expect(describeEvent({ kind: "potty", details: { what: "both", where: "outside", leash: "pen" } }).detail).toBe("pee + poop · in pen");
-    expect(describeEvent({ kind: "potty", details: { what: "poop", where: "outside" } }).detail).toBe("poop");
+    expect(describeEvent({ kind: "potty", details: { what: "pee", where: "outside", leash: "unleashed" } }).detail).toBe("outside · unleashed");
+    expect(describeEvent({ kind: "potty", details: { what: "both", where: "outside", leash: "pen" } }).detail).toBe("outside · in pen");
+    expect(describeEvent({ kind: "potty", details: { what: "poop", where: "outside" } }).detail).toBe("outside");
   });
 
   it("reads a No potty as a trip out, never as an accident", () => {
     expect(describeEvent({ kind: "potty", details: { what: "none", where: "outside", leash: "pen" } })).toEqual({
-      title: "Potty",
-      detail: "no potty · in pen",
+      title: "No potty",
+      detail: "outside · in pen",
     });
     const inside = { kind: "potty" as const, details: { what: "none", where: "inside" } };
-    expect(describeEvent(inside)).toEqual({ title: "Potty", detail: "no potty, inside" });
+    expect(describeEvent(inside)).toEqual({ title: "No potty", detail: "inside" });
     expect(isAccident(inside)).toBe(false);
   });
 

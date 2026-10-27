@@ -277,7 +277,7 @@
   nothing done. It keeps Where and, outside, Leash, like any potty. It resets neither the pee nor
   the poop clock, is never an accident (`isAccident`; inside hides the accident warning and the
   row is not red), and counts as nothing in Analytics' per-day rows. The feed reads
-  "no potty · leashed" or "no potty, inside".
+  **No potty** with "outside · leashed" or "inside".
 - **Potty's Leash pick** (Leashed / Unleashed / In pen) shows only while Where is Outside, and
   defaults to Leashed on a new entry. It is not remembered per phone. Correcting an old outside
   entry that has none opens with nothing picked, so a correction never invents one. The feed
@@ -286,14 +286,19 @@
   Leash. Nothing is picked by default (a new or old inside entry never gets one unless tapped);
   switching Where to Outside drops it from the save, as Inside drops Leash. Optional `spot` in
   details, inside only (`parseDetails` and `details_ok`, migration `lando_potty_inside_spot`). The
-  feed reads "pee, inside · crate". Inside is still an accident; Analytics is unchanged.
+  feed reads **Pee** with "accident, inside · crate". Inside is still an accident; Analytics is unchanged.
+- **A potty row's title is the what** (TEC-174; `describe()`): **Pee**, **Poop**, **Both** or **No potty**
+  (`POTTY_WHAT_LABELS`), never "Potty" or "Accident". The detail never repeats it: "outside · leashed",
+  "outside" (no leash picked), "inside · crate", then the issue link and photo count. An accident (`isAccident`)
+  keeps the red row and leads its detail with "accident, " ("accident, inside · crate"). The filter pill, Log
+  button and form keep the word Potty. Analytics' day timeline has its own labels (`MARK_LABELS`) and is unchanged.
 - **Photos sit below the Note** (TEC-172) on Potty, Fun and Training: `LogForm` renders one
   `PhotoPicker` after the shared Note field (When and Human, then Note, then Photos), not inside each
   kind's block. Health keeps its own Note and then its Photos, as before.
 - **Potty's photos and Related issue** (TEC-142): below Leash and Spot, the Medical issue checkbox and its select; the
   same Photos block as Health, Fun and Training (Take photo, Choose photos, Save waits for each,
-  `missingPhotos` backs it) comes after the Note; stored as optional `photos` on the potty details. Feed: "poop,
-  inside · re: Stomach & appetite, Oct 24 · 1 photo" with the thumbnails. The note stays optional.
+  `missingPhotos` backs it) comes after the Note; stored as optional `photos` on the potty details. Feed: "Poop"
+  "accident, inside · re: Stomach & appetite, Oct 24 · 1 photo" with the thumbnails. The note stays optional.
 - **Exercise's Other dogs** is one pick (TEC-129, replacing TEC-125's multi-select): a plain
   full-width `<select>`: None, every row in `lando.dogs` by name, Multiple, "Add dog…". There is
   no Yes/No. `dogsFromPick` (`lib/events.ts`) maps the pick: a dog saves `with_dogs: true,

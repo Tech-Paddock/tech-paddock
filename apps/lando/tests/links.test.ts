@@ -125,12 +125,12 @@ describe("the feed's words for a link", () => {
   it("is on a potty row too, ahead of its photo count", () => {
     const a = issue(local(24, 9));
     const p = ev({ kind: "potty", at: local(25, 8), details: { what: "poop", where: "inside", issue: a.id, photos: [P1] } });
-    expect(describeEvent(p, [], [a]).detail).toBe("poop, inside · re: Stomach & appetite, Oct 24 · 1 photo");
+    expect(describeEvent(p, [], [a]).detail).toBe("accident, inside · re: Stomach & appetite, Oct 24 · 1 photo");
   });
 
   it("adds nothing without a link", () => {
     expect(describeEvent(vet(local(25, 9))).detail).toBe("Check-up");
-    expect(describeEvent(ev({ kind: "potty", at: local(25, 8), details: { what: "pee", where: "outside" } })).detail).toBe("pee");
+    expect(describeEvent(ev({ kind: "potty", at: local(25, 8), details: { what: "pee", where: "outside" } })).detail).toBe("outside");
   });
 });
 

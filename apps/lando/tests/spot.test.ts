@@ -23,10 +23,10 @@ describe("potty spot", () => {
   });
   it("reads in the feed, and still counts as an accident", () => {
     const e = { kind: "potty" as const, details: { ...inside, spot: "crate" } };
-    expect(describeEvent(e)).toEqual({ title: "Accident", detail: "pee, inside · crate" });
+    expect(describeEvent(e)).toEqual({ title: "Pee", detail: "accident, inside · crate" });
     expect(isAccident(e)).toBe(true);
-    expect(describeEvent({ kind: "potty", details: { what: "both", where: "inside", spot: "loose" } }).detail).toBe("pee + poop, inside · loose");
-    expect(describeEvent({ kind: "potty", details: inside }).detail).toBe("pee, inside");
+    expect(describeEvent({ kind: "potty", details: { what: "both", where: "inside", spot: "loose" } }).detail).toBe("accident, inside · loose");
+    expect(describeEvent({ kind: "potty", details: inside }).detail).toBe("accident, inside");
   });
 });
 
