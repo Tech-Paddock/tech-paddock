@@ -96,7 +96,7 @@ type Props = {
   remembered: Remembered;
   weightUnit: Unit;
   /**
-   * A new entry: handed off at once, never awaited (charter, Never 5). `then`
+   * A new entry: handed off at once, never awaited (RULES.md, Never 5). `then`
    * are the training's treats, saved once the entry itself is.
    */
   onLog: (body: LogBody, then?: LogBody[]) => void;

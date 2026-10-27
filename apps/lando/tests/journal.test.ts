@@ -124,7 +124,7 @@ describe("writeEvent", () => {
 });
 
 describe("writeEvent — friends' dogs", () => {
-  // Invented: no real dog's name is in the repo (charter, Never 2).
+  // Invented: no real dog's name is in the repo (RULES.md, Never 2).
   const DOG_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   const DOG_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
   const WALK = { type: "walk", where: "outside", with_dogs: true, minutes: 15, treats: 0 };
@@ -191,7 +191,7 @@ describe("addPerson", () => {
 });
 
 describe("addDog", () => {
-  // Invented names (charter, Never 2).
+  // Invented names (RULES.md, Never 2).
   it("adds a dog by its tidied name and returns the row", async () => {
     const { db, tables, inserts } = fakeDb();
     const d = await addDog(db, "  Test   Pup ");

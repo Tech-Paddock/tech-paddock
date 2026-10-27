@@ -214,6 +214,11 @@ export function dayMarks(events: JournalEvent[], now: Date, days = ANALYTICS_DAY
   return out;
 }
 
+/** What the Day by day card draws: `TIMELINE_DAYS` days of marks and of counts, the same days, oldest first. */
+export function dayTimeline(events: JournalEvent[], now: Date): { marks: DayMarks[]; rows: DayRow[] } {
+  return { marks: dayMarks(events, now, TIMELINE_DAYS), rows: perDay(events, now, TIMELINE_DAYS) };
+}
+
 /**
  * Stack level (0, 1, 2) per mark so two marks in one lane closer than `gap`
  * hours do not sit on each other: each takes the lowest level whose last mark
@@ -221,11 +226,6 @@ export function dayMarks(events: JournalEvent[], now: Date, days = ANALYTICS_DAY
  * last is reused (a fourth mark within the gap overlaps; the row's tap text
  * lists every time).
  */
-/** What the Day by day card draws: `TIMELINE_DAYS` days of marks and of counts, the same days, oldest first. */
-export function dayTimeline(events: JournalEvent[], now: Date): { marks: DayMarks[]; rows: DayRow[] } {
-  return { marks: dayMarks(events, now, TIMELINE_DAYS), rows: perDay(events, now, TIMELINE_DAYS) };
-}
-
 export function stackLevels(hours: number[], gap: number, levels = 3): number[] {
   const lastAt: number[] = Array(levels).fill(-Infinity);
   return hours.map((h) => {

@@ -10,7 +10,7 @@ import { downscale } from "@/lib/image";
  * storage paths. A photo is one of three things on screen: uploading, failed
  * (with its Retry and ✕, still visible), or done. The form's Save waits for
  * every photo to be done, so an entry is never saved without a photo the
- * person picked (charter, Never 5). A local pattern (no other app has one).
+ * person picked (RULES.md, Never 5). A local pattern (no other app has one).
  */
 
 export type Shot = {

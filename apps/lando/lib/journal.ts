@@ -17,7 +17,7 @@ import { missingPhotos } from "./storage";
 
 /**
  * The database half. Every failure throws: a failed read must never render as
- * an empty day, and a failed write must never look logged (charter, Never 5).
+ * an empty day, and a failed write must never look logged (RULES.md, Never 5).
  */
 
 export class Conflict extends Error {}
@@ -81,7 +81,7 @@ export async function writeEvent(db: SupabaseClient, body: unknown, now = new Da
   }
 
   // A photo is stored as a path, so nothing but the bucket knows it is there:
-  // an entry is never saved naming one that did not upload (charter, Never 5).
+  // an entry is never saved naming one that did not upload (RULES.md, Never 5).
   const photos = eventPhotos(next);
   if (photos.length && (await missingPhotos(db, photos)).length) {
     throw new InvalidEvent("a photo didn't finish uploading — retry it, or remove it");
@@ -149,7 +149,7 @@ export async function listPeople(db: SupabaseClient): Promise<Person[]> {
 
 /**
  * Friends' dogs, by name. Added in the app (`addDog`, Other dogs' "Add dog…")
- * or by SQL; never in the repo (charter, Never 2). An empty table is an empty
+ * or by SQL; never in the repo (RULES.md, Never 2). An empty table is an empty
  * list; a failed read throws.
  */
 export async function listDogs(db: SupabaseClient): Promise<Dog[]> {

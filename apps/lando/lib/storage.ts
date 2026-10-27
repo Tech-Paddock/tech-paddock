@@ -42,15 +42,40 @@ export function photoPath(id: unknown, type: unknown, size: number): string {
   return `health/${id.toLowerCase()}.${PHOTO_TYPES[type as PhotoType]}`;
 }
 
-/** Store a photo. `upsert` so a retry after a lost response is the same photo, not an error. */
+/** A different photo under a stored photo's path: a stored photo never changes (RULES.md, Never 6). */
+export class PhotoConflict extends Error {
+  constructor(path: string) {
+    super(`a different photo is already stored at ${path}`);
+    this.name = "PhotoConflict";
+  }
+}
+
+const sameBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/**
+ * Store a photo, never over another. The upload is `upsert: false`, so the
+ * bucket itself refuses a path that holds an object. When it does, the stored
+ * bytes are read back: the same bytes are a retry of this photo (the phone
+ * re-sends one object after a dropped connection) and a success; different
+ * bytes are a `PhotoConflict`. Nothing here deletes or overwrites.
+ */
 export async function uploadPhoto(
   db: SupabaseClient,
   path: string,
   bytes: ArrayBuffer | Buffer,
   type: PhotoType
 ): Promise<void> {
-  const { error } = await db.storage.from(BUCKET).upload(path, bytes, { contentType: type, upsert: true });
-  if (error) throw new StorageError(`couldn't store the photo: ${error.message}`);
+  const bucket = db.storage.from(BUCKET);
+  const { error } = await bucket.upload(path, bytes, { contentType: type, upsert: false });
+  if (!error) return;
+  const e = error as { statusCode?: string | number; message?: string };
+  if (String(e.statusCode) !== "409" && !/already exists|duplicate/i.test(e.message ?? "")) {
+    throw new StorageError(`couldn't store the photo: ${e.message}`);
+  }
+  const { data, error: readError } = await bucket.download(path);
+  if (readError || !data) throw new StorageError(`couldn't check the stored photo: ${readError?.message}`);
+  const stored = new Uint8Array(await data.arrayBuffer());
+  if (!sameBytes(stored, new Uint8Array(bytes))) throw new PhotoConflict(path);
 }
 
 /** Signed URLs for many paths in one request. A path that could not be signed is absent from the map. */
@@ -70,7 +95,7 @@ export async function signedPhotoUrls(
 
 /**
  * The paths with no object behind them. An entry is never saved naming a photo
- * that is not there (charter, Never 5): a failed or skipped upload is refused
+ * that is not there (RULES.md, Never 5): a failed or skipped upload is refused
  * here even if the phone sent the path. A signing failure counts as missing.
  */
 export async function missingPhotos(db: SupabaseClient, paths: string[]): Promise<string[]> {

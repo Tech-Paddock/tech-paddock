@@ -1,7 +1,7 @@
 /**
  * The journal's rules, with no I/O so every one is tested.
  *
- * History is append-only (charter, Never 1). A row is never changed: a
+ * History is append-only (RULES.md, Never 1). A row is never changed: a
  * correction is a new event of the same kind whose `voids` names the one it
  * replaces, and a delete is a `void` event naming it. An event is **live** when
  * nothing voids it. Every screen reads live events only.
@@ -10,7 +10,8 @@
  * exercise, weight, health. The shapes of `details` below are also enforced by
  * the database (migrations `lando_people_and_events`, then
  * `widen_lando_events_details_shape`, then `widen_lando_potty_none`, then
- * `lando_health_events`, `lando_health_picklist`, `lando_issue_links`, `lando_vet_weight`); change both together.
+ * `lando_health_events`, `lando_health_picklist`, `lando_issue_links`, `lando_vet_weight`,
+ * `lando_potty_inside_spot`, `lando_details_ok_search_path`); change both together.
  */
 
 import { FOOD_TYPES, findFood, formatAmount, unitLabel, type FoodType } from "./foods";
