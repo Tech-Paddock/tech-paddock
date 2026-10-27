@@ -378,6 +378,13 @@
 
 ## Traps
 
+- **"JWT issued at future" is Supabase's, intermittent, and retried.** "Couldn't load the journal.
+  (couldn't read the journal: JWT issued at future)" is a 401 from Supabase's own clock drift:
+  its gateway mints a token per request and a backend a little behind rejects it. It hits one of
+  the three concurrent reads, mostly on the first open after idle, and the next request succeeds.
+  `retryingFetch` in `lib/supabase.ts` sends such a request once more after 300ms and returns
+  the second answer as it is; any other 401 or status passes through, so a real key failure still
+  shows. Do not widen it to other 401s, and do not swap it out of `getServiceClient`.
 - **A training's treats are found by its exact `at`** (`treatsWith`). Anything that rounds a
   correction's time (the `datetime-local` input holds minutes only) unlinks them: an untouched
   When must keep sending `event.at` as it is. Compare with `Date.parse`, never as strings: the
