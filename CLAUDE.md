@@ -17,15 +17,17 @@ deployed on its own. Simplicity beats multi-team defaults. This file binds every
 |---|---|
 | **Owner** | Directs. Approves what has no undo. |
 | **Technical director (TD)** | Architects: Linear queue, design, app surface, Postgres design, cross-schema contracts, shared auth plumbing, `apps/showcase`. Briefs the builder and Deployment. Never merges. |
-| **Builder** | Up to three helpers per issue, started only by the owner's `/build TEC-n`; the TD splits the work so each has its own files and branch. Builds, commits, pushes, reports, stops. |
+| **Builder** | Helpers started only on the owner's `/build`, each on its own branch; how the work splits is the TD's call. Builds, commits, pushes, reports, stops. |
 | **Deployment** | One helper, started by the TD when the owner runs `/deploy`. Checks for unfinished work; if clean, merges each ready branch through the `merge` skill and confirms it is live. |
 
 Only Deployment writes to a pull request. The TD does not build app features, except
 `apps/showcase` and touch-ups (a wrong doc, a missing config line).
 
-**Owner commands:** `/kickoff [brief]` starts a TD session; `/build TEC-n` starts the builder on an
-issue; `/status-check` reports branches,
-unfinished work, blockers and hot topics; `/deploy` deploys what is ready, or holds and reports.
+**Owner commands:** `/kickoff [brief]` starts a TD session; `/build` builds every issue this chat
+has readied, `/build TEC-n` that one, to a plan the TD shows first; `/status-check [app | session]`
+reports branches, unfinished work, blockers and hot topics; `/deploy` deploys what is ready, or
+holds and reports; `/closeout` says whether a chat is safe to archive; `/skill-check` lists every
+skill.
 
 **Propose before branching:** the job, what comes first, what it contradicts. No branch until the
 owner says go. "Backlog" means a Linear issue in Backlog, not a build.
@@ -91,11 +93,11 @@ go, go fully and do not reopen it.
 ## Linear, team TEC
 
 - **One issue per request,** labelled `owner:Owner` or `owner:TD`, plus `app:<app>` where one
-  applies. The body ends with numbered **Next steps**, each naming who acts. The guard refuses an
-  issue without them.
-- **Status:** Backlog (parked or blocked) · Todo (ready) · In Progress (work committed) · In Review
-  (pushed, awaiting merge) · Done (every Next step done; reopen a merge-closed issue if steps
-  remain).
+  applies. The body ends with numbered **Next steps**, each naming who acts: Owner, TD, Builder or
+  Deployment. The guard refuses an issue without them.
+- **Status:** Backlog (blocked, or parked with the `Parked` label) · Todo (ready) · In Progress
+  (work committed) · In Review (pushed, awaiting merge) · Done (every Next step done; reopen a
+  merge-closed issue if steps remain).
 - **Assign an issue only while a step waits on the owner,** and mark that step ⭐.
 - **Live closes an issue.** A phone check is a step only when the owner asks for one or the change
   cannot be tested signed out. It never holds the issue open: Deployment closes it with the
@@ -125,14 +127,17 @@ go, go fully and do not reopen it.
   `frame-ancestors 'self' https://techpaddock.io https://*.techpaddock.io`.
 - **Every deployed app is password-gated,** with a per-IP rate limit on `POST /api/login` in each
   project's Vercel Firewall. `apps/showcase` is the exception: public, static, holding nothing.
-  `drift` enforces that.
+  `drift` enforces that. The one path a scheduler may call signed out is `/api/cron/prices`, for
+  Vercel Cron, opened only by `CRON_SECRET` (TEC-132).
 - **Shared auth plumbing:** the stamped `lib/auth.ts`, `lib/password.ts`, `lib/login.ts`,
-  `lib/safe-redirect.ts`, `lib/logout.ts`; the gate file; `SESSION_SECRET`. The gate file is
-  `proxy.ts` on Next 16 (`middleware.ts` before it; Next 14 ignores `proxy.ts`), one copy in every
-  app. A bad edit publishes an endpoint; `drift` checks every app runs the same one.
+  `lib/safe-redirect.ts`, `lib/logout.ts`; the gate file; `SESSION_SECRET`; `CRON_SECRET`, which the
+  gate reads. The gate file is `proxy.ts` on Next 16 (`middleware.ts` before it; Next 14 ignores
+  `proxy.ts`), one copy in every app. A bad edit publishes an endpoint; `drift` checks every app
+  runs the same one.
 - **Append, don't rewrite,** anything that accumulates. Model synthesis is a separate step.
 - **Chrome is the target browser.** On iOS every browser is WebKit.
-- **The Garage** (`/admin` on home): probes are live; the drift panel is from home's last build.
+- **The Garage** (home's Garage tab; `/admin` redirects there): probes are live; the drift panel is
+  from home's last build.
 
 **Stack:** Next.js on Vercel · Supabase Postgres · Anthropic API (server-side) · Cloudflare
 Registrar.
@@ -153,9 +158,10 @@ are the owner's.
 
 1. **`main` is protected:** `gate`, `drift` and `request-line` required, branches up to date.
 2. **The guard** (`.claude/hooks/guard.mjs`, fails closed) refuses a push to `main`, a non-squash
-   merge, migration-history rewrites, and pull-request writes from anyone but Deployment; holds
-   starting Deployment or a builder, and Vercel and Supabase writes, for the owner; refuses a Linear issue
-   without labels or Next steps.
+   merge, migration-history rewrites, pull-request writes from anyone but Deployment, and app-code
+   edits from any helper but a builder; holds starting Deployment or a builder, the TD's own
+   app-code edits, Vercel writes, and Supabase writes other than `apply_migration`, for the owner;
+   refuses a Linear issue without labels or Next steps.
    `guard.test.mjs` proves each in CI.
 3. **CI `gate`:** every app typechecks, tests and builds, and `drift` passes
    (`node scripts/drift-check.mjs`): stamped copies, gate file per Next major, empty showcase, CI
