@@ -78,6 +78,75 @@ body {
   --status: var(--lando-status-red);
 }
 
+/* Feed colours (app/Journal.tsx, TEC-177), a local pattern beside the status
+   colours: one hue per filter form, with its own light and dark value. A feed
+   row keeps its ink text on a 16% tint of its form's colour and wears the colour
+   as a 4px left edge; the filter pills carry a dot of it, so they are the
+   legend. An accident row (data-kind="accident") uses the theme's --danger
+   instead, over Potty's colour. None is the pills' green or yellow. Checked
+   against the mcl39 tokens: each edge at least 4.4:1 on the paper and the
+   surface in light, 7.3:1 in dark; the ink on a tint at least 14.4:1 in light,
+   11.8:1 in dark. Colour is never the only cue: every title names its form. */
+:root {
+  --lando-kind-potty: rgb(30 100 200);
+  --lando-kind-food: rgb(190 80 0);
+  --lando-kind-fun: rgb(0 115 108);
+  --lando-kind-training: rgb(124 58 190);
+  --lando-kind-weight: rgb(84 100 120);
+  --lando-kind-health: rgb(190 36 110);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-mode="light"]) {
+    --lando-kind-potty: rgb(110 170 255);
+    --lando-kind-food: rgb(255 150 60);
+    --lando-kind-fun: rgb(64 200 190);
+    --lando-kind-training: rgb(190 150 255);
+    --lando-kind-weight: rgb(160 175 195);
+    --lando-kind-health: rgb(255 120 180);
+  }
+}
+:root[data-mode="dark"] {
+  --lando-kind-potty: rgb(110 170 255);
+  --lando-kind-food: rgb(255 150 60);
+  --lando-kind-fun: rgb(64 200 190);
+  --lando-kind-training: rgb(190 150 255);
+  --lando-kind-weight: rgb(160 175 195);
+  --lando-kind-health: rgb(255 120 180);
+}
+[data-kind="potty"] {
+  --kind: var(--lando-kind-potty);
+}
+[data-kind="food"] {
+  --kind: var(--lando-kind-food);
+}
+[data-kind="fun"] {
+  --kind: var(--lando-kind-fun);
+}
+[data-kind="training"] {
+  --kind: var(--lando-kind-training);
+}
+[data-kind="weight"] {
+  --kind: var(--lando-kind-weight);
+}
+[data-kind="health"] {
+  --kind: var(--lando-kind-health);
+}
+[data-kind="accident"] {
+  --kind: var(--lando-status-red);
+}
+.lando-row[data-kind] {
+  border-left: 4px solid var(--kind);
+  background-color: color-mix(in srgb, var(--kind) 16%, var(--surface));
+}
+.lando-kind-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background-color: var(--kind);
+  box-shadow: 0 0 0 1px var(--paper);
+}
+
 /* The bottom sheet rises rather than appears, unless motion is reduced. */
 @media (prefers-reduced-motion: no-preference) {
   .lando-sheet {

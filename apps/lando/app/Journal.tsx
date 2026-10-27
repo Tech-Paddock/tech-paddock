@@ -13,6 +13,9 @@ import {
   describe,
   displayUnit,
   emptyFeedText,
+  feedTone,
+  inPicks,
+  toggleForm,
   feedDays,
   followText,
   food as asFood,
@@ -103,8 +106,9 @@ export default function Journal() {
   const [remembered, setRemembered] = useState<Remembered>({});
   const [storageRead, setStorageRead] = useState(false);
   const [open, setOpen] = useState<Open>(null);
-  // The feed shows one form's entries, or all when null (TEC-129, TEC-136). Not remembered.
-  const [only, setOnly] = useState<FormKind | null>(null);
+  // The feed shows the picked forms' entries, or all when none is picked (TEC-129, TEC-136,
+  // TEC-177). Not remembered.
+  const [only, setOnly] = useState<FormKind[]>([]);
   // Signed URLs of health photos by storage path: the read's, plus every upload this session made.
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
@@ -338,9 +342,7 @@ export default function Journal() {
       ...pending.map((p) => ({ kind: p.body.kind, at: p.body.at, created_at: null, item: { pending: p } })),
       ...live.map((e) => ({ kind: e.kind, at: e.at, created_at: e.created_at, item: { saved: e } })),
     ];
-    const shown = only
-      ? rows.filter((r) => formOf("saved" in r.item ? r.item.saved : r.item.pending.body) === only)
-      : rows;
+    const shown = rows.filter((r) => inPicks(only, formOf("saved" in r.item ? r.item.saved : r.item.pending.body)));
     return feedDays(shown, now);
   }, [live, pending, only, now]);
   const anything = live.length > 0 || pending.length > 0;
@@ -533,29 +535,31 @@ export default function Journal() {
             <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Feed</h2>
             {/* Filter (TEC-129, TEC-136, TEC-171): small outlined pills in one row that
                 scrolls sideways, so they do not read as the Log tiles above. All first,
-                selected when nothing is picked; tap a form's pill to show only it, tap it
-                again (or All) for everything. Across every day. The button is the 44px
-                hit area; the pill is its inner span. */}
+                selected when nothing is picked; each form's pill toggles on its own (TEC-177),
+                All clears the picks, and picking all six reads as All. A dot of the form's
+                colour makes the pills the feed's legend. Across every day. The button is the
+                44px hit area; the pill is its inner span. */}
             <div
               role="group"
               aria-label="Show only"
               className="-mx-3 mb-2 flex gap-1 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {([null, ...FORM_KINDS] as const).map((k) => {
-                const selected = only === k;
+                const selected = k === null ? only.length === 0 : only.includes(k);
                 return (
                   <button
                     key={k ?? "all"}
                     type="button"
                     aria-pressed={selected}
-                    onClick={() => setOnly(k === null || only === k ? null : k)}
+                    onClick={() => setOnly((cur) => (k === null ? [] : toggleForm(cur, k)))}
                     className="flex min-h-[44px] shrink-0 items-center"
                   >
                     <span
-                      className={`whitespace-nowrap rounded-full border px-3 py-1 text-[13px] font-semibold ${
+                      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-[13px] font-semibold ${
                         selected ? "border-ink bg-ink text-ink-invert" : "border-line bg-transparent text-ink-soft"
                       }`}
                     >
+                      {k !== null && <span aria-hidden="true" data-kind={k} className="lando-kind-dot" />}
                       {k === null ? "All" : FORM_LABELS[k]}
                     </span>
                   </button>
@@ -581,7 +585,8 @@ export default function Journal() {
                         return (
                           <li
                             key={p.body.id}
-                            className="grid grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border border-dashed border-line bg-surface px-2.5 py-2"
+                            data-kind={formOf(p.body) ?? undefined}
+                            className="lando-row grid grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border border-dashed border-line bg-surface px-2.5 py-2"
                           >
                             <span className="whitespace-nowrap text-sm tabular-nums text-ink-soft">{feedTime(p.body.kind, p.body.at)}</span>
                             <span className="min-w-0 truncate">
@@ -617,9 +622,10 @@ export default function Journal() {
                         <li key={e.id}>
                           <button
                             type="button"
+                            data-kind={feedTone(e) ?? undefined}
                             onClick={() => setOpen({ form: formOf(e) ?? "potty", event: e })}
                             title={[feedTime(e.kind, e.at), title, detail, e.note ? `“${e.note}”` : "", nameOf(e.person_id)].filter(Boolean).join(" ")}
-                            className={`grid w-full grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border bg-surface px-2.5 py-2 text-left ${
+                            className={`lando-row grid w-full grid-cols-[4rem_minmax(0,1fr)_auto] items-baseline gap-2 rounded-xl border bg-surface px-2.5 py-2 text-left ${
                               accident ? "border-danger" : "border-line"
                             }`}
                           >
