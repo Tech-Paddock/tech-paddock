@@ -53,6 +53,7 @@ import {
   type FormKind,
   type HealthType,
   type JournalEvent,
+  type QuickLog,
   type LogKind,
   type Unit,
 } from "@/lib/events";
@@ -82,6 +83,8 @@ type Props = {
   form: FormKind;
   /** Set when correcting an entry; the form opens on its values. */
   event?: JournalEvent;
+  /** A tapped since-last pill's prefill (TEC-181), on a new entry only. */
+  quick?: QuickLog;
   /** A training being corrected: the treats already logged with it (`treatsWith`), shown, not changed. */
   sessionTreats?: JournalEvent[];
   people: Person[];
@@ -204,6 +207,7 @@ function Chips<T extends string>({
 export default function LogForm({
   form,
   event,
+  quick,
   sessionTreats = [],
   people,
   dogs,
@@ -234,7 +238,9 @@ export default function LogForm({
 
   // Potty
   const p = event?.kind === "potty" ? asPotty(event) : null;
-  const [what, setWhat] = useState(p?.what ?? "pee");
+  const quickPotty = !event && quick?.form === "potty" ? quick : null;
+  const quickFood = !event && quick?.form === "food" ? quick : null;
+  const [what, setWhat] = useState(p?.what ?? quickPotty?.what ?? "pee");
   const [where, setWhere] = useState(p?.where ?? (event?.kind === "exercise" ? asExercise(event).where : "outside"));
   // Leashed by default. An outside entry from before the pick existed opens
   // with nothing picked, so a correction never invents one.
@@ -249,11 +255,13 @@ export default function LogForm({
   // Food
   const f = event?.kind === "food" ? asFood(event) : null;
   const [foodType, setFoodType] = useState<FoodType>(f?.type ?? "meal");
-  const [itemId, setItemId] = useState(f?.item_id ?? defaultFood("meal", remembered));
+  const [itemId, setItemId] = useState(f?.item_id ?? quickFood?.itemId ?? defaultFood("meal", remembered));
   // An amount from the ⅛ scroller (TEC-136). The amount it opened on stays on
   // the list even when it is not an eighth (an older 1/3), so an untouched
   // correction keeps it.
-  const [amount, setAmount] = useState<number | null>(f ? f.amount : defaultAmount("meal", remembered));
+  const [amount, setAmount] = useState<number | null>(
+    f ? f.amount : quickFood?.itemId ? quickFood.amount : defaultAmount("meal", remembered)
+  );
   const [openedAmount] = useState(amount);
 
   // Exercise: Fun is a walk or playtime; Training is always training (TEC-136).

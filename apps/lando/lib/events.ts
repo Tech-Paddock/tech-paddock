@@ -506,7 +506,29 @@ export const HORIZON_DAYS = 30;
 
 export type Clock = "pee" | "poop" | "food" | "exercise";
 export const CLOCKS: Clock[] = ["pee", "poop", "food", "exercise"];
-export const CLOCK_LABELS: Record<Clock, string> = { pee: "Pee", poop: "Poop", food: "Food", exercise: "Exercise" };
+export const CLOCK_LABELS: Record<Clock, string> = { pee: "Pee", poop: "Poop", food: "Meal", exercise: "Exercise" };
+
+/**
+ * What a tapped pill opens its form on (TEC-181). Pee and Poop: Potty, outside,
+ * leashed, which is the form's own default, so only the `what` is set. Meal: Food
+ * with the last meal's item and amount; null item and amount mean the form's usual
+ * defaults. Exercise is not tappable.
+ */
+export type QuickLog =
+  | { form: "potty"; what: "pee" | "poop" }
+  | { form: "food"; itemId: string | null; amount: number | null };
+
+export function quickLog(clock: Clock, lastMeal: JournalEvent | null): QuickLog | null {
+  if (clock === "pee" || clock === "poop") return { form: "potty", what: clock };
+  if (clock !== "food") return null;
+  // `lastMeal` is `sinceLast`'s food clock: a live meal, never a treat. A meal whose item the
+  // catalogue no longer lists opens on the usual defaults rather than an id the form cannot show.
+  const none: QuickLog = { form: "food", itemId: null, amount: null };
+  if (!lastMeal || lastMeal.kind !== "food") return none;
+  const f = food(lastMeal);
+  if (f.type !== "meal" || !findFood("meal", f.item_id)) return none;
+  return { form: "food", itemId: f.item_id, amount: typeof f.amount === "number" ? f.amount : null };
+}
 
 function countsFor(e: JournalEvent, clock: Clock): boolean {
   switch (clock) {
