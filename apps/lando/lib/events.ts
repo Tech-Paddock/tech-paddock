@@ -510,6 +510,71 @@ export function sinceLast(events: JournalEvent[], now: Date): Record<Clock, Jour
   return out;
 }
 
+/* ── Meal gaps under the pills (TEC-172) ─────────────────────────────────── */
+
+/** The pills that carry a second line: meal to pee, meal to poop, meal to meal. */
+export type GapClock = "pee" | "poop" | "food";
+
+/**
+ * A pill's second line. `gap`: the time between the two events. `pending`: the
+ * latest meal has no pee (or poop) after it yet. `none`: nothing to measure (no
+ * meal, or only one meal ever for the meal-to-meal line).
+ */
+export type MealGap = { state: "gap"; ms: number } | { state: "pending" } | { state: "none" };
+
+/**
+ * The time from the latest meal to the first pee after it, the same to the
+ * first poop, and from the last meal to the one before it. Meals only, never
+ * treats. A pee counts as the pills count it (pee or both, inside too), a time
+ * in the future is ignored, and an older meal is never borrowed: when nothing
+ * followed the latest meal the answer is `pending`, not a gap from an earlier
+ * meal. Pure; no status colour applies to it.
+ */
+export function mealGaps(events: JournalEvent[], now: Date): Record<GapClock, MealGap> {
+  const t = now.getTime();
+  const live = liveEvents(events).filter((e) => Date.parse(e.at) <= t);
+  const meals = live.filter((e) => countsFor(e, "food")).sort(newestFirst);
+  const out: Record<GapClock, MealGap> = { pee: { state: "none" }, poop: { state: "none" }, food: { state: "none" } };
+  const latest = meals[0];
+  if (!latest) return out;
+  const mealAt = Date.parse(latest.at);
+  for (const c of ["pee", "poop"] as const) {
+    let first = Infinity;
+    for (const e of live) {
+      if (!countsFor(e, c)) continue;
+      const at = Date.parse(e.at);
+      if (at >= mealAt && at < first) first = at;
+    }
+    out[c] = first === Infinity ? { state: "pending" } : { state: "gap", ms: first - mealAt };
+  }
+  if (meals[1]) out.food = { state: "gap", ms: mealAt - Date.parse(meals[1].at) };
+  return out;
+}
+
+/** A duration for a pill's second line, in `formatAgo`'s spelling ("47m", "2h 5m"); under a minute is "<1m". */
+export function formatGap(ms: number): string {
+  const base = Date.parse("2026-01-01T00:00:00Z");
+  const s = formatAgo(new Date(base).toISOString(), new Date(base + Math.max(0, ms)));
+  return s === "now" ? "<1m" : s;
+}
+
+/**
+ * What the second line says, or null when it has nothing to say. `short` is
+ * for the pill (it must fit a quarter of a 375px phone); `words` is the
+ * screen-reader and title text.
+ */
+export function mealGapText(clock: GapClock, gap: MealGap): { short: string; words: string } | null {
+  if (gap.state === "none") return null;
+  const what = clock === "food" ? "meal" : clock;
+  if (gap.state === "pending") {
+    return { short: "not yet", words: `No ${what} since the latest meal yet` };
+  }
+  const d = formatGap(gap.ms);
+  return clock === "food"
+    ? { short: `gap ${d}`, words: `${d} between the last two meals` }
+    : { short: `meal→ ${d}`, words: `First ${what} came ${d} after the latest meal` };
+}
+
 /**
  * Short enough for a pill, never more than six characters: "now", "47m",
  * "2h 5m", "14h", "3d 4h", "12d". Past ten hours the minutes are dropped, and
@@ -829,13 +894,11 @@ export function describe(
   switch (e.kind) {
     case "potty": {
       const p = potty(e);
-      const what = p.what === "both" ? "pee + poop" : p.what === "none" ? "no potty" : p.what;
+      // The title says what happened (the form's own words); the detail says where, never the what again.
       const base =
         p.where === "inside"
-          ? p.spot
-            ? `${what}, inside · ${SPOT_LABELS[p.spot].toLowerCase()}`
-            : `${what}, inside`
-          : p.leash ? `${what} · ${LEASH_LABELS[p.leash].toLowerCase()}` : what;
+          ? `${isAccident(e) ? "accident, " : ""}inside${p.spot ? ` · ${SPOT_LABELS[p.spot].toLowerCase()}` : ""}`
+          : p.leash ? `outside · ${LEASH_LABELS[p.leash].toLowerCase()}` : "outside";
       const n = p.photos?.length ?? 0;
       const detail = [
         base,
@@ -844,7 +907,7 @@ export function describe(
       ]
         .filter(Boolean)
         .join(" · ");
-      return { title: isAccident(e) ? "Accident" : "Potty", detail };
+      return { title: POTTY_WHAT_LABELS[p.what], detail };
     }
     case "food": {
       const f = food(e);

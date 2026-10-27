@@ -565,7 +565,6 @@ export default function LogForm({
             <p className="text-[13px] font-semibold text-danger">Inside counts as an accident.</p>
           )}
           {relatedIssue}
-          <PhotoPicker photos={photos} />
         </>
       )}
 
@@ -724,7 +723,6 @@ export default function LogForm({
               <Chips label="Commands practised" options={COMMANDS} picked={commands} onChange={setCommands} />
             </Field>
           )}
-          <PhotoPicker photos={photos} />
           {treatOpen && (
             <Sheet title="Treat" onClose={() => setTreatOpen(false)} nested>
               <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2">
@@ -904,6 +902,9 @@ export default function LogForm({
           <input id="f-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Optional" className={input} />
         </Field>
       )}
+      {/* Photos sit below the Note (TEC-172) on Potty, Fun and Training. Health keeps its Note
+          above its own Photos block, so the order is the same there. */}
+      {(kind === "potty" || kind === "exercise") && <PhotoPicker photos={photos} />}
 
       {error && (
         <p role="alert" className="text-sm font-semibold text-danger">
