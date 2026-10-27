@@ -29,8 +29,9 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 const MAIN = "main";
 
@@ -52,6 +53,7 @@ export function decide(input) {
   const deploy = isDeployment(input);
   if (tool === "Agent" || tool === "Task") return startAgent(args, input);
   if (EDIT_TOOLS.has(tool)) return editApp(args, input);
+  if (tool === "Bash" && /plan-approved/.test(String(args.command ?? ""))) return deny(PLAN_RECORD_ONLY);
   if (tool === "Bash") return bash(String(args.command ?? ""), input?.cwd || process.cwd(), 0, deploy);
   if (!tool.startsWith("mcp__")) return null;
   const cut = tool.lastIndexOf("__");
@@ -88,14 +90,72 @@ const BUILDER = "builder";
 function startAgent(a, input) {
   const type = String(a.subagent_type ?? "").toLowerCase();
   if (type === DEPLOYMENT) {
-    if (input?.agent_id) return deny("Only the TD starts Deployment, on the owner's `/deploy`. Report what is ready and stop.");
-    return ask("Starting Deployment waits for the owner's approval. Approve it only if you ran `/deploy`.");
+    if (input?.agent_id) return deny("Only the TD starts Deployment, on the owner's `/deploy` or `/execute-plan`. Report what is ready and stop.");
+    if (onPlan(a, input)) return null;
+    return ask("Starting Deployment waits for the owner's approval. Approve it only if you ran `/deploy`, or it is a step of the plan you ran with `/execute-plan`.");
   }
   if (type === BUILDER) {
-    if (input?.agent_id) return deny("Only the TD starts a builder, on the owner's `/build`. Put the work in your report and stop.");
-    return ask("Starting a builder waits for the owner's approval. Approve it only if you ran `/build`.");
+    if (input?.agent_id) return deny("Only the TD starts a builder, on the owner's `/build` or `/execute-plan`. Put the work in your report and stop.");
+    if (onPlan(a, input)) return null;
+    return ask("Starting a builder waits for the owner's approval. Approve it only if you ran `/build`, or it is a step of the plan you ran with `/execute-plan`.");
   }
   return null;
+}
+
+/* ------------------------------------------------------------------------- */
+/* A plan run: one approval for the whole plan (TEC-179)                     */
+/* ------------------------------------------------------------------------- */
+
+/* `/summarize-plan` writes the plan it showed to `.claude/state/plan.json`:
+   the command that runs it and the issues it covers. When the owner types
+   `/execute-plan …`, the UserPromptSubmit hook (plan-gate.mjs, through
+   planGate below) compares the prompt with that command. A match writes
+   `plan-approved.json` with the session, the time and the plan's issues; a
+   mismatch, or no summary, blocks the prompt and says why. Only the owner's
+   typed prompt reaches that hook, and no tool may write the approval
+   (editApp and the Bash check refuse it), so an agent cannot approve its own
+   plan. While the approval is fresh and in the same session, the TD starts a
+   builder or Deployment whose brief names only the plan's issues without a
+   click; anything else asks as before. A missing or unreadable record asks:
+   the exception fails closed. */
+const PLAN_HOURS = 12;
+const PLAN_RECORD_ONLY =
+  "`.claude/state/plan-approved.json` is written only by the hook that sees the owner type `/execute-plan`. No tool writes it.";
+export const stateDir = (input) => join(process.env.CLAUDE_PROJECT_DIR || input?.cwd || process.cwd(), ".claude", "state");
+const readJson = (path) => {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return null;
+  }
+};
+const normCommand = (s) => String(s ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+export const issuesIn = (s) => [...new Set(String(s ?? "").toUpperCase().match(/\bTEC-\d+\b/g) ?? [])];
+
+export function planGate(input, now = Date.now()) {
+  const prompt = String(input?.prompt ?? "");
+  if (!/^\s*\/execute-plan(\s|$)/i.test(prompt)) return null;
+  const plan = readJson(join(stateDir(input), "plan.json"));
+  if (!plan?.command) {
+    return { block: "`/execute-plan` runs only a plan that `/summarize-plan` has shown in this chat, and there is none yet. Run `/summarize-plan` first." };
+  }
+  if (normCommand(prompt) !== normCommand(plan.command)) {
+    return { block: `That is not the plan summarized in this chat. To run it, type exactly:\n\n${plan.command}` };
+  }
+  const issues = Array.isArray(plan.issues) ? issuesIn(plan.issues.join(" ")) : [];
+  if (!issues.length) return { block: "The summarized plan names no issue, so there is nothing to run. Run `/summarize-plan` again." };
+  if (!input?.session_id) return { block: "This prompt carried no session id, so the plan run cannot be recorded. Run the steps with `/build` and `/deploy` instead." };
+  return { approve: { command: plan.command, issues, session_id: input.session_id, at: new Date(now).toISOString() } };
+}
+
+export function onPlan(a, input, now = Date.now()) {
+  if (input?.agent_id || !input?.session_id) return false;
+  const r = readJson(join(stateDir(input), "plan-approved.json"));
+  if (!r || r.session_id !== input.session_id || !Array.isArray(r.issues)) return false;
+  const age = now - Date.parse(r.at);
+  if (!(age >= 0 && age < PLAN_HOURS * 3600 * 1000)) return false;
+  const named = issuesIn(a?.prompt);
+  return named.length > 0 && named.every((n) => r.issues.includes(n));
 }
 
 /* App code is the builder's: the TD does not build app features (CLAUDE.md).
@@ -108,6 +168,7 @@ const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const APP_CODE = /(^|\/)apps\/(?!showcase\/)[^/]+\/.+/;
 function editApp(a, input) {
   const path = String(a.file_path ?? a.notebook_path ?? "").replace(/\\/g, "/");
+  if (/(^|\/)\.claude\/state\/plan-approved\.json$/.test(path)) return deny(PLAN_RECORD_ONLY);
   if (!APP_CODE.test(path) || /\.md$/i.test(path)) return null;
   if (!input?.agent_id) {
     return ask("App code is the builder's. Approve this edit only if it is a touch-up (a wrong doc or a missing config line); a feature waits for `/build`.");

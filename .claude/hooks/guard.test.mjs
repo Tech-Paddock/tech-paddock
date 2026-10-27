@@ -10,11 +10,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, mkdtempSync, readFileSync, symlinkSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, symlinkSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { decide, lex, nextSteps, stripSql, targetsMain } from "./decide.mjs";
+import { decide, lex, nextSteps, planGate, stripSql, targetsMain } from "./decide.mjs";
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HOOKS, "..", "..");
@@ -420,6 +420,68 @@ test("helpers", () => {
   }
 });
 
+/* A plan run: the owner's typed `/execute-plan` must match the summary (TEC-179) */
+function withState(files, fn) {
+  const dir = mkdtempSync(join(tmpdir(), "plan-"));
+  mkdirSync(join(dir, ".claude", "state"), { recursive: true });
+  for (const [name, body] of Object.entries(files)) writeFileSync(join(dir, ".claude", "state", name), JSON.stringify(body));
+  const before = process.env.CLAUDE_PROJECT_DIR;
+  process.env.CLAUDE_PROJECT_DIR = dir;
+  try {
+    return fn(dir);
+  } finally {
+    if (before === undefined) delete process.env.CLAUDE_PROJECT_DIR;
+    else process.env.CLAUDE_PROJECT_DIR = before;
+  }
+}
+
+test("/execute-plan: it must match the summary, or it is blocked with the summary's command", () => {
+  const plan = { command: "/execute-plan lando", issues: ["TEC-176", "TEC-177"] };
+  withState({}, () => {
+    assert.match(planGate({ prompt: "/execute-plan lando", session_id: "s1" }).block, /Run `\/summarize-plan` first/);
+  });
+  withState({ "plan.json": plan }, () => {
+    assert.equal(planGate({ prompt: "please summarize", session_id: "s1" }), null);
+    assert.equal(planGate({ prompt: "/execute-planner", session_id: "s1" }), null);
+    const wrong = planGate({ prompt: "/execute-plan cookbook", session_id: "s1" });
+    assert.match(wrong.block, /not the plan summarized/);
+    assert.match(wrong.block, /\/execute-plan lando/);
+    const ok = planGate({ prompt: "  /Execute-Plan   lando ", session_id: "s1" }, Date.parse("2026-10-27T15:00:00Z"));
+    assert.deepEqual(ok.approve, { command: "/execute-plan lando", issues: ["TEC-176", "TEC-177"], session_id: "s1", at: "2026-10-27T15:00:00.000Z" });
+    assert.match(planGate({ prompt: "/execute-plan lando" }).block, /no session id/);
+  });
+  withState({ "plan.json": { command: "/execute-plan lando", issues: [] } }, () => {
+    assert.match(planGate({ prompt: "/execute-plan lando", session_id: "s1" }).block, /names no issue/);
+  });
+});
+
+test("a plan run starts its own builders and Deployment without a click, and nothing else", () => {
+  const fresh = new Date(Date.now() - 60 * 1000).toISOString();
+  const stale = new Date(Date.now() - 13 * 3600 * 1000).toISOString();
+  const approved = (at, session_id = "s1") => ({ "plan-approved.json": { command: "/execute-plan lando", issues: ["TEC-176", "TEC-177"], session_id, at } });
+  const start = (subagent_type, prompt, who = {}) => verdict(decide({ tool_name: "Agent", tool_input: { subagent_type, prompt }, session_id: "s1", ...who }));
+  withState(approved(fresh), () => {
+    assert.equal(start("builder", "app: lando. Issue TEC-176."), "allow");
+    assert.equal(start("deployment", "Ready: claude/lando-x (TEC-176, TEC-177)."), "allow");
+    assert.equal(start("builder", "app: lando. Issue TEC-176, then TEC-999."), "ask"); // off the plan
+    assert.equal(start("builder", "app: lando. No issue named."), "ask");
+    assert.equal(start("builder", "Issue TEC-176.", { session_id: "s2" }), "ask"); // another session
+    assert.equal(start("builder", "Issue TEC-176.", { agent_id: "a9", agent_type: "general-purpose" }), "deny");
+  });
+  withState(approved(stale), () => assert.equal(start("builder", "Issue TEC-176."), "ask"));
+  withState(approved(fresh, "s2"), () => assert.equal(start("builder", "Issue TEC-176."), "ask"));
+  withState({ "plan-approved.json": "not json at all" }, () => assert.equal(start("builder", "Issue TEC-176."), "ask"));
+  withState({}, () => assert.equal(start("deployment", "TEC-176"), "ask"));
+});
+
+test("no tool writes the plan approval; only the prompt hook does", () => {
+  for (const tool_name of ["Edit", "Write"]) {
+    assert.equal(verdict(decide({ tool_name, tool_input: { file_path: "/home/user/tech-paddock/.claude/state/plan-approved.json" } })), "deny", tool_name);
+  }
+  assert.equal(verdict(decide({ tool_name: "Write", tool_input: { file_path: "/home/user/tech-paddock/.claude/state/plan.json" } })), "allow");
+  assert.equal(verdict(decide({ tool_name: "Bash", tool_input: { command: "echo '{}' > .claude/state/plan-approved.json" } })), "deny");
+});
+
 /* ------------------------------------------------------------------------- */
 /* The commands exactly as settings.json runs them                           */
 /* ------------------------------------------------------------------------- */
@@ -490,6 +552,27 @@ test("end to end: the real commands deny, ask and allow", () => {
     const explore = run(hookFor("Agent"), { tool_name: "Agent", tool_input: { subagent_type: "Explore", prompt: "x" } }, { shell });
     assert.equal(explore.decision, "allow", shell);
   }
+});
+
+test("end to end: the prompt hook blocks a mismatch and records a match", () => {
+  const command = settings.hooks.UserPromptSubmit[0].hooks[0].command;
+  const dir = mkdtempSync(join(tmpdir(), "plan-e2e-"));
+  mkdirSync(join(dir, ".claude", "hooks"), { recursive: true });
+  for (const f of ["decide.mjs", "plan-gate.mjs"]) copyFileSync(join(HOOKS, f), join(dir, ".claude", "hooks", f));
+  const runPrompt = (prompt) => {
+    const r = spawnSync("/bin/sh", ["-c", command], { input: JSON.stringify({ prompt, session_id: "s1" }), encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: dir } });
+    return { status: r.status, out: r.stdout.trim() ? JSON.parse(r.stdout) : null };
+  };
+  assert.deepEqual(runPrompt("hello"), { status: 0, out: null });
+  const none = runPrompt("/execute-plan lando");
+  assert.equal(none.out.decision, "block");
+  mkdirSync(join(dir, ".claude", "state"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "state", "plan.json"), JSON.stringify({ command: "/execute-plan lando", issues: ["TEC-176"] }));
+  assert.match(runPrompt("/execute-plan health").out.reason, /\/execute-plan lando/);
+  assert.equal(existsSync(join(dir, ".claude", "state", "plan-approved.json")), false);
+  assert.deepEqual(runPrompt("/execute-plan lando"), { status: 0, out: null });
+  const rec = JSON.parse(readFileSync(join(dir, ".claude", "state", "plan-approved.json"), "utf8"));
+  assert.deepEqual([rec.command, rec.issues, rec.session_id], ["/execute-plan lando", ["TEC-176"], "s1"]);
 });
 
 test("end to end: it fails closed", () => {

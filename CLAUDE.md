@@ -17,8 +17,8 @@ deployed on its own. Simplicity beats multi-team defaults. This file binds every
 |---|---|
 | **Owner** | Directs. Approves what has no undo. |
 | **Technical director (TD)** | Architects: Linear queue, design, app surface, Postgres design, cross-schema contracts, shared auth plumbing, `apps/showcase`. Briefs the builder and Deployment. Never merges. |
-| **Builder** | Helpers started only on the owner's `/build`, each on its own branch; how the work splits is the TD's call. Builds, commits, pushes, reports, stops. |
-| **Deployment** | One helper, started by the TD when the owner runs `/deploy`. Checks for unfinished work; if clean, merges each ready branch through the `merge` skill and confirms it is live. |
+| **Builder** | Helpers started only on the owner's `/build` or a step of `/execute-plan`, each on its own branch; how the work splits is the TD's call. Builds, commits, pushes, reports, stops. |
+| **Deployment** | One helper, started by the TD when the owner runs `/deploy` or a step of `/execute-plan`. Checks for unfinished work; if clean, merges each ready branch through the `merge` skill and confirms it is live. |
 
 Only Deployment writes to a pull request. The TD does not build app features, except
 `apps/showcase` and touch-ups (a wrong doc, a missing config line).
@@ -26,8 +26,9 @@ Only Deployment writes to a pull request. The TD does not build app features, ex
 **Owner commands:** `/kickoff [brief]` starts a TD session; `/build` builds every issue this chat
 has readied, `/build TEC-n` that one, to a plan the TD shows first; `/status-check [app | session]`
 reports branches, unfinished work, blockers and hot topics; `/deploy` deploys what is ready, or
-holds and reports; `/closeout` says whether a chat is safe to archive; `/skill-check` lists every
-skill.
+holds and reports; `/summarize-plan [app]` lists the builds and deploys ahead and the command that
+runs them; `/execute-plan …` runs exactly that plan, step by step; `/closeout` says whether a chat
+is safe to archive; `/skill-check` lists every skill.
 
 **Propose before branching:** the job, what comes first, what it contradicts. No branch until the
 owner says go. "Backlog" means a Linear issue in Backlog, not a build.
@@ -72,7 +73,7 @@ go, go fully and do not reopen it.
 - **Builder report:** blast radius (apps, shared files), whether it deploys alone or what it waits
   on, and the Deployment section. `NOTES.md` is
   updated on the same branch to what is true after merge.
-- **Deployment merges, on `/deploy` only:** pull request, CI green on the current head, migration,
+- **Deployment merges, on `/deploy` or a step of `/execute-plan` only:** pull request, CI green on the current head, migration,
   squash merge, deploy confirmed. The TD's own changes take the same path.
 - **Every pull request body carries the request line.** CI's `request-line` job checks it.
 
@@ -160,7 +161,8 @@ are the owner's.
 2. **The guard** (`.claude/hooks/guard.mjs`, fails closed) refuses a push to `main`, a non-squash
    merge, migration-history rewrites, pull-request writes from anyone but Deployment, and app-code
    edits from any helper but a builder; holds starting Deployment or a builder, the TD's own
-   app-code edits, Vercel writes, and Supabase writes other than `apply_migration`, for the owner;
+   app-code edits, Vercel writes, and Supabase writes other than `apply_migration`, for the owner (a
+   step of the plan the owner ran with `/execute-plan` starts without a click);
    refuses a Linear issue without labels or Next steps.
    `guard.test.mjs` proves each in CI.
 3. **CI `gate`:** every app typechecks, tests and builds, and `drift` passes

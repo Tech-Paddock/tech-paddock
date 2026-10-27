@@ -76,8 +76,8 @@ A matching version is something to read back, never to assume.
 A DROP has timed out through the connector, so design around it: put a widening check in a function
 (`lando.details_ok`) and widen with `create or replace function`, and start any constraint swap
 with `set local lock_timeout = '5s'`. Each replacement copies the newest file's whole body, and the
-function pins `set search_path = ''`; without it the security advisor warns, as it does for
-`lando.details_ok` today (TEC-164). Only if a DROP still times out, and a read-back shows it did
+function pins `set search_path = ''`; without it the security advisor warns, as it did for
+`lando.details_ok` until TEC-164. Only if a DROP still times out, and a read-back shows it did
 not land, does the owner run the file once in the SQL Editor inside `begin; … commit;` with
 `insert into supabase_migrations.schema_migrations (version, name)` for its version, as
 `drop_editor_tracker_shared` was. A drop of data stays a destructive migration (CLAUDE.md).
