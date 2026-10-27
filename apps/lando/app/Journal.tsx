@@ -29,6 +29,7 @@ import {
   mealGaps,
   mealsToday,
   pillStatus,
+  quickLog,
   round1,
   sinceLast,
   treatsWith,
@@ -37,6 +38,7 @@ import {
   type FeedRow,
   type FormKind,
   type JournalEvent,
+  type QuickLog,
 } from "@/lib/events";
 import {
   DEFAULTS_KEY,
@@ -66,7 +68,7 @@ type Pending = { body: LogBody; status: "saving" | "failed"; error?: string; the
 /** What `lando.unsaved` holds per entry: the body, plus its treats when it has any. */
 type Stored = LogBody & { then?: LogBody[] };
 
-type Open = { form: FormKind; event?: JournalEvent } | null;
+type Open = { form: FormKind; event?: JournalEvent; quick?: QuickLog } | null;
 type Tab = "log" | "analytics";
 
 async function postJson(url: string, body: unknown): Promise<{ ok: boolean; status: number; data: any }> {
@@ -81,6 +83,35 @@ async function postJson(url: string, body: unknown): Promise<{ ok: boolean; stat
 
 const isLogBody = (b: unknown): b is LogBody =>
   !!b && typeof b === "object" && LOG_KINDS.includes((b as LogBody).kind) && typeof (b as LogBody).details === "object";
+
+/** A since-last pill; a button when tapping it logs (TEC-181), a plain box otherwise (Exercise). */
+function Pill({
+  tap,
+  title,
+  status,
+  onTap,
+  children,
+}: {
+  tap: QuickLog | null;
+  title: string | undefined;
+  status: string | null;
+  onTap?: () => void;
+  children: React.ReactNode;
+}) {
+  const cls = "lando-pill w-full min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center";
+  if (!tap) return <div title={title} data-status={status ?? undefined} className={cls}>{children}</div>;
+  return (
+    <button
+      type="button"
+      title={title}
+      data-status={status ?? undefined}
+      onClick={onTap}
+      className={`${cls} cursor-pointer focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-pinstripe`}
+    >
+      {children}
+    </button>
+  );
+}
 
 /**
  * Two tabs, Log and Analytics, opening on Log (RULES.md, Surface: app, the
@@ -410,17 +441,25 @@ export default function Journal() {
               const last = clocks?.[c] ?? null;
               // Green, yellow or red by how long ago (TEC-142); exercise and "none" stay plain.
               const status = last ? pillStatus(c, now.getTime() - Date.parse(last.at)) : null;
+              // Pee, Poop and Meal open a quick log (TEC-181); Exercise is not tappable.
+              const tap = clocks ? quickLog(c, clocks.food) : null;
               const gapLine = gaps && c !== "exercise" ? mealGapText(c, gaps[c]) : null;
               return (
                 <div key={c} className="flex min-w-0 flex-col gap-0.5">
-                <div
+                <Pill
+                  tap={tap}
                   title={
-                    last
-                      ? `${CLOCK_LABELS[c]} at ${clockTime(last.at)}${status ? ` — ${PILL_STATUS_WORDS[status]}` : ""}`
+                    last || tap
+                      ? [
+                          last ? `${CLOCK_LABELS[c]} at ${clockTime(last.at)}${status ? ` — ${PILL_STATUS_WORDS[status]}` : ""}` : "",
+                          tap ? "tap to log" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(", ")
                       : undefined
                   }
-                  data-status={status ?? undefined}
-                  className="lando-pill min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center"
+                  status={status}
+                  onTap={tap ? () => setOpen({ form: tap.form, quick: tap }) : undefined}
                 >
                   <div className="truncate text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] text-ink-soft">
                     {CLOCK_LABELS[c]}
@@ -434,8 +473,9 @@ export default function Journal() {
                       : clocks
                         ? ` in ${HORIZON_DAYS} days`
                         : ""}
+                    {tap ? ", tap to log" : ""}
                   </span>
-                </div>
+                </Pill>
                 {/* Second line (TEC-172): plain, no status colour; the pill above keeps its own. */}
                 {gapLine && (
                   <div title={gapLine.words} className="truncate text-center text-[10px] leading-tight tabular-nums text-ink-soft">
@@ -676,6 +716,7 @@ export default function Journal() {
             key={open.event?.id ?? open.form}
             form={open.form}
             event={open.event}
+            quick={open.quick}
             sessionTreats={open.form === "training" && open.event && loaded ? treatsWith(loaded.events, open.event) : undefined}
             people={people}
             dogs={dogs}

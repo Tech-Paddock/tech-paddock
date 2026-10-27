@@ -4,7 +4,7 @@
 
 - v2 on Next.js 16: two tabs under the app bar, **Log** and **Analytics**, sticky, opening on Log
   (RULES.md holds the owner's override of the one-screen rule).
-- **Log**: four since-last pills in one row (pee, poop, food, exercise; label over value, the
+- **Log**: four since-last pills in one row (Pee, Poop, Meal, Exercise; label over value, the
   clock time in the title and for screen readers; coloured by TEC-142, below), "Logging as", six
   section buttons in two rows of three (TEC-137: Potty, Food, Fun / Training, Weight, Health;
   15px labels, 52px tall; the Weight button shows the newest weight on its face, "7.3 lb", with
@@ -71,8 +71,18 @@
   with the ink text unchanged. Contrast, checked against the mcl39 tokens: each edge at least 4.4:1
   on both the surface and the paper in light and dark; ink on a tint at least 11:1.
   **The food clock is the last meal** (`sinceLast`): a treat no longer resets it (before TEC-142 a
-  treat did). The pill is still labelled Food.
-- **Meal gaps under the pills** (TEC-172): under Pee, Poop and Food (not Exercise), a small plain
+  treat did). The pill is labelled **Meal** (TEC-181; `CLOCK_LABELS`); the Food button and form keep
+  their name because they log treats too.
+- **Tapping Pee, Poop or Meal opens a quick log** (TEC-181): the same form in the same bottom
+  sheet, on a new entry, with When now and everything editable. The pill is one `<button>` (`Pill`
+  in `Journal.tsx`); its title and screen-reader text end "tap to log". `quickLog` in `lib/events.ts`
+  decides the prefill and `LogForm` takes it as `quick`: **Pee** and **Poop** open Potty with that
+  what, the form's own Outside + Leashed (Time outside stays empty, TEC-176); **Meal** opens Food
+  on the last meal's item and amount (`sinceLast`'s food clock, so never a treat), or the usual
+  defaults with no meal in the read or an item the catalogue no longer lists. It ignores the
+  remembered meal on purpose. Exercise is a plain box, not tappable. The pills are not tappable
+  until the journal has loaded (the last meal is unknown before). Tests: `tests/quicklog.test.ts`.
+- **Meal gaps under the pills** (TEC-172): under Pee, Poop and Meal (not Exercise), a small plain
   second line, stacked beneath the pill (outside its coloured box, so the status colour never
   applies to it; 10px, soft ink, truncating). `mealGaps` / `mealGapText` / `formatGap` in
   `lib/events.ts`, tested in `tests/mealgaps.test.ts`. **Pee: "meal→ 40m"** is the latest meal to the first
