@@ -40,8 +40,8 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 - **Recipe pill** (TEC-183, `RecipeCard` in `Book.tsx`): the name, then rating as `5★` and the time
   (each absent when unset; `ratingPill`, `lib/recipeView.ts`), then origin and "makes N" only, then
   four macro tiles per serving (`MacroTiles`). Meal, main, cuisine, equipment, diet and tags are
-  stored and editable in Edit and **render nowhere on a kept recipe** (`pillFacts` is gone). Add's
-  draft still shows `MetaSummary`: deciding whether to keep it is where the model's tags matter.
+  stored and editable in Edit and the typed form, and **render nowhere**: not on the pill, the open
+  recipe or Add's draft (`pillFacts` and `MetaSummary` are gone).
   *On the menu* stays beside the book.
 - **An open recipe is in tabs** (TEC-183, `app/RecipeDetail.tsx`; replaces TEC-140's layout): the
   name, "origin · makes N · time", the rating as five tappable stars (the PATCH call; tapping the

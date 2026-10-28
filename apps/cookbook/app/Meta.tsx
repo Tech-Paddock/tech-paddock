@@ -1,6 +1,6 @@
 "use client";
 
-import { DIETS, MEALS, formatMinutes, type RecipeMeta } from "@/lib/metadata";
+import { DIETS, MEALS, type RecipeMeta } from "@/lib/metadata";
 
 /**
  * Recipe metadata on screen (TEC-52): the rating control, the typed form's
@@ -181,35 +181,5 @@ export function MetaFields({
         </div>
       </div>
     </details>
-  );
-}
-
-/**
- * The metadata as one quiet line — on a draft, so you can see what the model
- * said before you keep it, and on an open card. Nothing when nothing is set.
- */
-export function MetaSummary({ meta }: { meta: RecipeMeta }) {
-  const parts = [
-    formatMinutes(meta.total_minutes),
-    meta.meal,
-    meta.mains.length ? meta.mains.join(", ") : null,
-    meta.cuisine,
-    meta.equipment.length ? meta.equipment.join(", ") : null,
-    meta.diet.length ? meta.diet.join(", ") : null,
-  ].filter(Boolean);
-  if (parts.length === 0 && meta.tags.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-1 text-xs text-ink-soft">
-      {parts.length ? <p>{parts.join(" · ")}</p> : null}
-      {meta.tags.length ? (
-        <ul className="flex flex-wrap gap-1">
-          {meta.tags.map((t) => (
-            <li key={t} className="rounded border border-line px-1.5 py-0.5 text-[11px]">
-              {t}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
   );
 }
