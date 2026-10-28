@@ -4,16 +4,16 @@
 
 - v2 on Next.js 16: three tabs under the app bar, **Log**, **Analytics** and **What's new**, sticky, opening on Log
   (RULES.md holds the owner's override of the one-screen rule).
-- **Log**: four since-last pills in one row (Pee, Poop, Meal, Exercise; label over value, the
-  clock time in the title and for screen readers; coloured by TEC-142, below), "Logging as", six
-  section buttons in two rows of three (TEC-137: Potty, Food, Fun / Training, Weight, Health;
-  15px labels, 52px tall; the Weight button shows the newest weight on its face, "7.3 lb", with
-  its date still in the title and screen-reader text), then the **Feed** under a row of filter pills
-  (TEC-171, below). No growth chart
-  on Log since TEC-129: it lives in Analytics only. Each button opens a bottom sheet
-  (`app/Sheet.tsx`) with that form (`app/LogForm.tsx`, prop `form`), defaults filled in, so Save
-  is usually the only other tap. Tapping a feed row opens the matching form on that entry to
-  correct or delete it.
+- **Log** (TEC-186 made the pills the way in): four since-last pills in one row (Pee, Poop, Meal, **Fun**;
+  label over value, the clock time in the title and for screen readers; coloured by TEC-142, below), "Logging
+  as", **four buttons in two rows of two** (Treats, Training / Weight, Health; same 52px height and 15px labels
+  as before, so each is wider), then the **Feed** under a row of filter pills (TEC-171, below). **Potty and
+  Fun have no button**: they are reached through the pills (Fun's own Pee and Poop, below) and by tapping a
+  feed row. **Treats** opens the Food form on a treat (`TREAT_QUICK_LOG`; the Meal/Treat choice stays in the
+  form, and the Food filter pill and the form keep the name Food). No growth chart on Log since TEC-129: it
+  lives in Analytics only. Each button opens a bottom sheet (`app/Sheet.tsx`) with that form
+  (`app/LogForm.tsx`, prop `form`), defaults filled in, so Save is usually the only other tap. Tapping a feed
+  row opens the matching form on that entry to correct or delete it.
 - **Health** (TEC-137, reworked by TEC-139): a sixth form, kind `health`, with a Type of **Vet
   visit** or **Medical issue**, then **one plain full-width `<select>`** of high-level picks
   (styled like Other dogs'), a required **Note** under it ("What happened?"), up to `MAX_PHOTOS`
@@ -58,11 +58,11 @@
   and the voided entry keeps all of its own; a delete is a void. **Nothing is ever deleted from
   the bucket**, so a photo removed in a correction, discarded with an unsaved entry, or uploaded
   and abandoned stays there, unreferenced.
-- **Pill status colours** (TEC-142). Each pill but Exercise wears a status from how long ago its
+- **Pill status colours** (TEC-142). Each pill but Fun wears a status from how long ago its
   last event was (`pillStatus`, with the thresholds as named constants, all in `lib/events.ts`):
   **pee and poop** green under 1 h, yellow from 1 h up to and including 3 h, red over 3 h
   (`POTTY_YELLOW_MS`, `POTTY_RED_MS`); **food** green under 3 h, yellow from 3 h, red at 5 h or more
-  (`MEAL_YELLOW_MS`, `MEAL_RED_MS`). Exercise stays plain, and so does "none". The status is also in
+  (`MEAL_YELLOW_MS`, `MEAL_RED_MS`). Fun stays plain, and so does "none". The status is also in
   words, in the pill's `title` and in its screen-reader text (`PILL_STATUS_WORDS`: "green, recent",
   "yellow, getting long", "red, overdue"). The colour is a local pattern in `app/globals.css`, next
   to `--lando-series-*`: `--lando-status-green` and `--lando-status-yellow` (own values, one pair
@@ -73,27 +73,29 @@
   **The food clock is the last meal** (`sinceLast`): a treat no longer resets it (before TEC-142 a
   treat did). The pill is labelled **Meal** (TEC-181; `CLOCK_LABELS`); the Food button and form keep
   their name because they log treats too.
-- **Tapping Pee, Poop or Meal opens a quick log** (TEC-181): the same form in the same bottom
+- **Tapping a pill opens a quick log** (TEC-181, Fun by TEC-186): the same form in the same bottom
   sheet, on a new entry, with When now and everything editable. The pill is one `<button>` (`Pill`
   in `Journal.tsx`); its title and screen-reader text end "tap to log". `quickLog` in `lib/events.ts`
   decides the prefill and `LogForm` takes it as `quick`: **Pee** and **Poop** open Potty with that
   what, the form's own Outside + Leashed (Time outside stays empty, TEC-176); **Meal** opens Food
   on the last meal's item and amount (`sinceLast`'s food clock, so never a treat), or the usual
   defaults with no meal in the read or an item the catalogue no longer lists. It ignores the
-  remembered meal on purpose. Exercise is a plain box, not tappable. The pills are not tappable
-  until the journal has loaded (the last meal is unknown before). Tests: `tests/quicklog.test.ts`.
-- **Meal gaps under the pills** (TEC-172): under Pee, Poop and Meal (not Exercise), a small plain
-  second line, stacked beneath the pill (outside its coloured box, so the status colour never
-  applies to it; 10px, soft ink, truncating). `mealGaps` / `mealGapText` / `formatGap` in
-  `lib/events.ts`, tested in `tests/mealgaps.test.ts`. **Pee: "meal→ 40m"** is the latest meal to the first
-  pee at or after it (pee or both, inside counts, the pills' own rule; No potty does not); **Poop** the same for poop; **Food: "gap
-  4h 10m"** is the latest meal minus the one before it. Meals only, never treats. If nothing
-  followed the latest meal the line reads **"not yet"**; it never borrows an older meal's pee.
-  One meal ever: the Food line is blank; no meal in the read: all three are blank. Under a minute
-  is "<1m". Live events only, the future ignored, and it reads the same 30-day window as the pills.
-  Each line has screen-reader text and a title ("First pee came 40m after the latest meal", "4h 10m
-  between the last two meals", "No pee since the latest meal yet"). Longest line ("meal→ 9h 59m")
-  fits a quarter of 375px; changing the wording means re-checking that.
+  remembered meal on purpose. **Fun** opens the Fun form on a new walk with its usual defaults. The pills
+  are not tappable until the journal has loaded (the last meal is unknown before). Tests: `tests/quicklog.test.ts`.
+- **The Fun clock** (TEC-186; the `exercise` clock id, labelled Fun in `CLOCK_LABELS`): the last live **walk or
+  playtime** (`countsFor`); a training does not reset it. Plain, no status colour. Analytics still says exercise.
+- **Fun's Pee and Poop buttons** (TEC-186), on the Fun form of a **new** entry only (not on a correction, whose
+  time would be wrong, and not on Training): one tap saves a potty entry at once, no confirm. `at` is the tap,
+  Human is the form's person, no note, no photos. **Where is inferred, purely, by `funPotty`**: a walk is outside
+  and leashed (whatever Where shows); playtime outside is outside (no leash picked); playtime inside is inside,
+  an accident (no spot picked); training gets none. It goes through the usual pending path
+  (`Journal`'s `logPotty` -> `save`): the sheet **stays open**, a toast says "Pee logged", and the form lists
+  each tap ("Pee logged 8:30 PM  outside · leashed") with Saving…, or Not saved + Retry (`unsaved`, `onRetry`), so
+  a failed save is never shown as logged (RULES Never 5; it also sits in the feed with its own Retry). Each tap is
+  its own entry, independent of whether the Fun entry is saved or the sheet is closed. Two taps are two entries.
+  Tests: `tests/pillsway.test.ts`.
+- **The meal gaps under the pills are gone** (TEC-172's second lines, removed by TEC-186, with `mealGaps`,
+  `mealGapText`, `formatGap` and `tests/mealgaps.test.ts`). Meal-to-poop timing lives in Analytics only.
 - **Meals today** (TEC-142): "Meals today: N" at the right of the app bar, beside the livery badge
   (`mealsToday`: live `meal` entries whose `at` falls in the phone's local day; treats, voided and
   deleted entries do not count). The bar is the page's server component, so `app/Meals.tsx` is a
@@ -142,7 +144,7 @@
     `removed`. Correcting a linked weight from the Weight form keeps its `visit`.
   - **The server refuses** a `visit` that is not a vet visit event (`writeEvent` -> `checkVisitTarget`,
     the issue check's twin), a voided copy allowed.
-- **Fun and Training** (TEC-136) replace the Exercise button. Both save kind `exercise` with the
+- **Fun and Training** (TEC-136) replaced the Exercise button (and TEC-186 took both off the Log buttons: Fun is a pill, Training a button). Both save kind `exercise` with the
   existing `type`; the data shape did not change. `FORM_KINDS`, `kindOfForm` and `formOf`
   (`lib/events.ts`) map between the six forms and the five kinds: a walk or playtime is Fun, a
   training is Training. Fun's Type offers Walk and Playtime only (`FUN_TYPES`); Training has no
@@ -216,11 +218,13 @@
     live food treats at the session's exact `at`, to the millisecond. There is no link column.
     Moving the session's When in a correction leaves its treats at the old time (correct them
     from the feed), and they then no longer show on it.
-- **What's new** (TEC-182, `app/WhatsNew.tsx`): the third tab, after Analytics. It lists the newest
-  ten entries of `RELEASES` in `lib/releases.ts`: a date (`YYYY-MM-DD`, the day it went live) and one
-  plain sentence a non-technical reader follows, newest first. Static text, no database, no fetch,
-  no model. Older entries stay in the file; the file is append-only like the journal. The first
-  entries are a backfill from the shipped changes, small fixes merged or left out.
+- **What's new** (TEC-182, plain text since TEC-186; `app/WhatsNew.tsx`): the third tab, after Analytics. **No
+  cards.** Per day, a line "Oct 27 | a short summary of the day" (bold), then that day's entries as "•" bullets.
+  It shows the newest `DAYS_SHOWN` (7) **whole days** (`shownDays`), newest first, never a day cut short. Data
+  is in `lib/releases.ts`: `RELEASES` (a date `YYYY-MM-DD`, the day it went live, and one plain sentence a
+  non-technical reader follows, newest first) and `DAY_SUMMARIES` (one line per date, keyed by it; a test
+  requires a summary for every day with entries and none for a day without). Static text, no database, no
+  fetch, no model. Older entries stay in the file; it is append-only like the journal.
 - **Analytics** (`app/Analytics.tsx`, rebuilt by TEC-143; all aggregation is pure, in
   `lib/analytics.ts`, tested in `tests/timeline.test.ts`; no model call, no data change). The last 14
   local days, six cards,
@@ -291,7 +295,7 @@
 ## How it works
 
 - **Five kinds plus `void`** (`lib/events.ts`; `health` is described under State). `details` per kind, every key required unless
-  marked `?`: potty `{what: pee|poop|both|none, where: outside|inside, leash?: leashed|unleashed|pen, spot?: crate|pen|loose, minutes?: 1-120, issue?: uuid, photos?[]}`
+  marked `?`: potty `{what: pee|poop|both|none, where: outside|inside, leash?: leashed|unleashed|box|pen(retired), spot?: box|loose|crate(retired)|pen(retired), minutes?: 1-120, issue?: uuid, photos?[]}`
   (inside = an accident: warned in the form, red in the feed, counted apart in Analytics;
   `leash` and `minutes` only when outside, `spot` only when inside); food `{type, item_id, item_name, kcal_per, unit, amount}`; exercise
   `{type: walk|playtime|training, where, with_dogs, minutes, treats, commands?, dogs?, photos?}` (commands
@@ -307,27 +311,36 @@
   the poop clock, is never an accident (`isAccident`; inside hides the accident warning and the
   row is not red), and counts as nothing in Analytics' per-day rows. The feed reads
   **No potty** with "outside · leashed" or "inside".
-- **Potty's Leash pick** (Leashed / Unleashed / In pen) shows only while Where is Outside, and
+- **Potty's Leash pick** (Leashed / Unleashed / **In box**, TEC-186) shows only while Where is Outside, and
   defaults to Leashed on a new entry. It is not remembered per phone. Correcting an old outside
   entry that has none opens with nothing picked, so a correction never invents one. The feed
-  shows it after the what: "pee · unleashed".
-- **Potty's Spot pick** (Crate / Pen / Loose, TEC-161) shows only while Where is Inside, the twin of
-  Leash. Nothing is picked by default (a new or old inside entry never gets one unless tapped);
+  shows it after the what: "pee · unleashed". **`pen` is retired** (TEC-186) the way the food catalogue retires
+  an item: `LEASH` still holds it (so `parseDetails` and `lando.details_ok` accept it and the feed labels it
+  "In pen"), but `LEASH_OFFERED` is what the form offers. `leashOptions(current)` adds the entry's own retired
+  value to the chips, picked, so a correction on it shows it and saves it unchanged until another is tapped.
+- **Potty's Spot pick** (**Box** / **Loose**, TEC-161, reworked by TEC-186) shows only while Where is Inside, the
+  twin of Leash. Nothing is picked by default (a new or old inside entry never gets one unless tapped);
   switching Where to Outside drops it from the save, as Inside drops Leash. Optional `spot` in
-  details, inside only (`parseDetails` and `details_ok`, migration `lando_potty_inside_spot`). The
-  feed reads **Pee** with "accident, inside · crate". Inside is still an accident; Analytics is unchanged.
-- **Potty's Time outside** (TEC-176, owner: "Build duration into potty", "5 min increment") shows only while
-  Where is Outside, below Leash: chips 5 to 30 in fives (`OUT_MINUTES_CHIPS`) and a number box in 5-minute
-  steps up to 120 (`OUT_MINUTES_STEP`, `OUT_MINUTES_MAX`). Time from going out to coming back in. Optional: nothing
-  is picked on a new entry, it is never remembered per phone, and a correction opens with the entry's own
-  or nothing. Tapping the picked chip again clears it. Switching Where to Inside drops it from the save. No
+  details, inside only (`parseDetails` and `details_ok`, migration `lando_potty_inside_spot`). `crate` and `pen`
+  are retired exactly as the leash `pen` is (`SPOT` holds all four, `SPOT_OFFERED` is `box`, `loose`,
+  `spotOptions`). The feed reads **Pee** with "accident, inside · box". Inside is still an accident; Analytics is unchanged.
+  Live data at TEC-186: no entry holds leash `pen` or any `spot`. `box` is in `lando.details_ok` through migration
+  `lando_box_leash_spot` (both lists widened, `'box'` added; the spot list is written `('box', 'crate', 'pen',
+  'loose')` because `tests/details-ok-superset.test.ts` mutates the literal `'crate', 'pen', 'loose')`).
+- **Potty's Time outside** (TEC-176, chips only since TEC-186) shows only while Where is Outside, below Leash:
+  **chips only, no number box**: **≤5** (the character "≤", saves 5), 10, 15, 20, 25, 30, 45, 60
+  (`OUT_MINUTES_CHIPS`, `outMinutesLabel`; the ≤5 chip is labelled "5 minutes or less" for screen readers). The pick is the answer.
+  Time from going out to coming back in. Optional: nothing
+  is picked on a new entry, it is never remembered per phone, and a correction opens holding the entry's own
+  minutes. **An off-chip stored value (7, 90) shows no chip picked and saves unchanged** unless a chip is tapped;
+  there is no extra chip for it. Tapping the picked chip again clears it. Switching Where to Inside drops it from the save. No
   potty keeps it. Stored as optional `minutes` in potty details, outside only (`parseDetails` for any whole 1
-  to 120, and `details_ok`, migration `lando_potty_minutes`; the 5-minute step is the form's, so changing it
-  needs no migration). It shows on the feed row only; Analytics is unchanged.
+  to `OUT_MINUTES_MAX` (120), and `details_ok`, migration `lando_potty_minutes`); the bound was not narrowed and
+  no data was touched. It shows on the feed row only; Analytics is unchanged.
 - **A potty row's title is the what** (TEC-174; `describe()`): **Pee**, **Poop**, **Both** or **No potty**
   (`POTTY_WHAT_LABELS`), never "Potty" or "Accident". The detail never repeats it: "outside · leashed",
-  "outside" (no leash picked), "outside · leashed · 5 min" (Time outside, after the leash), "inside · crate", then the issue link and photo count. An accident (`isAccident`)
-  keeps the red row and leads its detail with "accident, " ("accident, inside · crate"). The filter pill, Log
+  "outside" (no leash picked), "outside · leashed · 5 min" (Time outside, after the leash), "inside · box", then the issue link and photo count. An accident (`isAccident`)
+  keeps the red row and leads its detail with "accident, " ("accident, inside · box"). The filter pill, Log
   button and form keep the word Potty. Analytics' day timeline has its own labels (`MARK_LABELS`) and is unchanged.
 - **Photos sit below the Note** (TEC-172) on Potty, Fun and Training: `LogForm` renders one
   `PhotoPicker` after the shared Note field (When and Human, then Note, then Photos), not inside each
@@ -416,9 +429,10 @@
 ## Traps
 
 - **Every Lando change a user would notice adds its line to `RELEASES`** (`lib/releases.ts`), at the
-  top, on the same branch. Plain words, what they can now do, no issue numbers, file names or
-  jargon, no real names. Nothing checks that a change added one; `tests/releases.test.ts` checks
-  only the shape (valid dates, newest first, ten shown, no ticket numbers).
+  top, on the same branch, and a **new day also needs its one-line summary in `DAY_SUMMARIES`**. Plain words,
+  what they can now do, no issue numbers, file names or jargon, no real names. Nothing checks that a change
+  added one; `tests/releases.test.ts` checks the shape (valid dates, newest first, a summary for every day with
+  entries, whole days shown, no ticket numbers). Never rewrite an existing sentence or summary.
 
 - **"JWT issued at future" is Supabase's, intermittent, and retried.** "Couldn't load the journal.
   (couldn't read the journal: JWT issued at future)" is a 401 from Supabase's own clock drift:
@@ -453,7 +467,8 @@
   constraint `events_details_shape` just calls it, so a widening is a new migration holding the
   function's whole current body with the one list or shape grown: copy the whole body from the
   newest migration file that defines `lando.details_ok`, sorting `supabase/migrations` by version
-  (today `lando_potty_minutes`, which is `lando_details_ok_search_path`'s body plus potty's optional
+  (today `lando_box_leash_spot`, which is `lando_potty_minutes`'s body plus `'box'` in the leash and spot lists;
+  that one is `lando_details_ok_search_path`'s plus potty's optional
   `minutes`; that one is `lando_potty_inside_spot`'s plus `set search_path = ''`; keep that line in every copy). No DROP, no constraint swap, and it goes through the connector. Replacing
   the function does **not** re-check existing rows, so a function that narrows would leave rows the
   database now calls invalid, and nothing would say so. Narrowing (removing a value, requiring a

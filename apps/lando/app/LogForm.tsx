@@ -17,13 +17,11 @@ import {
   dogsFromPick,
   kindOfForm,
   dogsPickFor,
-  LEASH,
-  LEASH_LABELS,
   OUT_MINUTES_CHIPS,
-  OUT_MINUTES_MAX,
-  OUT_MINUTES_STEP,
-  SPOT,
-  SPOT_LABELS,
+  funPotty,
+  leashOptions,
+  outMinutesLabel,
+  spotOptions,
   POTTY_WHAT,
   POTTY_WHAT_LABELS,
   UNITS,
@@ -62,7 +60,7 @@ import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import AmountScroller from "./AmountScroller";
 import PhotoPicker, { usePhotos } from "./Photos";
 import Sheet from "./Sheet";
-import { dateLabel, fromDateInput, fromLocalInput, toDateInput, toLocalInput, whenLabel } from "@/lib/localtime";
+import { clockTime, dateLabel, fromDateInput, fromLocalInput, toDateInput, toLocalInput, whenLabel } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
 
 export type Person = { id: string; display_name: string };
@@ -108,6 +106,15 @@ type Props = {
   onLog: (body: LogBody, then?: LogBody[]) => void;
   /** A correction or a delete: awaited, and its error shown here. `then` are saved once it succeeds. */
   onChange: (body: Record<string, unknown>, then?: LogBody[]) => Promise<{ error: string | null }>;
+  /**
+   * Fun's Pee and Poop buttons (TEC-186): a potty entry handed off at once through the same pending
+   * path as any new entry, and the sheet stays open. Never awaited (RULES.md, Never 5).
+   */
+  onPotty: (body: LogBody) => void;
+  /** The state of every entry not yet saved, by id; an id not in it has saved. */
+  unsaved: Record<string, "saving" | "failed">;
+  /** Retry an unsaved entry by id. */
+  onRetry: (id: string) => void;
 };
 
 /* ── Small parts ─────────────────────────────────────────────────────────── */
@@ -220,6 +227,9 @@ export default function LogForm({
   weightUnit,
   onLog,
   onChange,
+  onPotty,
+  unsaved,
+  onRetry,
 }: Props) {
   const kind: LogKind = kindOfForm(form);
   const editing = !!event;
@@ -248,25 +258,30 @@ export default function LogForm({
   // Inside only, nothing picked by default: a new or old inside entry never
   // gets a spot unless one is tapped.
   const [spot, setSpot] = useState<Spot | "">(p?.spot ?? "");
-  // Time outside (TEC-176): optional, outside only, never remembered. Nothing on a new entry, and a
-  // correction opens with the entry's own or nothing. Text, so the number box can be empty or half typed.
-  const [outMin, setOutMin] = useState(p?.minutes ? String(p.minutes) : "");
+  // Time outside (TEC-176, chips only since TEC-186): optional, outside only, never remembered. Nothing on
+  // a new entry; a correction opens holding the entry's own minutes, which stay unless a chip is tapped
+  // (an off-chip value such as 7 shows no chip picked and saves as it was).
+  const [outMin, setOutMin] = useState<number | null>(p?.minutes ?? null);
 
   // Food
   const f = event?.kind === "food" ? asFood(event) : null;
-  const [foodType, setFoodType] = useState<FoodType>(f?.type ?? "meal");
-  const [itemId, setItemId] = useState(f?.item_id ?? quickFood?.itemId ?? defaultFood("meal", remembered));
+  // The Treats button opens Food on a treat (TEC-186); the meal/treat choice stays in the form.
+  const firstFoodType: FoodType = f?.type ?? (quickFood?.type === "treat" ? "treat" : "meal");
+  const [foodType, setFoodType] = useState<FoodType>(firstFoodType);
+  const [itemId, setItemId] = useState(f?.item_id ?? quickFood?.itemId ?? defaultFood(firstFoodType, remembered));
   // An amount from the ⅛ scroller (TEC-136). The amount it opened on stays on
   // the list even when it is not an eighth (an older 1/3), so an untouched
   // correction keeps it.
   const [amount, setAmount] = useState<number | null>(
-    f ? f.amount : quickFood?.itemId ? quickFood.amount : defaultAmount("meal", remembered)
+    f ? f.amount : quickFood?.itemId ? quickFood.amount : defaultAmount(firstFoodType, remembered)
   );
   const [openedAmount] = useState(amount);
 
   // Exercise: Fun is a walk or playtime; Training is always training (TEC-136).
   const x = event?.kind === "exercise" ? asExercise(event) : null;
   const [exType, setExType] = useState<ExerciseType>(form === "training" ? "training" : x?.type ?? "walk");
+  // Fun's Pee and Poop buttons (TEC-186): what this form has logged so far. Each is its own potty entry.
+  const [tapped, setTapped] = useState<{ id: string; what: "pee" | "poop"; at: string; detail: string }[]>([]);
   // Training's Treats pop-up: treats picked here are saved with the session.
   const [treatQueue, setTreatQueue] = useState<QueuedTreat[]>([]);
   const [treatOpen, setTreatOpen] = useState(false);
@@ -370,6 +385,23 @@ export default function LogForm({
     return describe({ kind: "food", details }).detail;
   };
 
+  /** Fun's Pee or Poop: one tap saves a potty entry now, no confirm. Where comes from `funPotty`. */
+  function tapPotty(what: "pee" | "poop") {
+    const raw = funPotty({ type: exType, where }, what);
+    if (!raw) return;
+    const at = new Date().toISOString();
+    const body: LogBody = {
+      id: crypto.randomUUID(),
+      kind: "potty",
+      at,
+      person_id: personId || null,
+      details: parseDetails("potty", raw),
+      note: null,
+    };
+    setTapped((t) => [...t, { id: body.id, what, at, detail: describe(body).detail }]);
+    onPotty(body);
+  }
+
   async function addDog(e: { preventDefault(): void }) {
     e.preventDefault();
     setDogError(null);
@@ -397,7 +429,7 @@ export default function LogForm({
           where,
           ...(where === "outside" && leash ? { leash } : {}),
           ...(where === "inside" && spot ? { spot } : {}),
-          ...(where === "outside" && outMin.trim() ? { minutes: Number(outMin) } : {}),
+          ...(where === "outside" && outMin !== null ? { minutes: outMin } : {}),
           ...(hasIssue && issue ? { issue } : {}),
           ...(photos.paths.length ? { photos: photos.paths } : {}),
         };
@@ -561,37 +593,26 @@ export default function LogForm({
                 label="Leash"
                 value={leash}
                 onChange={setLeash}
-                options={LEASH.map((l) => [l, LEASH_LABELS[l]] as const)}
+                options={leashOptions(leash)}
               />
             </Field>
           )}
           {where === "outside" && (
-            <Field label="Time outside" htmlFor="f-outmin">
-              <div className="flex flex-wrap items-center gap-1.5">
+            <Field label="Time outside">
+              {/* Chips only (TEC-186): the pick is the answer. "≤5" saves 5. */}
+              <div role="group" aria-label="Time outside, minutes" className="flex flex-wrap items-center gap-1.5">
                 {OUT_MINUTES_CHIPS.map((m) => (
                   <button
                     key={m}
                     type="button"
-                    aria-pressed={outMin === String(m)}
-                    onClick={() => setOutMin(outMin === String(m) ? "" : String(m))}
+                    aria-pressed={outMin === m}
+                    aria-label={m === 5 ? "5 minutes or less" : `${m} minutes`}
+                    onClick={() => setOutMin(outMin === m ? null : m)}
                     className="block cursor-pointer whitespace-nowrap rounded-full border border-line bg-surface px-3.5 py-2 aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-ink focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-pinstripe"
                   >
-                    {m}
+                    {outMinutesLabel(m)}
                   </button>
                 ))}
-                <input
-                  id="f-outmin"
-                  type="number"
-                  inputMode="numeric"
-                  min={OUT_MINUTES_STEP}
-                  max={OUT_MINUTES_MAX}
-                  step={OUT_MINUTES_STEP}
-                  value={outMin}
-                  onChange={(e) => setOutMin(e.target.value)}
-                  placeholder="min"
-                  aria-label="Minutes outside"
-                  className={`${input} !w-20`}
-                />
               </div>
             </Field>
           )}
@@ -602,7 +623,7 @@ export default function LogForm({
                 label="Spot"
                 value={spot}
                 onChange={setSpot}
-                options={SPOT.map((l) => [l, SPOT_LABELS[l]] as const)}
+                options={spotOptions(spot)}
               />
             </Field>
           )}
@@ -724,6 +745,54 @@ export default function LogForm({
             )}
             {dogError && <p className="text-[13px] font-semibold text-danger">{dogError}</p>}
           </Field>
+          {/* Pee and Poop (TEC-186): a Fun form only, on a new entry. Each tap is its own potty entry,
+              saved at once and independent of whether this Fun entry is. */}
+          {form === "fun" && !editing && funPotty({ type: exType, where }, "pee") && (
+            <div className="grid gap-1.5 rounded-xl border border-line bg-surface p-2.5">
+              <span className="text-xs uppercase tracking-[0.06em] text-ink-soft">Log a potty now</span>
+              <div className="grid grid-cols-2 gap-2">
+                {(["pee", "poop"] as const).map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => tapPotty(w)}
+                    className="min-h-[44px] rounded-xl border border-line bg-paper px-3 py-2 font-bold active:translate-y-px focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-pinstripe"
+                  >
+                    {POTTY_WHAT_LABELS[w]}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[13px] text-ink-soft">
+                Logs now as {describe({ kind: "potty", details: funPotty({ type: exType, where }, "pee")! }).detail}. Each tap is
+                its own entry, saved right away, whether or not you save this one.
+              </p>
+              {tapped.length > 0 && (
+                <ul aria-live="polite" aria-label="Potty entries logged from this form" className="grid gap-1 text-[13px]">
+                  {tapped.map((t) => {
+                    const state = unsaved[t.id];
+                    return (
+                      <li key={t.id} className="flex flex-wrap items-center gap-x-2">
+                        <span className="font-semibold">
+                          {state === "failed" ? "✗" : state ? "…" : "✓"} {POTTY_WHAT_LABELS[t.what]}
+                          {state ? "" : " logged"} {clockTime(t.at)}
+                        </span>
+                        <span className="text-ink-soft">{t.detail}</span>
+                        {state === "saving" && <span className="text-ink-soft">Saving…</span>}
+                        {state === "failed" && (
+                          <>
+                            <span className="text-danger">Not saved</span>
+                            <button type="button" onClick={() => onRetry(t.id)} className="font-medium underline">
+                              Retry
+                            </button>
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <Field label="Length (min)" htmlFor="f-mins">
               <input id="f-mins" type="number" inputMode="numeric" min={1} max={600} value={minutes} onChange={(e) => setMinutes(e.target.value)} className={input} />

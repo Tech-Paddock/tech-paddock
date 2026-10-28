@@ -5,8 +5,9 @@
  * issue numbers, file names or jargon, and no real names (RULES.md, Never 2).
  *
  * Append-only, like the journal. Add the new entry at the TOP in the same
- * branch as the change; never rewrite an old one. The tab shows the newest
- * `RELEASES_SHOWN`; older entries stay here.
+ * branch as the change; never rewrite an old one. A new day also gets its
+ * one-line summary in `DAY_SUMMARIES` (TEC-186). The tab shows the newest
+ * `DAYS_SHOWN` whole days; older entries stay here.
  */
 export type Release = {
   /** The day it went live, YYYY-MM-DD. */
@@ -15,9 +16,30 @@ export type Release = {
   text: string;
 };
 
-export const RELEASES_SHOWN = 10;
+/** How many whole days the tab shows, newest first. */
+export const DAYS_SHOWN = 7;
+
+/**
+ * One short, plain line per day that has entries: what the day was about. The tab reads
+ * "Oct 27 | <this line>" and then the day's entries as bullets. Newest first; a summary,
+ * once written, is not rewritten.
+ */
+export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
+  "2026-10-28": "The top boxes are now the way in, and logging a potty got quicker.",
+  "2026-10-27": "Quick entries from the top boxes, colour in the feed, and time outside.",
+  "2026-10-26": "Analytics rebuilt, Fun and Training split out, and plenty of small improvements.",
+  "2026-10-25": "A Health button for vet visits and medical issues.",
+  "2026-10-21": "Lando's puppy journal goes live.",
+};
 
 export const RELEASES: readonly Release[] = [
+  { date: "2026-10-28", text: "The box at the top that said Exercise is now Fun. It counts walks and playtime only, and tapping it opens a new Fun entry." },
+  { date: "2026-10-28", text: "The Log buttons are now Treats, Training, Weight and Health. Treats opens the food form on a treat, and Potty and Fun are reached from the top boxes." },
+  { date: "2026-10-28", text: "The lines of meal timing under the top boxes are gone." },
+  { date: "2026-10-28", text: "On a new Fun entry, tap Pee or Poop to log a potty trip right away. A walk or play outside counts as normal, and play inside counts as an accident." },
+  { date: "2026-10-28", text: "Time outside is picked from buttons only, from 5 minutes or less up to 60, and the number box is gone." },
+  { date: "2026-10-28", text: "Outside potty trips can now say In box, and inside ones can say Box. Older entries that say pen or crate still read as before." },
+  { date: "2026-10-28", text: "This page is now plain text: a line for each day, then that day's updates." },
   { date: "2026-10-27", text: "Tap the Pee, Poop or Meal box at the top and a quick entry opens with the usual answers already filled in." },
   { date: "2026-10-27", text: "Each kind of entry has its own colour in the feed, and you can show more than one kind at a time." },
   { date: "2026-10-27", text: "When you log a potty trip outside, you can tap how many minutes it took." },
@@ -40,7 +62,26 @@ export const RELEASES: readonly Release[] = [
   { date: "2026-10-21", text: "Lando's puppy journal is live: log pee, poop, meals, exercise and weight, and see how long since the last one." },
 ];
 
-/** The entries the tab shows: the newest few, in the order written. */
-export function shownReleases(list: readonly Release[] = RELEASES): readonly Release[] {
-  return list.slice(0, RELEASES_SHOWN);
+export type ReleaseDay = { date: string; summary: string; items: string[] };
+
+/**
+ * The days the tab shows: whole days, newest first, each with its summary and its entries in
+ * the order written. A day with no summary reads with an empty one (a test forbids it).
+ */
+export function shownDays(
+  list: readonly Release[] = RELEASES,
+  summaries: Readonly<Record<string, string>> = DAY_SUMMARIES,
+  days: number = DAYS_SHOWN
+): ReleaseDay[] {
+  const out: ReleaseDay[] = [];
+  for (const r of list) {
+    let day = out.find((d) => d.date === r.date);
+    if (!day) {
+      if (out.length >= days) break;
+      day = { date: r.date, summary: summaries[r.date] ?? "", items: [] };
+      out.push(day);
+    }
+    day.items.push(r.text);
+  }
+  return out;
 }

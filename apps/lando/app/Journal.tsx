@@ -10,6 +10,7 @@ import {
   KIND_LABELS,
   LOG_KINDS,
   PILL_STATUS_WORDS,
+  TREAT_QUICK_LOG,
   describe,
   displayUnit,
   emptyFeedText,
@@ -25,8 +26,6 @@ import {
   isAccident,
   latestWeight,
   liveEvents,
-  mealGapText,
-  mealGaps,
   mealsToday,
   pillStatus,
   quickLog,
@@ -85,7 +84,7 @@ async function postJson(url: string, body: unknown): Promise<{ ok: boolean; stat
 const isLogBody = (b: unknown): b is LogBody =>
   !!b && typeof b === "object" && LOG_KINDS.includes((b as LogBody).kind) && typeof (b as LogBody).details === "object";
 
-/** A since-last pill; a button when tapping it logs (TEC-181), a plain box otherwise (Exercise). */
+/** A since-last pill; a button once the journal has loaded, so tapping it logs (TEC-181, TEC-186), a plain box before. */
 function Pill({
   tap,
   title,
@@ -116,9 +115,9 @@ function Pill({
 
 /**
  * Three tabs, Log, Analytics and What's new, opening on Log (RULES.md, Surface: app, the
- * owner's override, 2026-10-20). Log: since-last pills, who is logging, six section
- * buttons that each open a short form with defaults (Potty, Food, Fun,
- * Training, Weight, Health; TEC-136, TEC-137), and a feed of every loaded day, by when each
+ * owner's override, 2026-10-20). Log: four since-last pills that each open a quick log (Pee,
+ * Poop, Meal, Fun; TEC-181, TEC-186), who is logging, four buttons that open a short form with
+ * defaults (Treats, Training, Weight, Health; TEC-186), and a feed of every loaded day, by when each
  * entry happened, with a filter matching the buttons. Analytics: the last
  * fourteen days and the growth chart.
  *
@@ -332,6 +331,16 @@ export default function Journal() {
     void save(body, true, then);
   }
 
+  // Fun's Pee and Poop (TEC-186): saved at once through the usual pending row; the sheet stays open.
+  function logPotty(body: LogBody) {
+    void save(body, true);
+  }
+
+  function retryPending(id: string) {
+    const p = pending.find((x) => x.body.id === id);
+    if (p) void save(p.body, true, p.then);
+  }
+
   async function change(body: Record<string, unknown>, then?: LogBody[]): Promise<{ error: string | null }> {
     try {
       const { ok, status, data } = await postJson("/api/events", body);
@@ -356,8 +365,6 @@ export default function Journal() {
   }
 
   const clocks = useMemo(() => (loaded ? sinceLast(loaded.events, now) : null), [loaded, now]);
-  // The second line under pee, poop and food (TEC-172): meal to pee, meal to poop, meal to meal.
-  const gaps = useMemo(() => (loaded ? mealGaps(loaded.events, now) : null), [loaded, now]);
   // "Meals today: N" in the app bar (TEC-142): the phone's day, live meals only.
   useReportMeals(loaded ? mealsToday(loaded.events, now) : null);
   // The feed (TEC-136): every live entry in the read's window (today and the
@@ -443,18 +450,18 @@ export default function Journal() {
           hidden={tab !== "log"}
           className={tab === "log" ? "flex flex-col gap-4" : "hidden"}
         >
-          {/* Since-last pills: one row, label over value; the clock time is in the title. */}
+          {/* Since-last pills: one row, label over value; the clock time is in the title. All four open
+              a quick log (TEC-181, Fun since TEC-186). */}
           <section aria-label="Since last" className="grid grid-cols-4 gap-1.5">
             {CLOCKS.map((c) => {
               const last = clocks?.[c] ?? null;
-              // Green, yellow or red by how long ago (TEC-142); exercise and "none" stay plain.
+              // Green, yellow or red by how long ago (TEC-142); Fun and "none" stay plain.
               const status = last ? pillStatus(c, now.getTime() - Date.parse(last.at)) : null;
-              // Pee, Poop and Meal open a quick log (TEC-181); Exercise is not tappable.
+              // Pee, Poop, Meal and Fun open a quick log, once the journal has loaded.
               const tap = clocks ? quickLog(c, clocks.food) : null;
-              const gapLine = gaps && c !== "exercise" ? mealGapText(c, gaps[c]) : null;
               return (
-                <div key={c} className="flex min-w-0 flex-col gap-0.5">
                 <Pill
+                  key={c}
                   tap={tap}
                   title={
                     last || tap
@@ -484,14 +491,6 @@ export default function Journal() {
                     {tap ? ", tap to log" : ""}
                   </span>
                 </Pill>
-                {/* Second line (TEC-172): plain, no status colour; the pill above keeps its own. */}
-                {gapLine && (
-                  <div title={gapLine.words} className="truncate text-center text-[10px] leading-tight tabular-nums text-ink-soft">
-                    <span aria-hidden="true">{gapLine.short}</span>
-                    <span className="sr-only">{gapLine.words}</span>
-                  </div>
-                )}
-                </div>
               );
             })}
           </section>
@@ -538,22 +537,27 @@ export default function Journal() {
           </section>
           {personError && !askWho && <p className="-mt-3 text-sm text-urgent">{personError}</p>}
 
-          {/* Six sections, each opening its form, two rows of three (TEC-137):
-              Potty, Food, Fun / Training, Weight, Health. The Weight button
-              wears the newest weight; its date is in the title and for screen readers. */}
+          {/* Four buttons, two rows of two (TEC-186): Treats, Training / Weight, Health. Potty and Fun
+              are reached through the pills (and Fun's own Pee and Poop). Treats opens Food on a treat;
+              the meal/treat choice stays in the form. The Weight button wears the newest weight; its
+              date is in the title and for screen readers. */}
           <section aria-label="Log">
             <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Log</h2>
-            <div className="grid grid-cols-3 gap-1.5">
-              {(["potty", "food", "fun", "training"] as const).map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => setOpen({ form: k })}
-                  className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-0.5 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
-                >
-                  <b className="truncate text-[15px] leading-tight">{FORM_LABELS[k]}</b>
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setOpen({ form: "food", quick: TREAT_QUICK_LOG })}
+                className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-0.5 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
+              >
+                <b className="truncate text-[15px] leading-tight">Treats</b>
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen({ form: "training" })}
+                className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-0.5 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
+              >
+                <b className="truncate text-[15px] leading-tight">{FORM_LABELS.training}</b>
+              </button>
               <button
                 type="button"
                 onClick={() => setOpen({ form: "weight" })}
@@ -737,6 +741,9 @@ export default function Journal() {
             weightUnit={weightUnit}
             onLog={logNew}
             onChange={change}
+            onPotty={logPotty}
+            unsaved={Object.fromEntries(pending.map((p) => [p.body.id, p.status]))}
+            onRetry={retryPending}
           />
         </Sheet>
       )}

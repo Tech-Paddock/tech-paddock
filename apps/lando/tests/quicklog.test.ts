@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLOCKS, CLOCK_LABELS, quickLog, sinceLast, type JournalEvent } from "@/lib/events";
+import { CLOCKS, CLOCK_LABELS, TREAT_QUICK_LOG, quickLog, sinceLast, type JournalEvent } from "@/lib/events";
 
 // Invented ids. Nothing here is a real person or a real dog's record.
 let n = 0;
@@ -24,9 +24,14 @@ describe("quickLog — what a tapped pill opens (TEC-181)", () => {
     expect(quickLog("poop", null)).toEqual({ form: "potty", what: "poop" });
   });
 
-  it("Exercise is not tappable", () => {
-    expect(quickLog("exercise", null)).toBeNull();
-    expect(CLOCKS.filter((c) => quickLog(c, null))).toEqual(["pee", "poop", "food"]);
+  it("Fun opens the Fun form on a new entry, and every pill is tappable (TEC-186)", () => {
+    expect(CLOCK_LABELS.exercise).toBe("Fun");
+    expect(quickLog("exercise", null)).toEqual({ form: "fun" });
+    expect(CLOCKS.filter((c) => quickLog(c, null))).toEqual(["pee", "poop", "food", "exercise"]);
+  });
+
+  it("the Treats button opens Food on a treat, with the meal/treat choice left in the form (TEC-186)", () => {
+    expect(TREAT_QUICK_LOG).toEqual({ form: "food", itemId: null, amount: null, type: "treat" });
   });
 
   it("Meal opens Food on the last meal's item and amount", () => {
