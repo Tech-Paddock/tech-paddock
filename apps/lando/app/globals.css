@@ -12,12 +12,31 @@ body {
 
 /* Installed to the home screen there is no browser chrome, so the page runs
    under the notch and the home indicator. In Safari these insets are zero
-   and this changes nothing. */
+   and this changes nothing.
+
+   The top (TEC-188): the page is not scrolled by the inset, it is held clear
+   of it. The body used to pad the top by the inset, which only moves the first
+   screen down: scrolled, the content slid up through the band above the sticky
+   tabs (which sit at top: the inset), so it showed behind the status bar and
+   the bar looked tight under it. Now a fixed strip of the paper colour, exactly
+   the inset tall, covers that band, and the body adds a few pixels of clear
+   space (at most 8px, and none when the inset is zero) under it. */
 body {
-  padding-top: env(safe-area-inset-top);
+  padding-top: calc(env(safe-area-inset-top, 0px) + min(env(safe-area-inset-top, 0px), 8px));
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+}
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background-color: var(--paper);
+  z-index: 10;
+  pointer-events: none;
 }
 
 /* Analytics chart series (app/Glyph.tsx, DayTimeline.tsx, DailyChart.tsx,

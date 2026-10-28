@@ -55,9 +55,10 @@ import {
   type LogKind,
   type Unit,
 } from "@/lib/events";
-import { amountOptions, picklist, findFood, unitLabel, type FoodType } from "@/lib/foods";
+import { amountOptions, picklist, findFood, treatQtyError, unitLabel, type FoodType } from "@/lib/foods";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import AmountScroller from "./AmountScroller";
+import TreatQty from "./TreatQty";
 import PhotoPicker, { usePhotos } from "./Photos";
 import Sheet from "./Sheet";
 import { clockTime, dateLabel, fromDateInput, fromLocalInput, toDateInput, toLocalInput, whenLabel } from "@/lib/localtime";
@@ -285,6 +286,7 @@ export default function LogForm({
   // Training's Treats pop-up: treats picked here are saved with the session.
   const [treatQueue, setTreatQueue] = useState<QueuedTreat[]>([]);
   const [treatOpen, setTreatOpen] = useState(false);
+  const [treatError, setTreatError] = useState<string | null>(null);
   const [treatItem, setTreatItem] = useState(defaultFood("treat", remembered));
   const [treatAmount, setTreatAmount] = useState<number | null>(defaultAmount("treat", remembered));
   // One pick (TEC-129): None, a dog, or Multiple; picking is the answer to
@@ -363,11 +365,18 @@ export default function LogForm({
   function openTreat() {
     setTreatItem(defaultFood("treat", remembered));
     setTreatAmount(defaultAmount("treat", remembered));
+    setTreatError(null);
     setTreatOpen(true);
   }
 
   /** The pop-up's Add: queue the treat and count it on the session. */
   function addTreat() {
+    const bad = treatQtyError(treatAmount);
+    if (bad) {
+      setTreatError(bad);
+      return;
+    }
+    setTreatError(null);
     setTreatQueue((q) => [...q, { id: crypto.randomUUID(), item_id: treatItem, amount: treatAmount }]);
     setTreats((n) => String((Number(n) || 0) + 1));
     setTreatOpen(false);
@@ -470,6 +479,15 @@ export default function LogForm({
     if (kind === "health" && !note.trim()) {
       setError("Say what happened — the note is required.");
       return;
+    }
+    // A treat's amount is a whole number, 1 or more (TEC-188). A correction that never touched it
+    // keeps whatever it opened on.
+    if (kind === "food" && foodType === "treat") {
+      const bad = treatQtyError(amount, f ? f.amount : undefined);
+      if (bad) {
+        setError(bad);
+        return;
+      }
     }
     let details: Details;
     try {
@@ -600,7 +618,7 @@ export default function LogForm({
           {where === "outside" && (
             <Field label="Time outside">
               {/* Chips only (TEC-186): the pick is the answer. "≤5" saves 5. */}
-              <div role="group" aria-label="Time outside, minutes" className="flex flex-wrap items-center gap-1.5">
+              <div role="group" aria-label="Time outside, minutes" className="grid grid-cols-8 gap-1">
                 {OUT_MINUTES_CHIPS.map((m) => (
                   <button
                     key={m}
@@ -608,7 +626,7 @@ export default function LogForm({
                     aria-pressed={outMin === m}
                     aria-label={m === 5 ? "5 minutes or less" : `${m} minutes`}
                     onClick={() => setOutMin(outMin === m ? null : m)}
-                    className="block cursor-pointer whitespace-nowrap rounded-full border border-line bg-surface px-3.5 py-2 aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-ink focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-pinstripe"
+                    className="flex min-h-[44px] min-w-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-line bg-surface px-0 aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-ink focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-pinstripe"
                   >
                     {outMinutesLabel(m)}
                   </button>
@@ -639,7 +657,7 @@ export default function LogForm({
           <Field label="Type">
             <Seg name="type" label="Type" value={foodType} onChange={pickFoodType} options={[["meal", "Meal"], ["treat", "Treat"]] as const} />
           </Field>
-          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2">
+          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start gap-2">
             <Field label="What" htmlFor="f-item">
               <select id="f-item" value={itemId} onChange={(e) => setItemId(e.target.value)} className={input}>
                 {/* A retired item stays selectable on the entry that already has it. */}
@@ -651,13 +669,22 @@ export default function LogForm({
               </select>
             </Field>
             <Field label={amountUnit ? `Amount (${amountUnit})` : "Amount"} htmlFor="f-amount">
-              <AmountScroller
-                id="f-amount"
-                label={amountUnit ? `Amount in ${amountUnit}` : "Amount"}
-                options={amountOptions(openedAmount, defaultAmount("meal", remembered))}
-                value={amount}
-                onChange={setAmount}
-              />
+              {foodType === "treat" ? (
+                <TreatQty
+                  id="f-amount"
+                  label={amountUnit ? `Amount in ${amountUnit}` : "Amount"}
+                  value={amount}
+                  onChange={setAmount}
+                />
+              ) : (
+                <AmountScroller
+                  id="f-amount"
+                  label={amountUnit ? `Amount in ${amountUnit}` : "Amount"}
+                  options={amountOptions(openedAmount, defaultAmount("meal", remembered))}
+                  value={amount}
+                  onChange={setAmount}
+                />
+              )}
             </Field>
           </div>
           {item?.unit === null && <p className="-mt-2 text-[13px] text-ink-soft">Misc: say what it was in the note.</p>}
@@ -839,7 +866,7 @@ export default function LogForm({
           )}
           {treatOpen && (
             <Sheet title="Treat" onClose={() => setTreatOpen(false)} nested>
-              <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2">
+              <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start gap-2">
                 <Field label="What" htmlFor="t-item">
                   <select id="t-item" value={treatItem} onChange={(e) => setTreatItem(e.target.value)} className={input}>
                     {picklist("treat").map((o) => (
@@ -850,15 +877,15 @@ export default function LogForm({
                   </select>
                 </Field>
                 <Field label={treatFood?.unit ? `Amount (${unitLabel(treatFood.unit, treatAmount ?? 2)})` : "Amount"} htmlFor="t-amount">
-                  <AmountScroller
+                  <TreatQty
                     id="t-amount"
                     label={treatFood?.unit ? `Amount in ${unitLabel(treatFood.unit, treatAmount ?? 2)}` : "Amount"}
-                    options={amountOptions(defaultAmount("treat", remembered))}
                     value={treatAmount}
                     onChange={setTreatAmount}
                   />
                 </Field>
               </div>
+              {treatError && <p className="text-[13px] font-semibold text-danger">{treatError}</p>}
               <p className="text-[13px] text-ink-soft">
                 Logged as a treat at this session&apos;s time when you save it, and counted in Treats used.
               </p>

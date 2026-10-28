@@ -147,3 +147,17 @@ export function amountOptions(...keep: (number | null)[]): (number | null)[] {
   steps.sort((a, b) => a - b);
   return [null, ...steps];
 }
+
+/* ── A treat's quantity (TEC-188) ─────────────────────────────────────────── */
+
+/**
+ * Why a treat's amount cannot be saved, or null. A new treat takes a whole number of 1 or more.
+ * `opened` is the amount a correction opened on (omit it for a new treat): left untouched it saves as it was, so an older
+ * treat holding part of a piece is never forced to change. The stored shape and `parseDetails`
+ * are unchanged; this is the form's rule.
+ */
+export function treatQtyError(amount: number | null, opened?: number | null): string | null {
+  if (opened !== undefined && amount === opened) return null;
+  if (amount === null || !Number.isInteger(amount) || amount < 1) return "Treat amount: enter a whole number, 1 or more.";
+  return null;
+}

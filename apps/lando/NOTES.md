@@ -5,9 +5,10 @@
 - v2 on Next.js 16: three tabs under the app bar, **Log**, **Analytics** and **What's new**, sticky, opening on Log
   (RULES.md holds the owner's override of the one-screen rule).
 - **Log** (TEC-186 made the pills the way in): four since-last pills in one row (Pee, Poop, Meal, **Fun**;
-  label over value, the clock time in the title and for screen readers; coloured by TEC-142, below), "Logging
-  as", **four buttons in two rows of two** (Treats, Training / Weight, Health; same 52px height and 15px labels
-  as before, so each is wider), then the **Feed** under a row of filter pills (TEC-171, below). **Potty and
+  label over value, the clock time in the title and for screen readers; coloured by TEC-142, below), then
+  **four buttons in one row directly under them** (TEC-188: Treats, Training, Weight, Health, the pills' own
+  grid and 44px height, so the same size; no "Log" heading; Weight keeps "7.3 lb" as a small second line,
+  which fits at pill width, the date in its title), then "Logging as", then the **Feed** under a row of filter pills (TEC-171, below). **Potty and
   Fun have no button**: they are reached through the pills (Fun's own Pee and Poop, below) and by tapping a
   feed row. **Treats** opens the Food form on a treat (`TREAT_QUICK_LOG`; the Meal/Treat choice stays in the
   form, and the Food filter pill and the form keep the name Food). No growth chart on Log since TEC-129: it
@@ -190,7 +191,14 @@
   computes it from the CSS): each edge at least 4.4:1 on the paper and the surface, light and dark; ink on a
   tint at least 11:1. Food's light burnt papaya is the nearest to the yellow status; the two never sit side
   by side. The Log buttons, Analytics and the day timeline keep their own colours.
-- **Food amount is a scroll picker in ⅛ steps** (TEC-136, `app/AmountScroller.tsx`, a local
+- **A treat's amount is a plain whole-number box** (TEC-188, `app/TreatQty.tsx`, a digits-only text input with a
+  numeric keypad, min 1, opens on 1), in the Food form when Type is Treat and in Training's "+ Treat" pop-up.
+  Meals keep the scroller below. `treatQtyError` (`lib/foods.ts`) is the form's rule (a new treat: whole, 1 or
+  more); a correction that never touched the box saves the amount it opened on, so an older treat holding a
+  part of a piece (or none) is not forced to change. Stored shape and `parseDetails` are unchanged (the server
+  still accepts any amount above 0). The What select and the amount sit in a grid with `items-start`, so What
+  keeps a normal input height beside the 120px scroller.
+- **Food amount, for meals, is a scroll picker in ⅛ steps** (TEC-136, `app/AmountScroller.tsx`, a local
   pattern): three rows show, the middle one is the pick, it snaps a step at a time; one
   `spinbutton` for screen readers (arrows step, Page keys a whole unit, Home and End). It offers
   "—" (no amount, as before) and 1/8 up to `AMOUNT_PICKER_MAX` (20) (`amountOptions`). The stored
@@ -201,7 +209,7 @@
   meal amount, or "—" on its first.
 - **Treats on Training** (TEC-136): "+ Treat" beside Treats used opens a pop-up (a nested
   `Sheet`, drawn into `<body>`; its Escape closes it alone) to pick the treat (opens on Misc) and
-  its amount (the scroller, opens on 1). Add treat queues it in the form ("To log on save: …", ✕
+  its amount (the whole-number box, opens on 1). Add treat queues it in the form ("To log on save: …", ✕
   removes it) and adds one to Treats used (✕ takes one off); the number stays editable. On Save,
   each queued treat becomes a food `treat` entry at the session's exact `at` and Human
   (`treatEntry`), saved **after** the session:
@@ -329,7 +337,7 @@
   'loose')` because `tests/details-ok-superset.test.ts` mutates the literal `'crate', 'pen', 'loose')`).
 - **Potty's Time outside** (TEC-176, chips only since TEC-186) shows only while Where is Outside, below Leash:
   **chips only, no number box**: **≤5** (the character "≤", saves 5), 10, 15, 20, 25, 30, 45, 60
-  (`OUT_MINUTES_CHIPS`, `outMinutesLabel`; the ≤5 chip is labelled "5 minutes or less" for screen readers). The pick is the answer.
+  (`OUT_MINUTES_CHIPS`, `outMinutesLabel`; the ≤5 chip is labelled "5 minutes or less" for screen readers). The pick is the answer. The eight chips are one `grid-cols-8` row (about 39px wide, 44px tall at 360px; TEC-188), so a ninth would need a second row.
   Time from going out to coming back in. Optional: nothing
   is picked on a new entry, it is never remembered per phone, and a correction opens holding the entry's own
   minutes. **An off-chip stored value (7, 90) shows no chip picked and saves unchanged** unless a chip is tapped;
@@ -450,6 +458,13 @@
   `<body>` for that reason. React events still bubble through the portal to the outer `<form>`,
   so the pop-up holds no `<form>` and only `type="button"` buttons, or Enter would save the
   session.
+- **The top of the installed app** (TEC-188). Installed, `viewportFit: "cover"` lets the page run under the status
+  bar. `body` used to pad the top by `env(safe-area-inset-top)`, which only moves the first screen down; scrolled,
+  content slid up through that band above the sticky tabs (`top: env(safe-area-inset-top)`) and showed behind the
+  status bar. Now `body::before` is a fixed paper-coloured strip exactly the inset tall (`app/globals.css`), and the
+  body pads the inset plus `min(inset, 8px)`, so the bar has up to 8px of clear space and Safari (inset 0) is
+  unchanged. Checked here only by rewriting the inset to 47px in a Playwright run; never on a real standalone
+  iPhone. Keep the strip's z-index at the tabs' (10) or below the sheet backdrop (20).
 - **The amount scroller's rows are 40px each** (`ROW` in `app/AmountScroller.tsx`): the band,
   the padding rows and the box height (120) assume it. Change all of them together.
 

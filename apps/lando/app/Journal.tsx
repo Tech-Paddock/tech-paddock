@@ -84,6 +84,10 @@ async function postJson(url: string, body: unknown): Promise<{ ok: boolean; stat
 const isLogBody = (b: unknown): b is LogBody =>
   !!b && typeof b === "object" && LOG_KINDS.includes((b as LogBody).kind) && typeof (b as LogBody).details === "object";
 
+/** The since-last pills and the four Log buttons under them share one size (TEC-188); 44px keeps the hit area. */
+const PILL_SIZE = "flex min-h-[44px] flex-col justify-center";
+const BTN = "flex min-h-[44px] min-w-0 items-center justify-center rounded-xl px-0.5 py-1";
+
 /** A since-last pill; a button once the journal has loaded, so tapping it logs (TEC-181, TEC-186), a plain box before. */
 function Pill({
   tap,
@@ -98,7 +102,7 @@ function Pill({
   onTap?: () => void;
   children: React.ReactNode;
 }) {
-  const cls = "lando-pill w-full min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center";
+  const cls = `lando-pill ${PILL_SIZE} w-full min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center`;
   if (!tap) return <div title={title} data-status={status ?? undefined} className={cls}>{children}</div>;
   return (
     <button
@@ -495,6 +499,49 @@ export default function Journal() {
             })}
           </section>
 
+          {/* Four buttons in one row, the pills' size and grid, directly under them (TEC-188): Treats,
+              Training, Weight, Health. Potty and Fun are reached through the pills (and Fun's own Pee and
+              Poop). Treats opens Food on a treat; the meal/treat choice stays in the form. The Weight
+              button keeps its newest weight as a small second line (it fits at pill width); its date is in
+              the title and for screen readers. */}
+          <section aria-label="Log" className="-mt-2 grid grid-cols-4 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setOpen({ form: "food", quick: TREAT_QUICK_LOG })}
+              className={`${BTN} bg-[var(--tone-2-bg)] text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]`}
+            >
+              <b className="truncate text-[15px] leading-tight">Treats</b>
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen({ form: "training" })}
+              className={`${BTN} bg-[var(--tone-2-bg)] text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]`}
+            >
+              <b className="truncate text-[15px] leading-tight">{FORM_LABELS.training}</b>
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen({ form: "weight" })}
+              title={weightNote ?? undefined}
+              className={`${BTN} flex-col bg-raised text-ink shadow-[0_3px_0_rgb(var(--line-rgb))] active:translate-y-0.5 active:shadow-[0_1px_0_rgb(var(--line-rgb))]`}
+            >
+              <b className="truncate text-[15px] leading-tight">Weight</b>
+              {weightFace && (
+                <span aria-hidden="true" className="truncate text-[11px] leading-tight tabular-nums text-ink-soft">
+                  {weightFace}
+                </span>
+              )}
+              {weightNote && <span className="sr-only">, {weightNote}</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen({ form: "health" })}
+              className={`${BTN} bg-[var(--tone-2-bg)] text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]`}
+            >
+              <b className="truncate text-[15px] leading-tight">{FORM_LABELS.health}</b>
+            </button>
+          </section>
+
           {/* Who is logging */}
           <section className="flex items-center gap-2">
             <label htmlFor="who" className="text-ink-soft">
@@ -536,51 +583,6 @@ export default function Journal() {
             )}
           </section>
           {personError && !askWho && <p className="-mt-3 text-sm text-urgent">{personError}</p>}
-
-          {/* Four buttons, two rows of two (TEC-186): Treats, Training / Weight, Health. Potty and Fun
-              are reached through the pills (and Fun's own Pee and Poop). Treats opens Food on a treat;
-              the meal/treat choice stays in the form. The Weight button wears the newest weight; its
-              date is in the title and for screen readers. */}
-          <section aria-label="Log">
-            <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Log</h2>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setOpen({ form: "food", quick: TREAT_QUICK_LOG })}
-                className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-0.5 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
-              >
-                <b className="truncate text-[15px] leading-tight">Treats</b>
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpen({ form: "training" })}
-                className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-0.5 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
-              >
-                <b className="truncate text-[15px] leading-tight">{FORM_LABELS.training}</b>
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpen({ form: "weight" })}
-                title={weightNote ?? undefined}
-                className="flex min-h-[52px] min-w-0 flex-col items-center justify-center rounded-xl bg-raised px-0.5 py-1.5 text-ink shadow-[0_3px_0_rgb(var(--line-rgb))] active:translate-y-0.5 active:shadow-[0_1px_0_rgb(var(--line-rgb))]"
-              >
-                <b className="truncate text-[15px] leading-tight">Weight</b>
-                {weightFace && (
-                  <span aria-hidden="true" className="truncate text-[12px] leading-tight tabular-nums text-ink-soft">
-                    {weightFace}
-                  </span>
-                )}
-                {weightNote && <span className="sr-only">, {weightNote}</span>}
-              </button>
-              <button
-                type="button"
-                onClick={() => setOpen({ form: "health" })}
-                className="flex min-h-[52px] min-w-0 items-center justify-center rounded-xl bg-[var(--tone-2-bg)] px-0.5 py-2 text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
-              >
-                <b className="truncate text-[15px] leading-tight">{FORM_LABELS.health}</b>
-              </button>
-            </div>
-          </section>
 
           {/* The feed: every loaded day, newest first, by when it happened (TEC-136) */}
           <section aria-label="Feed">
