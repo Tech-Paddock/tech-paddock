@@ -2,7 +2,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { InvalidEvent, OUT_MINUTES_CHIPS, describe as describeEvent, parseDetails } from "@/lib/events";
+import { InvalidEvent, OUT_MINUTES_CHIPS, OUT_MINUTES_MAX, describe as describeEvent, outMinutesLabel, parseDetails } from "@/lib/events";
 
 describe("potty time outside", () => {
   const outside = { what: "pee", where: "outside" };
@@ -25,8 +25,10 @@ describe("potty time outside", () => {
   it("is outside only: inside refuses it", () => {
     expect(() => parseDetails("potty", { what: "pee", where: "inside", minutes: 10 })).toThrow(/outside only/);
   });
-  it("offers chips 5 to 30 in fives", () => {
-    expect([...OUT_MINUTES_CHIPS]).toEqual([5, 10, 15, 20, 25, 30]);
+  it("offers chips only (TEC-186): 5 shown as ≤5, 10 to 30 in fives, 45, 60; the stored bound stays 1 to 120", () => {
+    expect([...OUT_MINUTES_CHIPS]).toEqual([5, 10, 15, 20, 25, 30, 45, 60]);
+    expect(OUT_MINUTES_CHIPS.map(outMinutesLabel)).toEqual(["≤5", "10", "15", "20", "25", "30", "45", "60"]);
+    expect(OUT_MINUTES_MAX).toBe(120);
   });
   it("reads in the feed after the leash, before the link and photos; a row without one is unchanged", () => {
     const d = (details: Record<string, unknown>) => describeEvent({ kind: "potty", details }).detail;

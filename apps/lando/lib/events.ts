@@ -11,7 +11,8 @@
  * the database (migrations `lando_people_and_events`, then
  * `widen_lando_events_details_shape`, then `widen_lando_potty_none`, then
  * `lando_health_events`, `lando_health_picklist`, `lando_issue_links`, `lando_vet_weight`,
- * `lando_potty_inside_spot`, `lando_details_ok_search_path`, `lando_potty_minutes`); change both together.
+ * `lando_potty_inside_spot`, `lando_details_ok_search_path`, `lando_potty_minutes`,
+ * `lando_box_leash_spot`); change both together.
  */
 
 import { FOOD_TYPES, findFood, formatAmount, unitLabel, type FoodType } from "./foods";
@@ -67,18 +68,51 @@ export const POTTY_WHAT = ["pee", "poop", "both", "none"] as const;
 export type PottyWhat = (typeof POTTY_WHAT)[number];
 export const POTTY_WHAT_LABELS: Record<PottyWhat, string> = { pee: "Pee", poop: "Poop", both: "Both", none: "No potty" };
 export const WHERE = ["outside", "inside"] as const;
-/** How an outside potty went: on the leash, off it, or in the pen. Outside only. */
-export const LEASH = ["leashed", "unleashed", "pen"] as const;
+/**
+ * How an outside potty went. `box` is offered since TEC-186; `pen` is retired the way the food catalogue
+ * and the health reasons retire an id (RULES.md, Settled): not offered, still accepted here and by
+ * `lando.details_ok`, still labelled, and kept by a correction. Never delete or re-id one.
+ */
+export const LEASH = ["leashed", "unleashed", "box", "pen"] as const;
 export type Leash = (typeof LEASH)[number];
-export const LEASH_LABELS: Record<Leash, string> = { leashed: "Leashed", unleashed: "Unleashed", pen: "In pen" };
-/** Where an inside potty happened: the crate, the pen, or loose in the house. Inside only. */
-export const SPOT = ["crate", "pen", "loose"] as const;
+export const LEASH_LABELS: Record<Leash, string> = { leashed: "Leashed", unleashed: "Unleashed", box: "In box", pen: "In pen" };
+/** What the Leash pick offers, in order. */
+export const LEASH_OFFERED = ["leashed", "unleashed", "box"] as const satisfies readonly Leash[];
+/** Where an inside potty happened (inside only). `box` is offered; `crate` and `pen` are retired, as above. */
+export const SPOT = ["box", "loose", "crate", "pen"] as const;
 export type Spot = (typeof SPOT)[number];
-export const SPOT_LABELS: Record<Spot, string> = { crate: "Crate", pen: "Pen", loose: "Loose" };
-/** Time outside: the form's chips and number step (TEC-176). The stored value is any whole 1 to the max. */
-export const OUT_MINUTES_CHIPS = [5, 10, 15, 20, 25, 30] as const;
-export const OUT_MINUTES_STEP = 5;
+export const SPOT_LABELS: Record<Spot, string> = { box: "Box", loose: "Loose", crate: "Crate", pen: "Pen" };
+/** What the Spot pick offers, in order. */
+export const SPOT_OFFERED = ["box", "loose"] as const satisfies readonly Spot[];
+
+type Opts<T extends string> = readonly (readonly [T, string])[];
+
+/**
+ * The Leash chips: the offered ones, plus the entry's own retired value (shown picked) when a correction
+ * opens on one, so it is visible and saved unchanged until another is tapped.
+ */
+export function leashOptions(current: Leash | "" | null | undefined): Opts<Leash> {
+  const ids: Leash[] = [...LEASH_OFFERED];
+  if (current && !ids.includes(current)) ids.push(current);
+  return ids.map((id) => [id, LEASH_LABELS[id]] as const);
+}
+
+/** The Spot chips, the same way. */
+export function spotOptions(current: Spot | "" | null | undefined): Opts<Spot> {
+  const ids: Spot[] = [...SPOT_OFFERED];
+  if (current && !ids.includes(current)) ids.push(current);
+  return ids.map((id) => [id, SPOT_LABELS[id]] as const);
+}
+
+/**
+ * Time outside is picked from chips only (TEC-186): "<=5" (saves 5), then 10 to 30 in fives, 45, 60. The
+ * stored `minutes` is any whole 1 to OUT_MINUTES_MAX, which the server and database still accept, so an
+ * older entry holding another number keeps it.
+ */
+export const OUT_MINUTES_CHIPS = [5, 10, 15, 20, 25, 30, 45, 60] as const;
 export const OUT_MINUTES_MAX = 120;
+/** A chip's face: the first one reads "≤5" and saves 5. */
+export const outMinutesLabel = (m: number) => (m === 5 ? "≤5" : String(m));
 export type PottyDetails = {
   what: PottyWhat;
   where: (typeof WHERE)[number];
@@ -506,21 +540,26 @@ export const HORIZON_DAYS = 30;
 
 export type Clock = "pee" | "poop" | "food" | "exercise";
 export const CLOCKS: Clock[] = ["pee", "poop", "food", "exercise"];
-export const CLOCK_LABELS: Record<Clock, string> = { pee: "Pee", poop: "Poop", food: "Meal", exercise: "Exercise" };
+/** The pills' faces. The `exercise` clock is Fun (TEC-186): walks and playtime only, a training does not reset it. */
+export const CLOCK_LABELS: Record<Clock, string> = { pee: "Pee", poop: "Poop", food: "Meal", exercise: "Fun" };
 
 /**
- * What a tapped pill opens its form on (TEC-181). Pee and Poop: Potty, outside,
- * leashed, which is the form's own default, so only the `what` is set. Meal: Food
- * with the last meal's item and amount; null item and amount mean the form's usual
- * defaults. Exercise is not tappable.
+ * What a tapped pill, or the Treats button, opens its form on (TEC-181, TEC-186). Pee and Poop: Potty,
+ * outside, leashed, which is the form's own default, so only the `what` is set. Meal: Food with the last
+ * meal's item and amount; null item and amount mean the form's usual defaults. Fun: the Fun form on a new
+ * entry, all defaults. Treats (the button, not a pill): Food on a treat, with a treat's usual defaults.
  */
 export type QuickLog =
   | { form: "potty"; what: "pee" | "poop" }
-  | { form: "food"; itemId: string | null; amount: number | null };
+  | { form: "food"; itemId: string | null; amount: number | null; type?: "treat" }
+  | { form: "fun" };
+
+/** The Treats button: the Food form opened on a treat (the meal/treat choice stays in the form). */
+export const TREAT_QUICK_LOG: QuickLog = { form: "food", itemId: null, amount: null, type: "treat" };
 
 export function quickLog(clock: Clock, lastMeal: JournalEvent | null): QuickLog | null {
   if (clock === "pee" || clock === "poop") return { form: "potty", what: clock };
-  if (clock !== "food") return null;
+  if (clock === "exercise") return { form: "fun" };
   // `lastMeal` is `sinceLast`'s food clock: a live meal, never a treat. A meal whose item the
   // catalogue no longer lists opens on the usual defaults rather than an id the form cannot show.
   const none: QuickLog = { form: "food", itemId: null, amount: null };
@@ -528,6 +567,20 @@ export function quickLog(clock: Clock, lastMeal: JournalEvent | null): QuickLog 
   const f = food(lastMeal);
   if (f.type !== "meal" || !findFood("meal", f.item_id)) return none;
   return { form: "food", itemId: f.item_id, amount: typeof f.amount === "number" ? f.amount : null };
+}
+
+/**
+ * The potty a Fun form's Pee or Poop button logs (TEC-186), from the form's current state. A walk is
+ * outside and leashed; playtime outside is outside; playtime inside is inside, an accident. Training has
+ * no such buttons (null). Pure; the form adds the time (the tap) and the person.
+ */
+export function funPotty(
+  fun: { type: ExerciseType; where: (typeof WHERE)[number] },
+  what: "pee" | "poop"
+): PottyDetails | null {
+  if (fun.type === "walk") return { what, where: "outside", leash: "leashed" };
+  if (fun.type === "playtime") return { what, where: fun.where };
+  return null;
 }
 
 function countsFor(e: JournalEvent, clock: Clock): boolean {
@@ -545,7 +598,8 @@ function countsFor(e: JournalEvent, clock: Clock): boolean {
       // does not reset it.
       return e.kind === "food" && food(e).type === "meal";
     default:
-      return e.kind === clock;
+      // The Fun clock (TEC-186): walks and playtime; a training does not reset it.
+      return e.kind === "exercise" && exercise(e).type !== "training";
   }
 }
 
@@ -566,71 +620,6 @@ export function sinceLast(events: JournalEvent[], now: Date): Record<Clock, Jour
     }
   }
   return out;
-}
-
-/* ── Meal gaps under the pills (TEC-172) ─────────────────────────────────── */
-
-/** The pills that carry a second line: meal to pee, meal to poop, meal to meal. */
-export type GapClock = "pee" | "poop" | "food";
-
-/**
- * A pill's second line. `gap`: the time between the two events. `pending`: the
- * latest meal has no pee (or poop) after it yet. `none`: nothing to measure (no
- * meal, or only one meal ever for the meal-to-meal line).
- */
-export type MealGap = { state: "gap"; ms: number } | { state: "pending" } | { state: "none" };
-
-/**
- * The time from the latest meal to the first pee after it, the same to the
- * first poop, and from the last meal to the one before it. Meals only, never
- * treats. A pee counts as the pills count it (pee or both, inside too), a time
- * in the future is ignored, and an older meal is never borrowed: when nothing
- * followed the latest meal the answer is `pending`, not a gap from an earlier
- * meal. Pure; no status colour applies to it.
- */
-export function mealGaps(events: JournalEvent[], now: Date): Record<GapClock, MealGap> {
-  const t = now.getTime();
-  const live = liveEvents(events).filter((e) => Date.parse(e.at) <= t);
-  const meals = live.filter((e) => countsFor(e, "food")).sort(newestFirst);
-  const out: Record<GapClock, MealGap> = { pee: { state: "none" }, poop: { state: "none" }, food: { state: "none" } };
-  const latest = meals[0];
-  if (!latest) return out;
-  const mealAt = Date.parse(latest.at);
-  for (const c of ["pee", "poop"] as const) {
-    let first = Infinity;
-    for (const e of live) {
-      if (!countsFor(e, c)) continue;
-      const at = Date.parse(e.at);
-      if (at >= mealAt && at < first) first = at;
-    }
-    out[c] = first === Infinity ? { state: "pending" } : { state: "gap", ms: first - mealAt };
-  }
-  if (meals[1]) out.food = { state: "gap", ms: mealAt - Date.parse(meals[1].at) };
-  return out;
-}
-
-/** A duration for a pill's second line, in `formatAgo`'s spelling ("47m", "2h 5m"); under a minute is "<1m". */
-export function formatGap(ms: number): string {
-  const base = Date.parse("2026-01-01T00:00:00Z");
-  const s = formatAgo(new Date(base).toISOString(), new Date(base + Math.max(0, ms)));
-  return s === "now" ? "<1m" : s;
-}
-
-/**
- * What the second line says, or null when it has nothing to say. `short` is
- * for the pill (it must fit a quarter of a 375px phone); `words` is the
- * screen-reader and title text.
- */
-export function mealGapText(clock: GapClock, gap: MealGap): { short: string; words: string } | null {
-  if (gap.state === "none") return null;
-  const what = clock === "food" ? "meal" : clock;
-  if (gap.state === "pending") {
-    return { short: "not yet", words: `No ${what} since the latest meal yet` };
-  }
-  const d = formatGap(gap.ms);
-  return clock === "food"
-    ? { short: `gap ${d}`, words: `${d} between the last two meals` }
-    : { short: `meal→ ${d}`, words: `First ${what} came ${d} after the latest meal` };
 }
 
 /**
@@ -1098,11 +1087,11 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
     case "potty": {
       const out: PottyDetails = { what: oneOf(r.what, POTTY_WHAT, "what"), where: oneOf(r.where, WHERE, "where") };
       if (r.leash !== undefined && r.leash !== null) {
-        if (out.where !== "outside") throw new InvalidEvent("leashed, unleashed or in pen is for outside only");
+        if (out.where !== "outside") throw new InvalidEvent("leashed, unleashed or in box is for outside only");
         out.leash = oneOf(r.leash, LEASH, "leash");
       }
       if (r.spot !== undefined && r.spot !== null) {
-        if (out.where !== "inside") throw new InvalidEvent("crate, pen or loose is for inside only");
+        if (out.where !== "inside") throw new InvalidEvent("box or loose is for inside only");
         out.spot = oneOf(r.spot, SPOT, "spot");
       }
       if (r.minutes !== undefined && r.minutes !== null) {
