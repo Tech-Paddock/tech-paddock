@@ -165,15 +165,6 @@ export function formatMinutes(minutes: number | null): string | null {
 }
 
 /**
- * What the pill says about a recipe beyond its name and its kcal, in the order
- * agreed: meal, main, cuisine. Rating and time are rendered separately because
- * they stay visible on a phone; these give way first.
- */
-export function pillFacts(meta: Pick<RecipeMeta, "meal" | "mains" | "cuisine">): string[] {
-  return [meta.meal, meta.mains[0] ?? null, meta.cuisine].filter((f): f is string => Boolean(f));
-}
-
-/**
  * The fields a model is asked for, as JSON-schema properties. **No `rating`**:
  * a model is never asked for one. Enumerated vocabularies are described rather
  * than schema-enforced, because `readMeta` is the enforcement either way.

@@ -37,16 +37,39 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 
 - **Add's order is Ask Claude · Link · File · Type it, and it opens on Ask Claude** (TEC-135,
   `MODES` in `AddRecipe.tsx`). The modes' behaviour is unchanged.
-- Recipes cards (TEC-135): name with rating · time, the facts line, and four macro tiles per
-  serving. *On the menu* stays beside the book.
-- **An open recipe leads with the recipe** (TEC-140, `Book.tsx`): the per-serving `MacroRow`, the
-  metadata line (`MetaSummary`), **Ingredients**, **Method**, then **Macro breakdown**
-  (`app/MacroBreakdown.tsx`, a native `<details>`, collapsed), Your rating, then helpings and the
-  actions. The breakdown holds the whole pot beside one serving (`potAndServing`), the share of
-  calories from protein, carbs and fat (`calorieSplit`, both in `lib/breakdown.ts`, tests in
-  `tests/breakdown.test.ts`) and the provenance, which moved in from the top. Stored numbers only;
-  nothing is called. The section headings and the breakdown's summary, table and bar are local
+- **Recipe pill** (TEC-183, `RecipeCard` in `Book.tsx`): the name, then rating as `5★` and the time
+  (each absent when unset; `ratingPill`, `lib/recipeView.ts`), then origin and "makes N" only, then
+  four macro tiles per serving (`MacroTiles`). Meal, main, cuisine, equipment, diet and tags are
+  stored and editable in Edit and **render nowhere on a kept recipe** (`pillFacts` is gone). Add's
+  draft still shows `MetaSummary`: deciding whether to keep it is where the model's tags matter.
+  *On the menu* stays beside the book.
+- **An open recipe is in tabs** (TEC-183, `app/RecipeDetail.tsx`; replaces TEC-140's layout): the
+  name, "origin · makes N · time", the rating as five tappable stars (the PATCH call; tapping the
+  set star clears it) with "N of 5" or "Not rated", then a `role="tablist"` of **Ingredients ·
+  Method · Macros**. It opens on Ingredients; the tab is `RecipeCard` state, so it is held while
+  the card is mounted (not across a reload). Ingredients put a leading amount in its own column
+  (`splitIngredient`; a line that does not lead with one is shown whole). Method is numbered steps
+  in circles. Macros (`app/MacroTab.tsx`) is one serving's tiles, the calorie split bar
+  (`calorieSplit`, `lib/breakdown.ts`), the whole-pot line (`potAndServing`) and the provenance.
+  Stored numbers only; nothing is called. The segmented tabs, circles, chips and bar are local
   patterns.
+- **Add to list** is a card under the tabs (`AddToListCard`): "When are you cooking it?", chips
+  Today, Tomorrow and the next three days by name (`dayChips`: tomorrow plus 2, 3, 4, every day,
+  weekends included), "Pick a date…" opening the date input, one full-width button naming the day
+  ("Add to Friday's list"), then Edit recipe and Remove from book (with its confirm) as text
+  buttons. The helpings estimator and the pricing note are gone. The day sent is still
+  `YYYY-MM-DD` from `parseDay`; a cleared date disables the button.
+- **Tests render with `react-dom/server`** (`tests/recipeOpen.test.ts`): there is no DOM or click
+  harness here, so a tab "switch" is asserted by rendering `RecipeOpen` with each `tab`, not by a
+  click.
+- **Clark's dark values are softer** (TEC-183, `packages/shared/lib/theme.css`, stamped to every
+  app; only Clark differs): paper `#1A241F`, surface `#24322A`, raised `#324439`, ink `#EEF3EF`,
+  ink-soft `#B8C9BE`, accent `#F0CE5C`. The bar stays dark and unchanged. `tests/clarkDark.test.ts`
+  reads the stamped copy. **Trap:** home's rule ("at or below the lowest any other livery has")
+  cannot hold for ink on paper, surface and raised, because softer is the point; the test holds
+  those at their measured numbers and holds every other changed pair to the old rule, plus 4.5:1 /
+  3:1 absolutes. Three tokens beyond the canvas were lightened to keep their pairs: `line`
+  `#688071`, `danger` `#FFB4AC`, `sev-urgent` `#F8788C`.
 - **The split divides by the macros' own calories at 4/4/9, not the stored kcal**, rounded by
   largest remainder so it adds to 100, and is labelled approximate. The High protein filter
   (`isHighProtein`) divides by the stored kcal, so a recipe near 30% can read either side of it in
