@@ -52,6 +52,7 @@ import { clockTime, localMidnight, shortDate } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
 import { saveThen } from "@/lib/saveOrder";
 import Analytics from "./Analytics";
+import WhatsNew from "./WhatsNew";
 import { useReportMeals } from "./Meals";
 import LogForm, { type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
@@ -69,7 +70,7 @@ type Pending = { body: LogBody; status: "saving" | "failed"; error?: string; the
 type Stored = LogBody & { then?: LogBody[] };
 
 type Open = { form: FormKind; event?: JournalEvent; quick?: QuickLog } | null;
-type Tab = "log" | "analytics";
+type Tab = "log" | "analytics" | "new";
 
 async function postJson(url: string, body: unknown): Promise<{ ok: boolean; status: number; data: any }> {
   const res = await fetch(url, {
@@ -114,7 +115,7 @@ function Pill({
 }
 
 /**
- * Two tabs, Log and Analytics, opening on Log (RULES.md, Surface: app, the
+ * Three tabs, Log, Analytics and What's new, opening on Log (RULES.md, Surface: app, the
  * owner's override, 2026-10-20). Log: since-last pills, who is logging, six section
  * buttons that each open a short form with defaults (Potty, Food, Fun,
  * Training, Weight, Health; TEC-136, TEC-137), and a feed of every loaded day, by when each
@@ -400,12 +401,15 @@ export default function Journal() {
         className="sticky z-10 border-b border-line bg-paper"
         style={{ top: "env(safe-area-inset-top, 0px)" }}
       >
-        <div className="mx-auto grid max-w-md grid-cols-2 px-3">
+        <div className="mx-auto grid max-w-md grid-cols-3 px-3">
           <button role="tab" type="button" id="tab-log" aria-selected={tab === "log"} aria-controls="panel-log" onClick={() => showTab("log")} className={tabClass("log")}>
             Log
           </button>
           <button role="tab" type="button" id="tab-analytics" aria-selected={tab === "analytics"} aria-controls="panel-analytics" onClick={() => showTab("analytics")} className={tabClass("analytics")}>
             Analytics
+          </button>
+          <button role="tab" type="button" id="tab-new" aria-selected={tab === "new"} aria-controls="panel-new" onClick={() => showTab("new")} className={tabClass("new")}>
+            What&apos;s new
           </button>
         </div>
       </nav>
@@ -425,6 +429,10 @@ export default function Journal() {
         <div id="panel-analytics" role="tabpanel" aria-labelledby="tab-analytics" hidden={tab !== "analytics"}>
           {tab === "analytics" &&
             (loaded ? <Analytics events={loaded.events} now={now} /> : <p className="text-sm text-ink-soft">{loadError ? "" : "Loading…"}</p>)}
+        </div>
+
+        <div id="panel-new" role="tabpanel" aria-labelledby="tab-new" hidden={tab !== "new"}>
+          {tab === "new" && <WhatsNew />}
         </div>
 
         {/* `hidden` alone loses to Tailwind's `flex`, so the class carries it too. */}

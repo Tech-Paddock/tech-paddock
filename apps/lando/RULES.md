@@ -9,8 +9,8 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 ## Surface: app
 
-- Two tabs, Log and Analytics, opening on Log: the owner's override (2026-10-20) of the app
-  surface's one screen and no tabs. One-handed, thumb-first.
+- Three tabs, Log, Analytics and What's new, opening on Log: the owner's override (2026-10-20,
+  widened 2026-10-27, TEC-182) of the app surface's one screen and no tabs. One-handed, thumb-first.
 - An app bar over the tabs: theme, logout, Meals today and the livery badge.
 - Every form opens as a bottom sheet.
 - Installable through `/app.webmanifest`.
@@ -30,6 +30,9 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 - Login is the shared password until per-person logins ship (TEC-118).
 - Livery: McLaren '25 (`mcl39`), the theme's own; changed only in the theme.
+- Every change a user would notice adds one plain-language entry to the release notes
+  (`lib/releases.ts`, newest first, append-only) on the same branch: no issue numbers, file names,
+  jargon or real names (TEC-182).
 - Every stored id or list value is history's key: the food catalogue (fixed in code), health reason
   ids, `lando.dogs` ids, `COMMANDS`, and the potty what, leash and spot lists. Retire one (a food
   item: `retired: true`); never delete or re-id it, because old entries hold it. `lando.details_ok`

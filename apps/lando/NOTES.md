@@ -2,7 +2,7 @@
 
 ## State
 
-- v2 on Next.js 16: two tabs under the app bar, **Log** and **Analytics**, sticky, opening on Log
+- v2 on Next.js 16: three tabs under the app bar, **Log**, **Analytics** and **What's new**, sticky, opening on Log
   (RULES.md holds the owner's override of the one-screen rule).
 - **Log**: four since-last pills in one row (Pee, Poop, Meal, Exercise; label over value, the
   clock time in the title and for screen readers; coloured by TEC-142, below), "Logging as", six
@@ -216,6 +216,11 @@
     live food treats at the session's exact `at`, to the millisecond. There is no link column.
     Moving the session's When in a correction leaves its treats at the old time (correct them
     from the feed), and they then no longer show on it.
+- **What's new** (TEC-182, `app/WhatsNew.tsx`): the third tab, after Analytics. It lists the newest
+  ten entries of `RELEASES` in `lib/releases.ts`: a date (`YYYY-MM-DD`, the day it went live) and one
+  plain sentence a non-technical reader follows, newest first. Static text, no database, no fetch,
+  no model. Older entries stay in the file; the file is append-only like the journal. The first
+  entries are a backfill from the shipped changes, small fixes merged or left out.
 - **Analytics** (`app/Analytics.tsx`, rebuilt by TEC-143; all aggregation is pure, in
   `lib/analytics.ts`, tested in `tests/timeline.test.ts`; no model call, no data change). The last 14
   local days, six cards,
@@ -409,6 +414,11 @@
   ink tokens; series 2 is burnt orange in light and peach in dark, where the accent is papaya.
 
 ## Traps
+
+- **Every Lando change a user would notice adds its line to `RELEASES`** (`lib/releases.ts`), at the
+  top, on the same branch. Plain words, what they can now do, no issue numbers, file names or
+  jargon, no real names. Nothing checks that a change added one; `tests/releases.test.ts` checks
+  only the shape (valid dates, newest first, ten shown, no ticket numbers).
 
 - **"JWT issued at future" is Supabase's, intermittent, and retried.** "Couldn't load the journal.
   (couldn't read the journal: JWT issued at future)" is a 401 from Supabase's own clock drift:
