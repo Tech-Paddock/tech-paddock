@@ -44,9 +44,9 @@ section and closing comment before changing anything in this file.
 - A recipe stores no allergen or free-of claim and no macro tag, and its rating never comes from a
   model.
 - A recipe must not take a name that already means something else in this app's data.
-- An open recipe offers **N helpings cost** (arithmetic in the browser on the stored serving;
-  nothing is called or written), Your rating, Add to list, Edit and Remove. **Cookbook does not
-  log what was eaten** (owner, 2026-10-26): Health does, from `GET /api/servings` under the
+- An open recipe is **tabs Ingredients · Method · Macros**, the rating at the top, **Add to list**
+  by day, Edit and Remove; no helpings estimator, and no keywords shown anywhere (TEC-183; the
+  fields stay stored and editable). **Cookbook does not log what was eaten** (owner, 2026-10-26): Health does, from `GET /api/servings` under the
   contract below. Removing a recipe leaves anything Health logged untouched.
 
 ## Storage
