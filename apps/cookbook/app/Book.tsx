@@ -2,35 +2,25 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Menu from "./Menu";
-import MacroRow from "./MacroRow";
-import MacroBreakdown from "./MacroBreakdown";
+import { MacroTiles } from "./MacroTab";
+import { AddToListCard, ORIGIN_LABELS, RecipeOpen } from "./RecipeDetail";
 import { useToast } from "./Toast";
-import { round, scale } from "@/lib/macros";
-import { methodSteps, perServing, type Recipe, type RecipeOrigin } from "@/lib/recipes";
-import { formatMinutes, pillFacts } from "@/lib/metadata";
-import { localToday, menuDayLabel, parseDay } from "@/lib/menuDay";
-import { MetaSummary, Stars } from "./Meta";
+import { perServing, type Recipe } from "@/lib/recipes";
+import { formatMinutes } from "@/lib/metadata";
+import { menuDayLabel } from "@/lib/menuDay";
+import { FIRST_RECIPE_TAB, ratingPill, type RecipeTab } from "@/lib/recipeView";
 import EditRecipe from "./EditRecipe";
 import { BookFilters } from "./Tuning";
 import { NO_FILTER, cuisinesIn, filterActive, matchesFilter, type BookFilter } from "@/lib/tuning";
 
 /**
  * The book: On the menu beside it, every kept recipe in it, and what you can do
- * to one — price helpings, add it to the list for a day, rate, edit, remove.
+ * to one — read it in tabs, rate it, add it to the list for a day, edit, remove.
  *
  * **Adding one is the Add tab's** (`AddRecipe.tsx`, 2026-10-05). The two
  * stay mounted side by side, so a recipe kept there reaches this one through
  * `version` rather than through shared state.
  */
-
-/** The open recipe's section headings: the uppercase heading of TEC-135, copied locally. */
-const SECTION = "text-xs font-bold uppercase tracking-wider text-ink-soft";
-
-const ORIGIN_LABELS: Record<RecipeOrigin, string> = {
-  manual: "Yours",
-  generated: "Claude's",
-  imported: "Imported",
-};
 
 export default function Book({
   onAddedToList,
@@ -268,7 +258,7 @@ export default function Book({
   );
 }
 
-function RecipeCard({
+export function RecipeCard({
   recipe,
   open,
   listing,
@@ -289,19 +279,13 @@ function RecipeCard({
   onRemove: () => void;
   onEdited: (recipe: Recipe, repriced: boolean) => void;
 }) {
-  const [count, setCount] = useState("1");
-  // The day it goes on the menu (2026-10-05). Today unless another is picked.
-  const [day, setDay] = useState(() => localToday());
+  // Which tab is showing; the card stays mounted, so it is held while the book is.
+  const [tab, setTab] = useState<RecipeTab>(FIRST_RECIPE_TAB);
   // Every field is editable (2026-09-26), in place on the open card.
   const [editing, setEditing] = useState(false);
-  // **Remove asks first** (TEC-29 item 8): it is permanent, and it sat one tap
-  // from Add to list.
-  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const serving = perServing(recipe);
-  const helpings = Number(count);
-  const priced = Number.isFinite(helpings) && helpings > 0 ? scale(serving, helpings) : null;
   const minutes = formatMinutes(recipe.total_minutes);
-  const facts = pillFacts(recipe);
+  const stars = ratingPill(recipe.rating);
 
   return (
     // The id is what "On the menu" scrolls to.
@@ -310,39 +294,24 @@ function RecipeCard({
           than a character count — a count that fits a laptop overflows a phone,
           and this is mostly a phone object. `min-w-0` is what lets the name
           shrink at all inside a flex row, and `shrink-0` on the rest is what
-          stops the kcal being the thing that disappears.
-          **Rating and time stay on a phone; meal, main and cuisine give way**
-          (TEC-52), as the origin already did. Each is simply absent when unset,
-          which is every recipe until the backfill. */}
+          stops the rating and time being the thing that disappears.
+          **Rating then time** (TEC-183): "5★ · 35 min", each simply absent when
+          unset. The second line is origin and servings only; the keywords are
+          stored, editable in Edit, and not shown. */}
       <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full flex-col gap-1.5 px-3.5 py-3 text-left">
         <span className="flex w-full items-baseline justify-between gap-2">
           <span className="min-w-0 truncate text-base font-semibold">{recipe.name}</span>
           <span className="flex shrink-0 items-baseline gap-1 whitespace-nowrap text-xs text-ink-soft">
-            {recipe.rating ? <Stars rating={recipe.rating} /> : null}
-            {recipe.rating && minutes ? " · " : null}
+            {stars ? <span aria-label={`Rated ${recipe.rating} of 5`} className="font-semibold text-accent">{stars}</span> : null}
+            {stars && minutes ? " · " : null}
             {minutes ? <span className="tabular-nums">{minutes}</span> : null}
           </span>
         </span>
         <span className="text-xs text-ink-soft">
-          {facts.length ? `${facts.join(" · ")} · ` : ""}
           {ORIGIN_LABELS[recipe.origin]} · makes {recipe.servings}
         </span>
         {/* One serving's numbers as four tiles. */}
-        <span className="grid w-full grid-cols-4 gap-1">
-          {(
-            [
-              ["kcal", String(round(serving).kcal)],
-              ["protein", `${round(serving).protein_g}g`],
-              ["carbs", `${round(serving).carbs_g}g`],
-              ["fat", `${round(serving).fat_g}g`],
-            ] as const
-          ).map(([k, v]) => (
-            <span key={k} className="flex flex-col rounded-lg bg-raised px-2 py-1.5">
-              <span className="text-sm font-bold tabular-nums">{v}</span>
-              <span className="text-[11px] text-ink-soft">{k}</span>
-            </span>
-          ))}
-        </span>
+        <MacroTiles macros={serving} />
       </button>
 
       {open && editing ? (
@@ -357,138 +326,23 @@ function RecipeCard({
           />
         </div>
       ) : open ? (
-        // **The recipe leads** (TEC-140): one serving's macros, the metadata
-        // line, the ingredients, the method; then the Macro breakdown
-        // (collapsed: pot and serving, the % split, provenance), the rating
-        // you give after cooking, and the helpings and actions.
-        <div className="flex flex-col gap-3 border-t border-line/40 px-3.5 py-3">
-          <MacroRow macros={serving} per="one serving" />
-          <MetaSummary meta={recipe} />
-
-          {/* **`recipe.note` is stored and deliberately not shown here.** It is the
-              estimate's own caveat — "assumed a tablespoon of oil" — which is what
-              you want when deciding whether to keep a number and noise when you
-              are cooking. It still renders on the draft, where the deciding
-              happens, and it is still on the row for anything that wants it. */}
-
-          {recipe.ingredients.length > 0 ? (
-            <div className="flex flex-col gap-1.5">
-              <h3 className={SECTION}>Ingredients</h3>
-              <ul className="flex flex-col gap-1 text-sm">
-                {recipe.ingredients.map((i, n) => (
-                  <li key={n}>{i}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          {methodSteps(recipe.method).length > 0 ? (
-            <div className="flex flex-col gap-1.5">
-              <h3 className={SECTION}>Method</h3>
-              <ol className="flex list-inside list-decimal flex-col gap-1.5 text-sm text-ink-soft">
-                {methodSteps(recipe.method).map((step, n) => (
-                  // The marker the author wrote is stripped so the list's own
-                  // numbering does not print "1. 1. Chop the onion".
-                  <li key={n}>{step.replace(/^\d{1,2}[.)]\s*/, "")}</li>
-                ))}
-              </ol>
-            </div>
-          ) : null}
-
-          <MacroBreakdown recipe={recipe} />
-
-          <div className="flex items-center gap-2 text-xs text-ink-soft">
-            <span>Your rating</span>
-            <Stars rating={recipe.rating} onRate={onRate} busy={rating} />
-          </div>
-
-          {/* **Pricing helpings, and deliberately not logging them.**
-              Multiplying a stored serving is arithmetic in this browser — no
-              model, no request, nothing written. Logging what you ate is
-              Health's: it reads `GET /api/servings` under the contract in
-              `RULES.md` (TEC-11), and this app never writes a log. */}
-          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                value={count}
-                onChange={(e) => setCount(e.target.value)}
-                inputMode="decimal"
-                aria-label={`Helpings of ${recipe.name}`}
-                className="w-16 rounded border border-line bg-surface px-2 py-1.5 text-sm"
-              />
-              <span className="text-ink-soft">helpings cost</span>
-            </label>
-            {priced ? (
-              <span className="text-sm tabular-nums">
-                {round(priced).kcal} kcal · {round(priced).protein_g}g protein
-              </span>
-            ) : (
-              <span className="text-sm text-ink-soft">—</span>
-            )}
-
-            {/* The day picked here is the day it sits on the menu. A cleared
-                picker would send no day at all, so it disables the button
-                instead of quietly meaning "today". */}
-            <span className="ml-auto flex items-center gap-2">
-            <input
-              type="date"
-              value={day}
-              onChange={(e) => setDay(e.target.value)}
-              aria-label={`Day to cook ${recipe.name}`}
-              className="rounded border border-line bg-surface px-2 py-1 text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                const picked = parseDay(day);
-                if (picked) onList(picked);
-              }}
-              disabled={recipe.ingredients.length === 0 || listing || !parseDay(day)}
-              className="min-h-11 rounded-[10px] bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-50"
-            >
-              {listing ? "Adding…" : "Add to list"}
-            </button>
-            </span>
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="rounded border border-line px-3 py-1.5 text-sm"
-            >
-              Edit
-            </button>
-            {confirmingRemove ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setConfirmingRemove(false);
-                    onRemove();
-                  }}
-                  className="rounded border border-danger/60 px-3 py-1.5 text-sm text-danger"
-                >
-                  Remove — sure?
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmingRemove(false)}
-                  className="rounded border border-line px-3 py-1.5 text-sm text-ink-soft"
-                >
-                  Keep it
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmingRemove(true)}
-                className="rounded border border-line px-3 py-1.5 text-sm text-ink-soft"
-              >
-                Remove
-              </button>
-            )}
-          </div>
+        // **The recipe opens in tabs** (TEC-183): name, origin · makes · time and
+        // the rating up top, then Ingredients · Method · Macros, then Add to list
+        // by day with Edit and Remove under it. The helpings estimator and the
+        // keywords are gone; Health's `GET /api/servings` is untouched.
+        <div className="flex flex-col gap-4 border-t border-line/40 px-3.5 py-3">
+          <RecipeOpen recipe={recipe} tab={tab} onTab={setTab} onRate={onRate} rating={rating} />
+          <AddToListCard
+            name={recipe.name}
+            hasIngredients={recipe.ingredients.length > 0}
+            listing={listing}
+            onList={onList}
+            onEdit={() => setEditing(true)}
+            onRemove={onRemove}
+          />
           <p className="text-[11px] text-ink-soft">
-            Pricing helpings reads the numbers above and calls nothing. Editing re-prices only when the
-            ingredients change. Removing takes the recipe out of the book and leaves your shopping list
-            alone.
+            Editing re-prices only when the ingredients change. Removing takes the recipe out of the book and
+            leaves your shopping list alone.
           </p>
         </div>
       ) : null}

@@ -68,8 +68,10 @@ What home's own code enforces. The shared auth plumbing and its rules are in `CL
 - A livery's bar must be dark. The shared header CSS paints bar ink at 0.72 and 0.4 alpha and the
   failed-logout border in `--sev-urgent`; on a bright bar (papaya was tried) those fall under 4.5:1
   and 3:1. A bright bar needs those shared rules changed first.
-- Each token pair holds contrast at or above the lowest any existing livery has for that pair,
-  measured by hand: nothing in the repo checks it.
+- Each text pair holds at least 4.5:1 and `line` at least 3:1 on the surfaces it sits on, in both
+  polarities. A livery may go softer than the others, as Clark's dark did (owner, TEC-183), only
+  on the owner's word, with its numbers in the pull request; Clark's are held by Cookbook's
+  `tests/clarkDark.test.ts`, the rest are measured by hand.
 - No `tailwind.config.ts` holds a colour. A colour compiled in at build time is one no livery or
   polarity can reach.
 - A change to every app's look says so in its pull request.

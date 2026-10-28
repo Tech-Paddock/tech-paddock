@@ -7,7 +7,6 @@ import {
   META_PROMPT,
   META_SCHEMA_PROPERTIES,
   formatMinutes,
-  pillFacts,
   readList,
   readMeta,
   refusedWord,
@@ -140,15 +139,6 @@ describe("the pill", () => {
     expect(formatMinutes(60)).toBe("1 h");
     expect(formatMinutes(90)).toBe("1 h 30");
     expect(formatMinutes(null)).toBeNull();
-  });
-
-  it("names meal, main and cuisine in that order, skipping what is unset", () => {
-    expect(pillFacts({ meal: "dinner", mains: ["chicken", "rice"], cuisine: "thai" })).toEqual([
-      "dinner",
-      "chicken",
-      "thai",
-    ]);
-    expect(pillFacts({ meal: null, mains: [], cuisine: "thai" })).toEqual(["thai"]);
   });
 });
 

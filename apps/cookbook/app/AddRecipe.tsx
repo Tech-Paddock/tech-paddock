@@ -8,7 +8,7 @@ import { methodSteps, perServing, type Recipe, type RecipeDraft } from "@/lib/re
 import { MAX_FILE_BYTES, isFileMediaType, type RecipeFile } from "@/lib/upload";
 import { MAX_STEER, pileForAsk, turnDown, type TurnedDown } from "@/lib/reroll";
 import { downscale } from "@/lib/image";
-import { EMPTY_FORM, MetaFields, MetaSummary, Stars, type MetaForm } from "./Meta";
+import { EMPTY_FORM, MetaFields, Stars, type MetaForm } from "./Meta";
 import { PickFields } from "./Tuning";
 import { NO_PICKS, hasPicks, type Picks } from "@/lib/tuning";
 
@@ -408,9 +408,9 @@ export default function AddRecipe({
               />
             </div>
             {draft.note ? <p className="text-xs text-ink-soft">{draft.note}</p> : null}
-            {/* What the model said about the dish, to check before keeping it.
-                The rating is yours: the model is never asked for one. */}
-            <MetaSummary meta={draft.meta} />
+            {/* The model's keywords are stored with the draft and editable in the typed
+                form and in Edit; none is shown (TEC-183). The rating is yours: the
+                model is never asked for one. */}
             <div className="flex items-center gap-2 text-xs text-ink-soft">
               <span>Your rating (optional)</span>
               <Stars
