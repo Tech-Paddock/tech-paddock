@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FOODS, MISC_ID, formatAmount, parseAmount, picklist } from "@/lib/foods";
+import { FOODS, MISC_ID, formatAmount, parseAmount, picklist, treatQtyError } from "@/lib/foods";
 import { defaultAmount, defaultFood } from "@/lib/defaults";
 
 describe("the catalogue", () => {
@@ -72,5 +72,20 @@ describe("form defaults", () => {
 
   it("falls back to Misc when the remembered meal has left the list", () => {
     expect(defaultFood("meal", { meal: "gone" })).toBe(MISC_ID);
+  });
+});
+
+describe("a treat's quantity (TEC-188)", () => {
+  it("takes a whole number of 1 or more, and nothing else when new", () => {
+    expect(treatQtyError(1)).toBeNull();
+    expect(treatQtyError(3, 1)).toBeNull();
+    for (const bad of [null, 0, 0.5, 1.5, -2]) expect(treatQtyError(bad)).not.toBeNull();
+  });
+  it("saves a correction's untouched amount as it was, whole or not", () => {
+    expect(treatQtyError(0.5, 0.5)).toBeNull();
+    expect(treatQtyError(1.25, 1.25)).toBeNull();
+    expect(treatQtyError(0.75, 0.5)).not.toBeNull();
+    expect(treatQtyError(null, null)).toBeNull(); // an old treat with no amount, untouched
+    expect(treatQtyError(null)).not.toBeNull();
   });
 });
