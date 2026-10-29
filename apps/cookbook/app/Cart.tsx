@@ -6,9 +6,9 @@ import { refreshDue, scanDue } from "@/lib/refreshDue";
 import type { Candidate, CartLine, Outcome, Plan, ReviewLine } from "@/lib/cart";
 import { describeDrift, sizeDrift } from "@/lib/sizeDrift";
 import type { Modality } from "@/lib/modality";
-import type { Estimate, ScanRecord } from "@/lib/pricing";
+import type { ScanRecord } from "@/lib/pricing";
+import { refreshSummary } from "@/lib/refreshNote";
 import { describe as describeHeld, type TakeBackLine, type TakeBackOutcome } from "@/lib/takeBack";
-import { EstimatePanel } from "./Deals";
 import { useToast } from "./Toast";
 
 /**
@@ -32,7 +32,8 @@ import { useToast } from "./Toast";
  *
  * **Refresh** (2026-10-20): opening the tab with the last refresh over a week
  * old starts one in the background; *Refresh now* starts one by hand.
- * **Prices (TEC-121)**: Pickup/Delivery, the estimate and the deal scan.
+ * **Prices (TEC-121)**: Pickup/Delivery and the deal scan. The live estimate left
+ * in TEC-190: the list's totals are summed from the nightly check.
  * **Every request that borrows a Kroger token goes through `serial`**, one at
  * a time: two at once can race the refresh token's rotation.
  * **Take back (TEC-127)**: removes what Cookbook sent, after a second tap that
@@ -177,7 +178,7 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   const [stores, setStores] = useState<Store[] | null>(null);
   const [choosingStore, setChoosingStore] = useState(false);
 
-  const [busy, setBusy] = useState<null | "stores" | "review" | "send" | "disconnect" | "take-back-look" | "take-back">(null);
+  const [busy, setBusy] = useState<null | "stores" | "review" | "add" | "send" | "disconnect" | "take-back-look" | "take-back">(null);
   // Take back (TEC-127): the first tap reads what would go, the second takes it.
   const [takeBackPreview, setTakeBackPreview] = useState<TakeBackLine[] | null>(null);
   const [takeBackResults, setTakeBackResults] = useState<{
@@ -189,19 +190,18 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   const [review, setReview] = useState<ReviewLine[] | null>(null);
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [open, setOpen] = useState<string | null>(null);
-  const [confirmAgain, setConfirmAgain] = useState(false);
+  // Add to cart on one line (TEC-190): the review then holds only that line.
+  const [reviewOnly, setReviewOnly] = useState<string[] | null>(null);
+  const [adding, setAdding] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
   const [refused, setRefused] = useState<CartLine[] | null>(null);
   // After Send (TEC-135): the results, and the review they came from, so every
   // unsent line stays listed under Still on your list.
   const [results, setResults] = useState<Results | null>(null);
 
   const [refreshing, setRefreshing] = useState(false);
-  const [refreshNote, setRefreshNote] = useState<{ text: string; failed: boolean } | null>(null);
+  const [refreshNote, setRefreshNote] = useState<{ text: string; failed: boolean; summary?: { line: string; needsLook: boolean } } | null>(null);
   const autoRefreshed = useRef(false);
-
-  const [estimating, setEstimating] = useState(false);
-  const [estimate, setEstimate] = useState<{ estimate: Estimate; message: string } | null>(null);
-  const [showEstimate, setShowEstimate] = useState(false);
 
   const [latestScan, setLatestScan] = useState<ScanRecord | null>(null);
   // Only a failure is shown (TEC-132): the scan feeds the list lines' sale tags and the Deals
@@ -234,7 +234,7 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
         // **Said in words, and never as "nothing changed".**
         setRefreshNote({ text: `Refresh failed: ${body.error ?? "Kroger or the database didn't answer."}`, failed: true });
       } else {
-        setRefreshNote({ text: body.message as string, failed: false });
+        setRefreshNote({ text: body.message as string, failed: false, summary: refreshSummary(body.report) ?? undefined });
       }
       await loadStatus();
       brandsChanged.current();
@@ -319,7 +319,6 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     if (!status) return;
     const before = status.modality;
     setStatus({ ...status, modality });
-    setEstimate(null);
     try {
       const response = await fetch("/api/kroger", {
         method: "PATCH",
@@ -331,22 +330,6 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     } catch (e) {
       setStatus((current) => (current ? { ...current, modality: before } : current));
       toast.error(e instanceof Error ? e.message : "Couldn't save pickup or delivery.");
-    }
-  }
-
-  async function calculate() {
-    if (estimating) return;
-    setEstimating(true);
-    try {
-      const response = await serial(() => fetch("/api/kroger/estimate", { method: "POST" }));
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error ?? "Couldn't calculate the estimate.");
-      setEstimate(body as { estimate: Estimate; message: string });
-      setShowEstimate(true);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't calculate the estimate.");
-    } finally {
-      setEstimating(false);
     }
   }
 
@@ -377,8 +360,6 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
       setStores(null);
       setChoosingStore(false);
       setReview(null);
-      // The estimate was another store's prices.
-      setEstimate(null);
       await loadStatus();
       // A new store means new prices: check them now rather than in a week.
       void refresh();
@@ -403,29 +384,43 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     }
   }
 
-  /**
-   * **Send to cart** (TEC-135; RULES.md): look every line up and open the
-   * review. Nothing goes in until **Send N to cart**: the review is one list,
-   * every line ticked, Pick one pre-picked to the most bought.
-   */
-  async function startReview() {
-    if (busy) return;
-    setBusy("review");
+  /** Look lines up at Kroger. `ids` limits it to those lines (Add to cart on one line, TEC-190). */
+  async function lookUp(ids: string[] | null): Promise<ReviewLine[]> {
+    const url = ids ? `/api/kroger/cart?ids=${encodeURIComponent(ids.join(","))}` : "/api/kroger/cart";
+    const response = await serial(() => fetch(url, { cache: "no-store" }));
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error ?? "Couldn't get the list ready.");
+    return body.lines as ReviewLine[];
+  }
+
+  function openReview(lines: ReviewLine[], only: string[] | null) {
+    setReview(lines);
+    setReviewOnly(only);
+    setChoices(Object.fromEntries(lines.map((l) => [l.id, startingChoice(l)])));
+    // The first line to settle starts open, as on the mockup.
+    setOpen(lines.find((l) => sectionOf(l) === "pick")?.id ?? null);
+    window.scrollTo({ top: 0 });
+  }
+
+  function clearNotes() {
     setResults(null);
     setTakeBackPreview(null);
     setTakeBackResults(null);
     setRefused(null);
-    setConfirmAgain(false);
+  }
+
+  /**
+   * **Send all** (TEC-135; RULES.md): look every line still on the List up and
+   * open the review. Nothing goes in until **Send N to cart**: the review is
+   * one list, every line ticked, Pick one pre-picked to the most bought. Lines
+   * already in the cart are not in it (TEC-190).
+   */
+  async function startReview() {
+    if (busy) return;
+    setBusy("review");
+    clearNotes();
     try {
-      const response = await serial(() => fetch("/api/kroger/cart", { cache: "no-store" }));
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Couldn't get the list ready.");
-      const lines = body.lines as ReviewLine[];
-      setReview(lines);
-      setChoices(Object.fromEntries(lines.map((l) => [l.id, startingChoice(l)])));
-      // The first line to settle starts open, as on the mockup.
-      setOpen(lines.find((l) => sectionOf(l) === "pick")?.id ?? null);
-      window.scrollTo({ top: 0 });
+      openReview(await lookUp(null), null);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't get the list ready.");
     } finally {
@@ -433,8 +428,49 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     }
   }
 
+  /**
+   * **Add to cart on one line** (TEC-190): the same matching as Send all. A line
+   * that goes in as one saved product is sent at once and reports in a toast;
+   * anything that needs a look (Pick one, Not saved yet, nothing to add) opens
+   * the review with just that line, so nothing is added unseen.
+   */
+  async function addOne(id: string) {
+    if (busy) return;
+    setBusy("add");
+    setAdding(id);
+    clearNotes();
+    try {
+      const [line] = await lookUp([id]);
+      if (!line) throw new Error("That line isn't on the List any more, so there was nothing to add. It may already be in the cart.");
+      const pick = pickFor(line, startingChoice(line));
+      if (line.plan.kind !== "exact" || !pick) {
+        openReview([line], [id]);
+        return;
+      }
+      const sent = await post([pick], [id]);
+      if ("conflict" in sent) {
+        toast.error(`${line.name} is already in the cart. The cart only adds, so it wasn't sent again.`);
+        listChanged.current();
+        return;
+      }
+      const outcome = (sent.body.outcomes as Outcome[]).find((o) => o.id === id);
+      if (outcome?.result === "added") toast.notice(`${outcome.name} is in the cart. ${outcome.detail}`);
+      else toast.error(`${line.name} wasn't added. ${outcome?.detail ?? "Kroger didn't say why."}`);
+      if (sent.body.modalityWarning) toast.error(sent.body.modalityWarning as string);
+      if (sent.body.recordError) toast.error(sent.body.recordError as string);
+      brandsChanged.current();
+      listChanged.current();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't add that to the cart.");
+    } finally {
+      setBusy(null);
+      setAdding(null);
+    }
+  }
+
   function closeReview() {
     setReview(null);
+    setReviewOnly(null);
     setResults(null);
     setRefused(null);
   }
@@ -451,38 +487,46 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     return line.sent_at === null && line.plan.kind === "none" ? [{ id: line.id } as Pick] : [];
   });
   const going = picks.filter((p) => p.upc || p.url);
-  const again = (review ?? []).filter((l) => l.sent_at !== null && going.some((p) => p.id === l.id));
   const badUrl = (review ?? []).some((l) => {
     const url = choices[l.id]?.url.trim();
     return !!url && !isKingSoopersProduct(url);
   });
+
+  /** One POST of picks; `only` limits what the server sends and reports. A repeat (409) comes back as `conflict`. */
+  async function post(chosen: Pick[], only: string[] | null): Promise<{ body: Record<string, unknown> } | { conflict: CartLine[] }> {
+    const response = await serial(() =>
+      fetch("/api/kroger/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ picks: chosen, ...(only ? { only } : {}) }),
+      })
+    );
+    const body = await response.json();
+    if (response.status === 409 && Array.isArray(body.alreadySent)) return { conflict: body.alreadySent as CartLine[] };
+    if (!response.ok) throw new Error(body.error ?? "Couldn't send to the cart.");
+    return { body };
+  }
 
   async function send() {
     if (busy || going.length === 0) return;
     setBusy("send");
     setRefused(null);
     try {
-      const response = await serial(() =>
-        fetch("/api/kroger/cart", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ picks, again: again.length > 0 && confirmAgain }),
-        })
-      );
-      const body = await response.json();
-      if (response.status === 409 && Array.isArray(body.alreadySent)) {
-        setRefused(body.alreadySent as CartLine[]);
+      const sent = await post(picks, reviewOnly);
+      if ("conflict" in sent) {
+        setRefused(sent.conflict);
+        listChanged.current();
         return;
       }
-      if (!response.ok) throw new Error(body.error ?? "Couldn't send to the cart.");
-      // Only the lines this review held; the server's summary counts every open line.
+      const body = sent.body;
+      // Only the lines this review held; the server's summary counts every line it was given.
       const shown = new Set((review ?? []).map((l) => l.id));
       const outcomes = (body.outcomes as Outcome[]).filter((o) => shown.has(o.id));
       setResults({
         outcomes,
         summary: body.summary as string,
-        recordError: body.recordError ?? null,
-        modalityWarning: body.modalityWarning ?? null,
+        recordError: (body.recordError as string | null) ?? null,
+        modalityWarning: (body.modalityWarning as string | null) ?? null,
       });
       setOpen(null);
       window.scrollTo({ top: 0 });
@@ -551,6 +595,43 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     }
   }
 
+  /**
+   * **Remove** (TEC-190): Take back for one In cart line, in one tap. The ledger
+   * rows are written before Kroger is asked and the recorded Pickup/Delivery
+   * choice goes with the negative add (`lib/takeBack.ts`); nothing is retried
+   * without it. A line Kroger refuses stays in the cart, and the result says so.
+   */
+  async function removeOne(id: string) {
+    if (busy) return;
+    setBusy("take-back");
+    setRemoving(id);
+    setTakeBackResults(null);
+    setTakeBackPreview(null);
+    try {
+      const response = await serial(() =>
+        fetch("/api/kroger/cart/take-back", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true, ids: [id] }),
+        })
+      );
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Couldn't take that back out of the cart.");
+      setTakeBackResults({
+        outcomes: body.outcomes,
+        summary: body.summary,
+        recordError: body.recordError ?? null,
+        failed: body.failed === true,
+      });
+      listChanged.current();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't take that back out of the cart.");
+    } finally {
+      setBusy(null);
+      setRemoving(null);
+    }
+  }
+
   const ready = !!status?.configured && !!status.connected && !!status.store && !choosingStore;
 
   return {
@@ -573,27 +654,23 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     choose,
     picks,
     going,
-    again,
     badUrl,
-    confirmAgain,
-    setConfirmAgain,
     refused,
+    adding,
+    removing,
     results,
     refreshing,
     refreshNote,
-    estimating,
-    estimate,
-    showEstimate,
-    setShowEstimate,
     latestScan,
     scanNote,
     refresh,
     chooseModality,
-    calculate,
     findStores,
     pickStore,
     disconnect,
     startReview,
+    addOne,
+    removeOne,
     closeReview,
     send,
     lookTakeBack,
@@ -602,36 +679,8 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
 }
 
 // ---------------------------------------------------------------------------
-// The bottom bar: Send to cart and Take back stay at the bottom (TEC-135).
-// ---------------------------------------------------------------------------
-
-export function CartBar({ cart }: { cart: CartState }) {
-  if (!cart.ready) return null;
-  return (
-    <div className="sticky bottom-0 z-10 -mx-4 flex gap-2 border-t border-line bg-paper px-4 py-3">
-      <button
-        type="button"
-        onClick={() => void cart.startReview()}
-        disabled={cart.busy !== null}
-        className="min-h-12 flex-1 rounded-xl bg-accent text-base font-semibold text-accent-ink disabled:opacity-50"
-      >
-        {cart.busy === "review" ? "Looking up…" : "Send to cart"}
-      </button>
-      {/* **Says it leaves the rest** (RULES.md): Cookbook can only remove what it sent; the confirm says so. */}
-      <button
-        type="button"
-        onClick={() => void cart.lookTakeBack()}
-        disabled={cart.busy !== null || cart.takeBackPreview !== null}
-        className="min-h-12 rounded-xl border border-accent px-4 text-sm font-semibold text-accent disabled:opacity-50"
-      >
-        {cart.busy === "take-back-look" ? "Checking…" : "Take back"}
-      </button>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// The panel under the list: connection, store, refresh, estimate, Take back.
+// The panel under the list: connection, store and refresh. Take back moved to the
+// In cart section (TEC-190).
 // Deals are not here since TEC-132: they live on the Deals tab, and the list
 // keeps only each line's sale tag.
 // ---------------------------------------------------------------------------
@@ -717,9 +766,6 @@ export function CartPanel({ cart }: { cart: CartState }) {
           <button type="button" onClick={() => void cart.disconnect()} className={LINK}>
             disconnect
           </button>
-          <a href={CHECKOUT_URL} target="_blank" rel="noreferrer" className={LINK}>
-            Go to checkout
-          </a>
           <span className="ml-auto">{status.refreshedAt ? `prices checked ${when(status.refreshedAt)}` : "prices not checked yet"}</span>
           <button
             type="button"
@@ -730,22 +776,6 @@ export function CartPanel({ cart }: { cart: CartState }) {
             {cart.refreshing ? "Refreshing…" : "Refresh now"}
           </button>
         </div>
-
-        {cart.takeBackPreview ? (
-          <TakeBackConfirm
-            lines={cart.takeBackPreview}
-            working={cart.busy === "take-back"}
-            onConfirm={() => void cart.confirmTakeBack()}
-            onCancel={() => cart.setTakeBackPreview(null)}
-          />
-        ) : null}
-
-        {cart.takeBackResults ? <TakeBackResults results={cart.takeBackResults} /> : null}
-
-        {cart.estimate && cart.showEstimate ? (
-          <EstimatePanel estimate={cart.estimate.estimate} message={cart.estimate.message} onClose={() => cart.setShowEstimate(false)} />
-        ) : null}
-
       </div>
     );
   }
@@ -754,22 +784,43 @@ export function CartPanel({ cart }: { cart: CartState }) {
     <div className="flex flex-col gap-2 rounded-xl bg-surface p-3">
       <h2 className="text-sm font-semibold">King Soopers</h2>
       {body}
-      {cart.refreshing && !cart.refreshNote ? <p className="text-xs text-ink-soft">Checking prices and stock in the background…</p> : null}
       {cart.scanNote?.failed ? (
         <p role="alert" className="text-xs text-danger">
           {cart.scanNote.text}
-        </p>
-      ) : null}
-      {cart.refreshNote ? (
-        <p role={cart.refreshNote.failed ? "alert" : undefined} className={`text-xs ${cart.refreshNote.failed ? "text-danger" : "text-ink-soft"}`}>
-          {cart.refreshNote.text}
         </p>
       ) : null}
     </div>
   );
 }
 
-function TakeBackResults({ results }: { results: { outcomes: TakeBackOutcome[]; summary: string; recordError: string | null; failed: boolean } }) {
+/**
+ * The refresh log (TEC-190): **collapsed**, one summary line (checked, updated,
+ * how many sizes changed), the full sentence on a tap. A refresh that failed
+ * outright stays open as an alert, and a partial one counts what it could not
+ * check in the summary, so collapsing never hides a problem.
+ */
+export function RefreshLog({ cart }: { cart: CartState }) {
+  if (cart.refreshing && !cart.refreshNote) {
+    return <p className="px-2 text-xs text-ink-soft">Checking prices and stock in the background…</p>;
+  }
+  const note = cart.refreshNote;
+  if (!note) return null;
+  if (note.summary) {
+    return (
+      <details className="rounded-[10px] bg-surface px-3 py-2.5 text-[13px] text-ink-soft">
+        <summary className={`min-h-6 cursor-pointer ${note.summary.needsLook ? "text-warn" : ""}`}>{note.summary.line}</summary>
+        <p className="mt-2 text-xs">{note.text}</p>
+      </details>
+    );
+  }
+  return (
+    <p role={note.failed ? "alert" : undefined} className={`px-2 text-xs ${note.failed ? "text-danger" : "text-ink-soft"}`}>
+      {note.text}
+    </p>
+  );
+}
+
+export function TakeBackResults({ results }: { results: { outcomes: TakeBackOutcome[]; summary: string; recordError: string | null; failed: boolean } }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
       <h3 className="text-sm font-semibold">{results.summary}</h3>
@@ -813,7 +864,7 @@ function ResultChip({ result, good }: { result: string; good: string }) {
  * Take back's confirm (TEC-127): **what will come out, before it does**, and
  * that nothing else in the cart is touched.
  */
-function TakeBackConfirm(props: { lines: TakeBackLine[]; working: boolean; onConfirm: () => void; onCancel: () => void }) {
+export function TakeBackConfirm(props: { lines: TakeBackLine[]; working: boolean; onConfirm: () => void; onCancel: () => void }) {
   const recorded = props.lines.filter((l) => l.held.length > 0);
   const unrecorded = props.lines.filter((l) => l.held.length === 0);
 
@@ -1118,7 +1169,6 @@ export function SendView({ cart }: { cart: CartState }) {
   const pick = review.filter((l) => sectionOf(l) === "pick");
   const goingIn = review.filter((l) => sectionOf(l) === "going");
   const fresh = review.filter((l) => sectionOf(l) === "new");
-  const sent = review.filter((l) => sectionOf(l) === "sent");
   const left = review.filter((l) => l.sent_at === null && !cart.going.some((p) => p.id === l.id));
   const row = (l: ReviewLine) => <ReviewRow key={l.id} cart={cart} line={l} />;
 
@@ -1129,7 +1179,7 @@ export function SendView({ cart }: { cart: CartState }) {
         <h2 className="text-xl font-bold">Send to cart</h2>
         <p className="text-[13px] text-ink-soft">
           {review.length === 0
-            ? "Nothing on the list to send — ticked lines are already bought."
+            ? "Nothing on the List to send — ticked lines are already bought, and lines in the cart are not sent again."
             : `${pick.length} to pick · ${cart.going.length} of ${review.length} lines going in`}
         </p>
       </div>
@@ -1149,13 +1199,6 @@ export function SendView({ cart }: { cart: CartState }) {
           {fresh.map(row)}
         </Section>
       ) : null}
-      {/* **A second send warns and shows what was already sent** (RULES.md). */}
-      {sent.length > 0 ? (
-        <Section title="Already sent" count={sent.length} hint="the cart only adds">
-          {sent.map(row)}
-        </Section>
-      ) : null}
-
       {left.length > 0 ? (
         <section className="flex flex-col gap-1.5">
           <h3 className={`${HEADING} px-2 text-ink-soft`}>Still on your list · {left.length}</h3>
@@ -1167,14 +1210,8 @@ export function SendView({ cart }: { cart: CartState }) {
 
       {cart.refused ? (
         <p role="alert" className="px-2 text-xs text-danger">
-          Not sent — already in the cart: {cart.refused.map((l) => l.name).join(", ")}. Tick the box below to send them again.
+          Not sent — already in the cart: {cart.refused.map((l) => l.name).join(", ")}. The cart only adds, so they were not sent again; the list has been refreshed.
         </p>
-      ) : null}
-      {cart.again.length > 0 ? (
-        <label className="flex items-center gap-2 px-2 text-xs text-warn">
-          <input type="checkbox" checked={cart.confirmAgain} onChange={(e) => cart.setConfirmAgain(e.target.checked)} className="size-4 accent-accent" />
-          Yes, add {cart.again.map((l) => l.name).join(", ")} again — the cart only adds, so this doubles them
-        </label>
       ) : null}
       {cart.badUrl ? <p className="px-2 text-xs text-danger">A pasted address isn&rsquo;t a King Soopers product page.</p> : null}
 
@@ -1186,7 +1223,7 @@ export function SendView({ cart }: { cart: CartState }) {
         <button
           type="button"
           onClick={() => void cart.send()}
-          disabled={cart.going.length === 0 || cart.busy !== null || cart.badUrl || (cart.again.length > 0 && !cart.confirmAgain)}
+          disabled={cart.going.length === 0 || cart.busy !== null || cart.badUrl}
           className="min-h-12 w-full rounded-xl bg-accent text-base font-semibold text-accent-ink disabled:opacity-50"
         >
           {cart.busy === "send" ? "Sending…" : `Send ${cart.going.length} to cart`}

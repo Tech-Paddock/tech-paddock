@@ -73,6 +73,10 @@ export type DealBoard = {
   unpriced: number;
   /** Whether the nightly scan has recorded anything yet at this store. */
   hasNights: boolean;
+  /** When the nightly check first and last recorded prices at this store (TEC-190); null before the first. */
+  lastRun: { first: string; last: string; recordedAt: string | null } | null;
+  /** The most weeks of history any priced product has (the stoplight needs `MIN_WEEKS`). */
+  weeksHeld: number;
 };
 
 export type ScanDeals = {
@@ -91,6 +95,8 @@ export type BoardInput = {
   coupons: Coupon[];
   couponsStaged: boolean;
   scan: ScanDeals | null;
+  /** The nightly check's first and last night at the store (`readNightSpan`); optional so older callers still compile. */
+  span?: { first: string; last: string; recordedAt: string | null } | null;
 };
 
 const weighted = (parts: { value: number; weight: number }[]): number | null => {
@@ -100,7 +106,7 @@ const weighted = (parts: { value: number; weight: number }[]): number | null => 
 
 export function buildDealBoard(input: BoardInput): DealBoard {
   const { asOf, store, products } = input;
-  const empty: DealBoard = { store: store?.name ?? null, asOf, rows: [], couponsStaged: input.couponsStaged, unpriced: 0, hasNights: false };
+  const empty: DealBoard = { store: store?.name ?? null, asOf, rows: [], couponsStaged: input.couponsStaged, unpriced: 0, hasNights: false, lastRun: input.span ?? null, weeksHeld: 0 };
   if (!store) return empty;
 
   const freshFrom = addDays(asOf, -FRESH_NIGHTS);
@@ -194,5 +200,11 @@ export function buildDealBoard(input: BoardInput): DealBoard {
   }
 
   rows.sort((a, b) => a.aisle.localeCompare(b.aisle) || b.bought - a.bought || a.name.localeCompare(b.name));
-  return { ...empty, rows, unpriced, hasNights: input.nights.some((n) => n.location_id === store.locationId) };
+  return {
+    ...empty,
+    rows,
+    unpriced,
+    hasNights: input.nights.some((n) => n.location_id === store.locationId),
+    weeksHeld: rows.reduce((most, r) => Math.max(most, r.weeks), 0),
+  };
 }

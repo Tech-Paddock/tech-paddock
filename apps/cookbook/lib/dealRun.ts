@@ -6,14 +6,10 @@ import { readList } from "./grocery";
 import { decider } from "./decide";
 import { appendScan } from "./dealStore";
 import {
-  describeEstimate,
   describeScan,
-  estimate,
   findDeals,
   lookUp,
   scanEntries,
-  targetFor,
-  type Estimate,
   type LookupDeps,
   type ScanRecord,
   type ScanTrigger,
@@ -21,9 +17,9 @@ import {
 import { ConflictError } from "./errors";
 
 /**
- * The deal scan and the estimated total, wired to Kroger and the database
- * (TEC-121). **No model call.** Each borrows one access token
- * (`withAccessToken`), so the list tab runs them one at a time — two at once
+ * The deal scan, wired to Kroger and the database (TEC-121; the live estimate
+ * left in TEC-190). **No model call.** It borrows an access token
+ * (`withAccessToken`), so the list tab runs Kroger calls one at a time — two at once
  * can race the refresh token's rotation (NOTES.md).
  */
 
@@ -53,21 +49,5 @@ export async function runDealScan(trigger: ScanTrigger): Promise<{ scan: ScanRec
     const result = findDeals(entries, found);
     const scan = await appendScan({ ...result, trigger, location_id: store.locationId, store_name: store.name });
     return { scan, message: describeScan(result, store.name) };
-  });
-}
-
-/** Every open line × its quantity at the store, for the chosen mode. Computed, not stored. */
-export async function runEstimate(): Promise<{ estimate: Estimate; message: string }> {
-  return withAccessToken(async (accessToken, store, modality) => {
-    if (!store) throw new ConflictError(NEED_STORE);
-    const [words, products, open] = await Promise.all([readPreferences(), readProducts(), openLines()]);
-    const decide = decider(products, words);
-    const lines = open.map((l) => ({ id: l.id, name: l.name, quantity: l.quantity, target: targetFor(l.name, decide(l.name)) }));
-    const found = await lookUp(
-      lines.map((l) => l.target),
-      lookups(accessToken, store.locationId)
-    );
-    const result = estimate(lines, found, modality, store.name);
-    return { estimate: result, message: describeEstimate(result) };
   });
 }

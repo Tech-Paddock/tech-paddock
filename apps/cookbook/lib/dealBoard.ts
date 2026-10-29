@@ -1,6 +1,6 @@
 import { readConnectionRow } from "./krogerStore";
 import { readProducts } from "./productStore";
-import { readNightsSince, readWeeksSince } from "./priceStore";
+import { readNightSpan, readNightsSince, readWeeksSince } from "./priceStore";
 import { readCoupons } from "./couponStore";
 import { readLatestScan } from "./dealStore";
 import { addDays, denverDate } from "./priceDates";
@@ -27,12 +27,13 @@ export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> 
     return buildDealBoard({ asOf, store: null, products: [], nights: [], weeks: [], coupons: [], couponsStaged: staged, scan: null });
   }
 
-  const [products, nights, weeks, { coupons, staged }, latest] = await Promise.all([
+  const [products, nights, weeks, { coupons, staged }, latest, span] = await Promise.all([
     readProducts(),
     readNightsSince(store.locationId, addDays(asOf, -FRESH_NIGHTS)),
     readWeeksSince(store.locationId, addDays(asOf, -7 * HISTORY_WEEKS)),
     readCoupons(),
     readLatestScan(),
+    readNightSpan(store.locationId),
   ]);
 
   return buildDealBoard({
@@ -43,6 +44,7 @@ export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> 
     weeks,
     coupons,
     couponsStaged: staged,
+    span,
     scan: latest
       ? {
           ranOn: denverDate(new Date(latest.ran_at)),

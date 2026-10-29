@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DealBoard, DealRow } from "@/lib/dealRows";
 import { listDeals } from "@/lib/listDeals";
-import { ALL_AISLES, NO_FILTER, groupByAisle, matchesFilter, type DealFilter, type Kind, type LightFilter } from "@/lib/dealFilter";
+import { ALL_AISLES, NO_FILTER, emptyMessage, groupByAisle, matchesFilter, shortDay, type DealFilter, type Kind, type LightFilter } from "@/lib/dealFilter";
 
 /**
  * Deals (TEC-132), at `/deals`: every saved product with a recent price,
@@ -156,19 +156,8 @@ export default function DealsTab({ refreshKey = 0, openLines = null }: { refresh
   const mine = useMemo(() => (board && openLines ? listDeals(board.rows, openLines) : []), [board, openLines]);
   const set = (patch: Partial<DealFilter>) => setFilter((f) => ({ ...f, ...patch }));
 
-  const wantsCoupons = filter.kind === "coupon" || filter.kind === "stack";
-
-  function empty(): string {
-    if (!board) return "";
-    if (!board.store) return "Pick a store on the King Soopers list first, so prices are from your King Soopers.";
-    if (wantsCoupons && !board.couponsStaged) return "No coupons staged yet.";
-    if (board.rows.length === 0) {
-      return board.hasNights
-        ? "None of your saved products has a recent price."
-        : "No prices yet. The nightly scan runs about 3 a.m. Denver time; the first one fills this in.";
-    }
-    return "No deals match. Clear the search, or pick All aisles.";
-  }
+  // **Each empty filter says why** (TEC-190), not one sentence for all of them.
+  const why = board ? emptyMessage(board, filter) : null;
 
   return (
     <section className="flex flex-col gap-3">
@@ -183,6 +172,20 @@ export default function DealsTab({ refreshKey = 0, openLines = null }: { refresh
               ? ""
               : "Looking…"}
         </p>
+        {/* **When the nightly price check last ran** (TEC-190). */}
+        {board?.store ? (
+          <p className="text-[13px]">
+            Last price check:{" "}
+            <b>
+              {board.lastRun
+                ? board.lastRun.recordedAt
+                  ? new Date(board.lastRun.recordedAt).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+                  : shortDay(board.lastRun.last)
+                : "not yet"}
+            </b>
+            {board.lastRun ? <span className="text-ink-soft"> · prices since {shortDay(board.lastRun.first)}</span> : null}
+          </p>
+        ) : null}
       </div>
 
       {error ? (
@@ -261,7 +264,18 @@ export default function DealsTab({ refreshKey = 0, openLines = null }: { refresh
         </div>
       ) : null}
 
-      {board && groups.length === 0 ? <p className="rounded-xl bg-surface p-4 text-sm text-ink-soft">{empty()}</p> : null}
+      {board && groups.length === 0 && why ? (
+        <div role="status" className="flex flex-col gap-1 rounded-xl border border-dashed border-line p-3.5">
+          <span className="text-[15px] font-bold">{why.title}</span>
+          <span className="text-[13px] text-ink-soft">{why.body}</span>
+          {/* Show New instead: the same switch as tapping New above, one line of the filter's own state. */}
+          {why.offerNew ? (
+            <button type="button" onClick={() => set({ light: "new" })} className="mt-1 min-h-11 self-start rounded-xl border border-accent px-3.5 font-bold text-accent">
+              Show New instead
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {groups.map((g) => (
         <div key={g.aisle} className="flex flex-col gap-1.5">

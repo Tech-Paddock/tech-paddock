@@ -278,15 +278,74 @@ export function cartQuantity(amounts: Amount[], pack: Pack | null): number {
   return 1;
 }
 
+/**
+ * **Bulk produce reads as a bag** (TEC-190; `RULES.md`, *Storage*). Fixed
+ * rules, no model, the owner's table of 2026-10-29: more than 3 onions is a 3 lb
+ * bag, more than 3 potatoes a 5 lb bag, more than 4 carrots a 2 lb bag, more
+ * than 4 lemons or limes a bag. It applies only to a plain count of the plain
+ * item ("5 onions", "6 russet potatoes"): a measure ("2 cups chopped onion"),
+ * "green onions", "sweet potatoes" and anything else with a different noun are
+ * not bulk. The stored line is never rewritten; the bag is how the line is
+ * shown, searched and counted.
+ */
+type Bulk = { noun: RegExp; adjectives: string[]; over: number; size: string };
+
+const BULK: Bulk[] = [
+  { noun: /^onions?$/, adjectives: ["yellow", "white", "red", "sweet", "spanish"], over: 3, size: "3 lb bag" },
+  { noun: /^potatoes$|^potato$/, adjectives: ["russet", "red", "yellow", "gold", "golden", "white", "yukon", "baking", "idaho", "new"], over: 3, size: "5 lb bag" },
+  { noun: /^carrots?$/, adjectives: [], over: 4, size: "2 lb bag" },
+  { noun: /^lemons?$/, adjectives: [], over: 4, size: "2 lb bag" },
+  // The owner said "a bag" and gave no weight for limes, so none is invented.
+  { noun: /^limes?$/, adjectives: [], over: 4, size: "bag" },
+];
+
+export type Bag = {
+  /** The item as written, without quantities: "yellow onions". */
+  item: string;
+  /** "3 lb bag". */
+  size: string;
+  /** What the line is searched and matched as: "yellow onions 3 lb bag". */
+  phrase: string;
+  /** What the line was: "5 onions". */
+  was: string;
+};
+
+/** The bag a line reads as, or null when it is not bulk produce over its limit. */
+export function bagOf(line: { name: string; note: string | null }): Bag | null {
+  const { amount, rest } = leadingAmount(line.name);
+  const fromNote = noteAmounts(line.note);
+  const amounts = combine([...(amount ? [amount] : []), ...(fromNote ?? [])]);
+  if (amounts.length !== 1 || amounts[0].unit !== null) return null;
+  const count = value(amounts[0].qty);
+  const item = itemWords(rest);
+  const tokens = item.split(" ").filter(Boolean);
+  if (tokens.length === 0) return null;
+  const noun = tokens[tokens.length - 1];
+  const rule = BULK.find((b) => b.noun.test(noun) && tokens.slice(0, -1).every((t) => b.adjectives.includes(t)));
+  if (!rule || !(count > rule.over)) return null;
+  return { item, size: rule.size, phrase: `${item} ${rule.size}`, was: `${formatFraction(amounts[0].qty)} ${item}` };
+}
+
+/**
+ * The name a line is matched and searched as: the bag's phrase for bulk
+ * produce, else the line as typed. A saved product named for the bag
+ * ("onions 3 lb bag") beats search, as any saved product does.
+ */
+export function readAs(line: { name: string; note?: string | null }): string {
+  return bagOf({ name: line.name, note: line.note ?? null })?.phrase ?? line.name;
+}
+
 export type LineView = {
   /** The item, as shown: the product's shopping-unit label, else the cleaned item, capitalised. */
   name: string;
-  /** The combined amount, or null. */
+  /** The combined amount, or null. A bag reads "was 5 onions". */
   amount: string | null;
   /** The note, unless it was only amounts. */
   note: string | null;
   /** What the rules put in the cart. The stored quantity is what is sent; this is set when a line is added. */
   quantity: number;
+  /** Set when the line reads as a bag of bulk produce (TEC-190). */
+  bag?: Bag;
 };
 
 function capitalise(text: string): string {
@@ -299,6 +358,17 @@ export function lineView(line: { name: string; note: string | null }, pack: Pack
   const fromNote = noteAmounts(line.note);
   const amounts = combine([...(amount ? [amount] : []), ...(fromNote ?? [])]);
   const item = itemWords(rest) || itemWords(line.name) || line.name.trim();
+  // A saved product with its own pack conversion decides the quantity; the bag rule is for the rest.
+  const bag = pack?.label?.trim() || pack?.size ? null : bagOf(line);
+  if (bag) {
+    return {
+      name: capitalise(`${bag.item}, ${bag.size}`),
+      amount: `was ${bag.was}`,
+      note: fromNote ? null : line.note,
+      quantity: 1,
+      bag,
+    };
+  }
   return {
     name: pack?.label?.trim() || capitalise(item),
     amount: amounts.length > 0 ? formatAmounts(amounts) : null,

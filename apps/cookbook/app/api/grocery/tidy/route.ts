@@ -24,7 +24,8 @@ export const dynamic = "force-dynamic";
 /** Propose. Reads the open lines, asks for a consolidation, checks it, returns it unapplied. */
 export async function POST() {
   try {
-    const open = (await readList()).filter((i) => !i.checked);
+    // Lines already in the cart are not tidied (TEC-190): they are not on the List any more.
+    const open = (await readList()).filter((i) => !i.checked && i.sent_at === null);
     if (open.length < 2) {
       return NextResponse.json({ error: "There is nothing to merge yet." }, { status: 400 });
     }
@@ -75,7 +76,8 @@ export async function PUT(request: NextRequest) {
   if (lines.length === 0) return NextResponse.json({ error: "Nothing to apply." }, { status: 400 });
 
   try {
-    const open = (await readList()).filter((i) => !i.checked);
+    // Lines already in the cart are not tidied (TEC-190): they are not on the List any more.
+    const open = (await readList()).filter((i) => !i.checked && i.sent_at === null);
     const problem = validateTidy(open, lines);
     // The list moved under the proposal — something was added or ticked off
     // elsewhere. Refusing is right: applying would drop whatever arrived.

@@ -173,7 +173,7 @@ Reasoning is in the migration headers.
 - Scopes: `cart.basic:write product.compact`. A missing variable is named on the list tab and in
   `/api/health`.
 - `GET /api/kroger/cart` is the review. **Which products decide a line** is `decide`
-  (`lib/brands.ts`), one copy for the review, the estimate, the deal scan, the list's links and
+  (`lib/brands.ts`), one copy for the review, the list's prices, the deal scan, the list's links and
   marks: (1) a line that is 8–14 digits is that code, saved or not; (2) saved names as whole words,
   longest first, every product carrying the longest matching name a candidate; a search-word
   phrase longer than that decides instead, and on equal length products win. Among several
@@ -195,8 +195,11 @@ Reasoning is in the migration headers.
   salt" vs caramels, `fetch` stubbed).
 - **The review** (`SendView`, `app/Cart.tsx`) replaces the list on the list tab, with *← Back to
   the list*; nothing goes in until **Send N to cart**. One list in sections: *Pick one* (most
-  bought pre-picked; opens on the first), *Going in* (tap to change), *Not saved yet* (ticked;
-  *Paste a product page*), and *Already sent* (unticked; ticking one needs the "add again" box).
+  bought pre-picked; opens on the first), *Going in* (tap to change) and *Not saved yet* (ticked;
+  *Paste a product page*). **Since TEC-190 it holds only lines still on the List**: `GET
+  /api/kroger/cart` leaves out lines with `sent_at` (it still returns `alreadySent`), the *Already
+  sent* section and its "add again" box are gone from the screen, and `?ids=a,b` limits the review
+  to those lines (Add to cart on one line).
   A picked option is filled with the accent. **Make default** (a checkbox, only where `matched`
   and several options) rides on the pick as `makeDefault`. **Not this trip** is the only way a
   line with a product stays out; a line with nothing to add is sent as a bare `{id}` and comes
@@ -209,11 +212,22 @@ Reasoning is in the migration headers.
   remembering. A failure is appended to the line ("Couldn't make it the default … do it in Your
   brands"); the line stays added.
 - A line left out of the picks reports skipped, "Not this trip — still on your list."
-- The state is `useCart` (`app/Cart.tsx`); `List.tsx` lays out `SendView`, `CartPanel`
-  (connection, store, refresh, Take back's confirm, the estimate; **no deals since TEC-132**, they
-  live on the Deals tab) and `CartBar` (sticky
-  **Send to cart** and **Take back**). `serialKroger` is module-level, so the list and Your
-  brands' Refresh now share one Kroger queue.
+- The state is `useCart` (`app/Cart.tsx`); `List.tsx` lays out `SendView`, the **List** and **In
+  cart** sections, `RefreshLog` and `CartPanel` (connection, store, Refresh now; **no deals since
+  TEC-132**, they live on the Deals tab). The sticky `CartBar` is gone (TEC-190): **Send all to
+  cart** ends the List section, **Clear cart** and **Go to checkout** end In cart.
+  `serialKroger` is module-level, so the list and Your brands' Refresh share one Kroger queue.
+- **List and In cart** (TEC-190): a line is In cart when `sent_at` is set (Send sets it, a whole
+  Take back clears it), so the sections need no new column and no migration. **Add to cart** on a
+  line (`addOne`): `GET /api/kroger/cart?ids=<id>`, and when the plan is `exact` the pick is
+  posted at once (`POST` with `only: [id]`, which limits what the server sends and reports) and the
+  outcome is a toast; a Pick one, Not saved yet or no-product line opens `SendView` with that line
+  alone (`reviewOnly`). **Remove** (`removeOne`) is `POST /api/kroger/cart/take-back` with `ids:
+  [id]`; **Clear cart** is the old two-tap Take back (GET preview, then `confirm: true`, no `ids`).
+  The In cart total and the "Shows what Cookbook put in your cart" caveat are the screen's own
+  statement that the API cannot read the account. A ticked line that is also in the cart sits in
+  In cart (no tick there). **Tidy and Clear all / Clear ticked / Copy read the List only**: a line
+  in the cart is never merged into a tidy or deleted without a take back.
 - **Searching by the item alone** (TEC-131): `lineTerm` (`lib/cart.ts`) is
   `searchTerm(itemWords(name)) ?? searchTerm(name)`, used by `planLine` and `targetFor`; a
   phrase's search words are searched as written. The list's links use `itemWords` too
@@ -243,7 +257,9 @@ Reasoning is in the migration headers.
   taken back get `sent_at` cleared (`markUnsent`). A line with `sent_at` and no ledger rows was sent
   before the ledger and is skipped, with a pointer to the cart page. The summary always says
   anything added elsewhere is still there; any failure shows the `CHECKOUT_URL` link. The button
-  and confirm are local patterns in `app/Cart.tsx`.
+  and confirm are local patterns in `app/Cart.tsx`. **Remove** sends `ids` (TEC-190): the same
+  reserve-then-ask path for one line, with its recorded Pickup/Delivery choice, never retried
+  without it; a line sent before the ledger is skipped and says so, and stays In cart.
 - Refresh: `lib/refresh.ts`, `POST /api/kroger/refresh`, triggered by `lib/refreshDue.ts`. No cron of its own (the nightly price scan, below, is separate).
   Every saved code in one `productsByIds` (50 per request); a code absent from the answer is
   flagged (`missing_since` kept from the first time) and Kroger is searched by its `description`
@@ -252,15 +268,20 @@ Reasoning is in the migration headers.
   `successor`; a failed search keeps the old offer. Writes run four at a time. Drift (`sameSize`
   false between `size_first` and the size now; "1 lb" equals "16 oz") is named in the report.
   Search-word phrases are counted, not checked. `refreshed_at` moves only when products were
-  checked.
+  checked. **The log is collapsed** (TEC-190): `RefreshLog` (`app/Cart.tsx`) shows
+  `refreshSummary(report)` (`lib/refreshNote.ts`: "Checked 391 products · 391 updated · 27 sizes
+  changed", plus any not returned or not checked, in the warning colour) in a `<details>` that
+  starts closed; the old sentence is inside. A failed refresh, or a reply with no report, stays
+  as plain text and an alert.
 - **Replace** (`POST /api/brands/successor`): moves the code, page, description, size and
   price to the successor's; keeps names, count and `size_first` (so a smaller successor shows as
   drift); refused when another row holds the successor's code. Only on the tap.
 
 ## Prices (TEC-121)
 
-- Pure logic in `lib/pricing.ts`, wired in `lib/dealRun.ts`; `lib/decide.ts` is the one brand
-  decider for the review, the estimate and the scan, so a line is priced as what Send would add
+- Pure logic in `lib/pricing.ts` (the deal scan; `lookUp`, `targetFor`), wired in `lib/dealRun.ts`;
+  `lib/decide.ts` is the one brand decider for the review, the list's prices and the scan, so a
+  line is priced as what Send would add
   (its default or named product first). A line decided only by a product's Kroger name is priced
   as Kroger's top match for the item (`targetFor`), because only Send checks that product.
   Exact IDs go in one `productsByIds` call (50 per request); searches run four at a time.
@@ -273,24 +294,34 @@ Reasoning is in the migration headers.
   King Soopers panel says so in red.
 - Coupons are never read here. The *Find coupons* link left with the panel (TEC-132), and
   `couponsUrl` with it.
-- Estimate: `POST /api/kroger/estimate`, computed and not stored. The list header shows "about
-  $N" (rounded) from the last one, or *estimate it*. Promo first, in cents. A line not
-  offered for the chosen mode, with no price or with no match is unpriced and named; with nothing
-  priced, `total` is null and the sentence says there is no estimate.
+- **No live estimate since TEC-190.** `POST /api/kroger/estimate`, `runEstimate`, `estimate`,
+  `describeEstimate`, the *Calculate estimated total* / *estimate it* buttons and `EstimatePanel`
+  (and `app/Deals.tsx` with it) are gone. **The list's totals are summed from the nightly check**
+  (`lib/listPrices.ts`, pure, the browser runs it): `GET /api/grocery` reads the connection's store
+  and `readNightsSince` (the last `PRICE_WINDOW_NIGHTS`, 5, nights), takes each product's newest
+  night, and gives each line `price: {unit, total, onSale, night}` or `null`. The product a line is
+  priced as is `productFor`: the only saved product, a chosen one (default or named) or the single
+  Kroger-name match; an unsettled Pick one is **not guessed**, so it reads "no price yet" until a
+  pick makes it one. A line with no product or no night is "no price yet", never $0, and each
+  section's total line counts them ("about $21.46 · 1 no price yet"). The header names the night
+  the prices are from ("prices from the night of Oct 28", or "Oct 26 to Oct 28" when lines differ).
+  A failed price read comes back as `priceError` beside the list, which still renders. Totals are
+  Kroger's shelf price at the store before tax and coupons, not what the cart will charge:
+  Pickup/Delivery no longer prices anything.
 - Pickup/Delivery: `PATCH /api/kroger`, `lib/modality.ts` (no imports; the browser runs it). Send
   puts `modality` on each `/cart/add` item; a 400 or 422 is retried once without it, the rest of
   that send goes without, and `modalityWarning` says so. Not retried on 401, 403 or an outage.
 - On-sale tag on a list line: "On sale, N% off until <date>" (`lib/saleTag.ts`, type-only
   imports). No Kroger call of its own: `List.tsx` computes the tags (`saleTags`) from the cart
-  hook's latest scan and last estimate. The scan matches open lines by name, case-insensitive, and
-  only when its `location_id` is the chosen store; the estimate overrides for the lines it priced.
+  hook's latest scan. The scan matches open lines by name, case-insensitive, and
+  only when its `location_id` is the chosen store.
   A passed end date tags nothing; no end date drops "until". Says sale, never coupon (TEC-126). The
-  chip is a local pattern in `app/List.tsx`.
-- Picking a store clears the estimate but does not start a scan; the old store's scan tags nothing
-  until the next scan.
+  chip is a local pattern in `app/List.tsx`. Since TEC-190 only the scan tags (the estimate
+  override is gone) and only open List lines are tagged.
+- Picking a store does not start a scan; the old store's scan tags nothing until the next scan.
 - `Cart.tsx` runs every token-borrowing request through `serial`, one at a time: any page load can
-  start a refresh and a scan together. The estimate panel is a local pattern in `app/Deals.tsx`;
-  the Pickup/Delivery switch (`ModeSwitch`) is one in `app/List.tsx`.
+  start a refresh and a scan together. The Pickup/Delivery switch (`ModeSwitch`), the List and In
+  cart rows and the price text are local patterns in `app/List.tsx`.
 
 ## Deals (TEC-132)
 
@@ -333,6 +364,20 @@ Reasoning is in the migration headers.
   Neutral / Red / New, aisle); a **new** product shows under Any and under New, none of the three colours. A coupon
   matches by product code only. Coupon and Stacks say "no coupons staged yet" until a coupon row
   exists.
+- **Last price check and empty filters** (TEC-190). The board carries `lastRun` (first and last
+  night at the store and when the last night was written, `readNightSpan`) and `weeksHeld` (the
+  most weeks any priced product has). The tab says "Last price check: Wed Oct 28, 9:04 AM · prices
+  since Oct 27" (the cron's first insert, in the browser's time zone; the night's date when
+  `recorded_at` is missing). **`emptyMessage`** (`lib/dealFilter.ts`, pure) gives every empty
+  filter its own words: Green, Neutral and Red with under `MIN_WEEKS` weeks say colours start after
+  4 weeks of prices, **about `coloursFrom(asOf, weeksHeld)`** (the Monday run that rolls up the
+  missing week: from Thu Oct 29 with none, Nov 23; a Monday counts that day's run as done), and
+  offer **Show New instead**, which is `set({ light: "new" })`, the New button's own filter state.
+  Other empties: no store, coupons not staged, no prices yet, no recent prices, nothing new,
+  nothing on sale, and "No deals match" only as the last resort. **The filters were never broken**:
+  on 2026-10-29 `price_nights` held two nights (Oct 27, 28; 389 products) and `price_weeks` was
+  empty, so the stoplight had 0 of the 4 weeks it needs and every row is correctly New;
+  `tests/dealFilter.test.ts` builds that board and holds it.
 - **On my list** (TEC-132, owner 2026-10-26) is the first section of the tab, above the filters
   and not affected by them. `lib/listDeals.ts` (pure) takes the board's rows and the list's open
   (unticked) lines; `List.tsx` hands the lines up through `onOpenLines` and `Cookbook.tsx` passes
@@ -416,8 +461,13 @@ array**; each element is a product row or a search-word row.
   (`typedLines`, `lib/typedLines.ts`; owner, 2026-10-23, "Keep multi-line paste"; Enter adds,
   Shift+Enter starts a line; "notes after a dash"), **Cooking this week** (the menu as day and
   recipe chips with a two-tap Clear; names come from the book via `Cookbook.tsx`; moving a day
-  stays on the book's *On the menu*), **Still to buy · N** with Copy · Tidy · Clear ticked · Clear
-  all, the lines, the legend, the King Soopers panel, then the sticky bar.
+  stays on the book's *On the menu*), then **List · N** (Copy · Tidy · Clear ticked · Clear all, the
+  lines, the legend, **Send all to cart**), **In cart · N** (Remove per line, Clear cart, Go to
+  checkout, the caveat) and the King Soopers panel (TEC-190; the sticky bar left). The header says
+  "N still to buy · N in cart · store · prices from the night of …". Each List row is the tick,
+  the name over a small line (★ ? + mark, sale tag, recipes, amount, note), the price over the ×N
+  box, and **+ Cart** (32px, 12px bold, accessible name "Add to cart"; `h-8`, not the 44px floor,
+  by the owner's word).
 - **Each line's mark** (`lineMark`, `lib/brands.ts`; `GET /api/grocery` adds `mark`): ★ goes in
   as a saved product (code, only product, default, or named), ? needs a pick at Send, + anything
   else, including a product found only by its Kroger name and a typed code that is not saved.
@@ -429,6 +479,20 @@ array**; each element is a product row or a search-word row.
   tsp"): same units add, tsp/tbsp/cup/fl oz/pt/qt, oz/lb, g/kg and ml/l combine into the smallest
   unit present, other units are joined with " + ". Fractions stay fractions ("1 1/2 cups"). A note
   that is not only amounts shows as written. "12 pack …", "6 ct …" are names, not amounts.
+- **Bulk produce as bags** (TEC-190, `bagOf` / `readAs` in `lib/lineView.ts`): a plain count (no
+  unit; the name's and a Tidy note's amounts added) of onions or potatoes over 3, carrots or lemons
+  or limes over 4, with at most the listed colour words in front (onions: yellow, white, red,
+  sweet, spanish; potatoes: russet, red, yellow, gold, golden, white, yukon, baking, idaho, new;
+  none for the rest), becomes one bag: onions 3 lb, potatoes 5 lb, carrots 2 lb, lemons 2 lb
+  (that weight is the owner's mockup, not his words), limes "bag" (no weight was given and none is
+  invented). The view is "Onions, 3 lb bag" with "was 5 onions", quantity 1. **The same phrase is
+  how the line is decided, searched, linked and remembered**: `decider(name, note)` decides
+  `onions 3 lb bag`, `lineTerm(name, note)` searches it (so `itemWords` never drops the bag), and
+  the remembered name is the phrase, never the count. **Only a product that is itself a bag can
+  decide it** (a name that mentions the size, or "bag" as a word in its Kroger name); a saved
+  loose "onions" never does, or five onions would go in as one. A saved product with a pack label
+  or size decides the quantity instead and the rule steps aside. `decide`, `lineTerm`, `linkFor`,
+  `targetFor`, `scanEntries` and `quantityRule` now take the line's note as well as its name.
 - **The cart quantity is set when a line is written**, by the same rules (`quantityRule`,
   `lib/lineQuantity.ts`): typed lines (`POST /api/grocery`), recipe lines (`toGroceryList`) and a
   Tidy (`applyTidy`, the larger of carried and computed). With the product's pack conversion:
@@ -444,6 +508,19 @@ not answer), `InputError` 400, `ConflictError` 409, `UpstreamError` 502 (Kroger;
 when the stored sign-in failed), `SetupError` 501 (missing variable), anything else 500.
 
 ## Traps
+
+- **In cart is what Cookbook sent, not the account** (TEC-190). Anything added in the King Soopers
+  app, and anything bought since, is invisible; a line cleared from the list while in the cart
+  loses its ledger link (`item_id` null) and is never taken back, so Clear all and Clear ticked
+  leave In cart lines alone. A line the owner removes in the King Soopers app still shows In cart
+  until Remove or Clear cart (which Kroger may refuse or ignore; negative quantities stay
+  unconfirmed).
+- **A bag line saved as a product is saved under its phrase** ("onions 3 lb bag"), so a bag picked
+  for "5 onions" also catches "7 onions" and "8 yellow onions", and never "2 onions".
+- **Deals colours start at 4 weeks of rolled-up weeks, not 4 weeks of nights**: the Monday run
+  rolls a finished week, so the first colour is the run after the fourth Sunday. A missed Monday
+  that has nights is caught up on the next run; a week with no nights never rolls up and pushes
+  the date out, which `coloursFrom` cannot know.
 
 - **"Invalid API key" comes from Supabase.** Only drafting, an ingredient edit and Tidy call a
   model.
@@ -490,7 +567,7 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   (it is remembered) or add the name in Your brands.
 - A Pick one pick is remembered, so the line's whole name joins that product's names; the next
   time that exact line has one match and goes straight in, whatever the default.
-- The list's link and the estimate for a line decided by default follow the default; changing the
+- The list's link and price for a line decided by default follow the default; changing the
   default in Your brands changes them on the next read.
 - Your brands' groups chain through shared names, so one broad name ("milk") can pull unrelated
   products into one card. Make default sets only the shared names that product carries; when it
@@ -502,9 +579,9 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   lines written after. A pack conversion added later does not change lines already on the list.
 - A Tidy can raise a quantity lowered by hand, when the merged line's rule says more.
 - Preview and local deployments cannot complete Kroger sign-in; the redirect URI is production's.
-- A line added since the last scan has no sale tag until the next scan or *estimate it*; a line
-  renamed by Tidy loses its tag the same way. With no Scan button, the next scan is the weekly one
-  when any Cookbook page loads.
+- A line added since the last scan has no sale tag until the next scan; a line renamed by Tidy
+  loses its tag the same way. With no Scan button, the next scan is the weekly one when any
+  Cookbook page loads.
 - `withAccessToken` is per request: two tabs open at once can still race token rotation, because
   `serial` covers one page.
 - **`CRON_SECRET` must be set in `tp-cookbook` (32+ characters)**: unset or short, the gate and the

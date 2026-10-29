@@ -45,14 +45,23 @@ async function openLines(): Promise<CartLine[]> {
   return (await readList()).filter((i) => !i.checked).map(cartLine);
 }
 
-export async function GET() {
+/** `ids=a,b`: only these lines (Add to cart on one line, TEC-190). */
+function idsOf(raw: string | null): string[] | null {
+  const ids = (raw ?? "").split(",").map((i) => i.trim()).filter(Boolean);
+  return ids.length > 0 ? ids : null;
+}
+
+export async function GET(request?: NextRequest) {
   try {
     const [open, words, products] = await Promise.all([openLines(), readPreferences(), readProducts()]);
     const decide = decider(products, words);
+    // **Only lines still on the List** (TEC-190): a line in the cart is not looked up or offered again.
+    const only = idsOf(request ? new URL(request.url).searchParams.get("ids") : null);
+    const toReview = open.filter((l) => l.sent_at === null && (!only || only.includes(l.id)));
 
     const lines = await withAccessToken(async (accessToken, store) => {
       if (!store) throw new ConflictError("Pick a store first, so the matches are from your King Soopers.");
-      return reviewLines(open, decide, (term) => searchProducts(accessToken, term, store.locationId, CHECK_RESULTS));
+      return reviewLines(toReview, decide, (term) => searchProducts(accessToken, term, store.locationId, CHECK_RESULTS));
     });
 
     return NextResponse.json({ lines, alreadySent: alreadySent(open), checkoutUrl: CHECKOUT_URL });
@@ -65,9 +74,11 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const picks = readPicks(body.picks);
   const again = body.again === true;
+  // One line sent alone (Add to cart, TEC-190): only it is sent and reported.
+  const only = Array.isArray(body.only) ? body.only.filter((i: unknown): i is string => typeof i === "string") : null;
 
   try {
-    const open = await openLines();
+    const open = (await openLines()).filter((l) => !only || only.includes(l.id));
     if (picks.length === 0) throw new InputError("Nothing chosen to send.");
 
     // **Before Kroger is touched**: a repeat refused after the sign-in renewed is
@@ -87,7 +98,7 @@ export async function POST(request: NextRequest) {
       const decide = decider(products, words);
       for (const line of open) {
         if (!picks.some((p) => p.id === line.id && p.makeDefault)) continue;
-        const decision = decide(line.name);
+        const decision = decide(line.name, line.note);
         if (decision?.kind === "products" && decision.matched) defaultNames.set(line.id, decision.matched);
       }
     }

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { readProducts } from "@/lib/kroger";
-import { estimate, findDeals, lookUp, percentOff, scanEntries, type Deal } from "@/lib/pricing";
+import { findDeals, lookUp, percentOff, scanEntries, type Deal } from "@/lib/pricing";
 import { saleTags, saleText } from "@/lib/saleTag";
 
 /**
@@ -35,46 +35,22 @@ const lines = [
   { id: "b", name: "eggs" },
 ];
 
-function priced(id: string, name: string, sale: { percentOff: number; endsAt: string | null } | null) {
-  return { id, name, quantity: 1, description: name, url: "", unit: 3, onSale: sale !== null, sale, lineTotal: 3 };
-}
-
 describe("the on-sale tag on a list line", () => {
   it("tags a line the latest scan found on sale at the chosen store, matched by name without case", () => {
-    const tags = saleTags(lines, { locationId: STORE, scan: { location_id: STORE, deals: [deal()] }, estimate: null }, NOW);
+    const tags = saleTags(lines, { locationId: STORE, scan: { location_id: STORE, deals: [deal()] } }, NOW);
     expect([...tags.keys()]).toEqual(["a"]);
     expect(saleText(tags.get("a")!)).toBe("On sale, 25% off until Oct 27");
   });
 
   it("a scan from another store, or no store, tags nothing", () => {
     const scan = { location_id: "99999999", deals: [deal()] };
-    expect(saleTags(lines, { locationId: STORE, scan, estimate: null }, NOW).size).toBe(0);
-    expect(saleTags(lines, { locationId: null, scan: { ...scan, location_id: STORE }, estimate: null }, NOW).size).toBe(0);
-  });
-
-  it("the estimate is the newer look: it untags a line it priced off sale and tags one it priced on sale", () => {
-    const tags = saleTags(
-      lines,
-      {
-        locationId: STORE,
-        scan: { location_id: STORE, deals: [deal()] },
-        estimate: { priced: [priced("a", "2% milk", null), priced("b", "eggs", { percentOff: 10, endsAt: null })] },
-      },
-      NOW
-    );
-    expect([...tags.keys()]).toEqual(["b"]);
-    // No end date from Kroger: the tag leaves "until" off rather than guessing one.
-    expect(saleText(tags.get("b")!)).toBe("On sale, 10% off");
-  });
-
-  it("a line the estimate could not price falls back to the scan", () => {
-    const tags = saleTags(lines, { locationId: STORE, scan: { location_id: STORE, deals: [deal()] }, estimate: { priced: [] } }, NOW);
-    expect(tags.has("a")).toBe(true);
+    expect(saleTags(lines, { locationId: STORE, scan }, NOW).size).toBe(0);
+    expect(saleTags(lines, { locationId: null, scan: { ...scan, location_id: STORE } }, NOW).size).toBe(0);
   });
 
   it("a sale that has ended tags nothing; its last day still does", () => {
     const at = (endsAt: string) =>
-      saleTags(lines, { locationId: STORE, scan: { location_id: STORE, deals: [deal({ endsAt })] }, estimate: null }, NOW);
+      saleTags(lines, { locationId: STORE, scan: { location_id: STORE, deals: [deal({ endsAt })] } }, NOW);
     expect(at("2026-10-20T23:59:59Z").size).toBe(0);
     expect(at("2026-10-21T00:00:00Z").size).toBe(1);
   });
@@ -129,16 +105,13 @@ describe("from Kroger's answer to the tag, with Kroger mocked", () => {
     ],
   };
 
-  it("the estimate's priced line carries the sale, and the scan agrees, from the one lookup each already makes", async () => {
+  it("the scan's deal becomes the tag, from the one lookup it already makes", async () => {
     const byIds = vi.fn(async () => readProducts(body));
     const search = vi.fn(async () => null);
     const target = { kind: "id" as const, productId: MILK };
     const found = await lookUp([target], { byIds, search });
     expect(byIds).toHaveBeenCalledTimes(1);
     expect(search).not.toHaveBeenCalled();
-
-    const e = estimate([{ id: "a", name: "2% milk", quantity: 1, target }], found, "PICKUP", "S");
-    expect(e.priced[0].sale).toEqual({ percentOff: 25, endsAt: "2026-10-27T23:59:59Z" });
 
     const entries = scanEntries([], [], [{ name: "2% milk" }], () => ({
       kind: "products",
@@ -147,9 +120,7 @@ describe("from Kroger's answer to the tag, with Kroger mocked", () => {
       candidates: [{ id: "p1", upc: MILK, url: deal().url, count: 0, missing: false, description: null, size: null, sizeFirst: null, price: null, names: ["milk"] }],
     }));
     const scan = findDeals(entries, found);
-    const fromScan = saleTags(lines, { locationId: STORE, scan: { location_id: STORE, deals: scan.deals }, estimate: null }, NOW);
-    const fromEstimate = saleTags(lines, { locationId: STORE, scan: null, estimate: e }, NOW);
+    const fromScan = saleTags(lines, { locationId: STORE, scan: { location_id: STORE, deals: scan.deals } }, NOW);
     expect(saleText(fromScan.get("a")!)).toBe("On sale, 25% off until Oct 27");
-    expect(fromEstimate.get("a")).toEqual(fromScan.get("a"));
   });
 });
