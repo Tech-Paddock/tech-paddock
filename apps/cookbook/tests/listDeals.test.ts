@@ -115,13 +115,13 @@ describe("the surfaces", () => {
     const cart = read("../app/Cart.tsx");
     expect(cart).not.toMatch(/DealsPanel/);
     expect(cart).not.toMatch(/Scan for deals/);
-    expect(read("../app/Deals.tsx")).not.toMatch(/DealsPanel/);
-    // What stays: the estimate, Take back, and the connection.
-    expect(cart).toMatch(/EstimatePanel/);
+    // What stays: Take back (it is Clear cart now), and the connection. The live estimate is gone (TEC-190).
+    expect(cart).not.toMatch(/EstimatePanel/);
+    expect(cart).not.toMatch(/\/api\/kroger\/estimate/);
     expect(cart).toMatch(/TakeBackConfirm/);
   });
 
-  it("a list line keeps its sale tag, read from the scan and the estimate", () => {
+  it("a list line keeps its sale tag, read from the scan", () => {
     const list = read("../app/List.tsx");
     expect(list).toMatch(/saleTags\(/);
     expect(list).toMatch(/saleText\(/);

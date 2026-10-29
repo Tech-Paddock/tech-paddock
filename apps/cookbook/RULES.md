@@ -65,6 +65,20 @@ section and closing comment before changing anything in this file.
   count is the quantity ("2 onions", "3 bunches cilantro"), and a measure (tsp, cup) is one
   container. The user can still change it. These are fixed rules; no model runs. They apply
   whether or not Tidy ran.
+- **Bulk produce reads as a bag** (TEC-190). Where the list reads a line as what you buy, a plain
+  count over the limit becomes one bag: more than 3 onions a 3 lb bag, more than 3 potatoes a 5 lb
+  bag, more than 4 carrots a 2 lb bag, more than 4 lemons or limes a bag. The line shows, is
+  searched and is remembered as the bag, with "was 5 onions" beside it, and counts as one. A
+  measure ("2 cups chopped onion"), green onions, sweet potatoes and baby carrots are not bulk. A
+  saved product with its own pack conversion decides instead, and a saved product that is the bag
+  (a name that says its size, or "bag" in its Kroger name) beats search, as any saved product
+  does; a saved loose onion never decides a bag. Fixed rules; no model runs. The stored line is
+  never rewritten.
+- **The list's totals are summed, not asked for** (TEC-190). Each line is priced from its saved
+  product's latest night in `price_nights` (the sale price on a night it was on sale) times its
+  quantity; List and In cart each show a total, labelled with the night the prices are from. A
+  line with no saved product, no recent price or an unsettled Pick one is "no price yet", counted
+  in the total's line and never $0. Nothing calls Kroger to price the list.
 - Kroger is the only stored credential: one refresh token, encrypted under `KROGER_TOKEN_KEY`, plus
   the chosen store. Never sent to the browser or logged. Scope: add-to-cart and product read.
 - The Kroger access token is never stored.
@@ -91,7 +105,17 @@ section and closing comment before changing anything in this file.
 - The redirect URI is a fixed constant, never built from the Host header.
 - Pick a store once; lookups price and stock there.
 - Send adds; it never checks out. "Go to checkout" opens the King Soopers cart.
-- **Send groups the list into Going in, Pick one and Not saved yet.**
+- **The Grocery list is two sections, List and In cart** (TEC-190). List is what is still to send;
+  In cart is what Cookbook sent and has not taken back (`sent_at`, with the ledger behind it). A
+  line is in one, never both: sending moves it to In cart, taking it back returns it to List.
+  - **Add to cart** on a line sends it through the same matching as Send all: a line that goes in
+    as one saved product goes in at once and reports; Pick one, Not saved yet and no product open
+    the review with that line alone, so nothing is added unseen.
+  - **Remove** is Take back for that line; **Clear cart** is Take back for every line Cookbook has
+    in the cart, behind the confirm. **Send all** sends the whole List.
+  - **In cart is only what Cookbook sent and has not taken back.** The API cannot read the
+    account, so the screen says that anything added in the King Soopers app is not shown.
+- **Send all groups the List into Going in, Pick one and Not saved yet.**
   - **Going in:** a line that matches one product, its name's default, or a saved product the line
     names.
   - **Pick one:** a line that matches several products and has no default. The most-bought is
@@ -112,8 +136,9 @@ section and closing comment before changing anything in this file.
   One hit goes straight in; several go to Pick one.
 - No model picks a product or runs anywhere in this flow.
 - Every line reports added, skipped or failed; a partial send never reads as whole.
-- A second send warns and shows what was already sent, because the Cart API only adds.
-- **Take back** removes what Cookbook sent, by sending negative quantities of the same products,
+- A line already in the cart is not offered again, and the server still refuses to send it twice
+  without an explicit "again", because the Cart API only adds.
+- **Take back** (Remove on one line, Clear cart on all) removes what Cookbook sent, by sending negative quantities of the same products,
   and marks those lines unsent. It never claims the cart is empty: anything added elsewhere stays,
   and the confirm says so. If Kroger refuses a negative quantity, it reports that per line and
   offers the cart page.
@@ -126,7 +151,9 @@ section and closing comment before changing anything in this file.
   the cart hook's mount effect runs both from any tab. **The refresh is what keeps the Kroger
   sign-in alive.** It updates price and stock, flags a product Kroger no longer returns rather than
   dropping it, and offers the closest product by name as its successor; replacing keeps the names
-  and count, and happens only on a tap. A failed refresh says so.
+  and count, and happens only on a tap. A failed refresh says so. **Its log is one summary line,
+  collapsed** (checked, updated, sizes changed, and any product not returned or not checked); the
+  detail opens on a tap, and a failed refresh stays open.
 - The API cannot read the account; nothing here claims to know what was bought.
 - Kroger is mocked in tests.
 
@@ -155,6 +182,9 @@ section and closing comment before changing anything in this file.
 - **Deals shows every deal, coloured,** with search, aisle groups, All · On sale · Coupon · Stacks,
   and an Any · Green · Neutral · Red · New filter. Each deal shows its usual price and an 8-week
   trend.
+- **Deals says when the nightly check last ran,** and **every empty filter says why** (TEC-190):
+  the colours cannot show before 4 weeks of prices, so Green, Neutral and Red say when they start
+  until then.
 - **Coupons come only from the owner's own Chrome task (TEC-126),** reviewed before saving. Until it
   runs, Coupon and Stacks say "no coupons staged yet". **Stacks** marks a product with both a sale
   and a coupon.

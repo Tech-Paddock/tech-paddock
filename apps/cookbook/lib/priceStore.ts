@@ -124,6 +124,28 @@ export async function readRolledWeeks(from: string): Promise<Set<string>> {
   return new Set(rows.map((r) => String(r.week_start)));
 }
 
+/**
+ * When the nightly check first and last recorded anything at this store (TEC-190):
+ * the Deals tab says when it last ran. Null before the first night. `recordedAt`
+ * is when the last night's first row was written.
+ */
+export async function readNightSpan(locationId: string): Promise<{ first: string; last: string; recordedAt: string | null } | null> {
+  const edge = async (ascending: boolean) => {
+    const { data, error } = await getServiceClient()
+      .from("price_nights")
+      .select("night, recorded_at")
+      .eq("location_id", locationId)
+      .order("night", { ascending })
+      .order("recorded_at", { ascending })
+      .limit(1);
+    if (error) throw new LookupError(`Couldn't read when prices were last checked: ${error.message}`);
+    return (data ?? [])[0] as { night: string; recorded_at: string | null } | undefined;
+  };
+  const [first, last] = await Promise.all([edge(true), edge(false)]);
+  if (!first || !last) return null;
+  return { first: String(first.night), last: String(last.night), recordedAt: typeof last.recorded_at === "string" ? last.recorded_at : null };
+}
+
 /** One store's nights from `from` on (the Deals tab reads the last few). */
 export async function readNightsSince(locationId: string, from: string): Promise<NightRow[]> {
   const rows = await readAll("the nightly prices", (a, b) =>

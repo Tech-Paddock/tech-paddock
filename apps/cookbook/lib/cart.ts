@@ -3,6 +3,7 @@ import { isUpc, KrogerError, searchTerm, type Product } from "./kroger";
 import { ConflictError } from "./errors";
 import { modalityWord, type Modality } from "./modality";
 import { itemWords } from "./itemWords";
+import { bagOf, readAs } from "./lineView";
 import type { Candidate, Decision } from "./brands";
 
 /**
@@ -83,7 +84,10 @@ export type ReviewLine = CartLine & { plan: Plan };
  * alone** (TEC-131; `lib/itemWords.ts`), "6 cloves of garlic" as "garlic
  * cloves". When that leaves too little, the line as typed.
  */
-export function lineTerm(name: string): string | null {
+export function lineTerm(name: string, note: string | null = null): string | null {
+  // Bulk produce is searched as its bag (TEC-190): "5 onions" as "onions 3 lb bag".
+  const bag = bagOf({ name, note });
+  if (bag) return searchTerm(bag.phrase);
   return searchTerm(itemWords(name)) ?? searchTerm(name);
 }
 
@@ -116,10 +120,10 @@ function goingIn(
  */
 export async function planLine(
   line: CartLine,
-  decide: (name: string) => Decision,
+  decide: (name: string, note?: string | null) => Decision,
   search: (term: string) => Promise<Product[]>
 ): Promise<Plan> {
-  const decision = decide(line.name);
+  const decision = decide(line.name, line.note);
 
   if (decision?.kind === "products" && decision.via !== "description") {
     const options = decision.candidates;
@@ -128,7 +132,7 @@ export async function planLine(
     if (options.length > 1) return { kind: "settle", phrase: decision.name, via: "name", options, matched: decision.matched ?? null };
   }
 
-  const term = decision?.kind === "terms" ? searchTerm(decision.terms) : lineTerm(line.name);
+  const term = decision?.kind === "terms" ? searchTerm(decision.terms) : lineTerm(line.name, line.note);
   if (!term) return { kind: "none", reason: "Too short for Kroger's search — paste the exact product." };
 
   let results: Product[];
@@ -157,7 +161,7 @@ export async function planLine(
  */
 export async function reviewLines(
   lines: CartLine[],
-  decide: (name: string) => Decision,
+  decide: (name: string, note?: string | null) => Decision,
   search: (term: string) => Promise<Product[]>
 ): Promise<ReviewLine[]> {
   const out: ReviewLine[] = new Array(lines.length);
@@ -348,7 +352,7 @@ export async function sendLines(
 
     // **Only after the add went in.** A failed save is said on the line and
     // never undoes or hides the add: the product is in the cart either way.
-    const remembered = page ? await rememberPage(deps, line.name, page, upc, pick.url ? null : (pick.size ?? null)) : "";
+    const remembered = page ? await rememberPage(deps, readAs(line), page, upc, pick.url ? null : (pick.size ?? null)) : "";
     const defaulted = pick.makeDefault ? await defaultIt(deps, line, upc) : "";
     outcomes.push({ ...sent, result: "added", ...added, detail: `${added.detail}${remembered}${defaulted}` });
   }

@@ -1,9 +1,10 @@
 import { searchTerm, type Product } from "./kroger";
 import { lineTerm, type Decision } from "./cart";
-import { modalityWord, type Modality } from "./modality";
 
 /**
- * Prices at the chosen store: the estimated total and the deal scan (TEC-121).
+ * Prices at the chosen store: the deal scan (TEC-121). The live estimated total
+ * is gone (TEC-190): list totals are summed from the nightly check
+ * (`lib/listPrices.ts`).
  *
  * **Pure, with Kroger passed in**, like `lib/cart.ts` and `lib/refresh.ts`;
  * `lib/dealRun.ts` supplies the token and the store. **No model call.**
@@ -11,9 +12,6 @@ import { modalityWord, type Modality } from "./modality";
  * - **What a line is priced as** is what Send would put in the cart: a saved
  *   product in Your brands (the most counted, when several match), else
  *   Kroger's top match for the item alone (or for a phrase's search words).
- * - **A line with no price is counted and named, never $0.** The total is an
- *   estimate and says so; it is Kroger's shelf price, promo first, before tax,
- *   fees and coupons.
  * - **A deal is a promo below the regular price**, both from Kroger at the
  *   store. Coupons are not read (the public API has none); each deal links to
  *   King Soopers' coupon search instead.
@@ -32,11 +30,11 @@ export type Target =
  * its Kroger name is unconfirmed until Send checks it** (TEC-135), so it is
  * priced as Kroger's top match for the item, what Send falls back to.
  */
-export function targetFor(name: string, decision: Decision): Target {
+export function targetFor(name: string, decision: Decision, note: string | null = null): Target {
   if (decision?.kind === "products" && decision.via !== "description" && decision.candidates[0]) {
     return { kind: "id", productId: decision.candidates[0].upc };
   }
-  const term = decision?.kind === "terms" ? searchTerm(decision.terms) : lineTerm(name);
+  const term = decision?.kind === "terms" ? searchTerm(decision.terms) : lineTerm(name, note);
   return term ? { kind: "term", term } : { kind: "none", reason: "too short for Kroger's search" };
 }
 
@@ -114,113 +112,6 @@ export function percentOff(product: Pick<Product, "regular" | "promo">): number 
 }
 
 // ---------------------------------------------------------------------------
-// The estimated total
-// ---------------------------------------------------------------------------
-
-export type EstimateLine = { id: string; name: string; quantity: number; target: Target };
-
-export type PricedLine = {
-  id: string;
-  name: string;
-  quantity: number;
-  description: string;
-  url: string;
-  /** The unit price used: promo first. */
-  unit: number;
-  onSale: boolean;
-  /** The sale, when promo is below regular: what the list line's tag says (TEC-121 3a). */
-  sale: { percentOff: number; endsAt: string | null } | null;
-  lineTotal: number;
-};
-
-export type UnpricedLine = { id: string; name: string; quantity: number; reason: string };
-
-export type Estimate = {
-  modality: Modality;
-  store: string;
-  /** Null when no line could be priced: there is then no estimate, rather than $0. */
-  total: number | null;
-  priced: PricedLine[];
-  unpriced: UnpricedLine[];
-};
-
-/** Whether the product is offered in this mode at the store; null when Kroger did not say. */
-export function offeredFor(product: Product, modality: Modality): boolean | null {
-  return modality === "PICKUP" ? product.pickup : product.delivery;
-}
-
-/**
- * Each line × its quantity at the store, promo first. **A line not offered for
- * the chosen mode is unpriced**, named with why, because it cannot be bought
- * that way; Kroger saying nothing about the mode is not read as no.
- */
-export function estimate(lines: EstimateLine[], found: Map<string, Lookup>, modality: Modality, store: string): Estimate {
-  const priced: PricedLine[] = [];
-  const unpriced: UnpricedLine[] = [];
-  const word = modalityWord(modality);
-
-  for (const line of lines) {
-    const base = { id: line.id, name: line.name, quantity: line.quantity };
-    const key = targetKey(line.target);
-    if (line.target.kind === "none" || !key) {
-      unpriced.push({ ...base, reason: line.target.kind === "none" ? line.target.reason : "nothing to look up" });
-      continue;
-    }
-    const lookup = found.get(key);
-    if (!lookup || lookup.error) {
-      unpriced.push({ ...base, reason: lookup?.error ?? "not looked up" });
-      continue;
-    }
-    const product = lookup.product;
-    if (!product) {
-      unpriced.push({ ...base, reason: nothingFor(line.target) });
-      continue;
-    }
-    if (offeredFor(product, modality) === false) {
-      unpriced.push({ ...base, reason: `not offered for ${word} at your store` });
-      continue;
-    }
-    if (product.price === null) {
-      unpriced.push({ ...base, reason: "Kroger gave no price at your store" });
-      continue;
-    }
-    const off = percentOff(product);
-    priced.push({
-      ...base,
-      description: product.description,
-      url: product.url,
-      unit: product.price,
-      onSale: off !== null,
-      sale: off === null ? null : { percentOff: off, endsAt: product.promoEnds },
-      lineTotal: (cents(product.price) * line.quantity) / 100,
-    });
-  }
-
-  const total = priced.length === 0 ? null : priced.reduce((sum, p) => sum + cents(p.unit) * p.quantity, 0) / 100;
-  return { modality, store, total, priced, unpriced };
-}
-
-export function dollars(amount: number): string {
-  return `$${amount.toFixed(2)}`;
-}
-
-/**
- * The estimate in one sentence. **Always "estimated"**, and **unpriced lines are
- * counted and named** — "3 lines unpriced: …" — so a short total never reads
- * as the whole list.
- */
-export function describeEstimate(e: Estimate): string {
-  const word = modalityWord(e.modality);
-  const n = (k: number) => `${k} line${k === 1 ? "" : "s"}`;
-  const head =
-    e.total === null
-      ? `No line could be priced at ${e.store}, so there is no estimate.`
-      : `Estimated total ${dollars(e.total)} for ${n(e.priced.length)}, ${word} at ${e.store} — Kroger's shelf prices, before tax, fees and coupons.`;
-  if (e.unpriced.length === 0) return head;
-  return `${head} ${n(e.unpriced.length)} unpriced: ${e.unpriced.map((u) => u.name).join(", ")}.`;
-}
-
-// ---------------------------------------------------------------------------
 // The deal scan
 // ---------------------------------------------------------------------------
 
@@ -238,8 +129,8 @@ export type ScanEntry = { name: string; target: Target };
 export function scanEntries(
   products: { product_id: string; names: string[] }[],
   words: ScanWords[],
-  lines: { name: string }[],
-  decide: (name: string) => Decision
+  lines: { name: string; note?: string | null }[],
+  decide: (name: string, note?: string | null) => Decision
 ): ScanEntry[] {
   const entries: ScanEntry[] = [];
   for (const p of products) {
@@ -250,7 +141,7 @@ export function scanEntries(
     const term = searchTerm(w.kind === "terms" && w.terms ? w.terms : w.phrase);
     entries.push({ name: w.phrase, target: term ? { kind: "term", term } : { kind: "none", reason: "too short for Kroger's search" } });
   }
-  for (const line of lines) entries.push({ name: line.name, target: targetFor(line.name, decide(line.name)) });
+  for (const line of lines) entries.push({ name: line.name, target: targetFor(line.name, decide(line.name, line.note), line.note) });
   return entries;
 }
 

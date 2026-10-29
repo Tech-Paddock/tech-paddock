@@ -2,6 +2,7 @@ import { getServiceClient } from "./supabase";
 import { ConflictError, LookupError } from "./errors";
 import { searchFor } from "./grocery";
 import { itemWords } from "./itemWords";
+import { bagOf } from "./lineView";
 import type { Decision } from "./brands";
 
 /**
@@ -56,12 +57,14 @@ export type ResolvedLink = {
  * "garlic cloves". A product found only by its Kroger name is unconfirmed
  * (TEC-135), so that line links to the search too.
  */
-export function linkFor(name: string, decision: Decision): ResolvedLink {
+export function linkFor(name: string, decision: Decision, note: string | null = null): ResolvedLink {
   if (decision?.kind === "products" && decision.via !== "description" && decision.candidates[0]) {
     return { href: decision.candidates[0].url, via: decision };
   }
   if (decision?.kind === "terms") return { href: searchFor(decision.terms), via: decision };
-  return { href: searchFor(itemWords(name) || name), via: decision };
+  // Bulk produce links to a search for its bag (TEC-190).
+  const bag = bagOf({ name, note });
+  return { href: searchFor(bag ? bag.phrase : itemWords(name) || name), via: decision };
 }
 
 // ---------------------------------------------------------------------------

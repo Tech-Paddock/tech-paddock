@@ -20,12 +20,12 @@ export function packOf(decision: Decision): Pack | null {
  * conversion, which is what a line with no saved product gets anyway.
  */
 export async function quantityRule(): Promise<(line: { name: string; note: string | null }) => number> {
-  let decide: (name: string) => Decision = () => null;
+  let decide: (name: string, note?: string | null) => Decision = () => null;
   try {
     const [products, words] = await Promise.all([readProducts(), readPreferences()]);
     decide = decider(products, words);
   } catch {
     // Counted without conversions; see above.
   }
-  return (line) => lineView(line, packOf(decide(line.name))).quantity;
+  return (line) => lineView(line, packOf(decide(line.name, line.note))).quantity;
 }

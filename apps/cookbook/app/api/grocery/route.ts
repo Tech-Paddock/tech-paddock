@@ -16,6 +16,10 @@ import { decider } from "@/lib/decide";
 import { lineMark } from "@/lib/brands";
 import { lineView } from "@/lib/lineView";
 import { packOf, quantityRule } from "@/lib/lineQuantity";
+import { readConnectionRow } from "@/lib/krogerStore";
+import { readNightsSince } from "@/lib/priceStore";
+import { addDays, denverDate } from "@/lib/priceDates";
+import { PRICE_WINDOW_NIGHTS, latestNights, priceLines, productFor, type LinePrice } from "@/lib/listPrices";
 
 export const dynamic = "force-dynamic";
 
@@ -41,14 +45,38 @@ export async function GET() {
   try {
     const [items, words, products] = await Promise.all([readList(), readPreferences(), readProducts()]);
     const decide = decider(products, words);
+    const decisions = items.map((item) => decide(item.name, item.note));
+
+    // **Prices are the nightly check's** (TEC-190): each line's saved product at
+    // its latest night, never a live Kroger call. A failed read is said, and the
+    // lines read "no price yet"; it never breaks the list or reads as $0.
+    let priceError: string | null = null;
+    let store: string | null = null;
+    let prices = new Map<string, LinePrice | null>();
+    try {
+      const connection = await readConnectionRow();
+      if (connection?.location_id) {
+        store = connection.store_name ?? connection.location_id;
+        const nights = await readNightsSince(connection.location_id, addDays(denverDate(new Date()), -PRICE_WINDOW_NIGHTS));
+        prices = priceLines(
+          items.map((item, i) => ({ id: item.id, quantity: item.quantity, productId: productFor(decisions[i]) })),
+          latestNights(nights, connection.location_id)
+        );
+      }
+    } catch (e) {
+      priceError = e instanceof Error ? e.message : "Couldn't read the nightly prices.";
+    }
+
     return NextResponse.json({
-      items: items.map((item) => {
-        const decision = decide(item.name);
+      store,
+      priceError,
+      items: items.map((item, i) => {
+        const decision = decisions[i];
         // **What you buy** (TEC-131): the item, its amount, the note unless it
         // was only amounts. Display only; the stored line is not rewritten.
         const { quantity: _rule, ...view } = lineView(item, packOf(decision));
         // ★ / ? / + (TEC-135): what Send will do with it, said before Send.
-        return { ...item, ...linkFor(item.name, decision), view, mark: lineMark(decision) };
+        return { ...item, ...linkFor(item.name, decision, item.note), view, mark: lineMark(decision), price: prices.get(item.id) ?? null };
       }),
     });
   } catch (e) {

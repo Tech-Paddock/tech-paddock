@@ -1,5 +1,6 @@
 import { pageFor, productIdFromUrl } from "./kingsoopers";
 import { itemInName, itemWords, sameWord, wordsOf } from "./itemWords";
+import { bagOf } from "./lineView";
 
 /**
  * Your brands, one row per King Soopers product code (TEC-131; `RULES.md`,
@@ -333,8 +334,18 @@ export function lineMark(decision: Decision): LineMark {
 }
 
 /** `decide`, bound to the rows. */
-export function decider(products: SavedProduct[], words: WordRow[]): (name: string) => Decision {
-  return (name) => decide(name, products, words);
+export function decider(products: SavedProduct[], words: WordRow[]): (name: string, note?: string | null) => Decision {
+  return (name, note = null) => {
+    // **Bulk produce is decided as its bag** (TEC-190): "5 onions" as "onions 3 lb bag". Only a
+    // product that is itself a bag can decide it, by a name that says the bag's size or an
+    // official name with "bag" in it; otherwise a saved loose "onions" would go in once, for five.
+    const bag = bagOf({ name, note });
+    if (!bag) return decide(name, products, words);
+    const bagged = products.filter(
+      (p) => p.names.some((n) => mentions(n, bag.size)) || (p.description ? wordsOf(p.description).includes("bag") : false)
+    );
+    return decide(bag.phrase, bagged, words);
+  };
 }
 
 // ---------------------------------------------------------------------------

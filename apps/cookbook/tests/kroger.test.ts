@@ -381,6 +381,34 @@ describe("no token appears in any response body", () => {
     expect(kroger.mock.calls.length).toBe(before);
   });
 
+  it("the review holds only what is still on the List: a line in the cart is not looked up again (TEC-190)", async () => {
+    mem.list[0].sent_at = "2026-10-21T01:00:00Z";
+    const { GET } = await import("@/app/api/kroger/cart/route");
+    const review = await bodyOf(await GET());
+    expect(review.lines.map((l: { id: string }) => l.id)).toEqual(["b"]);
+    // The warning list still names what is in the cart.
+    expect(review.alreadySent.map((l: { id: string }) => l.id)).toEqual(["a"]);
+  });
+
+  it("Add to cart on one line: the review is that line alone, and so is the send and its report (TEC-190)", async () => {
+    const { GET, POST } = await import("@/app/api/kroger/cart/route");
+    const one = await bodyOf(await GET(new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart?ids=a")));
+    expect(one.lines.map((l: { id: string; plan: { kind: string } }) => [l.id, l.plan.kind])).toEqual([["a", "exact"]]);
+
+    const sent = await bodyOf(
+      await POST(
+        new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart", {
+          method: "POST",
+          body: JSON.stringify({ picks: [{ id: "a", upc: "0001111041700" }], only: ["a"] }),
+        })
+      )
+    );
+    // The other line is neither sent nor reported skipped: it was not part of this send.
+    expect(sent.outcomes.map((o: { id: string; result: string }) => [o.id, o.result])).toEqual([["a", "added"]]);
+    expect(mem.sent).toEqual(["a"]);
+    expect(mem.ledger).toEqual([expect.objectContaining({ item_id: "a", kind: "sent", quantity: 2 })]);
+  });
+
   it("a tapped match goes in, then is remembered as an exact product under the line's name, note dropped (TEC-128)", async () => {
     // An older row whose name still carries its note.
     mem.list[1] = { ...mem.list[1], name: "eggs — the big box" };
@@ -511,17 +539,6 @@ describe("prices on the list tab (TEC-121)", () => {
     expect(mem.sent).toEqual(["a"]);
   });
 
-  it("the estimate prices the list at the store, asking for the exact brands by ID", async () => {
-    const { POST } = await import("@/app/api/kroger/estimate/route");
-    const body = await bodyOf(await POST());
-    // milk ×2 (exact brand) and eggs ×1 (top match), both $3.49 in the fake.
-    expect(body.estimate.total).toBe(10.47);
-    expect(body.message).toMatch(/^Estimated total \$10\.47 for 2 lines, pickup at King Soopers Test/);
-    const productCalls = kroger.mock.calls.map(([u]) => decodeURIComponent(String(u))).filter((u) => u.includes("/products"));
-    expect(productCalls.some((u) => u.includes("filter.productId=0001111041700") && u.includes("filter.locationId=62000001"))).toBe(true);
-    expect(mem.scans).toEqual([]);
-  });
-
   it("a deal scan is appended, never overwritten, and the latest is what GET shows", async () => {
     kroger.mockImplementation(async (input: string | URL | Request) => {
       const url = String(input);
@@ -543,14 +560,12 @@ describe("prices on the list tab (TEC-121)", () => {
     expect((await bodyOf(await GET())).latest.id).toBe("scan-2");
   });
 
-  it("without a store, the scan and the estimate say so and save nothing", async () => {
+  it("without a store, the scan says so and saves nothing", async () => {
     mem.row = { ...mem.row, location_id: null, store_name: null };
     const deals = await import("@/app/api/kroger/deals/route");
-    const est = await import("@/app/api/kroger/estimate/route");
     const scan = await deals.POST(new NextRequest("https://cookbook.techpaddock.io/api/kroger/deals", { method: "POST", body: "{}" }));
     expect(scan.status).toBe(409);
     expect((await bodyOf(scan)).error).toMatch(/Pick a store/);
-    expect((await est.POST()).status).toBe(409);
     expect(mem.scans).toEqual([]);
   });
 });
@@ -608,6 +623,34 @@ describe("Take back (TEC-127)", () => {
     expect(body.failed).toBe(false);
     expect(mem.unsent).toEqual(["a"]);
     expect(mem.ledger.at(-1)).toMatchObject({ kind: "taken_back", quantity: -2, modality: "PICKUP" });
+  });
+
+  it("Remove takes back one line only; the ledger row is written before Kroger is asked, with the recorded mode (TEC-190)", async () => {
+    mem.list[0].sent_at = "2026-10-21T01:00:00Z";
+    mem.list[1].sent_at = "2026-10-21T01:00:00Z";
+    mem.ledger = [
+      { item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "PICKUP" },
+      { item_id: "b", name: "eggs", kind: "sent", upc: "0001111041701", quantity: 1, modality: "DELIVERY" },
+    ];
+    // The write happens before the negative add reaches Kroger.
+    let ledgerWhenAsked: number | null = null;
+    kroger.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
+      if (url.endsWith("/cart/add")) {
+        ledgerWhenAsked = mem.ledger.filter((r) => r.kind === "taken_back").length;
+        return new Response(null, { status: 204 });
+      }
+      return json({ data: [PRODUCT] });
+    });
+
+    const body = await bodyOf(await takeBackPost({ confirm: true, ids: ["b"] }));
+    expect(body.outcomes).toEqual([{ id: "b", name: "eggs", result: "taken back", detail: "Took back ×1." }]);
+    expect(cartBodies()).toEqual([{ items: [{ upc: "0001111041701", quantity: -1, modality: "DELIVERY" }] }]);
+    expect(ledgerWhenAsked).toBe(1);
+    expect(mem.unsent).toEqual(["b"]);
+    // Milk is still held.
+    expect(mem.ledger.filter((r) => r.item_id === "a")).toHaveLength(1);
   });
 
   it("when Kroger refuses a negative quantity, the line fails, stays sent, and the panel offers the cart page", async () => {

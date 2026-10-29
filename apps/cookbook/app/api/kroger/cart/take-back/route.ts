@@ -18,8 +18,9 @@ export const dynamic = "force-dynamic";
  * second tap, because it can't be undone from here. **No token in either body.**
  */
 
-async function lines(): Promise<TakeBackLine[]> {
-  const list = await readList();
+/** `only`: take back just these lines (Remove on one In cart line, TEC-190); omitted, every line Cookbook sent (Clear cart). */
+async function lines(only: string[] | null = null): Promise<TakeBackLine[]> {
+  const list = (await readList()).filter((l) => !only || only.includes(l.id));
   const rows = await readSends(list.map((l) => l.id));
   return takeBackLines(list, rows);
 }
@@ -48,7 +49,8 @@ export async function POST(request: NextRequest) {
 
   try {
     if (body.confirm !== true) throw new InputError("Take back needs a second tap to confirm.");
-    const todo = await lines();
+    const only = Array.isArray(body.ids) ? body.ids.filter((i: unknown): i is string => typeof i === "string") : null;
+    const todo = await lines(only && only.length > 0 ? only : null);
     if (todo.length === 0) throw new InputError("Cookbook hasn't sent anything on this list to the cart.");
 
     const run = (remove: (upc: string, quantity: number, modality: Held["modality"]) => Promise<void>) =>

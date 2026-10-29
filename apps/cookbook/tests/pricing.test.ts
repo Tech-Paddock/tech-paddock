@@ -3,20 +3,17 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { KrogerError, readProducts, type Product } from "@/lib/kroger";
 import {
-  describeEstimate,
   describeScan,
-  estimate,
   findDeals,
   lookUp,
   scanEntries,
   targetFor,
-  type EstimateLine,
 } from "@/lib/pricing";
 import { modalityWarning, sendLines, type CartLine, type Decision } from "@/lib/cart";
 import { scanDue, REFRESH_EVERY_MS } from "@/lib/refreshDue";
 
 /**
- * The deal scan, the estimated total and Pickup/Delivery (TEC-121). Kroger is
+ * The deal scan and Pickup/Delivery (TEC-121; the live estimate left in TEC-190). Kroger is
  * mocked entirely, against the shapes the 2026-10-20 probe confirmed: promo
  * with dates, fulfilment flags, several IDs per `filter.productId`.
  */
@@ -135,58 +132,6 @@ describe("what a line is looked up as", () => {
   });
 });
 
-describe("the estimated total", () => {
-  const lines: EstimateLine[] = [
-    { id: "a", name: "milk", quantity: 2, target: { kind: "id", productId: MILK } },
-    { id: "b", name: "eggs", quantity: 1, target: { kind: "term", term: "eggs" } },
-    { id: "c", name: "saffron", quantity: 1, target: { kind: "term", term: "saffron" } },
-    { id: "d", name: "ok", quantity: 1, target: { kind: "none", reason: "too short for Kroger's search" } },
-  ];
-
-  it("prices each line × quantity, promo first, and names every unpriced line rather than counting it as $0", () => {
-    const found = new Map([
-      [`id:${MILK}`, { product: product({ price: 2.5, promo: 2.5, regular: 3.49 }), error: null }],
-      ["term:eggs", { product: product({ productId: EGGS, upc: EGGS, description: "Eggs", price: null, regular: null }), error: null }],
-      ["term:saffron", { product: null, error: null }],
-    ]);
-    const e = estimate(lines, found, "PICKUP", "King Soopers Test");
-    expect(e.total).toBe(5);
-    expect(e.priced).toEqual([expect.objectContaining({ id: "a", unit: 2.5, lineTotal: 5, onSale: true })]);
-    expect(e.unpriced.map((u) => [u.name, u.reason])).toEqual([
-      ["eggs", "Kroger gave no price at your store"],
-      ["saffron", "Kroger has no match at your store"],
-      ["ok", "too short for Kroger's search"],
-    ]);
-    const words = describeEstimate(e);
-    expect(words).toMatch(/^Estimated total \$5\.00 for 1 line, pickup at King Soopers Test/);
-    expect(words).toMatch(/3 lines unpriced: eggs, saffron, ok\.$/);
-  });
-
-  it("uses the chosen mode: a product not offered for delivery is unpriced, and 'not said' is not 'no'", () => {
-    const found = new Map([
-      [`id:${MILK}`, { product: product({ delivery: false }), error: null }],
-      ["term:eggs", { product: product({ productId: EGGS, upc: EGGS, price: 4, delivery: null }), error: null }],
-    ]);
-    const two = lines.slice(0, 2);
-    const delivery = estimate(two, found, "DELIVERY", "S");
-    expect(delivery.unpriced.map((u) => u.reason)).toEqual(["not offered for delivery at your store"]);
-    expect(delivery.total).toBe(4);
-    expect(estimate(two, found, "PICKUP", "S").total).toBe(10.98);
-  });
-
-  it("with nothing priced there is no estimate, never $0.00", () => {
-    const e = estimate(lines.slice(2), new Map([["term:saffron", { product: null, error: null }]]), "PICKUP", "S");
-    expect(e.total).toBeNull();
-    expect(describeEstimate(e)).not.toMatch(/\$0/);
-    expect(describeEstimate(e)).toMatch(/no estimate/);
-  });
-
-  it("adds in cents, so $1.10 × 3 is $3.30", () => {
-    const e = estimate([{ ...lines[0], quantity: 3 }], new Map([[`id:${MILK}`, { product: product({ price: 1.1 }), error: null }]]), "PICKUP", "S");
-    expect(e.total).toBe(3.3);
-  });
-});
-
 describe("the deal scan", () => {
   const products = [{ product_id: MILK, names: ["milk"] }];
   const words = [{ phrase: "bread", kind: "terms" as const, terms: "sourdough bread" }];
@@ -248,7 +193,7 @@ describe("the deal scan", () => {
   });
 
   it("the deal scan never reads kingsoopers.com or calls a model", () => {
-    for (const file of ["../lib/pricing.ts", "../lib/dealRun.ts", "../app/Deals.tsx"]) {
+    for (const file of ["../lib/pricing.ts", "../lib/dealRun.ts", "../lib/listPrices.ts"]) {
       const source = readFileSync(resolve(__dirname, file), "utf8");
       expect(source).not.toMatch(/kingsoopers\.com/);
       expect(source).not.toMatch(/anthropic|models/i);

@@ -1,4 +1,6 @@
-import type { DealRow } from "./dealRows";
+import type { DealBoard, DealRow } from "./dealRows";
+import { addDays, mondayOf } from "./priceDates";
+import { HISTORY_WEEKS, MIN_WEEKS } from "./stoplight";
 
 /**
  * What the Deals tab filters on (TEC-132): search, aisle, All · On sale ·
@@ -35,4 +37,69 @@ export function groupByAisle(rows: DealRow[]): { aisle: string; rows: DealRow[] 
   const groups = new Map<string, DealRow[]>();
   for (const r of rows) groups.set(r.aisle, [...(groups.get(r.aisle) ?? []), r]);
   return [...groups].map(([aisle, list]) => ({ aisle, rows: list }));
+}
+
+// ---------------------------------------------------------------------------
+// Why a filter is empty (TEC-190)
+// ---------------------------------------------------------------------------
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Nov 23" from `YYYY-MM-DD`. */
+export function shortDay(iso: string): string {
+  const m = /^\d{4}-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${MONTHS[Number(m[1]) - 1]} ${Number(m[2])}` : iso;
+}
+
+/**
+ * About when colours begin: the Monday roll-up adds one week of history per
+ * run, so with `weeksHeld` weeks rolled up the stoplight (`MIN_WEEKS` weeks)
+ * can colour a product on the run that adds the last missing one. `asOf` is
+ * today's Denver date; a Monday's run has already happened by the time anyone
+ * reads it, so the next one is the Monday after. Already coloured: `asOf`.
+ */
+export function coloursFrom(asOf: string, weeksHeld: number): string {
+  const missing = MIN_WEEKS - weeksHeld;
+  if (missing <= 0) return asOf;
+  return addDays(addDays(mondayOf(asOf), 7), 7 * (missing - 1));
+}
+
+const LIGHT_WORD: Record<LightFilter, string> = { any: "", green: "green", neutral: "neutral", red: "red", new: "new" };
+
+/**
+ * What an empty Deals list says. **Each empty filter says why**, not "No deals
+ * match" for everything: the colours cannot appear before four weeks of
+ * nightly prices exist (`stoplight`), which is the case while the history is
+ * still building. `offerNew` asks the screen for a one-tap switch to New.
+ */
+export function emptyMessage(board: DealBoard, f: DealFilter): { title: string; body: string; offerNew: boolean } {
+  const coloured = f.light === "green" || f.light === "neutral" || f.light === "red";
+  if (!board.store) {
+    return { title: "No store picked", body: "Pick a store on the Grocery list first, so prices are from your King Soopers.", offerNew: false };
+  }
+  if ((f.kind === "coupon" || f.kind === "stack") && !board.couponsStaged) {
+    return { title: "No coupons staged yet", body: "Coupons come only from your own Chrome task, once it has run.", offerNew: false };
+  }
+  if (board.rows.length === 0) {
+    return board.hasNights
+      ? { title: "No recent prices", body: "None of your saved products has a price from the last few nights.", offerNew: false }
+      : { title: "No prices yet", body: "The nightly check runs about 3 a.m. Denver time; the first one fills this in.", offerNew: false };
+  }
+  if (coloured && board.weeksHeld < MIN_WEEKS) {
+    return {
+      title: `No ${LIGHT_WORD[f.light]} deals yet`,
+      body: `Colours compare today's price with each product's last ${HISTORY_WEEKS} weeks, and start after ${MIN_WEEKS} weeks of prices: about ${shortDay(coloursFrom(board.asOf, board.weeksHeld))}. Until then every product is New.`,
+      offerNew: true,
+    };
+  }
+  if (coloured) {
+    return { title: `Nothing is ${LIGHT_WORD[f.light]} right now`, body: "Try Any, or clear the search and pick All aisles.", offerNew: false };
+  }
+  if (f.light === "new") {
+    return { title: "Nothing is new", body: `Every product has ${MIN_WEEKS} or more weeks of history, so each has a colour.`, offerNew: false };
+  }
+  if (f.kind === "sale") {
+    return { title: "Nothing is on sale", body: "No saved product was on sale in the latest nightly prices. Try All.", offerNew: false };
+  }
+  return { title: "No deals match", body: "Clear the search, or pick All aisles.", offerNew: false };
 }

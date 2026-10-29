@@ -9,7 +9,10 @@ import type { MenuEntry } from "@/lib/menu";
 import { menuDayLabel } from "@/lib/menuDay";
 import { MODALITIES, modalityWord, type Modality } from "@/lib/modality";
 import { saleTags, saleText, type SaleTag } from "@/lib/saleTag";
-import { CartBar, CartPanel, SendView, useCart } from "./Cart";
+import { CHECKOUT_URL } from "@/lib/kingsoopers";
+import { totalsOf, type LinePrice, type Totals } from "@/lib/listPrices";
+import { shortDay } from "@/lib/dealFilter";
+import { CartPanel, RefreshLog, SendView, TakeBackConfirm, TakeBackResults, useCart } from "./Cart";
 import { useToast } from "./Toast";
 
 /**
@@ -27,7 +30,18 @@ type ShoppingLine = GroceryItem &
     view?: { name: string; amount: string | null; note: string | null };
     /** ★ default saved · ? needs a pick at Send · + not saved yet (TEC-135; `lineMark`). */
     mark?: LineMark;
+    /** This line's price from the nightly check, or null for "no price yet" (TEC-190; `lib/listPrices.ts`). */
+    price?: LinePrice | null;
   };
+
+const money = (n: number) => `$${n.toFixed(2)}`;
+
+/** "about $21.46 · 1 no price yet", or "no price yet" when nothing is priced. Never $0. */
+function totalWords(t: Totals, lines: number): string {
+  if (lines === 0) return "";
+  if (t.total === null) return "no price yet";
+  return `about ${money(t.total)}${t.unpriced > 0 ? ` · ${t.unpriced} no price yet` : ""}`;
+}
 
 /** What follows the name, small: the recipes, then the amount, then a typed note (TEC-131). */
 function details(item: ShoppingLine): string[] {
@@ -85,6 +99,9 @@ export default function List({
   const [proposal, setProposal] = useState<TidyLine[] | null>(null);
   const [copied, setCopied] = useState(false);
   const [reloads, setReloads] = useState(0);
+  // Prices come with the list, from the nightly check (TEC-190).
+  const [priceStore, setPriceStore] = useState<string | null>(null);
+  const [priceError, setPriceError] = useState<string | null>(null);
   // The add box looks like one line and grows to show a pasted list before Add.
   const box = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
@@ -100,6 +117,8 @@ export default function List({
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't read the list.");
       setItems(body.items as ShoppingLine[]);
+      setPriceStore((body.store as string | null) ?? null);
+      setPriceError((body.priceError as string | null) ?? null);
       setReadError(null);
     } catch (e) {
       // A failed read leaves `items` null rather than empty, because "buy
@@ -114,7 +133,7 @@ export default function List({
 
   // The Deals tab matches these; the list is read once, here, and handed up.
   useEffect(() => {
-    onOpenLines?.(items === null ? null : items.filter((i) => !i.checked).map((i) => i.name));
+    onOpenLines?.(items === null ? null : items.filter((i) => !i.checked && i.sent_at === null).map((i) => i.name));
   }, [items, onOpenLines]);
 
   // A refresh or a send changes Your brands, which is its own tab since
@@ -184,7 +203,8 @@ export default function List({
    * no undo**: this throws away the shopping you have not done yet.
    */
   async function clearEverything() {
-    const all = (items ?? []).map((i) => i.id);
+    // The List only (TEC-190): a line in the cart is taken back first, never just deleted.
+    const all = (items ?? []).filter((i) => i.sent_at === null).map((i) => i.id);
     if (all.length === 0) return;
     try {
       const response = await fetch("/api/grocery", {
@@ -193,7 +213,7 @@ export default function List({
         body: JSON.stringify({ ids: all }),
       });
       if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't clear the list.");
-      setItems([]);
+      await load();
       setConfirmingClear(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't clear the list.");
@@ -201,7 +221,7 @@ export default function List({
   }
 
   async function clearBought() {
-    const bought = (items ?? []).filter((i) => i.checked).map((i) => i.id);
+    const bought = (items ?? []).filter((i) => i.checked && i.sent_at === null).map((i) => i.id);
     if (bought.length === 0) return;
     try {
       const response = await fetch("/api/grocery", {
@@ -252,7 +272,7 @@ export default function List({
   }
 
   async function copyList() {
-    const text = asText(items ?? []);
+    const text = asText((items ?? []).filter((i) => i.sent_at === null));
     if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
@@ -264,18 +284,20 @@ export default function List({
     }
   }
 
-  const open = (items ?? []).filter((i) => !i.checked);
-  const bought = (items ?? []).filter((i) => i.checked);
-  // **On sale at the chosen store** (TEC-121 3a): the latest scan and the last
-  // estimate the cart holds; no Kroger call per render. Open lines only.
+  // **Two sections** (TEC-190): List is what is still to send; In cart is what Cookbook
+  // put in the King Soopers cart and has not taken back (`sent_at`, with the ledger
+  // behind it). A line is in one or the other, never both.
+  const all = items ?? [];
+  const onList = all.filter((i) => i.sent_at === null);
+  const inCart = all.filter((i) => i.sent_at !== null);
+  const open = onList.filter((i) => !i.checked);
+  const bought = onList.filter((i) => i.checked);
+  // **On sale at the chosen store** (TEC-121 3a): the latest deal scan the cart
+  // holds; no Kroger call per render. Open List lines only.
   const locationId = cart.status?.connected ? (cart.status.store?.locationId ?? null) : null;
   const onSale = useMemo(
-    () =>
-      saleTags(
-        (items ?? []).filter((i) => !i.checked),
-        { locationId, scan: cart.latestScan, estimate: cart.estimate?.estimate ?? null }
-      ),
-    [items, locationId, cart.latestScan, cart.estimate]
+    () => saleTags((items ?? []).filter((i) => i.sent_at === null && !i.checked), { locationId, scan: cart.latestScan }),
+    [items, locationId, cart.latestScan]
   );
 
   // **The review replaces the list** (the mockup's Send to cart screen), with a way back.
@@ -287,43 +309,39 @@ export default function List({
     );
   }
 
-  const total = cart.estimate?.estimate.total ?? null;
   const status = cart.status;
+  // **Totals are summed from the nightly check**, per section, never $0 (TEC-190).
+  const listTotals = totalsOf(open.map((i) => i.price));
+  const cartTotals = totalsOf(inCart.map((i) => i.price));
+  const everything = totalsOf([...open, ...inCart].map((i) => i.price));
+  const nightWords =
+    everything.from === null ? null : everything.from === everything.to ? shortDay(everything.from) : `${shortDay(everything.from)} to ${shortDay(everything.to as string)}`;
+  const canAdd = cart.ready && cart.busy === null;
 
   return (
     <section id="shop" className="flex scroll-mt-4 flex-col gap-3">
-      {/* The header: the count, the estimate, the store and Pickup/Delivery. */}
+      {/* The header: the counts, the store, where the prices are from, and Pickup/Delivery. */}
       <div className="flex items-end justify-between gap-3 px-2">
         <div className="flex min-w-0 flex-col gap-1">
           <h2 className="text-xl font-bold">Grocery list</h2>
           <p className="text-[13px] text-ink-soft">
-            {items !== null ? `${open.length} still to buy` : "Reading…"}
-            {cart.ready ? (
-              <>
-                {" · "}
-                {total !== null ? (
-                  <button type="button" onClick={() => cart.setShowEstimate(true)} className="underline-offset-2 hover:underline">
-                    about ${Math.round(total)}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void cart.calculate()}
-                    disabled={cart.estimating}
-                    className="text-accent underline-offset-2 hover:underline disabled:opacity-50"
-                  >
-                    {cart.estimating ? "estimating…" : "estimate it"}
-                  </button>
-                )}
-                {status?.store ? ` · ${status.store.name}` : ""}
-              </>
-            ) : null}
+            {items !== null ? `${open.length} still to buy · ${inCart.length} in cart` : "Reading…"}
+            {priceStore ? ` · ${priceStore}` : status?.store ? ` · ${status.store.name}` : ""}
+            {nightWords ? ` · prices from the night of ${nightWords}` : ""}
           </p>
+          {priceError ? (
+            <p role="alert" className="text-xs text-danger">
+              {priceError} Lines read “no price yet” until it can.
+            </p>
+          ) : null}
         </div>
         {cart.ready && status ? (
           <ModeSwitch value={status.modality} onChange={(m) => void cart.chooseModality(m)} disabled={cart.busy === "send" || cart.busy === "take-back"} />
         ) : null}
       </div>
+
+      {/* **The refresh log is collapsed** (TEC-190): one summary line, the detail on a tap. */}
+      <RefreshLog cart={cart} />
 
       {/* **Adding sits at the top** (2026-09-22): it is what you do most here. */}
       <div className="flex gap-2">
@@ -356,34 +374,36 @@ export default function List({
 
       <CookingThisWeek refreshKey={refreshKey} recipeNames={recipeNames} />
 
-      <div className="flex flex-col gap-1.5">
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-2">
-          <h3 className={HEADING}>Still to buy · {open.length}</h3>
-          <div className="flex flex-wrap gap-3.5">
-            <button type="button" onClick={copyList} disabled={open.length === 0} className={LINK}>
-              {copied ? "Copied" : "Copy"}
-            </button>
-            <button type="button" onClick={propose} disabled={open.length < 2 || busy !== null} className={LINK}>
-              {busy === "tidying" ? "Thinking…" : "Tidy"}
-            </button>
-            <button type="button" onClick={clearBought} disabled={bought.length === 0} className={LINK}>
-              Clear ticked
-            </button>
-            {confirmingClear ? (
-              <>
-                <button type="button" onClick={clearEverything} className="text-[13px] text-danger underline-offset-2 hover:underline">
-                  Clear all {(items ?? []).length} — sure?
-                </button>
-                <button type="button" onClick={() => setConfirmingClear(false)} className={LINK}>
-                  Keep it
-                </button>
-              </>
-            ) : (
-              <button type="button" onClick={() => setConfirmingClear(true)} disabled={(items ?? []).length === 0} className={LINK}>
-                Clear all
+      {/* ---- List ---- */}
+      <section aria-label="List" className="flex flex-col gap-1.5">
+        <div className="flex items-baseline justify-between gap-3 px-2">
+          <h3 className="text-lg font-bold">List · {open.length}</h3>
+          <span className="text-right text-[13px] text-ink-soft">{totalWords(listTotals, open.length)}</span>
+        </div>
+        <div className="flex flex-wrap gap-x-3.5 gap-y-1 px-2">
+          <button type="button" onClick={copyList} disabled={open.length === 0} className={LINK}>
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <button type="button" onClick={propose} disabled={open.length < 2 || busy !== null} className={LINK}>
+            {busy === "tidying" ? "Thinking…" : "Tidy"}
+          </button>
+          <button type="button" onClick={clearBought} disabled={bought.length === 0} className={LINK}>
+            Clear ticked
+          </button>
+          {confirmingClear ? (
+            <>
+              <button type="button" onClick={clearEverything} className="text-[13px] text-danger underline-offset-2 hover:underline">
+                Clear all {onList.length} — sure?
               </button>
-            )}
-          </div>
+              <button type="button" onClick={() => setConfirmingClear(false)} className={LINK}>
+                Keep it
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={() => setConfirmingClear(true)} disabled={onList.length === 0} className={LINK}>
+              Clear all
+            </button>
+          )}
         </div>
 
         {/* **A tidy is shown before it happens.** `validateTidy` has already
@@ -427,48 +447,133 @@ export default function List({
           ) : (
             <p className="px-2 text-sm text-ink-soft">Reading the list…</p>
           )
-        ) : items.length === 0 ? (
+        ) : onList.length === 0 ? (
           <p className="rounded-xl border border-dashed border-line p-4 text-sm text-ink-soft">
-            Nothing on it. Add a recipe&rsquo;s ingredients from the book, or type what you need.
+            {inCart.length > 0
+              ? "Nothing left on the List. Everything is in the cart."
+              : "Nothing on it. Add a recipe’s ingredients from the book, or type what you need."}
           </p>
         ) : (
-          <ul className="flex flex-col overflow-hidden rounded-xl bg-surface">
-            {items.map((item) => (
+          <ul className="flex flex-col gap-1.5">
+            {onList.map((item) => (
               <ListRow
                 key={item.id}
                 item={item}
                 sale={onSale.get(item.id) ?? null}
                 onTick={() => void tick(item)}
                 onQuantity={(q) => void setQuantity(item, q)}
+                canAdd={canAdd}
+                adding={cart.adding === item.id}
+                onAdd={() => void cart.addOne(item.id)}
               />
             ))}
           </ul>
         )}
         <p className="px-2 text-xs text-ink-soft">★ default saved · ? needs a pick at Send · + not saved yet</p>
-      </div>
+        {/* **Send all stays** (owner): the whole List through Going in, Pick one and Not saved yet. */}
+        {cart.ready ? (
+          <button
+            type="button"
+            onClick={() => void cart.startReview()}
+            disabled={cart.busy !== null || open.length === 0}
+            className="min-h-11 rounded-[10px] border border-accent bg-transparent text-[15px] font-bold text-accent disabled:opacity-50"
+          >
+            {cart.busy === "review" ? "Looking up…" : "Send all to cart"}
+          </button>
+        ) : null}
+      </section>
 
-      {/* Send to cart, King Soopers (TEC-90): connection, store, estimate, Take back. */}
+      {/* ---- In cart ---- */}
+      {cart.ready || inCart.length > 0 ? (
+        <section aria-label="In cart" className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between gap-3 px-2">
+            <h3 className="text-lg font-bold">In cart · {inCart.length}</h3>
+            <span className="text-right text-[13px] text-ink-soft">{totalWords(cartTotals, inCart.length)}</span>
+          </div>
+          {inCart.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-line p-4 text-sm text-ink-soft">Nothing Cookbook has put in the cart.</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {inCart.map((item) => (
+                <InCartRow
+                  key={item.id}
+                  item={item}
+                  disabled={cart.busy !== null}
+                  removing={cart.removing === item.id}
+                  onRemove={() => void cart.removeOne(item.id)}
+                />
+              ))}
+            </ul>
+          )}
+
+          {cart.takeBackPreview ? (
+            <TakeBackConfirm
+              lines={cart.takeBackPreview}
+              working={cart.busy === "take-back"}
+              onConfirm={() => void cart.confirmTakeBack()}
+              onCancel={() => cart.setTakeBackPreview(null)}
+            />
+          ) : null}
+          {cart.takeBackResults ? <TakeBackResults results={cart.takeBackResults} /> : null}
+
+          {/* **Clear cart is Take back** (RULES.md): its two taps and its "anything added elsewhere stays". */}
+          {cart.ready ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void cart.lookTakeBack()}
+                disabled={cart.busy !== null || cart.takeBackPreview !== null || inCart.length === 0}
+                className="min-h-11 flex-1 rounded-[10px] border border-danger bg-transparent text-[15px] font-bold text-danger disabled:opacity-50"
+              >
+                {cart.busy === "take-back-look" ? "Checking…" : "Clear cart"}
+              </button>
+              <a
+                href={CHECKOUT_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="flex min-h-11 flex-1 items-center justify-center rounded-[10px] bg-raised text-[15px]"
+              >
+                Go to checkout
+              </a>
+            </div>
+          ) : null}
+          {/* **The API cannot read the account**, so this is only what Cookbook sent (RULES.md). */}
+          <p className="px-2 text-xs text-ink-soft">
+            Shows what Cookbook put in your King Soopers cart. Anything you added in the King Soopers app stays there and isn&rsquo;t shown.
+          </p>
+        </section>
+      ) : null}
+
+      {/* Send to cart, King Soopers (TEC-90): connection, store and refresh. */}
       <CartPanel cart={cart} />
-      <CartBar cart={cart} />
     </section>
   );
 }
 
 /**
- * One line: its tick, the name (the link: your remembered product or a
- * search, as the server resolved it), what follows small, its marker and how
- * many. **The tick is its own tap target**, so ticking in the shop never opens
- * King Soopers (TEC-39).
+ * One List line: its tick, the name (the link: your remembered product or a
+ * search, as the server resolved it), what follows small, its price and how
+ * many, and **+ Cart** (TEC-190). **The tick is its own tap target**, so ticking
+ * in the shop never opens King Soopers (TEC-39). The ★ / ? / + marker leads the
+ * small text; the price is the nightly check's, or “no price yet”.
  */
-function ListRow(props: { item: ShoppingLine; sale: SaleTag | null; onTick: () => void; onQuantity: (q: number) => void }) {
+function ListRow(props: {
+  item: ShoppingLine;
+  sale: SaleTag | null;
+  onTick: () => void;
+  onQuantity: (q: number) => void;
+  canAdd: boolean;
+  adding: boolean;
+  onAdd: () => void;
+}) {
   const { item } = props;
   const mark = item.mark ?? "+";
   return (
-    <li className="flex min-h-12 items-center gap-2.5 border-t border-line/40 px-3.5 py-2.5 first:border-t-0">
+    <li className="flex items-center gap-2.5 rounded-[10px] bg-surface py-2 pl-3 pr-2.5">
       <label className="flex shrink-0 cursor-pointer items-center self-stretch">
         <input type="checkbox" checked={item.checked} onChange={props.onTick} aria-label={`Got ${item.name}`} className="size-6 accent-accent" />
       </label>
-      <span className="flex min-w-0 flex-1 flex-col">
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <a
           href={item.href}
           target="_blank"
@@ -477,20 +582,68 @@ function ListRow(props: { item: ShoppingLine; sale: SaleTag | null; onTick: () =
         >
           {item.view?.name ?? item.name}
         </a>
-        <span className="truncate text-xs text-ink-soft">
+        <span className="text-xs text-ink-soft">
+          {!item.checked ? (
+            <span title={MARK_WORDS[mark]} aria-label={MARK_WORDS[mark]} className={`mr-1 font-bold ${MARK_TONE[mark]}`}>
+              {mark}
+            </span>
+          ) : null}
           {/* **On sale at the chosen store** (TEC-121 3a). Says sale, never coupon. */}
           {props.sale ? <span className="mr-1 whitespace-nowrap rounded border border-accent px-1 text-[11px] text-accent">{saleText(props.sale)}</span> : null}
           {details(item).join(" · ")}
         </span>
       </span>
-      {!item.checked ? (
-        <span title={MARK_WORDS[mark]} aria-label={MARK_WORDS[mark]} className={`w-3.5 shrink-0 text-center text-sm font-bold ${MARK_TONE[mark]}`}>
-          {mark}
-        </span>
-      ) : (
-        <span className="w-3.5 shrink-0" />
-      )}
-      <Quantity key={`${item.id}:${item.quantity}`} item={item} onCommit={props.onQuantity} />
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        <Price price={item.price} />
+        <Quantity key={`${item.id}:${item.quantity}`} item={item} onCommit={props.onQuantity} />
+      </span>
+      {props.canAdd && !item.checked ? (
+        <button
+          type="button"
+          aria-label="Add to cart"
+          onClick={props.onAdd}
+          className="h-8 shrink-0 whitespace-nowrap rounded-lg bg-accent px-2.5 text-xs font-bold text-accent-ink disabled:opacity-50"
+        >
+          {props.adding ? "…" : "+ Cart"}
+        </button>
+      ) : null}
+    </li>
+  );
+}
+
+/** A line's price from the nightly check, or “no price yet”: never $0. */
+function Price({ price }: { price: LinePrice | null | undefined }) {
+  return price ? (
+    <span className="whitespace-nowrap text-[13px] tabular-nums" title={price.onSale ? "On sale in the last nightly check" : undefined}>
+      {money(price.total)}
+    </span>
+  ) : (
+    <span className="whitespace-nowrap text-[11px] text-ink-soft">no price yet</span>
+  );
+}
+
+/** One In cart line: what Cookbook sent, its price, and **Remove** (Take back for this line). */
+function InCartRow(props: { item: ShoppingLine; disabled: boolean; removing: boolean; onRemove: () => void }) {
+  const { item } = props;
+  const small = [item.quantity > 1 ? `×${item.quantity}` : null, ...details(item)].filter((x): x is string => !!x);
+  return (
+    <li className="flex items-center gap-2.5 rounded-[10px] bg-raised py-2 pl-3 pr-2.5">
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <a href={item.href} target="_blank" rel="noreferrer" className="text-[15px] font-semibold">
+          {item.view?.name ?? item.name}
+        </a>
+        <span className="text-xs text-ink-soft">{small.join(" · ")}</span>
+      </span>
+      <Price price={item.price} />
+      <button
+        type="button"
+        aria-label={`Remove ${item.view?.name ?? item.name} from the cart`}
+        onClick={props.onRemove}
+        disabled={props.disabled}
+        className="min-h-11 shrink-0 rounded-[10px] border border-line bg-transparent px-3 text-[13px] disabled:opacity-50"
+      >
+        {props.removing ? "Removing…" : "Remove"}
+      </button>
     </li>
   );
 }
