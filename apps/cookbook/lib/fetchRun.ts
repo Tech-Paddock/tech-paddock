@@ -7,7 +7,7 @@
  * **Why this exists (TEC-29 item 6).** A page that could not be read is refused
  * twice: the prompt asks for `read: false`, and the importer rejects a "read"
  * page that produced no ingredients. **A recipe invented from the link's slug has
- * ingredients and passes both** — which is the charter's own example of failure.
+ * ingredients and passes both** — which is `RULES.md`'s own example of an unread page (*Recipes*).
  * The third check does not ask the model anything: it looks at whether any fetch
  * returned a page at all.
  *

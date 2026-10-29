@@ -6,14 +6,14 @@ const createClient = vi.fn((..._args: unknown[]) => ({}));
 vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: unknown[]) => createClient(...a) }));
 
 /**
- * The one rule in this app's charter that a copy-paste can break silently.
+ * The one rule in this app's `RULES.md` (*Storage*) that a copy-paste can break silently.
  *
  * `apps/cookbook` was scaffolded by copying `apps/health`, and the single most
  * likely thing to survive that copy wrong is the schema pin — it is one word,
  * it is not in a filename, and nothing in a build or a typecheck would object
  * to it saying `health`. The failure would not be an error either: the app
  * would read and write another tool's tables perfectly happily, which is
- * exactly what the charter's "never another app's schema" exists to stop.
+ * exactly what `RULES.md`'s "never read or write another schema" exists to stop.
  *
  * `drift` cannot catch this. It checksums the files that must be *identical*
  * across apps, and `lib/supabase.ts` is deliberately a per-app variant.

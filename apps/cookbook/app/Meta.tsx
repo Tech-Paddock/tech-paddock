@@ -7,9 +7,10 @@ import { DIETS, MEALS, type RecipeMeta } from "@/lib/metadata";
  * fields, and the summary on a draft or an open card.
  *
  * **Built from the tokens that exist** — accent, line, ink-soft — so nothing
- * here changes the theme, which is TechPad Gen's. The stars are this app's own
- * pattern, not a shared one; if another app wants them, that is TechPad Gen's
- * call.
+ * here changes the theme, which is the shared one's
+ * (`packages/shared/lib/theme.css`). The stars are this app's own pattern, not a
+ * shared one; if another app wants them, it copies them and names that in its
+ * pull request.
  */
 
 /**

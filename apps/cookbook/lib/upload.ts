@@ -17,7 +17,7 @@
  * **The size cap is Vercel's, not a preference.** A serverless function refuses
  * a request body over 4.5 MB, and base64 costs a third on top, so 3 MB of file
  * is what fits with room for the rest of the JSON. The browser shrinks photos
- * well under that before they are sent (`app/Book.tsx`), so in practice this
+ * well under that before they are sent (`downscale` in `lib/image.ts`, called from `app/AddRecipe.tsx`), so in practice this
  * only bites on a large PDF, and it says so.
  */
 

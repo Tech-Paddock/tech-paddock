@@ -1,6 +1,10 @@
 import { getServiceClient } from "./supabase";
 import { ConflictError, InputError, LookupError } from "./errors";
 import { moveSends } from "./cartSends";
+import { MAX_QUANTITY, asText } from "./groceryText";
+
+// The helpers the browser runs live in `lib/groceryText.ts`, which imports no `./supabase`.
+export { MAX_QUANTITY, asText };
 
 /**
  * The shopping list, and the three ways it leaves this app.
@@ -9,7 +13,7 @@ import { moveSends } from "./cartSends";
  * the whole of it until the no-OAuth rule was reversed for King Soopers on
  * 2026-09-26 (TEC-90); the cart lives in `lib/cart.ts` and `lib/kroger.ts`, and
  * this file only carries what a line needs for it — a quantity, and when it was
- * last sent. Still no carve-out in `proxy.ts`.
+ * last sent. No gate exception for the list: the only one is the nightly price scan's path.
  *
  * **This is `cookbook.grocery_items`.** Health's list moved here and its table
  * is gone (TEC-15); nothing here writes `health.*`.
@@ -56,8 +60,6 @@ export type GroceryItem = {
 };
 
 const COLUMNS = "id, name, note, source, checked, created_at, recipes, quantity, sent_at";
-
-export const MAX_QUANTITY = 99;
 
 /** A quantity this app will store, or null. Whole, 1 to 99 — the same range the table checks. */
 export function readQuantity(value: unknown): number | null {
@@ -121,19 +123,6 @@ export function searchUrl(item: Pick<GroceryItem, "name">): string {
   // "2 lbs" and "the small tin" are instructions to a shopper, not search
   // terms, and they narrow a search to nothing.
   return searchFor(item.name);
-}
-
-/** The open lines as a block you can paste anywhere. Ticked-off lines are not shopping. */
-export function asText(items: GroceryItem[]): string {
-  const open = items.filter((i) => !i.checked);
-  if (open.length === 0) return "";
-  return open
-    .map((i) => {
-      // A quantity of one is the default and says nothing, so it is not printed.
-      const name = (i.quantity ?? 1) > 1 ? `${i.name} ×${i.quantity}` : i.name;
-      return i.note ? `${name} — ${i.note}` : name;
-    })
-    .join("\n");
 }
 
 // ---------------------------------------------------------------------------

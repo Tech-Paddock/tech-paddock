@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { perServing, type Recipe } from "@/lib/recipes";
+import { perServing } from "@/lib/recipeSteps";
+import type { Recipe } from "@/lib/recipes";
 import { round } from "@/lib/macros";
 import type { MenuEntry } from "@/lib/menu";
 import { menuDayLabel, parseDay } from "@/lib/menuDay";

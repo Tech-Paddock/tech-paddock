@@ -22,7 +22,8 @@ export async function GET() {
 }
 
 /**
- * Keep a draft. **The only route that writes a recipe.**
+ * Keep a draft. **The only route that keeps a draft** (an ingredient edit writes
+ * through `/api/recipes/edit`, and a rating through PATCH).
  *
  * Re-validated here rather than trusted, because the browser has had the draft in
  * its hands and a draft is where every number in the book comes from. The

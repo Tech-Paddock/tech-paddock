@@ -15,7 +15,7 @@ export const maxDuration = 60;
  * **The gate lets exactly this path through without a session, and only with
  * that header** (`proxy.ts`); this route checks the secret again itself, so the
  * gate is never the only lock. No model call, no account token. The body is
- * counts: no token, no secret.
+ * the night, the store's name, counts and the weeks rolled up: no token, no secret.
  */
 export async function GET(request: NextRequest) {
   if (!cronAuthorized(request.headers.get("authorization"))) {

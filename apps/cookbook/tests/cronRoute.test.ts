@@ -5,7 +5,7 @@ import { cronAuthorized } from "@/lib/cronAuth";
 /**
  * `/api/cron/prices` checks `CRON_SECRET` itself (TEC-132), behind the gate's
  * own check (`tests/gate.test.ts`). The scan is mocked: what is held here is
- * that nothing runs without the secret, and that the body carries counts only.
+ * that nothing runs without the secret, and that the body carries no secret.
  */
 
 const SECRET = "test-cron-secret-0123456789-abcdefghij"; // made up, 38 characters

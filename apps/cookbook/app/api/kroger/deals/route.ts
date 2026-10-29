@@ -6,8 +6,10 @@ import { errorResponse } from "@/lib/respond";
 export const dynamic = "force-dynamic";
 
 /**
- * The deal scan (TEC-121). **No model call, no cron, and no coupons read** —
- * Kroger's public API has none; each deal links to King Soopers' coupon search.
+ * The deal scan (TEC-121), run from the list tab. **No model call, and no coupons
+ * read** — Kroger's public API has none; coupons are staged separately
+ * (`lib/couponStore.ts`). The nightly scan is a different route
+ * (`/api/cron/prices`).
  *
  * GET is the latest scan, or `null` for never: the list tab decides from its
  * `ran_at` whether opening it should start another. POST runs one and

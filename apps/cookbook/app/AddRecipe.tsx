@@ -4,7 +4,8 @@ import { useState } from "react";
 import Provenance from "./Provenance";
 import MacroRow from "./MacroRow";
 import { useToast } from "./Toast";
-import { methodSteps, perServing, type Recipe, type RecipeDraft } from "@/lib/recipes";
+import { methodSteps, perServing } from "@/lib/recipeSteps";
+import type { Recipe, RecipeDraft } from "@/lib/recipes";
 import { MAX_FILE_BYTES, isFileMediaType, type RecipeFile } from "@/lib/upload";
 import { MAX_STEER, pileForAsk, turnDown, type TurnedDown } from "@/lib/reroll";
 import { downscale } from "@/lib/image";
@@ -24,8 +25,7 @@ import { NO_PICKS, hasPicks, type Picks } from "@/lib/tuning";
  * The draft step exists to show you what a model produced before it lands. On the
  * typed path you wrote the recipe, so the only thing the draft adds is the macros
  * — an approval of your own words back, which is ceremony.
- * **The charter still says all three land as a draft**; correcting it is the
- * technical director's, and the note is in this app's `NOTES.md`.
+ * `RULES.md` (*Recipes*) says the same: a typed recipe's draft is kept at once.
  *
  * **It is a tab of its own now** (2026-10-05, replacing the two-tab
  * index): Recipes · Add · King Soopers list. So it is always open — the collapse

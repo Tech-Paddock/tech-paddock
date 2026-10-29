@@ -18,10 +18,11 @@ import type { SavedProduct } from "./brands";
  *
  * **Today's price** is the product's latest nightly row from the last
  * `FRESH_NIGHTS` nights; an older one is not today's price and the product is
- * counted as unpriced instead. **Before the first nightly run**, the latest
- * deal scan (`deal_scans`, the list tab's) fills in the products it found on
- * sale, at the same store, so the tab is not empty on the first day; those rows
- * have no history and read "new: building history".
+ * counted as unpriced instead. **For any product with no fresh night**, the
+ * latest deal scan (`deal_scans`, the list tab's) fills in the ones it found on
+ * sale, at the same store, so the tab is not empty before the nightly run has
+ * reached them. Its colour is from whatever weeks it has, so a product with too
+ * few reads "new: building history".
  */
 
 /** A night this old or older is not today's price. */
