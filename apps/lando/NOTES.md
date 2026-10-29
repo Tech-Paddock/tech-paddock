@@ -2,8 +2,29 @@
 
 ## State
 
-- v2 on Next.js 16: three tabs under the app bar, **Log**, **Analytics** and **What's new**, sticky, opening on Log
-  (RULES.md holds the owner's override of the one-screen rule).
+- v2 on Next.js 16: four tabs under the app bar, **Log**, **Analytics**, **What's new** and **Upcoming**, sticky,
+  opening on Log (RULES.md holds the owner's override of the one-screen rule).
+- **Upcoming** (TEC-192): plans for vet visits, vaccines, medications and other things, in `lando.upcoming`
+  (kind, title, due day, optional time and note, optional repeat of N weeks, months or years, status open,
+  done or cancelled). The tab lists open items soonest first (`openItems`), each in the pills' status colours
+  (`.lando-pill[data-status]`: due today to 7 days out is amber/`yellow`, overdue is `red`, the rest neutral;
+  `upcomingTone`, by calendar day on the phone's day). The same first item is a one-line button under the
+  pills on Log, "Next: Title · Fri Nov 6" (" · overdue" when red), absent when nothing is open; a tap opens
+  the tab. Add and Edit use a bottom sheet (`UpcomingTab.tsx`); an item is edited in place and **cancelled,
+  never deleted** (the row keeps `status`). Reads and writes go through `/api/upcoming`: `GET` the open items,
+  `POST {action: add | edit | cancel | done}`. The journal read (`/api/journal`) is untouched; Upcoming loads
+  beside it, and one failing never blanks the other.
+  * **Done** on Medication or Other marks it done with today's date. Done on a **Vet visit or Vaccine** opens
+    the Vet visit form (`visitPrefill`: the item's day and time, noon when none; a vaccine's reason is
+    `vaccines`; a vet visit's reason only when the title says check-up or follow-up/recheck; the title is the
+    note). Journal remembers the link (`visitLinks`, by the visit's id); once `/api/events` saves that visit,
+    `saveThenClose` posts `done` with `done_event` set to the visit's id. Closing the form without saving
+    never closes the item; a failed save keeps its Retry, and the Retry closes the item when it lands. The
+    server also refuses to close a vet or vaccine item without a saved vet visit's id (`applyAction`).
+  * **A repeat**: the server inserts the next open item at `nextDue` (weeks add 7 days each; months and years
+    land on the same day, or the last day of a shorter month, so Jan 31 + 1 month is Feb 28/29), same kind,
+    title, note, time and repeat. If that insert fails the item is put back to open so Done can be tried again.
+  * No phone notifications (the owner's pick); the line on Log and the colours are the whole reminder.
 - **Log** (TEC-186 made the pills the way in): four since-last pills in one row (Pee, Poop, Meal, **Fun**;
   label over value, the clock time in the title and for screen readers; coloured by TEC-142, below), then
   **four buttons in one row directly under them** (TEC-188: Treats, Training, Weight, Health, the pills' own
@@ -453,6 +474,14 @@
   ink tokens; series 2 is burnt orange in light and peach in dark, where the accent is papaya.
 
 ## Traps
+
+- **Upcoming's Done on a visit is client-linked.** The link from the visit to its item lives in `Journal`'s
+  `visitLinks` ref, not in storage. If the visit saves but the phone loses the page before the `done` call
+  lands (or the call fails twice), the visit is in the journal and the item stays open; a toast says so. Tapping
+  Done again would log a second visit, so check the feed first and Cancel the item instead. A visit left unsaved
+  across a reload is retried from storage without its link. Upcoming dates are `YYYY-MM-DD` strings and
+  `due_time` is `HH:MM` (Postgres returns `HH:MM:SS`; `upcoming-db.ts` trims it): never build one with
+  `new Date("YYYY-MM-DD")`, which reads as UTC.
 
 - **Every Lando change a user would notice adds its line to `RELEASES`** (`lib/releases.ts`), at the
   top, on the same branch, and a **new day also needs its one-line summary in `DAY_SUMMARIES`**. Plain words,

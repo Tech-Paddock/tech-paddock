@@ -47,12 +47,22 @@ import {
   writeStore,
   type Remembered,
 } from "@/lib/defaults";
-import { clockTime, localMidnight, shortDate } from "@/lib/localtime";
+import { clockTime, localMidnight, shortDate, toDateInput } from "@/lib/localtime";
+import {
+  UPCOMING_TONE_WORDS,
+  needsVisit,
+  nextLine,
+  saveThenClose,
+  visitPrefill,
+  type Upcoming,
+  type UpcomingInput,
+} from "@/lib/upcoming";
 import type { AddedFood, FoodType, FoodUnit } from "@/lib/foods";
 import { nameBoxWidth } from "@/lib/names";
 import { saveThen } from "@/lib/saveOrder";
 import Analytics from "./Analytics";
 import WhatsNew from "./WhatsNew";
+import UpcomingTab from "./UpcomingTab";
 import { useReportMeals } from "./Meals";
 import LogForm, { type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
@@ -69,8 +79,8 @@ type Pending = { body: LogBody; status: "saving" | "failed"; error?: string; the
 /** What `lando.unsaved` holds per entry: the body, plus its treats when it has any. */
 type Stored = LogBody & { then?: LogBody[] };
 
-type Open = { form: FormKind; event?: JournalEvent; quick?: QuickLog } | null;
-type Tab = "log" | "analytics" | "new";
+type Open = { form: FormKind; event?: JournalEvent; quick?: QuickLog; visitFor?: Upcoming } | null;
+type Tab = "log" | "analytics" | "new" | "upcoming";
 
 async function postJson(url: string, body: unknown): Promise<{ ok: boolean; status: number; data: any }> {
   const res = await fetch(url, {
@@ -119,7 +129,7 @@ function Pill({
 }
 
 /**
- * Three tabs, Log, Analytics and What's new, opening on Log (RULES.md, Surface: app, the
+ * Four tabs, Log, Analytics, What's new and Upcoming, opening on Log (RULES.md, Surface: app, the
  * owner's override, 2026-10-20). Log: four since-last pills that each open a quick log (Pee,
  * Poop, Meal, Fun; TEC-181, TEC-186), who is logging, four buttons that open a short form with
  * defaults (Treats, Training, Weight, Health; TEC-186), and a feed of every loaded day, by when each
@@ -154,6 +164,24 @@ export default function Journal() {
   const sinceRef = useRef(since);
   sinceRef.current = since;
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Upcoming (TEC-192): open items, read apart from the journal so one failing never blanks the other.
+  const [upcoming, setUpcoming] = useState<Upcoming[] | null>(null);
+  const [upcomingError, setUpcomingError] = useState<string | null>(null);
+  // A vet visit opened from an Upcoming item's Done, by the visit's id: the item closes only once that
+  // visit is saved (`saveThenClose`), and a Retry of the visit keeps its link.
+  const visitLinks = useRef(new Map<string, string>());
+
+  const loadUpcoming = useCallback(async () => {
+    try {
+      const res = await fetch("/api/upcoming", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setUpcoming(data.items);
+      setUpcomingError(null);
+    } catch (e) {
+      setUpcomingError((e as Error).message || "couldn't reach the server");
+    }
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -169,7 +197,8 @@ export default function Journal() {
       // Keep whatever was on screen; say it may be stale. Never blank it.
       setLoadError((e as Error).message || "couldn't reach the server");
     }
-  }, []);
+    void loadUpcoming();
+  }, [loadUpcoming]);
 
   const updatePending = useCallback((fn: (list: Pending[]) => Pending[]) => {
     setPending((prev) => {
@@ -194,33 +223,67 @@ export default function Journal() {
     toastTimer.current = setTimeout(() => setToast(null), 1800);
   }, []);
 
+  // The visit that finished an Upcoming vet visit or vaccine is saved: now close the item and record the
+  // visit on it. One retry; if it still fails the visit is safe in the journal and the item stays open.
+  const closeUpcoming = useCallback(
+    async (itemId: string, visit: LogBody) => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const { ok, data } = await postJson("/api/upcoming", {
+            action: "done",
+            id: itemId,
+            done_on: toDateInput(visit.at),
+            done_event: visit.id,
+          });
+          if (ok) {
+            visitLinks.current.delete(visit.id);
+            setUpcoming((prev) => (prev ? [...prev.filter((i) => i.id !== itemId), ...(data.next ? [data.next] : [])] : prev));
+            return;
+          }
+          if (data.error) break;
+        } catch {
+          // no connection: try once more
+        }
+      }
+      visitLinks.current.delete(visit.id);
+      setToast("Visit saved, but the upcoming item is still open — reload to check");
+      clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setToast(null), 4000);
+      void loadUpcoming();
+    },
+    [loadUpcoming]
+  );
+
   const save = useCallback(
     async function save(body: LogBody, announce: boolean, then?: LogBody[]): Promise<void> {
       const after = then?.length ? then : undefined;
+      const itemId = visitLinks.current.get(body.id);
+      async function saveOne(b: LogBody): Promise<boolean> {
+        updatePending((list) => [...list.filter((p) => p.body.id !== b.id), { body: b, status: "saving", then: after }]);
+        try {
+          const { ok, data } = await postJson("/api/events", b);
+          if (!ok) throw new Error(data.error ?? "the server refused it");
+          mergeEvent(data.event);
+          updatePending((list) => list.filter((p) => p.body.id !== b.id));
+          if (announce) say(`${describe(b).title || KIND_LABELS[b.kind]} logged`);
+          return true;
+        } catch (e) {
+          const error = e instanceof TypeError ? "no connection" : (e as Error).message;
+          updatePending((list) => list.map((p) => (p.body.id === b.id ? { ...p, status: "failed", error } : p)));
+          return false;
+        }
+      }
       // The entry first; only once it is in, what follows it (a training's
-      // treats, a vet visit's weight), each its own row with its own Retry.
+      // treats, a vet visit's weight), each its own row with its own Retry. A visit that finishes an
+      // Upcoming item closes the item only after it is saved.
       await saveThen(
-        async (b) => {
-          updatePending((list) => [...list.filter((p) => p.body.id !== b.id), { body: b, status: "saving", then: after }]);
-          try {
-            const { ok, data } = await postJson("/api/events", b);
-            if (!ok) throw new Error(data.error ?? "the server refused it");
-            mergeEvent(data.event);
-            updatePending((list) => list.filter((p) => p.body.id !== b.id));
-            if (announce) say(`${describe(b).title || KIND_LABELS[b.kind]} logged`);
-            return true;
-          } catch (e) {
-            const error = e instanceof TypeError ? "no connection" : (e as Error).message;
-            updatePending((list) => list.map((p) => (p.body.id === b.id ? { ...p, status: "failed", error } : p)));
-            return false;
-          }
-        },
+        (b) => (itemId ? saveThenClose(saveOne, (v) => closeUpcoming(itemId, v), b) : saveOne(b)),
         (t) => void save(t, false),
         body,
         after
       );
     },
-    [mergeEvent, updatePending, say]
+    [mergeEvent, updatePending, say, closeUpcoming]
   );
 
   // Mount: who this phone is, its defaults, anything left unsaved, the journal.
@@ -327,6 +390,63 @@ export default function Journal() {
     }
   }
 
+  /** Upcoming's Add and Edit: awaited, so a refused item stays on its form with the reason. */
+  async function saveUpcoming(item: UpcomingInput, id?: string): Promise<{ error: string | null }> {
+    try {
+      const { ok, status, data } = await postJson("/api/upcoming", id ? { action: "edit", id, item } : { action: "add", item });
+      if (!ok) {
+        if (status === 409) void loadUpcoming();
+        return { error: data.error ?? "couldn't save" };
+      }
+      setUpcoming((prev) => [...(prev ?? []).filter((i) => i.id !== data.item.id), data.item]);
+      return { error: null };
+    } catch (e) {
+      return { error: e instanceof TypeError ? "no connection — try again" : (e as Error).message };
+    }
+  }
+
+  /** Cancel hides the item and keeps it in the table with its status. */
+  async function cancelUpcoming(id: string): Promise<{ error: string | null }> {
+    try {
+      const { ok, status, data } = await postJson("/api/upcoming", { action: "cancel", id });
+      if (!ok) {
+        if (status === 409) void loadUpcoming();
+        return { error: data.error ?? "couldn't cancel" };
+      }
+      setUpcoming((prev) => (prev ? prev.filter((i) => i.id !== id) : prev));
+      return { error: null };
+    } catch (e) {
+      return { error: e instanceof TypeError ? "no connection — try again" : (e as Error).message };
+    }
+  }
+
+  /**
+   * Done. A vet visit or vaccine opens the Vet visit form on the item's day and reason and closes only
+   * when that visit saves (`closeUpcoming`); closing the form leaves it open. Medication and Other are
+   * marked done at once, with today's date, and a repeat brings its next one.
+   */
+  async function doneUpcoming(item: Upcoming): Promise<{ error: string | null } | void> {
+    if (needsVisit(item.kind)) {
+      setOpen({ form: "health", visitFor: item });
+      return;
+    }
+    try {
+      const { ok, status, data } = await postJson("/api/upcoming", {
+        action: "done",
+        id: item.id,
+        done_on: toDateInput(new Date().toISOString()),
+      });
+      if (!ok) {
+        if (status === 409) void loadUpcoming();
+        return { error: data.error ?? "couldn't mark it done" };
+      }
+      setUpcoming((prev) => (prev ? [...prev.filter((i) => i.id !== item.id), ...(data.next ? [data.next] : [])] : prev));
+      say(`${item.title} done`);
+    } catch (e) {
+      return { error: e instanceof TypeError ? "no connection — try again" : (e as Error).message };
+    }
+  }
+
   const rememberPhotoUrl = useCallback((path: string, url: string) => {
     setPhotoUrls((prev) => ({ ...prev, [path]: url }));
   }, []);
@@ -350,6 +470,8 @@ export default function Journal() {
   }
 
   function logNew(body: LogBody, then?: LogBody[]) {
+    // A visit opened from an Upcoming item's Done: that item closes when this visit is saved.
+    if (open?.visitFor && body.kind === "health") visitLinks.current.set(body.id, open.visitFor.id);
     remember([body, ...(then ?? [])]);
     setOpen(null);
     void save(body, true, then);
@@ -421,6 +543,10 @@ export default function Journal() {
   // A row's time under its day's heading: the clock, or nothing for a weight (it is a day).
   const feedTime = (kind: string, at: string) => (kind === "weight" ? "" : clockTime(at));
 
+  // The phone's day, and the next open Upcoming item for the line under the pills (TEC-192).
+  const today = toDateInput(now.toISOString());
+  const next = upcoming ? nextLine(upcoming, today) : null;
+
   const tabClass = (t: Tab) =>
     `border-b-[3px] pb-2 pt-2.5 font-bold ${t === tab ? "border-pinstripe text-ink" : "border-transparent text-ink-soft"}`;
 
@@ -432,7 +558,7 @@ export default function Journal() {
         className="sticky z-10 border-b border-line bg-paper"
         style={{ top: "env(safe-area-inset-top, 0px)" }}
       >
-        <div className="mx-auto grid max-w-md grid-cols-3 px-3">
+        <div className="mx-auto grid max-w-md grid-cols-4 px-3">
           <button role="tab" type="button" id="tab-log" aria-selected={tab === "log"} aria-controls="panel-log" onClick={() => showTab("log")} className={tabClass("log")}>
             Log
           </button>
@@ -441,6 +567,9 @@ export default function Journal() {
           </button>
           <button role="tab" type="button" id="tab-new" aria-selected={tab === "new"} aria-controls="panel-new" onClick={() => showTab("new")} className={tabClass("new")}>
             What&apos;s new
+          </button>
+          <button role="tab" type="button" id="tab-upcoming" aria-selected={tab === "upcoming"} aria-controls="panel-upcoming" onClick={() => showTab("upcoming")} className={tabClass("upcoming")}>
+            Upcoming
           </button>
         </div>
       </nav>
@@ -460,6 +589,20 @@ export default function Journal() {
         <div id="panel-analytics" role="tabpanel" aria-labelledby="tab-analytics" hidden={tab !== "analytics"}>
           {tab === "analytics" &&
             (loaded ? <Analytics events={loaded.events} now={now} /> : <p className="text-sm text-ink-soft">{loadError ? "" : "Loading…"}</p>)}
+        </div>
+
+        <div id="panel-upcoming" role="tabpanel" aria-labelledby="tab-upcoming" hidden={tab !== "upcoming"}>
+          {tab === "upcoming" && (
+            <UpcomingTab
+              items={upcoming}
+              error={upcomingError}
+              today={today}
+              onRetry={() => void loadUpcoming()}
+              onSave={saveUpcoming}
+              onCancel={cancelUpcoming}
+              onDone={doneUpcoming}
+            />
+          )}
         </div>
 
         <div id="panel-new" role="tabpanel" aria-labelledby="tab-new" hidden={tab !== "new"}>
@@ -518,6 +661,19 @@ export default function Journal() {
               );
             })}
           </section>
+
+          {/* The next open Upcoming item, coloured like the pills; a tap opens the tab. Absent when none is open. */}
+          {next && (
+            <button
+              type="button"
+              data-status={next.tone ?? undefined}
+              onClick={() => showTab("upcoming")}
+              className="lando-pill -mt-2 min-h-[44px] w-full min-w-0 truncate rounded-xl border border-line bg-surface px-3 py-2 text-left text-[15px] font-semibold"
+            >
+              {next.text}
+              {next.tone && <span className="sr-only">, {UPCOMING_TONE_WORDS[next.tone]}</span>}
+            </button>
+          )}
 
           {/* Four buttons in one row, the pills' size and grid, directly under them (TEC-188): Treats,
               Training, Weight, Health. Potty and Fun are reached through the pills (and Fun's own Pee and
@@ -745,12 +901,13 @@ export default function Journal() {
       </div>
 
       {open && !askWho && (
-        <Sheet title={open.event ? `Edit ${describe(open.event).title.toLowerCase()}` : FORM_LABELS[open.form]} onClose={() => setOpen(null)}>
+        <Sheet title={open.event ? `Edit ${describe(open.event).title.toLowerCase()}` : open.visitFor ? "Vet visit" : FORM_LABELS[open.form]} onClose={() => setOpen(null)}>
           <LogForm
-            key={open.event?.id ?? open.form}
+            key={open.event?.id ?? (open.visitFor ? `visit-${open.visitFor.id}` : open.form)}
             form={open.form}
             event={open.event}
             quick={open.quick}
+            visitPrefill={open.visitFor ? visitPrefill(open.visitFor) : undefined}
             sessionTreats={open.form === "training" && open.event && loaded ? treatsWith(loaded.events, open.event) : undefined}
             people={people}
             dogs={dogs}

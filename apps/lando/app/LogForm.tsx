@@ -85,6 +85,11 @@ type Props = {
   event?: JournalEvent;
   /** A tapped since-last pill's prefill (TEC-181), on a new entry only. */
   quick?: QuickLog;
+  /**
+   * A Done on an Upcoming vet visit or vaccine (TEC-192): the Vet visit form opens on the item's day and
+   * time, its reason (left empty when the item does not say), and its title as the note. New entry only.
+   */
+  visitPrefill?: { day: string; time: string; reason: string; note: string };
   /** A training being corrected: the treats already logged with it (`treatsWith`), shown, not changed. */
   sessionTreats?: JournalEvent[];
   people: Person[];
@@ -224,6 +229,7 @@ export default function LogForm({
   form,
   event,
   quick,
+  visitPrefill,
   sessionTreats = [],
   people,
   dogs,
@@ -251,11 +257,13 @@ export default function LogForm({
   const hasPhotos = kind === "health" || kind === "exercise" || kind === "potty";
 
   // Common
-  const [when, setWhen] = useState(toLocalInput(event?.at ?? openedAt.current));
+  const prefill = !event && form === "health" ? visitPrefill : undefined;
+  const [when, setWhen] = useState(prefill ? `${prefill.day}T${prefill.time}` : toLocalInput(event?.at ?? openedAt.current));
   const [day, setDay] = useState(toDateInput(event?.at ?? openedAt.current));
-  const [whenTouched, setWhenTouched] = useState(false);
+  // A visit opened from Upcoming carries its own day, so the time is already picked.
+  const [whenTouched, setWhenTouched] = useState(!!prefill);
   const [personId, setPersonId] = useState(event ? event.person_id ?? "" : phonePerson ?? "");
-  const [note, setNote] = useState(event?.note ?? "");
+  const [note, setNote] = useState(event?.note ?? prefill?.note ?? "");
 
   // Potty
   const p = event?.kind === "potty" ? asPotty(event) : null;
@@ -351,7 +359,7 @@ export default function LogForm({
   // retired reasons, opens on them as a kept option and saves them unchanged
   // until another pick is made.
   const [{ pick: firstReason, kept: keptReasons }] = useState(() => healthPickFor(h));
-  const [reason, setReason] = useState(firstReason);
+  const [reason, setReason] = useState(firstReason || prefill?.reason || "");
   // Photos (TEC-137, and Fun and Training since TEC-139). A correction opens
   // with the photos the entry has and keeps whatever is not removed.
   const photos = usePhotos(event ? eventPhotos(event) : [], photoUrls, onPhotoUrl);
