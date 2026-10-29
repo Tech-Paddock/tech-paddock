@@ -48,6 +48,7 @@ import {
   type Remembered,
 } from "@/lib/defaults";
 import { clockTime, localMidnight, shortDate } from "@/lib/localtime";
+import type { AddedFood, FoodType, FoodUnit } from "@/lib/foods";
 import { nameBoxWidth } from "@/lib/names";
 import { saveThen } from "@/lib/saveOrder";
 import Analytics from "./Analytics";
@@ -56,7 +57,7 @@ import { useReportMeals } from "./Meals";
 import LogForm, { type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
 
-type Loaded = { events: JournalEvent[]; people: Person[]; dogs: Dog[] };
+type Loaded = { events: JournalEvent[]; people: Person[]; dogs: Dog[]; foods: AddedFood[] };
 
 /**
  * A new entry on its way to the database, or one that did not get there.
@@ -161,7 +162,7 @@ export default function Journal() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setLoaded({ events: data.events, people: data.people, dogs: data.dogs ?? [] });
+      setLoaded({ events: data.events, people: data.people, dogs: data.dogs ?? [], foods: data.foods ?? [] });
       setPhotoUrls((prev) => ({ ...prev, ...(data.photos ?? {}) }));
       setLoadError(null);
     } catch (e) {
@@ -264,6 +265,7 @@ export default function Journal() {
 
   const people = loaded?.people ?? [];
   const dogs = loaded?.dogs ?? [];
+  const foods = loaded?.foods ?? [];
   const person = people.find((p) => p.id === personId) ?? null;
   const nameOf = (id: string | null) => (id ? people.find((p) => p.id === id)?.display_name ?? "someone" : null);
   // First open on a phone: ask once whose it is.
@@ -304,6 +306,24 @@ export default function Journal() {
       return { dog, error: null };
     } catch (e) {
       return { dog: null, error: e instanceof TypeError ? "no connection" : (e as Error).message };
+    }
+  }
+
+  /** The Food form's "Add a food…": saved to `lando.foods`, then merged into the loaded list without a reload. */
+  async function addFood(input: {
+    type: FoodType;
+    name: string;
+    unit: FoodUnit;
+    kcalPer: number | null;
+  }): Promise<{ food: AddedFood | null; error: string | null }> {
+    try {
+      const { ok, data } = await postJson("/api/foods", input);
+      if (!ok) return { food: null, error: data.error ?? "couldn't add" };
+      const food = data.food as AddedFood;
+      setLoaded((prev) => (prev && !prev.foods.some((f) => f.id === food.id) ? { ...prev, foods: [...prev.foods, food] } : prev));
+      return { food, error: null };
+    } catch (e) {
+      return { food: null, error: e instanceof TypeError ? "no connection" : (e as Error).message };
     }
   }
 
@@ -462,7 +482,7 @@ export default function Journal() {
               // Green, yellow or red by how long ago (TEC-142); Fun and "none" stay plain.
               const status = last ? pillStatus(c, now.getTime() - Date.parse(last.at)) : null;
               // Pee, Poop, Meal and Fun open a quick log, once the journal has loaded.
-              const tap = clocks ? quickLog(c, clocks.food) : null;
+              const tap = clocks ? quickLog(c, clocks.food, foods) : null;
               return (
                 <Pill
                   key={c}
@@ -735,6 +755,8 @@ export default function Journal() {
             people={people}
             dogs={dogs}
             onAddDog={addDog}
+            foods={foods}
+            onAddFood={addFood}
             phonePerson={person?.id ?? null}
             events={loaded?.events ?? []}
             photoUrls={photoUrls}

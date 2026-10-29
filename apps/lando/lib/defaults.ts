@@ -7,7 +7,7 @@
  * back to Misc and the journal is untouched. The database is the journal.
  */
 
-import { MISC_ID, picklist, type FoodType } from "./foods";
+import { MISC_ID, picklist, type AddedFood, type FoodType } from "./foods";
 import type { Unit } from "./events";
 
 export const PERSON_KEY = "lando.person";
@@ -44,10 +44,10 @@ export function writeStore(key: string, value: unknown) {
  * The item a food form opens on. A meal: the last meal picked, or Misc. A
  * treat: always Misc (the owner's call, TEC-129), whatever was picked last.
  */
-export function defaultFood(type: FoodType, remembered: Remembered): string {
+export function defaultFood(type: FoodType, remembered: Remembered, added: readonly AddedFood[] = []): string {
   if (type === "treat") return MISC_ID;
   const id = remembered.meal;
-  return id && picklist(type).some((f) => f.id === id) ? id : MISC_ID;
+  return id && picklist(type, added).some((f) => f.id === id) ? id : MISC_ID;
 }
 
 /** The amount a food form opens on: the last meal's, one treat. */

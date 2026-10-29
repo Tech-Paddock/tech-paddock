@@ -15,7 +15,7 @@
  * `lando_box_leash_spot`); change both together.
  */
 
-import { FOOD_TYPES, findFood, formatAmount, unitLabel, type FoodType } from "./foods";
+import { FOOD_TYPES, FOOD_UNITS, cleanFoodName, findFood, foodNameTaken, formatAmount, unitLabel, type AddedFood, type FoodType, type FoodUnit } from "./foods";
 import { dateLabel, fromDateInput, localMidnight, shortDate, toDateInput } from "./localtime";
 
 export const LOG_KINDS = ["potty", "food", "exercise", "weight", "health"] as const;
@@ -523,14 +523,15 @@ export type QueuedTreat = { id: string; item_id: string; amount: number | null }
 export function treatEntry(
   t: QueuedTreat,
   at: string,
-  personId: string | null
+  personId: string | null,
+  added: readonly AddedFood[] = []
 ): { id: string; kind: "food"; at: string; person_id: string | null; details: Details; note: null } {
   return {
     id: t.id,
     kind: "food",
     at,
     person_id: personId,
-    details: parseDetails("food", { type: "treat", item_id: t.item_id, amount: t.amount }),
+    details: parseDetails("food", { type: "treat", item_id: t.item_id, amount: t.amount }, added),
     note: null,
   };
 }
@@ -557,7 +558,7 @@ export type QuickLog =
 /** The Treats button: the Food form opened on a treat (the meal/treat choice stays in the form). */
 export const TREAT_QUICK_LOG: QuickLog = { form: "food", itemId: null, amount: null, type: "treat" };
 
-export function quickLog(clock: Clock, lastMeal: JournalEvent | null): QuickLog | null {
+export function quickLog(clock: Clock, lastMeal: JournalEvent | null, added: readonly AddedFood[] = []): QuickLog | null {
   if (clock === "pee" || clock === "poop") return { form: "potty", what: clock };
   if (clock === "exercise") return { form: "fun" };
   // `lastMeal` is `sinceLast`'s food clock: a live meal, never a treat. A meal whose item the
@@ -565,7 +566,7 @@ export function quickLog(clock: Clock, lastMeal: JournalEvent | null): QuickLog 
   const none: QuickLog = { form: "food", itemId: null, amount: null };
   if (!lastMeal || lastMeal.kind !== "food") return none;
   const f = food(lastMeal);
-  if (f.type !== "meal" || !findFood("meal", f.item_id)) return none;
+  if (f.type !== "meal" || !findFood("meal", f.item_id, added)) return none;
   return { form: "food", itemId: f.item_id, amount: typeof f.amount === "number" ? f.amount : null };
 }
 
@@ -1072,14 +1073,40 @@ function wholeNumber(v: unknown, field: string, min: number, max: number): numbe
  * Food details from what the form sends ({type, item_id, amount}): the name,
  * calories and unit are taken from the catalogue here, never from the phone.
  */
-export function foodSnapshot(type: FoodType, itemId: string, amount: number | null): FoodDetails {
-  const item = findFood(type, itemId);
+export function foodSnapshot(type: FoodType, itemId: string, amount: number | null, added: readonly AddedFood[] = []): FoodDetails {
+  const item = findFood(type, itemId, added);
   if (!item) throw new InvalidEvent("that food is not in the list");
   return { type, item_id: item.id, item_name: item.name, kcal_per: item.kcalPer, unit: item.unit, amount };
 }
 
+/**
+ * A new food as the form sends it ({type, name, unit, kcalPer}), checked: the name trimmed, 1 to 60
+ * characters and not already in that list (code or added, case-blind); a unit from `FOOD_UNITS`;
+ * calories optional, above 0. Throws `InvalidEvent` with a sentence the form can show (TEC-191).
+ */
+export function parseNewFood(
+  raw: unknown,
+  added: readonly AddedFood[] = []
+): { type: FoodType; name: string; unit: FoodUnit; kcalPer: number | null } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new InvalidEvent("expected a JSON object");
+  const r = raw as Record<string, unknown>;
+  const type = oneOf(r.type, FOOD_TYPES, "type");
+  const name = typeof r.name === "string" ? cleanFoodName(r.name) : "";
+  if (name.length < 1 || name.length > 60) throw new InvalidEvent("a name is 1 to 60 characters");
+  const unit = oneOf(r.unit, FOOD_UNITS, "unit");
+  let kcalPer: number | null = null;
+  if (r.kcalPer !== undefined && r.kcalPer !== null) {
+    if (typeof r.kcalPer !== "number" || !Number.isFinite(r.kcalPer) || r.kcalPer <= 0 || r.kcalPer > 10000) {
+      throw new InvalidEvent("calories must be a number above 0");
+    }
+    kcalPer = Math.round(r.kcalPer * 1000) / 1000;
+  }
+  if (foodNameTaken(type, name, added)) throw new InvalidEvent(`${name} is already in the list`);
+  return { type, name, unit, kcalPer };
+}
+
 /** Only the fields a kind owns survive; every required one must be there. */
-export function parseDetails(kind: Kind, raw: unknown): Details {
+export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood[] = []): Details {
   if (kind === "void") return {};
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new InvalidEvent("details must be an object");
   const r = raw as Record<string, unknown>;
@@ -1114,7 +1141,7 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
         }
         amount = Math.round(r.amount * 1000) / 1000;
       }
-      return foodSnapshot(type, r.item_id, amount);
+      return foodSnapshot(type, r.item_id, amount, added);
     }
     case "exercise": {
       const type = oneOf(r.type, EXERCISE_TYPES, "type");
@@ -1189,7 +1216,7 @@ export function parseDetails(kind: Kind, raw: unknown): Details {
  * `id` comes from the phone, so a retried save after a dropped response is the
  * same row rather than a second pee.
  */
-export function parseNewEvent(body: unknown, now: Date): NewEvent {
+export function parseNewEvent(body: unknown, now: Date, added: readonly AddedFood[] = []): NewEvent {
   if (!body || typeof body !== "object") throw new InvalidEvent("expected a JSON object");
   const b = body as Record<string, unknown>;
   if (!isUuid(b.id)) throw new InvalidEvent("id must be a UUID");
@@ -1221,7 +1248,7 @@ export function parseNewEvent(body: unknown, now: Date): NewEvent {
     kind: kind as Kind,
     at,
     person_id: (b.person_id as string | null | undefined) ?? null,
-    details: parseDetails(kind as Kind, b.details),
+    details: parseDetails(kind as Kind, b.details, added),
     note,
     voids,
   };

@@ -385,10 +385,28 @@
   with no clock time and orders it at noon (`happenedAt`); the growth chart was already by day.
   Weights from before this keep their logged time in the database. Every other form keeps date
   and time. (`rowTime` in `lib/localtime.ts` is used only by `tests/localtime.test.ts`.)
-- **Food catalogue** (`lib/foods.ts`), fixed in code; Misc last in each list, no "add another".
+- **Food catalogue** (`lib/foods.ts`) is the code list **plus foods added in the app** (TEC-191, the
+  owner's reversal of the 2026-10-20 "fixed in code, no add another"). The picklist is the code
+  items then the added ones in the order added, not retired, Misc last (`picklist(type, added)`);
+  `findFood(type, id, added)` resolves either, retired too. Royal Canin Dachshund Puppy (369 kcal/cup,
+  Royal Canin's figure, source in its comment) is the second meal in code.
   The server builds the food snapshot (name, kcal-per, unit) from the catalogue by `item_id`;
   whatever the phone sends for those is ignored. **Calories are recorded and never shown.** Each
   figure's source is a comment on its item.
+- **Added foods** (`lando.foods`, migration `lando_foods`): id (uuid), type (`meal` | `treat`), name
+  (1 to 60 characters, unique per type ignoring case and outer spaces), unit (`FOOD_UNITS`: cup, scoop,
+  piece, treat, pop, gram), kcal_per (nullable, above 0), created_at, retired. RLS on, zero policies.
+  **The Food form's What pick ends with "Add a food…"** after Misc (`FOOD_ADD`, never a value, like
+  Add dog): it opens an inline Name, Unit (meals open on cup, treats on piece) and optional Calories
+  per unit (recorded, never shown). Add posts to `POST /api/foods` (`lib/journal.ts:addFood`,
+  `parseNewFood`: a name already in that list, code or added, in any case, is a 400, never a
+  duplicate), merges the row into the loaded list without a reload and **selects it; nothing is
+  logged until the form's Save.** Read with the journal (`listFoods`, `/api/journal` returns `foods`),
+  and by `writeEvent` for a `food` body, so the snapshot of an added food is built server-side like a
+  code one. Added foods are passed as the `added` argument (`parseDetails`, `parseNewEvent`,
+  `foodSnapshot`, `treatEntry`, `quickLog`, `defaultFood`); Quick log's Meal prefill opens on an added
+  meal as the last meal. Training's "+ Treat" pop-up lists added treats but has no "Add a food…".
+  There is no way in the app to retire or rename an added food yet; `retired` is set by SQL.
 - **Defaults per phone** (`lib/defaults.ts`, `localStorage`): `lando.person` (asked once on a
   phone's first open, "Whose phone is this?"), `lando.defaults` (last meal item, last weight unit,
   last meal amount). A meal opens on the last meal item and amount saved from this phone, or Misc
@@ -474,6 +492,11 @@
   `retired: true`, or its old entries can no longer be corrected (the server refuses an unknown
   `item_id`). Changing a name or calorie figure is safe; old entries keep their snapshot. A new id
   must match `^[a-z0-9-]{1,60}$` or the database refuses it.
+- **`lando.foods` is history's key too.** An entry holds an added food's `item_id` in jsonb, so no
+  foreign key protects it: never delete a row or change its id (a uuid, which that pattern accepts).
+  Retire with `retired = true`. **A food entry's save reads `lando.foods`**: without the table (code
+  merged before `lando_foods`) every food save, and every journal load, is a 503. The unit list is in
+  two places, `FOOD_UNITS` and the table's check; a test holds them equal.
 - **A new detail field needs three edits:** `parseDetails` in `lib/events.ts`, `lando.details_ok`
   (a new migration; see the next trap), and the tests. The function allows no unknown key, so a
   field added in the app alone fails every save with a 503. A new kind is a branch in the same

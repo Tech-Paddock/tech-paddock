@@ -37,6 +37,7 @@ import {
   issueChoices,
   linkedWeight,
   parseDetails,
+  parseNewFood,
   potty as asPotty,
   treatEntry,
   visitWeightPlan,
@@ -55,7 +56,7 @@ import {
   type LogKind,
   type Unit,
 } from "@/lib/events";
-import { amountOptions, picklist, findFood, treatQtyError, unitLabel, type FoodType } from "@/lib/foods";
+import { FOOD_UNITS, amountOptions, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit } from "@/lib/foods";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import AmountScroller from "./AmountScroller";
 import TreatQty from "./TreatQty";
@@ -91,6 +92,10 @@ type Props = {
   dogs: Dog[];
   /** Other dogs' "Add dog…": adds one to `lando.dogs` (or finds it) and hands it back. */
   onAddDog: (name: string) => Promise<{ dog: Dog | null; error: string | null }>;
+  /** Foods added in the app (`lando.foods`, TEC-191), retired ones too: the picklist is these plus the code catalogue. */
+  foods: AddedFood[];
+  /** The What pick's "Add a food…": saves one to `lando.foods` and hands it back. */
+  onAddFood: (food: { type: FoodType; name: string; unit: FoodUnit; kcalPer: number | null }) => Promise<{ food: AddedFood | null; error: string | null }>;
   phonePerson: string | null;
   /** Everything the journal read, voids included: the Related issue select lists its recent medical issues (TEC-142). */
   events: JournalEvent[];
@@ -171,6 +176,9 @@ function Seg<T extends string>({
   );
 }
 
+/** The What pick's last option: opens the add-a-food form, never a value. */
+const FOOD_ADD = "__add";
+
 const input =
   "w-full min-w-0 rounded-[10px] border border-line bg-paper px-2.5 py-2.5 outline-none focus:border-accent";
 
@@ -220,6 +228,8 @@ export default function LogForm({
   people,
   dogs,
   onAddDog,
+  foods,
+  onAddFood,
   phonePerson,
   events,
   photoUrls,
@@ -269,7 +279,7 @@ export default function LogForm({
   // The Treats button opens Food on a treat (TEC-186); the meal/treat choice stays in the form.
   const firstFoodType: FoodType = f?.type ?? (quickFood?.type === "treat" ? "treat" : "meal");
   const [foodType, setFoodType] = useState<FoodType>(firstFoodType);
-  const [itemId, setItemId] = useState(f?.item_id ?? quickFood?.itemId ?? defaultFood(firstFoodType, remembered));
+  const [itemId, setItemId] = useState(f?.item_id ?? quickFood?.itemId ?? defaultFood(firstFoodType, remembered, foods));
   // An amount from the ⅛ scroller (TEC-136). The amount it opened on stays on
   // the list even when it is not an eighth (an older 1/3), so an untouched
   // correction keeps it.
@@ -277,6 +287,13 @@ export default function LogForm({
     f ? f.amount : quickFood?.itemId ? quickFood.amount : defaultAmount(firstFoodType, remembered)
   );
   const [openedAmount] = useState(amount);
+  // "Add a food…" (TEC-191): the inline form under What. It never becomes the pick; the new food does.
+  const [addingFood, setAddingFood] = useState(false);
+  const [foodName, setFoodName] = useState("");
+  const [foodUnit, setFoodUnit] = useState<FoodUnit>(firstFoodType === "treat" ? "piece" : "cup");
+  const [foodKcal, setFoodKcal] = useState("");
+  const [foodError, setFoodError] = useState<string | null>(null);
+  const [foodBusy, setFoodBusy] = useState(false);
 
   // Exercise: Fun is a walk or playtime; Training is always training (TEC-136).
   const x = event?.kind === "exercise" ? asExercise(event) : null;
@@ -287,7 +304,7 @@ export default function LogForm({
   const [treatQueue, setTreatQueue] = useState<QueuedTreat[]>([]);
   const [treatOpen, setTreatOpen] = useState(false);
   const [treatError, setTreatError] = useState<string | null>(null);
-  const [treatItem, setTreatItem] = useState(defaultFood("treat", remembered));
+  const [treatItem, setTreatItem] = useState(defaultFood("treat", remembered, foods));
   const [treatAmount, setTreatAmount] = useState<number | null>(defaultAmount("treat", remembered));
   // One pick (TEC-129): None, a dog, or Multiple; picking is the answer to
   // "with other dogs", there is no Yes/No. An entry with `with_dogs` and no
@@ -358,12 +375,15 @@ export default function LogForm({
 
   function pickFoodType(t: FoodType) {
     setFoodType(t);
-    setItemId(defaultFood(t, remembered));
+    setItemId(defaultFood(t, remembered, foods));
+    setAddingFood(false);
+    setFoodError(null);
+    setFoodUnit(t === "treat" ? "piece" : "cup");
     setAmount(defaultAmount(t, remembered));
   }
 
   function openTreat() {
-    setTreatItem(defaultFood("treat", remembered));
+    setTreatItem(defaultFood("treat", remembered, foods));
     setTreatAmount(defaultAmount("treat", remembered));
     setTreatError(null);
     setTreatOpen(true);
@@ -389,7 +409,7 @@ export default function LogForm({
 
   /** "Freeze-dried beef hearts · 2 pieces", as the feed will read it. */
   const treatLabel = (t: QueuedTreat) => {
-    const item = findFood("treat", t.item_id);
+    const item = findFood("treat", t.item_id, foods);
     const details = { type: "treat", item_id: t.item_id, item_name: item?.name ?? "Treat", unit: item?.unit ?? null, amount: t.amount };
     return describe({ kind: "food", details }).detail;
   };
@@ -426,9 +446,34 @@ export default function LogForm({
     setDogName("");
   }
 
-  const item = findFood(foodType, itemId);
+  /** Add a food: checked here as the server will, saved, then picked. It is logged only when the form is saved. */
+  async function addFood(e: { preventDefault(): void }) {
+    e.preventDefault();
+    setFoodError(null);
+    const kcal = foodKcal.trim().replace(",", ".");
+    let checked;
+    try {
+      checked = parseNewFood({ type: foodType, name: foodName, unit: foodUnit, kcalPer: kcal === "" ? null : Number(kcal) }, foods);
+    } catch (err) {
+      setFoodError(err instanceof InvalidEvent ? err.message : "check the food");
+      return;
+    }
+    setFoodBusy(true);
+    const { food, error } = await onAddFood(checked);
+    setFoodBusy(false);
+    if (!food) {
+      setFoodError(error ?? "couldn't add");
+      return;
+    }
+    setItemId(food.id);
+    setAddingFood(false);
+    setFoodName("");
+    setFoodKcal("");
+  }
+
+  const item = findFood(foodType, itemId, foods);
   const amountUnit = item?.unit ? unitLabel(item.unit, amount ?? 2) : null;
-  const treatFood = findFood("treat", treatItem);
+  const treatFood = findFood("treat", treatItem, foods);
 
   function rawDetails(): Record<string, unknown> {
     switch (kind) {
@@ -492,7 +537,7 @@ export default function LogForm({
     let details: Details;
     try {
       // The same check the server makes, so a mistake is caught before the sheet closes.
-      details = parseDetails(kind, rawDetails());
+      details = parseDetails(kind, rawDetails(), foods);
     } catch (err) {
       setError(err instanceof InvalidEvent ? err.message : "check the form");
       return;
@@ -522,7 +567,7 @@ export default function LogForm({
     // saved after the session itself (TEC-136).
     let then: LogBody[] = [];
     try {
-      then = treatQueue.map((t) => treatEntry(t, at, body.person_id));
+      then = treatQueue.map((t) => treatEntry(t, at, body.person_id, foods));
       // A vet visit's Weight, saved after the visit (TEC-151); a Medical issue has none.
       if (kind === "health" && healthType === "vet") {
         then = visitWeightPlan({
@@ -659,13 +704,25 @@ export default function LogForm({
           </Field>
           <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start gap-2">
             <Field label="What" htmlFor="f-item">
-              <select id="f-item" value={itemId} onChange={(e) => setItemId(e.target.value)} className={input}>
+              <select
+                id="f-item"
+                value={itemId}
+                onChange={(e) => {
+                  // Add a food… never becomes the value: it opens the form and the pick stays put.
+                  if (e.target.value === FOOD_ADD) {
+                    setAddingFood(true);
+                    setFoodError(null);
+                  } else setItemId(e.target.value);
+                }}
+                className={input}
+              >
                 {/* A retired item stays selectable on the entry that already has it. */}
-                {(item && !picklist(foodType).includes(item) ? [item, ...picklist(foodType)] : picklist(foodType)).map((o) => (
+                {(item && !picklist(foodType, foods).includes(item) ? [item, ...picklist(foodType, foods)] : picklist(foodType, foods)).map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.name}
                   </option>
                 ))}
+                <option value={FOOD_ADD}>Add a food…</option>
               </select>
             </Field>
             <Field label={amountUnit ? `Amount (${amountUnit})` : "Amount"} htmlFor="f-amount">
@@ -687,6 +744,73 @@ export default function LogForm({
               )}
             </Field>
           </div>
+          {addingFood && (
+            /* Not a nested <form> (HTML has none): Enter in the name box adds the food rather than saving the entry. */
+            <div className="grid gap-2 rounded-xl border border-line bg-surface p-2.5">
+              <span className="text-xs uppercase tracking-[0.06em] text-ink-soft">
+                Add a {foodType === "treat" ? "treat" : "meal"} food
+              </span>
+              <Field label="Name" htmlFor="f-food-name">
+                <input
+                  id="f-food-name"
+                  autoFocus
+                  value={foodName}
+                  onChange={(e) => setFoodName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void addFood(e);
+                  }}
+                  maxLength={60}
+                  placeholder="Food name"
+                  className={input}
+                />
+              </Field>
+              <div className="grid grid-cols-2 items-start gap-2">
+                <Field label="Unit" htmlFor="f-food-unit">
+                  <select id="f-food-unit" value={foodUnit} onChange={(e) => setFoodUnit(e.target.value as FoodUnit)} className={input}>
+                    {FOOD_UNITS.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Calories per unit (optional)" htmlFor="f-food-kcal">
+                  <input
+                    id="f-food-kcal"
+                    inputMode="decimal"
+                    value={foodKcal}
+                    onChange={(e) => setFoodKcal(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void addFood(e);
+                    }}
+                    placeholder="Off the label"
+                    className={input}
+                  />
+                </Field>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => void addFood(e)}
+                  disabled={foodBusy}
+                  className="rounded-[10px] bg-accent px-3 py-2.5 font-medium text-accent-ink disabled:opacity-60"
+                >
+                  {foodBusy ? "Adding…" : "Add"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddingFood(false);
+                    setFoodError(null);
+                  }}
+                  className="text-ink-soft"
+                >
+                  Cancel
+                </button>
+              </div>
+              {foodError && <p className="text-[13px] font-semibold text-danger">{foodError}</p>}
+            </div>
+          )}
           {item?.unit === null && <p className="-mt-2 text-[13px] text-ink-soft">Misc: say what it was in the note.</p>}
         </>
       )}
@@ -869,7 +993,7 @@ export default function LogForm({
               <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start gap-2">
                 <Field label="What" htmlFor="t-item">
                   <select id="t-item" value={treatItem} onChange={(e) => setTreatItem(e.target.value)} className={input}>
-                    {picklist("treat").map((o) => (
+                    {picklist("treat", foods).map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.name}
                       </option>

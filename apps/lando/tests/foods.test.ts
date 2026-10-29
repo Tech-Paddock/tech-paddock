@@ -3,8 +3,8 @@ import { FOODS, MISC_ID, formatAmount, parseAmount, picklist, treatQtyError } fr
 import { defaultAmount, defaultFood } from "@/lib/defaults";
 
 describe("the catalogue", () => {
-  it("is the owner's list: one meal and three treats, Misc last in each, nothing else", () => {
-    expect(picklist("meal").map((f) => f.id)).toEqual(["purina-pro-plan-toy-puppy-chicken-rice", MISC_ID]);
+  it("is the owner's list in code: two meals and three treats, Misc last in each, nothing else", () => {
+    expect(picklist("meal").map((f) => f.id)).toEqual(["purina-pro-plan-toy-puppy-chicken-rice", "royal-canin-dachshund-puppy", MISC_ID]);
     expect(picklist("treat").map((f) => f.id)).toEqual([
       "freeze-dried-beef-hearts",
       "woof-pupsicle-refill-pop-small",
