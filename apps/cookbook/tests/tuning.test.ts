@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   NO_FILTER,
   NO_PICKS,
   cuisinesIn,
   dietSatisfies,
   hasPicks,
-  isHighProtein,
   matchesFilter,
   readPicks,
   tagWithPicks,
@@ -16,11 +17,10 @@ import type { Macros } from "@/lib/macros";
 
 /**
  * The tuning section (2026-09-26): pickers that steer a draft and
- * come back tagged on it, and the same options as filters on the book, with
- * high protein computed from the numbers rather than stored.
+ * come back tagged on it, and the same options as filters on the book.
  */
 
-const pot: Macros = { kcal: 2400, protein_g: 180, carbs_g: 120, fat_g: 100 }; // 30% protein
+const pot: Macros = { kcal: 2400, protein_g: 180, carbs_g: 120, fat_g: 100 };
 
 function recipe(over: Partial<RecipeMeta & Macros> = {}): RecipeMeta & Macros {
   return { ...EMPTY_META, ...pot, ...over };
@@ -135,26 +135,31 @@ describe("filters on the book", () => {
   });
 });
 
-describe("high protein is computed from the numbers, never a tag", () => {
-  it("is at least 30% of the calories from protein", () => {
-    expect(isHighProtein(pot)).toBe(true);
-    expect(isHighProtein({ ...pot, protein_g: 170 })).toBe(false);
+describe("the time filter uses prep plus cook (TEC-189)", () => {
+  const f = { ...NO_FILTER, max_minutes: 45 };
+  it("sums prep and cook", () => {
+    expect(matchesFilter(recipe({ prep_minutes: 15, cook_minutes: 30 }), f)).toBe(true);
+    expect(matchesFilter(recipe({ prep_minutes: 15, cook_minutes: 31 }), f)).toBe(false);
   });
-
-  it("does not change with the servings count — a share, not grams a serving", () => {
-    const perBowl = { kcal: pot.kcal / 8, protein_g: pot.protein_g / 8, carbs_g: 0, fat_g: 0 };
-    expect(isHighProtein(perBowl)).toBe(isHighProtein(pot));
+  it("counts whichever is set, and prefers them to the old total", () => {
+    expect(matchesFilter(recipe({ prep_minutes: 10 }), f)).toBe(true);
+    expect(matchesFilter(recipe({ cook_minutes: 60, total_minutes: 20 }), f)).toBe(false);
   });
-
-  it("follows a re-price, because nothing about it is stored", () => {
-    const before = recipe();
-    const after = recipe({ protein_g: 60 });
-    const f = { ...NO_FILTER, high_protein: true };
-    expect(matchesFilter(before, f)).toBe(true);
-    expect(matchesFilter(after, f)).toBe(false);
+  it("falls back to the old total when neither is set, and never matches when nothing is", () => {
+    expect(matchesFilter(recipe({ total_minutes: 40 }), f)).toBe(true);
+    expect(matchesFilter(recipe({ total_minutes: 50 }), f)).toBe(false);
+    expect(matchesFilter(recipe(), f)).toBe(false);
   });
+  it("the Ask Claude note reckons the same sum", () => {
+    const picks = { ...NO_PICKS, max_minutes: 30 };
+    expect(tagWithPicks({ ...EMPTY_META, prep_minutes: 10, cook_minutes: 15 }, picks).notes).toEqual([]);
+    expect(tagWithPicks({ ...EMPTY_META, prep_minutes: 20, cook_minutes: 30 }, picks).notes[0]).toContain("50 min");
+  });
+});
 
-  it("a zero-calorie row is not high anything", () => {
-    expect(isHighProtein({ kcal: 0, protein_g: 10, carbs_g: 0, fat_g: 0 })).toBe(false);
+describe("the book has no High protein filter (TEC-189)", () => {
+  it("its filter is the four picks and nothing more", () => {
+    expect(Object.keys(NO_FILTER).sort()).toEqual(["cuisine", "diet", "max_minutes", "meal"]);
+    expect(readFileSync(resolve(__dirname, "../app/Tuning.tsx"), "utf8")).not.toMatch(/High protein/i);
   });
 });

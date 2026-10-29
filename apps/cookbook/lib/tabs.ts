@@ -6,23 +6,22 @@
  * `https://cookbook.techpaddock.io/list` while the grocery list moves here
  * (TEC-15), so renaming it breaks a redirect in an app this one cannot see.
  *
- * **Add is a tab of its own** (2026-10-05, replacing the two-tab index
- * of 2026-09-24). **Your brands is the fourth** (TEC-131, 2026-10-22), after
- * the list, at `/brands`. **Deals is the fifth** (TEC-132, 2026-10-24), after
- * Your brands, at `/deals`. Still one verb each: browse, add, shop, remember,
- * save.
+ * **Add is a tab of its own** (2026-10-05). **Your brands** (TEC-131) lives at
+ * `/brands`, **Deals** (TEC-132) at `/deals`. **The order is Recipes · Grocery
+ * list · Deals · Add · Your brands** (TEC-189, 2026-10-29), and the list tab is
+ * now called **Grocery list** (the owner's call; it was "King Soopers list").
+ * Its path stays `/list`. Still one verb each: browse, shop, save, add,
+ * remember.
  */
 
 export type Tab = "recipes" | "add" | "shop" | "brands" | "deals";
 
 export const TABS: { id: Tab; label: string; path: string }[] = [
   { id: "recipes", label: "Recipes", path: "/" },
-  { id: "add", label: "Add", path: "/add" },
-  // Named for where it actually goes. Every link on it is a King Soopers search,
-  // so "Shopping list" was one word vaguer than the thing deserves.
-  { id: "shop", label: "King Soopers list", path: "/list" },
-  { id: "brands", label: "Your brands", path: "/brands" },
+  { id: "shop", label: "Grocery list", path: "/list" },
   { id: "deals", label: "Deals", path: "/deals" },
+  { id: "add", label: "Add", path: "/add" },
+  { id: "brands", label: "Your brands", path: "/brands" },
 ];
 
 export function pathFor(tab: Tab): string {

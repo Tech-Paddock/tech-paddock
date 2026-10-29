@@ -1,4 +1,5 @@
-import { localToday, menuDayLabel, parseDay } from "./menuDay";
+import { timeParts } from "./metadata";
+import { round, type Macros } from "./macros";
 
 /**
  * What the book's recipe pill and the open recipe say (TEC-183). Pure, so the
@@ -28,46 +29,32 @@ export type RecipeTab = (typeof RECIPE_TABS)[number]["key"];
 export const FIRST_RECIPE_TAB: RecipeTab = RECIPE_TABS[0].key;
 
 /* ---------------------------------------------------------------------- */
-/* Add to list: the day chips                                              */
+/* The list line and the open recipe's facts (TEC-189)                      */
 /* ---------------------------------------------------------------------- */
 
-export type DayChip = { key: string; label: string; day: string };
-
-/** `day` moved by `by` calendar days. Built at local noon, so no zone edge moves it. */
-function shiftDay(day: string, by: number): string {
-  const [y, m, d] = day.split("-").map(Number);
-  return localToday(new Date(y, m - 1, d + by, 12));
-}
-
-function weekdayName(day: string): string {
-  const [y, m, d] = day.split("-").map(Number);
-  return new Date(y, m - 1, d, 12).toLocaleDateString("en-US", { weekday: "long" });
-}
-
 /**
- * Today, Tomorrow, then the next three days by name ("Thursday"). The three
- * follow tomorrow, so no name repeats Today or Tomorrow. "Pick a date…" is not
- * here: it opens the date input and is the card's own chip.
+ * The second line of a recipe on the list: rating, Prep, Cook, makes N, each
+ * part absent when unset ("5★ · Prep 15m · Cook 30m · makes 4"). The old total
+ * stands in for Prep and Cook only while neither is set. `stars` is split out so
+ * the rating can be drawn in the accent.
  */
-export function dayChips(today: string = localToday()): DayChip[] {
-  const base = parseDay(today) ?? localToday();
-  return [
-    { key: "today", label: "Today", day: base },
-    { key: "tomorrow", label: "Tomorrow", day: shiftDay(base, 1) },
-    ...[2, 3, 4].map((n) => {
-      const day = shiftDay(base, n);
-      return { key: day, label: weekdayName(day), day };
-    }),
-  ];
+export function factsLine(r: {
+  rating: number | null;
+  servings: number;
+  total_minutes: number | null;
+  prep_minutes: number | null;
+  cook_minutes: number | null;
+}): { stars: string | null; rest: string } {
+  return {
+    stars: ratingPill(r.rating),
+    rest: [...timeParts(r), `makes ${r.servings}`].join(" · "),
+  };
 }
 
-/** The card's one button, naming the day: "Add to Thursday's list". */
-export function addButtonLabel(day: string, today: string = localToday()): string {
-  const chip = dayChips(today).find((c) => c.day === day);
-  if (!chip) return `Add to the list for ${menuDayLabel(day)}`;
-  if (chip.key === "today") return "Add to today's list";
-  if (chip.key === "tomorrow") return "Add to tomorrow's list";
-  return `Add to ${chip.label}'s list`;
+/** The third line: one serving's numbers as text, "520 kcal · 38p · 42c · 18f". */
+export function macrosLine(m: Macros): string {
+  const r = round(m);
+  return `${r.kcal} kcal · ${r.protein_g}p · ${r.carbs_g}c · ${r.fat_g}f`;
 }
 
 /* ---------------------------------------------------------------------- */

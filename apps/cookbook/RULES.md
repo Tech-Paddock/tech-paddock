@@ -21,8 +21,8 @@ section and closing comment before changing anything in this file.
 - Works on a phone, but is not designed around one-handed use.
 - No home-screen install unless the owner grants one; the shape does not change.
 - `/admin` and `/debug` never appear in navigation and do not count as screens.
-- The tabs Recipes · Add · King Soopers list · Your brands · Deals are the verb index: browse,
-  add, shop, remember, save. Installable is a shortcut, granted by the
+- The tabs Recipes · Grocery list · Deals · Add · Your brands are the verb index: browse,
+  shop, save, add, remember. Installable is a shortcut, granted by the
   owner; becoming an app is TEC-109.
 
 ## Recipes

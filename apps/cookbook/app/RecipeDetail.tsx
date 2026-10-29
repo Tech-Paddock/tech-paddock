@@ -4,23 +4,16 @@ import { useState } from "react";
 import MacroTab from "./MacroTab";
 import { Stars } from "./Meta";
 import { methodSteps, type Recipe, type RecipeOrigin } from "@/lib/recipes";
-import { formatMinutes } from "@/lib/metadata";
+import { timeParts } from "@/lib/metadata";
 import { localToday, parseDay } from "@/lib/menuDay";
-import {
-  RECIPE_TABS,
-  addButtonLabel,
-  dayChips,
-  ratingWords,
-  splitIngredient,
-  type RecipeTab,
-} from "@/lib/recipeView";
+import { RECIPE_TABS, ratingWords, splitIngredient, type RecipeTab } from "@/lib/recipeView";
 
 /**
  * The open recipe (TEC-183, the owner's canvas): name, origin · makes · time,
  * the rating up top, then Ingredients · Method · Macros as tabs. The keywords
  * (meal, main, cuisine, equipment, diet, tags) are stored and editable in Edit
  * and no longer shown here. Local patterns: the segmented tabs, the numbered
- * circles, the day chips.
+ * circles. Add to list is a date box (TEC-189).
  */
 
 export const ORIGIN_LABELS: Record<RecipeOrigin, string> = {
@@ -43,14 +36,13 @@ export function RecipeOpen({
   /** True while a rating is being saved. */
   rating: boolean;
 }) {
-  const minutes = formatMinutes(recipe.total_minutes);
   const steps = methodSteps(recipe.method);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
         <h3 className="text-lg font-bold">{recipe.name}</h3>
         <p className="text-xs text-ink-soft">
-          {[ORIGIN_LABELS[recipe.origin], `makes ${recipe.servings}`, minutes].filter(Boolean).join(" · ")}
+          {[ORIGIN_LABELS[recipe.origin], ...timeParts(recipe), `makes ${recipe.servings}`].join(" · ")}
         </p>
         <div className="flex items-center gap-2">
           <Stars rating={recipe.rating} onRate={onRate} busy={rating} size="text-2xl" />
@@ -136,10 +128,12 @@ export function RecipeOpen({
   );
 }
 
+
 /**
- * **Add to list** (TEC-183): when you are cooking it, as day chips, one primary
- * button naming the day, then Edit and Remove as quiet text. Remove keeps its
- * confirm. The day picked is the day it sits on the menu; a cleared date input
+ * **Add to list** (TEC-183; the day became one date box in TEC-189): "When are
+ * you cooking it?" is a single date input that opens on today, with Add to list
+ * beside it; the day picked is the day it sits on the menu. Edit and Remove sit
+ * under it as outlined buttons, and Remove keeps its confirm. A cleared date
  * disables the button instead of quietly meaning "today".
  */
 export function AddToListCard({
@@ -160,69 +154,38 @@ export function AddToListCard({
   /** Injected by the tests; the browser's own today otherwise. */
   today?: string;
 }) {
-  const chips = dayChips(today);
   const [day, setDay] = useState(today);
-  const [picking, setPicking] = useState(false);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const picked = parseDay(day);
-  const onChip = !picking && chips.some((c) => c.day === day);
+  const outline = "min-h-11 rounded-xl border border-line px-4 text-base";
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl bg-raised p-3.5">
-      <h4 className="text-sm font-bold">When are you cooking it?</h4>
-      <div className="flex flex-wrap gap-2">
-        {chips.map((c) => {
-          const on = onChip && c.day === day;
-          return (
-            <button
-              key={c.key}
-              type="button"
-              aria-pressed={on}
-              onClick={() => {
-                setPicking(false);
-                setDay(c.day);
-              }}
-              className={`min-h-9 rounded-full px-3.5 text-sm font-medium ${
-                on ? "bg-accent text-accent-ink" : "border border-line bg-surface"
-              }`}
-            >
-              {c.label}
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          aria-pressed={!onChip}
-          onClick={() => setPicking(true)}
-          className={`min-h-9 rounded-full px-3.5 text-sm font-medium ${
-            !onChip ? "bg-accent text-accent-ink" : "border border-line bg-surface"
-          }`}
-        >
-          Pick a date…
-        </button>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2.5 rounded-xl bg-raised p-3">
+        <h4 className="text-sm font-bold">When are you cooking it?</h4>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={day}
+            onChange={(e) => setDay(e.target.value)}
+            aria-label={`Day to cook ${name}`}
+            className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-base"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (picked) onList(picked);
+            }}
+            disabled={!hasIngredients || listing || !picked}
+            className="min-h-11 shrink-0 rounded-xl bg-accent px-4 text-base font-semibold text-accent-ink disabled:opacity-50"
+          >
+            {listing ? "Adding…" : "Add to list"}
+          </button>
+        </div>
       </div>
-      {!onChip ? (
-        <input
-          type="date"
-          value={day}
-          onChange={(e) => setDay(e.target.value)}
-          aria-label={`Day to cook ${name}`}
-          className="min-h-11 rounded-lg border border-line bg-surface px-3 text-base"
-        />
-      ) : null}
-      <button
-        type="button"
-        onClick={() => {
-          if (picked) onList(picked);
-        }}
-        disabled={!hasIngredients || listing || !picked}
-        className="min-h-12 w-full rounded-xl bg-accent px-4 text-base font-semibold text-accent-ink disabled:opacity-50"
-      >
-        {listing ? "Adding…" : picked ? addButtonLabel(picked, today) : "Pick a date"}
-      </button>
-      <div className="flex items-center justify-center gap-5 text-sm">
-        <button type="button" onClick={onEdit} className="min-h-9 text-ink-soft underline-offset-2 hover:underline">
-          Edit recipe
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={onEdit} className={outline}>
+          Edit
         </button>
         {confirmingRemove ? (
           <>
@@ -232,21 +195,17 @@ export function AddToListCard({
                 setConfirmingRemove(false);
                 onRemove();
               }}
-              className="min-h-9 font-semibold text-danger"
+              className={`${outline} font-semibold text-danger`}
             >
               Remove — sure?
             </button>
-            <button type="button" onClick={() => setConfirmingRemove(false)} className="min-h-9 text-ink-soft">
+            <button type="button" onClick={() => setConfirmingRemove(false)} className={`${outline} text-ink-soft`}>
               Keep it
             </button>
           </>
         ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmingRemove(true)}
-            className="min-h-9 text-ink-soft underline-offset-2 hover:underline"
-          >
-            Remove from book
+          <button type="button" onClick={() => setConfirmingRemove(true)} className={`${outline} text-danger`}>
+            Remove
           </button>
         )}
       </div>
