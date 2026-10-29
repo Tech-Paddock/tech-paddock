@@ -1,7 +1,9 @@
 /**
- * The food catalogue, fixed in code. The owner, 2026-10-20: "add them as the
- * defaults + Misc no other options". There is no "add another"; a new food is
- * a code change.
+ * The food catalogue: the foods in code below, plus the foods added in the app
+ * (`lando.foods`, TEC-191). The owner, 2026-10-20, fixed the list in code ("add
+ * them as the defaults + Misc no other options"); on 2026-10-29 he asked for
+ * "Add a food…" on the Food form, so the picklist is the two together, Misc
+ * last. An added food is passed in as `added` wherever a list is read.
  *
  * Calories are recorded with every food event and never shown ("track but not
  * yet surface"). Each event snapshots the item's id, name, kcal-per and unit at
@@ -29,6 +31,13 @@ export type Food = {
 
 export const MISC_ID = "misc";
 
+/** What an added food can count in (TEC-191), in the order the form offers them. */
+export const FOOD_UNITS = ["cup", "scoop", "piece", "treat", "pop", "gram"] as const;
+export type FoodUnit = (typeof FOOD_UNITS)[number];
+
+/** A food added in the app, as `lando.foods` holds it. Its `id` is history's key: never deleted, never changed. */
+export type AddedFood = Food & { type: FoodType };
+
 export const FOODS: Record<FoodType, Food[]> = {
   meal: [
     {
@@ -36,6 +45,14 @@ export const FOODS: Record<FoodType, Food[]> = {
       name: "Purina Pro Plan High Protein Toy Breed Puppy, Chicken & Rice",
       // 447 kcal/cup (4003 kcal/kg): manufacturer figures as listed by PetSmart.
       kcalPer: 447,
+      unit: "cup",
+    },
+    {
+      id: "royal-canin-dachshund-puppy",
+      name: "Royal Canin Dachshund Puppy",
+      // 369 kcal/cup (3,649 kcal/kg ME, as fed, calculated): Royal Canin's own figure for Breed Health
+      // Nutrition Dachshund Puppy dry (royalcanin.com/us product page; PetSmart lists the same).
+      kcalPer: 369,
       unit: "cup",
     },
     { id: MISC_ID, name: "Misc", kcalPer: null, unit: null },
@@ -66,15 +83,31 @@ export const FOODS: Record<FoodType, Food[]> = {
   ],
 };
 
-/** The picklist: every item not retired, Misc last. */
-export function picklist(type: FoodType): Food[] {
-  const live = FOODS[type].filter((f) => !f.retired);
+/** The code catalogue then the foods added in the app, for one list. */
+function every(type: FoodType, added: readonly AddedFood[]): Food[] {
+  return [...FOODS[type], ...added.filter((f) => f.type === type)];
+}
+
+/** The picklist: every item not retired, the code catalogue then added foods, Misc last. */
+export function picklist(type: FoodType, added: readonly AddedFood[] = []): Food[] {
+  const live = every(type, added).filter((f) => !f.retired);
   return [...live.filter((f) => f.id !== MISC_ID), ...live.filter((f) => f.id === MISC_ID)];
 }
 
 /** Any item, retired or not, so an old entry can still be corrected. */
-export function findFood(type: FoodType, id: string): Food | null {
-  return FOODS[type].find((f) => f.id === id) ?? null;
+export function findFood(type: FoodType, id: string, added: readonly AddedFood[] = []): Food | null {
+  return every(type, added).find((f) => f.id === id) ?? null;
+}
+
+/** A name as typed: outer spaces off, inner runs of spaces made one. */
+export function cleanFoodName(raw: string): string {
+  return raw.trim().replace(/\s+/g, " ");
+}
+
+/** Whether a name is already in a list (code or added, retired too), ignoring case and outer spaces. */
+export function foodNameTaken(type: FoodType, name: string, added: readonly AddedFood[] = []): boolean {
+  const n = cleanFoodName(name).toLowerCase();
+  return every(type, added).some((f) => f.name.trim().toLowerCase() === n);
 }
 
 /** "1/3 cup", "1 cup", "2 cups": plural above one. Units here are all regular. */

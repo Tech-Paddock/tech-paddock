@@ -5,6 +5,7 @@ import {
   checkVoid,
   correctionAt,
   parseNewEvent,
+  parseNewFood,
   type Dog,
   type ExerciseDetails,
   checkHealthReasons,
@@ -14,6 +15,7 @@ import {
   type JournalEvent,
 } from "./events";
 import { missingPhotos } from "./storage";
+import type { AddedFood } from "./foods";
 
 /**
  * The database half. Every failure throws: a failed read must never render as
@@ -67,7 +69,9 @@ async function findEvent(db: SupabaseClient, id: string): Promise<JournalEvent |
  * second time.
  */
 export async function writeEvent(db: SupabaseClient, body: unknown, now = new Date()): Promise<JournalEvent> {
-  const next = parseNewEvent(body, now);
+  // A food entry may name a food added in the app (TEC-191), which only the database knows.
+  const isFood = !!body && typeof body === "object" && (body as { kind?: unknown }).kind === "food";
+  const next = parseNewEvent(body, now, isFood ? await listFoods(db) : []);
 
   const existing = await findEvent(db, next.id);
   if (existing) return existing;
@@ -202,4 +206,45 @@ export async function addDog(db: SupabaseClient, raw: unknown): Promise<Dog> {
     if (after) return after;
   }
   throw new Error(`couldn't add dog: ${error.message}`);
+}
+
+type FoodRow = { id: string; type: AddedFood["type"]; name: string; unit: string; kcal_per: number | string | null; retired: boolean };
+
+/**
+ * Foods added in the app (TEC-191), retired ones too, so an old entry can still be corrected
+ * (`findFood`). The code catalogue is in `lib/foods.ts`. An empty table is an empty list; a failed
+ * read throws.
+ */
+export async function listFoods(db: SupabaseClient): Promise<AddedFood[]> {
+  const { data, error } = await db
+    .from("foods")
+    .select("id, type, name, unit, kcal_per, retired")
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
+  if (error) throw new Error(`couldn't read foods: ${error.message}`);
+  return (data as FoodRow[]).map((r) => ({
+    id: r.id,
+    type: r.type,
+    name: r.name,
+    unit: r.unit,
+    kcalPer: r.kcal_per === null ? null : Number(r.kcal_per),
+    ...(r.retired ? { retired: true } : {}),
+  }));
+}
+
+/**
+ * Add a food to a list (the Food form's "Add a food…"). A name already in that list, in any case,
+ * is refused, never duplicated (the table's unique index backs the race). The id is the database's
+ * and is never changed or deleted.
+ */
+export async function addFood(db: SupabaseClient, raw: unknown): Promise<AddedFood> {
+  const f = parseNewFood(raw, await listFoods(db));
+  const { data, error } = await db
+    .from("foods")
+    .insert({ type: f.type, name: f.name, unit: f.unit, kcal_per: f.kcalPer })
+    .select("id")
+    .single();
+  if (!error) return { id: (data as { id: string }).id, type: f.type, name: f.name, unit: f.unit, kcalPer: f.kcalPer };
+  if (error.code === "23505") throw new InvalidEvent(`${f.name} is already in the list`);
+  throw new Error(`couldn't add food: ${error.message}`);
 }

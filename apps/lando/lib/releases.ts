@@ -25,6 +25,7 @@ export const DAYS_SHOWN = 7;
  * once written, is not rewritten.
  */
 export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
+  "2026-10-29": "Royal Canin Dachshund Puppy joins the meal list, and you can add your own foods.",
   "2026-10-28": "The top boxes are now the way in, logging a potty got quicker, and the Log buttons are tidier.",
   "2026-10-27": "Quick entries from the top boxes, colour in the feed, and time outside.",
   "2026-10-26": "Analytics rebuilt, Fun and Training split out, and plenty of small improvements.",
@@ -33,6 +34,7 @@ export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
 };
 
 export const RELEASES: readonly Release[] = [
+  { date: "2026-10-29", text: "Royal Canin Dachshund Puppy is now on the meal list. On the Food form, pick Add a food at the bottom of the list to add a new meal or treat with its name and unit, and the calories if you know them. It is picked for you, and nothing is logged until you save." },
   { date: "2026-10-28", text: "The Log buttons now sit in one row right under the top boxes, and Logging as moves down above the feed. A treat's amount is a plain number, the What box is back to a normal size, time outside fits on one row, and on the iPhone app the top of the page sits a little lower so nothing slides behind the clock." },
   { date: "2026-10-28", text: "The box at the top that said Exercise is now Fun. It counts walks and playtime only, and tapping it opens a new Fun entry." },
   { date: "2026-10-28", text: "The Log buttons are now Treats, Training, Weight and Health. Treats opens the food form on a treat, and Potty and Fun are reached from the top boxes." },

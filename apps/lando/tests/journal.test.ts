@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { getServiceClient } from "@/lib/supabase";
 type SupabaseClient = ReturnType<typeof getServiceClient>;
-import { Conflict, addDog, addPerson, listDogs, readJournal, writeEvent } from "@/lib/journal";
+import { Conflict, addDog, addFood, addPerson, listDogs, listFoods, readJournal, writeEvent } from "@/lib/journal";
 import { InvalidEvent } from "@/lib/events";
 
 /**
@@ -13,7 +13,7 @@ type Row = Record<string, any>;
 type Err = { code?: string; message: string } | null;
 
 function fakeDb(opts: { failRead?: boolean; insertError?: Err } = {}) {
-  const tables: Record<string, Row[]> = { events: [], people: [], dogs: [] };
+  const tables: Record<string, Row[]> = { events: [], people: [], dogs: [], foods: [] };
   const inserts: Row[] = [];
 
   function builder(table: string) {
@@ -229,5 +229,65 @@ describe("addDog", () => {
 
   it("throws on a failed read rather than adding blind", async () => {
     await expect(addDog(fakeDb({ failRead: true }).db, "Test Pup")).rejects.toThrow(/dogs/);
+  });
+});
+
+describe("addFood and listFoods (TEC-191)", () => {
+  // Invented names (RULES.md, Never 2).
+  const NEW = { type: "treat", name: "  Test   Chew ", unit: "piece", kcalPer: 12.5 };
+
+  it("adds a food by its tidied name and returns it", async () => {
+    const { db, inserts, tables } = fakeDb();
+    const f = await addFood(db, NEW);
+    expect(inserts).toEqual([{ type: "treat", name: "Test Chew", unit: "piece", kcal_per: 12.5 }]);
+    expect(f).toMatchObject({ type: "treat", name: "Test Chew", unit: "piece", kcalPer: 12.5 });
+    expect(typeof f.id).toBe("string");
+    expect(tables.foods).toHaveLength(1);
+  });
+
+  it("keeps calories null when none were given", async () => {
+    const { db, inserts } = fakeDb();
+    const f = await addFood(db, { type: "meal", name: "Test Kibble", unit: "cup" });
+    expect(inserts[0].kcal_per).toBeNull();
+    expect(f.kcalPer).toBeNull();
+  });
+
+  it("refuses a duplicate name in the same list, in any case, never a second row", async () => {
+    const { db, tables } = fakeDb();
+    tables.foods.push({ id: "a-1", type: "treat", name: "Test Chew", unit: "piece", kcal_per: null, retired: false });
+    await expect(addFood(db, { ...NEW, name: "test chew" })).rejects.toThrow(/already in the list/);
+    expect(tables.foods).toHaveLength(1);
+    // The same name on the other list is a different food.
+    await expect(addFood(db, { ...NEW, type: "meal", unit: "cup" })).resolves.toMatchObject({ type: "meal" });
+  });
+
+  it("refuses a name the code catalogue already has", async () => {
+    await expect(addFood(fakeDb().db, { type: "meal", name: "royal canin dachshund puppy", unit: "cup" })).rejects.toBeInstanceOf(InvalidEvent);
+  });
+
+  it("turns the database's unique-index refusal (two phones at once) into the same answer", async () => {
+    const { db } = fakeDb({ insertError: { code: "23505", message: "duplicate key" } });
+    await expect(addFood(db, NEW)).rejects.toThrow(/already in the list/);
+  });
+
+  it("lists rows with kcal as a number and retired marked, and fails rather than reading short", async () => {
+    const { db, tables } = fakeDb();
+    tables.foods.push(
+      { id: "a-1", type: "treat", name: "Test Chew", unit: "piece", kcal_per: "12.500", retired: false },
+      { id: "b-2", type: "meal", name: "Test Kibble", unit: "cup", kcal_per: null, retired: true }
+    );
+    expect(await listFoods(db)).toEqual([
+      { id: "a-1", type: "treat", name: "Test Chew", unit: "piece", kcalPer: 12.5 },
+      { id: "b-2", type: "meal", name: "Test Kibble", unit: "cup", kcalPer: null, retired: true },
+    ]);
+    await expect(listFoods(fakeDb({ failRead: true }).db)).rejects.toThrow(/foods/);
+  });
+
+  it("logs an entry naming an added food with its snapshot, and refuses one it cannot find", async () => {
+    const { db, tables } = fakeDb();
+    tables.foods.push({ id: "a-1", type: "treat", name: "Test Chew", unit: "piece", kcal_per: 12.5, retired: false });
+    const row = await writeEvent(db, { id: ID, kind: "food", details: { type: "treat", item_id: "a-1", amount: 2 } });
+    expect(row.details).toEqual({ type: "treat", item_id: "a-1", item_name: "Test Chew", kcal_per: 12.5, unit: "piece", amount: 2 });
+    await expect(writeEvent(db, { id: ID2, kind: "food", details: { type: "treat", item_id: "gone", amount: 1 } })).rejects.toThrow(/not in the list/);
   });
 });
