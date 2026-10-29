@@ -129,9 +129,10 @@ describe("migration lando_box_leash_spot", () => {
   const fnOf = (sql: string) => sql.slice(sql.indexOf("create or replace function lando.details_ok(kind"), sql.indexOf("$fn$;"));
   const block = (fn: string, from: string, to: string) => fn.slice(fn.indexOf(from), fn.indexOf(to));
 
-  it("sorts after every other migration, so it is the newest body", () => {
+  it("is the newest migration defining lando.details_ok, so it is the newest body", () => {
     expect(file).toBeDefined();
-    expect(files.at(-1)).toBe(file);
+    const defining = files.filter((f) => read(f).includes("create or replace function lando.details_ok(kind"));
+    expect(defining.at(-1)).toBe(file);
   });
   it("widens leash and spot with box and keeps every old value", () => {
     const potty = block(fnOf(read(file)), "WHEN 'potty' THEN", "WHEN 'food' THEN");
