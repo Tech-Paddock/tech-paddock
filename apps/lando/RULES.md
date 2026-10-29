@@ -33,8 +33,8 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 - Every change a user would notice adds one plain-language entry to the release notes
   (`lib/releases.ts`, newest first, append-only) on the same branch: no issue numbers, file names,
   jargon or real names (TEC-182).
-- Every stored id or list value is history's key: the food catalogue (fixed in code), health reason
-  ids, `lando.dogs` ids, `COMMANDS`, and the potty what, leash and spot lists. Retire one (a food
+- Every stored id or list value is history's key: the food catalogue (the code list plus foods
+  added in the app, `lando.foods`, TEC-191), health reason ids, `lando.dogs` ids, `COMMANDS`, and the potty what, leash and spot lists. Retire one (a food
   item: `retired: true`); never delete or re-id it, because old entries hold it. `lando.details_ok`
   only ever widens: `create or replace` re-checks no rows.
 - Photos (on Health, Potty, Fun and Training entries) live in the private `lando-photos` bucket, shown through
