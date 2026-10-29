@@ -30,7 +30,16 @@ export const DIETS = ["vegetarian", "vegan", "pescatarian"] as const;
 export type Diet = (typeof DIETS)[number];
 
 export type RecipeMeta = {
+  /**
+   * The old single time, start to plate (TEC-52). Kept, not dropped: it is shown
+   * and filtered on only while neither `prep_minutes` nor `cook_minutes` is set
+   * (`timeMinutes`). The ways in no longer ask a model for it.
+   */
   total_minutes: number | null;
+  /** Hands-on time before it cooks (TEC-189). */
+  prep_minutes: number | null;
+  /** Time on the heat or in the oven, resting included (TEC-189). */
+  cook_minutes: number | null;
   meal: Meal | null;
   mains: string[];
   cuisine: string | null;
@@ -43,6 +52,8 @@ export type RecipeMeta = {
 
 export const EMPTY_META: RecipeMeta = {
   total_minutes: null,
+  prep_minutes: null,
+  cook_minutes: null,
   meal: null,
   mains: [],
   cuisine: null,
@@ -145,6 +156,8 @@ export function readMeta(raw: unknown, opts: { rating: boolean }): RecipeMeta {
 
   return {
     total_minutes: readMinutes(o.total_minutes),
+    prep_minutes: readMinutes(o.prep_minutes),
+    cook_minutes: readMinutes(o.cook_minutes),
     meal: meal && (MEALS as readonly string[]).includes(meal) ? (meal as Meal) : null,
     mains: readList(o.mains),
     cuisine: cuisine && !refusedWord(cuisine) ? cuisine : null,
@@ -165,12 +178,49 @@ export function formatMinutes(minutes: number | null): string | null {
 }
 
 /**
+ * **The time a recipe takes, for the "Under N minutes" filter and the notes**
+ * (TEC-189): prep plus cook, counting whichever is set, else the old total.
+ * Null when nothing is set, which no time filter matches.
+ */
+export function timeMinutes(
+  m: Pick<RecipeMeta, "total_minutes" | "prep_minutes" | "cook_minutes">,
+): number | null {
+  if (m.prep_minutes !== null || m.cook_minutes !== null) return (m.prep_minutes ?? 0) + (m.cook_minutes ?? 0);
+  return m.total_minutes;
+}
+
+/** "15m", "1h", "1h 30m". The list's "Prep 15m · Cook 30m". */
+export function shortMinutes(minutes: number | null): string | null {
+  if (!minutes || minutes < 1) return null;
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+/**
+ * The time words on the list line and the open recipe: "Prep 15m", "Cook 30m",
+ * or, only when neither is set, the old total ("35 min"). Empty when nothing is
+ * set.
+ */
+export function timeParts(
+  m: Pick<RecipeMeta, "total_minutes" | "prep_minutes" | "cook_minutes">,
+): string[] {
+  const prep = shortMinutes(m.prep_minutes);
+  const cook = shortMinutes(m.cook_minutes);
+  if (prep || cook) return [prep ? `Prep ${prep}` : null, cook ? `Cook ${cook}` : null].filter((x): x is string => Boolean(x));
+  const total = formatMinutes(m.total_minutes);
+  return total ? [total] : [];
+}
+
+/**
  * The fields a model is asked for, as JSON-schema properties. **No `rating`**:
  * a model is never asked for one. Enumerated vocabularies are described rather
  * than schema-enforced, because `readMeta` is the enforcement either way.
  */
 export const META_SCHEMA_PROPERTIES = {
-  total_minutes: { type: ["integer", "null"] },
+  prep_minutes: { type: ["integer", "null"] },
+  cook_minutes: { type: ["integer", "null"] },
   meal: { type: ["string", "null"] },
   mains: { type: "array", items: { type: "string" } },
   cuisine: { type: ["string", "null"] },
@@ -184,7 +234,8 @@ export const META_KEYS = Object.keys(META_SCHEMA_PROPERTIES);
 /** The same fields, said in a prompt. Shared so the three ways in ask for them identically. */
 export const META_PROMPT = `Also describe the dish, for deciding what to cook:
 
-- "total_minutes": start to plate, including oven and resting time; null if you cannot tell.
+- "prep_minutes": the hands-on time before it cooks — chopping, mixing, marinating you do at the board; null if you cannot tell.
+- "cook_minutes": the time it then spends cooking, oven and resting included; null if you cannot tell. (Prep and cook, not one total.)
 - "meal": one of ${MEALS.join(", ")}; null if none fits.
 - "mains": what the dish is built around, one or two words each — ["chicken"], ["lentils", "spinach"].
 - "cuisine": one or two words — "thai", "mexican"; null if it has none in particular.
@@ -198,5 +249,5 @@ export const META_PROMPT = `Also describe the dish, for deciding what to cook:
   Those are worked out from the numbers.`;
 
 export const META_JSON_HINT =
-  `"total_minutes": number or null, "meal": string or null, "mains": [string], ` +
+  `"prep_minutes": number or null, "cook_minutes": number or null, "meal": string or null, "mains": [string], ` +
   `"cuisine": string or null, "equipment": [string], "diet": [string], "tags": [string]`;

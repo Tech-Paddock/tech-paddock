@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addButtonLabel, dayChips, ratingPill, ratingWords, splitIngredient, RECIPE_TABS, FIRST_RECIPE_TAB } from "@/lib/recipeView";
+import { factsLine, macrosLine, ratingPill, ratingWords, splitIngredient, RECIPE_TABS, FIRST_RECIPE_TAB } from "@/lib/recipeView";
 
 /** TEC-183: what the pill, the tabs and the Add to list card say. */
 describe("the pill's rating", () => {
@@ -25,23 +25,26 @@ describe("the tabs", () => {
   });
 });
 
-describe("the day chips", () => {
-  // Wednesday 2026-10-28.
-  const chips = dayChips("2026-10-28");
-  it("are Today, Tomorrow, then the next three days by name", () => {
-    expect(chips.map((c) => c.label)).toEqual(["Today", "Tomorrow", "Friday", "Saturday", "Sunday"]);
-    expect(chips.map((c) => c.day)).toEqual(["2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"]);
+describe("the list line (TEC-189)", () => {
+  const base = { rating: 5, servings: 4, total_minutes: null, prep_minutes: 15, cook_minutes: 30 };
+  const text = (r: Parameters<typeof factsLine>[0]) => {
+    const f = factsLine(r);
+    return f.stars ? `${f.stars} · ${f.rest}` : f.rest;
+  };
+  it("reads rating · Prep · Cook · makes N", () => {
+    expect(text(base)).toBe("5★ · Prep 15m · Cook 30m · makes 4");
   });
-  it("cross a year end", () => {
-    expect(dayChips("2026-12-30").map((c) => c.day)).toEqual([
-      "2026-12-30", "2026-12-31", "2027-01-01", "2027-01-02", "2027-01-03",
-    ]);
+  it("drops each part that is unset", () => {
+    expect(text({ ...base, rating: null })).toBe("Prep 15m · Cook 30m · makes 4");
+    expect(text({ ...base, cook_minutes: null })).toBe("5★ · Prep 15m · makes 4");
+    expect(text({ ...base, prep_minutes: null, cook_minutes: null })).toBe("5★ · makes 4");
   });
-  it("name the picked day on the button", () => {
-    expect(addButtonLabel("2026-10-28", "2026-10-28")).toBe("Add to today's list");
-    expect(addButtonLabel("2026-10-29", "2026-10-28")).toBe("Add to tomorrow's list");
-    expect(addButtonLabel("2026-10-30", "2026-10-28")).toBe("Add to Friday's list");
-    expect(addButtonLabel("2026-11-12", "2026-10-28")).toBe("Add to the list for Thu 11/12");
+  it("shows the old total only when neither prep nor cook is set", () => {
+    expect(text({ ...base, prep_minutes: null, cook_minutes: null, total_minutes: 35 })).toBe("5★ · 35 min · makes 4");
+    expect(text({ ...base, total_minutes: 35 })).toBe("5★ · Prep 15m · Cook 30m · makes 4");
+  });
+  it("gives one serving's numbers as text", () => {
+    expect(macrosLine({ kcal: 519.6, protein_g: 38.2, carbs_g: 41.5, fat_g: 18 })).toBe("520 kcal · 38p · 42c · 18f");
   });
 });
 

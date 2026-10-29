@@ -295,7 +295,7 @@ export default function List({
       {/* The header: the count, the estimate, the store and Pickup/Delivery. */}
       <div className="flex items-end justify-between gap-3 px-2">
         <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="text-xl font-bold">King Soopers list</h2>
+          <h2 className="text-xl font-bold">Grocery list</h2>
           <p className="text-[13px] text-ink-soft">
             {items !== null ? `${open.length} still to buy` : "Reading…"}
             {cart.ready ? (

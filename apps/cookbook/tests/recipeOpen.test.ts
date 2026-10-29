@@ -21,7 +21,9 @@ const recipe: Recipe = {
   protein_g: 120,
   carbs_g: 160,
   fat_g: 90,
-  total_minutes: 35,
+  total_minutes: null,
+  prep_minutes: 15,
+  cook_minutes: 30,
   meal: "dinner",
   mains: ["chicken"],
   cuisine: "thai",
@@ -53,25 +55,31 @@ function openTab(tab: "ingredients" | "method" | "macros") {
   );
 }
 
-describe("the recipe pill", () => {
-  it("shows the rating as 5★ then the time, and origin and makes", () => {
-    const html = card(recipe, false);
+describe("the recipe on the list (TEC-189)", () => {
+  const html = card(recipe, false);
+  it("is the name, then 5★ · Prep · Cook · makes N, then one serving as text", () => {
+    expect(html).toContain("Green curry");
     expect(html).toContain("5★");
-    expect(html).toContain("35 min");
-    expect(html.indexOf("5★")).toBeLessThan(html.indexOf("35 min"));
-    expect(html).toContain("Claude&#x27;s · makes 4");
+    expect(html).toMatch(/ · Prep 15m · Cook 30m · makes 4/);
+    expect(html).toContain("500 kcal · 30p · 40c · 23f");
   });
-  it("shows no rating when unrated, and still the time", () => {
-    const html = card({ ...recipe, rating: null }, false);
-    expect(html).not.toContain("★");
-    expect(html).toContain("35 min");
+  it("has no macro tiles on the list", () => {
+    expect(html).not.toContain("grid-cols-4");
+    expect(html).not.toContain(">protein<");
+  });
+  it("drops the rating when unrated, and shows the old total only with no prep or cook", () => {
+    const unrated = card({ ...recipe, rating: null }, false);
+    expect(unrated).not.toContain("★");
+    expect(unrated).toContain("Prep 15m");
+    const legacy = card({ ...recipe, prep_minutes: null, cook_minutes: null, total_minutes: 35 }, false);
+    expect(legacy).toContain("35 min · makes 4");
+    expect(legacy).not.toContain("Prep");
+    expect(card({ ...recipe, total_minutes: 35 }, false)).not.toContain("35 min");
   });
   it("shows none of meal, main, cuisine, equipment, diet or tags", () => {
-    const html = card(recipe, false);
     for (const word of ["dinner", "chicken", "thai", "one pot", "vegetarian", "workmight"]) {
       expect(html).not.toContain(word);
     }
-    expect(html).toContain("kcal");
   });
 });
 
@@ -130,16 +138,21 @@ describe("the Add to list card", () => {
         today: "2026-10-28",
       }),
     );
-  it("asks when, offers the day chips, and names today on the button", () => {
+  it("asks when with one date box that opens on today, not chips", () => {
     const html = render();
     expect(html).toContain("When are you cooking it?");
-    for (const label of ["Today", "Tomorrow", "Friday", "Saturday", "Sunday", "Pick a date…"]) {
-      expect(html).toContain(`>${label}<`);
+    expect(html).toContain('type="date"');
+    expect(html).toContain('value="2026-10-28"');
+    for (const label of ["Today", "Tomorrow", "Friday", "Pick a date"]) {
+      expect(html).not.toContain(label);
     }
-    expect(html).toContain("Add to today&#x27;s list");
-    expect(html).toContain("Edit recipe");
-    expect(html).toContain("Remove from book");
-    expect(html).not.toContain('type="date"');
+    expect(html).not.toContain("aria-pressed");
+  });
+  it("has Add to list, Edit and Remove", () => {
+    const html = render();
+    expect(html).toContain(">Add to list<");
+    expect(html).toContain(">Edit<");
+    expect(html).toContain(">Remove<");
   });
   it("carries no pricing note", () => {
     expect(render().toLowerCase()).not.toContain("pricing");

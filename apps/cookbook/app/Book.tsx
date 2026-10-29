@@ -2,13 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Menu from "./Menu";
-import { MacroTiles } from "./MacroTab";
-import { AddToListCard, ORIGIN_LABELS, RecipeOpen } from "./RecipeDetail";
+import { AddToListCard, RecipeOpen } from "./RecipeDetail";
 import { useToast } from "./Toast";
 import { perServing, type Recipe } from "@/lib/recipes";
-import { formatMinutes } from "@/lib/metadata";
 import { menuDayLabel } from "@/lib/menuDay";
-import { FIRST_RECIPE_TAB, ratingPill, type RecipeTab } from "@/lib/recipeView";
+import { FIRST_RECIPE_TAB, factsLine, macrosLine, type RecipeTab } from "@/lib/recipeView";
 import EditRecipe from "./EditRecipe";
 import { BookFilters } from "./Tuning";
 import { NO_FILTER, cuisinesIn, filterActive, matchesFilter, type BookFilter } from "@/lib/tuning";
@@ -192,7 +190,7 @@ export default function Book({
           trailing into a list. */}
       {/* The new look (TEC-135, the owner's mockup): a heading with the count,
           a full-width search, the filters, then cards. Behaviour unchanged. */}
-      <section id="book" className="flex scroll-mt-4 flex-col gap-3">
+      <section id="book" className="flex scroll-mt-4 flex-col gap-2">
         <div className="flex flex-col gap-1 px-2">
           <h2 className="text-xl font-bold">Recipes</h2>
           {recipes !== null ? (
@@ -208,7 +206,7 @@ export default function Book({
             type="search"
             placeholder="Search the book"
             aria-label="Search recipes"
-            className="min-h-11 rounded-xl border border-line bg-surface px-3.5 text-base"
+            className="min-h-10 rounded-xl border border-line bg-surface px-3.5 text-base"
           />
         ) : null}
         {recipes !== null && recipes.length > 0 ? (
@@ -235,7 +233,7 @@ export default function Book({
             {filterActive(filter) ? " with these filters. A recipe with that detail not set never matches it." : "."}
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col gap-1.5">
             {shown.map((recipe) => (
               <RecipeCard
                 key={recipe.id}
@@ -283,35 +281,31 @@ export function RecipeCard({
   const [tab, setTab] = useState<RecipeTab>(FIRST_RECIPE_TAB);
   // Every field is editable (2026-09-26), in place on the open card.
   const [editing, setEditing] = useState(false);
-  const serving = perServing(recipe);
-  const minutes = formatMinutes(recipe.total_minutes);
-  const stars = ratingPill(recipe.rating);
+  const facts = factsLine(recipe);
 
   return (
     // The id is what "On the menu" scrolls to.
     <li id={`recipe-${recipe.id}`} className="scroll-mt-4 overflow-hidden rounded-xl bg-surface">
-      {/* **A lean pill: the name gives way, the facts do not.** `truncate` rather
-          than a character count — a count that fits a laptop overflows a phone,
-          and this is mostly a phone object. `min-w-0` is what lets the name
-          shrink at all inside a flex row, and `shrink-0` on the rest is what
-          stops the rating and time being the thing that disappears.
-          **Rating then time** (TEC-183): "5★ · 35 min", each simply absent when
-          unset. The second line is origin and servings only; the keywords are
-          stored, editable in Edit, and not shown. */}
-      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full flex-col gap-1.5 px-3.5 py-3 text-left">
-        <span className="flex w-full items-baseline justify-between gap-2">
-          <span className="min-w-0 truncate text-base font-semibold">{recipe.name}</span>
-          <span className="flex shrink-0 items-baseline gap-1 whitespace-nowrap text-xs text-ink-soft">
-            {stars ? <span aria-label={`Rated ${recipe.rating} of 5`} className="font-semibold text-accent">{stars}</span> : null}
-            {stars && minutes ? " · " : null}
-            {minutes ? <span className="tabular-nums">{minutes}</span> : null}
-          </span>
-        </span>
+      {/* **Three short text lines** (TEC-189, the owner's pick from the preview):
+          the name; then rating · Prep · Cook · makes N, each part absent when
+          unset (the old total stands in only while neither Prep nor Cook is
+          set); then one serving's numbers as text. The four macro tiles are
+          gone from the list (the Macros tab keeps them). **Origin is no longer
+          on the line**: it did not fit at 360px beside Prep and Cook, and the
+          open recipe still says it. `truncate` on the name, not a character
+          count, so a long name gives way and the facts do not. */}
+      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full flex-col gap-0.5 px-3 py-2 text-left">
+        <span className="min-w-0 truncate text-[15px] font-semibold">{recipe.name}</span>
         <span className="text-xs text-ink-soft">
-          {ORIGIN_LABELS[recipe.origin]} · makes {recipe.servings}
+          {facts.stars ? (
+            <>
+              <span aria-label={`Rated ${recipe.rating} of 5`} className="font-semibold text-accent">{facts.stars}</span>
+              {" · "}
+            </>
+          ) : null}
+          {facts.rest}
         </span>
-        {/* One serving's numbers as four tiles. */}
-        <MacroTiles macros={serving} />
+        <span className="text-xs tabular-nums text-ink-soft">{macrosLine(perServing(recipe))}</span>
       </button>
 
       {open && editing ? (
@@ -328,7 +322,7 @@ export function RecipeCard({
       ) : open ? (
         // **The recipe opens in tabs** (TEC-183): name, origin · makes · time and
         // the rating up top, then Ingredients · Method · Macros, then Add to list
-        // by day with Edit and Remove under it. The helpings estimator and the
+        // by a date box (TEC-189) with Edit and Remove under it. The helpings estimator and the
         // keywords are gone; Health's `GET /api/servings` is untouched.
         <div className="flex flex-col gap-4 border-t border-line/40 px-3.5 py-3">
           <RecipeOpen recipe={recipe} tab={tab} onTab={setTab} onRate={onRate} rating={rating} />
