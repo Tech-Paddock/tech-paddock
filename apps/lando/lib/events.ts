@@ -652,6 +652,48 @@ export function sinceLast(events: JournalEvent[], now: Date): Record<Clock, Jour
   return out;
 }
 
+/* ── The Meal pill's label (TEC-194) ─────────────────────────────────────── */
+
+const EIGHTHS = ["", "⅛", "¼", "⅜", "½", "⅝", "¾", "⅞"];
+
+/** Cups rounded to the nearest ⅛ (never below ⅛) as a mixed fraction: "⅞", "1⅛", "2". */
+export function formatCups(cups: number): string {
+  const eighths = Math.max(1, Math.round(cups * 8));
+  return `${Math.floor(eighths / 8) || ""}${EIGHTHS[eighths % 8]}`;
+}
+
+/** "cup" at one or less, "cups" above it, judged on the rounded ⅛ amount. */
+export function cupsWord(cups: number): string {
+  return Math.max(1, Math.round(cups * 8)) <= 8 ? "cup" : "cups";
+}
+
+/**
+ * Today's meals for the Meal pill: how many (live meals on the phone's day, voids out, treats never)
+ * and the cups eaten (only meals logged in cups add; Misc and other units count toward `count` alone).
+ * `cups` is null when no meal today has a cup amount.
+ */
+export function mealsSummary(events: JournalEvent[], now: Date): { count: number; cups: number | null } {
+  const start = localMidnight(now).getTime();
+  const end = start + 86_400_000;
+  let count = 0;
+  let cups: number | null = null;
+  for (const e of liveEvents(events)) {
+    if (e.kind !== "food" || food(e).type !== "meal") continue;
+    const t = Date.parse(e.at);
+    if (t < start || t >= end) continue;
+    count++;
+    const f = food(e);
+    if (f.unit === "cup" && typeof f.amount === "number" && f.amount > 0) cups = (cups ?? 0) + f.amount;
+  }
+  return { count, cups };
+}
+
+/** The Meal pill's face: "Meals: 2 · 1⅛ cups", or "Meals: 2" when no cup amount was logged. */
+export function mealPillLabel(events: JournalEvent[], now: Date): string {
+  const { count, cups } = mealsSummary(events, now);
+  return cups === null ? `Meals: ${count}` : `Meals: ${count} · ${formatCups(cups)} ${cupsWord(cups)}`;
+}
+
 /**
  * Short enough for a pill, never more than six characters: "now", "47m",
  * "2h 5m", "14h", "3d 4h", "12d". Past ten hours the minutes are dropped, and

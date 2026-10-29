@@ -93,7 +93,7 @@
   with the ink text unchanged. Contrast, checked against the mcl39 tokens: each edge at least 4.4:1
   on both the surface and the paper in light and dark; ink on a tint at least 11:1.
   **The food clock is the last meal** (`sinceLast`): a treat no longer resets it (before TEC-142 a
-  treat did). The pill is labelled **Meal** (TEC-181; `CLOCK_LABELS`); the Food button and form keep
+  treat did). The pill's face is **"Meals: N · X cups"** (TEC-194, below; `CLOCK_LABELS` still says Meal for the others' titles); the Food button and form keep
   their name because they log treats too.
 - **Tapping a pill opens a quick log** (TEC-181, Fun by TEC-186): the same form in the same bottom
   sheet, on a new entry, with When now and everything editable. The pill is one `<button>` (`Pill`
@@ -121,6 +121,15 @@
 - **The app bar** (TEC-193, `app/AppBar.tsx`): the name, theme, logout and the livery badge. **"Meals today: N" is
   gone** (TEC-142's `Meals.tsx` context, `useReportMeals` and `mealsToday` with its tests were removed); the Meal
   pill already counts meals. The bar wraps rather than clips on a very narrow phone.
+- **The Meal pill's label** (TEC-194, `mealsSummary` / `mealPillLabel` in `lib/events.ts`, `tests/mealpill.test.ts`):
+  "Meals: N · X cups" for the phone's day (`localMidnight(now)` to the next midnight, so it rolls at midnight with
+  `now`). N is live meals (voids out, treats never, any unit, Misc included). X sums only meals whose snapshot unit
+  is `cup` (Snuffle mat is one) with an amount, rounded to the nearest 1/8 with a floor of 1/8, written as a mixed
+  fraction ("⅞ cup", "1⅛ cups", "2 cups"; singular at 1 or less, judged on the rounded value). No cup amount
+  today: "Meals: N" (and "Meals: 0"). Before the journal loads it reads "Meals". Only the label changed: tap-to-log
+  and the time-since value stay. The title starts with the label and then "Last meal at ..."; the label is the
+  visible text, so screen readers get it too. The label may wrap at the dot (the other pills' labels still
+  truncate). Trap: it is the one pill whose label is not a constant; do not read `CLOCK_LABELS.food` for its face.
 - **Related issue** (TEC-142), on **Potty** and on a **vet visit** (not on a medical issue), behind a
   **Medical issue** checkbox (TEC-161): unticked, the select is hidden and no `issue` is saved;
   ticked, a plain `<select>` of None and the newest 20 live medical issues, labelled by date and pick ("Oct 24 ·
