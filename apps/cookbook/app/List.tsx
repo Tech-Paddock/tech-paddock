@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { typedLines } from "@/lib/typedLines";
-import { MAX_QUANTITY, asText, type GroceryItem, type TidyLine } from "@/lib/grocery";
+import { MAX_QUANTITY, asText } from "@/lib/groceryText";
+import type { GroceryItem, TidyLine } from "@/lib/grocery";
 import type { ResolvedLink } from "@/lib/preferences";
 import type { LineMark } from "@/lib/brands";
 import type { MenuEntry } from "@/lib/menu";
@@ -70,7 +71,7 @@ const MARK_WORDS: Record<LineMark, string> = { "★": "Your default", "?": "Need
  *
  * **It leaves three ways**: a block of text you copy, a King Soopers search you
  * tap, or **Send to cart** — the no-OAuth rule was reversed for King Soopers on
- * 2026-09-26 (TEC-90). Still no `proxy.ts` carve-out. Each line carries a
+ * 2026-09-26 (TEC-90). No gate exception for the list. Each line carries a
  * quantity for the cart, default 1.
  *
  * Local patterns: the marker column, the menu strip's chips and the

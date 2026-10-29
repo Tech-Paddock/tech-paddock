@@ -1,7 +1,8 @@
 import Provenance from "./Provenance";
 import { MACRO_LABELS, round, type Macros } from "@/lib/macros";
 import { calorieSplit, potAndServing, SPLIT_KEYS } from "@/lib/breakdown";
-import { perServing, type Recipe } from "@/lib/recipes";
+import { perServing } from "@/lib/recipeSteps";
+import type { Recipe } from "@/lib/recipes";
 
 /**
  * One serving's four numbers as tiles: the book's pill and the Macros tab share

@@ -31,7 +31,7 @@ import type { Candidate, Decision } from "./brands";
  *   product row is made (TEC-128, TEC-131), only once its add succeeded, so a
  *   failed add saves nothing. **No model picks a product.**
  * - **Every open line reports added, skipped or failed**, so a partial send never
- *   reads as a whole one. A line is skipped only on *Not this trip*.
+ *   reads as a whole one. A line is skipped only on *Not this trip*, or when it has no product to add.
  * - **A line already sent is refused without an explicit "again"**: the Cart API
  *   only adds, so a silent repeat doubles the quantity.
  */

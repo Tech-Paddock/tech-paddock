@@ -9,7 +9,8 @@ import { NO_FILTER, TIME_CHOICES, filterActive, type BookFilter, type Picks } fr
  * protein was dropped from the book in TEC-189). Rules in `lib/tuning.ts`.
  *
  * **Built from the tokens that exist** — line, surface, ink-soft — so nothing
- * here changes the theme, which is TechPad Gen's. The row of compact selects is
+ * here changes the theme, which is the shared one's
+ * (`packages/shared/lib/theme.css`). The row of compact selects is
  * this app's own pattern; on the book it is one row of four at 360px.
  */
 

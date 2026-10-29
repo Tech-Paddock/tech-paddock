@@ -21,7 +21,7 @@ import { ConflictError, InputError } from "./errors";
  *   the same path every way in uses. The new pot, its model and its caveat
  *   replace the old ones.
  * - **Servings changed alone → no call.** Same pot, a different divisor: "I got
- *   eight bowls, not six" is the charter's own example of the cheap edit, and
+ *   eight bowls, not six" is the cheap edit, and
  *   `/api/servings` divides the stored pot by the new count on the next read.
  *   Asking a model to re-estimate an unchanged list would buy a noisier number
  *   of the same pot.

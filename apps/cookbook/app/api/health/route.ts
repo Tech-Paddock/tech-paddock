@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { configProblems } from "@/lib/kroger";
+import { CRON_SECRET_MIN_LENGTH } from "@/lib/cronAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ const probes: Record<string, () => Promise<Omit<Check, "name">>> = {
    *
    * **A schema missing from that dashboard list fails here as a permissions
    * error**, which reads like a bad key and is not one. That step is outside
-   * this repo and is the one the standup protocol says gets missed, so this
+   * this repo and is the step `supabase/README.md` lists for a new schema, and the one that gets missed, so this
    * probe is the thing that tells you it was. It bit `coffee` for an hour on
    * 2026-09-12 with the key suspected the whole time.
    */
@@ -79,5 +80,20 @@ const probes: Record<string, () => Promise<Omit<Check, "name">>> = {
       ok: true,
       detail: "present — this probe cannot tell whether it matches the other apps, and a mismatch reads as a login bug rather than an error",
     };
+  },
+
+  /**
+   * The nightly price scan's secret (TEC-132): set, and long enough for the gate
+   * and the route to accept it. Presence and length only — never the value, and
+   * never a call to the route. Unset or short, Vercel Cron's call is a 401 every
+   * night and nothing else breaks.
+   */
+  async cronSecret() {
+    const s = process.env.CRON_SECRET;
+    if (!s) return { ok: false, detail: "CRON_SECRET is not set — the nightly price scan is refused" };
+    if (s.length < CRON_SECRET_MIN_LENGTH) {
+      return { ok: false, detail: `CRON_SECRET is set but under ${CRON_SECRET_MIN_LENGTH} characters — the gate and the route refuse it` };
+    }
+    return { ok: true, detail: `present, ${CRON_SECRET_MIN_LENGTH}+ characters — the route not called` };
   },
 };

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import MacroTab from "./MacroTab";
 import { Stars } from "./Meta";
-import { methodSteps, type Recipe, type RecipeOrigin } from "@/lib/recipes";
+import { methodSteps } from "@/lib/recipeSteps";
+import type { Recipe, RecipeOrigin } from "@/lib/recipes";
 import { timeParts } from "@/lib/metadata";
 import { localToday, parseDay } from "@/lib/menuDay";
 import { RECIPE_TABS, ratingWords, splitIngredient, type RecipeTab } from "@/lib/recipeView";

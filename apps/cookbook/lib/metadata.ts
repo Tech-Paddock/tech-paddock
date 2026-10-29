@@ -3,9 +3,9 @@
  * rating. What you decide what to cook by, as opposed to what it costs you.
  *
  * **Pure, and imported by the browser** — so it must never import `supabase.ts`
- * (the trap in `NOTES.md`). The migration header,
- * `cookbook_recipe_metadata`, holds the reasoning; this file holds the rules the
- * database cannot express.
+ * (nor anything that does; `NOTES.md`, *Client components*). The migration
+ * header, `cookbook_recipe_metadata`, holds the reasoning; this file holds the
+ * rules the database cannot express.
  *
  * Two things were agreed not to exist, and this is where they are refused:
  *
@@ -231,7 +231,7 @@ export const META_SCHEMA_PROPERTIES = {
 
 export const META_KEYS = Object.keys(META_SCHEMA_PROPERTIES);
 
-/** The same fields, said in a prompt. Shared so the three ways in ask for them identically. */
+/** The same fields, said in a prompt. Shared so the four ways in ask for them identically. */
 export const META_PROMPT = `Also describe the dish, for deciding what to cook:
 
 - "prep_minutes": the hands-on time before it cooks — chopping, mixing, marinating you do at the board; null if you cannot tell.

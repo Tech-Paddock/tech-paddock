@@ -13,8 +13,8 @@ import { lineTerm, type Decision } from "./cart";
  *   product in Your brands (the most counted, when several match), else
  *   Kroger's top match for the item alone (or for a phrase's search words).
  * - **A deal is a promo below the regular price**, both from Kroger at the
- *   store. Coupons are not read (the public API has none); each deal links to
- *   King Soopers' coupon search instead.
+ *   store. Coupons are not read (the public API has none); staged coupons are
+ *   `lib/couponStore.ts`'s.
  */
 
 export type Target =
@@ -157,7 +157,7 @@ export type Deal = {
   saving: number;
   /** When the sale ends, as Kroger gave it, or null. */
   endsAt: string | null;
-  /** The brands and list lines this product stands for; the coupons link searches the first. */
+  /** The brands and list lines this product stands for. */
   for: string[];
 };
 

@@ -1,10 +1,10 @@
 /**
- * Whether opening the list tab should start a refresh (2026-10-20).
+ * Whether a page load should start a refresh (2026-10-20).
  *
- * **No imports**, because the browser runs it: the list tab asks this once per
- * open and, when it says yes, starts a refresh in the background without
- * waiting on it. No cron, so this is the only thing that makes a refresh
- * happen on its own — and it only happens when the list is opened.
+ * **No imports**, because the browser runs it: the list panel (`Cart.tsx`)
+ * asks this once per page load, on any Cookbook page, and, when it says yes,
+ * starts a refresh in the background without waiting on it. No cron of its
+ * own, so this is the only thing that makes a refresh happen on its own.
  */
 
 export const REFRESH_EVERY_MS = 7 * 24 * 60 * 60 * 1000;
@@ -26,7 +26,7 @@ export function refreshDue(status: RefreshInputs, now: number = Date.now()): boo
 }
 
 /**
- * Whether opening the list tab should start a deal scan (TEC-121). **The same
+ * Whether a page load should start a deal scan (TEC-121). **The same
  * rule as the refresh** — over seven days since the last, or never — and it
  * also needs a chosen store, since prices are per store. `lastScanAt` is the
  * latest appended scan's `ran_at`.

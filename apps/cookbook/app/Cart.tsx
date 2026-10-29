@@ -204,8 +204,8 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   const autoRefreshed = useRef(false);
 
   const [latestScan, setLatestScan] = useState<ScanRecord | null>(null);
-  // Only a failure is shown (TEC-132): the scan feeds the list lines' sale tags and the Deals
-  // board's first day, and the panel that showed its results is gone.
+  // Only a failure is shown (TEC-132): the scan feeds the list lines' sale tags and fills a Deals row for a
+  // product with no fresh night, and the panel that showed its results is gone.
   const [scanNote, setScanNote] = useState<{ text: string; failed: boolean } | null>(null);
   const autoScanned = useRef(false);
 

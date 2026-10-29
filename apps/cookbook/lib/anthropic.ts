@@ -196,7 +196,7 @@ export type RecipeFields = {
 };
 
 // ---------------------------------------------------------------------------
-// 1 · Pricing a dish — the judgement, and the only call all three ways in make
+// 1 · Pricing a dish — the judgement, and the only call all four ways in make
 // ---------------------------------------------------------------------------
 
 export type RecipeEstimate = { macros: Macros; note: string | null };
@@ -409,9 +409,10 @@ ${META_PROMPT}`;
 /**
  * Read a recipe off a file the person uploaded.
  *
- * **The same two enforcements as reading a page**, for the same reason: the
- * prompt asks for `read: false`, and the check below independently rejects a
- * file claimed as read that produced no ingredients. A photo of a finished dish
+ * **The first two of reading a page's three checks**, for the same reason (the
+ * third, that a fetch returned a page, has no file to ask about): the prompt
+ * asks for `read: false`, and the check below independently rejects a file
+ * claimed as read that produced no ingredients. A photo of a finished dish
  * with its name in the corner is this path's version of a URL slug.
  *
  * **The file goes to the model and nowhere else.** See `lib/upload.ts`.

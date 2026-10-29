@@ -527,10 +527,13 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 - Health reads a 503, or a `SESSION_SECRET` mismatch, as "couldn't reach the Cookbook".
 - `tests/servings.test.ts` holds the contract's exact fields; metadata never enters it.
 - **`/list` is depended on by Health's redirect** (`tests/tabs.test.ts`); renaming it is cross-app.
-- **Client components import libs that import `./supabase`**: `Book.tsx`, `AddRecipe.tsx` and
-  `Menu.tsx` take pure helpers from `lib/recipes.ts`, and `List.tsx` from `lib/grocery.ts`. That is
-  safe only because the service key is not `NEXT_PUBLIC_` and is read inside `getServiceClient`;
-  never read it at module top level.
+- **Client components import only pure libs.** The helpers they run sit apart from the modules that
+  import `./supabase`: `perServing` and `methodSteps` in `lib/recipeSteps.ts`, `MAX_QUANTITY` and
+  `asText` in `lib/groceryText.ts`. `lib/recipes.ts` and `lib/grocery.ts` re-export them, so the
+  routes and tests read them from there as before; a client component takes them from the pure
+  file and takes only *types* from the other. Keep it so: a client import of a module that imports
+  `./supabase` pulls the client into the browser bundle, where it is safe only because the service
+  key is not `NEXT_PUBLIC_` and is read inside `getServiceClient`; never read it at module top level.
 - Empty-vs-unread is in `DECISIONS.md`. `lint` is unconfigured.
 - Read Vercel and Supabase live before writing a deployment step.
 - **`api.kroger.com` is reachable from a session; `developer.kroger.com` and `kingsoopers.com`
@@ -586,7 +589,11 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   `serial` covers one page.
 - **`CRON_SECRET` must be set in `tp-cookbook` (32+ characters)**: unset or short, the gate and the
   route both refuse, and Vercel Cron's call is a 401 every night. Nothing else breaks, so it is easy
-  to miss; the first Deals tab is simply empty.
+  to miss; the first Deals tab is simply empty. `.env.example` says how to make one, and
+  `/api/health` has a `cronSecret` check (set and 32+ characters, never the value), so a missing
+  or short secret turns the whole probe 503. `tests/cronSession.test.ts` holds that a valid session
+  cookie is refused on the path without the bearer (`tests/gate.test.ts` is byte-identical in every
+  app, so that half lives in its own file).
 - **Disconnect (`DELETE /api/kroger`) deletes the connection row, and the chosen store with it.**
   Until King Soopers is connected and a store picked again, every nightly price run answers 409
   "Pick a store first" (`lib/priceRun.ts`), and those nights stay gaps forever. Missing
