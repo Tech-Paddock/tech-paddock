@@ -26,7 +26,6 @@ import {
   isAccident,
   latestWeight,
   liveEvents,
-  mealsToday,
   pillStatus,
   quickLog,
   round1,
@@ -63,7 +62,6 @@ import { saveThen } from "@/lib/saveOrder";
 import Analytics from "./Analytics";
 import WhatsNew from "./WhatsNew";
 import UpcomingTab from "./UpcomingTab";
-import { useReportMeals } from "./Meals";
 import LogForm, { type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
 
@@ -511,8 +509,6 @@ export default function Journal() {
   }
 
   const clocks = useMemo(() => (loaded ? sinceLast(loaded.events, now) : null), [loaded, now]);
-  // "Meals today: N" in the app bar (TEC-142): the phone's day, live meals only.
-  useReportMeals(loaded ? mealsToday(loaded.events, now) : null);
   // The feed (TEC-136): every live entry in the read's window (today and the
   // HORIZON_DAYS before it; older weights stay in Analytics' growth chart),
   // plus anything not saved yet, under one chip's filter.
@@ -908,7 +904,7 @@ export default function Journal() {
             event={open.event}
             quick={open.quick}
             visitPrefill={open.visitFor ? visitPrefill(open.visitFor) : undefined}
-            sessionTreats={open.form === "training" && open.event && loaded ? treatsWith(loaded.events, open.event) : undefined}
+            sessionTreats={(open.form === "training" || open.form === "potty") && open.event && loaded ? treatsWith(loaded.events, open.event) : undefined}
             people={people}
             dogs={dogs}
             onAddDog={addDog}

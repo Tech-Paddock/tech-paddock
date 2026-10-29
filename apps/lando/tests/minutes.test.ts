@@ -2,7 +2,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { InvalidEvent, OUT_MINUTES_CHIPS, OUT_MINUTES_MAX, describe as describeEvent, outMinutesLabel, parseDetails } from "@/lib/events";
+import { InvalidEvent, OUT_MINUTES_CHIPS, OUT_MINUTES_MAX, describe as describeEvent, outMinutesAria, outMinutesChip, outMinutesLabel, parseDetails } from "@/lib/events";
 
 describe("potty time outside", () => {
   const outside = { what: "pee", where: "outside" };
@@ -25,17 +25,29 @@ describe("potty time outside", () => {
   it("is outside only: inside refuses it", () => {
     expect(() => parseDetails("potty", { what: "pee", where: "inside", minutes: 10 })).toThrow(/outside only/);
   });
-  it("offers chips only (TEC-186): 5 shown as ≤5, 10 to 30 in fives, 45, 60; the stored bound stays 1 to 120", () => {
-    expect([...OUT_MINUTES_CHIPS]).toEqual([5, 10, 15, 20, 25, 30, 45, 60]);
-    expect(OUT_MINUTES_CHIPS.map(outMinutesLabel)).toEqual(["≤5", "10", "15", "20", "25", "30", "45", "60"]);
+  it("offers five range chips (TEC-193): up to 5, 5-15, 15-30, 30-45, 45-60, each saving its upper bound; the stored bound stays 1 to 120", () => {
+    expect([...OUT_MINUTES_CHIPS]).toEqual([5, 15, 30, 45, 60]);
+    expect(OUT_MINUTES_CHIPS.map(outMinutesLabel)).toEqual(["≤5", "5–15", "15–30", "30–45", "45–60"]);
+    expect(OUT_MINUTES_CHIPS.map(outMinutesAria)).toEqual(["5 minutes or less", "5 to 15 minutes", "15 to 30 minutes", "30 to 45 minutes", "45 to 60 minutes"]);
     expect(OUT_MINUTES_MAX).toBe(120);
+    // What a chip saves passes the same check as before.
+    for (const m of OUT_MINUTES_CHIPS) expect(parseDetails("potty", { ...outside, minutes: m })).toEqual({ ...outside, minutes: m });
   });
-  it("reads in the feed after the leash, before the link and photos; a row without one is unchanged", () => {
+  it("opens a correction on the chip its value matches, and on none for an older value", () => {
+    expect([5, 15, 30, 45, 60].map(outMinutesChip)).toEqual([5, 15, 30, 45, 60]);
+    for (const old of [1, 7, 10, 20, 25, 90, 120]) expect(outMinutesChip(old)).toBeNull();
+    expect(outMinutesChip(null)).toBeNull();
+    expect(outMinutesChip(undefined)).toBeNull();
+  });
+  it("reads in the feed (a range for a chip's value) after the leash, before the link and photos; a row without one is unchanged", () => {
     const d = (details: Record<string, unknown>) => describeEvent({ kind: "potty", details }).detail;
-    expect(d({ ...outside, leash: "leashed", minutes: 5 })).toBe("outside · leashed · 5 min");
-    expect(d({ ...outside, minutes: 20 })).toBe("outside · 20 min");
-    expect(d({ ...outside, leash: "pen", minutes: 15, photos: ["health/00000000-0000-4000-8000-000000000001.jpg"] })).toBe(
-      "outside · in pen · 15 min · 1 photo"
+    expect(d({ ...outside, leash: "leashed", minutes: 5 })).toBe("outside · leashed · ≤5 min");
+    expect(d({ ...outside, leash: "leashed", minutes: 15 })).toBe("outside · leashed · 5–15 min");
+    expect(d({ ...outside, minutes: 60 })).toBe("outside · 45–60 min");
+    // An older entry holding another number still reads "N min".
+    for (const old of [10, 20, 25, 7, 90]) expect(d({ ...outside, minutes: old })).toBe(`outside · ${old} min`);
+    expect(d({ ...outside, leash: "pen", minutes: 30, photos: ["health/00000000-0000-4000-8000-000000000001.jpg"] })).toBe(
+      "outside · in pen · 15–30 min · 1 photo"
     );
     expect(d({ ...outside, leash: "leashed" })).toBe("outside · leashed");
     expect(d(outside)).toBe("outside");

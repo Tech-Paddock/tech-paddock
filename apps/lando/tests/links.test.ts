@@ -18,7 +18,6 @@ import {
   eventPhotos,
   issueChoices,
   issueLinkText,
-  mealsToday,
   parseDetails,
   pillStatus,
   resolveIssue,
@@ -350,37 +349,6 @@ describe("the food clock is the last meal", () => {
   });
   it("is none when only treats were logged", () => {
     expect(sinceLast([treat(local(26, 14))], NOW).food).toBeNull();
-  });
-});
-
-/* ── Meals today ─────────────────────────────────────────────────────────── */
-
-describe("mealsToday", () => {
-  const NOW = new Date(2026, 9, 26, 15, 0);
-  it("counts the phone's local day, edge to edge", () => {
-    const events = [
-      meal(local(25, 23, 59)), // yesterday
-      meal(local(26, 0, 0)), // midnight starts today
-      meal(local(26, 8)),
-      meal(local(26, 18)),
-      meal(local(26, 23, 59)),
-      meal(local(27, 0, 0)), // tomorrow
-    ];
-    expect(mealsToday(events, NOW)).toBe(4);
-  });
-  it("does not count treats, voided or deleted meals, or other kinds", () => {
-    const wrong = meal(local(26, 9));
-    const fixed = meal(local(26, 9), { voids: wrong.id });
-    const gone = meal(local(26, 10));
-    const events = [wrong, fixed, gone, del(gone), treat(local(26, 11)), issue(local(26, 12))];
-    expect(mealsToday(events, NOW)).toBe(1);
-  });
-  it("is 0 for an empty day", () => {
-    expect(mealsToday([], NOW)).toBe(0);
-  });
-  it("uses the phone's day: a late-evening meal is still today where UTC says tomorrow", () => {
-    const lateEvening = meal(new Date(2026, 9, 26, 22, 30).toISOString()); // 02:30Z the next day
-    expect(mealsToday([lateEvening], new Date(2026, 9, 26, 23, 0))).toBe(1);
   });
 });
 

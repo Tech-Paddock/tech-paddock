@@ -39,10 +39,11 @@ import {
   parseDetails,
   parseNewFood,
   potty as asPotty,
-  treatEntry,
+  inlineTreatEntries,
+  outMinutesAria,
+  outMinutesChip,
   visitWeightPlan,
   weight as asWeight,
-  type QueuedTreat,
   type CommandId,
   type Details,
   type Dog,
@@ -61,7 +62,7 @@ import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import AmountScroller from "./AmountScroller";
 import TreatQty from "./TreatQty";
 import PhotoPicker, { usePhotos } from "./Photos";
-import Sheet from "./Sheet";
+import TreatRow from "./TreatRow";
 import { clockTime, dateLabel, fromDateInput, fromLocalInput, toDateInput, toLocalInput, whenLabel } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
 
@@ -90,7 +91,7 @@ type Props = {
    * time, its reason (left empty when the item does not say), and its title as the note. New entry only.
    */
   visitPrefill?: { day: string; time: string; reason: string; note: string };
-  /** A training being corrected: the treats already logged with it (`treatsWith`), shown, not changed. */
+  /** A training or potty being corrected: the treats already logged with it (`treatsWith`), shown, not changed. */
   sessionTreats?: JournalEvent[];
   people: Person[];
   /** Friends' dogs from `lando.dogs`, by name. */
@@ -112,7 +113,7 @@ type Props = {
   weightUnit: Unit;
   /**
    * A new entry: handed off at once, never awaited (RULES.md, Never 5). `then`
-   * are the training's treats, saved once the entry itself is.
+   * are the inline treat row's entry, saved once the entry itself is.
    */
   onLog: (body: LogBody, then?: LogBody[]) => void;
   /** A correction or a delete: awaited, and its error shown here. `then` are saved once it succeeds. */
@@ -194,34 +195,16 @@ const WHERE_OPTS = [
 
 /* ── The form ────────────────────────────────────────────────────────────── */
 
-/** Chips that toggle, several at once. Real checkboxes underneath. */
-function Chips<T extends string>({
-  label,
-  options,
-  picked,
-  onChange,
-}: {
-  label: string;
-  options: readonly (readonly [T, string])[];
-  picked: T[];
-  onChange: (next: T[]) => void;
-}) {
+/** The treats already logged with an entry being corrected: shown, not changed. */
+function LoggedTreats({ treats }: { treats: JournalEvent[] }) {
   return (
-    <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
-      {options.map(([id, text]) => (
-        <label key={id} className="relative">
-          <input
-            type="checkbox"
-            checked={picked.includes(id)}
-            onChange={(e) => onChange(e.target.checked ? [...picked, id] : picked.filter((c) => c !== id))}
-            className="peer absolute opacity-0"
-          />
-          <span className="block cursor-pointer whitespace-nowrap rounded-full border border-line bg-surface px-3.5 py-2 peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-pinstripe">
-            {text}
-          </span>
-        </label>
+    <ul aria-label="Treats with this entry" className="-mt-1 flex flex-col gap-1 text-[13px]">
+      {treats.map((t) => (
+        <li key={t.id} className="text-ink-soft">
+          Logged: {describe(t).detail}
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -277,9 +260,9 @@ export default function LogForm({
   // Inside only, nothing picked by default: a new or old inside entry never
   // gets a spot unless one is tapped.
   const [spot, setSpot] = useState<Spot | "">(p?.spot ?? "");
-  // Time outside (TEC-176, chips only since TEC-186): optional, outside only, never remembered. Nothing on
-  // a new entry; a correction opens holding the entry's own minutes, which stay unless a chip is tapped
-  // (an off-chip value such as 7 shows no chip picked and saves as it was).
+  // Time outside (TEC-176, range chips since TEC-193): optional, outside only, never remembered. A chip saves
+  // its upper bound. Nothing on a new entry; a correction opens holding the entry's own minutes, which stay
+  // unless a chip is tapped (an older value such as 10 shows no chip picked and saves as it was).
   const [outMin, setOutMin] = useState<number | null>(p?.minutes ?? null);
 
   // Food
@@ -308,12 +291,11 @@ export default function LogForm({
   const [exType, setExType] = useState<ExerciseType>(form === "training" ? "training" : x?.type ?? "walk");
   // Fun's Pee and Poop buttons (TEC-186): what this form has logged so far. Each is its own potty entry.
   const [tapped, setTapped] = useState<{ id: string; what: "pee" | "poop"; at: string; detail: string }[]>([]);
-  // Training's Treats pop-up: treats picked here are saved with the session.
-  const [treatQueue, setTreatQueue] = useState<QueuedTreat[]>([]);
-  const [treatOpen, setTreatOpen] = useState(false);
-  const [treatError, setTreatError] = useState<string | null>(null);
+  // The inline treat row on Potty and Training (TEC-193): opens on 0, which logs nothing. A treat above 0
+  // is saved as its own entry once this one is. Its id is fixed, so a retry is the same row.
   const [treatItem, setTreatItem] = useState(defaultFood("treat", remembered, foods));
-  const [treatAmount, setTreatAmount] = useState<number | null>(defaultAmount("treat", remembered));
+  const [treatQty, setTreatQty] = useState<number | null>(0);
+  const treatId = useRef(crypto.randomUUID());
   // One pick (TEC-129): None, a dog, or Multiple; picking is the answer to
   // "with other dogs", there is no Yes/No. An entry with `with_dogs` and no
   // ids (Multiple, or from before the list) opens on Multiple, which saves
@@ -329,6 +311,7 @@ export default function LogForm({
   const [dogBusy, setDogBusy] = useState(false);
   const [minutes, setMinutes] = useState(String(x?.minutes ?? 15));
   const [treats, setTreats] = useState(String(x?.treats ?? 0));
+  // Training counts the treat entries it has (a correction keeps the ones already logged); Fun keeps its box.
   const [commands, setCommands] = useState<CommandId[]>(x?.commands ?? []);
 
   // Weight
@@ -390,38 +373,6 @@ export default function LogForm({
     setAmount(defaultAmount(t, remembered));
   }
 
-  function openTreat() {
-    setTreatItem(defaultFood("treat", remembered, foods));
-    setTreatAmount(defaultAmount("treat", remembered));
-    setTreatError(null);
-    setTreatOpen(true);
-  }
-
-  /** The pop-up's Add: queue the treat and count it on the session. */
-  function addTreat() {
-    const bad = treatQtyError(treatAmount);
-    if (bad) {
-      setTreatError(bad);
-      return;
-    }
-    setTreatError(null);
-    setTreatQueue((q) => [...q, { id: crypto.randomUUID(), item_id: treatItem, amount: treatAmount }]);
-    setTreats((n) => String((Number(n) || 0) + 1));
-    setTreatOpen(false);
-  }
-
-  function dropTreat(id: string) {
-    setTreatQueue((q) => q.filter((t) => t.id !== id));
-    setTreats((n) => String(Math.max(0, (Number(n) || 0) - 1)));
-  }
-
-  /** "Freeze-dried beef hearts · 2 pieces", as the feed will read it. */
-  const treatLabel = (t: QueuedTreat) => {
-    const item = findFood("treat", t.item_id, foods);
-    const details = { type: "treat", item_id: t.item_id, item_name: item?.name ?? "Treat", unit: item?.unit ?? null, amount: t.amount };
-    return describe({ kind: "food", details }).detail;
-  };
-
   /** Fun's Pee or Poop: one tap saves a potty entry now, no confirm. Where comes from `funPotty`. */
   function tapPotty(what: "pee" | "poop") {
     const raw = funPotty({ type: exType, where }, what);
@@ -481,7 +432,6 @@ export default function LogForm({
 
   const item = findFood(foodType, itemId, foods);
   const amountUnit = item?.unit ? unitLabel(item.unit, amount ?? 2) : null;
-  const treatFood = findFood("treat", treatItem, foods);
 
   function rawDetails(): Record<string, unknown> {
     switch (kind) {
@@ -502,7 +452,7 @@ export default function LogForm({
           type: exType,
           where,
           minutes: Number(minutes),
-          treats: Number(treats || 0),
+          treats: form === "training" ? (x?.treats ?? 0) + (treatQty ? 1 : 0) : Number(treats || 0),
           ...(exType === "training" ? { commands } : {}),
           ...dogsFromPick(dogPick, keptDogs),
           ...(photos.paths.length ? { photos: photos.paths } : {}),
@@ -571,11 +521,13 @@ export default function LogForm({
       details,
       note: note.trim() || null,
     };
-    // Treats from the pop-up: food entries at the session's time and person,
-    // saved after the session itself (TEC-136).
+    // The inline treat row on Potty and Training: one food entry at this entry's time and person, saved
+    // after it (TEC-136, TEC-193), and none at quantity 0.
     let then: LogBody[] = [];
     try {
-      then = treatQueue.map((t) => treatEntry(t, at, body.person_id, foods));
+      if (kind === "potty" || form === "training") {
+        then = inlineTreatEntries({ id: treatId.current, item_id: treatItem, qty: treatQty }, at, body.person_id, foods);
+      }
       // A vet visit's Weight, saved after the visit (TEC-151); a Medical issue has none.
       if (kind === "health" && healthType === "vet") {
         then = visitWeightPlan({
@@ -670,15 +622,15 @@ export default function LogForm({
           )}
           {where === "outside" && (
             <Field label="Time outside">
-              {/* Chips only (TEC-186): the pick is the answer. "≤5" saves 5. */}
-              <div role="group" aria-label="Time outside, minutes" className="grid grid-cols-8 gap-1">
+              {/* Range chips only (TEC-186, TEC-193): each saves its upper bound ("≤5" saves 5, "5–15" saves 15). */}
+              <div role="group" aria-label="Time outside, minutes" className="grid grid-cols-5 gap-1">
                 {OUT_MINUTES_CHIPS.map((m) => (
                   <button
                     key={m}
                     type="button"
-                    aria-pressed={outMin === m}
-                    aria-label={m === 5 ? "5 minutes or less" : `${m} minutes`}
-                    onClick={() => setOutMin(outMin === m ? null : m)}
+                    aria-pressed={outMinutesChip(outMin) === m}
+                    aria-label={outMinutesAria(m)}
+                    onClick={() => setOutMin(outMinutesChip(outMin) === m ? null : m)}
                     className="flex min-h-[44px] min-w-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-line bg-surface px-0 aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-ink focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-pinstripe"
                   >
                     {outMinutesLabel(m)}
@@ -698,6 +650,9 @@ export default function LogForm({
               />
             </Field>
           )}
+          {/* Right below Time outside, and in the same place inside (TEC-193). */}
+          <TreatRow foods={foods} item={treatItem} qty={treatQty} onItem={setTreatItem} onQty={setTreatQty} />
+          {sessionTreats.length > 0 && <LoggedTreats treats={sessionTreats} />}
           {where === "inside" && what !== "none" && (
             <p className="text-[13px] font-semibold text-danger">Inside counts as an accident.</p>
           )}
@@ -837,9 +792,21 @@ export default function LogForm({
               />
             </Field>
           )}
-          <Field label="Where">
-            <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
-          </Field>
+          {/* Training: Time sits beside Inside/Outside, on the top row (TEC-193). */}
+          {form === "training" ? (
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+              <Field label="Where">
+                <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
+              </Field>
+              <Field label="Time (min)" htmlFor="f-mins">
+                <input id="f-mins" type="number" inputMode="numeric" min={1} max={600} value={minutes} onChange={(e) => setMinutes(e.target.value)} className={`${input} w-[84px]`} />
+              </Field>
+            </div>
+          ) : (
+            <Field label="Where">
+              <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
+            </Field>
+          )}
           <Field label="Other dogs" htmlFor={addingDog ? "f-dog-name" : "f-dogs"}>
             {addingDog ? (
               /* Not a nested <form> (HTML has none): Enter here adds the dog
@@ -952,84 +919,47 @@ export default function LogForm({
               )}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Length (min)" htmlFor="f-mins">
-              <input id="f-mins" type="number" inputMode="numeric" min={1} max={600} value={minutes} onChange={(e) => setMinutes(e.target.value)} className={input} />
-            </Field>
-            <Field label="Treats used" htmlFor="f-treats">
-              <div className="flex min-w-0 gap-1.5">
-                <input id="f-treats" type="number" inputMode="numeric" min={0} max={500} value={treats} onChange={(e) => setTreats(e.target.value)} className={`${input} flex-1`} />
-                {form === "training" && (
-                  /* Training's Treats pop-up (TEC-136): pick what and how much;
-                     it is logged as a food treat when the session is saved. */
-                  <button
-                    type="button"
-                    onClick={openTreat}
-                    aria-label="Log a treat"
-                    className="shrink-0 rounded-[10px] bg-accent px-3 font-semibold text-accent-ink"
-                  >
-                    + Treat
-                  </button>
-                )}
-              </div>
-            </Field>
-          </div>
-          {form === "training" && (sessionTreats.length > 0 || treatQueue.length > 0) && (
-            <ul aria-label="Treats with this session" className="-mt-1 flex flex-col gap-1 text-[13px]">
-              {sessionTreats.map((t) => (
-                <li key={t.id} className="text-ink-soft">
-                  Logged: {describe(t).detail}
-                </li>
-              ))}
-              {treatQueue.map((t) => (
-                <li key={t.id} className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate">To log on save: {treatLabel(t)}</span>
-                  <button type="button" onClick={() => dropTreat(t.id)} aria-label="Remove this treat" className="px-2 py-1 text-ink-soft">
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ul>
+          {form === "fun" && (
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Length (min)" htmlFor="f-mins">
+                <input id="f-mins" type="number" inputMode="numeric" min={1} max={600} value={minutes} onChange={(e) => setMinutes(e.target.value)} className={input} />
+              </Field>
+              <Field label="Treats used" htmlFor="f-treats">
+                <input id="f-treats" type="number" inputMode="numeric" min={0} max={500} value={treats} onChange={(e) => setTreats(e.target.value)} className={input} />
+              </Field>
+            </div>
+          )}
+          {/* Training's treat: the pick beside how many, inline (TEC-193). Logged as its own treat entry
+              when the session is saved, and counted in the session's treats. */}
+          {form === "training" && (
+            <>
+              <TreatRow foods={foods} item={treatItem} qty={treatQty} onItem={setTreatItem} onQty={setTreatQty} />
+              {sessionTreats.length > 0 && <LoggedTreats treats={sessionTreats} />}
+            </>
           )}
           {exType === "training" && (
-            <Field label="Commands practised">
-              <Chips label="Commands practised" options={COMMANDS} picked={commands} onChange={setCommands} />
-            </Field>
-          )}
-          {treatOpen && (
-            <Sheet title="Treat" onClose={() => setTreatOpen(false)} nested>
-              <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start gap-2">
-                <Field label="What" htmlFor="t-item">
-                  <select id="t-item" value={treatItem} onChange={(e) => setTreatItem(e.target.value)} className={input}>
-                    {picklist("treat", foods).map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label={treatFood?.unit ? `Amount (${unitLabel(treatFood.unit, treatAmount ?? 2)})` : "Amount"} htmlFor="t-amount">
-                  <TreatQty
-                    id="t-amount"
-                    label={treatFood?.unit ? `Amount in ${unitLabel(treatFood.unit, treatAmount ?? 2)}` : "Amount"}
-                    value={treatAmount}
-                    onChange={setTreatAmount}
-                  />
-                </Field>
-              </div>
-              {treatError && <p className="text-[13px] font-semibold text-danger">{treatError}</p>}
-              <p className="text-[13px] text-ink-soft">
-                Logged as a treat at this session&apos;s time when you save it, and counted in Treats used.
-              </p>
-              <button
-                type="button"
-                data-autofocus
-                onClick={addTreat}
-                className="rounded-[14px] bg-[var(--tone-2-bg)] px-4 py-3 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)]"
+            <Field label="Commands practised" htmlFor="f-commands">
+              {/* A picklist, not chips (TEC-193): a native multi-select over the fixed list, which a phone
+                  shows as a checklist. The picks are stored as before, in the list's order. */}
+              <select
+                id="f-commands"
+                multiple
+                value={commands}
+                onChange={(e) => setCommands(Array.from(e.target.selectedOptions, (o) => o.value as CommandId))}
+                className={input}
               >
-                Add treat
-              </button>
-            </Sheet>
+                {COMMANDS.map(([id, text]) => (
+                  <option key={id} value={id}>
+                    {text}
+                  </option>
+                ))}
+              </select>
+              <p aria-live="polite" className="text-[13px] text-ink-soft">
+                {commands.length
+                  ? `Picked: ${COMMANDS.filter(([id]) => commands.includes(id)).map(([, text]) => text).join(", ")}`
+                  : "None picked. Tap to choose several."}
+              </p>
+            </Field>
           )}
         </>
       )}

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { FOODS, MISC_ID, formatAmount, parseAmount, picklist, treatQtyError } from "@/lib/foods";
 import { defaultAmount, defaultFood } from "@/lib/defaults";
+import { parseDetails } from "@/lib/events";
 
 describe("the catalogue", () => {
-  it("is the owner's list in code: two meals and three treats, Misc last in each, nothing else", () => {
-    expect(picklist("meal").map((f) => f.id)).toEqual(["purina-pro-plan-toy-puppy-chicken-rice", "royal-canin-dachshund-puppy", MISC_ID]);
+  it("is the owner's list in code: three meals (a snuffle mat among them) and three treats, Misc last in each, nothing else", () => {
+    expect(picklist("meal").map((f) => f.id)).toEqual(["purina-pro-plan-toy-puppy-chicken-rice", "royal-canin-dachshund-puppy", "snuffle-mat", MISC_ID]);
     expect(picklist("treat").map((f) => f.id)).toEqual([
       "freeze-dried-beef-hearts",
       "woof-pupsicle-refill-pop-small",
@@ -13,14 +14,31 @@ describe("the catalogue", () => {
     ]);
   });
 
-  it("gives every named item calories and a unit, and Misc neither", () => {
+  it("gives every named item calories and a unit, Misc neither, and the snuffle mat a unit but no calories (TEC-193)", () => {
     for (const list of Object.values(FOODS))
       for (const f of list) {
         if (f.id === MISC_ID) expect([f.kcalPer, f.unit]).toEqual([null, null]);
+        else if (f.id === "snuffle-mat") expect([f.kcalPer, f.unit]).toEqual([null, "cup"]);
         else expect(f.kcalPer! > 0 && !!f.unit).toBe(true);
         // The database refuses any other id shape.
         expect(f.id).toMatch(/^[a-z0-9-]{1,60}$/);
       }
+  });
+});
+
+describe("the snuffle mat (TEC-193)", () => {
+  it("is a meal in cups with no calories, and opens on the same amount as every other meal", () => {
+    expect(parseDetails("food", { type: "meal", item_id: "snuffle-mat", amount: 0.125 })).toMatchObject({
+      type: "meal",
+      item_id: "snuffle-mat",
+      item_name: "Snuffle mat",
+      kcal_per: null,
+      unit: "cup",
+      amount: 0.125,
+    });
+    // No per-item default: the form's amount depends on the remembered meal amount only.
+    expect(defaultAmount("meal", {})).toBeNull();
+    expect(defaultAmount("meal", { mealAmount: 0.75 })).toBe(0.75);
   });
 });
 
