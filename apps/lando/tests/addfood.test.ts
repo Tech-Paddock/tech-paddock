@@ -15,7 +15,7 @@ const ADDED = [MEAL, TREAT, RETIRED];
 describe("the merged picklist", () => {
   it("is the code catalogue then added foods in the order added, Misc last, retired left off", () => {
     const meals = picklist("meal", ADDED).map((f) => f.id);
-    expect(meals).toEqual([...FOODS.meal.filter((f) => f.id !== MISC_ID).map((f) => f.id), MEAL.id, MISC_ID]);
+    expect(meals).toEqual([...FOODS.meal.filter((f) => f.id !== MISC_ID && !f.retired).map((f) => f.id), MEAL.id, MISC_ID]);
     expect(meals.at(-1)).toBe(MISC_ID);
     expect(picklist("treat", ADDED).map((f) => f.id).slice(-2)).toEqual([TREAT.id, MISC_ID]);
   });

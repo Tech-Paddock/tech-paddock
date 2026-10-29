@@ -129,10 +129,11 @@ describe("migration lando_box_leash_spot", () => {
   const fnOf = (sql: string) => sql.slice(sql.indexOf("create or replace function lando.details_ok(kind"), sql.indexOf("$fn$;"));
   const block = (fn: string, from: string, to: string) => fn.slice(fn.indexOf(from), fn.indexOf(to));
 
-  it("is the newest migration defining lando.details_ok, so it is the newest body", () => {
+  it("defines lando.details_ok, and later widenings are held to the superset rule (TEC-164)", () => {
     expect(file).toBeDefined();
     const defining = files.filter((f) => read(f).includes("create or replace function lando.details_ok(kind"));
-    expect(defining.at(-1)).toBe(file);
+    expect(defining.indexOf(file)).toBeGreaterThanOrEqual(0);
+    // Later widenings are held to the superset rule by details-ok-superset.test.ts.
   });
   it("widens leash and spot with box and keeps every old value", () => {
     const potty = block(fnOf(read(file)), "WHEN 'potty' THEN", "WHEN 'food' THEN");
