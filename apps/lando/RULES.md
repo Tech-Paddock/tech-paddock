@@ -9,8 +9,8 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 ## Surface: app
 
-- Three tabs, Log, Analytics and What's new, opening on Log: the owner's override (2026-10-20,
-  widened 2026-10-27, TEC-182) of the app surface's one screen and no tabs. One-handed, thumb-first.
+- Four tabs, Log, Analytics, What's new and Upcoming, opening on Log: the owner's override
+  (2026-10-20, widened 2026-10-27 TEC-182 and 2026-10-29 TEC-192) of the app surface's one screen and no tabs. One-handed, thumb-first.
 - An app bar over the tabs: theme, logout, Meals today and the livery badge.
 - Every form opens as a bottom sheet.
 - Installable through `/app.webmanifest`.
@@ -28,6 +28,9 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 ## Settled
 
+- Upcoming items are plans kept in `lando.upcoming`: edited in place and never deleted (cancelled
+  instead). The journal stays append-only; a done vet visit or vaccine links the visit that closed it
+  (`done_event`) (TEC-192).
 - Login is the shared password until per-person logins ship (TEC-118).
 - Livery: McLaren '25 (`mcl39`), the theme's own; changed only in the theme.
 - Every change a user would notice adds one plain-language entry to the release notes
