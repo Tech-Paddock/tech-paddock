@@ -11,7 +11,7 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 - Four tabs, Log, Analytics, What's new and Upcoming, opening on Log: the owner's override
   (2026-10-20, widened 2026-10-27 TEC-182 and 2026-10-29 TEC-192) of the app surface's one screen and no tabs. One-handed, thumb-first.
-- An app bar over the tabs: theme, logout, Meals today and the livery badge.
+- An app bar over the tabs: theme, logout and the livery badge (Meals today left, TEC-193).
 - Every form opens as a bottom sheet.
 - Installable through `/app.webmanifest`.
 

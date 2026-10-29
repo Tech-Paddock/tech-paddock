@@ -55,6 +55,9 @@ export const FOODS: Record<FoodType, Food[]> = {
       kcalPer: 369,
       unit: "cup",
     },
+    // Which kibble goes in the mat is not recorded, so no calories (TEC-193). No amount of its own: it
+    // opens on the same default as every other meal.
+    { id: "snuffle-mat", name: "Snuffle mat", kcalPer: null, unit: "cup" },
     { id: MISC_ID, name: "Misc", kcalPer: null, unit: null },
   ],
   treat: [

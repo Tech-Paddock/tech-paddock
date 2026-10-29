@@ -15,7 +15,7 @@
  * `lando_box_leash_spot`); change both together.
  */
 
-import { FOOD_TYPES, FOOD_UNITS, cleanFoodName, findFood, foodNameTaken, formatAmount, unitLabel, type AddedFood, type FoodType, type FoodUnit } from "./foods";
+import { FOOD_TYPES, FOOD_UNITS, cleanFoodName, findFood, foodNameTaken, formatAmount, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit } from "./foods";
 import { dateLabel, fromDateInput, localMidnight, shortDate, toDateInput } from "./localtime";
 
 export const LOG_KINDS = ["potty", "food", "exercise", "weight", "health"] as const;
@@ -105,14 +105,23 @@ export function spotOptions(current: Spot | "" | null | undefined): Opts<Spot> {
 }
 
 /**
- * Time outside is picked from chips only (TEC-186): "<=5" (saves 5), then 10 to 30 in fives, 45, 60. The
- * stored `minutes` is any whole 1 to OUT_MINUTES_MAX, which the server and database still accept, so an
- * older entry holding another number keeps it.
+ * Time outside is picked from range chips only (TEC-186, ranges TEC-193): up to 5, 5 to 15, 15 to 30, 30 to
+ * 45 and 45 to 60 minutes. A chip stores its upper bound in `minutes`, so the stored value is still any
+ * whole 1 to OUT_MINUTES_MAX, which the server and database accept: an older entry holding another number
+ * (10, 20, 25) keeps it and reads "N min".
  */
-export const OUT_MINUTES_CHIPS = [5, 10, 15, 20, 25, 30, 45, 60] as const;
+export const OUT_MINUTES_CHIPS = [5, 15, 30, 45, 60] as const;
 export const OUT_MINUTES_MAX = 120;
-/** A chip's face: the first one reads "≤5" and saves 5. */
-export const outMinutesLabel = (m: number) => (m === 5 ? "≤5" : String(m));
+const OUT_RANGES: Record<number, string> = { 5: "≤5", 15: "5–15", 30: "15–30", 45: "30–45", 60: "45–60" };
+/** A chip's face: "≤5", "5–15"… (the upper bound is what it saves). */
+export const outMinutesLabel = (m: number) => OUT_RANGES[m] ?? String(m);
+/** The feed's words for a stored `minutes`: a range for the five chip values, "N min" for any other. */
+export const outMinutesText = (m: number) => `${outMinutesLabel(m)} min`;
+/** A chip's name for a screen reader. */
+export const outMinutesAria = (m: number) => (m === 5 ? "5 minutes or less" : `${OUT_RANGES[m].replace("–", " to ")} minutes`);
+/** The chip a stored value matches, or null (an older value such as 10 picks no chip). */
+export const outMinutesChip = (m: number | null | undefined): number | null =>
+  m !== null && m !== undefined && (OUT_MINUTES_CHIPS as readonly number[]).includes(m) ? m : null;
 export type PottyDetails = {
   what: PottyWhat;
   where: (typeof WHERE)[number];
@@ -536,6 +545,26 @@ export function treatEntry(
   };
 }
 
+/** The inline treat row on Potty and Training (TEC-193): the pick, how many, and the id its entry will have. */
+export type InlineTreat = { id: string; item_id: string; qty: number | null };
+
+/**
+ * What the inline treat row saves after its parent: one treat entry at the parent's time and person, or
+ * nothing when the quantity is empty or 0. The row opens at 0, so a form saved without touching it logs no
+ * treat. Any other quantity must be a whole number, 1 or more. Throws `InvalidEvent` like any form.
+ */
+export function inlineTreatEntries(
+  t: InlineTreat,
+  at: string,
+  personId: string | null,
+  added: readonly AddedFood[] = []
+): ReturnType<typeof treatEntry>[] {
+  if (t.qty === null || t.qty === 0) return [];
+  const bad = treatQtyError(t.qty);
+  if (bad) throw new InvalidEvent(bad);
+  return [treatEntry({ id: t.id, item_id: t.item_id, amount: t.qty }, at, personId, added)];
+}
+
 /** How far behind today the journal is read. A clock with nothing in it says so. */
 export const HORIZON_DAYS = 30;
 
@@ -672,21 +701,6 @@ export function pillStatus(clock: Clock, elapsedMs: number | null): PillStatus |
   const ms = Math.max(0, elapsedMs);
   if (clock === "food") return ms >= MEAL_RED_MS ? "red" : ms >= MEAL_YELLOW_MS ? "yellow" : "green";
   return ms > POTTY_RED_MS ? "red" : ms >= POTTY_YELLOW_MS ? "yellow" : "green";
-}
-
-/**
- * Meals logged on the phone's local day of `now` (TEC-142): live meals only.
- * Treats are not meals, and a voided or deleted meal is not live. Midnights
- * come from the calendar, so a DST day is 23 or 25 hours and still one day.
- */
-export function mealsToday(events: JournalEvent[], now: Date): number {
-  const start = localMidnight(now).getTime();
-  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
-  return liveEvents(events).filter((e) => {
-    if (e.kind !== "food" || food(e).type !== "meal") return false;
-    const t = Date.parse(e.at);
-    return t >= start && t < end;
-  }).length;
 }
 
 /* ── Linking to a medical issue (TEC-142) ────────────────────────────────── */
@@ -949,7 +963,7 @@ export function describe(
           : [
               "outside",
               p.leash ? LEASH_LABELS[p.leash].toLowerCase() : "",
-              p.minutes ? `${p.minutes} min` : "",
+              p.minutes ? outMinutesText(p.minutes) : "",
             ]
               .filter(Boolean)
               .join(" · ");

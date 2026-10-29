@@ -2,13 +2,14 @@
 
 import { useEffect, useRef } from "react";
 import { formatAmount } from "@/lib/foods";
+import { SCROLLER_ROW as ROW, SCROLLER_WIDTH, scrollerWindow } from "@/lib/scroller";
 
-const ROW = 40; // px per step; three rows show, the middle one is the pick
 const SETTLE_MS = 90;
 
 /**
  * A scroll picker for a food amount (TEC-136), in eighths: a short column that
- * snaps one step at a time, the middle row being the pick. A local pattern,
+ * snaps one step at a time, the middle row being the pick, with half a row of
+ * each neighbour showing (TEC-193). A local pattern,
  * copied from no other app: the native `<select>` opens a full-screen list on
  * a phone, and a typed amount was a keyboard and a fraction to spell.
  *
@@ -76,12 +77,15 @@ export default function AmountScroller({
     pick(index + step[e.key]);
   }
 
+  const win = scrollerWindow();
   const text = (o: number | null) => (o === null ? "—" : formatAmount(o));
 
   return (
-    <div className="relative h-[120px] min-w-0 overflow-hidden rounded-[10px] border border-line bg-paper focus-within:border-accent">
+    <div style={{ height: win.height, maxWidth: SCROLLER_WIDTH }}
+      className="relative min-w-0 overflow-hidden rounded-[10px] border border-line bg-paper focus-within:border-accent">
       {/* The pick's band, behind the rows. */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-x-1 top-[40px] h-[40px] rounded-lg bg-raised" />
+      <div aria-hidden="true" style={{ top: win.bandTop, height: win.bandHeight }}
+        className="pointer-events-none absolute inset-x-1 rounded-lg bg-raised" />
       <div
         id={id}
         ref={box}
@@ -94,7 +98,7 @@ export default function AmountScroller({
         onKeyDown={onKey}
         className="relative h-full snap-y snap-mandatory overflow-y-scroll overscroll-contain outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div style={{ height: ROW }} aria-hidden="true" />
+        <div style={{ height: win.pad }} aria-hidden="true" />
         {options.map((o, i) => (
           <div
             key={o ?? "none"}
@@ -102,13 +106,13 @@ export default function AmountScroller({
             onClick={() => pick(i, true)}
             style={{ height: ROW }}
             className={`flex snap-center items-center justify-center tabular-nums ${
-              i === index ? "text-lg font-bold text-ink" : "text-ink-soft"
+              i === index ? "text-base font-bold text-ink" : "text-ink-soft"
             }`}
           >
             {text(o)}
           </div>
         ))}
-        <div style={{ height: ROW }} aria-hidden="true" />
+        <div style={{ height: win.pad }} aria-hidden="true" />
       </div>
     </div>
   );

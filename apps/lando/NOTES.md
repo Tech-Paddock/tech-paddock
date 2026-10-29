@@ -118,11 +118,9 @@
   Tests: `tests/pillsway.test.ts`.
 - **The meal gaps under the pills are gone** (TEC-172's second lines, removed by TEC-186, with `mealGaps`,
   `mealGapText`, `formatGap` and `tests/mealgaps.test.ts`). Meal-to-poop timing lives in Analytics only.
-- **Meals today** (TEC-142): "Meals today: N" at the right of the app bar, beside the livery badge
-  (`mealsToday`: live `meal` entries whose `at` falls in the phone's local day; treats, voided and
-  deleted entries do not count). The bar is the page's server component, so `app/Meals.tsx` is a
-  small context: `Journal` reports the count (`useReportMeals`), `MealsBadge` shows it, and
-  nothing shows until the journal has loaded. The bar wraps rather than clips on a very narrow phone.
+- **The app bar** (TEC-193, `app/AppBar.tsx`): the name, theme, logout and the livery badge. **"Meals today: N" is
+  gone** (TEC-142's `Meals.tsx` context, `useReportMeals` and `mealsToday` with its tests were removed); the Meal
+  pill already counts meals. The bar wraps rather than clips on a very narrow phone.
 - **Related issue** (TEC-142), on **Potty** and on a **vet visit** (not on a medical issue), behind a
   **Medical issue** checkbox (TEC-161): unticked, the select is hidden and no `issue` is saved;
   ticked, a plain `<select>` of None and the newest 20 live medical issues, labelled by date and pick ("Oct 24 ·
@@ -213,40 +211,50 @@
   tint at least 11:1. Food's light burnt papaya is the nearest to the yellow status; the two never sit side
   by side. The Log buttons, Analytics and the day timeline keep their own colours.
 - **A treat's amount is a plain whole-number box** (TEC-188, `app/TreatQty.tsx`, a digits-only text input with a
-  numeric keypad, min 1, opens on 1), in the Food form when Type is Treat and in Training's "+ Treat" pop-up.
-  Meals keep the scroller below. `treatQtyError` (`lib/foods.ts`) is the form's rule (a new treat: whole, 1 or
+  numeric keypad, min 1, opens on 1), in the Food form when Type is Treat (opens on 1) and in the inline treat row on Potty and Training (opens on 0,
+  below). Meals keep the scroller below. `treatQtyError` (`lib/foods.ts`) is the form's rule (a new treat: whole, 1 or
   more); a correction that never touched the box saves the amount it opened on, so an older treat holding a
   part of a piece (or none) is not forced to change. Stored shape and `parseDetails` are unchanged (the server
   still accepts any amount above 0). The What select and the amount sit in a grid with `items-start`, so What
-  keeps a normal input height beside the 120px scroller.
+  keeps a normal input height beside the scroller.
 - **Food amount, for meals, is a scroll picker in ⅛ steps** (TEC-136, `app/AmountScroller.tsx`, a local
-  pattern): three rows show, the middle one is the pick, it snaps a step at a time; one
+  pattern): **a small window, two rows tall (TEC-193)**: the pick in full with half of the amount above and half
+  of the amount below peeking in, 88px wide at most (`lib/scroller.ts`: `SCROLLER_ROW` 32, `SCROLLER_WIDTH`,
+  `scrollerWindow()` holds the height, the half-row padding and the band, and `tests/inlinetreat.test.ts` holds
+  the window); it snaps a step at a time; one
   `spinbutton` for screen readers (arrows step, Page keys a whole unit, Home and End). It offers
   "—" (no amount, as before) and 1/8 up to `AMOUNT_PICKER_MAX` (20) (`amountOptions`). The stored
   bound is unchanged (above 0, at most 1000). An amount the form opened on that is not an eighth
   (an older 1/3) or is past 20, and a phone's remembered meal amount, are slotted into the list,
   so an untouched correction keeps them. Eighths read as fractions, reduced (`formatAmount`:
   "1/8", "3/8", "1 1/4"). Defaults unchanged: a treat opens on 1, a meal on this phone's last
-  meal amount, or "—" on its first.
-- **Treats on Training** (TEC-136): "+ Treat" beside Treats used opens a pop-up (a nested
-  `Sheet`, drawn into `<body>`; its Escape closes it alone) to pick the treat (opens on Misc) and
-  its amount (the whole-number box, opens on 1). Add treat queues it in the form ("To log on save: …", ✕
-  removes it) and adds one to Treats used (✕ takes one off); the number stays editable. On Save,
-  each queued treat becomes a food `treat` entry at the session's exact `at` and Human
-  (`treatEntry`), saved **after** the session:
-  - New session: the session is a pending row carrying its treats (`then`, mirrored in
-    `lando.unsaved` with it). Once it saves, each treat is saved as its own row with its own
-    Retry. If the session fails, its row reads "+ 2 treats" with Not saved: Retry saves the
-    session and then its treats; ✕ discards both, so no treat is ever logged for a session that
-    never was.
-  - Closing the sheet without saving drops the queue with the rest of the form: nothing is logged.
-  - Correction: the queued treats are saved once the correction succeeds; if it fails, the form
-    stays open with its error and the queue intact.
-  - Deleting a training leaves its treats: they were eaten. Delete one from the feed if it was not.
-  - A correction shows the treats already logged with the session ("Logged: …", `treatsWith`):
-    live food treats at the session's exact `at`, to the millisecond. There is no link column.
-    Moving the session's When in a correction leaves its treats at the old time (correct them
-    from the feed), and they then no longer show on it.
+  meal amount, or "—" on its first. The **Snuffle mat** (TEC-193, `lib/foods.ts`, id `snuffle-mat`, unit cup, no
+  calories, before Misc) takes that same default: there is no per-item amount.
+- **The inline treat row on Training and Potty** (TEC-193, replacing Training's "+ Treat" pop-up of TEC-136;
+  `app/TreatRow.tsx`, one component for both forms): a treat pick (the code list plus foods added in the app,
+  TEC-191, Misc last; opens on Misc) beside **Qty** (the whole-number box; **opens on 0**, which logs nothing).
+  On Training it sits after Other dogs and before Commands; on Potty it sits right below Time outside, and in
+  the same place for an inside potty (after Spot). Fun has no row and keeps its Length and Treats used boxes.
+  On Save, a Qty of 1 or more becomes one food `treat` entry at the entry's exact `at` and Human
+  (`inlineTreatEntries`, which calls `treatEntry`), saved **after** it; Qty 0 or empty saves none.
+  - Its id is fixed when the form opens (`treatId`), so a retry is the same row.
+  - New entry: the entry is a pending row carrying the treat (`then`, mirrored in `lando.unsaved` with it).
+    Once it saves, the treat is saved as its own row with its own Retry. If the entry fails, its row reads
+    "+ 1 treat" with Not saved: Retry saves the entry and then the treat; ✕ discards both, so no treat is ever
+    logged for an entry that never was (`lib/saveOrder.ts`).
+  - Closing the sheet without saving logs nothing. A failed correction keeps the form open, the row intact.
+  - **Training's stored `treats` is a count of treat entries** (as before): a new training stores 1 when Qty is
+    above 0, else 0; a correction stores the count it had plus 1 for a treat added now. The "Treats used" box is
+    gone from Training (Fun keeps it); how many pieces is the treat entry's amount.
+  - Deleting a training or potty leaves its treats: they were eaten. Delete one from the feed if it was not.
+  - A correction (Training or Potty) shows the treats already logged with it ("Logged: …", `treatsWith`): live
+    food treats at the entry's exact `at`, to the millisecond. There is no link column. Moving the entry's
+    When in a correction leaves its treats at the old time (correct them from the feed), and they then no
+    longer show on it. The row opens on 0 on a correction too, so nothing already logged is saved twice.
+- **Training's layout** (TEC-193): Time (min) sits on the top row beside Inside/Outside, then Other dogs, the
+  treat row, then **Commands practised**, a native multi-select over `COMMANDS` (a phone shows a checklist) with
+  "Picked: Sit, Down" under it. The picks are stored exactly as before, filtered to the list's order
+  (`parseDetails`). The `Chips` component is gone with it.
 - **What's new** (TEC-182, plain text since TEC-186; `app/WhatsNew.tsx`): the third tab, after Analytics. **No
   cards.** Per day, a line "Oct 27 | a short summary of the day" (bold), then that day's entries as "•" bullets.
   It shows the newest `DAYS_SHOWN` (7) **whole days** (`shownDays`), newest first, never a day cut short. Data
@@ -356,19 +364,23 @@
   Live data at TEC-186: no entry holds leash `pen` or any `spot`. `box` is in `lando.details_ok` through migration
   `lando_box_leash_spot` (both lists widened, `'box'` added; the spot list is written `('box', 'crate', 'pen',
   'loose')` because `tests/details-ok-superset.test.ts` mutates the literal `'crate', 'pen', 'loose')`).
-- **Potty's Time outside** (TEC-176, chips only since TEC-186) shows only while Where is Outside, below Leash:
-  **chips only, no number box**: **≤5** (the character "≤", saves 5), 10, 15, 20, 25, 30, 45, 60
-  (`OUT_MINUTES_CHIPS`, `outMinutesLabel`; the ≤5 chip is labelled "5 minutes or less" for screen readers). The pick is the answer. The eight chips are one `grid-cols-8` row (about 39px wide, 44px tall at 360px; TEC-188), so a ninth would need a second row.
-  Time from going out to coming back in. Optional: nothing
+- **Potty's Time outside** (TEC-176, range chips since TEC-193) shows only while Where is Outside, below Leash:
+  **range chips only, no number box**: **≤5**, **5–15**, **15–30**, **30–45**, **45–60** (`OUT_MINUTES_CHIPS`
+  5, 15, 30, 45, 60; `outMinutesLabel`; the en dash is the character "–"; screen readers get "5 minutes or
+  less", "5 to 15 minutes"…, `outMinutesAria`). **Each chip stores its upper bound in the existing `minutes`**,
+  so no migration. Five chips are one `grid-cols-5` row. The pick is the answer. Time from going out to coming
+  back in. Optional: nothing
   is picked on a new entry, it is never remembered per phone, and a correction opens holding the entry's own
-  minutes. **An off-chip stored value (7, 90) shows no chip picked and saves unchanged** unless a chip is tapped;
-  there is no extra chip for it. Tapping the picked chip again clears it. Switching Where to Inside drops it from the save. No
+  minutes. **A stored value that is not one of the five (7, 10, 20, 25, 90, from the earlier chips) shows no chip
+  picked, saves unchanged** unless a chip is tapped, and **reads "N min"** in the feed; the five read as ranges
+  (`outMinutesText`: "≤5 min", "5–15 min"…; `outMinutesChip` finds the chip a value matches). There is no extra chip
+  for an old value. Tapping the picked chip again clears it. Switching Where to Inside drops it from the save. No
   potty keeps it. Stored as optional `minutes` in potty details, outside only (`parseDetails` for any whole 1
   to `OUT_MINUTES_MAX` (120), and `details_ok`, migration `lando_potty_minutes`); the bound was not narrowed and
   no data was touched. It shows on the feed row only; Analytics is unchanged.
 - **A potty row's title is the what** (TEC-174; `describe()`): **Pee**, **Poop**, **Both** or **No potty**
   (`POTTY_WHAT_LABELS`), never "Potty" or "Accident". The detail never repeats it: "outside · leashed",
-  "outside" (no leash picked), "outside · leashed · 5 min" (Time outside, after the leash), "inside · box", then the issue link and photo count. An accident (`isAccident`)
+  "outside" (no leash picked), "outside · leashed · 5–15 min" (Time outside, after the leash), "inside · box", then the issue link and photo count. An accident (`isAccident`)
   keeps the red row and leads its detail with "accident, " ("accident, inside · box"). The filter pill, Log
   button and form keep the word Potty. Analytics' day timeline has its own labels (`MARK_LABELS`) and is unchanged.
 - **Photos sit below the Note** (TEC-172) on Potty, Fun and Training: `LogForm` renders one
@@ -426,7 +438,7 @@
   and by `writeEvent` for a `food` body, so the snapshot of an added food is built server-side like a
   code one. Added foods are passed as the `added` argument (`parseDetails`, `parseNewEvent`,
   `foodSnapshot`, `treatEntry`, `quickLog`, `defaultFood`); Quick log's Meal prefill opens on an added
-  meal as the last meal. Training's "+ Treat" pop-up lists added treats but has no "Add a food…".
+  meal as the last meal. The inline treat row lists added treats but has no "Add a food…".
   There is no way in the app to retire or rename an added food yet; `retired` is set by SQL.
 - **Defaults per phone** (`lib/defaults.ts`, `localStorage`): `lando.person` (asked once on a
   phone's first open, "Whose phone is this?"), `lando.defaults` (last meal item, last weight unit,
@@ -502,9 +514,10 @@
   database spells the instant `+00:00`, the phone `Z`.
 - **A sheet inside a sheet must be portalled.** The bottom sheet rises with a `transform`, which
   makes it the containing block of any `position: fixed` child; `Sheet nested` draws into
-  `<body>` for that reason. React events still bubble through the portal to the outer `<form>`,
-  so the pop-up holds no `<form>` and only `type="button"` buttons, or Enter would save the
-  session.
+  `<body>` for that reason. Nothing uses it since TEC-193 removed Training's pop-up, but it stays for the
+  next one. React events still bubble through the portal to the outer `<form>`,
+  so such a pop-up holds no `<form>` and only `type="button"` buttons, or Enter would save the
+  entry.
 - **The top of the installed app** (TEC-188). Installed, `viewportFit: "cover"` lets the page run under the status
   bar. `body` used to pad the top by `env(safe-area-inset-top)`, which only moves the first screen down; scrolled,
   content slid up through that band above the sticky tabs (`top: env(safe-area-inset-top)`) and showed behind the
@@ -512,8 +525,9 @@
   body pads the inset plus `min(inset, 8px)`, so the bar has up to 8px of clear space and Safari (inset 0) is
   unchanged. Checked here only by rewriting the inset to 47px in a Playwright run; never on a real standalone
   iPhone. Keep the strip's z-index at the tabs' (10) or below the sheet backdrop (20).
-- **The amount scroller's rows are 40px each** (`ROW` in `app/AmountScroller.tsx`): the band,
-  the padding rows and the box height (120) assume it. Change all of them together.
+- **The amount scroller's rows are 32px each** (`SCROLLER_ROW` in `lib/scroller.ts`): the band,
+  the half-row padding and the box height (two rows) all come from it through `scrollerWindow()`. Change the
+  one number; the snap math in `AmountScroller.tsx` assumes the padding is half a row.
 
 - The Supabase exposed-schemas list is outside the repo. Without `lando` on it, every read fails as
   a permissions error that reads like a bad key; `/api/health` probes `lando.events`.
