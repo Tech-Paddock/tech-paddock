@@ -35,10 +35,6 @@ export function potAndServing(recipe: Macros & { servings: number }): { pot: Mac
  *
  * The same for the pot and a serving (a share does not change with the count).
  * `null` when there is nothing to split.
- *
- * Note: the book's High protein filter (`isHighProtein`, `lib/tuning.ts`)
- * divides by the stored kcal, so a recipe near 30% can read either side of it
- * here. Different questions; neither is changed for the other.
  */
 export function calorieSplit(m: Macros): Record<SplitKey, number> | null {
   const kcal = SPLIT_KEYS.map((k) => Math.max(0, m[k]) * KCAL_PER_GRAM[k]);

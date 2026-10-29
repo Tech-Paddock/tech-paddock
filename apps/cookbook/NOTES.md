@@ -6,9 +6,11 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 
 - Next 16, React 19. Gate: `proxy.ts`, Node runtime, the one gate every app runs; `drift` fails a
   `middleware.ts`.
-- Tabs in `lib/tabs.ts`, rendered by `app/Cookbook.tsx` as one scrolling row of pills: `/`
-  Recipes, `/add` (`AddRecipe.tsx`), `/list` (signed out, it round-trips `/login?from=/list`),
-  `/brands` Your brands (`Brands.tsx`, TEC-131), `/deals` Deals (`DealsTab.tsx`, TEC-132). All panels stay mounted; a send or refresh on the
+- Tabs in `lib/tabs.ts`, rendered by `app/Cookbook.tsx` as one scrolling row of pills, **in the order
+  Recipes · Grocery list · Deals · Add · Your brands** (TEC-189): `/` Recipes, `/list` Grocery list
+  (renamed from "King Soopers list"; **the path stays `/list`** because Health redirects to it; signed
+  out, it round-trips `/login?from=/list`), `/deals` Deals (`DealsTab.tsx`, TEC-132), `/add`
+  (`AddRecipe.tsx`), `/brands` Your brands (`Brands.tsx`, TEC-131). All panels stay mounted; a send or refresh on the
   list bumps Your brands, and an edit in Your brands reloads the list. Results are toasts; a failed
   read stays inline.
 - **The look is the owner's mockup of 2026-10-23** (TEC-135; the canvas is linked from TEC-135):
@@ -37,12 +39,24 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 
 - **Add's order is Ask Claude · Link · File · Type it, and it opens on Ask Claude** (TEC-135,
   `MODES` in `AddRecipe.tsx`). The modes' behaviour is unchanged.
-- **Recipe pill** (TEC-183, `RecipeCard` in `Book.tsx`): the name, then rating as `5★` and the time
-  (each absent when unset; `ratingPill`, `lib/recipeView.ts`), then origin and "makes N" only, then
-  four macro tiles per serving (`MacroTiles`). Meal, main, cuisine, equipment, diet and tags are
-  stored and editable in Edit and the typed form, and **render nowhere**: not on the pill, the open
-  recipe or Add's draft (`pillFacts` and `MetaSummary` are gone).
+- **A recipe on the list is three short text lines** (TEC-189, `RecipeCard` in `Book.tsx`; replaces
+  TEC-183's pill with tiles): the name; "5★ · Prep 15m · Cook 30m · makes 4" (`factsLine`,
+  `lib/recipeView.ts`; each part absent when unset, and the old `total_minutes` ("35 min") stands in
+  only while neither prep nor cook is set); one serving as text, "520 kcal · 38p · 42c · 18f"
+  (`macrosLine`). The four macro tiles are gone from the list (`MacroTiles` still draws the Macros
+  tab). **Origin is not on the facts line** (it did not fit beside Prep and Cook at 360px); the open
+  recipe still says it. Meal, main, cuisine, equipment, diet and tags are stored and editable in
+  Edit and the typed form, and **render nowhere**: not on the list, the open recipe or Add's draft.
   *On the menu* stays beside the book.
+- **Prep and cook minutes** (TEC-189, the `cookbook_prep_cook_minutes` migration): two nullable
+  columns on `recipes`, bounds as `total_minutes` (1 to 2880). `total_minutes` is **kept, not
+  dropped**: 2 of 3 live recipes held it at the time, nothing converts it, and the Edit form shows a
+  "Total" box only for a recipe that has one and neither prep nor cook. A model is asked for
+  `prep_minutes` and `cook_minutes` (`META_SCHEMA_PROPERTIES`, `META_PROMPT`), no longer for a total,
+  through all four ways in; `readMeta` is the one reader. `timeMinutes` (`lib/metadata.ts`) is prep
+  plus cook (whichever is set), else the total: the book's "Under N minutes" filter and Ask Claude's
+  overrun note use it, and a recipe with nothing set never matches. Health's `GET /api/servings`
+  does not carry either column.
 - **An open recipe is in tabs** (TEC-183, `app/RecipeDetail.tsx`; replaces TEC-140's layout): the
   name, "origin · makes N · time", the rating as five tappable stars (the PATCH call; tapping the
   set star clears it) with "N of 5" or "Not rated", then a `role="tablist"` of **Ingredients ·
@@ -53,12 +67,11 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   (`calorieSplit`, `lib/breakdown.ts`), the whole-pot line (`potAndServing`) and the provenance.
   Stored numbers only; nothing is called. The segmented tabs, circles, chips and bar are local
   patterns.
-- **Add to list** is a card under the tabs (`AddToListCard`): "When are you cooking it?", chips
-  Today, Tomorrow and the next three days by name (`dayChips`: tomorrow plus 2, 3, 4, every day,
-  weekends included), "Pick a date…" opening the date input, one full-width button naming the day
-  ("Add to Friday's list"), then Edit recipe and Remove from book (with its confirm) as text
-  buttons. The helpings estimator and the pricing note are gone. The day sent is still
-  `YYYY-MM-DD` from `parseDay`; a cleared date disables the button.
+- **Add to list** is a card under the tabs (`AddToListCard`, TEC-189): "When are you cooking it?" is
+  **one date box opening on today** with an Add to list button beside it (the day chips and "Pick a
+  date…" are gone, with `dayChips` and `addButtonLabel`), then Edit and Remove as outlined buttons
+  (Remove keeps its confirm). The helpings estimator and the pricing note are gone. The day sent is
+  still `YYYY-MM-DD` from `parseDay`; a cleared date disables the button.
 - **Tests render with `react-dom/server`** (`tests/recipeOpen.test.ts`): there is no DOM or click
   harness here, so a tab "switch" is asserted by rendering `RecipeOpen` with each `tab`, not by a
   click.
@@ -71,22 +84,21 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   3:1 absolutes. Three tokens beyond the canvas were lightened to keep their pairs: `line`
   `#688071`, `danger` `#FFB4AC`, `sev-urgent` `#F8788C`.
 - **The split divides by the macros' own calories at 4/4/9, not the stored kcal**, rounded by
-  largest remainder so it adds to 100, and is labelled approximate. The High protein filter
-  (`isHighProtein`) divides by the stored kcal, so a recipe near 30% can read either side of it in
-  the breakdown.
+  largest remainder so it adds to 100, and is labelled approximate. (The book's High protein
+  filter, which divided by the stored kcal, was dropped in TEC-189.)
 - The typed path runs a name check before its pricing call.
 - An import is also refused when no fetch returned a page (`lib/fetchRun.ts`).
 - **Something else** re-asks with every turned-down draft and its reason (`lib/reroll.ts`); **Bin
   it** is a turn-down. The pile is browser state, cleared by Keep it or a new ask.
 - Ask Claude's pickers (meal, diet, cuisine, time; `lib/tuning.ts`) are requirements. Diet is tagged
-  only where the model agrees, else noted. Book filters add High protein (≥30% of kcal, computed);
-  an unset field never matches.
+  only where the model agrees, else noted. Book filters are the same four, as **one row of
+  four compact selects** under the search at 360px (`BookFilters`, `app/Tuning.tsx`; High protein
+  was dropped, TEC-189); an unset field never matches.
 - Metadata sits flat on `recipes`, read by `lib/metadata.ts`. `meal` and `diet` are
   check-constrained to `MEALS` and `DIETS`; `readMeta` drops free-of claims and macro tags. The
   rating is read only from this app's forms. Older rows read "not set" until supplied (TEC-52).
 - Editing (`lib/edit.ts`) re-estimates the whole pot whenever the ingredient list changes at all
-  (reordering counts), in one call before the one write; servings alone re-divides the pot. Card
-  pill: rating and time; meal · main · cuisine when wide. Confirmed for TEC-140: changing
+  (reordering counts), in one call before the one write; servings alone re-divides the pot. Confirmed for TEC-140: changing
   ingredients updates the macros, and the breakdown reads the row that comes back, so it follows.
 - `methodSteps` splits only on the next number in a run ("gas mark 4" stays); its tests hold the
   edges.

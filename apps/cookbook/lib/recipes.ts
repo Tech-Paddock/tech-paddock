@@ -73,7 +73,7 @@ export type RecipeDraft = {
 // One literal, not a concatenation: supabase-js parses the select string's type,
 // and a `+` turns every row into an error type.
 const COLUMNS =
-  "id, name, servings, kcal, protein_g, carbs_g, fat_g, origin, source, model, source_url, ingredients, method, note, created_at, total_minutes, meal, mains, cuisine, equipment, diet, tags, rating";
+  "id, name, servings, kcal, protein_g, carbs_g, fat_g, origin, source, model, source_url, ingredients, method, note, created_at, total_minutes, prep_minutes, cook_minutes, meal, mains, cuisine, equipment, diet, tags, rating";
 
 /**
  * How two names are compared for collision.

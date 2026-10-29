@@ -55,7 +55,10 @@ export function Stars({
 
 /** The typed form's metadata, as the strings a form holds. The server reads them with `readMeta`. */
 export type MetaForm = {
+  /** The old single time; carried so an edit never clears it, shown only while Prep and Cook are both empty. */
   total_minutes: string;
+  prep_minutes: string;
+  cook_minutes: string;
   meal: string;
   mains: string;
   cuisine: string;
@@ -67,6 +70,8 @@ export type MetaForm = {
 
 export const EMPTY_FORM: MetaForm = {
   total_minutes: "",
+  prep_minutes: "",
+  cook_minutes: "",
   meal: "",
   mains: "",
   cuisine: "",
@@ -80,6 +85,8 @@ export const EMPTY_FORM: MetaForm = {
 export function formFromMeta(meta: RecipeMeta): MetaForm {
   return {
     total_minutes: meta.total_minutes ? String(meta.total_minutes) : "",
+    prep_minutes: meta.prep_minutes ? String(meta.prep_minutes) : "",
+    cook_minutes: meta.cook_minutes ? String(meta.cook_minutes) : "",
     meal: meta.meal ?? "",
     mains: meta.mains.join(", "),
     cuisine: meta.cuisine ?? "",
@@ -114,13 +121,33 @@ export function MetaFields({
       <summary className="cursor-pointer px-3 py-2 text-sm text-ink-soft">Details (optional)</summary>
       <div className="grid grid-cols-2 gap-2 p-3 pt-1">
         <input
-          value={value.total_minutes}
-          onChange={(e) => set("total_minutes", e.target.value)}
+          value={value.prep_minutes}
+          onChange={(e) => set("prep_minutes", e.target.value)}
           inputMode="numeric"
-          placeholder="Minutes, start to plate"
-          aria-label="Total minutes"
+          placeholder="Prep (min)"
+          aria-label="Prep minutes"
           className={input}
         />
+        <input
+          value={value.cook_minutes}
+          onChange={(e) => set("cook_minutes", e.target.value)}
+          inputMode="numeric"
+          placeholder="Cook (min)"
+          aria-label="Cook minutes"
+          className={input}
+        />
+        {/* The old single time (TEC-189): only a recipe that still holds one and
+            has neither Prep nor Cook sees it, so an edit can change or clear it. */}
+        {value.total_minutes && !value.prep_minutes && !value.cook_minutes ? (
+          <input
+            value={value.total_minutes}
+            onChange={(e) => set("total_minutes", e.target.value)}
+            inputMode="numeric"
+            placeholder="Total (min), start to plate"
+            aria-label="Total minutes"
+            className={`${input} col-span-2`}
+          />
+        ) : null}
         <select
           value={value.meal}
           onChange={(e) => set("meal", e.target.value)}
@@ -135,18 +162,18 @@ export function MetaFields({
           ))}
         </select>
         <input
-          value={value.mains}
-          onChange={(e) => set("mains", e.target.value)}
-          placeholder="Main: chicken, lentils"
-          aria-label="Main ingredients, comma separated"
-          className={input}
-        />
-        <input
           value={value.cuisine}
           onChange={(e) => set("cuisine", e.target.value)}
           placeholder="Cuisine"
           aria-label="Cuisine"
           className={input}
+        />
+        <input
+          value={value.mains}
+          onChange={(e) => set("mains", e.target.value)}
+          placeholder="Main: chicken, lentils"
+          aria-label="Main ingredients, comma separated"
+          className={`${input} col-span-2`}
         />
         <input
           value={value.equipment}

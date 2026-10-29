@@ -24,9 +24,20 @@ describe("the tabs' addresses", () => {
   });
 });
 
+describe("the tab order and names (TEC-189)", () => {
+  it("is Recipes, Grocery list, Deals, Add, Your brands", () => {
+    expect(TABS.map((t) => t.label)).toEqual(["Recipes", "Grocery list", "Deals", "Add", "Your brands"]);
+  });
+
+  it("the list tab is renamed but keeps /list, and its heading says the same", () => {
+    expect(TABS.find((t) => t.id === "shop")?.label).toBe("Grocery list");
+    expect(pathFor("shop")).toBe("/list");
+    expect(readFileSync(resolve(__dirname, "../app/List.tsx"), "utf8")).toMatch(/<h2 className="text-xl font-bold">Grocery list<\/h2>/);
+  });
+});
+
 describe("the Add tab (2026-10-05)", () => {
-  it("sits between the book and the list, at /add", () => {
-    expect(TABS.map((t) => t.label).slice(0, 3)).toEqual(["Recipes", "Add", "King Soopers list"]);
+  it("is at /add", () => {
     expect(pathFor("add")).toBe("/add");
   });
 
@@ -38,9 +49,8 @@ describe("the Add tab (2026-10-05)", () => {
 });
 
 describe("Your brands, its own tab (TEC-131)", () => {
-  it("comes after the King Soopers list, at /brands, and the list keeps /list", () => {
-    // Deals (TEC-132) is the fifth tab, so the whole list is now five.
-    expect(TABS.map((t) => t.label)).toEqual(["Recipes", "Add", "King Soopers list", "Your brands", "Deals"]);
+  it("is the last tab, at /brands, and the list keeps /list", () => {
+    expect(TABS[TABS.length - 1].label).toBe("Your brands");
     expect(pathFor("brands")).toBe("/brands");
     expect(pathFor("shop")).toBe("/list");
   });
@@ -54,9 +64,9 @@ describe("Your brands, its own tab (TEC-131)", () => {
 });
 
 describe("Deals, its own tab (TEC-132)", () => {
-  it("comes right after Your brands, at /deals, and /list is unchanged", () => {
+  it("comes right after the Grocery list, at /deals, and /list is unchanged", () => {
     const labels = TABS.map((t) => t.label);
-    expect(labels[labels.indexOf("Your brands") + 1]).toBe("Deals");
+    expect(labels[labels.indexOf("Grocery list") + 1]).toBe("Deals");
     expect(pathFor("deals")).toBe("/deals");
     expect(pathFor("shop")).toBe("/list");
   });

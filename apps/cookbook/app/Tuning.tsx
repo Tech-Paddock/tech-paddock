@@ -5,18 +5,15 @@ import { NO_FILTER, TIME_CHOICES, filterActive, type BookFilter, type Picks } fr
 
 /**
  * The tuning section on screen (2026-09-26): meal, diet, cuisine and time
- * as pickers on Ask Claude, and the same four plus **High protein** as filters
- * on the book. Rules in `lib/tuning.ts`.
+ * as pickers on Ask Claude, and the same four as filters on the book (High
+ * protein was dropped from the book in TEC-189). Rules in `lib/tuning.ts`.
  *
- * **Built from the tokens that exist** — line, surface, accent, ink-soft — so
- * nothing here changes the theme, which is TechPad Gen's. Two patterns are this
- * app's own and flagged as such: the row of compact selects, and the **toggle
- * chip** (High protein) — a bordered pill that fills with the accent when on,
- * `aria-pressed` carrying the state. If another app wants either, that is
- * TechPad Gen's call.
+ * **Built from the tokens that exist** — line, surface, ink-soft — so nothing
+ * here changes the theme, which is TechPad Gen's. The row of compact selects is
+ * this app's own pattern; on the book it is one row of four at 360px.
  */
 
-const select = "min-w-0 rounded-lg border border-line bg-surface px-2 py-1.5 text-sm";
+const select = "w-full min-w-0 rounded-lg border border-line bg-surface px-1.5 py-1.5 text-[13px]";
 
 /** The four shared selects. `cuisines` are the book's own, offered as suggestions. */
 function PickSelects({
@@ -25,6 +22,7 @@ function PickSelects({
   cuisines,
   idPrefix,
   cuisineAsList,
+  bare = false,
 }: {
   value: Picks;
   onChange: (next: Picks) => void;
@@ -32,6 +30,8 @@ function PickSelects({
   idPrefix: string;
   /** A filter can only match a cuisine the book has; a picker may ask for a new one. */
   cuisineAsList: boolean;
+  /** Short labels ("Meal", "<30 min") for the book's one row of four at 360px. */
+  bare?: boolean;
 }) {
   const set = <K extends keyof Picks>(key: K, v: Picks[K]) => onChange({ ...value, [key]: v });
   return (
@@ -42,7 +42,7 @@ function PickSelects({
         aria-label="Meal"
         className={select}
       >
-        <option value="">Any meal</option>
+        <option value="">{bare ? "Meal" : "Any meal"}</option>
         {MEALS.map((m) => (
           <option key={m} value={m}>
             {m}
@@ -55,7 +55,7 @@ function PickSelects({
         aria-label="Diet"
         className={select}
       >
-        <option value="">Any diet</option>
+        <option value="">{bare ? "Diet" : "Any diet"}</option>
         {DIETS.map((d) => (
           <option key={d} value={d}>
             {d}
@@ -69,7 +69,7 @@ function PickSelects({
           aria-label="Cuisine"
           className={select}
         >
-          <option value="">Any cuisine</option>
+          <option value="">{bare ? "Cuisine" : "Any cuisine"}</option>
           {cuisines.map((c) => (
             <option key={c} value={c}>
               {c}
@@ -100,10 +100,10 @@ function PickSelects({
         aria-label="Time, start to plate"
         className={select}
       >
-        <option value="">Any time</option>
+        <option value="">{bare ? "Time" : "Any time"}</option>
         {TIME_CHOICES.map((m) => (
           <option key={m} value={m}>
-            under {m} min
+            {bare ? `<${m} min` : `under ${m} min`}
           </option>
         ))}
       </select>
@@ -139,28 +139,14 @@ export function BookFilters({
   cuisines: string[];
 }) {
   return (
-    <div role="group" aria-label="Filter the book" className="flex flex-wrap items-center gap-2">
-      <PickSelects
-        value={value}
-        onChange={(picks) => onChange({ ...value, ...picks })}
-        cuisines={cuisines}
-        idPrefix="book"
-        cuisineAsList
-      />
-      <button
-        type="button"
-        aria-pressed={value.high_protein}
-        onClick={() => onChange({ ...value, high_protein: !value.high_protein })}
-        title="At least 30% of the calories from protein — worked out from the numbers"
-        className={`rounded-full border px-3 py-1.5 text-sm ${
-          value.high_protein ? "border-accent bg-accent font-semibold text-accent-ink" : "border-line text-ink-soft"
-        }`}
-      >
-        High protein
-      </button>
+    <div role="group" aria-label="Filter the book" className="flex flex-col gap-1">
+      {/* One row of four (TEC-189): Meal, Diet, Cuisine, Time. */}
+      <div className="grid grid-cols-4 gap-1.5">
+        <PickSelects value={value} onChange={onChange} cuisines={cuisines} idPrefix="book" cuisineAsList bare />
+      </div>
       {filterActive(value) ? (
-        <button type="button" onClick={() => onChange(NO_FILTER)} className="text-sm text-ink-soft underline">
-          Clear
+        <button type="button" onClick={() => onChange(NO_FILTER)} className="self-start text-sm text-ink-soft underline">
+          Clear filters
         </button>
       ) : null}
     </div>

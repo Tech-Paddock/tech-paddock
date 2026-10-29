@@ -10,6 +10,8 @@ import {
   readList,
   readMeta,
   refusedWord,
+  timeMinutes,
+  timeParts,
 } from "@/lib/metadata";
 import { generatePrompt } from "@/lib/reroll";
 
@@ -119,9 +121,22 @@ describe("reading the rest", () => {
     }
   });
 
+  it("reads prep and cook the same way, each on its own (TEC-189)", () => {
+    const m = readMeta({ prep_minutes: "15", cook_minutes: 29.6 }, { rating: false });
+    expect([m.prep_minutes, m.cook_minutes, m.total_minutes]).toEqual([15, 30, null]);
+    for (const bad of [0, -5, 2881, "soon", null]) {
+      expect(readMeta({ prep_minutes: bad, cook_minutes: bad }, { rating: false })).toMatchObject({
+        prep_minutes: null,
+        cook_minutes: null,
+      });
+    }
+  });
+
   it("reads nothing as nothing, not as an error", () => {
     expect(readMeta(null, { rating: true })).toEqual({
       total_minutes: null,
+      prep_minutes: null,
+      cook_minutes: null,
       meal: null,
       mains: [],
       cuisine: null,
@@ -139,6 +154,56 @@ describe("the pill", () => {
     expect(formatMinutes(60)).toBe("1 h");
     expect(formatMinutes(90)).toBe("1 h 30");
     expect(formatMinutes(null)).toBeNull();
+  });
+});
+
+describe("prep and cook time (TEC-189)", () => {
+  it("is asked of a model as two fields, not one total", () => {
+    const keys = Object.keys(META_SCHEMA_PROPERTIES);
+    expect(keys).toContain("prep_minutes");
+    expect(keys).toContain("cook_minutes");
+    expect(keys).not.toContain("total_minutes");
+    expect(META_PROMPT).toMatch(/"prep_minutes"/);
+    expect(META_PROMPT).toMatch(/"cook_minutes"/);
+  });
+
+  it("the time is prep plus cook, whichever is set, else the old total", () => {
+    const none = { total_minutes: null, prep_minutes: null, cook_minutes: null };
+    expect(timeMinutes({ ...none, prep_minutes: 15, cook_minutes: 30 })).toBe(45);
+    expect(timeMinutes({ ...none, prep_minutes: 10 })).toBe(10);
+    expect(timeMinutes({ ...none, cook_minutes: 20, total_minutes: 99 })).toBe(20);
+    expect(timeMinutes({ ...none, total_minutes: 35 })).toBe(35);
+    expect(timeMinutes(none)).toBeNull();
+  });
+
+  it("is said as Prep and Cook, and the total only when neither is set", () => {
+    const none = { total_minutes: null, prep_minutes: null, cook_minutes: null };
+    expect(timeParts({ ...none, prep_minutes: 15, cook_minutes: 30 })).toEqual(["Prep 15m", "Cook 30m"]);
+    expect(timeParts({ ...none, prep_minutes: 5 })).toEqual(["Prep 5m"]);
+    expect(timeParts({ ...none, cook_minutes: 90 })).toEqual(["Cook 1h 30m"]);
+    expect(timeParts({ ...none, prep_minutes: 5, total_minutes: 35 })).toEqual(["Prep 5m"]);
+    expect(timeParts({ ...none, total_minutes: 35 })).toEqual(["35 min"]);
+    expect(timeParts(none)).toEqual([]);
+  });
+
+  describe("the migration", () => {
+    const dir = resolve(__dirname, "../../../supabase/migrations");
+    const file = readdirSync(dir).find((f) => f.endsWith("_cookbook_prep_cook_minutes.sql"));
+    const sql = file ? readFileSync(resolve(dir, file), "utf8") : "";
+    const statements = sql.replace(/--.*$/gm, "");
+
+    it("exists, is additive, and drops nothing (total_minutes stays)", () => {
+      expect(file).toBeDefined();
+      expect(sql).toMatch(/Shape: \*\*additive\.\*\*/);
+      expect(statements).not.toMatch(/\b(drop|rename|update|delete|truncate)\b/i);
+    });
+
+    it("adds exactly two nullable columns with the same bounds as total_minutes", () => {
+      const names = [...statements.matchAll(/add column (\w+)/gi)].map((m) => m[1]);
+      expect(names).toEqual(["prep_minutes", "cook_minutes"]);
+      expect(statements).not.toMatch(/not null/i);
+      expect(statements.match(/> 0 and \w+ <= 2880/g)).toHaveLength(2);
+    });
   });
 });
 

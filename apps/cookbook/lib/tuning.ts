@@ -1,13 +1,10 @@
-import { DIETS, MEALS, formatMinutes, type Diet, type Meal, type RecipeMeta } from "./metadata";
-import type { Macros } from "./macros";
+import { DIETS, MEALS, formatMinutes, timeMinutes, type Diet, type Meal, type RecipeMeta } from "./metadata";
 
 /**
  * The tuning section (2026-09-26): the same four options — meal,
  * diet, cuisine, time — **as pickers on Ask Claude** that steer a new draft and
- * come back tagged on it, and **as filters on the book**. Plus one filter that
- * is not a tag at all: **high protein, computed from the numbers** (TEC-52's
- * agreed rule — a macro fact is never stored, because it goes stale the moment
- * the recipe is re-priced).
+ * come back tagged on it, and **as filters on the book**. (The book's High
+ * protein filter was dropped in TEC-189; a macro fact is still never stored.)
  *
  * Pure and imported by the browser, so it never imports `supabase.ts`.
  */
@@ -90,9 +87,11 @@ export function tagWithPicks(meta: RecipeMeta, p: Picks): { meta: RecipeMeta; no
     notes.push(`You asked for ${p.diet}, and Claude did not mark this one ${p.diet} — check the ingredients before you keep it.`);
   }
   if (p.max_minutes) {
-    if (meta.total_minutes === null) notes.push(`You asked for under ${p.max_minutes} minutes; Claude gave no time.`);
-    else if (meta.total_minutes > p.max_minutes) {
-      notes.push(`You asked for under ${p.max_minutes} minutes; Claude reckons ${formatMinutes(meta.total_minutes)}.`);
+    // Prep plus cook (TEC-189), else the old total.
+    const took = timeMinutes(meta);
+    if (took === null) notes.push(`You asked for under ${p.max_minutes} minutes; Claude gave no time.`);
+    else if (took > p.max_minutes) {
+      notes.push(`You asked for under ${p.max_minutes} minutes; Claude reckons ${formatMinutes(took)}.`);
     }
   }
   return { meta: next, notes };
@@ -102,37 +101,29 @@ export function tagWithPicks(meta: RecipeMeta, p: Picks): { meta: RecipeMeta; no
 // Filters on the book
 // ---------------------------------------------------------------------------
 
-export type BookFilter = Picks & { high_protein: boolean };
+/** The book's filters are the four picks and nothing else (TEC-189 dropped High protein). */
+export type BookFilter = Picks;
 
-export const NO_FILTER: BookFilter = { ...NO_PICKS, high_protein: false };
-
-/**
- * **High protein: at least 30% of the calories from protein**, at 4 kcal a
- * gram. A share rather than grams a serving, so it does not change with the
- * servings count and means the same thing for a side as for a main. Computed on
- * every read from the stored numbers — never a tag (TEC-52).
- */
-export const HIGH_PROTEIN_SHARE = 0.3;
-
-export function isHighProtein(m: Macros): boolean {
-  return m.kcal > 0 && (m.protein_g * 4) / m.kcal >= HIGH_PROTEIN_SHARE;
-}
+export const NO_FILTER: BookFilter = NO_PICKS;
 
 export function filterActive(f: BookFilter): boolean {
-  return hasPicks(f) || f.high_protein;
+  return hasPicks(f);
 }
 
 /**
  * Does a recipe pass the filter? **A recipe with a field unset does not pass a
  * filter on that field** — "under 30 minutes" is not a claim anything can make
- * about a recipe with no time. Every filter set must hold.
+ * about a recipe with no time. The time is prep plus cook, falling back to the
+ * old total (`timeMinutes`). Every filter set must hold.
  */
-export function matchesFilter(r: RecipeMeta & Macros, f: BookFilter): boolean {
+export function matchesFilter(r: RecipeMeta, f: BookFilter): boolean {
   if (f.meal && r.meal !== f.meal) return false;
   if (f.diet && !dietSatisfies(r.diet, f.diet)) return false;
   if (f.cuisine && r.cuisine !== f.cuisine) return false;
-  if (f.max_minutes && (r.total_minutes === null || r.total_minutes > f.max_minutes)) return false;
-  if (f.high_protein && !isHighProtein(r)) return false;
+  if (f.max_minutes) {
+    const took = timeMinutes(r);
+    if (took === null || took > f.max_minutes) return false;
+  }
   return true;
 }
 
