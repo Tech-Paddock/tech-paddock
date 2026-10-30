@@ -667,9 +667,16 @@ export function cupsWord(cups: number): string {
   return Math.max(1, Math.round(cups * 8)) <= 8 ? "cup" : "cups";
 }
 
+/** A count in halves as a mixed fraction, never a decimal: "2", "½", "2½" (TEC-197). */
+export function formatMealCount(count: number): string {
+  const whole = Math.floor(count);
+  if (count === whole) return String(whole);
+  return `${whole || ""}½`;
+}
+
 /**
- * Today's meals for the Meal pill: how many (live meals on the phone's day, voids out, treats never)
- * and the cups eaten (only meals logged in cups add; Misc and other units count toward `count` alone).
+ * Today's meals for the Meal pill: how many (live meals on the phone's day, voids out, treats never;
+ * a meal is 1 and a snuffle mat 0.5, TEC-197) and the cups eaten (only meals logged in cups add; Misc and other units count toward `count` alone).
  * `cups` is null when no meal today has a cup amount.
  */
 export function mealsSummary(events: JournalEvent[], now: Date): { count: number; cups: number | null } {
@@ -681,8 +688,8 @@ export function mealsSummary(events: JournalEvent[], now: Date): { count: number
     if (e.kind !== "food" || !isMealType(food(e).type)) continue;
     const t = Date.parse(e.at);
     if (t < start || t >= end) continue;
-    count++;
     const f = food(e);
+    count += f.type === "snuffle" ? 0.5 : 1;
     if (f.unit === "cup" && typeof f.amount === "number" && f.amount > 0) cups = (cups ?? 0) + f.amount;
   }
   return { count, cups };
@@ -691,7 +698,8 @@ export function mealsSummary(events: JournalEvent[], now: Date): { count: number
 /** The Meal pill's face: "Meals: 2 · 1⅛ cups", or "Meals: 2" when no cup amount was logged. */
 export function mealPillLabel(events: JournalEvent[], now: Date): string {
   const { count, cups } = mealsSummary(events, now);
-  return cups === null ? `Meals: ${count}` : `Meals: ${count} · ${formatCups(cups)} ${cupsWord(cups)}`;
+  const n = formatMealCount(count);
+  return cups === null ? `Meals: ${n}` : `Meals: ${n} · ${formatCups(cups)} ${cupsWord(cups)}`;
 }
 
 /**
