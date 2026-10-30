@@ -79,6 +79,17 @@ section and closing comment before changing anything in this file.
   quantity; List and In cart each show a total, labelled with the night the prices are from. A
   line with no saved product, no recent price or an unsettled Pick one is "no price yet", counted
   in the total's line and never $0. Nothing calls Kroger to price the list.
+- **A list line says what its price means, from the same nightly data** (TEC-196). On List and In
+  cart each line stays **on one line**: the name truncates with an ellipsis and the full text is the
+  line's `title`, while the price, the bubble and the button keep their size. The **bubble** reads
+  "Sale $2.99" when the saved product's night has promo below regular, and "Coupon" only when a
+  staged coupon (`cookbook.coupons`) lists its code; never invented. The line is **shaded by the
+  Deals stoplight for that product**: green when Deals calls it green, red when red, plain
+  otherwise; **before 4 weeks of history, on sale or with a coupon is good, else plain, never red**.
+  A line with no saved product or no recent price stays plain. Colour is never the only cue: the
+  bubble or a word ("Good price", "High price") says why. A line's shade and the Deals board come
+  from one function and never disagree. A **Best** toggle on the List shows only the lines that are
+  Best (below). No Kroger call, no model.
 - Kroger is the only stored credential: one refresh token, encrypted under `KROGER_TOKEN_KEY`, plus
   the chosen store. Never sent to the browser or logged. Scope: add-to-cart and product read.
 - The Kroger access token is never stored.
@@ -147,7 +158,7 @@ section and closing comment before changing anything in this file.
   Pickup/Delivery choice.
 - Each saved brand keeps product ID, page, size, last price, stock and when checked. Refresh runs
   when any Cookbook page loads over seven days after the last, or on **Refresh now**; the weekly
-  deal scan, which feeds the list's sale tags, starts the same way. Every tab panel is mounted, so
+  deal scan, which fills a Deals row for a product with no fresh night, starts the same way. Every tab panel is mounted, so
   the cart hook's mount effect runs both from any tab. **The refresh is what keeps the Kroger
   sign-in alive.** It updates price and stock, flags a product Kroger no longer returns rather than
   dropping it, and offers the closest product by name as its successor; replacing keeps the names
@@ -179,9 +190,13 @@ section and closing comment before changing anything in this file.
   - otherwise no colour.
   - Under 4 weeks of history it reads "new: building history".
   - The thresholds are reviewed in TEC-138.
-- **Deals shows every deal, coloured,** with search, aisle groups, All · On sale · Coupon · Stacks,
+- **Deals shows every deal, coloured,** with search, aisle groups, All · On sale · Coupon · Stacks · Best,
   and an Any · Green · Neutral · Red · New filter. Each deal shows its usual price and an 8-week
   trend.
+- **Best** (TEC-196; the owner's pick, 2026-10-29) is tonight's price at, or within 5% of, that
+  product's lowest nightly price in the last 12 weeks, and needs at least 2 nights. It is one pure
+  function (`lib/bestPrice.ts`) used by Deals and the Grocery list, so they never disagree. Its
+  empty state says why: under 2 nights, or nothing at its low.
 - **Deals says when the nightly check last ran,** and **every empty filter says why** (TEC-190):
   the colours cannot show before 4 weeks of prices, so Green, Neutral and Red say when they start
   until then.

@@ -15,7 +15,9 @@ import { ALL_AISLES, NO_FILTER, emptyMessage, groupByAisle, matchesFilter, short
  *   shopping list (`lib/listDeals.ts`), from the board and the list already
  *   read; no request of its own;
  * - search, the aisle chips (Kroger's own categories), **All · On sale ·
- *   Coupon · Stacks**, and **Any · Green · Neutral · Red · New**;
+ *   Coupon · Stacks · Best** (Best, TEC-196: at, or within 5% of, the lowest
+ *   night in 12 weeks, `lib/bestPrice.ts`, shared with the Grocery list), and
+ *   **Any · Green · Neutral · Red · New**;
  * - each row: the name, its usual price, the sale and coupon tags, today's
  *   price, the stoplight's reason and an 8-week trend (the last bar is today);
  * - a product with under four weeks of history reads "new: building history",
@@ -35,6 +37,7 @@ const KINDS: [Kind, string][] = [
   ["sale", "On sale"],
   ["coupon", "Coupon"],
   ["stack", "Stacks"],
+  ["best", "Best"],
 ];
 
 const LIGHTS: [LightFilter, string][] = [
@@ -73,11 +76,12 @@ function Trend({ row }: { row: DealRow }) {
   );
 }
 
-function Tag({ children, tone }: { children: React.ReactNode; tone: "sale" | "coupon" | "stack" | "out" }) {
+function Tag({ children, tone }: { children: React.ReactNode; tone: "sale" | "coupon" | "stack" | "best" | "out" }) {
   const tones = {
     sale: "bg-accent text-accent-ink",
     coupon: "bg-raised text-ink",
     stack: "border border-accent text-accent",
+    best: "border border-accent text-accent",
     out: "border border-line text-ink-soft",
   };
   return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tones[tone]}`}>{children}</span>;
@@ -115,6 +119,7 @@ function Row({ row, forLines }: { row: DealRow; forLines?: string[] }) {
             </Tag>
           ))}
           {row.stacks ? <Tag tone="stack">Stacks</Tag> : null}
+          {row.best.qualifies ? <Tag tone="best">Best</Tag> : null}
           {row.inStock === false ? <Tag tone="out">Out of stock</Tag> : null}
         </div>
       </div>
@@ -202,7 +207,7 @@ export default function DealsTab({ refreshKey = 0, openLines = null }: { refresh
           aria-label="Search deals"
           className="min-h-11 rounded-xl border border-line bg-surface px-3.5 text-base"
         />
-        <div role="group" aria-label="Show" className="grid grid-cols-4 gap-1 rounded-xl bg-raised p-1">
+        <div role="group" aria-label="Show" className="grid grid-cols-5 gap-1 rounded-xl bg-raised p-1">
           {KINDS.map(([id, label]) => (
             <button
               key={id}
@@ -299,6 +304,7 @@ export default function DealsTab({ refreshKey = 0, openLines = null }: { refresh
       <p className="px-2 text-[11px] text-ink-soft">
         Prices are Kroger&rsquo;s at your store, recorded every night about 3 a.m. Denver time; a missed night is a gap, never filled in.
         Green is 15% or more under a product&rsquo;s usual price, or at its 12-week low and under its usual; red is 10% or more over, even on sale.
+        Best is today&rsquo;s price at, or within 5% of, a product&rsquo;s lowest night in the last 12 weeks, once it has 2 nights.
         Coupons come only from your own Chrome task, once it has run.
       </p>
     </section>

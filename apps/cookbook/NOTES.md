@@ -289,8 +289,8 @@ Reasoning is in the migration headers.
   phrase, plus every open line; a deal is `promo < regular`, sorted by percent off, then dollars.
   Runs when any Cookbook page loads and the latest scan is over seven days old (`scanDue`): every
   tab panel is mounted, and the cart hook's mount effect starts it. **No panel shows it and there
-  is no Scan button (TEC-132)**: it feeds the list lines' sale tags and the Deals board's products
-  with no fresh night. A scan that throws saves nothing, so the next page load retries, and the
+  is no Scan button (TEC-132)**: it feeds only the Deals board's products
+  with no fresh night (the list's sale bubble reads the nightly prices since TEC-196). A scan that throws saves nothing, so the next page load retries, and the
   King Soopers panel says so in red.
 - Coupons are never read here. The *Find coupons* link left with the panel (TEC-132), and
   `couponsUrl` with it.
@@ -298,7 +298,8 @@ Reasoning is in the migration headers.
   `describeEstimate`, the *Calculate estimated total* / *estimate it* buttons and `EstimatePanel`
   (and `app/Deals.tsx` with it) are gone. **The list's totals are summed from the nightly check**
   (`lib/listPrices.ts`, pure, the browser runs it): `GET /api/grocery` reads the connection's store
-  and `readNightsSince` (the last `PRICE_WINDOW_NIGHTS`, 5, nights), takes each product's newest
+  and `readNightsSince` (12 weeks since TEC-196, for Best; the newest night within
+  `PRICE_WINDOW_NIGHTS`, 5, counts for the price), takes each product's newest
   night, and gives each line `price: {unit, total, onSale, night}` or `null`. The product a line is
   priced as is `productFor`: the only saved product, a chosen one (default or named) or the single
   Kroger-name match; an unsettled Pick one is **not guessed**, so it reads "no price yet" until a
@@ -311,13 +312,32 @@ Reasoning is in the migration headers.
 - Pickup/Delivery: `PATCH /api/kroger`, `lib/modality.ts` (no imports; the browser runs it). Send
   puts `modality` on each `/cart/add` item; a 400 or 422 is retried once without it, the rest of
   that send goes without, and `modalityWarning` says so. Not retried on 401, 403 or an outage.
-- On-sale tag on a list line: "On sale, N% off until <date>" (`lib/saleTag.ts`, type-only
-  imports). No Kroger call of its own: `List.tsx` computes the tags (`saleTags`) from the cart
-  hook's latest scan. The scan matches open lines by name, case-insensitive, and
-  only when its `location_id` is the chosen store.
-  A passed end date tags nothing; no end date drops "until". Says sale, never coupon (TEC-126). The
-  chip is a local pattern in `app/List.tsx`. Since TEC-190 only the scan tags (the estimate
-  override is gone) and only open List lines are tagged.
+- **The sale/coupon bubble, the shade and Best on a list line** (TEC-196). `lib/saleTag.ts` is
+  gone (it read the weekly scan); `lib/lineDeal.ts` (pure) replaces it. `GET /api/grocery` adds
+  `deal` to every line (`lineDeals`): from the line's saved product (`productFor`), its newest
+  night **within `FRESH_NIGHTS` (3), the Deals board's own rule**, its weeks (`readWeeksSince`) and
+  the active staged coupons (`readCoupons`), through `productSignal` (`lib/dealSignal.ts`), **the
+  same function `buildDealBoard` calls**, so a line's shade and the board's colour cannot differ.
+  `deal` is `{shade, reason, salePrice, coupon, best, bestNights}` or `null` (no saved product, no
+  night that fresh, no price: plain, no bubble). **Shade**: green is good, red is bad, else plain;
+  `new` (under `MIN_WEEKS`) is good when on sale or with a coupon, never bad (`shadeOf`). The bubble
+  is "Sale $2.99" (night's sale below regular), "Coupon" (a staged coupon lists the code, matched
+  by code only; none staged today so only sales show), or "Sale + coupon". Colour is never the
+  only cue: a bubble, or "● Good price" / "● High price" (shortened to Good / High beside a
+  bubble, with the full words as `title`/`aria-label`). A failed weeks/coupons read comes back as
+  `dealError`, said in the header, and lines stay plain; prices are unaffected. Ticked lines are
+  not shaded. The row is one line: name `truncate`, small line `truncate` with `overflow-hidden`,
+  the mark, bubble, word, price, ×N and buttons `shrink-0`; the row's `title` is the whole text.
+  Shading is a 4px left edge plus an 8% wash (`SHADE_CLASS` in `app/List.tsx`; local pattern, the
+  Deals row's edge and tints); `tests/dealShade.test.ts` holds ink, soft ink and the tint at 4.5:1
+  on it, Clark light and dark, over paper, surface and raised.
+- **Best** (`lib/bestPrice.ts`, pure, `BEST_WITHIN` 0.05, `BEST_MIN_NIGHTS` 2): tonight's effective
+  price at or within 5% of the lowest night in the 12 weeks to today (day 84 back counts), needing
+  at least 2 priced nights. Deals' Best button (fifth in the Show group; `DealRow.best`, board
+  `nightsHeld`) and the List's **Best** toggle (`aria-pressed`, filters `i.deal?.best`) both read
+  it. Empty states: Deals `bestEmpty` and the List's `bestEmptyWords` say "needs at least 2 nights"
+  or "nothing is at its low". Until a 2nd night exists nothing is Best. The Deals board now reads
+  12 weeks of nights (was 3) for it.
 - Picking a store does not start a scan; the old store's scan tags nothing until the next scan.
 - `Cart.tsx` runs every token-borrowing request through `serial`, one at a time: any page load can
   start a refresh and a scan together. The Pickup/Delivery switch (`ModeSwitch`), the List and In
@@ -465,7 +485,7 @@ array**; each element is a product row or a search-word row.
   lines, the legend, **Send all to cart**), **In cart · N** (Remove per line, Clear cart, Go to
   checkout, the caveat) and the King Soopers panel (TEC-190; the sticky bar left). The header says
   "N still to buy · N in cart · store · prices from the night of …". Each List row is the tick,
-  the name over a small line (★ ? + mark, sale tag, recipes, amount, note), the price over the ×N
+  the name over a small line (★ ? + mark, bubble, recipes, amount, note), the price over the ×N
   box, and **+ Cart** (32px, 12px bold, accessible name "Add to cart"; `h-8`, not the 44px floor,
   by the owner's word).
 - **Each line's mark** (`lineMark`, `lib/brands.ts`; `GET /api/grocery` adds `mark`): ★ goes in
@@ -582,9 +602,11 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   lines written after. A pack conversion added later does not change lines already on the list.
 - A Tidy can raise a quantity lowered by hand, when the merged line's rule says more.
 - Preview and local deployments cannot complete Kroger sign-in; the redirect URI is production's.
-- A line added since the last scan has no sale tag until the next scan; a line renamed by Tidy
-  loses its tag the same way. With no Scan button, the next scan is the weekly one when any
-  Cookbook page loads.
+- A list line's bubble and shade need a saved product and a night within 3 days at the chosen
+  store (the Deals board's rule); a line with none is plain, which is right but can read as "no
+  deal". A product the board shows only from the weekly scan (no fresh night) is plain on the list.
+  Nothing is Best until a product has 2 nights; before ~Nov 23 nothing is red or green by history,
+  only sale or coupon is good.
 - `withAccessToken` is per request: two tabs open at once can still race token rotation, because
   `serial` covers one page.
 - **`CRON_SECRET` must be set in `tp-cookbook` (32+ characters)**: unset or short, the gate and the
