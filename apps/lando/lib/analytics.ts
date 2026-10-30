@@ -7,6 +7,7 @@
  * day 23 or 25 hours long, and subtracting would put an evening on the wrong day.
  */
 
+import { isMealType } from "./foods";
 import {
   exercise,
   food,
@@ -379,7 +380,7 @@ export function mealToPoop(events: JournalEvent[], now: Date, days = ANALYTICS_D
   const end = endOfToday(now);
   let pending = 0;
   for (const e of live) {
-    if (e.kind !== "food" || food(e).type !== "meal") continue;
+    if (e.kind !== "food" || !isMealType(food(e).type)) continue;
     const t = Date.parse(e.at);
     if (t < first || t >= end) continue;
     const row = rows[dayIndex(starts, t)];
@@ -436,7 +437,7 @@ export function foodAgainstWeight(events: JournalEvent[], now: Date, weightUnit:
   const first = starts[0].getTime();
   const end = endOfToday(now);
   const meals = liveEvents(events)
-    .filter((e) => e.kind === "food" && food(e).type === "meal")
+    .filter((e) => e.kind === "food" && isMealType(food(e).type))
     .map((e) => ({ t: Date.parse(e.at), unit: food(e).unit ?? "", amount: food(e).amount }))
     .filter((m) => m.t >= first && m.t < end);
   const counts = new Map<string, number>();

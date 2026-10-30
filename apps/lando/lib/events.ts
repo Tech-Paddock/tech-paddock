@@ -15,7 +15,7 @@
  * `lando_box_leash_spot`); change both together.
  */
 
-import { FOOD_TYPES, FOOD_UNITS, cleanFoodName, findFood, foodNameTaken, formatAmount, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit } from "./foods";
+import { FOOD_TYPES, FOOD_UNITS, cleanFoodName, isMealType, listOf, findFood, foodNameTaken, formatAmount, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "./foods";
 import { dateLabel, fromDateInput, localMidnight, shortDate, toDateInput } from "./localtime";
 
 export const LOG_KINDS = ["potty", "food", "exercise", "weight", "health"] as const;
@@ -595,7 +595,7 @@ export function quickLog(clock: Clock, lastMeal: JournalEvent | null, added: rea
   const none: QuickLog = { form: "food", itemId: null, amount: null };
   if (!lastMeal || lastMeal.kind !== "food") return none;
   const f = food(lastMeal);
-  if (f.type !== "meal" || !findFood("meal", f.item_id, added)) return none;
+  if (!isMealType(f.type) || !findFood("meal", f.item_id, added)) return none;
   return { form: "food", itemId: f.item_id, amount: typeof f.amount === "number" ? f.amount : null };
 }
 
@@ -626,7 +626,7 @@ function countsFor(e: JournalEvent, clock: Clock): boolean {
     case "food":
       // The food clock is the last meal (TEC-142): a treat is not a meal and
       // does not reset it.
-      return e.kind === "food" && food(e).type === "meal";
+      return e.kind === "food" && isMealType(food(e).type);
     default:
       // The Fun clock (TEC-186): walks and playtime; a training does not reset it.
       return e.kind === "exercise" && exercise(e).type !== "training";
@@ -678,7 +678,7 @@ export function mealsSummary(events: JournalEvent[], now: Date): { count: number
   let count = 0;
   let cups: number | null = null;
   for (const e of liveEvents(events)) {
-    if (e.kind !== "food" || food(e).type !== "meal") continue;
+    if (e.kind !== "food" || !isMealType(food(e).type)) continue;
     const t = Date.parse(e.at);
     if (t < start || t >= end) continue;
     count++;
@@ -1023,7 +1023,7 @@ export function describe(
       const f = food(e);
       const amount =
         f.amount === null ? "" : f.unit ? `${formatAmount(f.amount)} ${unitLabel(f.unit, f.amount)}` : formatAmount(f.amount);
-      return { title: f.type === "treat" ? "Treat" : "Meal", detail: [f.item_name, amount].filter(Boolean).join(" · ") };
+      return { title: f.type === "treat" ? "Treat" : f.type === "snuffle" ? "Snuffle mat" : "Meal", detail: [f.item_name, amount].filter(Boolean).join(" · ") };
     }
     case "exercise": {
       const x = exercise(e);
@@ -1143,10 +1143,11 @@ export function foodSnapshot(type: FoodType, itemId: string, amount: number | nu
 export function parseNewFood(
   raw: unknown,
   added: readonly AddedFood[] = []
-): { type: FoodType; name: string; unit: FoodUnit; kcalPer: number | null } {
+): { type: ListType; name: string; unit: FoodUnit; kcalPer: number | null } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new InvalidEvent("expected a JSON object");
   const r = raw as Record<string, unknown>;
-  const type = oneOf(r.type, FOOD_TYPES, "type");
+  // A snuffle mat adds a meal food (TEC-195): the list it picks from.
+  const type = listOf(oneOf(r.type, FOOD_TYPES, "type"));
   const name = typeof r.name === "string" ? cleanFoodName(r.name) : "";
   if (name.length < 1 || name.length > 60) throw new InvalidEvent("a name is 1 to 60 characters");
   const unit = oneOf(r.unit, FOOD_UNITS, "unit");

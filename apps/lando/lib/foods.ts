@@ -15,8 +15,25 @@
  * each list.
  */
 
-export const FOOD_TYPES = ["meal", "treat"] as const;
+/**
+ * What a food entry's type can be. A snuffle mat (TEC-195) is its own type in the journal but picks from the meal
+ * list, and everything meal-based counts it as a meal (`isMealType`).
+ */
+export const FOOD_TYPES = ["meal", "snuffle", "treat"] as const;
 export type FoodType = (typeof FOOD_TYPES)[number];
+
+/** The two lists foods live in: `lando.foods.type` and `FOODS` hold these only. */
+export type ListType = "meal" | "treat";
+
+/** The list a food type picks from: a snuffle mat picks from the meal list. */
+export function listOf(type: FoodType): ListType {
+  return type === "treat" ? "treat" : "meal";
+}
+
+/** A meal or a snuffle mat: what the Meal pill, time since last meal, meal gaps and quick log count as a meal. */
+export function isMealType(type: FoodType): boolean {
+  return type !== "treat";
+}
 
 export type Food = {
   /** Stable forever: events store it. Lowercase letters, digits and dashes. */
@@ -36,9 +53,9 @@ export const FOOD_UNITS = ["cup", "scoop", "piece", "treat", "pop", "gram"] as c
 export type FoodUnit = (typeof FOOD_UNITS)[number];
 
 /** A food added in the app, as `lando.foods` holds it. Its `id` is history's key: never deleted, never changed. */
-export type AddedFood = Food & { type: FoodType };
+export type AddedFood = Food & { type: ListType };
 
-export const FOODS: Record<FoodType, Food[]> = {
+export const FOODS: Record<ListType, Food[]> = {
   meal: [
     {
       id: "purina-pro-plan-toy-puppy-chicken-rice",
@@ -55,9 +72,9 @@ export const FOODS: Record<FoodType, Food[]> = {
       kcalPer: 369,
       unit: "cup",
     },
-    // Which kibble goes in the mat is not recorded, so no calories (TEC-193). No amount of its own: it
-    // opens on the same default as every other meal.
-    { id: "snuffle-mat", name: "Snuffle mat", kcalPer: null, unit: "cup" },
+    // Retired (TEC-195): a snuffle mat is now a food type that picks from this list. Kept, never deleted,
+    // so an entry logged with it under TEC-193 still reads and corrects.
+    { id: "snuffle-mat", name: "Snuffle mat", kcalPer: null, unit: "cup", retired: true },
     { id: MISC_ID, name: "Misc", kcalPer: null, unit: null },
   ],
   treat: [
@@ -88,7 +105,8 @@ export const FOODS: Record<FoodType, Food[]> = {
 
 /** The code catalogue then the foods added in the app, for one list. */
 function every(type: FoodType, added: readonly AddedFood[]): Food[] {
-  return [...FOODS[type], ...added.filter((f) => f.type === type)];
+  const list = listOf(type);
+  return [...FOODS[list], ...added.filter((f) => f.type === list)];
 }
 
 /** The picklist: every item not retired, the code catalogue then added foods, Misc last. */

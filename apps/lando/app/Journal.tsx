@@ -57,7 +57,7 @@ import {
   type Upcoming,
   type UpcomingInput,
 } from "@/lib/upcoming";
-import type { AddedFood, FoodType, FoodUnit } from "@/lib/foods";
+import { isMealType, type AddedFood, type FoodUnit, type ListType } from "@/lib/foods";
 import { nameBoxWidth } from "@/lib/names";
 import { saveThen } from "@/lib/saveOrder";
 import Analytics from "./Analytics";
@@ -373,7 +373,7 @@ export default function Journal() {
 
   /** The Food form's "Add a food…": saved to `lando.foods`, then merged into the loaded list without a reload. */
   async function addFood(input: {
-    type: FoodType;
+    type: ListType;
     name: string;
     unit: FoodUnit;
     kcalPer: number | null;
@@ -456,7 +456,7 @@ export default function Journal() {
       // A meal's item and amount are remembered; a treat always opens on Misc.
       if (body.kind === "food") {
         const f = asFood(body);
-        if (f.type === "meal") {
+        if (isMealType(f.type)) {
           next.meal = f.item_id;
           if (f.amount !== null) next.mealAmount = f.amount;
         }

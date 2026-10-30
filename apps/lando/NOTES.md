@@ -123,8 +123,8 @@
   pill already counts meals. The bar wraps rather than clips on a very narrow phone.
 - **The Meal pill's label** (TEC-194, `mealsSummary` / `mealPillLabel` in `lib/events.ts`, `tests/mealpill.test.ts`):
   "Meals: N · X cups" for the phone's day (`localMidnight(now)` to the next midnight, so it rolls at midnight with
-  `now`). N is live meals (voids out, treats never, any unit, Misc included). X sums only meals whose snapshot unit
-  is `cup` (Snuffle mat is one) with an amount, rounded to the nearest 1/8 with a floor of 1/8, written as a mixed
+  `now`). N is live meals and snuffle mats (voids out, treats never, any unit, Misc included). X sums only meals whose snapshot unit
+  is `cup` (a snuffle mat's usually is) with an amount, rounded to the nearest 1/8 with a floor of 1/8, written as a mixed
   fraction ("⅞ cup", "1⅛ cups", "2 cups"; singular at 1 or less, judged on the rounded value). No cup amount
   today: "Meals: N" (and "Meals: 0"). Before the journal loads it reads "Meals". Only the label changed: tap-to-log
   and the time-since value stay. The title starts with the label and then "Last meal at ..."; the label is the
@@ -237,8 +237,17 @@
   (an older 1/3) or is past 20, and a phone's remembered meal amount, are slotted into the list,
   so an untouched correction keeps them. Eighths read as fractions, reduced (`formatAmount`:
   "1/8", "3/8", "1 1/4"). Defaults unchanged: a treat opens on 1, a meal on this phone's last
-  meal amount, or "—" on its first. The **Snuffle mat** (TEC-193, `lib/foods.ts`, id `snuffle-mat`, unit cup, no
-  calories, before Misc) takes that same default: there is no per-item amount.
+  meal amount, or "—" on its first. **Snuffle mat is a food type**
+  (TEC-195, `FOOD_TYPES` = meal, snuffle, treat; the Food form's Type choice reads Meal, Snuffle mat, Treat): it picks from the
+  **meal list** (`listOf("snuffle")` is `meal`, so `picklist`, `findFood`, `defaultFood` and "Add a food…" all use the meal
+  list, and an added food is a meal food: `lando.foods.type` stays meal|treat) and takes the meal amount default. It counts
+  as a meal everywhere meal-based (`isMealType` in `lib/foods.ts`: the Meal pill's N and cups, time since last meal,
+  meal-to-pee/poop gaps, the food-against-weight chart, quick log's prefill, the remembered meal item and amount); on the
+  per-day counts and timeline it is a meal mark. The feed row is titled "Snuffle mat". A new meal-based check uses
+  `isMealType`, never `type === "meal"`. The TEC-193 item `snuffle-mat` is **retired** (kept, still resolves; entries
+  logged with it are `type: meal` and still read and correct). Awkward by design: a last-meal quick log prefill from an old
+  `snuffle-mat` entry opens the Meal form on that retired item (it stays selectable there); and a snuffle mat's item is
+  the kibble in it, so calories follow the item, while the retired item has none.
 - **The inline treat row on Training and Potty** (TEC-193, replacing Training's "+ Treat" pop-up of TEC-136;
   `app/TreatRow.tsx`, one component for both forms): a treat pick (the code list plus foods added in the app,
   TEC-191, Misc last; opens on Misc) beside **Qty** (the whole-number box; **opens on 0**, which logs nothing).
@@ -557,7 +566,8 @@
   constraint `events_details_shape` just calls it, so a widening is a new migration holding the
   function's whole current body with the one list or shape grown: copy the whole body from the
   newest migration file that defines `lando.details_ok`, sorting `supabase/migrations` by version
-  (today `lando_box_leash_spot`, which is `lando_potty_minutes`'s body plus `'box'` in the leash and spot lists;
+  (today `lando_snuffle_type`, which is `lando_box_leash_spot`'s body plus `'snuffle'` in the food type list;
+  that one is `lando_potty_minutes`'s body plus `'box'` in the leash and spot lists;
   that one is `lando_details_ok_search_path`'s plus potty's optional
   `minutes`; that one is `lando_potty_inside_spot`'s plus `set search_path = ''`; keep that line in every copy). No DROP, no constraint swap, and it goes through the connector. Replacing
   the function does **not** re-check existing rows, so a function that narrows would leave rows the
@@ -573,6 +583,9 @@
   from an older file fails it. It compares lists, not rules: a changed bound (`BETWEEN 1 AND 6`) or a
   regex is not seen, so a narrowing of those still needs the validated swap above. Each widening's
   own test still holds its own file's shape.
+- **The food type list is in two places:** `FOOD_TYPES` in `lib/foods.ts` and the food branch of `lando.details_ok`
+  (`IN ('meal', 'snuffle', 'treat')`, migration `lando_snuffle_type`). A type in the app alone fails every save of it with a
+  503. `tests/snuffle.test.ts` reads the migration. Deploy order: the migration first, then the code.
 - **The health lists are in two places:** `VET_REASONS` + `VET_RETIRED` and `ISSUE_PICKS` +
   `ISSUE_RETIRED` in `lib/events.ts` and `lando.details_ok`. The database holds the union.
   `tests/health.test.ts` reads the newest migration defining the function (by version; it must be

@@ -4,8 +4,8 @@ import { defaultAmount, defaultFood } from "@/lib/defaults";
 import { parseDetails } from "@/lib/events";
 
 describe("the catalogue", () => {
-  it("is the owner's list in code: three meals (a snuffle mat among them) and three treats, Misc last in each, nothing else", () => {
-    expect(picklist("meal").map((f) => f.id)).toEqual(["purina-pro-plan-toy-puppy-chicken-rice", "royal-canin-dachshund-puppy", "snuffle-mat", MISC_ID]);
+  it("is the owner's list in code: two meals and three treats, Misc last in each, nothing else (the snuffle mat item is retired, TEC-195)", () => {
+    expect(picklist("meal").map((f) => f.id)).toEqual(["purina-pro-plan-toy-puppy-chicken-rice", "royal-canin-dachshund-puppy", MISC_ID]);
     expect(picklist("treat").map((f) => f.id)).toEqual([
       "freeze-dried-beef-hearts",
       "woof-pupsicle-refill-pop-small",
@@ -26,8 +26,8 @@ describe("the catalogue", () => {
   });
 });
 
-describe("the snuffle mat (TEC-193)", () => {
-  it("is a meal in cups with no calories, and opens on the same amount as every other meal", () => {
+describe("the retired snuffle mat item (TEC-193, retired by TEC-195)", () => {
+  it("still reads as a meal item in cups with no calories, and opens on the same amount as every other meal", () => {
     expect(parseDetails("food", { type: "meal", item_id: "snuffle-mat", amount: 0.125 })).toMatchObject({
       type: "meal",
       item_id: "snuffle-mat",

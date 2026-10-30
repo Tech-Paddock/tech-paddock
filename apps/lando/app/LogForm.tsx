@@ -57,7 +57,7 @@ import {
   type LogKind,
   type Unit,
 } from "@/lib/events";
-import { FOOD_UNITS, amountOptions, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit } from "@/lib/foods";
+import { FOOD_UNITS, amountOptions, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import AmountScroller from "./AmountScroller";
 import TreatQty from "./TreatQty";
@@ -101,7 +101,7 @@ type Props = {
   /** Foods added in the app (`lando.foods`, TEC-191), retired ones too: the picklist is these plus the code catalogue. */
   foods: AddedFood[];
   /** The What pick's "Add a food…": saves one to `lando.foods` and hands it back. */
-  onAddFood: (food: { type: FoodType; name: string; unit: FoodUnit; kcalPer: number | null }) => Promise<{ food: AddedFood | null; error: string | null }>;
+  onAddFood: (food: { type: ListType; name: string; unit: FoodUnit; kcalPer: number | null }) => Promise<{ food: AddedFood | null; error: string | null }>;
   phonePerson: string | null;
   /** Everything the journal read, voids included: the Related issue select lists its recent medical issues (TEC-142). */
   events: JournalEvent[];
@@ -663,7 +663,7 @@ export default function LogForm({
       {kind === "food" && (
         <>
           <Field label="Type">
-            <Seg name="type" label="Type" value={foodType} onChange={pickFoodType} options={[["meal", "Meal"], ["treat", "Treat"]] as const} />
+            <Seg name="type" label="Type" value={foodType} onChange={pickFoodType} options={[["meal", "Meal"], ["snuffle", "Snuffle mat"], ["treat", "Treat"]] as const} />
           </Field>
           <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start gap-2">
             <Field label="What" htmlFor="f-item">
