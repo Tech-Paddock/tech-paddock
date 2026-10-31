@@ -4,7 +4,7 @@ import { readNightSpan, readNightsSince, readWeeksSince } from "./priceStore";
 import { readCoupons } from "./couponStore";
 import { readLatestScan } from "./dealStore";
 import { addDays, denverDate } from "./priceDates";
-import { buildDealBoard, FRESH_NIGHTS, type DealBoard } from "./dealRows";
+import { buildDealBoard, type DealBoard } from "./dealRows";
 import { HISTORY_WEEKS } from "./stoplight";
 
 /**
@@ -29,7 +29,8 @@ export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> 
 
   const [products, nights, weeks, { coupons, staged }, latest, span] = await Promise.all([
     readProducts(),
-    readNightsSince(store.locationId, addDays(asOf, -FRESH_NIGHTS)),
+    // Twelve weeks of nights, not three: Best compares tonight with the lowest night (TEC-196).
+    readNightsSince(store.locationId, addDays(asOf, -7 * HISTORY_WEEKS)),
     readWeeksSince(store.locationId, addDays(asOf, -7 * HISTORY_WEEKS)),
     readCoupons(),
     readLatestScan(),

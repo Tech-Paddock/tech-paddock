@@ -1,9 +1,11 @@
 import { pageFor } from "./kingsoopers";
 import { addDays } from "./priceDates";
 import { percentOff } from "./pricing";
-import { couponActive, type Coupon } from "./couponRules";
-import { effectivePrice, type NightRow, type WeekRow } from "./priceWeeks";
-import { stoplight, weeksInWindow, type Light } from "./stoplight";
+import type { Coupon } from "./couponRules";
+import type { Best } from "./bestPrice";
+import { couponsByProduct, productSignal, type Shade } from "./dealSignal";
+import type { NightRow, WeekRow } from "./priceWeeks";
+import { weeksInWindow, type Light } from "./stoplight";
 import type { SavedProduct } from "./brands";
 
 /**
@@ -61,6 +63,10 @@ export type DealRow = {
   coupons: { title: string; amount: string; expires_on: string | null }[];
   /** On sale and with a coupon. */
   stacks: boolean;
+  /** How a Grocery list line for this product is shaded (`lib/dealSignal.ts`, shared). */
+  shade: Shade;
+  /** Within 5% of the 12-week nightly low (`lib/bestPrice.ts`, shared with the list). */
+  best: Best;
 };
 
 export type DealBoard = {
@@ -78,6 +84,8 @@ export type DealBoard = {
   lastRun: { first: string; last: string; recordedAt: string | null } | null;
   /** The most weeks of history any priced product has (the stoplight needs `MIN_WEEKS`). */
   weeksHeld: number;
+  /** The most priced nights any product has in the last 12 weeks (Best needs `BEST_MIN_NIGHTS`). */
+  nightsHeld: number;
 };
 
 export type ScanDeals = {
@@ -107,7 +115,7 @@ const weighted = (parts: { value: number; weight: number }[]): number | null => 
 
 export function buildDealBoard(input: BoardInput): DealBoard {
   const { asOf, store, products } = input;
-  const empty: DealBoard = { store: store?.name ?? null, asOf, rows: [], couponsStaged: input.couponsStaged, unpriced: 0, hasNights: false, lastRun: input.span ?? null, weeksHeld: 0 };
+  const empty: DealBoard = { store: store?.name ?? null, asOf, rows: [], couponsStaged: input.couponsStaged, unpriced: 0, hasNights: false, lastRun: input.span ?? null, weeksHeld: 0, nightsHeld: 0 };
   if (!store) return empty;
 
   const freshFrom = addDays(asOf, -FRESH_NIGHTS);
@@ -127,11 +135,14 @@ export function buildDealBoard(input: BoardInput): DealBoard {
     weeksBy.set(w.product_id, [...(weeksBy.get(w.product_id) ?? []), w]);
   }
 
-  const active = input.coupons.filter((c) => couponActive(c, asOf));
-  const couponsBy = new Map<string, Coupon[]>();
-  for (const c of active) {
-    for (const code of new Set(c.product_ids)) couponsBy.set(code, [...(couponsBy.get(code) ?? []), c]);
+  // Every night at the store, for Best (twelve weeks of them; the stoplight reads the weeks).
+  const nightsBy = new Map<string, NightRow[]>();
+  for (const n of input.nights) {
+    if (n.location_id !== store.locationId) continue;
+    nightsBy.set(n.product_id, [...(nightsBy.get(n.product_id) ?? []), n]);
   }
+
+  const couponsBy = couponsByProduct(input.coupons, asOf);
 
   const rows: DealRow[] = [];
   let unpriced = 0;
@@ -160,18 +171,17 @@ export function buildDealBoard(input: BoardInput): DealBoard {
       continue;
     }
 
-    const now = effectivePrice({ regular, sale });
-    if (now === null) {
+    const history = weeksInWindow(weeksBy.get(p.product_id) ?? [], asOf);
+    const coupons = (couponsBy.get(p.product_id) ?? []).map((c) => ({ title: c.title, amount: c.amount, expires_on: c.expires_on }));
+    // **The one function a list line asks too** (TEC-196), so the two agree.
+    const signal = productSignal({ regular, sale, coupons: coupons.length, weeks: history, nights: nightsBy.get(p.product_id) ?? [], asOf });
+    if (signal === null) {
       unpriced += 1;
       continue;
     }
-
-    const history = weeksInWindow(weeksBy.get(p.product_id) ?? [], asOf);
-    const verdict = stoplight(now, history, asOf);
+    const { now, verdict, onSale } = signal;
     const usual = weighted(history.flatMap((w) => (w.regular_mean === null ? [] : [{ value: w.regular_mean, weight: w.nights_seen }])));
-    const coupons = (couponsBy.get(p.product_id) ?? []).map((c) => ({ title: c.title, amount: c.amount, expires_on: c.expires_on }));
     const off = regular !== null && sale !== null ? percentOff({ regular, promo: sale }) : null;
-    const onSale = sale !== null && (regular === null || sale < regular);
 
     rows.push({
       productId: p.product_id,
@@ -197,6 +207,8 @@ export function buildDealBoard(input: BoardInput): DealBoard {
         .map((w) => w.mean),
       coupons,
       stacks: onSale && coupons.length > 0,
+      shade: signal.shade,
+      best: signal.best,
     });
   }
 
@@ -207,5 +219,6 @@ export function buildDealBoard(input: BoardInput): DealBoard {
     unpriced,
     hasNights: input.nights.some((n) => n.location_id === store.locationId),
     weeksHeld: rows.reduce((most, r) => Math.max(most, r.weeks), 0),
+    nightsHeld: rows.reduce((most, r) => Math.max(most, r.best.nights), 0),
   };
 }

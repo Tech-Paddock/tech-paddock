@@ -1,17 +1,18 @@
 import type { DealBoard, DealRow } from "./dealRows";
 import { addDays, mondayOf } from "./priceDates";
+import { BEST_MIN_NIGHTS, BEST_WITHIN } from "./bestPrice";
 import { HISTORY_WEEKS, MIN_WEEKS } from "./stoplight";
 
 /**
  * What the Deals tab filters on (TEC-132): search, aisle, All · On sale ·
- * Coupon · Stacks, and Green · Neutral · Red. **Pure and type-only imports**,
+ * Coupon · Stacks · Best, and Green · Neutral · Red. **Pure and type-only imports**,
  * because the browser runs it (`lib/dealRows.ts` pulls in server code).
  *
  * The colour filter is by light: a product that is **new** (under four weeks
  * of history) has no colour yet, so it shows under Any and under New only.
  */
 
-export type Kind = "all" | "sale" | "coupon" | "stack";
+export type Kind = "all" | "sale" | "coupon" | "stack" | "best";
 export type LightFilter = "any" | "green" | "neutral" | "red" | "new";
 
 export type DealFilter = { query: string; kind: Kind; aisle: string; light: LightFilter };
@@ -28,6 +29,7 @@ export function matchesFilter(row: DealRow, f: DealFilter): boolean {
   if (f.kind === "sale" && !row.onSale) return false;
   if (f.kind === "coupon" && row.coupons.length === 0) return false;
   if (f.kind === "stack" && !row.stacks) return false;
+  if (f.kind === "best" && !row.best.qualifies) return false;
   if (f.light !== "any" && row.light !== f.light) return false;
   return true;
 }
@@ -85,6 +87,7 @@ export function emptyMessage(board: DealBoard, f: DealFilter): { title: string; 
       ? { title: "No recent prices", body: "None of your saved products has a price from the last few nights.", offerNew: false }
       : { title: "No prices yet", body: "The nightly check runs about 3 a.m. Denver time; the first one fills this in.", offerNew: false };
   }
+  if (f.kind === "best" && f.light === "any") return bestEmpty(board);
   if (coloured && board.weeksHeld < MIN_WEEKS) {
     return {
       title: `No ${LIGHT_WORD[f.light]} deals yet`,
@@ -102,4 +105,23 @@ export function emptyMessage(board: DealBoard, f: DealFilter): { title: string; 
     return { title: "Nothing is on sale", body: "No saved product was on sale in the latest nightly prices. Try All.", offerNew: false };
   }
   return { title: "No deals match", body: "Clear the search, or pick All aisles.", offerNew: false };
+}
+
+/**
+ * Why Best is empty (TEC-196): either no product has the `BEST_MIN_NIGHTS`
+ * nights it takes to say, or none is at its low right now. Says which.
+ */
+function bestEmpty(board: DealBoard): { title: string; body: string; offerNew: boolean } {
+  if (board.nightsHeld < BEST_MIN_NIGHTS) {
+    return {
+      title: "No best deals yet",
+      body: `Best needs at least ${BEST_MIN_NIGHTS} nights of prices for a product to know its low. The nightly check adds one a night, about 3 a.m. Denver time.`,
+      offerNew: false,
+    };
+  }
+  return {
+    title: "Nothing is at its low right now",
+    body: `Best is today's price at, or within ${Math.round(BEST_WITHIN * 100)}% of, a product's lowest night in the last ${HISTORY_WEEKS} weeks. Try All, or clear the search and pick All aisles.`,
+    offerNew: false,
+  };
 }

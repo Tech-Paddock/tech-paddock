@@ -34,6 +34,8 @@ function row(productId: string, name: string, names: string[], over: Partial<Dea
     trend: [],
     coupons: [],
     stacks: false,
+    shade: "plain",
+    best: { qualifies: false, low: null, nights: 0, why: "few-nights" },
     ...over,
   };
 }
@@ -121,11 +123,11 @@ describe("the surfaces", () => {
     expect(cart).toMatch(/TakeBackConfirm/);
   });
 
-  it("a list line keeps its sale tag, read from the scan", () => {
+  it("a list line's sale bubble now reads the nightly prices, not the weekly scan (TEC-196)", () => {
     const list = read("../app/List.tsx");
-    expect(list).toMatch(/saleTags\(/);
-    expect(list).toMatch(/saleText\(/);
-    expect(list).toMatch(/cart\.latestScan/);
+    expect(list).toMatch(/bubbleText\(/);
+    expect(list).not.toMatch(/saleTags\(/);
+    expect(list).not.toMatch(/cart\.latestScan/);
   });
 
   it("the Deals tab reads /api/deals and nothing else: no Kroger call for On my list", () => {

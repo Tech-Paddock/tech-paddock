@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { typedLines } from "@/lib/typedLines";
 import { MAX_QUANTITY, asText } from "@/lib/groceryText";
 import type { GroceryItem, TidyLine } from "@/lib/grocery";
@@ -9,7 +9,8 @@ import type { LineMark } from "@/lib/brands";
 import type { MenuEntry } from "@/lib/menu";
 import { menuDayLabel } from "@/lib/menuDay";
 import { MODALITIES, modalityWord, type Modality } from "@/lib/modality";
-import { saleTags, saleText, type SaleTag } from "@/lib/saleTag";
+import { bestEmptyWords, bubbleText, shadeWord, type LineDeal } from "@/lib/lineDeal";
+import type { Shade } from "@/lib/dealSignal";
 import { CHECKOUT_URL } from "@/lib/kingsoopers";
 import { totalsOf, type LinePrice, type Totals } from "@/lib/listPrices";
 import { shortDay } from "@/lib/dealFilter";
@@ -33,6 +34,8 @@ type ShoppingLine = GroceryItem &
     mark?: LineMark;
     /** This line's price from the nightly check, or null for "no price yet" (TEC-190; `lib/listPrices.ts`). */
     price?: LinePrice | null;
+    /** The sale/coupon bubble, the shade and Best, from the nightly prices (TEC-196; `lib/lineDeal.ts`). */
+    deal?: LineDeal | null;
   };
 
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -49,6 +52,47 @@ function details(item: ShoppingLine): string[] {
   const recipes = item.recipes.length > 0 ? item.recipes.join(" · ") : item.source === "recipe" ? "from a recipe" : "by hand";
   const note = item.view ? item.view.note : item.note;
   return [recipes, item.view?.amount ?? null, note].filter((x): x is string => !!x);
+}
+
+/**
+ * **A line is shaded by its deal** (TEC-196), in the Deals board's own tints: the
+ * accent for good and the danger colour for bad, as a 4px left edge (the board's
+ * edge) and a faint wash over the row's own ground. Plain rows keep a clear edge
+ * so the ticks line up. Colour is never the only cue: the bubble or "Good price" /
+ * "High price" says why. The wash is 8%, where `tests/dealShade.test.ts` holds
+ * every text colour on it at 4.5:1 in light and dark.
+ */
+const SHADE_CLASS: Record<Shade, string> = {
+  plain: "border-l-4 border-l-transparent",
+  good: "border-l-4 border-l-accent bg-gradient-to-r from-accent/[0.08] to-accent/[0.08]",
+  bad: "border-l-4 border-l-danger bg-gradient-to-r from-danger/[0.08] to-danger/[0.08]",
+};
+
+/** The whole line as text: what a truncated line shows in full as its `title`. */
+function lineTitle(item: ShoppingLine, small: string[]): string {
+  const deal = item.deal;
+  const why = deal && deal.shade !== "plain" ? `${shadeWord(deal)}, ${deal.reason}` : null;
+  return [item.view?.name ?? item.name, bubbleText(deal), why, ...small].filter((x): x is string => !!x).join(" · ");
+}
+
+/**
+ * What says why a line is shaded, small: the bubble (a sale or a coupon), and a
+ * word when the bubble does not explain it (a good price from history alone, or
+ * any high price). Neither shrinks; the details beside them truncate.
+ */
+function Why({ deal }: { deal: LineDeal | null | undefined }) {
+  const bubble = bubbleText(deal);
+  const word = shadeWord(deal);
+  const showWord = word && (deal?.shade === "bad" || !bubble);
+  return (
+    <>
+      {/* The word first: when the row is tight it is the cue that must survive. Beside a bubble it shortens to Good / High, so neither is clipped at 360px. */}
+      {showWord ? (
+        <span className={`shrink-0 whitespace-nowrap text-[11px] font-semibold ${deal?.shade === "bad" ? "text-danger" : "text-accent"}`} aria-label={word} title={word}>● {bubble ? word.split(" ")[0] : word}</span>
+      ) : null}
+      {bubble ? <span className="shrink-0 whitespace-nowrap rounded border border-accent px-1 text-[11px] text-accent">{bubble}</span> : null}
+    </>
+  );
 }
 
 const LINK = "text-[13px] text-accent underline-offset-2 hover:underline disabled:opacity-50";
@@ -103,6 +147,9 @@ export default function List({
   // Prices come with the list, from the nightly check (TEC-190).
   const [priceStore, setPriceStore] = useState<string | null>(null);
   const [priceError, setPriceError] = useState<string | null>(null);
+  const [dealError, setDealError] = useState<string | null>(null);
+  // **Best** (TEC-196): only the List lines at, or within 5% of, their 12-week low.
+  const [bestOnly, setBestOnly] = useState(false);
   // The add box looks like one line and grows to show a pasted list before Add.
   const box = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
@@ -120,6 +167,7 @@ export default function List({
       setItems(body.items as ShoppingLine[]);
       setPriceStore((body.store as string | null) ?? null);
       setPriceError((body.priceError as string | null) ?? null);
+      setDealError((body.dealError as string | null) ?? null);
       setReadError(null);
     } catch (e) {
       // A failed read leaves `items` null rather than empty, because "buy
@@ -293,13 +341,9 @@ export default function List({
   const inCart = all.filter((i) => i.sent_at !== null);
   const open = onList.filter((i) => !i.checked);
   const bought = onList.filter((i) => i.checked);
-  // **On sale at the chosen store** (TEC-121 3a): the latest deal scan the cart
-  // holds; no Kroger call per render. Open List lines only.
-  const locationId = cart.status?.connected ? (cart.status.store?.locationId ?? null) : null;
-  const onSale = useMemo(
-    () => saleTags((items ?? []).filter((i) => i.sent_at === null && !i.checked), { locationId, scan: cart.latestScan }),
-    [items, locationId, cart.latestScan]
-  );
+  // **Best** (TEC-196): the List lines at, or within 5% of, their 12-week nightly low.
+  // The server decided it (`lib/bestPrice.ts`, the Deals board's function); this only filters.
+  const shownLines = bestOnly ? onList.filter((i) => i.deal?.best) : onList;
 
   // **The review replaces the list** (the mockup's Send to cart screen), with a way back.
   if (cart.review !== null) {
@@ -333,6 +377,11 @@ export default function List({
           {priceError ? (
             <p role="alert" className="text-xs text-danger">
               {priceError} Lines read “no price yet” until it can.
+            </p>
+          ) : null}
+          {dealError ? (
+            <p role="alert" className="text-xs text-danger">
+              {dealError} Lines stay plain, with no sale bubble or Best, until it can.
             </p>
           ) : null}
         </div>
@@ -382,6 +431,15 @@ export default function List({
           <span className="text-right text-[13px] text-ink-soft">{totalWords(listTotals, open.length)}</span>
         </div>
         <div className="flex flex-wrap gap-x-3.5 gap-y-1 px-2">
+          {/* **Best** (TEC-196): only the lines at, or within 5% of, their 12-week low. */}
+          <button
+            type="button"
+            aria-pressed={bestOnly}
+            onClick={() => setBestOnly((b) => !b)}
+            className={`rounded-full px-2.5 py-0.5 text-[13px] ${bestOnly ? "bg-accent font-semibold text-accent-ink" : "border border-line text-accent"}`}
+          >
+            Best{bestOnly ? ` · ${shownLines.length}` : ""}
+          </button>
           <button type="button" onClick={copyList} disabled={open.length === 0} className={LINK}>
             {copied ? "Copied" : "Copy"}
           </button>
@@ -454,13 +512,21 @@ export default function List({
               ? "Nothing left on the List. Everything is in the cart."
               : "Nothing on it. Add a recipe’s ingredients from the book, or type what you need."}
           </p>
+        ) : shownLines.length === 0 ? (
+          // **An empty Best says why** (TEC-196), as an empty Deals filter does.
+          <div role="status" className="flex flex-col gap-1 rounded-xl border border-dashed border-line p-3.5">
+            <span className="text-[15px] font-bold">{bestEmptyWords(onList.map((i) => i.deal)).title}</span>
+            <span className="text-[13px] text-ink-soft">{bestEmptyWords(onList.map((i) => i.deal)).body}</span>
+            <button type="button" onClick={() => setBestOnly(false)} className="mt-1 min-h-11 self-start rounded-xl border border-accent px-3.5 font-bold text-accent">
+              Show the whole List
+            </button>
+          </div>
         ) : (
           <ul className="flex flex-col gap-1.5">
-            {onList.map((item) => (
+            {shownLines.map((item) => (
               <ListRow
                 key={item.id}
                 item={item}
-                sale={onSale.get(item.id) ?? null}
                 onTick={() => void tick(item)}
                 onQuantity={(q) => void setQuantity(item, q)}
                 canAdd={canAdd}
@@ -557,10 +623,14 @@ export default function List({
  * many, and **+ Cart** (TEC-190). **The tick is its own tap target**, so ticking
  * in the shop never opens King Soopers (TEC-39). The ★ / ? / + marker leads the
  * small text; the price is the nightly check's, or “no price yet”.
+ *
+ * **One line per item** (TEC-196): the name and the small line each truncate with
+ * an ellipsis, and the full text is the row's `title`. The mark, the bubble, the
+ * price, the count and the button never shrink. **Shaded by deal**, with the
+ * bubble or a word saying why.
  */
 function ListRow(props: {
   item: ShoppingLine;
-  sale: SaleTag | null;
   onTick: () => void;
   onQuantity: (q: number) => void;
   canAdd: boolean;
@@ -569,8 +639,10 @@ function ListRow(props: {
 }) {
   const { item } = props;
   const mark = item.mark ?? "+";
+  // A ticked line is done: no shade, no bubble.
+  const deal = item.checked ? null : item.deal;
   return (
-    <li className="flex items-center gap-2.5 rounded-[10px] bg-surface py-2 pl-3 pr-2.5">
+    <li title={lineTitle({ ...item, deal }, details(item))} className={`flex items-center gap-2.5 rounded-[10px] bg-surface py-2 pl-2 pr-2.5 ${SHADE_CLASS[deal?.shade ?? "plain"]}`}>
       <label className="flex shrink-0 cursor-pointer items-center self-stretch">
         <input type="checkbox" checked={item.checked} onChange={props.onTick} aria-label={`Got ${item.name}`} className="size-6 accent-accent" />
       </label>
@@ -579,19 +651,19 @@ function ListRow(props: {
           href={item.href}
           target="_blank"
           rel="noreferrer"
-          className={`text-[15px] font-semibold ${item.checked ? "text-ink-soft line-through" : ""}`}
+          className={`block truncate text-[15px] font-semibold ${item.checked ? "text-ink-soft line-through" : ""}`}
         >
           {item.view?.name ?? item.name}
         </a>
-        <span className="text-xs text-ink-soft">
+        <span className="flex min-w-0 items-center gap-1 overflow-hidden text-xs text-ink-soft">
           {!item.checked ? (
-            <span title={MARK_WORDS[mark]} aria-label={MARK_WORDS[mark]} className={`mr-1 font-bold ${MARK_TONE[mark]}`}>
+            <span title={MARK_WORDS[mark]} aria-label={MARK_WORDS[mark]} className={`shrink-0 font-bold ${MARK_TONE[mark]}`}>
               {mark}
             </span>
           ) : null}
-          {/* **On sale at the chosen store** (TEC-121 3a). Says sale, never coupon. */}
-          {props.sale ? <span className="mr-1 whitespace-nowrap rounded border border-accent px-1 text-[11px] text-accent">{saleText(props.sale)}</span> : null}
-          {details(item).join(" · ")}
+          {/* **The sale/coupon bubble, from the nightly prices** (TEC-196). */}
+          <Why deal={deal} />
+          <span className="min-w-0 truncate">{details(item).join(" · ")}</span>
         </span>
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1">
@@ -628,12 +700,15 @@ function InCartRow(props: { item: ShoppingLine; disabled: boolean; removing: boo
   const { item } = props;
   const small = [item.quantity > 1 ? `×${item.quantity}` : null, ...details(item)].filter((x): x is string => !!x);
   return (
-    <li className="flex items-center gap-2.5 rounded-[10px] bg-raised py-2 pl-3 pr-2.5">
+    <li title={lineTitle(item, small)} className={`flex items-center gap-2.5 rounded-[10px] bg-raised py-2 pl-2 pr-2.5 ${SHADE_CLASS[item.deal?.shade ?? "plain"]}`}>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <a href={item.href} target="_blank" rel="noreferrer" className="text-[15px] font-semibold">
+        <a href={item.href} target="_blank" rel="noreferrer" className="block truncate text-[15px] font-semibold">
           {item.view?.name ?? item.name}
         </a>
-        <span className="text-xs text-ink-soft">{small.join(" · ")}</span>
+        <span className="flex min-w-0 items-center gap-1 overflow-hidden text-xs text-ink-soft">
+          <Why deal={item.deal} />
+          <span className="min-w-0 truncate">{small.join(" · ")}</span>
+        </span>
       </span>
       <Price price={item.price} />
       <button
@@ -641,7 +716,7 @@ function InCartRow(props: { item: ShoppingLine; disabled: boolean; removing: boo
         aria-label={`Remove ${item.view?.name ?? item.name} from the cart`}
         onClick={props.onRemove}
         disabled={props.disabled}
-        className="min-h-11 shrink-0 rounded-[10px] border border-line bg-transparent px-3 text-[13px] disabled:opacity-50"
+        className="min-h-11 shrink-0 whitespace-nowrap rounded-[10px] border border-line bg-transparent px-3 text-[13px] disabled:opacity-50"
       >
         {props.removing ? "Removing…" : "Remove"}
       </button>

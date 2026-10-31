@@ -18,6 +18,7 @@ const board = (over: Partial<DealBoard> = {}): DealBoard => ({
   hasNights: true,
   lastRun: { first: "2026-10-27", last: "2026-10-28", recordedAt: "2026-10-28T09:04:00Z" },
   weeksHeld: 0,
+  nightsHeld: 0,
   ...over,
 });
 const f = (over: Partial<DealFilter>): DealFilter => ({ ...NO_FILTER, ...over });

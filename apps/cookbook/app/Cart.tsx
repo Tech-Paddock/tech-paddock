@@ -204,7 +204,7 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   const autoRefreshed = useRef(false);
 
   const [latestScan, setLatestScan] = useState<ScanRecord | null>(null);
-  // Only a failure is shown (TEC-132): the scan feeds the list lines' sale tags and fills a Deals row for a
+  // Only a failure is shown (TEC-132): the scan fills a Deals row for a
   // product with no fresh night, and the panel that showed its results is gone.
   const [scanNote, setScanNote] = useState<{ text: string; failed: boolean } | null>(null);
   const autoScanned = useRef(false);
@@ -682,7 +682,7 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
 // The panel under the list: connection, store and refresh. Take back moved to the
 // In cart section (TEC-190).
 // Deals are not here since TEC-132: they live on the Deals tab, and the list
-// keeps only each line's sale tag.
+// keeps only each line's sale bubble (TEC-196, from the nightly prices).
 // ---------------------------------------------------------------------------
 
 export function CartPanel({ cart }: { cart: CartState }) {

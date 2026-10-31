@@ -17,9 +17,13 @@ import { lineMark } from "@/lib/brands";
 import { lineView } from "@/lib/lineView";
 import { packOf, quantityRule } from "@/lib/lineQuantity";
 import { readConnectionRow } from "@/lib/krogerStore";
-import { readNightsSince } from "@/lib/priceStore";
+import { readNightsSince, readWeeksSince } from "@/lib/priceStore";
+import { readCoupons } from "@/lib/couponStore";
 import { addDays, denverDate } from "@/lib/priceDates";
 import { PRICE_WINDOW_NIGHTS, latestNights, priceLines, productFor, type LinePrice } from "@/lib/listPrices";
+import { lineDeals, type LineDeal } from "@/lib/lineDeal";
+import { FRESH_NIGHTS } from "@/lib/dealRows";
+import { HISTORY_WEEKS } from "@/lib/stoplight";
 
 export const dynamic = "force-dynamic";
 
@@ -51,17 +55,33 @@ export async function GET() {
     // its latest night, never a live Kroger call. A failed read is said, and the
     // lines read "no price yet"; it never breaks the list or reads as $0.
     let priceError: string | null = null;
+    let dealError: string | null = null;
     let store: string | null = null;
     let prices = new Map<string, LinePrice | null>();
+    let deals = new Map<string, LineDeal | null>();
+    const asOf = denverDate(new Date());
+    const lines = items.map((item, i) => ({ id: item.id, quantity: item.quantity, productId: productFor(decisions[i]) }));
     try {
       const connection = await readConnectionRow();
       if (connection?.location_id) {
         store = connection.store_name ?? connection.location_id;
-        const nights = await readNightsSince(connection.location_id, addDays(denverDate(new Date()), -PRICE_WINDOW_NIGHTS));
-        prices = priceLines(
-          items.map((item, i) => ({ id: item.id, quantity: item.quantity, productId: productFor(decisions[i]) })),
-          latestNights(nights, connection.location_id)
-        );
+        // Twelve weeks of nights, not five: the price is the newest night, and
+        // Best (TEC-196) compares it with the lowest. One read feeds both.
+        const nights = await readNightsSince(connection.location_id, addDays(asOf, -7 * HISTORY_WEEKS));
+        prices = priceLines(lines, latestNights(nights.filter((n) => n.night >= addDays(asOf, -PRICE_WINDOW_NIGHTS)), connection.location_id));
+
+        // **The bubble, the shade and Best** (TEC-196): the same nightly rows, plus the
+        // weeks and staged coupons the Deals board reads, through the one function
+        // it uses. A failed read is said and the lines stay plain; it never breaks the list.
+        try {
+          const [weeks, { coupons }] = await Promise.all([
+            readWeeksSince(connection.location_id, addDays(asOf, -7 * HISTORY_WEEKS)),
+            readCoupons(),
+          ]);
+          deals = lineDeals(lines, { asOf, locationId: connection.location_id, nights, weeks, coupons, freshNights: FRESH_NIGHTS });
+        } catch (e) {
+          dealError = e instanceof Error ? e.message : "Couldn't read the deal history.";
+        }
       }
     } catch (e) {
       priceError = e instanceof Error ? e.message : "Couldn't read the nightly prices.";
@@ -70,13 +90,14 @@ export async function GET() {
     return NextResponse.json({
       store,
       priceError,
+      dealError,
       items: items.map((item, i) => {
         const decision = decisions[i];
         // **What you buy** (TEC-131): the item, its amount, the note unless it
         // was only amounts. Display only; the stored line is not rewritten.
         const { quantity: _rule, ...view } = lineView(item, packOf(decision));
         // ★ / ? / + (TEC-135): what Send will do with it, said before Send.
-        return { ...item, ...linkFor(item.name, decision, item.note), view, mark: lineMark(decision), price: prices.get(item.id) ?? null };
+        return { ...item, ...linkFor(item.name, decision, item.note), view, mark: lineMark(decision), price: prices.get(item.id) ?? null, deal: deals.get(item.id) ?? null };
       }),
     });
   } catch (e) {
