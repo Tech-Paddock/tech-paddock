@@ -123,7 +123,9 @@
   pill already counts meals. The bar wraps rather than clips on a very narrow phone.
 - **The Meal pill's label** (TEC-194, `mealsSummary` / `mealPillLabel` in `lib/events.ts`, `tests/mealpill.test.ts`):
   "Meals: N · X cups" for the phone's day (`localMidnight(now)` to the next midnight, so it rolls at midnight with
-  `now`). N is live meals and snuffle mats (voids out, treats never, any unit, Misc included). X sums only meals whose snapshot unit
+  `now`). N is live meals (1 each) plus snuffle mats (0.5 each, TEC-197), written in halves with a ½ glyph, never a decimal
+  ("Meals: 2½", "Meals: ½", `formatMealCount`); voids out, treats never, any unit, Misc included. Only this N halves:
+  time since last meal, meal gaps, quick-log prefill and the remembered amount still treat a snuffle mat as a meal. X sums only meals whose snapshot unit
   is `cup` (a snuffle mat's usually is) with an amount, rounded to the nearest 1/8 with a floor of 1/8, written as a mixed
   fraction ("⅞ cup", "1⅛ cups", "2 cups"; singular at 1 or less, judged on the rounded value). No cup amount
   today: "Meals: N" (and "Meals: 0"). Before the journal loads it reads "Meals". Only the label changed: tap-to-log

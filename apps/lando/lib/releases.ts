@@ -25,6 +25,7 @@ export const DAYS_SHOWN = 7;
  * once written, is not rewritten.
  */
 export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
+  "2026-10-30": "A snuffle mat counts as half a meal.",
   "2026-10-29": "Royal Canin Dachshund Puppy joins the meal list, and you can add your own foods.",
   "2026-10-28": "The top boxes are now the way in, logging a potty got quicker, and the Log buttons are tidier.",
   "2026-10-27": "Quick entries from the top boxes, colour in the feed, and time outside.",
@@ -34,6 +35,7 @@ export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
 };
 
 export const RELEASES: readonly Release[] = [
+  { date: "2026-10-30", text: "A snuffle mat now counts as half a meal on the Meal box, so a meal and a snuffle mat read Meals: 1½. The cups still add in full." },
   { date: "2026-10-29", text: "Snuffle mat is now its own type on the Food form, beside Meal and Treat. It picks from the meal list, shows in the feed as Snuffle mat, and counts as a meal: on the Meal box, in the time since the last meal and in the meal gaps. The old Snuffle mat item has left the meal list, and older entries still read and can be corrected." },
   { date: "2026-10-29", text: "The Meal box at the top now reads Meals with today's count and the cups eaten, like Meals: 2 · 1⅛ cups, in eighth-cup steps. Only meals logged in cups add to the cups, and the box still shows the time since the last meal and opens a quick entry when tapped." },
   { date: "2026-10-29", text: "Meals today is gone from the top bar, and time outside is now picked in ranges, from 5 minutes or less up to 45 to 60. The amount box on the food form is smaller, and Snuffle mat is on the meal list. Training has its time at the top beside Inside and Outside, commands are picked from a list, and Training and Potty both have a treat and how many right in the form." },

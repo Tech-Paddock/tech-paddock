@@ -24,6 +24,7 @@ const at = (h: number) => new Date(2026, 9, 29, h, 0, 0).toISOString();
 const ev = (over: Partial<JournalEvent> & Pick<JournalEvent, "kind" | "at">): JournalEvent => ({
   id: uuid(), person_id: null, details: {}, note: null, voids: null, created_at: over.at, ...over,
 });
+const voidOf = (e: JournalEvent): JournalEvent => ev({ kind: "void", at: e.at, voids: e.id });
 const food = (h: number, type: "meal" | "snuffle" | "treat", unit: string | null, amount: number | null, item = "x") =>
   ev({ kind: "food", at: at(h), details: { type, item_id: item, item_name: "Invented food", kcal_per: null, unit, amount } });
 
@@ -89,12 +90,12 @@ describe("parseDetails and the feed row", () => {
   });
 });
 
-describe("everything meal-based counts it as a meal", () => {
+describe("everything meal-based counts it as a meal (the Meal pill counts half, TEC-197)", () => {
   it("the Meal pill's N and cups", () => {
     const events = [food(7, "meal", "cup", 0.5), food(10, "snuffle", "cup", 0.25), food(11, "treat", "treat", 2)];
-    expect(mealsSummary(events, NOW)).toEqual({ count: 2, cups: 0.75 });
-    expect(mealPillLabel(events, NOW)).toBe("Meals: 2 · ¾ cup");
-    expect(mealPillLabel([food(10, "snuffle", "cup", null)], NOW)).toBe("Meals: 1");
+    expect(mealsSummary(events, NOW)).toEqual({ count: 1.5, cups: 0.75 });
+    expect(mealPillLabel(events, NOW)).toBe("Meals: 1½ · ¾ cup");
+    expect(mealPillLabel([food(10, "snuffle", "cup", null)], NOW)).toBe("Meals: ½");
   });
   it("time since the last meal", () => {
     const events = [food(7, "meal", "cup", 1), food(12, "snuffle", "cup", 0.25)];
@@ -119,5 +120,24 @@ describe("the migration", () => {
   });
   it("leaves lando.foods alone: a snuffle mat uses meal foods", () => {
     expect(code).not.toMatch(/lando\.foods/);
+  });
+});
+
+describe("the Meal pill counts a snuffle mat as half a meal (TEC-197)", () => {
+  it("meals only read whole", () => {
+    expect(mealPillLabel([food(7, "meal", "cup", 0.5), food(12, "meal", "cup", 0.5)], NOW)).toBe("Meals: 2 · 1 cup");
+  });
+  it("snuffle only reads a half", () => {
+    expect(mealPillLabel([food(10, "snuffle", "cup", null)], NOW)).toBe("Meals: ½");
+    expect(mealPillLabel([food(10, "snuffle", "cup", 0.25)], NOW)).toBe("Meals: ½ · ¼ cup");
+  });
+  it("mixed reads 2½, with cups in full", () => {
+    const events = [food(7, "meal", "cup", 0.5), food(9, "meal", "cup", 0.5), food(10, "snuffle", "cup", 0.25)];
+    expect(mealPillLabel(events, NOW)).toBe("Meals: 2½ · 1¼ cups");
+    expect(mealPillLabel([food(7, "meal", "cup", null), food(10, "snuffle", "cup", null), food(11, "snuffle", "cup", null)], NOW)).toBe("Meals: 2");
+  });
+  it("leaves a voided snuffle mat out", () => {
+    const m = food(10, "snuffle", "cup", 0.25);
+    expect(mealPillLabel([food(7, "meal", "cup", 0.5), m, voidOf(m)], NOW)).toBe("Meals: 1 · ½ cup");
   });
 });
