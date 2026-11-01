@@ -6,6 +6,7 @@ import {
   correctionAt,
   parseNewEvent,
   parseNewFood,
+  parseNewMedication,
   type Dog,
   type ExerciseDetails,
   checkHealthReasons,
@@ -16,6 +17,7 @@ import {
 } from "./events";
 import { missingPhotos } from "./storage";
 import type { AddedFood } from "./foods";
+import type { Medication, MedUnit } from "./medications";
 
 /**
  * The database half. Every failure throws: a failed read must never render as
@@ -71,7 +73,14 @@ async function findEvent(db: SupabaseClient, id: string): Promise<JournalEvent |
 export async function writeEvent(db: SupabaseClient, body: unknown, now = new Date()): Promise<JournalEvent> {
   // A food entry may name a food added in the app (TEC-191), which only the database knows.
   const isFood = !!body && typeof body === "object" && (body as { kind?: unknown }).kind === "food";
-  const next = parseNewEvent(body, now, isFood ? await listFoods(db) : []);
+  // A medication dose names a medication added in the app (TEC-199), which only the database knows.
+  // Only a dose reads the table, so a vet visit or an issue never depends on it.
+  const isDose =
+    !!body &&
+    typeof body === "object" &&
+    (body as { kind?: unknown }).kind === "health" &&
+    (body as { details?: { type?: unknown } }).details?.type === "medication";
+  const next = parseNewEvent(body, now, isFood ? await listFoods(db) : [], isDose ? await listMedications(db) : []);
 
   const existing = await findEvent(db, next.id);
   if (existing) return existing;
@@ -247,4 +256,33 @@ export async function addFood(db: SupabaseClient, raw: unknown): Promise<AddedFo
   if (!error) return { id: (data as { id: string }).id, type: f.type, name: f.name, unit: f.unit, kcalPer: f.kcalPer };
   if (error.code === "23505") throw new InvalidEvent(`${f.name} is already in the list`);
   throw new Error(`couldn't add food: ${error.message}`);
+}
+
+type MedicationRow = { id: string; name: string; unit: MedUnit; retired: boolean };
+
+/**
+ * Medications added in the app (TEC-199), retired ones too, so an old dose can still be corrected
+ * (`findMedication`). There is no list in code. An empty table is an empty list; a failed read throws.
+ */
+export async function listMedications(db: SupabaseClient): Promise<Medication[]> {
+  const { data, error } = await db
+    .from("medications")
+    .select("id, name, unit, retired")
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
+  if (error) throw new Error(`couldn't read medications: ${error.message}`);
+  return (data as MedicationRow[]).map((r) => ({ id: r.id, name: r.name, unit: r.unit, ...(r.retired ? { retired: true } : {}) }));
+}
+
+/**
+ * Add a medication (the Medication tab's "Add a medication…"). A name already in the list, in any case, is
+ * refused, never duplicated (the table's unique index backs the race). The id is the database's and is never
+ * changed or deleted.
+ */
+export async function addMedication(db: SupabaseClient, raw: unknown): Promise<Medication> {
+  const m = parseNewMedication(raw, await listMedications(db));
+  const { data, error } = await db.from("medications").insert({ name: m.name, unit: m.unit }).select("id").single();
+  if (!error) return { id: (data as { id: string }).id, name: m.name, unit: m.unit };
+  if (error.code === "23505") throw new InvalidEvent(`${m.name} is already in the list`);
+  throw new Error(`couldn't add medication: ${error.message}`);
 }

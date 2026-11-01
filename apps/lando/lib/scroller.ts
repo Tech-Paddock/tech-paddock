@@ -4,7 +4,7 @@
  * Kept here so the window can be tested without a browser.
  */
 export const SCROLLER_ROW = 32; // px per step
-export const SCROLLER_WIDTH = 88; // px; thin, since an amount is a few characters
+export const SCROLLER_WIDTH = 52; // px; half the box it was (TEC-199), since an amount is a few characters
 
 export function scrollerWindow(row: number = SCROLLER_ROW) {
   const height = row * 2;

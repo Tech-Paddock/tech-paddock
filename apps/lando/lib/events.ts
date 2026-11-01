@@ -17,6 +17,7 @@
 
 import { FOOD_TYPES, FOOD_UNITS, cleanFoodName, isMealType, listOf, findFood, foodNameTaken, formatAmount, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "./foods";
 import { dateLabel, fromDateInput, localMidnight, shortDate, toDateInput } from "./localtime";
+import { DOSE_MAX, MED_NAME_MAX, MED_ROUTES, MED_ROUTE_LABELS, MED_UNITS, cleanMedName, doseText, findMedication, medNameTaken, type MedRoute, type MedUnit, type Medication } from "./medications";
 
 export const LOG_KINDS = ["potty", "food", "exercise", "weight", "health"] as const;
 export type LogKind = (typeof LOG_KINDS)[number];
@@ -245,10 +246,13 @@ export type WeightDetails = {
 
 /* ── Health (TEC-137) ────────────────────────────────────────────────────── */
 
-/** A vet visit, or a medical issue noticed at home. Photos can go on either. */
-export const HEALTH_TYPES = ["vet", "issue"] as const;
+/**
+ * A vet visit, a medical issue noticed at home, or a medication dose (TEC-199). Photos can go on any. A vet
+ * visit and an issue pick a reason; a medication names a medication, a dose, a unit and how it was given.
+ */
+export const HEALTH_TYPES = ["vet", "issue", "medication"] as const;
 export type HealthType = (typeof HEALTH_TYPES)[number];
-export const HEALTH_LABELS: Record<HealthType, string> = { vet: "Vet visit", issue: "Medical issue" };
+export const HEALTH_LABELS: Record<HealthType, string> = { vet: "Vet visit", issue: "Medical issue", medication: "Medication" };
 
 /**
  * Why we went to the vet: one high-level pick (TEC-139), the detail goes in
@@ -313,12 +317,12 @@ type Pair = readonly (readonly [string, string])[];
 
 /** The pick list a health type offers. */
 export function healthOptions(type: HealthType): Pair {
-  return type === "vet" ? VET_REASONS : ISSUE_PICKS;
+  return type === "vet" ? VET_REASONS : type === "issue" ? ISSUE_PICKS : [];
 }
 
 /** Every id the type accepts: the offered picks, then the retired ones. */
 export function healthAccepted(type: HealthType): Pair {
-  return type === "vet" ? [...VET_REASONS, ...VET_RETIRED] : [...ISSUE_PICKS, ...ISSUE_RETIRED];
+  return type === "vet" ? [...VET_REASONS, ...VET_RETIRED] : type === "issue" ? [...ISSUE_PICKS, ...ISSUE_RETIRED] : [];
 }
 
 /** A reason's label, offered or retired, else the stored id as it is. */
@@ -335,7 +339,7 @@ export const HEALTH_KEPT = "__kept";
  * a retired one) opens on `HEALTH_KEPT` carrying those reasons as they were.
  */
 export function healthPickFor(h: Pick<HealthDetails, "type" | "reasons"> | null): { pick: string; kept: string[] | null } {
-  if (!h) return { pick: "", kept: null };
+  if (!h || h.type === "medication") return { pick: "", kept: null };
   const [only] = h.reasons;
   if (h.reasons.length === 1 && healthOptions(h.type).some(([id]) => id === only)) return { pick: only, kept: null };
   return { pick: HEALTH_KEPT, kept: [...h.reasons] };
@@ -354,6 +358,7 @@ export function healthReasonsFromPick(pick: string, kept: readonly string[] | nu
  */
 export function checkHealthReasons(next: { details: Details }, target: { kind: string; details: Details } | null): void {
   const d = next.details as HealthDetails;
+  if (d.type === "medication") return; // a dose has no reason; `parseDetails` holds its own checks
   if (d.reasons.length === 1 && healthOptions(d.type).some(([id]) => id === d.reasons[0])) return;
   if (target?.kind === "health") {
     const t = target.details as HealthDetails;
@@ -375,11 +380,17 @@ export const PHOTO_PATH = /^health\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 
 export type HealthDetails = {
   type: HealthType;
-  /** One from the type's list; an entry from before TEC-139 may hold several, or retired ids. */
+  /** One from the type's list; an entry from before TEC-139 may hold several, or retired ids. A medication has none: the key is absent. */
   reasons: string[];
+  /** A medication dose only (TEC-199): the `lando.medications` id, its name then, how much, the unit and how it was given. */
+  med_id?: string;
+  med_name?: string;
+  dose?: number;
+  unit?: MedUnit;
+  route?: MedRoute;
   /** Storage paths, 1 to MAX_PHOTOS; no key when there are none. */
   photos?: string[];
-  /** Vet visits only (TEC-142): the id of the Health issue event it relates to; `resolveIssue` finds the live one. */
+  /** A vet visit or a medication dose (TEC-142, TEC-199): the id of the Health issue event it relates to; `resolveIssue` finds the live one. */
   issue?: string;
 };
 
@@ -572,32 +583,6 @@ export type Clock = "pee" | "poop" | "food" | "exercise";
 export const CLOCKS: Clock[] = ["pee", "poop", "food", "exercise"];
 /** The pills' faces. The `exercise` clock is Fun (TEC-186): walks and playtime only, a training does not reset it. */
 export const CLOCK_LABELS: Record<Clock, string> = { pee: "Pee", poop: "Poop", food: "Meal", exercise: "Fun" };
-
-/**
- * What a tapped pill, or the Treats button, opens its form on (TEC-181, TEC-186). Pee and Poop: Potty,
- * outside, leashed, which is the form's own default, so only the `what` is set. Meal: Food with the last
- * meal's item and amount; null item and amount mean the form's usual defaults. Fun: the Fun form on a new
- * entry, all defaults. Treats (the button, not a pill): Food on a treat, with a treat's usual defaults.
- */
-export type QuickLog =
-  | { form: "potty"; what: "pee" | "poop" }
-  | { form: "food"; itemId: string | null; amount: number | null; type?: "treat" }
-  | { form: "fun" };
-
-/** The Treats button: the Food form opened on a treat (the meal/treat choice stays in the form). */
-export const TREAT_QUICK_LOG: QuickLog = { form: "food", itemId: null, amount: null, type: "treat" };
-
-export function quickLog(clock: Clock, lastMeal: JournalEvent | null, added: readonly AddedFood[] = []): QuickLog | null {
-  if (clock === "pee" || clock === "poop") return { form: "potty", what: clock };
-  if (clock === "exercise") return { form: "fun" };
-  // `lastMeal` is `sinceLast`'s food clock: a live meal, never a treat. A meal whose item the
-  // catalogue no longer lists opens on the usual defaults rather than an id the form cannot show.
-  const none: QuickLog = { form: "food", itemId: null, amount: null };
-  if (!lastMeal || lastMeal.kind !== "food") return none;
-  const f = food(lastMeal);
-  if (!isMealType(f.type) || !findFood("meal", f.item_id, added)) return none;
-  return { form: "food", itemId: f.item_id, amount: typeof f.amount === "number" ? f.amount : null };
-}
 
 /**
  * The potty a Fun form's Pee or Poop button logs (TEC-186), from the form's current state. A walk is
@@ -1058,7 +1043,15 @@ export function describe(
       const n = h.photos?.length ?? 0;
       // A vet visit's linked weight (TEC-151): "Check-up · 7.6 lb".
       const w = h.type === "vet" && e.id ? linkedWeight(events, e.id) : null;
+      // A medication dose reads "Medication  Name · 5 mg · by mouth" (TEC-199).
+      const dose =
+        h.type === "medication" && h.med_name
+          ? [h.med_name, h.dose !== undefined && h.unit ? doseText(h.dose, h.unit) : "", h.route ? MED_ROUTE_LABELS[h.route]?.toLowerCase() ?? "" : ""]
+              .filter(Boolean)
+              .join(" · ")
+          : "";
       const parts = [
+        dose,
         (h.reasons ?? []).map((id) => healthReasonLabel(h.type, id)).join(", "),
         w ? `${round1(weight(w).value)} ${weight(w).unit}` : "",
         h.issue ? issueLinkText(events, h.issue) : "",
@@ -1170,8 +1163,51 @@ export function parseNewFood(
   return { type, name, unit, kcalPer };
 }
 
+/**
+ * A medication dose from what the form sends ({med_id, dose, unit, route, issue?, photos?}): the name is taken
+ * from the medication here, never from the phone (the way a food's snapshot is). A retired medication still
+ * resolves, so an old dose can be corrected. The dose is a number above 0, at most `DOSE_MAX`.
+ */
+function medicationDetails(r: Record<string, unknown>, meds: readonly Medication[]): HealthDetails {
+  if (typeof r.med_id !== "string") throw new InvalidEvent("pick a medication");
+  const med = findMedication(meds, r.med_id);
+  if (!med) throw new InvalidEvent("that medication is not in the list — reload");
+  const dose = r.dose;
+  if (typeof dose !== "number" || !Number.isFinite(dose) || dose <= 0 || dose > DOSE_MAX) {
+    throw new InvalidEvent(`dose must be a number above 0 and at most ${DOSE_MAX}`);
+  }
+  const out: HealthDetails = {
+    type: "medication",
+    med_id: med.id,
+    med_name: med.name,
+    dose: Math.round(dose * 1000) / 1000,
+    unit: oneOf(r.unit, MED_UNITS, "unit"),
+    route: oneOf(r.route, MED_ROUTES.map(([id]) => id), "given"),
+  } as HealthDetails;
+  const issue = parseIssue(r.issue);
+  if (issue) out.issue = issue;
+  const photos = parsePhotos(r.photos);
+  if (photos) out.photos = photos;
+  return out;
+}
+
+/**
+ * A new medication as the form sends it ({name, unit}), checked: the name trimmed, 1 to 60 characters and not
+ * already in the list (retired too, case-blind); a unit from `MED_UNITS`. Throws `InvalidEvent` with a
+ * sentence the form can show (TEC-199).
+ */
+export function parseNewMedication(raw: unknown, meds: readonly Medication[] = []): { name: string; unit: MedUnit } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new InvalidEvent("expected a JSON object");
+  const r = raw as Record<string, unknown>;
+  const name = typeof r.name === "string" ? cleanMedName(r.name) : "";
+  if (name.length < 1 || name.length > MED_NAME_MAX) throw new InvalidEvent(`a name is 1 to ${MED_NAME_MAX} characters`);
+  const unit = oneOf(r.unit, MED_UNITS, "unit");
+  if (medNameTaken(name, meds)) throw new InvalidEvent(`${name} is already in the list`);
+  return { name, unit };
+}
+
 /** Only the fields a kind owns survive; every required one must be there. */
-export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood[] = []): Details {
+export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood[] = [], meds: readonly Medication[] = []): Details {
   if (kind === "void") return {};
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new InvalidEvent("details must be an object");
   const r = raw as Record<string, unknown>;
@@ -1252,6 +1288,7 @@ export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood
     }
     case "health": {
       const type = oneOf(r.type, HEALTH_TYPES, "type");
+      if (type === "medication") return medicationDetails(r, meds);
       const accepted = healthAccepted(type);
       const picked = r.reasons;
       if (!Array.isArray(picked) || picked.some((c) => typeof c !== "string" || !accepted.some(([id]) => id === c))) {
@@ -1281,7 +1318,7 @@ export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood
  * `id` comes from the phone, so a retried save after a dropped response is the
  * same row rather than a second pee.
  */
-export function parseNewEvent(body: unknown, now: Date, added: readonly AddedFood[] = []): NewEvent {
+export function parseNewEvent(body: unknown, now: Date, added: readonly AddedFood[] = [], meds: readonly Medication[] = []): NewEvent {
   if (!body || typeof body !== "object") throw new InvalidEvent("expected a JSON object");
   const b = body as Record<string, unknown>;
   if (!isUuid(b.id)) throw new InvalidEvent("id must be a UUID");
@@ -1304,16 +1341,19 @@ export function parseNewEvent(body: unknown, now: Date, added: readonly AddedFoo
 
   if (b.person_id !== undefined && b.person_id !== null && !isUuid(b.person_id)) throw new InvalidEvent("person_id must be a UUID");
 
-  // Health needs the story: the pick is only the headline (TEC-139).
   const note = kind === "void" ? null : (text(b.note, "note", 500) ?? null);
-  if (kind === "health" && !note) throw new InvalidEvent("say what happened — the note is required");
+  const details = parseDetails(kind as Kind, b.details, added, meds);
+  // A vet visit or an issue needs the story: the pick is only the headline (TEC-139). A dose does not (TEC-199).
+  if (kind === "health" && !note && (details as HealthDetails).type !== "medication") {
+    throw new InvalidEvent("say what happened — the note is required");
+  }
 
   return {
     id: b.id,
     kind: kind as Kind,
     at,
     person_id: (b.person_id as string | null | undefined) ?? null,
-    details: parseDetails(kind as Kind, b.details, added),
+    details,
     note,
     voids,
   };
