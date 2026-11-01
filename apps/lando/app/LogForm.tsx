@@ -38,6 +38,7 @@ import {
   linkedWeight,
   parseDetails,
   parseNewFood,
+  parseNewMedication,
   potty as asPotty,
   inlineTreatEntries,
   outMinutesAria,
@@ -53,16 +54,19 @@ import {
   type FormKind,
   type HealthType,
   type JournalEvent,
-  type QuickLog,
   type LogKind,
+  type PottyWhat,
   type Unit,
 } from "@/lib/events";
-import { FOOD_UNITS, amountOptions, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
+import { FOOD_UNITS, MISC_ID, amountOptions, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
+import { MED_ROUTES, MED_UNITS, findMedication, medPicklist, type MedRoute, type MedUnit, type Medication } from "@/lib/medications";
+import { FUTURE_NOTICE, doneWhen, futureItem, isFutureDay, isFutureWhen, type DonePrefill } from "@/lib/future";
+import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type UpcomingInput } from "@/lib/upcoming";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import AmountScroller from "./AmountScroller";
 import TreatQty from "./TreatQty";
+import TreatCount from "./TreatCount";
 import PhotoPicker, { usePhotos } from "./Photos";
-import TreatRow from "./TreatRow";
 import { clockTime, dateLabel, fromDateInput, fromLocalInput, toDateInput, toLocalInput, whenLabel } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
 
@@ -80,18 +84,18 @@ export type LogBody = {
 };
 
 type Props = {
-  /** Which of the five forms (TEC-136): Fun and Training both save `exercise`. */
+  /** Which of the six forms (TEC-136): Fun and Training both save `exercise`. */
   form: FormKind;
+  /** Health's tab on a new entry (TEC-199): Vet visit unless a Done or a Medication opens it on another. */
+  healthType?: HealthType;
   /** Set when correcting an entry; the form opens on its values. */
   event?: JournalEvent;
-  /** A tapped since-last pill's prefill (TEC-181), on a new entry only. */
-  quick?: QuickLog;
   /**
-   * A Done on an Upcoming vet visit or vaccine (TEC-192): the Vet visit form opens on the item's day and
-   * time, its reason (left empty when the item does not say), and its title as the note. New entry only.
+   * A Done on an upcoming item (TEC-192, TEC-199): the form opens on the item's day and time (once they have
+   * come), its reason, medication and dose, and its words as the note. New entry only.
    */
-  visitPrefill?: { day: string; time: string; reason: string; note: string };
-  /** A training or potty being corrected: the treats already logged with it (`treatsWith`), shown, not changed. */
+  done?: DonePrefill;
+  /** A training, fun or potty being corrected: the treats already logged with it (`treatsWith`), shown, not changed. */
   sessionTreats?: JournalEvent[];
   people: Person[];
   /** Friends' dogs from `lando.dogs`, by name. */
@@ -102,6 +106,10 @@ type Props = {
   foods: AddedFood[];
   /** The What pick's "Add a food…": saves one to `lando.foods` and hands it back. */
   onAddFood: (food: { type: ListType; name: string; unit: FoodUnit; kcalPer: number | null }) => Promise<{ food: AddedFood | null; error: string | null }>;
+  /** Medications added in the app (`lando.medications`, TEC-199), retired ones too. */
+  medications: Medication[];
+  /** The Medication pick's "Add a medication…": saves one to `lando.medications` and hands it back. */
+  onAddMedication: (m: { name: string; unit: MedUnit }) => Promise<{ medication: Medication | null; error: string | null }>;
   phonePerson: string | null;
   /** Everything the journal read, voids included: the Related issue select lists its recent medical issues (TEC-142). */
   events: JournalEvent[];
@@ -113,11 +121,13 @@ type Props = {
   weightUnit: Unit;
   /**
    * A new entry: handed off at once, never awaited (RULES.md, Never 5). `then`
-   * are the inline treat row's entry, saved once the entry itself is.
+   * are the follow-ups (a treat count's entry, a vet visit's weight), saved once the entry itself is.
    */
   onLog: (body: LogBody, then?: LogBody[]) => void;
   /** A correction or a delete: awaited, and its error shown here. `then` are saved once it succeeds. */
   onChange: (body: Record<string, unknown>, then?: LogBody[]) => Promise<{ error: string | null }>;
+  /** A future When (TEC-199): saves an upcoming item instead of an entry. Awaited, and its error shown here. */
+  onUpcoming: (item: UpcomingInput) => Promise<{ error: string | null }>;
   /**
    * Fun's Pee and Poop buttons (TEC-186): a potty entry handed off at once through the same pending
    * path as any new entry, and the sheet stays open. Never awaited (RULES.md, Never 5).
@@ -131,10 +141,10 @@ type Props = {
 
 /* ── Small parts ─────────────────────────────────────────────────────────── */
 
-function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
-  const lbl = "text-xs uppercase tracking-[0.06em] text-ink-soft";
+function Field({ label, htmlFor, children, className = "" }: { label: string; htmlFor?: string; children: React.ReactNode; className?: string }) {
+  const lbl = "text-[11px] uppercase tracking-[0.06em] text-ink-soft";
   return (
-    <div className="grid min-w-0 gap-1">
+    <div className={`grid min-w-0 content-start gap-0.5 ${className}`}>
       {htmlFor ? (
         <label htmlFor={htmlFor} className={lbl}>
           {label}
@@ -147,7 +157,11 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; 
   );
 }
 
-/** One choice of a few, as chips. Real radios underneath, so arrows and screen readers work. */
+/**
+ * One choice of a few, as chips (TEC-199: sized to their content with narrow padding, wrapping rather than
+ * stretching). Real radios underneath, so arrows and screen readers work. Each label is the 44px hit area; the
+ * chip is its inner span.
+ */
 function Seg<T extends string>({
   name,
   value,
@@ -162,9 +176,9 @@ function Seg<T extends string>({
   label: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1.5">
+    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-x-1">
       {options.map(([v, text]) => (
-        <label key={v} className="relative">
+        <label key={v} className="relative flex min-h-[44px] items-center">
           <input
             type="radio"
             name={name}
@@ -173,7 +187,7 @@ function Seg<T extends string>({
             onChange={() => onChange(v)}
             className="peer absolute opacity-0"
           />
-          <span className="block cursor-pointer whitespace-nowrap rounded-full border border-line bg-surface px-3.5 py-2 peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-pinstripe">
+          <span className="block cursor-pointer whitespace-nowrap rounded-full border border-line bg-surface px-2.5 py-1 text-[15px] peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-pinstripe">
             {text}
           </span>
         </label>
@@ -182,11 +196,26 @@ function Seg<T extends string>({
   );
 }
 
+/**
+ * A box of a form (TEC-199): Box 1 is When and Logging as, Box 2 the entry, Box 3 the secondary things. The
+ * `data-section` marks them in order for the tests and for anyone reading the form.
+ */
+function Box({ section, label, children }: { section: string; label: string; children: React.ReactNode }) {
+  return (
+    <section data-section={section} aria-label={label} className="grid gap-1.5 rounded-xl border border-line bg-paper p-2">
+      {children}
+    </section>
+  );
+}
+
 /** The What pick's last option: opens the add-a-food form, never a value. */
 const FOOD_ADD = "__add";
+/** The Medication pick's last option: opens the add-a-medication form, never a value. */
+const MED_ADD = "__add_med";
 
+/** A field box: narrow padding, 44px tall, sized by its parent. */
 const input =
-  "w-full min-w-0 rounded-[10px] border border-line bg-paper px-2.5 py-2.5 outline-none focus:border-accent";
+  "w-full min-w-0 min-h-[44px] rounded-[10px] border border-line bg-surface px-2 py-1.5 text-[15px] outline-none focus:border-accent";
 
 const WHERE_OPTS = [
   ["outside", "Outside"],
@@ -198,7 +227,7 @@ const WHERE_OPTS = [
 /** The treats already logged with an entry being corrected: shown, not changed. */
 function LoggedTreats({ treats }: { treats: JournalEvent[] }) {
   return (
-    <ul aria-label="Treats with this entry" className="-mt-1 flex flex-col gap-1 text-[13px]">
+    <ul aria-label="Treats with this entry" className="flex flex-col gap-1 text-[13px]">
       {treats.map((t) => (
         <li key={t.id} className="text-ink-soft">
           Logged: {describe(t).detail}
@@ -210,15 +239,17 @@ function LoggedTreats({ treats }: { treats: JournalEvent[] }) {
 
 export default function LogForm({
   form,
+  healthType: startHealthType,
   event,
-  quick,
-  visitPrefill,
+  done,
   sessionTreats = [],
   people,
   dogs,
   onAddDog,
   foods,
   onAddFood,
+  medications,
+  onAddMedication,
   phonePerson,
   events,
   photoUrls,
@@ -227,6 +258,7 @@ export default function LogForm({
   weightUnit,
   onLog,
   onChange,
+  onUpcoming,
   onPotty,
   unsaved,
   onRetry,
@@ -239,20 +271,22 @@ export default function LogForm({
   // Health, Fun, Training and Potty take photos (TEC-137, TEC-139, TEC-142).
   const hasPhotos = kind === "health" || kind === "exercise" || kind === "potty";
 
-  // Common
-  const prefill = !event && form === "health" ? visitPrefill : undefined;
-  const [when, setWhen] = useState(prefill ? `${prefill.day}T${prefill.time}` : toLocalInput(event?.at ?? openedAt.current));
-  const [day, setDay] = useState(toDateInput(event?.at ?? openedAt.current));
-  // A visit opened from Upcoming carries its own day, so the time is already picked.
-  const [whenTouched, setWhenTouched] = useState(!!prefill);
+  // Common. A Done opens on the item's day and time once they have come; before that it is "now".
+  const prefill = !event ? done : undefined;
+  const prefillWhen = prefill ? doneWhen(prefill, new Date()) : null;
+  const [when, setWhen] = useState(prefillWhen ?? toLocalInput(event?.at ?? openedAt.current));
+  const [day, setDay] = useState(prefillWhen ? prefillWhen.slice(0, 10) : toDateInput(event?.at ?? openedAt.current));
+  const [whenTouched, setWhenTouched] = useState(!!prefillWhen);
   const [personId, setPersonId] = useState(event ? event.person_id ?? "" : phonePerson ?? "");
   const [note, setNote] = useState(event?.note ?? prefill?.note ?? "");
+  // A repeat, for a future When only (TEC-199): every N weeks, months or years.
+  const [repeatOn, setRepeatOn] = useState(false);
+  const [repeatEvery, setRepeatEvery] = useState("1");
+  const [repeatUnit, setRepeatUnit] = useState<RepeatUnit>("week");
 
-  // Potty
+  // Potty: nothing is preselected for What (TEC-199); a save without one is refused.
   const p = event?.kind === "potty" ? asPotty(event) : null;
-  const quickPotty = !event && quick?.form === "potty" ? quick : null;
-  const quickFood = !event && quick?.form === "food" ? quick : null;
-  const [what, setWhat] = useState(p?.what ?? quickPotty?.what ?? "pee");
+  const [what, setWhat] = useState<PottyWhat | "">(p?.what ?? "");
   const [where, setWhere] = useState(p?.where ?? (event?.kind === "exercise" ? asExercise(event).where : "outside"));
   // Leashed by default. An outside entry from before the pick existed opens
   // with nothing picked, so a correction never invents one.
@@ -267,16 +301,13 @@ export default function LogForm({
 
   // Food
   const f = event?.kind === "food" ? asFood(event) : null;
-  // The Treats button opens Food on a treat (TEC-186); the meal/treat choice stays in the form.
-  const firstFoodType: FoodType = f?.type ?? (quickFood?.type === "treat" ? "treat" : "meal");
+  const firstFoodType: FoodType = f?.type ?? "meal";
   const [foodType, setFoodType] = useState<FoodType>(firstFoodType);
-  const [itemId, setItemId] = useState(f?.item_id ?? quickFood?.itemId ?? defaultFood(firstFoodType, remembered, foods));
+  const [itemId, setItemId] = useState(f?.item_id ?? defaultFood(firstFoodType, remembered, foods));
   // An amount from the ⅛ scroller (TEC-136). The amount it opened on stays on
   // the list even when it is not an eighth (an older 1/3), so an untouched
   // correction keeps it.
-  const [amount, setAmount] = useState<number | null>(
-    f ? f.amount : quickFood?.itemId ? quickFood.amount : defaultAmount(firstFoodType, remembered)
-  );
+  const [amount, setAmount] = useState<number | null>(f ? f.amount : defaultAmount(firstFoodType, remembered));
   const [openedAmount] = useState(amount);
   // "Add a food…" (TEC-191): the inline form under What. It never becomes the pick; the new food does.
   const [addingFood, setAddingFood] = useState(false);
@@ -291,10 +322,9 @@ export default function LogForm({
   const [exType, setExType] = useState<ExerciseType>(form === "training" ? "training" : x?.type ?? "walk");
   // Fun's Pee and Poop buttons (TEC-186): what this form has logged so far. Each is its own potty entry.
   const [tapped, setTapped] = useState<{ id: string; what: "pee" | "poop"; at: string; detail: string }[]>([]);
-  // The inline treat row on Potty and Training (TEC-193): opens on 0, which logs nothing. A treat above 0
-  // is saved as its own entry once this one is. Its id is fixed, so a retry is the same row.
-  const [treatItem, setTreatItem] = useState(defaultFood("treat", remembered, foods));
-  const [treatQty, setTreatQty] = useState<number | null>(0);
+  // The treat count on Potty, Training and Fun (TEC-199): opens on 0, which logs nothing. A count above 0 is
+  // saved as its own Misc treat entry once this one is. Its id is fixed, so a retry is the same row.
+  const [treatQty, setTreatQty] = useState(0);
   const treatId = useRef(crypto.randomUUID());
   // One pick (TEC-129): None, a dog, or Multiple; picking is the answer to
   // "with other dogs", there is no Yes/No. An entry with `with_dogs` and no
@@ -310,8 +340,6 @@ export default function LogForm({
   const [dogError, setDogError] = useState<string | null>(null);
   const [dogBusy, setDogBusy] = useState(false);
   const [minutes, setMinutes] = useState(String(x?.minutes ?? 15));
-  const [treats, setTreats] = useState(String(x?.treats ?? 0));
-  // Training counts the treat entries it has (a correction keeps the ones already logged); Fun keeps its box.
   const [commands, setCommands] = useState<CommandId[]>(x?.commands ?? []);
 
   // Weight
@@ -319,7 +347,7 @@ export default function LogForm({
   const [value, setValue] = useState(w ? String(w.value) : "");
   const [unit, setUnit] = useState<Unit>(w?.unit ?? remembered.unit ?? weightUnit);
 
-  // Health (TEC-137): a vet visit or a medical issue, picks from a fixed list, photos on both.
+  // Health (TEC-137): a vet visit, a medical issue or a medication dose, photos on all.
   const h = event?.kind === "health" ? asHealth(event) : null;
   // A vet visit's optional Weight (TEC-151). It opens empty, in this phone's last
   // unit; a correction opens on the weight already saved with the visit, and
@@ -327,14 +355,14 @@ export default function LogForm({
   const [linked] = useState(() => (event && h?.type === "vet" ? linkedWeight(events, event.id) : null));
   const [visitValue, setVisitValue] = useState(linked ? String(asWeight(linked).value) : "");
   const [visitUnit, setVisitUnit] = useState<Unit>(linked ? asWeight(linked).unit : remembered.unit ?? weightUnit);
-  const [healthType, setHealthType] = useState<HealthType>(h?.type ?? "vet");
-  // Related issue (TEC-142), on Potty and on a vet visit: the id of a medical
+  const [healthType, setHealthType] = useState<HealthType>(h?.type ?? startHealthType ?? "vet");
+  // Related issue (TEC-142), on Potty, a vet visit and a medication dose: the id of a medical
   // issue, or none. A correction opens on the stored link and keeps it unless
   // it is changed; `issueChoices` adds it as an option when the list would not.
   const [firstIssue] = useState(p?.issue ?? h?.issue ?? "");
   const [issue, setIssue] = useState(firstIssue);
   // The "Medical issue" checkbox (TEC-161) gates the select: a correction with a
-  // stored link opens ticked; unticked, no link is saved (the pick is kept, so
+  // stored link opens ticked on it; unticked, no link is saved (the pick is kept, so
   // ticking again brings it back).
   const [hasIssue, setHasIssue] = useState(firstIssue !== "");
   const issueOptions = issueChoices(events, firstIssue || null);
@@ -343,6 +371,19 @@ export default function LogForm({
   // until another pick is made.
   const [{ pick: firstReason, kept: keptReasons }] = useState(() => healthPickFor(h));
   const [reason, setReason] = useState(firstReason || prefill?.reason || "");
+  // A medication dose (TEC-199): which medication, how much, in what unit, and how it was given.
+  const [medId, setMedId] = useState(h?.med_id ?? prefill?.medId ?? "");
+  const [dose, setDose] = useState(h?.dose !== undefined ? String(h.dose) : prefill?.dose ?? "");
+  const [medUnit, setMedUnit] = useState<MedUnit>(
+    h?.unit ?? ((MED_UNITS as readonly string[]).includes(prefill?.unit ?? "") ? (prefill!.unit as MedUnit) : findMedication(medications, h?.med_id ?? prefill?.medId ?? "")?.unit ?? "mg")
+  );
+  const [route, setRoute] = useState<MedRoute>(h?.route ?? "mouth");
+  // "Add a medication…": the inline form under the pick. It never becomes the pick; the new medication does.
+  const [addingMed, setAddingMed] = useState(false);
+  const [medName, setMedName] = useState("");
+  const [newMedUnit, setNewMedUnit] = useState<MedUnit>("mg");
+  const [medError, setMedError] = useState<string | null>(null);
+  const [medBusy, setMedBusy] = useState(false);
   // Photos (TEC-137, and Fun and Training since TEC-139). A correction opens
   // with the photos the entry has and keeps whatever is not removed.
   const photos = usePhotos(event ? eventPhotos(event) : [], photoUrls, onPhotoUrl);
@@ -363,6 +404,16 @@ export default function LogForm({
   const deleteId = useRef(crypto.randomUUID());
   // The visit's weight is its own entry; its id is fixed too, so a retry is the same row.
   const visitWeightId = useRef(crypto.randomUUID());
+
+  // A When after now is a plan (TEC-199): the form says so and saves an upcoming item, with a Repeat. A saved
+  // entry cannot be moved there. The clock is read each render, so the line is right when Save is pressed.
+  const nowDate = new Date();
+  const futureWhen =
+    whenTouched &&
+    (dateOnly
+      ? isFutureDay(day, toDateInput(nowDate.toISOString()))
+      : isFutureWhen(fromLocalInput(when) ? new Date(fromLocalInput(when)!) : null, nowDate));
+  const future = futureWhen && !editing;
 
   function pickFoodType(t: FoodType) {
     setFoodType(t);
@@ -430,8 +481,33 @@ export default function LogForm({
     setFoodKcal("");
   }
 
+  /** Add a medication: checked here as the server will, saved, then picked. A dose is logged only when the form is saved. */
+  async function addMedication(e: { preventDefault(): void }) {
+    e.preventDefault();
+    setMedError(null);
+    let checked;
+    try {
+      checked = parseNewMedication({ name: medName, unit: newMedUnit }, medications);
+    } catch (err) {
+      setMedError(err instanceof InvalidEvent ? err.message : "check the medication");
+      return;
+    }
+    setMedBusy(true);
+    const { medication, error } = await onAddMedication(checked);
+    setMedBusy(false);
+    if (!medication) {
+      setMedError(error ?? "couldn't add");
+      return;
+    }
+    setMedId(medication.id);
+    setMedUnit(medication.unit);
+    setAddingMed(false);
+    setMedName("");
+  }
+
   const item = findFood(foodType, itemId, foods);
   const amountUnit = item?.unit ? unitLabel(item.unit, amount ?? 2) : null;
+  const pickedMed = findMedication(medications, medId);
 
   function rawDetails(): Record<string, unknown> {
     switch (kind) {
@@ -452,7 +528,9 @@ export default function LogForm({
           type: exType,
           where,
           minutes: Number(minutes),
-          treats: form === "training" ? (x?.treats ?? 0) + (treatQty ? 1 : 0) : Number(treats || 0),
+          // The treats a session counts are its treat entries (as Training always did): 1 when a count was
+          // added now, on top of any already logged with it.
+          treats: (x?.treats ?? 0) + (treatQty > 0 ? 1 : 0),
           ...(exType === "training" ? { commands } : {}),
           ...dogsFromPick(dogPick, keptDogs),
           ...(photos.paths.length ? { photos: photos.paths } : {}),
@@ -461,6 +539,17 @@ export default function LogForm({
         // A weight saved from a vet visit keeps its link when corrected here (TEC-151).
         return { value: Number(value.replace(",", ".")), unit, ...(w?.visit ? { visit: w.visit } : {}) };
       case "health":
+        if (healthType === "medication") {
+          return {
+            type: "medication",
+            med_id: medId,
+            dose: Number(dose.replace(",", ".")),
+            unit: medUnit,
+            route,
+            ...(hasIssue && issue ? { issue } : {}),
+            ...(photos.paths.length ? { photos: photos.paths } : {}),
+          };
+        }
         return {
           type: healthType,
           reasons: healthReasonsFromPick(reason === HEALTH_KEPT && h?.type !== healthType ? "" : reason, keptReasons),
@@ -470,18 +559,67 @@ export default function LogForm({
     }
   }
 
+  /** A future When: the form's words become an upcoming item, saved and awaited (its error stays here). */
+  async function submitFuture() {
+    let item: UpcomingInput;
+    try {
+      const every = repeatOn ? Number(repeatEvery) : null;
+      item = futureItem({
+        form,
+        healthType,
+        day: dateOnly ? day : when.slice(0, 10),
+        time: dateOnly ? null : when.slice(11, 16),
+        note,
+        repeatEvery: every,
+        repeatUnit: repeatOn ? repeatUnit : null,
+        reason: reason === HEALTH_KEPT ? "" : reason,
+        med: healthType === "medication" ? { name: pickedMed?.name ?? "", dose: Number(dose.replace(",", ".")) || null, unit: medUnit } : null,
+      });
+    } catch (err) {
+      setError(err instanceof InvalidEvent ? err.message : "check the form");
+      return;
+    }
+    setBusy(true);
+    const { error } = await onUpcoming(item);
+    setBusy(false);
+    if (error) setError(error);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (futureWhen && editing) {
+      setError("A saved entry can't move to the future — delete it and log a new one for then.");
+      return;
+    }
+    if (future) {
+      await submitFuture();
+      return;
+    }
     // Never saved around a photo: it is uploaded, or the person removes it.
     if (hasPhotos && (photos.working || photos.failed)) {
       setError(photos.failed ? "A photo didn't upload — retry it, or remove it." : "A photo is still uploading.");
       return;
     }
-    // The pick is the headline; the note is the story, and it is required (TEC-139).
-    if (kind === "health" && !note.trim()) {
+    // Potty opens with nothing picked and will not save without a What (TEC-199).
+    if (kind === "potty" && !what) {
+      setError("Pick what happened — pee, poop, both or no potty.");
+      return;
+    }
+    // The pick is the headline; the note is the story, and it is required for a vet visit or an issue (TEC-139).
+    if (kind === "health" && healthType !== "medication" && !note.trim()) {
       setError("Say what happened — the note is required.");
       return;
+    }
+    if (kind === "health" && healthType === "medication") {
+      if (!medId) {
+        setError("Pick the medication.");
+        return;
+      }
+      if (!dose.trim()) {
+        setError("Say how much was given.");
+        return;
+      }
     }
     // A treat's amount is a whole number, 1 or more (TEC-188). A correction that never touched it
     // keeps whatever it opened on.
@@ -495,7 +633,7 @@ export default function LogForm({
     let details: Details;
     try {
       // The same check the server makes, so a mistake is caught before the sheet closes.
-      details = parseDetails(kind, rawDetails(), foods);
+      details = parseDetails(kind, rawDetails(), foods, medications);
     } catch (err) {
       setError(err instanceof InvalidEvent ? err.message : "check the form");
       return;
@@ -521,12 +659,12 @@ export default function LogForm({
       details,
       note: note.trim() || null,
     };
-    // The inline treat row on Potty and Training: one food entry at this entry's time and person, saved
-    // after it (TEC-136, TEC-193), and none at quantity 0.
+    // The treat count on Potty, Training and Fun: one Misc treat entry at this entry's time and person, amount
+    // the count, saved after it, and none at 0 (TEC-199).
     let then: LogBody[] = [];
     try {
-      if (kind === "potty" || form === "training") {
-        then = inlineTreatEntries({ id: treatId.current, item_id: treatItem, qty: treatQty }, at, body.person_id, foods);
+      if (kind === "potty" || kind === "exercise") {
+        then = inlineTreatEntries({ id: treatId.current, item_id: MISC_ID, qty: treatQty }, at, body.person_id, foods);
       }
       // A vet visit's Weight, saved after the visit (TEC-151); a Medical issue has none.
       if (kind === "health" && healthType === "vet") {
@@ -569,320 +707,577 @@ export default function LogForm({
   // "Save walk", "Save playtime", "Save training", "Save potty"…
   const title =
     form === "fun" ? EXERCISE_LABELS[exType] : form === "health" ? HEALTH_LABELS[healthType] : FORM_LABELS[form];
-  const photoBlock = hasPhotos && (photos.working || photos.failed);
+  const photoBlock = hasPhotos && !future && (photos.working || photos.failed);
 
-  // The Related issue select, on Potty and on a vet visit (TEC-142): None, then
-  // recent live medical issues, newest first, by date and pick.
-  const relatedIssue = (
-    <>
-      <label className="flex items-center gap-2.5 py-1">
-        <input
-          type="checkbox"
-          checked={hasIssue}
-          onChange={(e) => setHasIssue(e.target.checked)}
-          className="h-5 w-5 accent-accent"
-        />
-        <span>Medical issue</span>
-      </label>
-      {hasIssue && (
-        <Field label="Related issue" htmlFor="f-issue">
-          <select id="f-issue" value={issue} onChange={(e) => setIssue(e.target.value)} className={input}>
-            <option value="">None</option>
-            {issueOptions.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-      )}
-    </>
+  // The medical issue link, on Potty, a vet visit and a medication dose (TEC-142, TEC-199): a checkbox, and
+  // behind it None and the recent live medical issues, newest first, by date and pick.
+  const issueCheck = (label: string) => (
+    <label className="flex min-h-[44px] items-center gap-2">
+      <input type="checkbox" checked={hasIssue} onChange={(e) => setHasIssue(e.target.checked)} className="h-5 w-5 accent-accent" />
+      <span>{label}</span>
+    </label>
+  );
+  const issueSelect = hasIssue && (
+    <Field label="Related issue" htmlFor="f-issue">
+      <select id="f-issue" value={issue} onChange={(e) => setIssue(e.target.value)} className={input}>
+        <option value="">None</option>
+        {issueOptions.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </Field>
   );
 
+  // The Other dogs pick, shared by Fun and Training. Its "Add dog…" swaps it for a name box.
+  const dogsField = (
+    <Field label="Other dogs" htmlFor="f-dogs">
+      {/* One pick (TEC-129): every dog by name, then Multiple, then Add dog. Add dog never becomes the
+          value: it opens the name box and the pick stays where it was until a dog is added. */}
+      <select
+        id="f-dogs"
+        value={dogPick}
+        onChange={(e) => {
+          if (e.target.value === DOGS_ADD) {
+            setAddingDog(true);
+            setDogError(null);
+          } else setDogPick(e.target.value);
+        }}
+        className={input}
+      >
+        <option value={DOGS_NONE}>None</option>
+        {keptDogs && <option value={DOGS_KEPT}>{keptLabel}</option>}
+        {dogs.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.name}
+          </option>
+        ))}
+        <option value={DOGS_MULTIPLE}>Multiple</option>
+        <option value={DOGS_ADD}>Add dog…</option>
+      </select>
+    </Field>
+  );
+  const addDogRow = addingDog && (
+    /* Not a nested <form> (HTML has none): Enter here adds the dog rather than saving the session. */
+    <div className="flex min-w-0 items-center gap-2">
+      <input
+        id="f-dog-name"
+        aria-label="Dog's name"
+        autoFocus
+        value={dogName}
+        onChange={(e) => setDogName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") void addDog(e);
+        }}
+        maxLength={40}
+        placeholder="Dog's name"
+        className={`${input} flex-1`}
+      />
+      <button type="button" onClick={(e) => void addDog(e)} disabled={dogBusy} className="min-h-[44px] rounded-[10px] bg-accent px-3 font-medium text-accent-ink disabled:opacity-60">
+        {dogBusy ? "Adding…" : "Add"}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setAddingDog(false);
+          setDogError(null);
+        }}
+        className="min-h-[44px] px-1 text-ink-soft"
+      >
+        Cancel
+      </button>
+    </div>
+  );
+
+  const treatCount = <TreatCount value={treatQty} onChange={setTreatQty} />;
+
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3" noValidate>
-      {kind === "potty" && (
-        <>
-          <Field label="What">
-            <Seg name="what" label="What" value={what} onChange={setWhat} options={POTTY_WHAT.map((v) => [v, POTTY_WHAT_LABELS[v]] as const)} />
-          </Field>
-          <Field label="Where">
-            <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
-          </Field>
-          {where === "outside" && (
-            <Field label="Leash">
-              <Seg
-                name="leash"
-                label="Leash"
-                value={leash}
-                onChange={setLeash}
-                options={leashOptions(leash)}
-              />
-            </Field>
-          )}
-          {where === "outside" && (
-            <Field label="Time outside">
-              {/* Range chips only (TEC-186, TEC-193): each saves its upper bound ("≤5" saves 5, "5–15" saves 15). */}
-              <div role="group" aria-label="Time outside, minutes" className="grid grid-cols-5 gap-1">
-                {OUT_MINUTES_CHIPS.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    aria-pressed={outMinutesChip(outMin) === m}
-                    aria-label={outMinutesAria(m)}
-                    onClick={() => setOutMin(outMinutesChip(outMin) === m ? null : m)}
-                    className="flex min-h-[44px] min-w-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-line bg-surface px-0 aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-accent-ink focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-pinstripe"
-                  >
-                    {outMinutesLabel(m)}
-                  </button>
-                ))}
-              </div>
-            </Field>
-          )}
-          {where === "inside" && (
-            <Field label="Spot">
-              <Seg
-                name="spot"
-                label="Spot"
-                value={spot}
-                onChange={setSpot}
-                options={spotOptions(spot)}
-              />
-            </Field>
-          )}
-          {/* Right below Time outside, and in the same place inside (TEC-193). */}
-          <TreatRow foods={foods} item={treatItem} qty={treatQty} onItem={setTreatItem} onQty={setTreatQty} />
-          {sessionTreats.length > 0 && <LoggedTreats treats={sessionTreats} />}
-          {where === "inside" && what !== "none" && (
-            <p className="text-[13px] font-semibold text-danger">Inside counts as an accident.</p>
-          )}
-          {relatedIssue}
-        </>
-      )}
-
-      {kind === "food" && (
-        <>
-          <Field label="Type">
-            <Seg name="type" label="Type" value={foodType} onChange={pickFoodType} options={[["meal", "Meal"], ["snuffle", "Snuffle mat"], ["treat", "Treat"]] as const} />
-          </Field>
-          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start gap-2">
-            <Field label="What" htmlFor="f-item">
-              <select
-                id="f-item"
-                value={itemId}
-                onChange={(e) => {
-                  // Add a food… never becomes the value: it opens the form and the pick stays put.
-                  if (e.target.value === FOOD_ADD) {
-                    setAddingFood(true);
-                    setFoodError(null);
-                  } else setItemId(e.target.value);
-                }}
-                className={input}
-              >
-                {/* A retired item stays selectable on the entry that already has it. */}
-                {(item && !picklist(foodType, foods).includes(item) ? [item, ...picklist(foodType, foods)] : picklist(foodType, foods)).map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.name}
-                  </option>
-                ))}
-                <option value={FOOD_ADD}>Add a food…</option>
-              </select>
-            </Field>
-            <Field label={amountUnit ? `Amount (${amountUnit})` : "Amount"} htmlFor="f-amount">
-              {foodType === "treat" ? (
-                <TreatQty
-                  id="f-amount"
-                  label={amountUnit ? `Amount in ${amountUnit}` : "Amount"}
-                  value={amount}
-                  onChange={setAmount}
-                />
-              ) : (
-                <AmountScroller
-                  id="f-amount"
-                  label={amountUnit ? `Amount in ${amountUnit}` : "Amount"}
-                  options={amountOptions(openedAmount, defaultAmount("meal", remembered))}
-                  value={amount}
-                  onChange={setAmount}
-                />
-              )}
-            </Field>
-          </div>
-          {addingFood && (
-            /* Not a nested <form> (HTML has none): Enter in the name box adds the food rather than saving the entry. */
-            <div className="grid gap-2 rounded-xl border border-line bg-surface p-2.5">
-              <span className="text-xs uppercase tracking-[0.06em] text-ink-soft">
-                Add a {foodType === "treat" ? "treat" : "meal"} food
+    <form onSubmit={submit} className="flex flex-col gap-2" noValidate>
+      {/* Box 1: When and Logging as, on one line (TEC-199). */}
+      <Box section="when" label="When and who">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <Field label="When" htmlFor="f-when">
+            {/* The native control is wider than half a phone and pushed into
+                Logging as, so a short label shows instead. The real input sits over
+                it, transparent: a tap opens the phone's own picker, and focus,
+                screen readers and keyboard editing still reach the input. */}
+            <div className="relative min-h-[44px] min-w-0 rounded-[10px] border border-line bg-surface focus-within:border-accent">
+              <span aria-hidden="true" className="block truncate px-2 py-2.5 text-[15px] tabular-nums">
+                {dateOnly
+                  ? dateLabel(day, new Date()) || "Pick a date"
+                  : !editing && !whenTouched
+                    ? "Now"
+                    : whenLabel(when, new Date()) || "Pick a time"}
               </span>
-              <Field label="Name" htmlFor="f-food-name">
-                <input
-                  id="f-food-name"
-                  autoFocus
-                  value={foodName}
-                  onChange={(e) => setFoodName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void addFood(e);
-                  }}
-                  maxLength={60}
-                  placeholder="Food name"
-                  className={input}
-                />
-              </Field>
-              <div className="grid grid-cols-2 items-start gap-2">
-                <Field label="Unit" htmlFor="f-food-unit">
-                  <select id="f-food-unit" value={foodUnit} onChange={(e) => setFoodUnit(e.target.value as FoodUnit)} className={input}>
-                    {FOOD_UNITS.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Calories per unit (optional)" htmlFor="f-food-kcal">
-                  <input
-                    id="f-food-kcal"
-                    inputMode="decimal"
-                    value={foodKcal}
-                    onChange={(e) => setFoodKcal(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void addFood(e);
-                    }}
-                    placeholder="Off the label"
-                    className={input}
-                  />
-                </Field>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={(e) => void addFood(e)}
-                  disabled={foodBusy}
-                  className="rounded-[10px] bg-accent px-3 py-2.5 font-medium text-accent-ink disabled:opacity-60"
-                >
-                  {foodBusy ? "Adding…" : "Add"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddingFood(false);
-                    setFoodError(null);
-                  }}
-                  className="text-ink-soft"
-                >
-                  Cancel
-                </button>
-              </div>
-              {foodError && <p className="text-[13px] font-semibold text-danger">{foodError}</p>}
-            </div>
-          )}
-          {item?.unit === null && <p className="-mt-2 text-[13px] text-ink-soft">Misc: say what it was in the note.</p>}
-        </>
-      )}
-
-      {kind === "exercise" && (
-        <>
-          {/* Fun picks walk or playtime; Training has no Type (TEC-136). */}
-          {form === "fun" && (
-            <Field label="Type">
-              <Seg
-                name="type"
-                label="Type"
-                value={exType}
-                onChange={setExType}
-                options={FUN_TYPES.map((t) => [t, EXERCISE_LABELS[t]] as const)}
+              <input
+                id="f-when"
+                type={dateOnly ? "date" : "datetime-local"}
+                value={dateOnly ? day : when}
+                onClick={(e) => {
+                  try {
+                    e.currentTarget.showPicker();
+                  } catch {
+                    // Not supported, or not from a tap: the native control still edits.
+                  }
+                }}
+                onChange={(e) => {
+                  if (dateOnly) setDay(e.target.value);
+                  else setWhen(e.target.value);
+                  setWhenTouched(true);
+                }}
+                className="absolute inset-0 h-full w-full min-w-0 cursor-pointer opacity-0"
               />
+            </div>
+          </Field>
+          <Field label="Logging as" htmlFor="f-who">
+            <select
+              id="f-who"
+              value={personId}
+              onChange={(e) => setPersonId(e.target.value)}
+              className={input}
+              style={{ width: nameBoxWidth(people.map((p) => p.display_name)) }}
+            >
+              <option value="">Nobody</option>
+              {people.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.display_name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        {futureWhen && (
+          <div className="grid gap-1">
+            <p role="status" className="text-[13px] font-semibold text-ink">
+              {editing ? "A saved entry can't move to the future." : FUTURE_NOTICE}
+            </p>
+            {future && (
+              <div className="flex flex-wrap items-center gap-x-2">
+                <label className="flex min-h-[44px] items-center gap-2">
+                  <input type="checkbox" checked={repeatOn} onChange={(e) => setRepeatOn(e.target.checked)} className="h-5 w-5 accent-accent" />
+                  <span>Repeat</span>
+                </label>
+                {repeatOn && (
+                  <>
+                    <span className="text-ink-soft">every</span>
+                    <input
+                      aria-label="Repeat every"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={REPEAT_MAX}
+                      value={repeatEvery}
+                      onChange={(e) => setRepeatEvery(e.target.value)}
+                      className={`${input} w-[64px]`}
+                    />
+                    <select aria-label="Repeat unit" value={repeatUnit} onChange={(e) => setRepeatUnit(e.target.value as RepeatUnit)} className={`${input} w-auto`}>
+                      {REPEAT_UNITS.map((u) => (
+                        <option key={u} value={u}>
+                          {Number(repeatEvery) === 1 ? u : `${u}s`}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Box>
+
+      {/* Box 2: the entry. */}
+      <Box section="entry" label="The entry">
+        {kind === "potty" && (
+          <>
+            <Field label="What">
+              <Seg name="what" label="What" value={what} onChange={setWhat} options={POTTY_WHAT.map((v) => [v, POTTY_WHAT_LABELS[v]] as const)} />
             </Field>
-          )}
-          {/* Training: Time sits beside Inside/Outside, on the top row (TEC-193). */}
-          {form === "training" ? (
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+            {/* Where and Leash (or Spot) on one line. */}
+            <div className="flex flex-wrap items-start gap-x-4">
               <Field label="Where">
                 <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
               </Field>
-              <Field label="Time (min)" htmlFor="f-mins">
-                <input id="f-mins" type="number" inputMode="numeric" min={1} max={600} value={minutes} onChange={(e) => setMinutes(e.target.value)} className={`${input} w-[84px]`} />
+              {where === "outside" && (
+                <Field label="Leash">
+                  <Seg name="leash" label="Leash" value={leash} onChange={setLeash} options={leashOptions(leash)} />
+                </Field>
+              )}
+              {where === "inside" && (
+                <Field label="Spot">
+                  <Seg name="spot" label="Spot" value={spot} onChange={setSpot} options={spotOptions(spot)} />
+                </Field>
+              )}
+            </div>
+            {where === "outside" && (
+              <Field label="Time outside">
+                {/* Range chips only (TEC-186, TEC-193): each saves its upper bound ("≤5" saves 5, "5–15" saves 15). */}
+                <div role="group" aria-label="Time outside, minutes" className="flex flex-wrap gap-x-1">
+                  {OUT_MINUTES_CHIPS.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      aria-pressed={outMinutesChip(outMin) === m}
+                      aria-label={outMinutesAria(m)}
+                      onClick={() => setOutMin(outMinutesChip(outMin) === m ? null : m)}
+                      className="group flex min-h-[44px] items-center whitespace-nowrap focus-visible:outline-none"
+                    >
+                      <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[15px] group-aria-pressed:border-accent group-aria-pressed:bg-accent group-aria-pressed:text-accent-ink group-focus-visible:outline group-focus-visible:outline-[3px] group-focus-visible:outline-offset-2 group-focus-visible:outline-pinstripe">
+                        {outMinutesLabel(m)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            )}
+          </>
+        )}
+
+        {kind === "food" && (
+          <>
+            <Field label="Type">
+              <Seg name="type" label="Type" value={foodType} onChange={pickFoodType} options={[["meal", "Meal"], ["snuffle", "Snuffle mat"], ["treat", "Treat"]] as const} />
+            </Field>
+            {/* What and a half-size Amount scroller on one line. */}
+            <div className="flex items-start gap-2">
+              <Field label="What" htmlFor="f-item" className="flex-1">
+                <select
+                  id="f-item"
+                  value={itemId}
+                  onChange={(e) => {
+                    // Add a food… never becomes the value: it opens the form and the pick stays put.
+                    if (e.target.value === FOOD_ADD) {
+                      setAddingFood(true);
+                      setFoodError(null);
+                    } else setItemId(e.target.value);
+                  }}
+                  className={input}
+                >
+                  {/* A retired item stays selectable on the entry that already has it. */}
+                  {(item && !picklist(foodType, foods).includes(item) ? [item, ...picklist(foodType, foods)] : picklist(foodType, foods)).map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                  <option value={FOOD_ADD}>Add a food…</option>
+                </select>
+              </Field>
+              <Field label={amountUnit ? `Amount (${amountUnit})` : "Amount"} htmlFor="f-amount" className="shrink-0">
+                {foodType === "treat" ? (
+                  <TreatQty id="f-amount" label={amountUnit ? `Amount in ${amountUnit}` : "Amount"} value={amount} onChange={setAmount} />
+                ) : (
+                  <AmountScroller
+                    id="f-amount"
+                    label={amountUnit ? `Amount in ${amountUnit}` : "Amount"}
+                    options={amountOptions(openedAmount, defaultAmount("meal", remembered))}
+                    value={amount}
+                    onChange={setAmount}
+                  />
+                )}
               </Field>
             </div>
-          ) : (
-            <Field label="Where">
-              <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
-            </Field>
-          )}
-          <Field label="Other dogs" htmlFor={addingDog ? "f-dog-name" : "f-dogs"}>
-            {addingDog ? (
-              /* Not a nested <form> (HTML has none): Enter here adds the dog
-                 rather than saving the session. */
-              <div className="flex min-w-0 items-center gap-2">
-                <input
-                  id="f-dog-name"
-                  autoFocus
-                  value={dogName}
-                  onChange={(e) => setDogName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void addDog(e);
-                  }}
-                  maxLength={40}
-                  placeholder="Dog's name"
-                  className={`${input} flex-1`}
-                />
-                <button
-                  type="button"
-                  onClick={(e) => void addDog(e)}
-                  disabled={dogBusy}
-                  className="rounded-[10px] bg-accent px-3 py-2.5 font-medium text-accent-ink disabled:opacity-60"
-                >
-                  {dogBusy ? "Adding…" : "Add"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddingDog(false);
-                    setDogError(null);
-                  }}
-                  className="text-ink-soft"
-                >
-                  Cancel
-                </button>
+            {addingFood && (
+              /* Not a nested <form> (HTML has none): Enter in the name box adds the food rather than saving the entry. */
+              <div className="grid gap-1.5 rounded-xl border border-line bg-surface p-2">
+                <span className="text-[11px] uppercase tracking-[0.06em] text-ink-soft">Add a {foodType === "treat" ? "treat" : "meal"} food</span>
+                <Field label="Name" htmlFor="f-food-name">
+                  <input
+                    id="f-food-name"
+                    autoFocus
+                    value={foodName}
+                    onChange={(e) => setFoodName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void addFood(e);
+                    }}
+                    maxLength={60}
+                    placeholder="Food name"
+                    className={input}
+                  />
+                </Field>
+                <div className="flex items-start gap-2">
+                  <Field label="Unit" htmlFor="f-food-unit">
+                    <select id="f-food-unit" value={foodUnit} onChange={(e) => setFoodUnit(e.target.value as FoodUnit)} className={input}>
+                      {FOOD_UNITS.map((u) => (
+                        <option key={u} value={u}>
+                          {u}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Calories per unit (optional)" htmlFor="f-food-kcal" className="flex-1">
+                    <input
+                      id="f-food-kcal"
+                      inputMode="decimal"
+                      value={foodKcal}
+                      onChange={(e) => setFoodKcal(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void addFood(e);
+                      }}
+                      placeholder="Off the label"
+                      className={input}
+                    />
+                  </Field>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={(e) => void addFood(e)} disabled={foodBusy} className="min-h-[44px] rounded-[10px] bg-accent px-3 font-medium text-accent-ink disabled:opacity-60">
+                    {foodBusy ? "Adding…" : "Add"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddingFood(false);
+                      setFoodError(null);
+                    }}
+                    className="min-h-[44px] px-1 text-ink-soft"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {foodError && <p className="text-[13px] font-semibold text-danger">{foodError}</p>}
               </div>
-            ) : (
-              /* One pick (TEC-129): every dog by name, then Multiple, then
-                 Add dog. Add dog never becomes the value: it opens the name
-                 box and the pick stays where it was until a dog is added. */
-              <select
-                id="f-dogs"
-                value={dogPick}
-                onChange={(e) => {
-                  if (e.target.value === DOGS_ADD) {
-                    setAddingDog(true);
-                    setDogError(null);
-                  } else setDogPick(e.target.value);
-                }}
-                className={input}
-              >
-                <option value={DOGS_NONE}>None</option>
-                {keptDogs && <option value={DOGS_KEPT}>{keptLabel}</option>}
-                {dogs.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-                <option value={DOGS_MULTIPLE}>Multiple</option>
-                <option value={DOGS_ADD}>Add dog…</option>
-              </select>
+            )}
+            {item?.unit === null && <p className="text-[13px] text-ink-soft">Misc: say what it was in the note.</p>}
+          </>
+        )}
+
+        {kind === "exercise" && (
+          <>
+            {/* Fun picks walk or playtime; Training has no Type (TEC-136). */}
+            {form === "fun" && (
+              <Field label="Type">
+                <Seg name="type" label="Type" value={exType} onChange={setExType} options={FUN_TYPES.map((t) => [t, EXERCISE_LABELS[t]] as const)} />
+              </Field>
+            )}
+            {/* Where and Time on one line (Fun calls it Length). */}
+            <div className="flex flex-wrap items-start gap-x-4">
+              <Field label="Where">
+                <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
+              </Field>
+              <Field label={form === "training" ? "Time (min)" : "Length (min)"} htmlFor="f-mins">
+                <input id="f-mins" type="number" inputMode="numeric" min={1} max={600} value={minutes} onChange={(e) => setMinutes(e.target.value)} className={`${input} w-[76px]`} />
+              </Field>
+            </div>
+            {/* Commands and Other dogs on one line; Fun has Other dogs alone. */}
+            {addDogRow || (
+              <div className={`grid items-start gap-2 ${exType === "training" ? "grid-cols-2" : "grid-cols-1"}`}>
+                {exType === "training" && (
+                  <Field label="Commands practised" htmlFor="f-commands">
+                    {/* A picklist, not chips (TEC-193): a native multi-select over the fixed list, which a phone
+                        shows as a checklist. The picks are stored as before, in the list's order. */}
+                    <select
+                      id="f-commands"
+                      multiple
+                      value={commands}
+                      onChange={(e) => setCommands(Array.from(e.target.selectedOptions, (o) => o.value as CommandId))}
+                      className={input}
+                    >
+                      {COMMANDS.map(([id, text]) => (
+                        <option key={id} value={id}>
+                          {text}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
+                {dogsField}
+              </div>
             )}
             {dogError && <p className="text-[13px] font-semibold text-danger">{dogError}</p>}
-          </Field>
+            {exType === "training" && commands.length > 0 && (
+              <p aria-live="polite" className="text-[13px] text-ink-soft">
+                Picked: {COMMANDS.filter(([id]) => commands.includes(id)).map(([, text]) => text).join(", ")}
+              </p>
+            )}
+          </>
+        )}
+
+        {kind === "weight" && (
+          <div className="flex flex-wrap items-start gap-x-4">
+            <Field label="Weight" htmlFor="f-value">
+              <input
+                id="f-value"
+                data-autofocus
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="7.0"
+                className={`${input} w-[96px]`}
+              />
+            </Field>
+            <Field label="Unit">
+              <Seg name="unit" label="Unit" value={unit} onChange={setUnit} options={UNITS.map((u) => [u, u] as const)} />
+            </Field>
+          </div>
+        )}
+
+        {kind === "health" && (
+          <>
+            <Field label="Type">
+              <Seg name="health-type" label="Type" value={healthType} onChange={pickHealthType} options={HEALTH_TYPES.map((t) => [t, HEALTH_LABELS[t]] as const)} />
+            </Field>
+            {healthType !== "medication" && (
+              /* One plain select, like Other dogs (TEC-139); the detail goes in the note. */
+              <Field label={healthType === "vet" ? "Why" : "What"} htmlFor="f-reason">
+                <select id="f-reason" value={reason} onChange={(e) => setReason(e.target.value)} className={input}>
+                  <option value="">Pick one…</option>
+                  {keptReasons && h?.type === healthType && (
+                    <option value={HEALTH_KEPT}>{keptReasons.map((id) => healthReasonLabel(healthType, id)).join(", ")}</option>
+                  )}
+                  {healthOptions(healthType).map(([id, label]) => (
+                    <option key={id} value={id}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            {healthType === "vet" && (
+              <div className="flex flex-wrap items-start gap-x-4">
+                <Field label="Weight (optional)" htmlFor="f-visit-weight">
+                  <input
+                    id="f-visit-weight"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    value={visitValue}
+                    onChange={(e) => setVisitValue(e.target.value)}
+                    placeholder="7.0"
+                    className={`${input} w-[96px]`}
+                  />
+                </Field>
+                <Field label="Unit">
+                  <Seg name="visit-unit" label="Unit" value={visitUnit} onChange={setVisitUnit} options={UNITS.map((u) => [u, u] as const)} />
+                </Field>
+              </div>
+            )}
+            {healthType === "medication" && (
+              <>
+                {/* Medication, Dose and Unit on one line. */}
+                {addingMed ? (
+                  /* Not a nested <form> (HTML has none): Enter in the name box adds the medication rather than saving the dose. */
+                  <div className="grid gap-1.5 rounded-xl border border-line bg-surface p-2">
+                    <span className="text-[11px] uppercase tracking-[0.06em] text-ink-soft">Add a medication</span>
+                    <div className="flex items-start gap-2">
+                      <Field label="Name" htmlFor="f-med-name" className="flex-1">
+                        <input
+                          id="f-med-name"
+                          autoFocus
+                          value={medName}
+                          onChange={(e) => setMedName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void addMedication(e);
+                          }}
+                          maxLength={60}
+                          placeholder="Medication name"
+                          className={input}
+                        />
+                      </Field>
+                      <Field label="Unit" htmlFor="f-med-new-unit">
+                        <select id="f-med-new-unit" value={newMedUnit} onChange={(e) => setNewMedUnit(e.target.value as MedUnit)} className={input}>
+                          {MED_UNITS.map((u) => (
+                            <option key={u} value={u}>
+                              {u}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={(e) => void addMedication(e)} disabled={medBusy} className="min-h-[44px] rounded-[10px] bg-accent px-3 font-medium text-accent-ink disabled:opacity-60">
+                        {medBusy ? "Adding…" : "Add"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddingMed(false);
+                          setMedError(null);
+                        }}
+                        className="min-h-[44px] px-1 text-ink-soft"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {medError && <p className="text-[13px] font-semibold text-danger">{medError}</p>}
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2">
+                    <Field label="Medication" htmlFor="f-med" className="flex-1">
+                      <select
+                        id="f-med"
+                        value={medId}
+                        onChange={(e) => {
+                          // Add a medication… never becomes the value: it opens the form and the pick stays put.
+                          if (e.target.value === MED_ADD) {
+                            setAddingMed(true);
+                            setMedError(null);
+                            return;
+                          }
+                          setMedId(e.target.value);
+                          const m = findMedication(medications, e.target.value);
+                          if (m) setMedUnit(m.unit);
+                        }}
+                        className={input}
+                      >
+                        <option value="">Pick one…</option>
+                        {/* A retired medication stays selectable on the dose that already has it. */}
+                        {(pickedMed && !medPicklist(medications).includes(pickedMed) ? [pickedMed, ...medPicklist(medications)] : medPicklist(medications)).map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                        <option value={MED_ADD}>Add a medication…</option>
+                      </select>
+                    </Field>
+                    <Field label="Dose" htmlFor="f-dose" className="shrink-0">
+                      <input id="f-dose" type="text" inputMode="decimal" autoComplete="off" value={dose} onChange={(e) => setDose(e.target.value)} placeholder="5" className={`${input} w-[64px]`} />
+                    </Field>
+                    <Field label="Unit" htmlFor="f-med-unit" className="shrink-0">
+                      <select id="f-med-unit" value={medUnit} onChange={(e) => setMedUnit(e.target.value as MedUnit)} className={`${input} w-auto`}>
+                        {MED_UNITS.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                )}
+                <Field label="Given">
+                  <Seg name="route" label="Given" value={route} onChange={setRoute} options={MED_ROUTES} />
+                </Field>
+                {issueCheck("For a medical issue")}
+                {issueSelect}
+              </>
+            )}
+          </>
+        )}
+      </Box>
+
+      {/* Box 3: the secondary things (TEC-199). Potty: the treats count then the medical issue, on one line.
+          Training and Fun: the treats count. A vet visit: the medical issue. Not on a future entry, which
+          keeps no treats or issue link. */}
+      {!future && (kind === "potty" || kind === "exercise" || (kind === "health" && healthType === "vet")) && (
+        <Box section="secondary" label="Treats and issue">
+          <div className="flex flex-wrap items-center gap-x-4">
+            {(kind === "potty" || kind === "exercise") && treatCount}
+            {(kind === "potty" || (kind === "health" && healthType === "vet")) && issueCheck("Medical issue")}
+          </div>
+          {issueSelect}
+          {sessionTreats.length > 0 && <LoggedTreats treats={sessionTreats} />}
           {/* Pee and Poop (TEC-186): a Fun form only, on a new entry. Each tap is its own potty entry,
               saved at once and independent of whether this Fun entry is. */}
           {form === "fun" && !editing && funPotty({ type: exType, where }, "pee") && (
-            <div className="grid gap-1.5 rounded-xl border border-line bg-surface p-2.5">
-              <span className="text-xs uppercase tracking-[0.06em] text-ink-soft">Log a potty now</span>
-              <div className="grid grid-cols-2 gap-2">
+            <div className="grid gap-1">
+              <span className="text-[11px] uppercase tracking-[0.06em] text-ink-soft">Log a potty now</span>
+              <div className="flex flex-wrap gap-2">
                 {(["pee", "poop"] as const).map((w) => (
                   <button
                     key={w}
                     type="button"
                     onClick={() => tapPotty(w)}
-                    className="min-h-[44px] rounded-xl border border-line bg-paper px-3 py-2 font-bold active:translate-y-px focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-pinstripe"
+                    className="min-h-[44px] rounded-xl border border-line bg-surface px-4 font-bold active:translate-y-px focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-pinstripe"
                   >
                     {POTTY_WHAT_LABELS[w]}
                   </button>
@@ -890,7 +1285,7 @@ export default function LogForm({
               </div>
               <p className="text-[13px] text-ink-soft">
                 Logs now as {describe({ kind: "potty", details: funPotty({ type: exType, where }, "pee")! }).detail}. Each tap is
-                its own entry, saved right away, whether or not you save this one.
+                its own entry, saved right away.
               </p>
               {tapped.length > 0 && (
                 <ul aria-live="polite" aria-label="Potty entries logged from this form" className="grid gap-1 text-[13px]">
@@ -907,7 +1302,7 @@ export default function LogForm({
                         {state === "failed" && (
                           <>
                             <span className="text-danger">Not saved</span>
-                            <button type="button" onClick={() => onRetry(t.id)} className="font-medium underline">
+                            <button type="button" onClick={() => onRetry(t.id)} className="min-h-[44px] font-medium underline">
                               Retry
                             </button>
                           </>
@@ -919,195 +1314,31 @@ export default function LogForm({
               )}
             </div>
           )}
-          {form === "fun" && (
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Length (min)" htmlFor="f-mins">
-                <input id="f-mins" type="number" inputMode="numeric" min={1} max={600} value={minutes} onChange={(e) => setMinutes(e.target.value)} className={input} />
-              </Field>
-              <Field label="Treats used" htmlFor="f-treats">
-                <input id="f-treats" type="number" inputMode="numeric" min={0} max={500} value={treats} onChange={(e) => setTreats(e.target.value)} className={input} />
-              </Field>
-            </div>
-          )}
-          {/* Training's treat: the pick beside how many, inline (TEC-193). Logged as its own treat entry
-              when the session is saved, and counted in the session's treats. */}
-          {form === "training" && (
-            <>
-              <TreatRow foods={foods} item={treatItem} qty={treatQty} onItem={setTreatItem} onQty={setTreatQty} />
-              {sessionTreats.length > 0 && <LoggedTreats treats={sessionTreats} />}
-            </>
-          )}
-          {exType === "training" && (
-            <Field label="Commands practised" htmlFor="f-commands">
-              {/* A picklist, not chips (TEC-193): a native multi-select over the fixed list, which a phone
-                  shows as a checklist. The picks are stored as before, in the list's order. */}
-              <select
-                id="f-commands"
-                multiple
-                value={commands}
-                onChange={(e) => setCommands(Array.from(e.target.selectedOptions, (o) => o.value as CommandId))}
-                className={input}
-              >
-                {COMMANDS.map(([id, text]) => (
-                  <option key={id} value={id}>
-                    {text}
-                  </option>
-                ))}
-              </select>
-              <p aria-live="polite" className="text-[13px] text-ink-soft">
-                {commands.length
-                  ? `Picked: ${COMMANDS.filter(([id]) => commands.includes(id)).map(([, text]) => text).join(", ")}`
-                  : "None picked. Tap to choose several."}
-              </p>
-            </Field>
-          )}
-        </>
+        </Box>
       )}
 
-      {kind === "weight" && (
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Weight" htmlFor="f-value">
-            <input
-              id="f-value"
-              data-autofocus
-              type="number"
-              inputMode="decimal"
-              step="0.1"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="7.0"
-              className={input}
-            />
-          </Field>
-          <Field label="Unit">
-            <Seg name="unit" label="Unit" value={unit} onChange={setUnit} options={UNITS.map((u) => [u, u] as const)} />
-          </Field>
-        </div>
-      )}
-
-      {kind === "health" && (
-        <>
-          <Field label="Type">
-            <Seg
-              name="health-type"
-              label="Type"
-              value={healthType}
-              onChange={pickHealthType}
-              options={HEALTH_TYPES.map((t) => [t, HEALTH_LABELS[t]] as const)}
-            />
-          </Field>
-          {/* One plain select, like Other dogs (TEC-139); the detail goes in the note. */}
-          <Field label={healthType === "vet" ? "Why" : "What"} htmlFor="f-reason">
-            <select id="f-reason" value={reason} onChange={(e) => setReason(e.target.value)} className={input}>
-              <option value="">Pick one…</option>
-              {keptReasons && h?.type === healthType && (
-                <option value={HEALTH_KEPT}>{keptReasons.map((id) => healthReasonLabel(healthType, id)).join(", ")}</option>
-              )}
-              {healthOptions(healthType).map(([id, label]) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          {healthType === "vet" && relatedIssue}
-          {healthType === "vet" && (
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Weight (optional)" htmlFor="f-visit-weight">
-                <input
-                  id="f-visit-weight"
-                  type="number"
-                  inputMode="decimal"
-                  step="0.1"
-                  value={visitValue}
-                  onChange={(e) => setVisitValue(e.target.value)}
-                  placeholder="7.0"
-                  className={input}
-                />
-              </Field>
-              <Field label="Unit">
-                <Seg name="visit-unit" label="Unit" value={visitUnit} onChange={setVisitUnit} options={UNITS.map((u) => [u, u] as const)} />
-              </Field>
-            </div>
-          )}
-          <Field label="Note" htmlFor="f-note">
-            <input
-              id="f-note"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              maxLength={500}
-              required
-              aria-required="true"
-              placeholder="What happened?"
-              className={input}
-            />
-          </Field>
-          <PhotoPicker photos={photos} />
-        </>
-      )}
-
-      {/* When takes the row; Human is as wide as the longest name (TEC-129). */}
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-        <Field label="When" htmlFor="f-when">
-          {/* The native control is wider than half a phone and pushed into
-              Human, so a short label shows instead. The real input sits over
-              it, transparent: a tap opens the phone's own picker, and focus,
-              screen readers and keyboard editing still reach the input. */}
-          <div className="relative min-w-0 rounded-[10px] border border-line bg-paper focus-within:border-accent">
-            <span aria-hidden="true" className="block truncate px-2.5 py-2.5 tabular-nums">
-              {dateOnly
-                ? dateLabel(day, new Date()) || "Pick a date"
-                : !editing && !whenTouched
-                  ? "Now"
-                  : whenLabel(when, new Date()) || "Pick a time"}
-            </span>
-            <input
-              id="f-when"
-              type={dateOnly ? "date" : "datetime-local"}
-              value={dateOnly ? day : when}
-              max={dateOnly ? toDateInput(new Date().toISOString()) : undefined}
-              onClick={(e) => {
-                try {
-                  e.currentTarget.showPicker();
-                } catch {
-                  // Not supported, or not from a tap: the native control still edits.
-                }
-              }}
-              onChange={(e) => {
-                if (dateOnly) setDay(e.target.value);
-                else setWhen(e.target.value);
-                setWhenTouched(true);
-              }}
-              className="absolute inset-0 h-full w-full min-w-0 cursor-pointer opacity-0"
-            />
-          </div>
-        </Field>
-        <Field label="Human" htmlFor="f-who">
-          <select
-            id="f-who"
-            value={personId}
-            onChange={(e) => setPersonId(e.target.value)}
-            className={input}
-            style={{ width: nameBoxWidth(people.map((p) => p.display_name)) }}
-          >
-            <option value="">Nobody</option>
-            {people.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.display_name}
-              </option>
-            ))}
-          </select>
+      {/* The note: a full-width two-line text box that scrolls past two lines (TEC-199). */}
+      <div data-section="note">
+        <Field label="Note" htmlFor="f-note">
+          <textarea
+            id="f-note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            maxLength={500}
+            required={kind === "health" && healthType !== "medication"}
+            aria-required={kind === "health" && healthType !== "medication" ? "true" : undefined}
+            placeholder={kind === "health" && healthType !== "medication" ? "What happened?" : "Optional"}
+            className={`${input} block resize-none overflow-y-auto leading-snug`}
+          />
         </Field>
       </div>
-      {/* Health has its Note under the pick, and requires it. */}
-      {kind !== "health" && (
-        <Field label="Note" htmlFor="f-note">
-          <input id="f-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Optional" className={input} />
-        </Field>
+      {/* Photos sit below the Note (TEC-172), where the form has photos. A future entry keeps none. */}
+      {hasPhotos && !future && (
+        <div data-section="photos">
+          <PhotoPicker photos={photos} />
+        </div>
       )}
-      {/* Photos sit below the Note (TEC-172) on Potty, Fun and Training. Health keeps its Note
-          above its own Photos block, so the order is the same there. */}
-      {(kind === "potty" || kind === "exercise") && <PhotoPicker photos={photos} />}
 
       {error && (
         <p role="alert" className="text-sm font-semibold text-danger">
@@ -1117,26 +1348,30 @@ export default function LogForm({
 
       <button
         type="submit"
+        data-section="save"
         disabled={busy || photoBlock}
         data-autofocus={kind === "weight" && !editing ? undefined : true}
-        className="rounded-[14px] bg-[var(--tone-2-bg)] px-4 py-3 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)] disabled:opacity-60"
+        className="min-h-[44px] rounded-[14px] bg-[var(--tone-2-bg)] px-4 py-2.5 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)] disabled:opacity-60"
       >
         {busy
           ? "Saving…"
-          : photos.working && hasPhotos
-            ? "Uploading photo…"
-            : photos.failed && hasPhotos
-              ? "Fix the photo to save"
-              : editing
-                ? "Save changes"
-                : `Save ${title.toLowerCase()}`}
+          : future
+            ? "Save as upcoming"
+            : photos.working && hasPhotos
+              ? "Uploading photo…"
+              : photos.failed && hasPhotos
+                ? "Fix the photo to save"
+                : editing
+                  ? "Save changes"
+                  : `Save ${title.toLowerCase()}`}
       </button>
       {editing ? (
-        <button type="button" onClick={remove} disabled={busy} className="self-start py-1 font-semibold text-danger disabled:opacity-60">
+        <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] self-start font-semibold text-danger disabled:opacity-60">
           {confirmDelete ? "Tap again to delete" : "Delete this entry"}
         </button>
       ) : (
-        <p className="text-[13px] text-ink-soft">Defaults are filled in. Change only what&apos;s different.</p>
+        /* Potty has no defaults to explain (nothing is preselected) and drops the helper text (TEC-199). */
+        kind !== "potty" && <p className="text-[13px] text-ink-soft">Defaults are filled in. Change only what&apos;s different.</p>
       )}
     </form>
   );

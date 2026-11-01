@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FOODS, FOOD_UNITS, MISC_ID, findFood, foodNameTaken, picklist, type AddedFood } from "@/lib/foods";
-import { InvalidEvent, foodSnapshot, parseNewFood, quickLog, treatEntry, type JournalEvent } from "@/lib/events";
+import { InvalidEvent, foodSnapshot, parseNewFood, treatEntry, type JournalEvent } from "@/lib/events";
 import { defaultFood } from "@/lib/defaults";
 
 // Invented foods (RULES.md, Never 2).
@@ -96,7 +96,7 @@ describe("the add-a-food check", () => {
   });
 });
 
-describe("Quick log's Meal prefill and the form's defaults with an added food", () => {
+describe("The form's defaults with an added food", () => {
   const meal = (item: string): JournalEvent =>
     ({
       id: "55555555-5555-4555-8555-555555555555",
@@ -109,12 +109,6 @@ describe("Quick log's Meal prefill and the form's defaults with an added food", 
       created_at: "2026-10-29T12:00:00.000Z",
     }) as JournalEvent;
 
-  it("opens on an added food as the last meal", () => {
-    expect(quickLog("food", meal(MEAL.id), ADDED)).toEqual({ form: "food", itemId: MEAL.id, amount: 0.5 });
-  });
-  it("falls back to the usual when that food is not known", () => {
-    expect(quickLog("food", meal(MEAL.id))).toEqual({ form: "food", itemId: null, amount: null });
-  });
   it("remembers an added meal as the phone's default, and Misc when it is retired or unknown", () => {
     expect(defaultFood("meal", { meal: MEAL.id }, ADDED)).toBe(MEAL.id);
     expect(defaultFood("meal", { meal: RETIRED.id }, ADDED)).toBe(MISC_ID);

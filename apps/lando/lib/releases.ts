@@ -25,6 +25,7 @@ export const DAYS_SHOWN = 7;
  * once written, is not rewritten.
  */
 export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
+  "2026-11-01": "Tidier forms, one Potty button, a Medication tab, and plans for the days ahead.",
   "2026-10-30": "A snuffle mat counts as half a meal.",
   "2026-10-29": "Royal Canin Dachshund Puppy joins the meal list, and you can add your own foods.",
   "2026-10-28": "The top boxes are now the way in, logging a potty got quicker, and the Log buttons are tidier.",
@@ -35,6 +36,12 @@ export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
 };
 
 export const RELEASES: readonly Release[] = [
+  { date: "2026-11-01", text: "The tabs are now Log, Analytics and Patch notes. What's new has a new name, and the Upcoming tab is gone: anything planned for later now lives in the Log." },
+  { date: "2026-11-01", text: "Pick a time in the future on any form and it saves as something coming up instead of an entry. You can repeat it every few weeks, months or years. A Next 7 days box under the top boxes shows what is due this week, in amber when it is close and red when it is late, and an Upcoming choice in the feed lists everything coming up. Done opens the form it came from, filled in, and closes the item once you save." },
+  { date: "2026-11-01", text: "Health has a Medication tab beside Vet visit and Medical issue. Pick a medication, say how much and how it was given, and every dose shows in the feed. Add a new medication from the list any time." },
+  { date: "2026-11-01", text: "Treats on Potty, Training and Fun are now a simple count with minus and plus buttons. Anything above zero is logged as its own treat, and Food still lets you pick a specific treat." },
+  { date: "2026-11-01", text: "There is one Potty button with nothing preset, so you choose what happened each time. The Log buttons are now Potty, Food, Training, Fun, Weight and Health, and the top boxes only show their numbers, so tapping them no longer opens a form." },
+  { date: "2026-11-01", text: "Every form is tidier and tighter: When and Logging as share the first box, the entry sits in its own box, and treats and medical issue sit together in a third. Buttons and boxes are smaller, Where and Leash share a line, and the note is a two-line box." },
   { date: "2026-10-30", text: "A snuffle mat now counts as half a meal on the Meal box, so a meal and a snuffle mat read Meals: 1½. The cups still add in full." },
   { date: "2026-10-29", text: "Snuffle mat is now its own type on the Food form, beside Meal and Treat. It picks from the meal list, shows in the feed as Snuffle mat, and counts as a meal: on the Meal box, in the time since the last meal and in the meal gaps. The old Snuffle mat item has left the meal list, and older entries still read and can be corrected." },
   { date: "2026-10-29", text: "The Meal box at the top now reads Meals with today's count and the cups eaten, like Meals: 2 · 1⅛ cups, in eighth-cup steps. Only meals logged in cups add to the cups, and the box still shows the time since the last meal and opens a quick entry when tapped." },

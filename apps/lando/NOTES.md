@@ -2,53 +2,92 @@
 
 ## State
 
-- v2 on Next.js 16: four tabs under the app bar, **Log**, **Analytics**, **What's new** and **Upcoming**, sticky,
-  opening on Log (RULES.md holds the owner's override of the one-screen rule).
-- **Upcoming** (TEC-192): plans for vet visits, vaccines, medications and other things, in `lando.upcoming`
-  (kind, title, due day, optional time and note, optional repeat of N weeks, months or years, status open,
-  done or cancelled). The tab lists open items soonest first (`openItems`), each in the pills' status colours
-  (`.lando-pill[data-status]`: due today to 7 days out is amber/`yellow`, overdue is `red`, the rest neutral;
-  `upcomingTone`, by calendar day on the phone's day). The same first item is a one-line button under the
-  pills on Log, "Next: Title · Fri Nov 6" (" · overdue" when red), absent when nothing is open; a tap opens
-  the tab. Add and Edit use a bottom sheet (`UpcomingTab.tsx`); an item is edited in place and **cancelled,
-  never deleted** (the row keeps `status`). Reads and writes go through `/api/upcoming`: `GET` the open items,
-  `POST {action: add | edit | cancel | done}`. The journal read (`/api/journal`) is untouched; Upcoming loads
-  beside it, and one failing never blanks the other.
-  * **Done** on Medication or Other marks it done with today's date. Done on a **Vet visit or Vaccine** opens
-    the Vet visit form (`visitPrefill`: the item's day and time, noon when none; a vaccine's reason is
-    `vaccines`; a vet visit's reason only when the title says check-up or follow-up/recheck; the title is the
-    note). Journal remembers the link (`visitLinks`, by the visit's id); once `/api/events` saves that visit,
-    `saveThenClose` posts `done` with `done_event` set to the visit's id. Closing the form without saving
-    never closes the item; a failed save keeps its Retry, and the Retry closes the item when it lands. The
-    server also refuses to close a vet or vaccine item without a saved vet visit's id (`applyAction`).
-  * **A repeat**: the server inserts the next open item at `nextDue` (weeks add 7 days each; months and years
-    land on the same day, or the last day of a shorter month, so Jan 31 + 1 month is Feb 28/29), same kind,
-    title, note, time and repeat. If that insert fails the item is put back to open so Done can be tried again.
-  * No phone notifications (the owner's pick); the line on Log and the colours are the whole reminder.
-- **Log** (TEC-186 made the pills the way in): four since-last pills in one row (Pee, Poop, Meal, **Fun**;
-  label over value, the clock time in the title and for screen readers; coloured by TEC-142, below), then
-  **four buttons in one row directly under them** (TEC-188: Treats, Training, Weight, Health, the pills' own
-  grid and 44px height, so the same size; no "Log" heading; Weight keeps "7.3 lb" as a small second line,
-  which fits at pill width, the date in its title), then "Logging as", then the **Feed** under a row of filter pills (TEC-171, below). **Potty and
-  Fun have no button**: they are reached through the pills (Fun's own Pee and Poop, below) and by tapping a
-  feed row. **Treats** opens the Food form on a treat (`TREAT_QUICK_LOG`; the Meal/Treat choice stays in the
-  form, and the Food filter pill and the form keep the name Food). No growth chart on Log since TEC-129: it
-  lives in Analytics only. Each button opens a bottom sheet (`app/Sheet.tsx`) with that form
-  (`app/LogForm.tsx`, prop `form`), defaults filled in, so Save is usually the only other tap. Tapping a feed
-  row opens the matching form on that entry to correct or delete it.
-- **Health** (TEC-137, reworked by TEC-139): a sixth form, kind `health`, with a Type of **Vet
-  visit** or **Medical issue**, then **one plain full-width `<select>`** of high-level picks
-  (styled like Other dogs'), a required **Note** under it ("What happened?"), up to `MAX_PHOTOS`
-  (6) photos, and the usual When and Human. Vet visit: Check-up, Vaccines, Sick or injured,
-  Procedure (spay/neuter, dental), Follow-up, Other (`VET_REASONS`). Medical issue: Stomach &
-  appetite, Skin, ears & eyes, Limping or injury, Breathing or cough, Energy or behaviour, Other
-  (`ISSUE_PICKS`, both in `lib/events.ts`). A new entry opens on "Pick one…" and Save without a
-  pick says so. Switching the Type keeps the pick only if the other list shares it ("Other").
-  Stored shape: `{type: vet|issue, reasons[], photos?[], issue?: uuid}` (`issue` on a vet visit
-  only, migration `lando_issue_links`), `reasons` an array of one for every new entry; the story is
-  the event's own `note`. Feed: "Vet visit  Check-up · 2 photos"
-  with up to four 40px thumbnails and the note after it; the chip is Health. Analytics and the
-  since-last pills ignore it.
+- v2 on Next.js 16: three tabs under the app bar, **Log**, **Analytics** and **Patch notes** (TEC-199; "What's new"
+  renamed in the UI only, the file is still `app/WhatsNew.tsx` and the data `lib/releases.ts`; the Upcoming tab is gone),
+  sticky, evenly spaced, opening on Log (RULES.md holds the owner's override of the one-screen rule).
+- **Upcoming items** (TEC-192, no tab since TEC-199): plans in `lando.upcoming` (kind vet, vaccine, medication or other; title,
+  due day, optional time and note, optional repeat of N weeks, months or years, status open, done or cancelled). **A future
+  When on any form creates one** (`lib/future.ts`; below), and the old Add/Edit sheet is gone, so nothing is edited in place
+  from the app any more (the `edit` action stays in the route, unused); an item is **cancelled, never deleted** (the row
+  keeps `status`). Reads and writes go through `/api/upcoming`: `GET` the open items, `POST {action: add | edit | cancel |
+  done}`. The journal read (`/api/journal`) is untouched; upcoming loads beside it, and one failing never blanks the other.
+  * **Next 7 days** (the box under the pills on Log, `nextWeek`): open items due within `SOON_DAYS` (7) of the phone's day,
+    overdue ones too, soonest first. Absent when nothing is due. **The Upcoming filter** (the last pill of the feed's Show-only
+    row; exclusive of the form pills) lists every open item soonest first (`allUpcoming`), with Cancel as well as Done. Both use
+    `app/UpcomingList.tsx`: each row wears the pills' status colours (`.lando-pill[data-status]`: due today to 7 days out is
+    amber/`yellow`, overdue `red`, later neutral; `upcomingTone`, by calendar day on the phone's day), says when it is due, how
+    it repeats and its note, and the tone in words for screen readers.
+  * **A future When** (`isFutureWhen`, or `isFutureDay` for a weight, which is a day): the form says "Future: saves as upcoming",
+    shows a **Repeat** (every N weeks, months or years; only then), hides the photos and Box 3, and Save reads "Save as
+    upcoming". Save posts an upcoming item through `onUpcoming` (awaited: a refusal stays on the form) and writes no journal
+    entry. The item's kind comes from the form (`futureKind`): a Vet visit is `vet`, a Medication `medication`, everything else
+    `other`; its title is the form's name (`futureTitle`: "Potty", "Training", "Medical issue", "Vet visit · Check-up",
+    "Name · 5 mg"), which is how Done finds the form again. A saved entry cannot be moved to the future (the form says so, and
+    the server refuses a time past a day ahead as before). A When in the same minute as now is not the future.
+  * **Done** (`formForItem`, in `doneUpcoming`): a vet visit or vaccine opens the Vet visit form, a medication the Medication tab,
+    an Other titled with a form's name that form (Medical issue opens Health on Medical issue), prefilled (`donePrefill`: the
+    item's day and time **once they have come**, else the form's own "now", so a Done before the day is never a second future
+    entry; a vet visit's reason from `visitPrefill` or a form-made title; a medication's pick, dose and unit from its title; the
+    note is the item's note, plus its title when that is its own words). An old Other item with its own words (no form) is marked
+    done at once with today's date, as TEC-192 did; an old medication item now opens the Medication form (pick and dose empty
+    when its title names no listed medication). The form's entry then closes the item: `Journal`'s `visitLinks` maps the saved
+    entry's id to the item, and `saveThenClose` posts `done` with `done_event` once it is saved. Closing the form without saving
+    never closes the item; a failed save keeps its Retry, which closes the item when it lands. The server still refuses to close
+    a vet or vaccine item without a saved vet visit's id (`applyAction`); medication and Other take any entry.
+  * **A repeat**: the server inserts the next open item at `nextDue` (weeks add 7 days each; months and years land on the same
+    day, or the last day of a shorter month, so Jan 31 + 1 month is Feb 28/29), same kind, title, note, time and repeat. If that
+    insert fails the item is put back to open so Done can be tried again.
+  * No phone notifications (the owner's pick); the box on Log and the colours are the whole reminder.
+- **Log** (TEC-199): four since-last pills in one row (Pee, Poop, Meal, **Fun**; label over value, the clock time in the title and
+  for screen readers; coloured by TEC-142, below) that **only show their numbers and are not tappable** (TEC-181's quick log is
+  retired: `quickLog`, `QuickLog`, `TREAT_QUICK_LOG` and their tests are gone), then the **Next 7 days** box when anything is due,
+  then **six buttons, three across** (Potty, Food, Training, Fun, Weight, Health; Weight keeps "7.3 lb" as a small second line,
+  the date in its title; there is **no Treats button**: a treat is logged through Food's Type or a treat count), then "Logging as",
+  then the **Feed** under a row of filter pills (TEC-171, below). There is one Potty button and nothing preset on its form. No
+  growth chart on Log since TEC-129: it lives in Analytics only. Each button opens a bottom sheet (`app/Sheet.tsx`) with that form
+  (`app/LogForm.tsx`, prop `form`). Tapping a feed row opens the matching form on that entry to correct or delete it.
+- **Every form is boxed and compact** (TEC-199, `app/LogForm.tsx`; the order is held by `tests/boxedforms.test.ts` through
+  `data-section`): **Box 1** When and Logging as on one line (the form's old "Human" label), with the future line and Repeat under
+  them when the When is in the future; **Box 2**, the entry; **Box 3**, the secondary things (Potty: the treat count then
+  Medical issue on one line; Training and Fun: the treat count, and Fun's Pee/Poop buttons; Vet visit: Medical issue; none on Food,
+  Weight, Medical issue or Medication); then **Note** (a full-width `<textarea>`, two rows, scrolling past two; required for a vet
+  visit or an issue, optional elsewhere), **Photos** under it where the form has photos (Potty, Fun, Training, Health), and Save
+  last. Per form, Box 2: *Potty* What (Pee, Poop, Both, No potty; **nothing preselected, and a save without one is refused**) ·
+  Where with Leash (outside) or Spot (inside) on one line · Time outside (outside). *Food* Type (Meal, Snuffle mat, Treat) · What
+  and a half-size Amount on one line (the scroller is `SCROLLER_WIDTH` 52, it was 88). *Training* Where and Time on one line ·
+  Commands practised and Other dogs on one line (a half-width native multi-select beside the dogs pick; the "Picked:" line shows
+  only when something is picked). *Fun* Type · Where and Length · Other dogs. *Weight* weight and unit on one line. *Health* Type
+  (Vet visit, Medical issue, Medication) then each tab's own fields. **Compact controls**: chips, pills, buttons, pick lists and
+  field boxes size to their content with narrow padding (`px-2.5 py-1` chips, `px-2 py-1.5` boxes) and wrap; the 44px touch target
+  is kept as the hit area (a chip's `label` or `button` is 44px tall and the chip is its inner span; boxes are `min-h-[44px]`).
+  The Potty form lost its extra boxes and helper text (the accident line, "Defaults are filled in"); nothing else changed in the
+  data. Only existing tokens are used (the boxes are `paper` on the sheet's `surface`, inputs `surface`).
+- **Health** (TEC-137, reworked by TEC-139, **Medication added by TEC-199**): a sixth form, kind `health`, with a Type of **Vet
+  visit**, **Medical issue** or **Medication**. A vet visit and an issue have **one plain full-width `<select>`** of high-level picks
+  (styled like Other dogs'), a required **Note** ("What happened?"), up to `MAX_PHOTOS` (6) photos, and the usual When and Logging
+  as. Vet visit: Check-up, Vaccines, Sick or injured, Procedure (spay/neuter, dental), Follow-up, Other (`VET_REASONS`). Medical
+  issue: Stomach & appetite, Skin, ears & eyes, Limping or injury, Breathing or cough, Energy or behaviour, Other (`ISSUE_PICKS`,
+  both in `lib/events.ts`). A new entry opens on "Pick one…" and Save without a pick says so. Switching the Type keeps the pick
+  only if the other list shares it ("Other"). Stored shape: `{type: vet|issue, reasons[], photos?[], issue?: uuid}` (`issue` on a
+  vet visit only, migration `lando_issue_links`), `reasons` an array of one for every new entry; the story is the event's own
+  `note`. Feed: "Vet visit  Check-up · 2 photos" with up to four 40px thumbnails and the note after it; the chip is Health.
+  Analytics and the since-last pills ignore it.
+- **Medication** (TEC-199, `lib/medications.ts`): a Health entry of Type Medication, one dose. Its Box 2 is **Medication (a pick
+  list), Dose and Unit on one line**, **Given** (By mouth, On skin, Ear/eye, Shot; opens on By mouth), and **For a medical issue**
+  (the same checkbox and select as a vet visit's). Stored shape `{type: 'medication', med_id, med_name, dose, unit, route, issue?,
+  photos?}`: **no `reasons` key**; `med_name` is a snapshot taken by the server from the medication (the phone's is ignored,
+  like a food's), `dose` is above 0 and at most `DOSE_MAX` (10 000), `unit` one of `MED_UNITS` (mg, ml, g, tablet, chew, capsule,
+  spray, dose) and `route` one of `MED_ROUTES` (mouth, skin, ear-eye, shot). **The note is optional** (a vet visit's and an issue's
+  stay required), so `parseNewEvent` reads the details first. `checkHealthReasons` and `healthPickFor` pass a medication
+  untouched. The feed reads "Medication  Name · 5 mg · by mouth". The medications live in **`lando.medications`** (migration
+  `lando_medications`): id (uuid), name (1 to 60 characters, unique ignoring case and outer spaces), unit (the unit the pick opens
+  on), created_at, retired. RLS on, zero policies. There is no list in code and **none is seeded**: the pick list starts empty and
+  ends with **"Add a medication…"** (`MED_ADD`, never a value, like Add a food): Name and Unit, `POST /api/medications`
+  (`journal.ts:addMedication`, `parseNewMedication`: a name already there in any case, retired too, is a 400), merged into the
+  loaded list, selected, nothing logged until the form's Save. Read with the journal (`listMedications`, `/api/journal` returns
+  `medications`) and, for a dose only, by `writeEvent`. Retire one by SQL (`retired = true`); it leaves the pick list but old
+  doses still resolve and can be corrected, a retired one staying selectable on the dose that holds it. Picking a medication sets
+  the Unit to its own. A future Medication saves an upcoming item titled "Name · 5 mg".
 - **The Health note is required** (TEC-139), for a new entry and a correction alike: the phone
   blocks Save on a blank or whitespace-only note with "Say what happened — the note is required."
   and the server refuses it too (`parseNewEvent`, so `writeEvent`; a delete is exempt, and no
@@ -95,15 +134,8 @@
   **The food clock is the last meal** (`sinceLast`): a treat no longer resets it (before TEC-142 a
   treat did). The pill's face is **"Meals: N · X cups"** (TEC-194, below; `CLOCK_LABELS` still says Meal for the others' titles); the Food button and form keep
   their name because they log treats too.
-- **Tapping a pill opens a quick log** (TEC-181, Fun by TEC-186): the same form in the same bottom
-  sheet, on a new entry, with When now and everything editable. The pill is one `<button>` (`Pill`
-  in `Journal.tsx`); its title and screen-reader text end "tap to log". `quickLog` in `lib/events.ts`
-  decides the prefill and `LogForm` takes it as `quick`: **Pee** and **Poop** open Potty with that
-  what, the form's own Outside + Leashed (Time outside stays empty, TEC-176); **Meal** opens Food
-  on the last meal's item and amount (`sinceLast`'s food clock, so never a treat), or the usual
-  defaults with no meal in the read or an item the catalogue no longer lists. It ignores the
-  remembered meal on purpose. **Fun** opens the Fun form on a new walk with its usual defaults. The pills
-  are not tappable until the journal has loaded (the last meal is unknown before). Tests: `tests/quicklog.test.ts`.
+- **The pills are display-only** (TEC-199, retiring TEC-181's quick log and TEC-186's tap to log): `Pill` in `Journal.tsx` is a plain
+  `div`; the title no longer ends "tap to log". Fun's own Pee and Poop buttons (below) are unchanged.
 - **The Fun clock** (TEC-186; the `exercise` clock id, labelled Fun in `CLOCK_LABELS`): the last live **walk or
   playtime** (`countsFor`); a training does not reset it. Plain, no status colour. Analytics still says exercise.
 - **Fun's Pee and Poop buttons** (TEC-186), on the Fun form of a **new** entry only (not on a correction, whose
@@ -244,39 +276,34 @@
   **meal list** (`listOf("snuffle")` is `meal`, so `picklist`, `findFood`, `defaultFood` and "Add a food…" all use the meal
   list, and an added food is a meal food: `lando.foods.type` stays meal|treat) and takes the meal amount default. It counts
   as a meal everywhere meal-based (`isMealType` in `lib/foods.ts`: the Meal pill's N and cups, time since last meal,
-  meal-to-pee/poop gaps, the food-against-weight chart, quick log's prefill, the remembered meal item and amount); on the
+  meal-to-pee/poop gaps, the food-against-weight chart, the remembered meal item and amount); on the
   per-day counts and timeline it is a meal mark. The feed row is titled "Snuffle mat". A new meal-based check uses
   `isMealType`, never `type === "meal"`. The TEC-193 item `snuffle-mat` is **retired** (kept, still resolves; entries
-  logged with it are `type: meal` and still read and correct). Awkward by design: a last-meal quick log prefill from an old
-  `snuffle-mat` entry opens the Meal form on that retired item (it stays selectable there); and a snuffle mat's item is
-  the kibble in it, so calories follow the item, while the retired item has none.
-- **The inline treat row on Training and Potty** (TEC-193, replacing Training's "+ Treat" pop-up of TEC-136;
-  `app/TreatRow.tsx`, one component for both forms): a treat pick (the code list plus foods added in the app,
-  TEC-191, Misc last; opens on Misc) beside **Qty** (the whole-number box; **opens on 0**, which logs nothing).
-  On Training it sits after Other dogs and before Commands; on Potty it sits right below Time outside, and in
-  the same place for an inside potty (after Spot). Fun has no row and keeps its Length and Treats used boxes.
-  On Save, a Qty of 1 or more becomes one food `treat` entry at the entry's exact `at` and Human
-  (`inlineTreatEntries`, which calls `treatEntry`), saved **after** it; Qty 0 or empty saves none.
+  logged with it are `type: meal` and still read and correct). Awkward by design: a snuffle mat's item is the kibble in it, so calories follow the item,
+  while the retired item has none.
+- **The treat count on Potty, Training and Fun** (TEC-199, `app/TreatCount.tsx`; replacing TEC-193's treat pick beside a quantity,
+  `TreatRow`, which is gone): "Treats" with − and + around a number, opening on 0, no picker (0 to 99). A count above 0 becomes **one
+  food `treat` entry, item Misc, amount = the count** (`inlineTreatEntries` with `MISC_ID`, via `treatEntry`) at the entry's exact
+  `at` and Logging as, saved **after** it; 0 saves none. This is the "type of treat dropped, only the number kept" call; **Food's
+  Type = Treat still picks a specific treat** (and Add a food…).
   - Its id is fixed when the form opens (`treatId`), so a retry is the same row.
-  - New entry: the entry is a pending row carrying the treat (`then`, mirrored in `lando.unsaved` with it).
-    Once it saves, the treat is saved as its own row with its own Retry. If the entry fails, its row reads
-    "+ 1 treat" with Not saved: Retry saves the entry and then the treat; ✕ discards both, so no treat is ever
-    logged for an entry that never was (`lib/saveOrder.ts`).
+  - New entry: the entry is a pending row carrying the treat (`then`, mirrored in `lando.unsaved` with it). Once it saves, the
+    treat is saved as its own row with its own Retry. If the entry fails, its row reads "+ 1 treat" (the entries behind it, not the
+    count) with Not saved: Retry saves the entry and then the treat; ✕ discards both (`lib/saveOrder.ts`).
   - Closing the sheet without saving logs nothing. A failed correction keeps the form open, the row intact.
-  - **Training's stored `treats` is a count of treat entries** (as before): a new training stores 1 when Qty is
-    above 0, else 0; a correction stores the count it had plus 1 for a treat added now. The "Treats used" box is
-    gone from Training (Fun keeps it); how many pieces is the treat entry's amount.
-  - Deleting a training or potty leaves its treats: they were eaten. Delete one from the feed if it was not.
-  - A correction (Training or Potty) shows the treats already logged with it ("Logged: …", `treatsWith`): live
-    food treats at the entry's exact `at`, to the millisecond. There is no link column. Moving the entry's
-    When in a correction leaves its treats at the old time (correct them from the feed), and they then no
-    longer show on it. The row opens on 0 on a correction too, so nothing already logged is saved twice.
-- **Training's layout** (TEC-193): Time (min) sits on the top row beside Inside/Outside, then Other dogs, the
-  treat row, then **Commands practised**, a native multi-select over `COMMANDS` (a phone shows a checklist) with
-  "Picked: Sit, Down" under it. The picks are stored exactly as before, filtered to the list's order
-  (`parseDetails`). The `Chips` component is gone with it.
-- **What's new** (TEC-182, plain text since TEC-186; `app/WhatsNew.tsx`): the third tab, after Analytics. **No
-  cards.** Per day, a line "Oct 27 | a short summary of the day" (bold), then that day's entries as "•" bullets.
+  - **A training's or fun's stored `treats` is a count of treat entries**: a new one stores 1 when the count is above 0, else 0; a
+    correction stores the count it had plus 1 for a treat added now. **Fun used to keep a free "Treats used" number of pieces;**
+    it now has the count too, with this meaning (it was never read by Analytics; the feed still says "N treats"), so an old Fun
+    entry's number and a new one's differ in meaning. Fun's Length box stays.
+  - Deleting a training, fun or potty leaves its treats: they were eaten. Delete one from the feed if it was not.
+  - A correction shows the treats already logged with it ("Logged: …", `treatsWith`): live food treats at the entry's exact `at`,
+    to the millisecond. There is no link column. Moving the entry's When in a correction leaves its treats at the old time. The
+    count opens on 0 on a correction too, so nothing already logged is saved twice.
+- **Training's commands** (TEC-193, laid out by TEC-199): a native multi-select over `COMMANDS` (a phone shows a checklist) in a half-width
+  box beside Other dogs, with "Picked: Sit, Down" under the row once something is picked. The picks are stored exactly as before,
+  filtered to the list's order (`parseDetails`).
+- **Patch notes** (TEC-182 as "What's new", renamed TEC-199; plain text since TEC-186; `app/WhatsNew.tsx`): the third tab, after
+  Analytics. **No cards.** Per day, a line "Oct 27 | a short summary of the day" (bold), then that day's entries as "•" bullets.
   It shows the newest `DAYS_SHOWN` (7) **whole days** (`shownDays`), newest first, never a day cut short. Data
   is in `lib/releases.ts`: `RELEASES` (a date `YYYY-MM-DD`, the day it went live, and one plain sentence a
   non-technical reader follows, newest first) and `DAY_SUMMARIES` (one line per date, keyed by it; a test
@@ -457,7 +484,7 @@
   logged until the form's Save.** Read with the journal (`listFoods`, `/api/journal` returns `foods`),
   and by `writeEvent` for a `food` body, so the snapshot of an added food is built server-side like a
   code one. Added foods are passed as the `added` argument (`parseDetails`, `parseNewEvent`,
-  `foodSnapshot`, `treatEntry`, `quickLog`, `defaultFood`); Quick log's Meal prefill opens on an added
+  `foodSnapshot`, `treatEntry`, `defaultFood`); the Food form's Meal opens on an added
   meal as the last meal. The inline treat row lists added treats but has no "Add a food…".
   There is no way in the app to retire or rename an added food yet; `retired` is set by SQL.
 - **Defaults per phone** (`lib/defaults.ts`, `localStorage`): `lando.person` (asked once on a
@@ -497,7 +524,7 @@
 - **Growth chart** (`app/GrowthChart.tsx`): live weights in the newest weight's unit, y axis from
   zero, tap for the nearest point, a table underneath; `since` limits it to a window. Shown in
   Analytics only.
-- **Person boxes fit a name** (TEC-129): Human in every form and "Logging as" take an inline
+- **Person boxes fit a name** (TEC-129): "Logging as" in every form (it was labelled Human until TEC-199) and on Log take an inline
   width from `nameBoxWidth` (`lib/names.ts`): the longest `display_name` in `ch`, at least 6
   (the "Nobody" option) and at most 14, plus one `ch` and room for the padding and arrow. Past
   14 characters the closed box truncates; the open list shows the name whole. The empty options
@@ -507,10 +534,10 @@
 
 ## Traps
 
-- **Upcoming's Done on a visit is client-linked.** The link from the visit to its item lives in `Journal`'s
-  `visitLinks` ref, not in storage. If the visit saves but the phone loses the page before the `done` call
-  lands (or the call fails twice), the visit is in the journal and the item stays open; a toast says so. Tapping
-  Done again would log a second visit, so check the feed first and Cancel the item instead. A visit left unsaved
+- **Upcoming's Done is client-linked.** The link from the entry saved by a Done to its item lives in `Journal`'s
+  `visitLinks` ref, not in storage. If the entry saves but the phone loses the page before the `done` call
+  lands (or the call fails twice), the entry is in the journal and the item stays open; a toast says so. Tapping
+  Done again would log a second entry, so check the feed first and Cancel the item (the Upcoming filter) instead. An entry left unsaved
   across a reload is retried from storage without its link. Upcoming dates are `YYYY-MM-DD` strings and
   `due_time` is `HH:MM` (Postgres returns `HH:MM:SS`; `upcoming-db.ts` trims it): never build one with
   `new Date("YYYY-MM-DD")`, which reads as UTC.
@@ -545,6 +572,17 @@
   body pads the inset plus `min(inset, 8px)`, so the bar has up to 8px of clear space and Safari (inset 0) is
   unchanged. Checked here only by rewriting the inset to 47px in a Playwright run; never on a real standalone
   iPhone. Keep the strip's z-index at the tabs' (10) or below the sheet backdrop (20).
+- **Medications are history's key, and the journal read needs the table.** An entry holds a medication's `med_id` in jsonb, so no
+  foreign key protects it: never delete a row or change its id; retire with `retired = true`. `/api/journal` reads
+  `lando.medications` with the events, so code merged before `lando_medications` is applied makes every journal load a 503
+  (a dose's write needs it too). **Deploy order: `lando_medications`, then `lando_medication_entries`, then the code.** The unit
+  and route lists are in three places each (`MED_UNITS` / `MED_ROUTES`, the table's check, `lando.details_ok`); `tests/boxedforms.test.ts`
+  holds them equal. The word `drop` is not a medication unit: `tests/health.test.ts` bans it from the newest function file's
+  text, so the list uses `g`, `spray` and `dose` instead.
+- **Done on a form-made item finds the form by the item's title** (`formForItem`): "Potty", "Food", "Fun", "Training", "Weight" and
+  "Medical issue" are `FORM_TITLES`, so a new Other item whose title is one of those opens that form on Done. An old Other item
+  that happens to carry one of those words as its own title would open the form too. A medication's dose and a vet visit's reason
+  are read back from the title ("Name · 5 mg", "Vet visit · Check-up"), not stored on the item; the Given route is not kept.
 - **The amount scroller's rows are 32px each** (`SCROLLER_ROW` in `lib/scroller.ts`): the band,
   the half-row padding and the box height (two rows) all come from it through `scrollerWindow()`. Change the
   one number; the snap math in `AmountScroller.tsx` assumes the padding is half a row.
@@ -568,7 +606,8 @@
   constraint `events_details_shape` just calls it, so a widening is a new migration holding the
   function's whole current body with the one list or shape grown: copy the whole body from the
   newest migration file that defines `lando.details_ok`, sorting `supabase/migrations` by version
-  (today `lando_snuffle_type`, which is `lando_box_leash_spot`'s body plus `'snuffle'` in the food type list;
+  (today `lando_medication_entries`, which is `lando_snuffle_type`'s body with health wrapped in a CASE: a new `medication` branch, and the
+  old vet and issue shape as its ELSE, unchanged; `lando_snuffle_type` is `lando_box_leash_spot`'s body plus `'snuffle'` in the food type list;
   that one is `lando_potty_minutes`'s body plus `'box'` in the leash and spot lists;
   that one is `lando_details_ok_search_path`'s plus potty's optional
   `minutes`; that one is `lando_potty_inside_spot`'s plus `set search_path = ''`; keep that line in every copy). No DROP, no constraint swap, and it goes through the connector. Replacing
