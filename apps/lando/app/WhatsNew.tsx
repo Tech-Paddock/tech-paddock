@@ -14,7 +14,7 @@ function dayLabel(date: string) {
 export default function WhatsNew() {
   return (
     <section className="grid gap-4">
-      <h2 className="text-base font-bold">What&apos;s new</h2>
+      <h2 className="text-base font-bold">Patch notes</h2>
       {shownDays().map((d) => (
         <div key={d.date} className="grid gap-1">
           <h3 className="text-[15px] font-bold">

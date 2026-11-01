@@ -6,11 +6,11 @@ import {
   CLOCK_LABELS,
   FORM_KINDS,
   FORM_LABELS,
+  HEALTH_LABELS,
   HORIZON_DAYS,
   KIND_LABELS,
   LOG_KINDS,
   PILL_STATUS_WORDS,
-  TREAT_QUICK_LOG,
   describe,
   displayUnit,
   emptyFeedText,
@@ -27,7 +27,6 @@ import {
   latestWeight,
   liveEvents,
   pillStatus,
-  quickLog,
   round1,
   sinceLast,
   treatsWith,
@@ -35,9 +34,9 @@ import {
   type Dog,
   type FeedRow,
   type FormKind,
+  type HealthType,
   mealPillLabel,
   type JournalEvent,
-  type QuickLog,
 } from "@/lib/events";
 import {
   DEFAULTS_KEY,
@@ -48,25 +47,19 @@ import {
   type Remembered,
 } from "@/lib/defaults";
 import { clockTime, localMidnight, shortDate, toDateInput } from "@/lib/localtime";
-import {
-  UPCOMING_TONE_WORDS,
-  needsVisit,
-  nextLine,
-  saveThenClose,
-  visitPrefill,
-  type Upcoming,
-  type UpcomingInput,
-} from "@/lib/upcoming";
+import { saveThenClose, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
+import { allUpcoming, donePrefill, formForItem, nextWeek } from "@/lib/future";
+import type { MedUnit, Medication } from "@/lib/medications";
 import { isMealType, type AddedFood, type FoodUnit, type ListType } from "@/lib/foods";
 import { nameBoxWidth } from "@/lib/names";
 import { saveThen } from "@/lib/saveOrder";
 import Analytics from "./Analytics";
 import WhatsNew from "./WhatsNew";
-import UpcomingTab from "./UpcomingTab";
+import UpcomingList from "./UpcomingList";
 import LogForm, { type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
 
-type Loaded = { events: JournalEvent[]; people: Person[]; dogs: Dog[]; foods: AddedFood[] };
+type Loaded = { events: JournalEvent[]; people: Person[]; dogs: Dog[]; foods: AddedFood[]; medications: Medication[] };
 
 /**
  * A new entry on its way to the database, or one that did not get there.
@@ -78,8 +71,9 @@ type Pending = { body: LogBody; status: "saving" | "failed"; error?: string; the
 /** What `lando.unsaved` holds per entry: the body, plus its treats when it has any. */
 type Stored = LogBody & { then?: LogBody[] };
 
-type Open = { form: FormKind; event?: JournalEvent; quick?: QuickLog; visitFor?: Upcoming } | null;
-type Tab = "log" | "analytics" | "new" | "upcoming";
+/** `doneFor` is the upcoming item a Done opened this form for (TEC-199); `healthType` is Health's tab on a new entry. */
+type Open = { form: FormKind; event?: JournalEvent; healthType?: HealthType; doneFor?: Upcoming } | null;
+type Tab = "log" | "analytics" | "new";
 
 async function postJson(url: string, body: unknown): Promise<{ ok: boolean; status: number; data: any }> {
   const res = await fetch(url, {
@@ -98,42 +92,24 @@ const isLogBody = (b: unknown): b is LogBody =>
 const PILL_SIZE = "flex min-h-[44px] flex-col justify-center";
 const BTN = "flex min-h-[44px] min-w-0 items-center justify-center rounded-xl px-0.5 py-1";
 
-/** A since-last pill; a button once the journal has loaded, so tapping it logs (TEC-181, TEC-186), a plain box before. */
-function Pill({
-  tap,
-  title,
-  status,
-  onTap,
-  children,
-}: {
-  tap: QuickLog | null;
-  title: string | undefined;
-  status: string | null;
-  onTap?: () => void;
-  children: React.ReactNode;
-}) {
-  const cls = `lando-pill ${PILL_SIZE} w-full min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center`;
-  if (!tap) return <div title={title} data-status={status ?? undefined} className={cls}>{children}</div>;
+/**
+ * A since-last pill (TEC-199): it only shows its numbers and is not tappable. The way in is the Log buttons
+ * (TEC-181's quick log, which opened a form from a pill, is retired).
+ */
+function Pill({ title, status, children }: { title: string | undefined; status: string | null; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      title={title}
-      data-status={status ?? undefined}
-      onClick={onTap}
-      className={`${cls} cursor-pointer focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-pinstripe`}
-    >
+    <div title={title} data-status={status ?? undefined} className={`lando-pill ${PILL_SIZE} w-full min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center`}>
       {children}
-    </button>
+    </div>
   );
 }
 
 /**
- * Four tabs, Log, Analytics, What's new and Upcoming, opening on Log (RULES.md, Surface: app, the
- * owner's override, 2026-10-20). Log: four since-last pills that each open a quick log (Pee,
- * Poop, Meal, Fun; TEC-181, TEC-186), who is logging, four buttons that open a short form with
- * defaults (Treats, Training, Weight, Health; TEC-186), and a feed of every loaded day, by when each
- * entry happened, with a filter matching the buttons. Analytics: the last
- * fourteen days and the growth chart.
+ * Three tabs, Log, Analytics and Patch notes, opening on Log (RULES.md, Surface: app, the owner's
+ * override, 2026-10-20). Log: four since-last pills that only show their numbers (Pee, Poop, Meal, Fun),
+ * the Next 7 days box, six buttons that open a short form (Potty, Food, Training, Fun, Weight, Health;
+ * TEC-199), who is logging, and a feed of every loaded day, by when each entry happened, with a filter
+ * matching the buttons and an Upcoming filter. Analytics: the last fourteen days and the growth chart.
  *
  * **Save never waits.** The sheet closes at once and the entry shows as
  * "Saving…", then joins the feed, or stays as "Not saved" with Retry
@@ -154,6 +130,7 @@ export default function Journal() {
   // The feed shows the picked forms' entries, or all when none is picked (TEC-129, TEC-136,
   // TEC-177). Not remembered.
   const [only, setOnly] = useState<FormKind[]>([]);
+  const [showUpcoming, setShowUpcoming] = useState(false);
   // Signed URLs of health photos by storage path: the read's, plus every upload this session made.
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
@@ -163,7 +140,8 @@ export default function Journal() {
   const sinceRef = useRef(since);
   sinceRef.current = since;
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // Upcoming (TEC-192): open items, read apart from the journal so one failing never blanks the other.
+  // Upcoming (TEC-192, TEC-199): open items, read apart from the journal so one failing never blanks the other.
+  // The feed's Upcoming filter lists them all; the Next 7 days box the ones due within the week.
   const [upcoming, setUpcoming] = useState<Upcoming[] | null>(null);
   const [upcomingError, setUpcomingError] = useState<string | null>(null);
   // A vet visit opened from an Upcoming item's Done, by the visit's id: the item closes only once that
@@ -189,7 +167,7 @@ export default function Journal() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setLoaded({ events: data.events, people: data.people, dogs: data.dogs ?? [], foods: data.foods ?? [] });
+      setLoaded({ events: data.events, people: data.people, dogs: data.dogs ?? [], foods: data.foods ?? [], medications: data.medications ?? [] });
       setPhotoUrls((prev) => ({ ...prev, ...(data.photos ?? {}) }));
       setLoadError(null);
     } catch (e) {
@@ -328,6 +306,7 @@ export default function Journal() {
   const people = loaded?.people ?? [];
   const dogs = loaded?.dogs ?? [];
   const foods = loaded?.foods ?? [];
+  const medications = loaded?.medications ?? [];
   const person = people.find((p) => p.id === personId) ?? null;
   const nameOf = (id: string | null) => (id ? people.find((p) => p.id === id)?.display_name ?? "someone" : null);
   // First open on a phone: ask once whose it is.
@@ -389,15 +368,30 @@ export default function Journal() {
     }
   }
 
-  /** Upcoming's Add and Edit: awaited, so a refused item stays on its form with the reason. */
-  async function saveUpcoming(item: UpcomingInput, id?: string): Promise<{ error: string | null }> {
+  /** The Medication tab's "Add a medication…": saved to `lando.medications`, then merged into the loaded list without a reload. */
+  async function addMedication(input: { name: string; unit: MedUnit }): Promise<{ medication: Medication | null; error: string | null }> {
     try {
-      const { ok, status, data } = await postJson("/api/upcoming", id ? { action: "edit", id, item } : { action: "add", item });
-      if (!ok) {
-        if (status === 409) void loadUpcoming();
-        return { error: data.error ?? "couldn't save" };
-      }
+      const { ok, data } = await postJson("/api/medications", input);
+      if (!ok) return { medication: null, error: data.error ?? "couldn't add" };
+      const medication = data.medication as Medication;
+      setLoaded((prev) => (prev && !prev.medications.some((m) => m.id === medication.id) ? { ...prev, medications: [...prev.medications, medication] } : prev));
+      return { medication, error: null };
+    } catch (e) {
+      return { medication: null, error: e instanceof TypeError ? "no connection" : (e as Error).message };
+    }
+  }
+
+  /**
+   * A future When on any form (TEC-199): the form's item is saved as an upcoming item, awaited, so a refused
+   * one stays on its form with the reason. The sheet closes once it is in.
+   */
+  async function addUpcoming(item: UpcomingInput): Promise<{ error: string | null }> {
+    try {
+      const { ok, data } = await postJson("/api/upcoming", { action: "add", item });
+      if (!ok) return { error: data.error ?? "couldn't save" };
       setUpcoming((prev) => [...(prev ?? []).filter((i) => i.id !== data.item.id), data.item]);
+      setOpen(null);
+      say(`${item.title} scheduled`);
       return { error: null };
     } catch (e) {
       return { error: e instanceof TypeError ? "no connection — try again" : (e as Error).message };
@@ -420,13 +414,15 @@ export default function Journal() {
   }
 
   /**
-   * Done. A vet visit or vaccine opens the Vet visit form on the item's day and reason and closes only
-   * when that visit saves (`closeUpcoming`); closing the form leaves it open. Medication and Other are
-   * marked done at once, with today's date, and a repeat brings its next one.
+   * Done. It opens the form the item came from (`formForItem`: Vet visit, Medication, or the form named in
+   * an Other item's title), prefilled, and closes the item only when that entry saves (`closeUpcoming`);
+   * closing the form leaves it open. An old Other item with its own words is marked done at once, with
+   * today's date, and a repeat brings its next one.
    */
   async function doneUpcoming(item: Upcoming): Promise<{ error: string | null } | void> {
-    if (needsVisit(item.kind)) {
-      setOpen({ form: "health", visitFor: item });
+    const target = formForItem(item);
+    if (target) {
+      setOpen({ form: target.form, healthType: target.healthType, doneFor: item });
       return;
     }
     try {
@@ -469,8 +465,8 @@ export default function Journal() {
   }
 
   function logNew(body: LogBody, then?: LogBody[]) {
-    // A visit opened from an Upcoming item's Done: that item closes when this visit is saved.
-    if (open?.visitFor && body.kind === "health") visitLinks.current.set(body.id, open.visitFor.id);
+    // An entry opened from an upcoming item's Done: that item closes when this entry is saved.
+    if (open?.doneFor) visitLinks.current.set(body.id, open.doneFor.id);
     remember([body, ...(then ?? [])]);
     setOpen(null);
     void save(body, true, then);
@@ -502,6 +498,13 @@ export default function Journal() {
     } catch (e) {
       return { error: e instanceof TypeError ? "no connection — try again" : (e as Error).message };
     }
+  }
+
+  /** Cancel hides an item and keeps it in the table with its status. */
+  async function cancelItem(id: string): Promise<{ error: string | null }> {
+    const result = await cancelUpcoming(id);
+    if (!result.error) say("Upcoming item cancelled");
+    return result;
   }
 
   function showTab(t: Tab) {
@@ -540,9 +543,10 @@ export default function Journal() {
   // A row's time under its day's heading: the clock, or nothing for a weight (it is a day).
   const feedTime = (kind: string, at: string) => (kind === "weight" ? "" : clockTime(at));
 
-  // The phone's day, and the next open Upcoming item for the line under the pills (TEC-192).
+  // The phone's day, and the upcoming items: the week's for the box under the pills, every open one for the filter (TEC-199).
   const today = toDateInput(now.toISOString());
-  const next = upcoming ? nextLine(upcoming, today) : null;
+  const week = upcoming ? nextWeek(upcoming, today) : [];
+  const allOpen = upcoming ? allUpcoming(upcoming) : [];
 
   const tabClass = (t: Tab) =>
     `border-b-[3px] pb-2 pt-2.5 font-bold ${t === tab ? "border-pinstripe text-ink" : "border-transparent text-ink-soft"}`;
@@ -555,7 +559,7 @@ export default function Journal() {
         className="sticky z-10 border-b border-line bg-paper"
         style={{ top: "env(safe-area-inset-top, 0px)" }}
       >
-        <div className="mx-auto grid max-w-md grid-cols-4 px-3">
+        <div className="mx-auto grid max-w-md grid-cols-3 gap-2 px-3">
           <button role="tab" type="button" id="tab-log" aria-selected={tab === "log"} aria-controls="panel-log" onClick={() => showTab("log")} className={tabClass("log")}>
             Log
           </button>
@@ -563,10 +567,7 @@ export default function Journal() {
             Analytics
           </button>
           <button role="tab" type="button" id="tab-new" aria-selected={tab === "new"} aria-controls="panel-new" onClick={() => showTab("new")} className={tabClass("new")}>
-            What&apos;s new
-          </button>
-          <button role="tab" type="button" id="tab-upcoming" aria-selected={tab === "upcoming"} aria-controls="panel-upcoming" onClick={() => showTab("upcoming")} className={tabClass("upcoming")}>
-            Upcoming
+            Patch notes
           </button>
         </div>
       </nav>
@@ -588,20 +589,6 @@ export default function Journal() {
             (loaded ? <Analytics events={loaded.events} now={now} /> : <p className="text-sm text-ink-soft">{loadError ? "" : "Loading…"}</p>)}
         </div>
 
-        <div id="panel-upcoming" role="tabpanel" aria-labelledby="tab-upcoming" hidden={tab !== "upcoming"}>
-          {tab === "upcoming" && (
-            <UpcomingTab
-              items={upcoming}
-              error={upcomingError}
-              today={today}
-              onRetry={() => void loadUpcoming()}
-              onSave={saveUpcoming}
-              onCancel={cancelUpcoming}
-              onDone={doneUpcoming}
-            />
-          )}
-        </div>
-
         <div id="panel-new" role="tabpanel" aria-labelledby="tab-new" hidden={tab !== "new"}>
           {tab === "new" && <WhatsNew />}
         </div>
@@ -614,37 +601,30 @@ export default function Journal() {
           hidden={tab !== "log"}
           className={tab === "log" ? "flex flex-col gap-4" : "hidden"}
         >
-          {/* Since-last pills: one row, label over value; the clock time is in the title. All four open
-              a quick log (TEC-181, Fun since TEC-186). */}
+          {/* Since-last pills: one row, label over value; the clock time is in the title. They only show their
+              numbers and are not tappable (TEC-199). */}
           <section aria-label="Since last" className="grid grid-cols-4 gap-1.5">
             {CLOCKS.map((c) => {
               const last = clocks?.[c] ?? null;
               // Green, yellow or red by how long ago (TEC-142); Fun and "none" stay plain.
               const status = last ? pillStatus(c, now.getTime() - Date.parse(last.at)) : null;
-              // Pee, Poop, Meal and Fun open a quick log, once the journal has loaded.
-              const tap = clocks ? quickLog(c, clocks.food, foods) : null;
               // The Meal pill reads today's meals and cups (TEC-194); the others keep their name.
               const isMeal = c === "food";
               const face = isMeal && loaded ? mealPillLabel(loaded.events, now) : isMeal ? "Meals" : CLOCK_LABELS[c];
               return (
                 <Pill
                   key={c}
-                  tap={tap}
                   title={
-                    last || tap
+                    last
                       ? [
                           isMeal && loaded ? face : "",
-                          last
-                            ? `${isMeal ? "Last meal" : CLOCK_LABELS[c]} at ${clockTime(last.at)}${status ? ` — ${PILL_STATUS_WORDS[status]}` : ""}`
-                            : "",
-                          tap ? "tap to log" : "",
+                          `${isMeal ? "Last meal" : CLOCK_LABELS[c]} at ${clockTime(last.at)}${status ? ` — ${PILL_STATUS_WORDS[status]}` : ""}`,
                         ]
                           .filter(Boolean)
                           .join(", ")
                       : undefined
                   }
                   status={status}
-                  onTap={tap ? () => setOpen({ form: tap.form, quick: tap }) : undefined}
                 >
                   {/* The Meal label is longer ("Meals: 2 · 1⅛ cups"): it may wrap at the dot instead of clipping. */}
                   <div
@@ -666,46 +646,35 @@ export default function Journal() {
                       : clocks
                         ? ` in ${HORIZON_DAYS} days`
                         : ""}
-                    {tap ? ", tap to log" : ""}
                   </span>
                 </Pill>
               );
             })}
           </section>
 
-          {/* The next open Upcoming item, coloured like the pills; a tap opens the tab. Absent when none is open. */}
-          {next && (
-            <button
-              type="button"
-              data-status={next.tone ?? undefined}
-              onClick={() => showTab("upcoming")}
-              className="lando-pill -mt-2 min-h-[44px] w-full min-w-0 truncate rounded-xl border border-line bg-surface px-3 py-2 text-left text-[15px] font-semibold"
-            >
-              {next.text}
-              {next.tone && <span className="sr-only">, {UPCOMING_TONE_WORDS[next.tone]}</span>}
-            </button>
+          {/* Next 7 days (TEC-199): open items due in the coming week, overdue too, soonest first, each with
+              Done. Absent when nothing is due; the feed's Upcoming filter has the rest. */}
+          {week.length > 0 && (
+            <section aria-label="Next 7 days" className="-mt-2 grid gap-1 rounded-xl border border-line bg-paper p-2">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Next 7 days</h2>
+              <UpcomingList items={week} today={today} onDone={doneUpcoming} />
+            </section>
           )}
 
-          {/* Four buttons in one row, the pills' size and grid, directly under them (TEC-188): Treats,
-              Training, Weight, Health. Potty and Fun are reached through the pills (and Fun's own Pee and
-              Poop). Treats opens Food on a treat; the meal/treat choice stays in the form. The Weight
-              button keeps its newest weight as a small second line (it fits at pill width); its date is in
-              the title and for screen readers. */}
-          <section aria-label="Log" className="-mt-2 grid grid-cols-4 gap-1.5">
-            <button
-              type="button"
-              onClick={() => setOpen({ form: "food", quick: TREAT_QUICK_LOG })}
-              className={`${BTN} bg-[var(--tone-2-bg)] text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]`}
-            >
-              <b className="truncate text-[15px] leading-tight">Treats</b>
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpen({ form: "training" })}
-              className={`${BTN} bg-[var(--tone-2-bg)] text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]`}
-            >
-              <b className="truncate text-[15px] leading-tight">{FORM_LABELS.training}</b>
-            </button>
+          {/* Six buttons, the pills' height, three across (TEC-199): Potty, Food, Training, Fun, Weight, Health.
+              Treats are logged through Food's Type or a treat count on a form. The Weight button keeps its
+              newest weight as a small second line; its date is in the title and for screen readers. */}
+          <section aria-label="Log" className="-mt-2 grid grid-cols-3 gap-1.5">
+            {(["potty", "food", "training", "fun"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setOpen({ form: f })}
+                className={`${BTN} bg-[var(--tone-2-bg)] text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]`}
+              >
+                <b className="truncate text-[15px] leading-tight">{FORM_LABELS[f]}</b>
+              </button>
+            ))}
             <button
               type="button"
               onClick={() => setOpen({ form: "weight" })}
@@ -786,13 +755,16 @@ export default function Journal() {
               className="-mx-3 mb-2 flex gap-1 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {([null, ...FORM_KINDS] as const).map((k) => {
-                const selected = k === null ? only.length === 0 : only.includes(k);
+                const selected = k === null ? only.length === 0 && !showUpcoming : only.includes(k);
                 return (
                   <button
                     key={k ?? "all"}
                     type="button"
                     aria-pressed={selected}
-                    onClick={() => setOnly((cur) => (k === null ? [] : toggleForm(cur, k)))}
+                    onClick={() => {
+                      setShowUpcoming(false);
+                      setOnly((cur) => (k === null ? [] : toggleForm(cur, k)));
+                    }}
                     className="flex min-h-[44px] shrink-0 items-center"
                   >
                     <span
@@ -806,13 +778,39 @@ export default function Journal() {
                   </button>
                 );
               })}
+              {/* The Upcoming filter (TEC-199): every open upcoming item instead of the feed. */}
+              <button
+                type="button"
+                aria-pressed={showUpcoming}
+                onClick={() => {
+                  setShowUpcoming((on) => !on);
+                  setOnly([]);
+                }}
+                className="flex min-h-[44px] shrink-0 items-center"
+              >
+                <span
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-[13px] font-semibold ${
+                    showUpcoming ? "border-ink bg-ink text-ink-invert" : "border-line bg-transparent text-ink-soft"
+                  }`}
+                >
+                  Upcoming
+                </span>
+              </button>
             </div>
-            {days.length === 0 && (
+            {showUpcoming && (
+              <>
+                {upcomingError && !upcoming && <p className="text-urgent">Couldn&apos;t load upcoming items. ({upcomingError})</p>}
+                {upcoming && allOpen.length === 0 && <p className="text-ink-soft">Nothing upcoming. Pick a future When on any form to add one.</p>}
+                {!upcoming && !upcomingError && <p className="text-ink-soft">Loading…</p>}
+                {allOpen.length > 0 && <UpcomingList items={allOpen} today={today} onDone={doneUpcoming} onCancel={cancelItem} />}
+              </>
+            )}
+            {!showUpcoming && days.length === 0 && (
               <p className="text-ink-soft">
                 {!loaded ? (loadError ? "" : "Loading…") : emptyFeedText(anything ? only : null)}
               </p>
             )}
-            <div className="flex flex-col gap-3">
+            <div className={showUpcoming ? "hidden" : "flex flex-col gap-3"}>
               {days.map((d) => (
                 <section key={d.day} aria-label={d.label}>
                   <h3 className="mb-1 text-[13px] font-bold text-ink">{d.label}</h3>
@@ -906,25 +904,36 @@ export default function Journal() {
                 </section>
               ))}
             </div>
-            {live.length > 0 && <p className="mt-1.5 text-xs text-ink-soft">Tap an entry to correct or delete it.</p>}
+            {!showUpcoming && live.length > 0 && <p className="mt-1.5 text-xs text-ink-soft">Tap an entry to correct or delete it.</p>}
           </section>
         </div>
       </div>
 
       {open && !askWho && (
-        <Sheet title={open.event ? `Edit ${describe(open.event).title.toLowerCase()}` : open.visitFor ? "Vet visit" : FORM_LABELS[open.form]} onClose={() => setOpen(null)}>
+        <Sheet
+          title={
+            open.event
+              ? `Edit ${describe(open.event).title.toLowerCase()}`
+              : open.doneFor && open.form === "health"
+                ? HEALTH_LABELS[open.healthType ?? "vet"]
+                : FORM_LABELS[open.form]
+          }
+          onClose={() => setOpen(null)}
+        >
           <LogForm
-            key={open.event?.id ?? (open.visitFor ? `visit-${open.visitFor.id}` : open.form)}
+            key={open.event?.id ?? (open.doneFor ? `done-${open.doneFor.id}` : open.form)}
             form={open.form}
+            healthType={open.healthType}
             event={open.event}
-            quick={open.quick}
-            visitPrefill={open.visitFor ? visitPrefill(open.visitFor) : undefined}
-            sessionTreats={(open.form === "training" || open.form === "potty") && open.event && loaded ? treatsWith(loaded.events, open.event) : undefined}
+            done={open.doneFor ? donePrefill(open.doneFor, medications) : undefined}
+            sessionTreats={(open.form === "training" || open.form === "potty" || open.form === "fun") && open.event && loaded ? treatsWith(loaded.events, open.event) : undefined}
             people={people}
             dogs={dogs}
             onAddDog={addDog}
             foods={foods}
             onAddFood={addFood}
+            medications={medications}
+            onAddMedication={addMedication}
             phonePerson={person?.id ?? null}
             events={loaded?.events ?? []}
             photoUrls={photoUrls}
@@ -933,6 +942,7 @@ export default function Journal() {
             weightUnit={weightUnit}
             onLog={logNew}
             onChange={change}
+            onUpcoming={addUpcoming}
             onPotty={logPotty}
             unsaved={Object.fromEntries(pending.map((p) => [p.body.id, p.status]))}
             onRetry={retryPending}
