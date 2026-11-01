@@ -1,11 +1,10 @@
-// TEC-193: the bar without Meals today, the portion scroller's window, Training's field order, the inline
-// treat row on Training and Potty, and the commands picklist.
+// TEC-193: the bar without Meals today, the portion scroller's window, the treat entries behind a form and the
+// commands picklist. The inline treat row (a pick beside a quantity) became a count in TEC-199, so its layout
+// tests moved to boxedforms.test.ts.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import AppBar from "@/app/AppBar";
-import LogForm from "@/app/LogForm";
-import TreatRow from "@/app/TreatRow";
 import AmountScroller from "@/app/AmountScroller";
 import { COMMANDS, InvalidEvent, inlineTreatEntries, parseDetails, type JournalEvent } from "@/lib/events";
 import { amountOptions, type AddedFood } from "@/lib/foods";
@@ -84,80 +83,6 @@ describe("the inline treat entries", () => {
     const saveNext = vi.fn();
     expect(await saveThen(async () => false, saveNext, "potty", ["treat"])).toBe(false);
     expect(saveNext).not.toHaveBeenCalled();
-  });
-});
-
-const formProps = {
-  people: [],
-  dogs: [],
-  onAddDog: async () => ({ dog: null, error: null }),
-  foods: ADDED,
-  onAddFood: async () => ({ food: null, error: null }),
-  phonePerson: null,
-  events: [] as JournalEvent[],
-  photoUrls: {},
-  onPhotoUrl: () => {},
-  remembered: {},
-  weightUnit: "lb" as const,
-  onLog: () => {},
-  onChange: async () => ({ error: null }),
-  onPotty: () => {},
-  unsaved: {},
-  onRetry: () => {},
-};
-const render = (form: "training" | "potty" | "fun") => renderToStaticMarkup(createElement(LogForm, { form, ...formProps }));
-const at = (html: string, needle: string) => {
-  const i = html.indexOf(needle);
-  expect(i, `${needle} is in the form`).toBeGreaterThanOrEqual(0);
-  return i;
-};
-
-describe("Training's layout", () => {
-  const html = render("training");
-  it("puts Time on the top row, beside Inside/Outside, before Other dogs", () => {
-    expect(at(html, "Where")).toBeLessThan(at(html, "Time (min)"));
-    expect(at(html, "Time (min)")).toBeLessThan(at(html, "Other dogs"));
-    // The same row: nothing between the two but the Where chips and the Time field.
-    const row = html.slice(at(html, "Where") - 200, at(html, "Time (min)"));
-    expect(row).not.toContain("Other dogs");
-    expect(html).not.toContain("Length (min)");
-  });
-  it("has the inline treat row (pick beside quantity) after Other dogs, then the commands", () => {
-    expect(at(html, "Other dogs")).toBeLessThan(at(html, "f-treat-item"));
-    expect(at(html, "f-treat-item")).toBeLessThan(at(html, "f-treat-qty"));
-    expect(at(html, "f-treat-qty")).toBeLessThan(at(html, "Commands practised"));
-    expect(html).not.toContain("+ Treat");
-    expect(html).toContain("Cheese bits");
-  });
-  it("opens the treat quantity on 0, so an untouched form logs no treat", () => {
-    expect(html).toMatch(/id="f-treat-qty"[^>]*value="0"/);
-  });
-  it("offers the commands as one multi-select over the fixed list, not chips", () => {
-    const sel = html.slice(at(html, 'id="f-commands"'));
-    expect(sel.slice(0, sel.indexOf("</select>"))).toContain("multiple");
-    for (const [id, text] of COMMANDS) expect(sel).toContain(`value="${id}">${text}</option>`);
-    expect(html).not.toMatch(/type="checkbox"[^>]*>[^<]*<span[^>]*>Sit</);
-  });
-});
-
-describe("Potty's treat row", () => {
-  it("sits right below Time outside, before the medical issue", () => {
-    const html = render("potty");
-    expect(at(html, "Time outside")).toBeLessThan(at(html, "f-treat-item"));
-    expect(at(html, "f-treat-item")).toBeLessThan(at(html, "Medical issue"));
-    // Nothing but the chips of Time outside sits between them.
-    expect(html.slice(at(html, "Time outside"), at(html, "f-treat-item"))).not.toMatch(/Leash|Spot|Medical/);
-  });
-  it("is not on Fun, which keeps its Length and Treats used boxes", () => {
-    const html = render("fun");
-    expect(html).not.toContain("f-treat-item");
-    expect(html).toContain("Treats used");
-    expect(html).toContain("Length (min)");
-  });
-  it("renders the shared row with a label and unit", () => {
-    const html = renderToStaticMarkup(createElement(TreatRow, { foods: ADDED, item: "cheese-bits", qty: 2, onItem: () => {}, onQty: () => {} }));
-    expect(html).toContain("Qty (pieces)");
-    expect(html).toContain("Cheese bits");
   });
 });
 

@@ -11,7 +11,6 @@ import {
   mealsSummary,
   parseDetails,
   parseNewFood,
-  quickLog,
   sinceLast,
   type JournalEvent,
 } from "@/lib/events";
@@ -100,10 +99,6 @@ describe("everything meal-based counts it as a meal (the Meal pill counts half, 
   it("time since the last meal", () => {
     const events = [food(7, "meal", "cup", 1), food(12, "snuffle", "cup", 0.25)];
     expect(sinceLast(events, NOW).food?.id).toBe(events[1].id);
-  });
-  it("quick log prefills from a snuffle mat's item and amount", () => {
-    const last = food(12, "snuffle", "cup", 0.25, "royal-canin-dachshund-puppy");
-    expect(quickLog("food", last)).toEqual({ form: "food", itemId: "royal-canin-dachshund-puppy", amount: 0.25 });
   });
 });
 
