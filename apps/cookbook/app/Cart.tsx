@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CHECKOUT_URL } from "@/lib/kingsoopers";
 import { refreshDue, scanDue } from "@/lib/refreshDue";
 import type { CartLine, CartPick, Outcome, ReviewLine } from "@/lib/cart";
 import { guessPick, guessPicks, needsSplash, pickOf, pickerOptions, type PickerOption } from "@/lib/cartGuess";
+import type { CheckResult } from "@/lib/checkLine";
 import type { CartRefresh } from "@/lib/cartRefresh";
 import type { Modality } from "@/lib/modality";
 import type { ScanRecord } from "@/lib/pricing";
@@ -20,16 +21,25 @@ import { useToast } from "./Toast";
  * reconfirm and read a list"). **Send all** and **+ Cart** go in as the best
  * guess (`lib/cartGuess.ts`): the one saved product or the name's default, the
  * most-bought of several, else Kroger's top match. After a send every line
- * reports added, skipped or failed (`SendResults`). Whatever goes in is
+ * reports added, skipped or failed. Whatever goes in is
  * remembered in Your brands (TEC-128). **No model picks anything.**
+ *
+ * **Adds never ask, and there is no Sent list** (TEC-211; owner, 2026-11-02: "No
+ * confirmation. I clicked it, it goes."). A send is one toast, "Sent 12" or
+ * "Sent 12 · 2 not sent"; a line that did not go reads "not sent" in its price
+ * spot until the next send (`notSent`).
+ *
+ * **The live check** (TEC-211): `runCheck` asks `GET /api/kroger/check` whether the
+ * sign-in still works, on open, after any King Soopers call fails, and when the
+ * status is tapped. It is in `serial` with everything else that borrows the token.
  *
  * **Cookbook is the only way anything enters the cart** (owner): In cart is the
  * whole King Soopers cart. **Refresh cart** re-reads the ledger and prices the
  * cart today with the app's token, never the account's.
  *
  * **The one picker that stays** is `ProductSplash`: Add an item opens a choice
- * of products when several match and none is the default; **Change** on an In
- * cart line opens the same one.
+ * of products when several match and none is the default. (**Change** on an In
+ * cart line went in TEC-211.)
  *
  * **Refresh** (2026-10-20): opening the tab with the last refresh over a week
  * old starts one in the background; *Refresh now* starts one by hand.
@@ -52,17 +62,13 @@ type Status = {
 
 type Store = { locationId: string; name: string; address: string };
 
-type Results = {
-  outcomes: Outcome[];
-  summary: string;
-  recordError: string | null;
-  modalityWarning: string | null;
-};
-
 type TakeBackResult = { outcomes: TakeBackOutcome[]; summary: string; recordError: string | null; failed: boolean };
 
-/** The lines a splash still has to settle, and whether it is Change on an In cart line. */
-type Splash = { queue: ReviewLine[]; change: boolean };
+/** The lines a splash still has to settle. */
+type Splash = { queue: ReviewLine[] };
+
+/** Where this browser remembers the last check that passed, for "last worked ...". A convenience only. */
+const LAST_WORKED_KEY = "cookbook:kroger-last-worked";
 
 const CALLBACK_WORDS: Record<string, string> = {
   connected: "King Soopers connected.",
@@ -74,6 +80,11 @@ const CALLBACK_WORDS: Record<string, string> = {
 
 const LINK = "underline decoration-dotted underline-offset-2";
 const HEADING = "text-xs font-bold uppercase tracking-wider";
+
+/** The one toast after a send (TEC-211): "Sent 12" or "Sent 12 · 2 not sent". */
+export function sentWords(added: number, notSent: number): string {
+  return `Sent ${added}${notSent > 0 ? ` · ${notSent} not sent` : ""}`;
+}
 
 export function when(iso: string): string {
   const d = new Date(iso);
@@ -120,8 +131,12 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   const [takeBackResults, setTakeBackResults] = useState<TakeBackResult | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
-  // After Send (TEC-206): every line reports added, skipped or failed.
-  const [results, setResults] = useState<Results | null>(null);
+  // A line a send did not take, and why (TEC-211): "not sent" in its price spot until the next send.
+  const [notSent, setNotSent] = useState<Map<string, string>>(new Map());
+  // The live check (TEC-211): null until the first answer.
+  const [check, setCheck] = useState<CheckResult | null>(null);
+  const [lastWorked, setLastWorked] = useState<string | null>(null);
+  const checking = useRef(false);
   // The one picker that stays (TEC-206).
   const [splash, setSplash] = useState<Splash | null>(null);
   // Refresh cart (TEC-206): today's prices for what is in the cart, and when they were read.
@@ -155,6 +170,36 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     }
   }, []);
 
+  /**
+   * **The live check** (TEC-211). Runs on open, after any King Soopers call fails, and when
+   * the status is tapped. One at a time; in `serial` because it borrows the account's token.
+   * A check that cannot even reach this app's server reads as "can't reach", with the reason.
+   */
+  const runCheck = useCallback(async () => {
+    if (checking.current) return;
+    checking.current = true;
+    setCheck(null);
+    try {
+      const response = await serial(() => fetch("/api/kroger/check", { cache: "no-store" }));
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "Couldn't check King Soopers.");
+      const result = body as CheckResult;
+      setCheck(result);
+      if (result.state === "connected") {
+        setLastWorked(result.checkedAt);
+        try {
+          window.localStorage.setItem(LAST_WORKED_KEY, result.checkedAt);
+        } catch {
+          // Private window or blocked storage: it is only a convenience.
+        }
+      }
+    } catch (e) {
+      setCheck({ state: "unreachable", checkedAt: new Date().toISOString(), detail: e instanceof Error ? e.message : "Couldn't check King Soopers.", problems: [] });
+    } finally {
+      checking.current = false;
+    }
+  }, [serial]);
+
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -163,6 +208,7 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
       if (!response.ok) {
         // **Said in words, and never as "nothing changed".**
         setRefreshNote({ text: `Refresh failed: ${body.error ?? "Kroger or the database didn't answer."}`, failed: true });
+        void runCheck();
       } else {
         setRefreshNote({ text: body.message as string, failed: false, summary: refreshSummary(body.report) ?? undefined });
       }
@@ -170,10 +216,11 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
       brandsChanged.current();
     } catch {
       setRefreshNote({ text: "Refresh failed: couldn't reach this app's server.", failed: true });
+      void runCheck();
     } finally {
       setRefreshing(false);
     }
-  }, [loadStatus, serial]);
+  }, [loadStatus, runCheck, serial]);
 
   /**
    * **Refresh cart** (TEC-206): the ledger fixes In cart, and today's price is read for each
@@ -235,6 +282,7 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
         if (!response.ok) {
           // **Said in words, never as "no deals".**
           setScanNote({ text: `Deal scan failed: ${body.error ?? "Kroger or the database didn't answer."}`, failed: true });
+          void runCheck();
         } else {
           setLatestScan(body.scan as ScanRecord);
           setScanNote(null);
@@ -243,7 +291,7 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
         setScanNote({ text: "Deal scan failed: couldn't reach this app's server.", failed: true });
       }
     },
-    [serial]
+    [runCheck, serial]
   );
 
   // On open: read the connection, say how a sign-in just went, and start a
@@ -259,6 +307,14 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
       const rest = params.toString();
       window.history.replaceState(null, "", window.location.pathname + (rest ? `?${rest}` : ""));
     }
+
+    // The live check, once on open (TEC-211): the header never says "Connected" on a saved sign-in alone.
+    try {
+      setLastWorked(window.localStorage.getItem(LAST_WORKED_KEY));
+    } catch {
+      // Blocked storage: "last worked" just reads "no good check yet".
+    }
+    void runCheck();
 
     void loadStatus().then(async (s) => {
       if (s && !autoRefreshed.current && refreshDue(s)) {
@@ -280,7 +336,7 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
         }
       }
     });
-  }, [loadStatus, refresh, refreshCart, loadScan, scan]);
+  }, [loadStatus, refresh, refreshCart, loadScan, scan, runCheck]);
 
   async function chooseModality(modality: Modality) {
     if (!status) return;
@@ -341,9 +397,9 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     try {
       const response = await fetch("/api/kroger", { method: "DELETE" });
       if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't disconnect.");
-      setResults(null);
       setSplash(null);
       await loadStatus();
+      void runCheck();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't disconnect.");
     } finally {
@@ -351,9 +407,9 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     }
   }
 
-  /** Look lines up at Kroger. `ids` limits it to those lines; `includeSent` lets Change look up a line already in the cart. */
-  async function lookUp(ids: string[] | null, includeSent = false): Promise<ReviewLine[]> {
-    const query = ids ? `?ids=${encodeURIComponent(ids.join(","))}${includeSent ? "&include=sent" : ""}` : "";
+  /** Look lines up at Kroger. `ids` limits it to those lines. Only lines still on the List are ever looked up. */
+  async function lookUp(ids: string[] | null): Promise<ReviewLine[]> {
+    const query = ids ? `?ids=${encodeURIComponent(ids.join(","))}` : "";
     const response = await serial(() => fetch(`/api/kroger/cart${query}`, { cache: "no-store" }));
     const body = await response.json();
     if (!response.ok) throw new Error(body.error ?? "Couldn't get the list ready.");
@@ -361,7 +417,6 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   }
 
   function clearNotes() {
-    setResults(null);
     setTakeBackResults(null);
   }
 
@@ -390,8 +445,9 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   }
 
   /**
-   * **Send all** (TEC-206): the caller has already asked "Send N items?". Every line still
-   * on the List goes in as its best guess, and the results say added, skipped or failed for each.
+   * **Send all** (TEC-206, TEC-211): no confirm; one tap sends. Every line still on the List
+   * goes in as its best guess. The answer is one toast, "Sent 12" or "Sent 12 · 2 not sent",
+   * and a line that did not go reads "not sent" in its price spot until the next send.
    */
   async function sendAll() {
     if (busy) return;
@@ -404,6 +460,7 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
         toast.notice("Nothing on the List to send.");
         return;
       }
+      setNotSent(new Map());
       const sent = await post(picks, null);
       if ("conflict" in sent) {
         toast.error(`Already in the cart: ${sent.conflict.map((l) => l.name).join(", ")}. The cart only adds, so nothing was sent.`);
@@ -412,26 +469,33 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
       }
       const body = sent.body;
       const shown = new Set(lines.map((l) => l.id));
-      setResults({
-        outcomes: (body.outcomes as Outcome[]).filter((o) => shown.has(o.id)),
-        summary: body.summary as string,
-        recordError: (body.recordError as string | null) ?? null,
-        modalityWarning: (body.modalityWarning as string | null) ?? null,
-      });
+      const outcomes = (body.outcomes as Outcome[]).filter((o) => shown.has(o.id));
+      const left = outcomes.filter((o) => o.result !== "added");
+      setNotSent(new Map(left.map((o) => [o.id, o.detail])));
+      const words = sentWords(outcomes.length - left.length, left.length);
+      if (left.length > 0) toast.error(words);
+      else toast.notice(words);
       afterSend(body);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't send to the cart.");
+      void runCheck();
     } finally {
       setBusy(null);
     }
   }
 
-  /** **+ Cart on one line** (TEC-206): the caller has asked "Add 1 to the cart?"; it goes in as the best guess and reports in a toast. */
+  /** **+ Cart on one line** (TEC-206, TEC-211): no confirm; it goes in as the best guess and reports in a toast. */
   async function addOne(id: string) {
     if (busy) return;
     setBusy("add");
     setAdding(id);
     clearNotes();
+    setNotSent((m) => {
+      const next = new Map(m);
+      next.delete(id);
+      return next;
+    });
+    const failed = (detail: string) => setNotSent((m) => new Map(m).set(id, detail));
     try {
       const [line] = await lookUp([id]);
       if (!line) throw new Error("That line isn't on the List any more, so there was nothing to add. It may already be in the cart.");
@@ -443,10 +507,15 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
       }
       const outcome = (sent.body.outcomes as Outcome[]).find((o) => o.id === id);
       if (outcome?.result === "added") toast.notice(`${outcome.name} is in the cart. ${outcome.detail}`);
-      else toast.error(`${line.name} wasn't added. ${outcome?.detail ?? "Kroger didn't say why."}`);
+      else {
+        failed(outcome?.detail ?? "Kroger didn't say why.");
+        toast.error(`${line.name} wasn't added. ${outcome?.detail ?? "Kroger didn't say why."}`);
+      }
       afterSend(sent.body);
     } catch (e) {
+      failed(e instanceof Error ? e.message : "Couldn't add that to the cart.");
       toast.error(e instanceof Error ? e.message : "Couldn't add that to the cart.");
+      void runCheck();
     } finally {
       setBusy(null);
       setAdding(null);
@@ -461,27 +530,9 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     if (!status?.configured || !status.connected || !status.store || ids.length === 0) return;
     try {
       const lines = (await lookUp(ids)).filter((l) => needsSplash(l.plan));
-      if (lines.length > 0) setSplash({ queue: lines, change: false });
+      if (lines.length > 0) setSplash({ queue: lines });
     } catch {
       // The lines are on the List either way; a failed look-up only means no splash.
-    }
-  }
-
-  /** **Change** on an In cart line: the same picker, for the product that went in. */
-  async function changeLine(id: string) {
-    if (busy) return;
-    setBusy("lookup");
-    try {
-      const [line] = await lookUp([id], true);
-      if (!line || pickerOptions(line.plan).length === 0) {
-        toast.error("There's nothing else to choose for that line.");
-        return;
-      }
-      setSplash({ queue: [line], change: true });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't look that up.");
-    } finally {
-      setBusy(null);
     }
   }
 
@@ -489,23 +540,13 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     setSplash((s) => (s && s.queue.length > 1 ? { ...s, queue: s.queue.slice(1) } : null));
   }
 
-  /**
-   * A tap in the splash. Add an item: that product goes into the cart now (and becomes the
-   * default with the tick). Change: the old product is taken back out first, then this one goes in.
-   */
+  /** A tap in the splash: that product goes into the cart now (and becomes the default with the tick). */
   async function chooseProduct(option: PickerOption, makeDefault: boolean) {
     const current = splash;
     const line = current?.queue[0];
     if (!current || !line || busy) return;
     setBusy("add");
     try {
-      if (current.change) {
-        const gone = await takeBackRequest([line.id]);
-        if (gone.failed) {
-          setTakeBackResults(gone);
-          throw new Error("The old product wouldn't come out of the cart, so nothing was changed.");
-        }
-      }
       const sent = await post([pickOf(line, option, makeDefault)], [line.id]);
       if ("conflict" in sent) throw new Error(`${line.name} is already in the cart.`);
       const outcome = (sent.body.outcomes as Outcome[]).find((o) => o.id === line.id);
@@ -536,7 +577,10 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
       })
     );
     const body = await response.json();
-    if (!response.ok) throw new Error(body.error ?? "Couldn't take back from the cart.");
+    if (!response.ok) {
+      void runCheck();
+      throw new Error(body.error ?? "Couldn't take back from the cart.");
+    }
     listChanged.current();
     void refreshCart(true);
     return {
@@ -572,7 +616,6 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   async function clearCart() {
     if (busy) return;
     setBusy("take-back");
-    setResults(null);
     setTakeBackResults(null);
     try {
       const done = await takeBackRequest(null, true);
@@ -601,8 +644,10 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     dismissTakeBack: () => setTakeBackResults(null),
     adding,
     removing,
-    results,
-    dismissResults: () => setResults(null),
+    notSent,
+    check,
+    lastWorked,
+    runCheck,
     splash,
     leaveSplash,
     chooseProduct,
@@ -621,20 +666,18 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     sendAll,
     addOne,
     offerChoices,
-    changeLine,
     removeOne,
     clearCart,
   };
 }
 
 // ---------------------------------------------------------------------------
-// The panel under the list: connection and refresh. The store is chosen in the
-// list's header (TEC-206).
-// Deals are not here since TEC-132: they live on the Deals tab, and the list
-// keeps only each line's sale bubble (TEC-196, from the nightly prices).
+// The King Soopers panel at the bottom is gone (TEC-211): its connection, store,
+// Pickup/Delivery, prices checked, Refresh now and disconnect are in the list's
+// header, beside the live status. Deals are not here since TEC-132.
 // ---------------------------------------------------------------------------
 
-/** Search for a store by ZIP and pick one. In the list's header; also the first-time step in the panel. */
+/** Search for a store by ZIP and pick one. In the list's header, for the first store and for Change store. */
 export function StorePicker({ cart }: { cart: CartState }) {
   const { status } = cart;
   return (
@@ -689,65 +732,6 @@ export function StorePicker({ cart }: { cart: CartState }) {
   );
 }
 
-export function CartPanel({ cart }: { cart: CartState }) {
-  const { status } = cart;
-  let body: ReactNode;
-  if (status === null) {
-    body = cart.statusError ? (
-      <p role="alert" className="text-sm text-danger">{cart.statusError}</p>
-    ) : (
-      <p className="text-sm text-ink-soft">Checking the King Soopers connection…</p>
-    );
-  } else if (!status.configured) {
-    // **In words, naming the variable** — never a dead button.
-    body = <p className="text-sm text-ink-soft">Send to cart isn&rsquo;t set up on this deployment: {status.problems.join("; ")}.</p>;
-  } else if (!status.connected) {
-    body = (
-      <div className="flex flex-col gap-2">
-        <p className="text-sm text-ink-soft">
-          Sign in to King Soopers once, and the list can go straight into your cart. Checkout stays at King Soopers.
-        </p>
-        <a href="/kroger/connect" className="self-start rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink">
-          Connect King Soopers
-        </a>
-      </div>
-    );
-  } else if (!status.store) {
-    body = <StorePicker cart={cart} />;
-  } else {
-    body = (
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
-          <button type="button" onClick={() => void cart.disconnect()} className={LINK}>
-            disconnect
-          </button>
-          <span className="ml-auto">{status.refreshedAt ? `prices checked ${when(status.refreshedAt)}` : "prices not checked yet"}</span>
-          <button
-            type="button"
-            onClick={() => void cart.refresh()}
-            disabled={cart.refreshing}
-            className="rounded border border-line px-2 py-1 disabled:opacity-50"
-          >
-            {cart.refreshing ? "Refreshing…" : "Refresh now"}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-2 rounded-xl bg-surface p-3">
-      <h2 className="text-sm font-semibold">King Soopers</h2>
-      {body}
-      {cart.scanNote?.failed ? (
-        <p role="alert" className="text-xs text-danger">
-          {cart.scanNote.text}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 /**
  * The refresh log (TEC-190): **collapsed**, one summary line (checked, updated,
  * how many sizes changed), the full sentence on a tap. A refresh that failed
@@ -759,7 +743,12 @@ export function RefreshLog({ cart }: { cart: CartState }) {
     return <p className="px-2 text-xs text-ink-soft">Checking prices and stock in the background…</p>;
   }
   const note = cart.refreshNote;
-  if (!note) return null;
+  // Nothing to report yet: just when the prices were last checked (it moved here from the panel, TEC-211).
+  if (!note) {
+    const at = cart.status?.configured && cart.status.connected && cart.status.store ? cart.status.refreshedAt : undefined;
+    if (at === undefined) return null;
+    return <p className="px-2 text-xs text-ink-soft">{at ? `Prices checked ${when(at)}` : "Prices not checked yet"}</p>;
+  }
   if (note.summary) {
     return (
       <details className="rounded-[10px] bg-surface px-3 py-2.5 text-[13px] text-ink-soft">
@@ -825,61 +814,19 @@ export function TakeBackResults({ results, onClose }: { results: TakeBackResult;
 }
 
 /**
- * After Send (TEC-206): **every line reports added, skipped or failed**, so a
- * partial send never reads as whole. Shown in place on the list, not in front
- * of it, and dismissed with a tap.
- */
-export function SendResults({ cart }: { cart: CartState }) {
-  const results = cart.results;
-  if (!results) return null;
-  const added = results.outcomes.filter((o) => o.result === "added");
-  const left = results.outcomes.filter((o) => o.result !== "added");
-  return (
-    <section aria-label="Send results" className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-3 px-2">
-        <h3 className="text-lg font-bold">
-          Sent {added.length} item{added.length === 1 ? "" : "s"}
-          {left.length > 0 ? ` · ${left.length} not sent` : ""}
-        </h3>
-        <button type="button" onClick={cart.dismissResults} className="text-[13px] text-accent underline-offset-2 hover:underline">
-          Dismiss
-        </button>
-      </div>
-      <p className={`${HEADING} px-2 text-ink-soft`}>{results.summary}</p>
-      <ul className="flex flex-col overflow-hidden rounded-xl bg-surface">
-        {results.outcomes.map((o) => (
-          <li key={o.id} className="flex items-baseline gap-2 border-t border-line/40 px-3.5 py-2.5 text-sm first:border-t-0">
-            <ResultChip result={o.result} good="added" />
-            <span className="min-w-0">
-              {o.name} <span className="text-ink-soft">— {o.detail}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-      {results.modalityWarning ? <p role="alert" className="px-2 text-xs text-warn">{results.modalityWarning}</p> : null}
-      {results.recordError ? <p className="px-2 text-xs text-danger">{results.recordError}</p> : null}
-      <a href={CHECKOUT_URL} target="_blank" rel="noreferrer" className="px-2 text-[13px] text-accent underline-offset-2 hover:underline">
-        Go to checkout on King Soopers
-      </a>
-    </section>
-  );
-}
-
-/**
  * **The one picker that stays** (TEC-206; owner: "Add an item opens a choice of
  * products when several match and none is the default"). A splash over the
  * list: tap a product to use it, tick **Make default** to keep it for that name.
- * The same splash is **Change** on an In cart line. Anything else about a send
- * is settled without asking.
+ * Anything else about a send is settled without asking.
  */
 export function ProductSplash({ cart }: { cart: CartState }) {
   const splash = cart.splash;
   const line = splash?.queue[0];
   if (!splash || !line) return null;
-  return <SplashBody key={line.id} cart={cart} line={line} change={splash.change} more={splash.queue.length - 1} />;
+  return <SplashBody key={line.id} cart={cart} line={line} more={splash.queue.length - 1} />;
 }
 
-function SplashBody({ cart, line, change, more }: { cart: CartState; line: ReviewLine; change: boolean; more: number }) {
+function SplashBody({ cart, line, more }: { cart: CartState; line: ReviewLine; more: number }) {
   const [makeDefault, setMakeDefault] = useState(false);
   const options = pickerOptions(line.plan);
   const matched = (line.plan.kind === "exact" || line.plan.kind === "settle") && line.plan.matched && options.length > 1;
@@ -897,9 +844,9 @@ function SplashBody({ cart, line, change, more }: { cart: CartState; line: Revie
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 sm:items-center">
       <div role="dialog" aria-modal="true" aria-label={`Which ${line.name}`} className="flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl bg-paper p-4">
         <div className="flex flex-col gap-0.5">
-          <h2 className="text-lg font-bold">{change ? `Change ${line.name}` : `Which ${line.name}?`}</h2>
+          <h2 className="text-lg font-bold">Which {line.name}?</h2>
           <p className="text-[13px] text-ink-soft">
-            {change ? "Tap the one that should be in the cart instead." : "Several match and none is your default. Tap one to add it to the cart."}
+            Several match and none is your default. Tap one to add it to the cart.
             {more > 0 ? ` ${more} more to choose after this.` : ""}
           </p>
         </div>
@@ -930,7 +877,7 @@ function SplashBody({ cart, line, change, more }: { cart: CartState; line: Revie
           </label>
         ) : null}
         <button type="button" onClick={cart.leaveSplash} disabled={working} className="min-h-11 self-start rounded-[10px] px-2 text-[15px] text-accent underline-offset-2 hover:underline disabled:opacity-50">
-          {change ? "Cancel" : "Leave it on the list"}
+          Leave it on the list
         </button>
       </div>
     </div>

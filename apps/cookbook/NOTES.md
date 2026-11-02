@@ -257,28 +257,29 @@ Reasoning is in the migration headers.
 - **No review, no pop-up lists** (TEC-206). `SendView`, `ReviewRow`, `Choice`, `startingChoice`,
   `pickFor` and `sectionOf` are gone from `app/Cart.tsx`. **Send all** runs `lookUp(null)` (`GET
   /api/kroger/cart`, only lines still on the List), then `guessPicks` (`lib/cartGuess.ts`, pure), then
-  one `POST /api/kroger/cart`. The best guess: `exact` goes in as its product (no page sent, never
+  one `POST /api/kroger/cart`. **No confirm, no Sent list** (TEC-211): see *The live check and the one-line list* below. The best guess: `exact` goes in as its product (no page sent, never
   re-saved); `settle` sends the most-bought option with its page (so it is remembered); `match` sends
   Kroger's top match with its page and size; `none` is a bare `{id}` and comes back "No product to
-  add.". Every line then reports in `SendResults` on the list (added, skipped or failed; Dismiss).
-  `?ids=a,b` limits the lookup (+ Cart on one line); `include=sent` also looks up a line already in
-  the cart (Change). **Confirms** are `confirmWords` (`lib/cartGuess.ts`): a count, never names;
-  `List.tsx` holds `confirm` for the section buttons and `rowConfirm` for a row's + Cart and Remove.
+  add.". The send then reports in one toast (`sentWords`, `app/Cart.tsx`).
+  `?ids=a,b` limits the lookup (+ Cart on one line); the route looks up only lines still on the List
+  (`include=sent` went with Change, TEC-211). **Confirms** are `confirmWords` (`lib/cartGuess.ts`): a
+  count, never names, for Remove, Clear cart, Tidy, Clear ticked and Clear all only; `List.tsx` holds
+  `confirm` for the section buttons and `removeConfirm` for a row's Remove.
 - **Make default on Send**: the route reads each ticked line's `matched` name **before** sending
   (remembering a pick can add the line's own name to the product, which would change what it
   matches), and `sendLines` calls `makeDefault` only after that line's add succeeded, after
   remembering. A failure is appended to the line ("Couldn't make it the default … do it in Your
   brands"); the line stays added.
-- The state is `useCart` (`app/Cart.tsx`); `List.tsx` lays out the header, the **List** and **In
-  cart** sections, `SendResults`, `RefreshLog` and `CartPanel` (connection, Refresh now; **no deals
-  since TEC-132**, they live on the Deals tab). The store is chosen in the list's header
+- The state is `useCart` (`app/Cart.tsx`); `List.tsx` lays out the header (with `KingSoopersStatus`), the
+  **List** and **In cart** sections and `RefreshLog`. `SendResults` and `CartPanel` are gone (TEC-211);
+  **no deals since TEC-132**, they live on the Deals tab. The store is chosen in the list's header
   (`StorePicker`, ZIP only: Kroger's Locations API has no city filter). `serialKroger` is
   module-level, so the list and Your brands' Refresh share one Kroger queue.
 - **List and In cart** (TEC-190, TEC-206): a line is In cart when `sent_at` is set (Send sets it, a
   whole Take back clears it), so the sections need no new column. **In cart is the whole King
   Soopers cart**: every add comes from this app, and the King Soopers app is only for checkout, so
-  no screen says an add elsewhere is hidden. **+ Cart** (`addOne`) asks "Add 1 to the cart?" in the
-  row, then sends `guessPick` with `only: [id]` and reports in a toast. **Remove** (`removeOne`) and
+  no screen says an add elsewhere is hidden. **+ Cart** (`addOne`) goes at once (TEC-211): it sends
+  `guessPick` with `only: [id]` and reports in a toast. **Remove** (`removeOne`) and
   **Clear cart** (`clearCart`) both go through `takeBackRequest`: `POST
   /api/kroger/cart/take-back` with `confirm: true`, and `ids` for Remove only. Clear cart sends
   `clear: true` as well (TEC-210) and calls no GET preview and has no King Soopers step.
@@ -305,13 +306,42 @@ Reasoning is in the migration headers.
   at nothing makes its line "no price", never $0. The client keeps the result in `cartCheck` (not
   stored; it is read again on each open, and by `useCart` once on open when connected with a
   store): the live In cart total with the time, and each In cart row's live price.
-  `GET /api/grocery` adds `used` ({product, size}, from the ledger and Your brands) on In cart
-  items for "Used: …"; display only, null when the read fails.
+  `GET /api/grocery` still adds `used` ({product, size}, from the ledger and Your brands) on In cart
+  items, but **no screen reads it since TEC-211** (the "Used:" line went with Change); dead weight
+  in that route until someone removes it.
+
+- **The live check and the one-line list** (TEC-211; owner, 2026-11-02). `GET /api/kroger/check`
+  (`app/api/kroger/check/route.ts`, signed-in only like every `/api` route; the gate is unchanged)
+  borrows the account's token with `withAccessToken` and answers `{ state, checkedAt, detail,
+  problems }`, never a token (`tests/kroger.test.ts`). `checkConnection` (`lib/krogerCheck.ts`)
+  reads the thrown error as one of five states: **connected**; **expired** (a `KrogerError` with
+  `reconnect`, which includes a stored token this app can't open, e.g. a changed `KROGER_TOKEN_KEY`);
+  **unreachable** (any other `KrogerError`, including no answer); **not-connected** (`ConflictError`);
+  **not-set-up** (`KrogerConfigError`, naming the variable). Anything else, such as the database not
+  answering, is thrown and reads as a 503, never as King Soopers being down. The wording and the
+  client-safe types are in `lib/checkLine.ts` (pure; `lib/krogerCheck.ts` imports the Kroger client
+  and stays on the server). **It proves the sign-in works; it cannot prove the cart is right**, since
+  the Cart API cannot read it. The client (`runCheck`, in `serial` with every call that borrows the
+  token) runs it on open, after any King Soopers call fails (refresh, deal scan, send, + Cart,
+  take back, a failed look-up) and when the status is tapped; a check that can't reach this app's
+  own server also reads "Can't reach King Soopers", with the reason in the tooltip. "last worked" is
+  kept in this browser's `localStorage` (`cookbook:kroger-last-worked`, read and written in try/catch).
+  **The King Soopers panel is in the header**: row one is the status (dot and words, tap to
+  re-check), Reconnect/Connect where that is the way out, and **Refresh now**; row two is
+  Pickup/Delivery, the store (tap for the ZIP search) and a small **disconnect** link; "Prices
+  checked …" is the quiet line under it (`RefreshLog` with no note), and a failed deal scan shows
+  there too. Nothing King Soopers renders below In cart. **Rows are item · qty · price**: List rows
+  keep the tick, the ×N box and **+ Cart**; In cart rows keep a ×N label (the quantity sent, not
+  editable) and **Remove**. The recipe names, ★ ? + mark, bubble, amount, note and "Used:" line are
+  gone; the deal shade stays, with the bubble and "Good price"/"High price" words on the price's
+  `title` and accessible name. **A send is one toast** ("Sent 12", "Sent 12 · 2 not sent"); a line it
+  did not take reads a red "not sent" in its price spot (`notSent`, in memory, cleared by the next
+  send or reload).
 - **The splash** (`ProductSplash`, `app/Cart.tsx`) is the only picker. After Add an item,
   `offerChoices(ids)` looks the new lines up and opens it for each `needsSplash` plan (`settle` with
   two or more options). Tapping a product (`chooseProduct`) adds it to the cart now, with **Make
-  default** ticked or not (`pickOf`, `lib/cartGuess.ts`). **Change** on an In cart row
-  (`changeLine`) reuses it: the old product is taken back first, then the new one goes in.
+  default** ticked or not (`pickOf`, `lib/cartGuess.ts`). **Change on an In cart row is gone**
+  (TEC-211): to use another product, Remove the line and add it again.
 - **Searching by the item alone** (TEC-131): `lineTerm` (`lib/cart.ts`) is
   `searchTerm(itemWords(name)) ?? searchTerm(name)`, used by `planLine` and `targetFor`; a
   phrase's search words are searched as written. The list's links use `itemWords` too
@@ -375,7 +405,7 @@ Reasoning is in the migration headers.
   tab panel is mounted, and the cart hook's mount effect starts it. **No panel shows it and there
   is no Scan button (TEC-132)**: it feeds only the Deals board's products
   with no fresh night (the list's sale bubble reads the nightly prices since TEC-196). A scan that throws saves nothing, so the next page load retries, and the
-  King Soopers panel says so in red.
+  list header says so in red (TEC-211).
 - Coupons are never read here. The *Find coupons* link left with the panel (TEC-132), and
   `couponsUrl` with it.
 - **No live estimate since TEC-190.** `POST /api/kroger/estimate`, `runEstimate`, `estimate`,
@@ -566,15 +596,16 @@ array**; each element is a product row or a search-word row.
   Shift+Enter starts a line; "notes after a dash"), **Cooking this week** (the menu as day and
   recipe chips with a two-tap Clear; names come from the book via `Cookbook.tsx`; moving a day
   stays on the book's *On the menu*), then **List · N** (Copy · Tidy · Clear ticked · Clear all, the
-  lines, the legend, **Send all to cart**), **In cart · N** (Remove per line, Clear cart, Go to
-  checkout, the caveat) and the King Soopers panel (TEC-190; the sticky bar left). The header says
-  "N still to buy · N in cart · store · prices from the night of …". Each List row is the tick,
-  the name over a small line (★ ? + mark, bubble, recipes, amount, note), the price over the ×N
-  box, and **+ Cart** (32px, 12px bold, accessible name "Add to cart"; `h-8`, not the 44px floor,
-  by the owner's word).
+  lines, **Send all to cart**) and **In cart · N** (Remove per line, Clear cart, Go to checkout).
+  The King Soopers panel moved into the header in TEC-211 (see *The live check and the one-line
+  list*). The header says "N still to buy · N in cart · prices from the night of …", then the live
+  status. Each List row is **the tick, the name, the ×N box, the price and + Cart** on one line
+  (32px, 12px bold, accessible name "Add to cart"; `h-8`, not the 44px floor, by the owner's word);
+  the recipes, mark, bubble, amount and note no longer show (TEC-211).
 - **Each line's mark** (`lineMark`, `lib/brands.ts`; `GET /api/grocery` adds `mark`): ★ goes in
   as a saved product (code, only product, default, or named), ? needs a pick at Send, + anything
   else, including a product found only by its Kroger name and a typed code that is not saved.
+  **Not shown since TEC-211**; the route still sends it.
 - **Shown as what you buy** (`lib/lineView.ts`, display only; `GET /api/grocery` adds `view` to
   each line): `[ ] <name> — <recipes> · <amount> · <note>   ×<quantity>`, the name full size and
   the rest small. The name is the decided product's `pack_label` (the top candidate when several

@@ -471,6 +471,49 @@ describe("no token appears in any response body", () => {
     expect(open(String(mem.row?.refresh_token_sealed), key())).toBe(NEW_RT);
   });
 
+  describe("the live check (TEC-211)", () => {
+    afterEach(() => {
+      kroger.mockImplementation(defaultKroger);
+    });
+    const check = async () => (await import("@/app/api/kroger/check/route")).GET();
+
+    it("a working sign-in is connected; the body carries no token, and the rotated refresh token is resealed", async () => {
+      const body = await bodyOf(await check());
+      expect(body).toMatchObject({ state: "connected", detail: null, problems: [] });
+      expect(Object.keys(body).sort()).toEqual(["checkedAt", "detail", "problems", "state"]);
+      expect(open(String(mem.row?.refresh_token_sealed), key())).toBe(NEW_RT);
+    });
+
+    it("a refused sign-in is expired, in words and with no token", async () => {
+      kroger.mockImplementationOnce(async () => json({ error: "invalid_grant" }, 400));
+      const body = await bodyOf(await check());
+      expect(body.state).toBe("expired");
+      expect(body.detail).toMatch(/connect King Soopers again/);
+    });
+
+    it("Kroger not answering is unreachable, not expired", async () => {
+      kroger.mockImplementationOnce(async () => {
+        throw new Error("network down");
+      });
+      const body = await bodyOf(await check());
+      expect(body.state).toBe("unreachable");
+    });
+
+    it("nothing saved is not connected, and Kroger is not called", async () => {
+      mem.row = null;
+      const before = kroger.mock.calls.length;
+      expect((await bodyOf(await check())).state).toBe("not-connected");
+      expect(kroger.mock.calls.length).toBe(before);
+    });
+
+    it("a missing variable is not set up, and names it", async () => {
+      vi.stubEnv("KROGER_CLIENT_ID", "");
+      const body = await bodyOf(await check());
+      expect(body.state).toBe("not-set-up");
+      expect(body.problems).toEqual(["KROGER_CLIENT_ID is not set"]);
+    });
+  });
+
   it("a refused sign-in is an error in words, with no token in it", async () => {
     kroger.mockImplementationOnce(async () => json({ error: "invalid_grant" }, 400));
     const { POST } = await import("@/app/api/kroger/refresh/route");
