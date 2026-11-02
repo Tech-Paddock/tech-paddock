@@ -34,6 +34,10 @@ describe("the list line (TEC-189)", () => {
   it("reads rating · Prep · Cook · makes N", () => {
     expect(text(base)).toBe("5★ · Prep 15m · Cook 30m · makes 4");
   });
+  it("names the meal after the rating when there is one, and says nothing for none (TEC-205)", () => {
+    expect(text({ ...base, meal: "creami" })).toBe("5★ · Creami · Prep 15m · Cook 30m · makes 4");
+    expect(text({ ...base, meal: null })).toBe("5★ · Prep 15m · Cook 30m · makes 4");
+  });
   it("drops each part that is unset", () => {
     expect(text({ ...base, rating: null })).toBe("Prep 15m · Cook 30m · makes 4");
     expect(text({ ...base, cook_minutes: null })).toBe("5★ · Prep 15m · makes 4");

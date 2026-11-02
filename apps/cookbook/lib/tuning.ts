@@ -1,4 +1,4 @@
-import { DIETS, MEALS, formatMinutes, timeMinutes, type Diet, type Meal, type RecipeMeta } from "./metadata";
+import { DIETS, OTHER_MEAL, formatMinutes, readMealWord, timeMinutes, type Diet, type Meal, type RecipeMeta } from "./metadata";
 
 /**
  * The tuning section (2026-09-26): the same four options — meal,
@@ -37,7 +37,7 @@ export function readPicks(raw: unknown): Picks {
   const cuisine = word(o.cuisine);
   const minutes = typeof o.max_minutes === "string" ? Number(o.max_minutes) : o.max_minutes;
   return {
-    meal: (MEALS as readonly string[]).includes(meal) ? (meal as Meal) : null,
+    meal: readMealWord(meal),
     diet: (DIETS as readonly string[]).includes(diet) ? (diet as Diet) : null,
     cuisine: cuisine && cuisine.length <= MAX_CUISINE ? cuisine : null,
     max_minutes: (TIME_CHOICES as readonly number[]).includes(minutes as number) ? (minutes as number) : null,
@@ -102,12 +102,15 @@ export function tagWithPicks(meta: RecipeMeta, p: Picks): { meta: RecipeMeta; no
 // ---------------------------------------------------------------------------
 
 /** The book's filters are the four picks and nothing else (TEC-189 dropped High protein). */
-export type BookFilter = Picks;
+export type BookFilter = Omit<Picks, "meal"> & {
+  /** A meal, or Other: a recipe with no meal (TEC-205). */
+  meal: Meal | typeof OTHER_MEAL | null;
+};
 
 export const NO_FILTER: BookFilter = NO_PICKS;
 
 export function filterActive(f: BookFilter): boolean {
-  return hasPicks(f);
+  return hasPicks({ ...f, meal: null }) || f.meal !== null;
 }
 
 /**
@@ -117,7 +120,7 @@ export function filterActive(f: BookFilter): boolean {
  * old total (`timeMinutes`). Every filter set must hold.
  */
 export function matchesFilter(r: RecipeMeta, f: BookFilter): boolean {
-  if (f.meal && r.meal !== f.meal) return false;
+  if (f.meal === OTHER_MEAL ? r.meal !== null : f.meal && r.meal !== f.meal) return false;
   if (f.diet && !dietSatisfies(r.diet, f.diet)) return false;
   if (f.cuisine && r.cuisine !== f.cuisine) return false;
   if (f.max_minutes) {

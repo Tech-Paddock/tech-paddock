@@ -45,8 +45,10 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   only while neither prep nor cook is set); one serving as text, "520 kcal · 38p · 42c · 18f"
   (`macrosLine`). The four macro tiles are gone from the list (`MacroTiles` still draws the Macros
   tab). **Origin is not on the facts line** (it did not fit beside Prep and Cook at 360px); the open
-  recipe still says it. Meal, main, cuisine, equipment, diet and tags are stored and editable in
-  Edit and the typed form, and **render nowhere**: not on the list, the open recipe or Add's draft.
+  recipe still says it. **The meal is the one keyword shown** (TEC-205): after the rating on the list
+  line and after the origin on the open recipe, by its capitalised name, and nothing for a recipe with
+  none. Main, cuisine, equipment, diet and tags are stored and editable in Edit and the typed form,
+  and **render nowhere**: not on the list, the open recipe or Add's draft.
   *On the menu* stays beside the book.
 - **Prep and cook minutes** (TEC-189, the `cookbook_prep_cook_minutes` migration): two nullable
   columns on `recipes`, bounds as `total_minutes` (1 to 2880). `total_minutes` is **kept, not
@@ -95,7 +97,14 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   four compact selects** under the search at 360px (`BookFilters`, `app/Tuning.tsx`; High protein
   was dropped, TEC-189); an unset field never matches.
 - Metadata sits flat on `recipes`, read by `lib/metadata.ts`. `meal` and `diet` are
-  check-constrained to `MEALS` and `DIETS`; `readMeta` drops free-of claims and macro tags. The
+  check-constrained to `MEALS` and `DIETS`; `readMeta` drops free-of claims and macro tags. **The
+  meal list is Main · Side · Breakfast · Snack · Dessert · Creami** (TEC-205), held by
+  `cookbook.meal_ok`, so a change is `create or replace function`, not a constraint swap (the old
+  plain check was dropped once, in `cookbook_meal_list`). A recipe with no meal is null and reads as
+  **Other**, a book-filter value only (`OTHER_MEAL`); it is never stored or offered to a model, a
+  sauce or dressing is null. `readMealWord` reads a `dinner` or `lunch` from any model or request
+  as `main`, so the code works either side of the migration, which moved dinner and lunch to main
+  and every recipe tagged `creami` to `creami` (one-way). The
   rating is read only from this app's forms. Older rows read "not set" until supplied (TEC-52).
 - Editing (`lib/edit.ts`) re-estimates the whole pot whenever the ingredient list changes at all
   (reordering counts), in one call before the one write; servings alone re-divides the pot. Confirmed for TEC-140: changing

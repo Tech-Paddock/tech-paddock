@@ -5,15 +5,15 @@ import MacroTab from "./MacroTab";
 import { Stars } from "./Meta";
 import { methodSteps } from "@/lib/recipeSteps";
 import type { Recipe, RecipeOrigin } from "@/lib/recipes";
-import { timeParts } from "@/lib/metadata";
+import { mealLabel, timeParts } from "@/lib/metadata";
 import { localToday, parseDay } from "@/lib/menuDay";
 import { RECIPE_TABS, ratingWords, splitIngredient, type RecipeTab } from "@/lib/recipeView";
 
 /**
  * The open recipe (TEC-183, the owner's canvas): name, origin · makes · time,
  * the rating up top, then Ingredients · Method · Macros as tabs. The keywords
- * (meal, main, cuisine, equipment, diet, tags) are stored and editable in Edit
- * and no longer shown here. Local patterns: the segmented tabs, the numbered
+ * (main, cuisine, equipment, diet, tags) are stored and editable in Edit
+ * and no longer shown here; the meal is, by its name (TEC-205). Local patterns: the segmented tabs, the numbered
  * circles. Add to list is a date box (TEC-189).
  */
 
@@ -46,7 +46,7 @@ export function RecipeOpen({
       <div className="flex flex-col gap-1">
         <h3 className="text-lg font-bold">{recipe.name}</h3>
         <p className="text-xs text-ink-soft">
-          {[ORIGIN_LABELS[recipe.origin], ...timeParts(recipe), `makes ${recipe.servings}`].join(" · ")}
+          {[ORIGIN_LABELS[recipe.origin], ...(recipe.meal ? [mealLabel(recipe.meal)] : []), ...timeParts(recipe), `makes ${recipe.servings}`].join(" · ")}
         </p>
         <div className="flex items-center gap-2">
           <Stars rating={recipe.rating} onRate={onRate} busy={rating} size="text-2xl" />

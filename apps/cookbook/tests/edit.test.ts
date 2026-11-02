@@ -69,7 +69,7 @@ describe("what re-prices", () => {
     await applyEdit(
       d,
       "r1",
-      edit({ name: "Friday chilli", method: "Just cook it.", meta: { ...EMPTY_META, meal: "dinner", rating: 5 } })
+      edit({ name: "Friday chilli", method: "Just cook it.", meta: { ...EMPTY_META, meal: "main", rating: 5 } })
     );
     expect(d.estimate).not.toHaveBeenCalled();
   });
@@ -143,7 +143,7 @@ describe("reading an edit off a request", () => {
       name: "x",
       servings: 2,
       ingredients: ["a"],
-      meta: { tags: ["gluten-free", "high protein", "one-pot"], rating: 4, meal: "dinner" },
+      meta: { tags: ["gluten-free", "high protein", "one-pot"], rating: 4, meal: "main" },
     });
     expect("edit" in read && read.edit.meta.tags).toEqual(["one-pot"]);
     expect("edit" in read && read.edit.meta.rating).toBe(4);

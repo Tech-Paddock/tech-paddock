@@ -6,6 +6,7 @@ import {
   NO_PICKS,
   cuisinesIn,
   dietSatisfies,
+  filterActive,
   hasPicks,
   matchesFilter,
   readPicks,
@@ -28,8 +29,8 @@ function recipe(over: Partial<RecipeMeta & Macros> = {}): RecipeMeta & Macros {
 
 describe("reading the picks off a request", () => {
   it("keeps what is on a list and drops what is not", () => {
-    expect(readPicks({ meal: "Dinner", diet: "vegan", cuisine: " Thai ", max_minutes: "30" })).toEqual({
-      meal: "dinner",
+    expect(readPicks({ meal: "Main", diet: "vegan", cuisine: " Thai ", max_minutes: "30" })).toEqual({
+      meal: "main",
       diet: "vegan",
       cuisine: "thai",
       max_minutes: 30,
@@ -47,13 +48,13 @@ describe("reading the picks off a request", () => {
 describe("the picks in the generate prompt", () => {
   it("are requirements, each one said", () => {
     const prompt = generatePrompt("something warming", [], "", {
-      meal: "dinner",
+      meal: "main",
       diet: "vegetarian",
       cuisine: "thai",
       max_minutes: 30,
     });
     expect(prompt).toContain("What they asked for: something warming");
-    expect(prompt).toContain("It is a dinner.");
+    expect(prompt).toContain("It is a main.");
     expect(prompt).toContain("It is vegetarian — every ingredient");
     expect(prompt).toContain("The cuisine is thai.");
     expect(prompt).toContain("under 30 minutes");
@@ -71,12 +72,12 @@ describe("the picks in the generate prompt", () => {
 
 describe("the draft comes back tagged with what was picked", () => {
   it("meal and cuisine are written on", () => {
-    const { meta, notes } = tagWithPicks({ ...EMPTY_META, meal: "lunch", cuisine: "fusion" }, {
+    const { meta, notes } = tagWithPicks({ ...EMPTY_META, meal: "side", cuisine: "fusion" }, {
       ...NO_PICKS,
-      meal: "dinner",
+      meal: "main",
       cuisine: "thai",
     });
-    expect(meta.meal).toBe("dinner");
+    expect(meta.meal).toBe("main");
     expect(meta.cuisine).toBe("thai");
     expect(notes).toEqual([]);
   });
@@ -103,17 +104,32 @@ describe("the draft comes back tagged with what was picked", () => {
 });
 
 describe("filters on the book", () => {
-  it("dinner + vegetarian + under 30 minutes: every one must hold", () => {
-    const f = { ...NO_FILTER, meal: "dinner" as const, diet: "vegetarian" as const, max_minutes: 30 };
-    expect(matchesFilter(recipe({ meal: "dinner", diet: ["vegetarian"], total_minutes: 25 }), f)).toBe(true);
-    expect(matchesFilter(recipe({ meal: "lunch", diet: ["vegetarian"], total_minutes: 25 }), f)).toBe(false);
-    expect(matchesFilter(recipe({ meal: "dinner", diet: [], total_minutes: 25 }), f)).toBe(false);
-    expect(matchesFilter(recipe({ meal: "dinner", diet: ["vegetarian"], total_minutes: 40 }), f)).toBe(false);
+  it("main + vegetarian + under 30 minutes: every one must hold", () => {
+    const f = { ...NO_FILTER, meal: "main" as const, diet: "vegetarian" as const, max_minutes: 30 };
+    expect(matchesFilter(recipe({ meal: "main", diet: ["vegetarian"], total_minutes: 25 }), f)).toBe(true);
+    expect(matchesFilter(recipe({ meal: "side", diet: ["vegetarian"], total_minutes: 25 }), f)).toBe(false);
+    expect(matchesFilter(recipe({ meal: "main", diet: [], total_minutes: 25 }), f)).toBe(false);
+    expect(matchesFilter(recipe({ meal: "main", diet: ["vegetarian"], total_minutes: 40 }), f)).toBe(false);
+  });
+
+  it("Other matches a recipe with no meal, and only that (TEC-205)", () => {
+    const other = { ...NO_FILTER, meal: "other" as const };
+    expect(matchesFilter(recipe(), other)).toBe(true);
+    expect(matchesFilter(recipe({ meal: "main" }), other)).toBe(false);
+    expect(matchesFilter(recipe({ meal: "creami" }), { ...NO_FILTER, meal: "creami" })).toBe(true);
+    expect(matchesFilter(recipe({ meal: "dessert" }), { ...NO_FILTER, meal: "creami" })).toBe(false);
+    expect(filterActive(other)).toBe(true);
+  });
+
+  it("a picked dinner is read as main", () => {
+    expect(readPicks({ meal: "dinner" }).meal).toBe("main");
+    expect(readPicks({ meal: "lunch" }).meal).toBe("main");
+    expect(readPicks({ meal: "other" }).meal).toBeNull();
   });
 
   it("a recipe with the detail unset never matches a filter on it", () => {
     expect(matchesFilter(recipe(), { ...NO_FILTER, max_minutes: 90 })).toBe(false);
-    expect(matchesFilter(recipe(), { ...NO_FILTER, meal: "dinner" })).toBe(false);
+    expect(matchesFilter(recipe(), { ...NO_FILTER, meal: "main" })).toBe(false);
   });
 
   it("no filter shows everything, set or not", () => {
