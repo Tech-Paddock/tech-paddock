@@ -69,7 +69,7 @@ What is true now and its traps. Rules are in `RULES.md`; open work is in Linear 
   that the images were not looked at. It cannot tell that from a page with no images, and warns
   for both.
 - `guide_model` records the model that answered; it is not a setting. Its column comment says so
-  (`20261102001100_coffee_guide_model_comment`).
+  (`coffee_guide_model_comment`).
 - Test fixtures use invented producers (`northfieldroasters.example`, `sweetbloomcoffee.com`
   predates that and is in older cases); keep real producers out of new ones.
 - TDS, extraction, beverage yield and grinder have no `guide_*` column. The copy-out is told not to
