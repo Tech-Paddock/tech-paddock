@@ -37,7 +37,7 @@ const COLUMNS = "id, kind, at, person_id, details, note, voids, created_at";
 
 /**
  * Everything the screen needs in one read: the last `HORIZON_DAYS` before
- * `since`, every weight ever (the growth chart), and every voiding event (so a
+ * `since`, every weight ever (the growth chart), every note ever (the Notes tab, TEC-204), and every voiding event (so a
  * correction or delete of anything read is seen). Paged; a journal too long to
  * read whole is an error, never a silently short one.
  */
@@ -48,7 +48,7 @@ export async function readJournal(db: SupabaseClient, since: Date): Promise<Jour
     const { data, error } = await db
       .from("events")
       .select(COLUMNS)
-      .or(`at.gte.${horizon},kind.eq.weight,voids.not.is.null`)
+      .or(`at.gte.${horizon},kind.eq.weight,kind.eq.note,voids.not.is.null`)
       .order("created_at", { ascending: true })
       .order("id", { ascending: true })
       .range(page * PAGE, page * PAGE + PAGE - 1);

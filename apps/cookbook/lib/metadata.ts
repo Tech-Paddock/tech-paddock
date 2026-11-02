@@ -21,9 +21,29 @@
  * cannot disagree about what a field may hold.
  */
 
-/** Must match the check constraint on `cookbook.recipes.meal`. */
-export const MEALS = ["breakfast", "lunch", "dinner", "snack", "dessert", "side"] as const;
+/**
+ * Must match `cookbook.meal_ok` (migration `cookbook_meal_list`, TEC-205). A recipe
+ * with no meal is stored null and reads as Other (`OTHER_MEAL`); Other is never stored.
+ */
+export const MEALS = ["main", "side", "breakfast", "snack", "dessert", "creami"] as const;
 export type Meal = (typeof MEALS)[number];
+
+/** The filter's word for a recipe with no meal. Never stored, never offered to a model. */
+export const OTHER_MEAL = "other" as const;
+
+/** "main" is shown "Main"; no meal is "Other". */
+export function mealLabel(meal: string | null): string {
+  return meal ? meal.charAt(0).toUpperCase() + meal.slice(1) : "Other";
+}
+
+/**
+ * A meal word off untrusted input. The old list had dinner and lunch; both are
+ * now Main, so a model or a request still saying either is read as `main`.
+ */
+export function readMealWord(word: string): Meal | null {
+  const w = word === "dinner" || word === "lunch" ? "main" : word;
+  return (MEALS as readonly string[]).includes(w) ? (w as Meal) : null;
+}
 
 /** Must match the check constraint on `cookbook.recipes.diet`. What a dish IS, never what it is free of. */
 export const DIETS = ["vegetarian", "vegan", "pescatarian"] as const;
@@ -158,7 +178,7 @@ export function readMeta(raw: unknown, opts: { rating: boolean }): RecipeMeta {
     total_minutes: readMinutes(o.total_minutes),
     prep_minutes: readMinutes(o.prep_minutes),
     cook_minutes: readMinutes(o.cook_minutes),
-    meal: meal && (MEALS as readonly string[]).includes(meal) ? (meal as Meal) : null,
+    meal: meal ? readMealWord(meal) : null,
     mains: readList(o.mains),
     cuisine: cuisine && !refusedWord(cuisine) ? cuisine : null,
     equipment: readList(o.equipment),
@@ -236,7 +256,7 @@ export const META_PROMPT = `Also describe the dish, for deciding what to cook:
 
 - "prep_minutes": the hands-on time before it cooks — chopping, mixing, marinating you do at the board; null if you cannot tell.
 - "cook_minutes": the time it then spends cooking, oven and resting included; null if you cannot tell. (Prep and cook, not one total.)
-- "meal": one of ${MEALS.join(", ")}; null if none fits.
+- "meal": one of ${MEALS.join(", ")}; null if none fits (a sauce, seasoning or dressing is null). A lunch or dinner dish is "main".
 - "mains": what the dish is built around, one or two words each — ["chicken"], ["lentils", "spinach"].
 - "cuisine": one or two words — "thai", "mexican"; null if it has none in particular.
 - "equipment": anything beyond a hob, a pan and a knife — ["oven"], ["slow cooker"]; [] if nothing.

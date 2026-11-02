@@ -1,6 +1,6 @@
 "use client";
 
-import { DIETS, MEALS, type Diet, type Meal } from "@/lib/metadata";
+import { DIETS, MEALS, OTHER_MEAL, mealLabel, type Diet } from "@/lib/metadata";
 import { NO_FILTER, TIME_CHOICES, filterActive, type BookFilter, type Picks } from "@/lib/tuning";
 
 /**
@@ -25,8 +25,8 @@ function PickSelects({
   cuisineAsList,
   bare = false,
 }: {
-  value: Picks;
-  onChange: (next: Picks) => void;
+  value: BookFilter;
+  onChange: (next: BookFilter) => void;
   cuisines: string[];
   idPrefix: string;
   /** A filter can only match a cuisine the book has; a picker may ask for a new one. */
@@ -34,21 +34,23 @@ function PickSelects({
   /** Short labels ("Meal", "<30 min") for the book's one row of four at 360px. */
   bare?: boolean;
 }) {
-  const set = <K extends keyof Picks>(key: K, v: Picks[K]) => onChange({ ...value, [key]: v });
+  const set = <K extends keyof BookFilter>(key: K, v: BookFilter[K]) => onChange({ ...value, [key]: v });
   return (
     <>
       <select
         value={value.meal ?? ""}
-        onChange={(e) => set("meal", (e.target.value || null) as Meal | null)}
+        onChange={(e) => set("meal", (e.target.value || null) as BookFilter["meal"])}
         aria-label="Meal"
         className={select}
       >
         <option value="">{bare ? "Meal" : "Any meal"}</option>
         {MEALS.map((m) => (
           <option key={m} value={m}>
-            {m}
+            {mealLabel(m)}
           </option>
         ))}
+        {/* Other is a filter only: a recipe with no meal. Never a pick or a stored value. */}
+        {cuisineAsList ? <option value={OTHER_MEAL}>{mealLabel(null)}</option> : null}
       </select>
       <select
         value={value.diet ?? ""}
@@ -124,7 +126,13 @@ export function PickFields({
 }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      <PickSelects value={value} onChange={onChange} cuisines={cuisines} idPrefix="ask" cuisineAsList={false} />
+      <PickSelects
+        value={value}
+        onChange={(n) => onChange({ ...n, meal: n.meal === OTHER_MEAL ? null : n.meal })}
+        cuisines={cuisines}
+        idPrefix="ask"
+        cuisineAsList={false}
+      />
     </div>
   );
 }

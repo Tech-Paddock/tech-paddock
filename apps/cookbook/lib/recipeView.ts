@@ -1,4 +1,4 @@
-import { timeParts } from "./metadata";
+import { mealLabel, timeParts, type Meal } from "./metadata";
 import { round, type Macros } from "./macros";
 import { NOT_ESTIMATED } from "./recipeSteps";
 
@@ -48,6 +48,7 @@ export function menuServingLine(m: Macros | null): string {
  */
 export function factsLine(r: {
   rating: number | null;
+  meal?: Meal | null;
   servings: number;
   total_minutes: number | null;
   prep_minutes: number | null;
@@ -55,7 +56,7 @@ export function factsLine(r: {
 }): { stars: string | null; rest: string } {
   return {
     stars: ratingPill(r.rating),
-    rest: [...timeParts(r), `makes ${r.servings}`].join(" · "),
+    rest: [mealLabel(r.meal ?? null), ...timeParts(r), `makes ${r.servings}`].join(" · "),
   };
 }
 

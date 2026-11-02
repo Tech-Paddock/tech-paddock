@@ -87,8 +87,9 @@ describe("section order per form", () => {
     ["Vet visit", "health", { healthType: "vet" }, ORDER],
     ["Medical issue", "health", { healthType: "issue" }, ["when", "entry", "note", "photos", "save"]],
     ["Medication", "health", { healthType: "medication" }, ["when", "entry", "note", "photos", "save"]],
-    ["Food", "food", {}, ["when", "entry", "note", "save"]],
-    ["Weight", "weight", {}, ["when", "entry", "note", "save"]],
+    // Photos and files are on every form (TEC-203).
+    ["Food", "food", {}, ["when", "entry", "note", "photos", "save"]],
+    ["Weight", "weight", {}, ["when", "entry", "note", "photos", "save"]],
   ];
   for (const [name, form, extra, expected] of cases) {
     it(`${name}: When and Logging as, the entry, the secondary box, the note, photos, then Save last`, () => {
@@ -367,9 +368,9 @@ describe("a future When", () => {
     expect(submit.indexOf("await submitFuture()")).toBeGreaterThan(0);
     expect(submit.indexOf("await submitFuture()")).toBeLessThan(submit.indexOf("onLog(body, then)"));
     expect(submit.slice(0, submit.indexOf("await submitFuture()"))).not.toContain("onLog");
-    expect(form).toContain("await onUpcoming(item)");
-    // The Repeat control is inside the future branch only.
-    expect(form).toMatch(/\{future && \(\s+<div className="flex flex-wrap items-center gap-x-2">/);
+    expect(form).toContain("await onUpcoming(item, plan?.id)");
+    // The Repeat control is inside the planning branch only (a future When, or an open item being edited).
+    expect(form).toMatch(/\{planning && \(\s+<div className="flex flex-wrap items-center gap-x-2">/);
   });
   it("a saved entry cannot move to the future, and the server refuses a time past a day ahead", () => {
     const body = { id: "99999999-9999-4999-8999-999999999999", kind: "potty", at: "2026-11-09T12:00:00.000Z", details: { what: "pee", where: "outside" } };
@@ -468,9 +469,9 @@ describe("Done opens the matching form, prefilled", () => {
 
 describe("the Log screen", () => {
   const html = renderToStaticMarkup(createElement(Journal));
-  it("has three tabs, Log, Analytics and Patch notes, in that order", () => {
+  it("has four tabs, Log, Notes, Analytics and Patch notes, in that order (TEC-204)", () => {
     const tabs = [...html.matchAll(/role="tab"[^>]*>([^<]+)</g)].map((m) => m[1]);
-    expect(tabs).toEqual(["Log", "Analytics", "Patch notes"]);
+    expect(tabs).toEqual(["Log", "Notes", "Analytics", "Patch notes"]);
     expect(html).not.toContain("Upcoming</button>");
     expect(html).not.toContain("What&#x27;s new");
   });

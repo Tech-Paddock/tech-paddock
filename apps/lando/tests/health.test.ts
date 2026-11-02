@@ -30,7 +30,7 @@ import {
   type JournalEvent,
 } from "@/lib/events";
 import { writeEvent } from "@/lib/journal";
-import { MAX_PHOTO_BYTES, missingPhotos, photoPath, signedPhotoUrls } from "@/lib/storage";
+import { MAX_PHOTO_BYTES, missingPhotos, photoPath, signedPhotoUrls, storedContentType } from "@/lib/storage";
 
 type SupabaseClient = ReturnType<typeof getServiceClient>;
 
@@ -97,7 +97,12 @@ describe("parseDetails — health", () => {
       "https://example.com/a.jpg",
       "health/../secret.jpg",
       "coffee/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.jpg",
-      P1.replace(".jpg", ".gif"),
+      // Any short extension is a file now (TEC-203); these are still not paths this app wrote.
+      P1.replace(".jpg", ".JPG"),
+      P1.replace(".jpg", ".abcdefghijk"),
+      P1.replace(".jpg", ".tar.gz"),
+      P1.replace(".jpg", "."),
+      P1 + "/x",
       P1.toUpperCase(),
       7,
     ]) {
@@ -208,7 +213,7 @@ describe("the fixed lists", () => {
   it("gives Fun and Training the photos key, the same shape as Health's", () => {
     const fn = body(latest().sql);
     const exercise = fn.slice(fn.indexOf("WHEN 'exercise' THEN"), fn.indexOf("WHEN 'weight' THEN"));
-    expect(exercise).toContain("'commands', 'dogs', 'photos'] = '{}'::jsonb");
+    expect(exercise).toContain("'commands', 'dogs', 'photos', 'names'] = '{}'::jsonb");
     expect(exercise).toContain("jsonb_array_length(details -> 'photos') BETWEEN 1 AND 6");
     expect(exercise).toContain("^health/[0-9a-f]{8}");
   });
@@ -397,16 +402,41 @@ describe("lib/storage", () => {
     expect(PHOTO_PATH.test(photoPath(ID, "image/png", 1))).toBe(true);
   });
 
-  it("refuses a missing id, a type that is not an image we take, an empty file and a huge one", () => {
+  it("refuses a missing id, an empty file and a huge one", () => {
     expect(() => photoPath(undefined, "image/jpeg", 10)).toThrow(InvalidEvent);
     expect(() => photoPath("../x", "image/jpeg", 10)).toThrow(InvalidEvent);
-    expect(() => photoPath(ID, "image/gif", 10)).toThrow(InvalidEvent);
-    expect(() => photoPath(ID, "image/heic", 10)).toThrow(InvalidEvent);
-    expect(() => photoPath(ID, "toString", 10)).toThrow(InvalidEvent);
-    expect(() => photoPath(ID, null, 10)).toThrow(InvalidEvent);
     expect(() => photoPath(ID, "image/jpeg", 0)).toThrow(/empty/);
-    expect(() => photoPath(ID, "image/jpeg", MAX_PHOTO_BYTES + 1)).toThrow(/too big/);
+    expect(() => photoPath(ID, "application/pdf", 0, "a.pdf")).toThrow(/empty/);
+    expect(() => photoPath(ID, "image/jpeg", MAX_PHOTO_BYTES + 1)).toThrow(/over 4 MB/);
+    expect(() => photoPath(ID, "application/pdf", MAX_PHOTO_BYTES + 1, "a.pdf")).toThrow(/over 4 MB/);
     expect(photoPath(ID, "image/jpeg", MAX_PHOTO_BYTES)).toBe(`health/${ID}.jpg`);
+  });
+
+  it("takes any other file (TEC-203): its extension comes from its name, lowercased and short, else none", () => {
+    expect(photoPath(ID, "application/pdf", 10, "Vet bill.PDF")).toBe(`health/${ID}.pdf`);
+    expect(photoPath(ID, "image/heic", 10, "IMG_1.HEIC")).toBe(`health/${ID}.heic`);
+    expect(photoPath(ID, "image/gif", 10, "a.gif")).toBe(`health/${ID}.gif`);
+    expect(photoPath(ID, "", 10, "notes")).toBe(`health/${ID}`);
+    expect(photoPath(ID, "application/octet-stream", 10, "x.abcdefghijk")).toBe(`health/${ID}`);
+    expect(photoPath(ID, "application/octet-stream", 10, "../../etc/passwd")).toBe(`health/${ID}`);
+    expect(photoPath(ID, "application/octet-stream", 10, "a.p/df")).toBe(`health/${ID}`);
+    // A type named like an object member is not mistaken for a picture's: the name decides.
+    expect(photoPath(ID, "toString", 10, "a.txt")).toBe(`health/${ID}.txt`);
+    expect(photoPath(ID, null, 10, undefined)).toBe(`health/${ID}`);
+    // A picture's type wins over a misleading name.
+    expect(photoPath(ID, "image/png", 10, "a.pdf")).toBe(`health/${ID}.png`);
+    for (const name of ["Vet bill.PDF", "IMG_1.HEIC", "notes", "x.tar.gz"]) {
+      expect(PHOTO_PATH.test(photoPath(ID, "application/octet-stream", 10, name))).toBe(true);
+    }
+  });
+
+  it("stores a type a browser would run as plain bytes, and keeps a document's own", () => {
+    expect(storedContentType("application/pdf")).toBe("application/pdf");
+    expect(storedContentType("image/jpeg")).toBe("image/jpeg");
+    for (const t of ["text/html", "image/svg+xml", "application/xhtml+xml", "text/xml", "application/javascript", "text/javascript"]) {
+      expect(storedContentType(t)).toBe("application/octet-stream");
+    }
+    for (const t of ["", null, undefined, "no slash", "a/b; charset=x\r\nX: y"]) expect(storedContentType(t)).toBe("application/octet-stream");
   });
 
   it("signs many paths in one request and leaves out one it could not sign", async () => {
@@ -551,11 +581,13 @@ describe("photos on Fun and Training (TEC-139)", () => {
     expect(describeEvent({ kind: "exercise", details: { ...ex, photos: [P1] } }).detail).toContain("1 photo");
   });
 
-  it("eventPhotos reads Health's, Fun's and Training's, and nothing else's", () => {
+  it("eventPhotos reads every kind's attachments (Food and Weight too, TEC-203), and a void has none", () => {
     expect(eventPhotos({ kind: "health", details: { type: "vet", reasons: ["other"], photos: [P1] } })).toEqual([P1]);
     expect(eventPhotos({ kind: "exercise", details: { ...ex, photos: [P2] } })).toEqual([P2]);
     expect(eventPhotos({ kind: "exercise", details: ex })).toEqual([]);
-    expect(eventPhotos({ kind: "weight", details: { photos: [P1] } })).toEqual([]);
+    expect(eventPhotos({ kind: "weight", details: { photos: [P1] } })).toEqual([P1]);
+    expect(eventPhotos({ kind: "food", details: { photos: [P2] } })).toEqual([P2]);
+    expect(eventPhotos({ kind: "void", details: { photos: [P1] } })).toEqual([]);
   });
 
   it("writeEvent refuses an exercise naming a photo that never uploaded, and saves one that did", async () => {

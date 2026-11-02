@@ -29,6 +29,7 @@ import {
   food as asFood,
   health as asHealth,
   HEALTH_KEPT,
+  eventNames,
   eventPhotos,
   healthOptions,
   healthPickFor,
@@ -61,8 +62,8 @@ import {
 } from "@/lib/events";
 import { FOOD_UNITS, MISC_ID, amountOptions, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
 import { MED_ROUTES, MED_UNITS, findMedication, medPicklist, type MedRoute, type MedUnit, type Medication } from "@/lib/medications";
-import { FUTURE_NOTICE, doneWhen, futureItem, isFutureDay, isFutureWhen, type DonePrefill } from "@/lib/future";
-import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type UpcomingInput } from "@/lib/upcoming";
+import { FUTURE_NOTICE, donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, type DonePrefill } from "@/lib/future";
+import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import AmountScroller from "./AmountScroller";
 import TreatQty from "./TreatQty";
@@ -98,6 +99,11 @@ type Props = {
    * come), its reason, medication and dose, and its words as the note. New entry only.
    */
   done?: DonePrefill;
+  /**
+   * An open upcoming item being edited (TEC-203): the form opens on its future When and its words, and Save updates
+   * the item in place. A done or cancelled item is never opened.
+   */
+  plan?: Upcoming;
   /** A training, fun or potty being corrected: the treats already logged with it (`treatsWith`), shown, not changed. */
   sessionTreats?: JournalEvent[];
   people: Person[];
@@ -130,7 +136,7 @@ type Props = {
   /** A correction or a delete: awaited, and its error shown here. `then` are saved once it succeeds. */
   onChange: (body: Record<string, unknown>, then?: LogBody[]) => Promise<{ error: string | null }>;
   /** A future When (TEC-199): saves an upcoming item instead of an entry. Awaited, and its error shown here. */
-  onUpcoming: (item: UpcomingInput) => Promise<{ error: string | null }>;
+  onUpcoming: (item: UpcomingInput, id?: string) => Promise<{ error: string | null }>;
   /**
    * Fun's Pee and Poop buttons (TEC-186): a potty entry handed off at once through the same pending
    * path as any new entry, and the sheet stays open. Never awaited (RULES.md, Never 5).
@@ -144,7 +150,7 @@ type Props = {
 
 /* ── Small parts ─────────────────────────────────────────────────────────── */
 
-function Field({ label, htmlFor, children, className = "" }: { label: string; htmlFor?: string; children: React.ReactNode; className?: string }) {
+export function Field({ label, htmlFor, children, className = "" }: { label: string; htmlFor?: string; children: React.ReactNode; className?: string }) {
   const lbl = "text-[11px] uppercase tracking-[0.06em] text-ink-soft";
   return (
     <div className={`grid min-w-0 content-start gap-0.5 ${className}`}>
@@ -203,7 +209,7 @@ function Seg<T extends string>({
  * A box of a form (TEC-199): Box 1 is When and Logging as, Box 2 the entry, Box 3 the secondary things. The
  * `data-section` marks them in order for the tests and for anyone reading the form.
  */
-function Box({ section, label, children }: { section: string; label: string; children: React.ReactNode }) {
+export function Box({ section, label, children }: { section: string; label: string; children: React.ReactNode }) {
   return (
     <section data-section={section} aria-label={label} className="grid gap-1.5 rounded-xl border border-line bg-paper p-2">
       {children}
@@ -221,10 +227,10 @@ const MED_ADD = "__add_med";
  * `w-[64px]` and `w-auto`, so a width here would beat every narrow field. Each field names its own width:
  * `inputFull` where it fills its column, `w-[..]` or the content's own width elsewhere.
  */
-const input =
+export const input =
   "min-w-0 min-h-[44px] rounded-[10px] border border-line bg-surface px-2 py-1.5 text-[15px] outline-none focus:border-accent";
 
-const inputFull = `${input} w-full`;
+export const inputFull = `${input} w-full`;
 
 const WHERE_OPTS = [
   ["outside", "Outside"],
@@ -252,6 +258,7 @@ export default function LogForm({
   quick,
   event,
   done,
+  plan,
   sessionTreats = [],
   people,
   dogs,
@@ -273,26 +280,26 @@ export default function LogForm({
   unsaved,
   onRetry,
 }: Props) {
-  const kind: LogKind = kindOfForm(form);
+  const kind: Exclude<LogKind, "note"> = kindOfForm(form);
   const editing = !!event;
   const openedAt = useRef(new Date().toISOString());
   // A weight is a day, not a moment: its When picks a date, stored at local noon.
   const dateOnly = kind === "weight";
-  // Health, Fun, Training and Potty take photos (TEC-137, TEC-139, TEC-142).
-  const hasPhotos = kind === "health" || kind === "exercise" || kind === "potty";
+  // Every form takes photos and files (TEC-137, TEC-139, TEC-142; Food, Weight and any file type TEC-203).
 
-  // Common. A Done opens on the item's day and time once they have come; before that it is "now".
-  const prefill = !event ? done : undefined;
-  const prefillWhen = prefill ? doneWhen(prefill, new Date()) : null;
+  // Common. A Done opens on the item's day and time once they have come; before that it is "now". An edit of an
+  // upcoming item opens on its own day and time, past or not: it is a plan, and overdue is a state, not an error.
+  const prefill = !event ? (done ?? (plan ? donePrefill(plan, medications) : undefined)) : undefined;
+  const prefillWhen = prefill ? (plan ? `${prefill.day}T${prefill.time}` : doneWhen(prefill, new Date())) : null;
   const [when, setWhen] = useState(prefillWhen ?? toLocalInput(event?.at ?? openedAt.current));
   const [day, setDay] = useState(prefillWhen ? prefillWhen.slice(0, 10) : toDateInput(event?.at ?? openedAt.current));
   const [whenTouched, setWhenTouched] = useState(!!prefillWhen);
   const [personId, setPersonId] = useState(event ? event.person_id ?? "" : phonePerson ?? "");
   const [note, setNote] = useState(event?.note ?? prefill?.note ?? "");
   // A repeat, for a future When only (TEC-199): every N weeks, months or years.
-  const [repeatOn, setRepeatOn] = useState(false);
-  const [repeatEvery, setRepeatEvery] = useState("1");
-  const [repeatUnit, setRepeatUnit] = useState<RepeatUnit>("week");
+  const [repeatOn, setRepeatOn] = useState(!!plan?.repeat_every);
+  const [repeatEvery, setRepeatEvery] = useState(String(plan?.repeat_every ?? 1));
+  const [repeatUnit, setRepeatUnit] = useState<RepeatUnit>(plan?.repeat_unit ?? "week");
 
   // Potty: nothing is preselected for What (TEC-199) unless a Pee or Poop pill opened it; a save without one is refused.
   const p = event?.kind === "potty" ? asPotty(event) : null;
@@ -401,7 +408,14 @@ export default function LogForm({
   const [medBusy, setMedBusy] = useState(false);
   // Photos (TEC-137, and Fun and Training since TEC-139). A correction opens
   // with the photos the entry has and keeps whatever is not removed.
-  const photos = usePhotos(event ? eventPhotos(event) : [], photoUrls, onPhotoUrl);
+  // A Done or an edit of an upcoming item opens with the item's own (TEC-203), so a Done's entry carries them.
+  const photos = usePhotos(
+    event ? eventPhotos(event) : prefill?.photos ?? [],
+    event ? eventNames(event) : prefill?.names ?? {},
+    photoUrls,
+    onPhotoUrl
+  );
+  const attachments = photos.paths.length ? { photos: photos.paths, ...(Object.keys(photos.names).length ? { names: photos.names } : {}) } : {};
 
   function pickHealthType(t: HealthType) {
     setHealthType(t);
@@ -429,6 +443,8 @@ export default function LogForm({
       ? isFutureDay(day, toDateInput(nowDate.toISOString()))
       : isFutureWhen(fromLocalInput(when) ? new Date(fromLocalInput(when)!) : null, nowDate));
   const future = futureWhen && !editing;
+  // Saves an upcoming item: a future When on a new entry, or an open item being edited.
+  const planning = !!plan || future;
 
   function pickFoodType(t: FoodType) {
     setFoodType(t);
@@ -534,10 +550,10 @@ export default function LogForm({
           ...(where === "inside" && spot ? { spot } : {}),
           ...(where === "outside" && outMin !== null ? { minutes: outMin } : {}),
           ...(hasIssue && issue ? { issue } : {}),
-          ...(photos.paths.length ? { photos: photos.paths } : {}),
+          ...attachments,
         };
       case "food":
-        return { type: foodType, item_id: itemId, amount };
+        return { type: foodType, item_id: itemId, amount, ...attachments };
       case "exercise":
         return {
           type: exType,
@@ -548,11 +564,11 @@ export default function LogForm({
           treats: (x?.treats ?? 0) + (treatQty > 0 ? 1 : 0),
           ...(exType === "training" ? { commands } : {}),
           ...dogsFromPick(dogPick, keptDogs),
-          ...(photos.paths.length ? { photos: photos.paths } : {}),
+          ...attachments,
         };
       case "weight":
         // A weight saved from a vet visit keeps its link when corrected here (TEC-151).
-        return { value: Number(value.replace(",", ".")), unit, ...(w?.visit ? { visit: w.visit } : {}) };
+        return { value: Number(value.replace(",", ".")), unit, ...(w?.visit ? { visit: w.visit } : {}), ...attachments };
       case "health":
         if (healthType === "medication") {
           return {
@@ -562,14 +578,14 @@ export default function LogForm({
             unit: medUnit,
             route,
             ...(hasIssue && issue ? { issue } : {}),
-            ...(photos.paths.length ? { photos: photos.paths } : {}),
+            ...attachments,
           };
         }
         return {
           type: healthType,
           reasons: healthReasonsFromPick(reason === HEALTH_KEPT && h?.type !== healthType ? "" : reason, keptReasons),
           ...(healthType === "vet" && hasIssue && issue ? { issue } : {}),
-          ...(photos.paths.length ? { photos: photos.paths } : {}),
+          ...attachments,
         };
     }
   }
@@ -589,13 +605,15 @@ export default function LogForm({
         repeatUnit: repeatOn ? repeatUnit : null,
         reason: reason === HEALTH_KEPT ? "" : reason,
         med: healthType === "medication" ? { name: pickedMed?.name ?? "", dose: Number(dose.replace(",", ".")) || null, unit: medUnit } : null,
+        photos: photos.paths,
+        names: Object.keys(photos.names).length ? photos.names : undefined,
       });
     } catch (err) {
       setError(err instanceof InvalidEvent ? err.message : "check the form");
       return;
     }
     setBusy(true);
-    const { error } = await onUpcoming(item);
+    const { error } = await onUpcoming(item, plan?.id);
     setBusy(false);
     if (error) setError(error);
   }
@@ -607,13 +625,13 @@ export default function LogForm({
       setError("A saved entry can't move to the future — delete it and log a new one for then.");
       return;
     }
-    if (future) {
-      await submitFuture();
+    // Never saved around an attachment: it is uploaded, or the person removes it.
+    if (photos.working || photos.failed) {
+      setError(photos.failed ? "An attachment didn't upload — retry it, or remove it." : "An attachment is still uploading.");
       return;
     }
-    // Never saved around a photo: it is uploaded, or the person removes it.
-    if (hasPhotos && (photos.working || photos.failed)) {
-      setError(photos.failed ? "A photo didn't upload — retry it, or remove it." : "A photo is still uploading.");
+    if (planning) {
+      await submitFuture();
       return;
     }
     // Potty opens with nothing picked and will not save without a What (TEC-199).
@@ -722,7 +740,7 @@ export default function LogForm({
   // "Save walk", "Save playtime", "Save training", "Save potty"…
   const title =
     form === "fun" ? EXERCISE_LABELS[exType] : form === "health" ? HEALTH_LABELS[healthType] : FORM_LABELS[form];
-  const photoBlock = hasPhotos && !future && (photos.working || photos.failed);
+  const photoBlock = photos.working || photos.failed;
 
   // The medical issue link, on Potty, a vet visit and a medication dose (TEC-142, TEC-199): a checkbox, and
   // behind it None and the recent live medical issues, newest first, by date and pick.
@@ -863,12 +881,12 @@ export default function LogForm({
             </select>
           </Field>
         </div>
-        {futureWhen && (
+        {(futureWhen || plan) && (
           <div className="grid gap-1">
             <p role="status" className="text-[13px] font-semibold text-ink">
-              {editing ? "A saved entry can't move to the future." : FUTURE_NOTICE}
+              {editing ? "A saved entry can't move to the future." : plan && !futureWhen ? "Upcoming: Save updates it" : FUTURE_NOTICE}
             </p>
-            {future && (
+            {planning && (
               <div className="flex flex-wrap items-center gap-x-2">
                 <label className="flex min-h-[44px] items-center gap-2">
                   <input type="checkbox" checked={repeatOn} onChange={(e) => setRepeatOn(e.target.checked)} className="h-5 w-5 accent-accent" />
@@ -1278,7 +1296,7 @@ export default function LogForm({
       {/* Box 3: the secondary things (TEC-199). Potty: the treats count then the medical issue, on one line.
           Training and Fun: the treats count. A vet visit: the medical issue. Not on a future entry, which
           keeps no treats or issue link. */}
-      {!future && (kind === "potty" || kind === "exercise" || (kind === "health" && healthType === "vet")) && (
+      {!planning && (kind === "potty" || kind === "exercise" || (kind === "health" && healthType === "vet")) && (
         <Box section="secondary" label="Treats and issue">
           <div className="flex flex-wrap items-center gap-x-4">
             {(kind === "potty" || kind === "exercise") && treatCount}
@@ -1353,12 +1371,10 @@ export default function LogForm({
           />
         </Field>
       </div>
-      {/* Photos sit below the Note (TEC-172), where the form has photos. A future entry keeps none. */}
-      {hasPhotos && !future && (
-        <div data-section="photos">
-          <PhotoPicker photos={photos} />
-        </div>
-      )}
+      {/* Photos and files sit below the Note (TEC-172), on every form and on an upcoming item (TEC-203). */}
+      <div data-section="photos">
+        <PhotoPicker photos={photos} />
+      </div>
 
       {error && (
         <p role="alert" className="text-sm font-semibold text-danger">
@@ -1375,15 +1391,17 @@ export default function LogForm({
       >
         {busy
           ? "Saving…"
-          : future
-            ? "Save as upcoming"
-            : photos.working && hasPhotos
-              ? "Uploading photo…"
-              : photos.failed && hasPhotos
-                ? "Fix the photo to save"
-                : editing
-                  ? "Save changes"
-                  : `Save ${title.toLowerCase()}`}
+          : photos.working
+            ? "Uploading attachment…"
+            : photos.failed
+              ? "Fix the attachment to save"
+              : plan
+                ? "Save changes"
+                : future
+                  ? "Save as upcoming"
+                  : editing
+                    ? "Save changes"
+                    : `Save ${title.toLowerCase()}`}
       </button>
       {editing ? (
         <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] self-start font-semibold text-danger disabled:opacity-60">

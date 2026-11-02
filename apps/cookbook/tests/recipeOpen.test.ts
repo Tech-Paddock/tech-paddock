@@ -24,7 +24,7 @@ const recipe: Recipe = {
   total_minutes: null,
   prep_minutes: 15,
   cook_minutes: 30,
-  meal: "dinner",
+  meal: "main",
   mains: ["chicken"],
   cuisine: "thai",
   equipment: ["one pot"],
@@ -77,7 +77,7 @@ describe("the recipe on the list (TEC-189)", () => {
     expect(card({ ...recipe, total_minutes: 35 }, false)).not.toContain("35 min");
   });
   it("shows none of meal, main, cuisine, equipment, diet or tags", () => {
-    for (const word of ["dinner", "chicken", "thai", "one pot", "vegetarian", "workmight"]) {
+    for (const word of ["chicken", "thai", "one pot", "vegetarian", "workmight"]) {
       expect(html).not.toContain(word);
     }
   });
@@ -104,7 +104,7 @@ describe("the open recipe", () => {
     expect(card({ ...recipe, rating: null }, true)).toContain("Not rated");
   });
   it("renders no keywords and no helpings estimator", () => {
-    for (const word of ["dinner", "chicken", "thai", "one pot", "vegetarian", "workmight", "elpings"]) {
+    for (const word of ["chicken", "thai", "one pot", "vegetarian", "workmight", "elpings"]) {
       expect(html).not.toContain(word);
     }
     expect(html).not.toContain("Macro breakdown");
