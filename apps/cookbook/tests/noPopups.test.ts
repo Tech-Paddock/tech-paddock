@@ -67,10 +67,6 @@ function review(id: string, plan: Plan, over: Partial<ReviewLine> = {}): ReviewL
 
 describe("the confirm says a count and never a list", () => {
   it("asks once per action with how many", () => {
-    expect(confirmWords("send", 12)).toEqual({ ask: "Send 12 items?", yes: "Send" });
-    expect(confirmWords("send", 1).ask).toBe("Send 1 item?");
-    expect(confirmWords("add", 1).ask).toBe("Add 1 to the cart?");
-    expect(confirmWords("add", 3).ask).toBe("Add 3 to the cart?");
     expect(confirmWords("remove", 1).ask).toBe("Take 1 out of the cart?");
     expect(confirmWords("clear-cart", 5).ask).toBe("Clear the cart? 5 items come out.");
     expect(confirmWords("tidy", 9).ask).toBe("Tidy 9 lines?");
@@ -86,9 +82,10 @@ describe("the confirm says a count and never a list", () => {
     const read = (f: string) => readFileSync(resolve(__dirname, f), "utf8");
     const list = read("../app/List.tsx");
     const cart = read("../app/Cart.tsx");
-    for (const kind of ["send", "tidy", "clear-ticked", "clear-all", "clear-cart"]) expect(list).toContain(`"${kind}"`);
-    expect(list).toMatch(/confirmWords\("add"/);
+    // TEC-211: adds (+ Cart, Send all) never ask; taking out, tidying and clearing still do.
+    for (const kind of ["tidy", "clear-ticked", "clear-all", "clear-cart"]) expect(list).toContain(`"${kind}"`);
     expect(list).toMatch(/confirmWords\("remove"/);
+    expect(list).not.toMatch(/confirmWords\("add"|setConfirm\("send"\)|confirm === "send"/);
     expect(list).not.toMatch(/proposal/i);
     expect(list).not.toMatch(/TakeBackConfirm/);
     expect(cart).not.toMatch(/ReviewRow|SendView|Back to the list|TakeBackConfirm|Pick one|Not saved yet/);
@@ -344,13 +341,13 @@ describe("the splash, the one picker that stays", () => {
     expect(pickOf(unmatched, second, true)).not.toHaveProperty("makeDefault");
   });
 
-  it("Add an item opens it from the new lines, and Change reuses it", () => {
+  it("Add an item opens it from the new lines; Change is gone (TEC-211)", () => {
     const cart = readFileSync(resolve(__dirname, "../app/Cart.tsx"), "utf8");
     const list = readFileSync(resolve(__dirname, "../app/List.tsx"), "utf8");
     expect(list).toMatch(/cart\.offerChoices\(/);
     expect(cart).toMatch(/needsSplash\(l\.plan\)/);
     expect(cart).toMatch(/Make default/);
-    expect(cart).toMatch(/change: true/);
+    expect(cart).not.toMatch(/change: true|changeLine/);
   });
 });
 

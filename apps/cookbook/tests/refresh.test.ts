@@ -44,7 +44,8 @@ describe("opening the list tab", () => {
   });
 
   it("the checkout link is the constant, not a typed address", () => {
-    const cart = readFileSync(resolve(__dirname, "../app/Cart.tsx"), "utf8");
+    // TEC-211: the link left the Sent list (Cart.tsx) and stays in the In cart section (List.tsx).
+    const cart = readFileSync(resolve(__dirname, "../app/Cart.tsx"), "utf8") + readFileSync(resolve(__dirname, "../app/List.tsx"), "utf8");
     expect(cart).toMatch(/href=\{CHECKOUT_URL\}/);
     expect(cart).not.toMatch(/kingsoopers\.com\/cart/);
   });

@@ -189,14 +189,12 @@ describe("the list's surface", () => {
     expect(imports.some((i) => /Store|supabase|kroger/i.test(i))).toBe(false);
   });
 
-  it("each List and In cart line is one line: the name and the small line truncate, the price, bubble and button do not", () => {
+  it("each List and In cart line is one line: the name truncates, the quantity, price and button do not (TEC-211: no bubble or small line)", () => {
     for (const row of [list.slice(list.indexOf("function ListRow"), list.indexOf("function Price")), list.slice(list.indexOf("function InCartRow"), list.indexOf("function ModeSwitch"))]) {
-      expect(row).toMatch(/block truncate text-\[15px\]/);
-      expect(row).toMatch(/min-w-0 truncate/);
-      expect(row).toMatch(/title=\{lineTitle\(/);
+      expect(row).toMatch(/block min-w-0 flex-1 truncate text-\[15px\]/);
+      expect(row).toMatch(/<li\s+title=\{/);
       expect(row).not.toMatch(/whitespace-normal|break-words|line-clamp/);
     }
-    expect(list).toMatch(/shrink-0 whitespace-nowrap rounded border border-accent/); // the bubble
     expect(list).toMatch(/h-8 shrink-0 whitespace-nowrap rounded-lg bg-accent/); // + Cart
     expect(list).toMatch(/min-h-11 shrink-0 whitespace-nowrap rounded-\[10px\] border border-line/); // Remove
   });

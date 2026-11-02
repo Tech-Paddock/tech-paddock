@@ -7,7 +7,6 @@ import type { GroceryItem, TidyLine } from "@/lib/grocery";
 import { confirmWords, type ConfirmKind } from "@/lib/cartGuess";
 import { tickedLast } from "@/lib/listOrder";
 import type { ResolvedLink } from "@/lib/preferences";
-import type { LineMark } from "@/lib/brands";
 import type { MenuEntry } from "@/lib/menu";
 import { menuDayLabel } from "@/lib/menuDay";
 import { MODALITIES, modalityWord, type Modality } from "@/lib/modality";
@@ -16,7 +15,8 @@ import type { Shade } from "@/lib/dealSignal";
 import { CHECKOUT_URL } from "@/lib/kingsoopers";
 import { totalsOf, type LinePrice, type Totals } from "@/lib/listPrices";
 import { shortDay } from "@/lib/dealFilter";
-import { CartPanel, ProductSplash, RefreshLog, SendResults, StorePicker, TakeBackResults, useCart, when } from "./Cart";
+import { checkLine, clock } from "@/lib/checkLine";
+import { ProductSplash, RefreshLog, StorePicker, TakeBackResults, useCart, when } from "./Cart";
 import { useToast } from "./Toast";
 
 /**
@@ -32,14 +32,10 @@ type ShoppingLine = GroceryItem &
      * the note unless it was only amounts. Display only.
      */
     view?: { name: string; amount: string | null; note: string | null };
-    /** ★ default saved · ? needs a pick at Send · + not saved yet (TEC-135; `lineMark`). */
-    mark?: LineMark;
     /** This line's price from the nightly check, or null for "no price yet" (TEC-190; `lib/listPrices.ts`). */
     price?: LinePrice | null;
     /** The sale/coupon bubble, the shade and Best, from the nightly prices (TEC-196; `lib/lineDeal.ts`). */
     deal?: LineDeal | null;
-    /** The product an In cart line went in as (TEC-206), from the ledger. */
-    used?: { product: string; size: string | null } | null;
   };
 
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -49,13 +45,6 @@ function totalWords(t: Totals, lines: number): string {
   if (lines === 0) return "";
   if (t.total === null) return "no price yet";
   return `about ${money(t.total)}${t.unpriced > 0 ? ` · ${t.unpriced} no price yet` : ""}`;
-}
-
-/** What follows the name, small: the recipes, then the amount, then a typed note (TEC-131). */
-function details(item: ShoppingLine): string[] {
-  const recipes = item.recipes.length > 0 ? item.recipes.join(" · ") : item.source === "recipe" ? "from a recipe" : "by hand";
-  const note = item.view ? item.view.note : item.note;
-  return [recipes, item.view?.amount ?? null, note].filter((x): x is string => !!x);
 }
 
 /**
@@ -72,37 +61,20 @@ const SHADE_CLASS: Record<Shade, string> = {
   bad: "border-l-4 border-l-danger bg-gradient-to-r from-danger/[0.08] to-danger/[0.08]",
 };
 
-/** The whole line as text: what a truncated line shows in full as its `title`. */
-function lineTitle(item: ShoppingLine, small: string[]): string {
-  const deal = item.deal;
-  const why = deal && deal.shade !== "plain" ? `${shadeWord(deal)}, ${deal.reason}` : null;
-  return [item.view?.name ?? item.name, bubbleText(deal), why, ...small].filter((x): x is string => !!x).join(" · ");
-}
-
 /**
- * What says why a line is shaded, small: the bubble (a sale or a coupon), and a
- * word when the bubble does not explain it (a good price from history alone, or
- * any high price). Neither shrinks; the details beside them truncate.
+ * What says why a line is shaded, in words: the bubble (a sale or a coupon) and
+ * "Good price" / "High price" with its reason. **One line per item** (TEC-211):
+ * the row shows item, qty and price only, so this rides on the price's `title`
+ * and accessible name, where colour is not the only cue.
  */
-function Why({ deal }: { deal: LineDeal | null | undefined }) {
-  const bubble = bubbleText(deal);
-  const word = shadeWord(deal);
-  const showWord = word && (deal?.shade === "bad" || !bubble);
-  return (
-    <>
-      {/* The word first: when the row is tight it is the cue that must survive. Beside a bubble it shortens to Good / High, so neither is clipped at 360px. */}
-      {showWord ? (
-        <span className={`shrink-0 whitespace-nowrap text-[11px] font-semibold ${deal?.shade === "bad" ? "text-danger" : "text-accent"}`} aria-label={word} title={word}>● {bubble ? word.split(" ")[0] : word}</span>
-      ) : null}
-      {bubble ? <span className="shrink-0 whitespace-nowrap rounded border border-accent px-1 text-[11px] text-accent">{bubble}</span> : null}
-    </>
-  );
+function dealWords(deal: LineDeal | null | undefined): string | null {
+  const why = deal && deal.shade !== "plain" ? `${shadeWord(deal)}, ${deal.reason}` : null;
+  return [bubbleText(deal), why].filter((x): x is string => !!x).join(" · ") || null;
 }
 
 const LINK = "text-[13px] text-accent underline-offset-2 hover:underline disabled:opacity-50";
 const HEADING = "text-xs font-bold uppercase tracking-wider text-ink-soft";
-const MARK_TONE: Record<LineMark, string> = { "★": "text-accent", "?": "text-warn", "+": "text-ink-soft" };
-const MARK_WORDS: Record<LineMark, string> = { "★": "Your default", "?": "Needs a pick at Send", "+": "Not saved yet" };
+const TONE = { good: "text-accent", bad: "text-danger", warn: "text-warn", plain: "text-ink-soft" } as const;
 
 /**
  * The King Soopers list (TEC-135, the owner's mockup of 2026-10-23).
@@ -111,18 +83,19 @@ const MARK_WORDS: Record<LineMark, string> = { "★": "Your default", "?": "Need
  * the book rather than beside a food log, settled on 2026-09-20. **Named for
  * where it goes, since 2026-09-22.**
  *
- * Top to bottom: the header (how many are **Still to buy**, the live cart total, the
- * store, Pickup/Delivery), **Cooking this week**, the filters, the add box, the lines with
- * a ★ / ? / + marker each, the King Soopers panel, and **Send to cart** and
- * **Take back** at the bottom. Send to cart goes in as a best guess after one
- * confirm, with no review screen (`useCart`, `Cart.tsx`, TEC-206).
+ * Top to bottom: the header (how many are **Still to buy**, the live cart total, and
+ * **King Soopers**: the live status, the store, Pickup/Delivery, Refresh now; TEC-211),
+ * **Cooking this week**, the filters, the add box, the lines (**item · qty · price**,
+ * one line each), **Send all to cart**, then In cart. **Nothing King Soopers sits below
+ * In cart.** Send goes in as a best guess, at once, with no review and no confirm
+ * (`useCart`, `Cart.tsx`, TEC-206, TEC-211).
  *
  * **It leaves three ways**: a block of text you copy, a King Soopers search you
  * tap, or **Send to cart** — the no-OAuth rule was reversed for King Soopers on
  * 2026-09-26 (TEC-90). No gate exception for the list. Each line carries a
  * quantity for the cart, default 1.
  *
- * Local patterns: the marker column, the menu strip's chips and the
+ * Local patterns: the status dot, the menu strip's chips and the
  * Pickup/Delivery segmented switch. They reuse the theme's tokens only.
  */
 export default function List({
@@ -143,9 +116,9 @@ export default function List({
   const [readError, setReadError] = useState<string | null>(null);
   const toast = useToast();
   // **One "Are you sure?" with a count, never a list** (TEC-206). Section buttons use
-  // `confirm`; a row's + Cart and Remove use `rowConfirm`.
+  // `confirm`; a row's Remove uses `removeConfirm`. **Adds never ask** (TEC-211).
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
-  const [rowConfirm, setRowConfirm] = useState<{ kind: "add" | "remove"; id: string } | null>(null);
+  const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState<null | "adding" | "tidying">(null);
   const [copied, setCopied] = useState(false);
@@ -395,7 +368,7 @@ export default function List({
     <section id="shop" className="flex scroll-mt-4 flex-col gap-3">
       <ProductSplash cart={cart} />
 
-      {/* The header: the counts, the live cart total, Pickup/Delivery and the store. */}
+      {/* The header: the counts, the live cart total, and King Soopers (TEC-211): the live status, Pickup/Delivery, the store. */}
       <div className="flex flex-col gap-2 px-2">
         <div className="flex min-w-0 flex-col gap-1">
           <h2 className="text-xl font-bold">Grocery list</h2>
@@ -425,24 +398,40 @@ export default function List({
             </p>
           ) : null}
         </div>
+
+        {/* ---- King Soopers: one status, always visible; tap it to check again ---- */}
+        <KingSoopersStatus cart={cart} />
         {storeLine && status ? (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             <ModeSwitch value={status.modality} onChange={(m) => void cart.chooseModality(m)} disabled={cart.busy === "send" || cart.busy === "take-back"} />
             <button
               type="button"
               onClick={() => cart.setChoosingStore(!cart.choosingStore)}
               aria-expanded={cart.choosingStore}
               aria-label={`Store: ${status.store?.name}. Change store`}
-              className="min-h-9 min-w-0 truncate rounded-[10px] bg-raised px-3 text-left text-xs"
+              className="min-h-9 min-w-0 flex-1 truncate rounded-[10px] bg-raised px-3 text-left text-xs"
             >
               {status.store?.name} <span className="text-accent">· change</span>
             </button>
+            <button type="button" onClick={() => void cart.disconnect()} disabled={cart.busy !== null} className="shrink-0 text-xs text-ink-soft underline decoration-dotted underline-offset-2 disabled:opacity-50">
+              disconnect
+            </button>
+          </div>
+        ) : null}
+        {status?.configured && status.connected && !status.store ? (
+          <div className="rounded-xl bg-surface p-3">
+            <StorePicker cart={cart} />
           </div>
         ) : null}
         {cart.choosingStore ? (
           <div className="rounded-xl bg-surface p-3">
             <StorePicker cart={cart} />
           </div>
+        ) : null}
+        {cart.scanNote?.failed ? (
+          <p role="alert" className="text-xs text-danger">
+            {cart.scanNote.text}
+          </p>
         ) : null}
       </div>
 
@@ -553,36 +542,24 @@ export default function List({
                 onQuantity={(q) => void setQuantity(item, q)}
                 canAdd={canAdd}
                 adding={cart.adding === item.id}
-                confirming={rowConfirm?.kind === "add" && rowConfirm.id === item.id}
-                onAskAdd={() => setRowConfirm({ kind: "add", id: item.id })}
-                onCancel={() => setRowConfirm(null)}
-                onAdd={() => {
-                  setRowConfirm(null);
-                  void cart.addOne(item.id);
-                }}
+                notSent={cart.notSent.get(item.id) ?? null}
+                onAdd={() => void cart.addOne(item.id)}
               />
             ))}
           </ul>
         )}
-        <p className="px-2 text-xs text-ink-soft">★ default saved · ? several, the most-bought goes in · + not saved yet, Kroger&rsquo;s top match goes in</p>
-        {/* **Send all** (TEC-206): one confirm with the count, then every line goes in as its best guess. */}
+        {/* **Send all** (TEC-206, TEC-211): no confirm. One tap, and every line goes in as its best guess. */}
         {cart.ready ? (
-          confirm === "send" ? (
-            sure("send", open.length, () => void cart.sendAll(), "accent")
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirm("send")}
-              disabled={cart.busy !== null || open.length === 0}
-              className="min-h-11 rounded-[10px] border border-accent bg-transparent text-[15px] font-bold text-accent disabled:opacity-50"
-            >
-              {cart.busy === "send" ? "Sending…" : "Send all to cart"}
-            </button>
-          )
+          <button
+            type="button"
+            onClick={() => void cart.sendAll()}
+            disabled={cart.busy !== null || open.length === 0}
+            className="min-h-11 rounded-[10px] border border-accent bg-transparent text-[15px] font-bold text-accent disabled:opacity-50"
+          >
+            {cart.busy === "send" ? "Sending…" : "Send all to cart"}
+          </button>
         ) : null}
       </section>
-
-      <SendResults cart={cart} />
 
       {/* ---- In cart ---- */}
       {cart.ready || inCart.length > 0 ? (
@@ -611,14 +588,13 @@ export default function List({
                     live={live ? { total: live.total } : null}
                     disabled={cart.busy !== null}
                     removing={cart.removing === item.id}
-                    confirming={rowConfirm?.kind === "remove" && rowConfirm.id === item.id}
-                    onAskRemove={() => setRowConfirm({ kind: "remove", id: item.id })}
-                    onCancel={() => setRowConfirm(null)}
+                    confirming={removeConfirm === item.id}
+                    onAskRemove={() => setRemoveConfirm(item.id)}
+                    onCancel={() => setRemoveConfirm(null)}
                     onRemove={() => {
-                      setRowConfirm(null);
+                      setRemoveConfirm(null);
                       void cart.removeOne(item.id);
                     }}
-                    onChange={() => void cart.changeLine(item.id)}
                   />
                 );
               })}
@@ -654,127 +630,163 @@ export default function List({
           ) : null}
         </section>
       ) : null}
-
-      {/* Send to cart, King Soopers (TEC-90): connection and refresh. */}
-      <CartPanel cart={cart} />
     </section>
   );
 }
 
-/** "3:42 PM", for when the cart was last priced. */
-function clock(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? when(iso) : d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+/**
+ * **The live King Soopers status** (TEC-211), always visible in the header: a dot, the
+ * state in words (colour is never the only cue), and what follows. Tapping it checks
+ * again. Beside it, Reconnect or Connect where that is the way out, and **Refresh now**
+ * (the price refresh) once connected with a store. "Not set up" says which variable is missing.
+ */
+function KingSoopersStatus({ cart }: { cart: ReturnType<typeof useCart> }) {
+  const { status } = cart;
+  if (status === null && cart.statusError && !cart.check) {
+    return (
+      <p role="alert" className="text-xs text-danger">
+        {cart.statusError}
+      </p>
+    );
+  }
+  const line = checkLine(cart.check, cart.lastWorked);
+  const checking = cart.check === null;
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void cart.runCheck()}
+          disabled={checking}
+          aria-label={`King Soopers: ${line.word}${line.rest ? `, ${line.rest}` : ""}. Tap to check again`}
+          title={cart.check?.detail ?? "Tap to check King Soopers again"}
+          className="flex min-h-9 min-w-0 flex-1 items-center gap-1.5 text-left text-[13px]"
+        >
+          <span aria-hidden="true" className={TONE[line.tone]}>
+            ●
+          </span>
+          <span role="status" className={`shrink-0 font-semibold ${TONE[line.tone]}`}>
+            {line.word}
+          </span>
+          {line.rest ? <span className="min-w-0 truncate text-ink-soft">· {line.rest}</span> : null}
+        </button>
+        {line.action ? (
+          <a href={line.action.href} className="shrink-0 whitespace-nowrap text-[13px] font-semibold text-accent underline-offset-2 hover:underline">
+            {line.action.label}
+          </a>
+        ) : null}
+        {status?.configured && status.connected && status.store ? (
+          <button
+            type="button"
+            onClick={() => void cart.refresh()}
+            disabled={cart.refreshing}
+            title={status.refreshedAt ? `Prices checked ${when(status.refreshedAt)}` : "Prices not checked yet"}
+            className="min-h-9 shrink-0 whitespace-nowrap rounded-lg border border-line px-2.5 text-xs disabled:opacity-50"
+          >
+            {cart.refreshing ? "Refreshing…" : "Refresh now"}
+          </button>
+        ) : null}
+      </div>
+      {cart.check?.state === "not-set-up" && cart.check.problems.length > 0 ? (
+        <p className="text-xs text-ink-soft">Send to cart isn&rsquo;t set up on this deployment: {cart.check.problems.join("; ")}.</p>
+      ) : null}
+    </div>
+  );
 }
 
 /**
- * One List line: its tick, the name (the link: your remembered product or a
- * search, as the server resolved it), what follows small, its price and how
- * many, and **+ Cart** (TEC-190). **The tick is its own tap target**, so ticking
- * in the shop never opens King Soopers (TEC-39). The ★ / ? / + marker leads the
- * small text; the price is the nightly check's, or “no price yet”.
+ * One List line: **item · qty · price** and nothing else (TEC-211; owner, 2026-11-02:
+ * "On the shopping list I just want to see item qty and price"). The tick, the name (the
+ * link: your remembered product or a search, as the server resolved it), the ×N box, the
+ * price, and **+ Cart**, which are controls, not text. **The tick is its own tap target**,
+ * so ticking in the shop never opens King Soopers (TEC-39).
  *
- * **One line per item** (TEC-196): the name and the small line each truncate with
- * an ellipsis, and the full text is the row's `title`. The mark, the bubble, the
- * price, the count and the button never shrink. **Shaded by deal**, with the
- * bubble or a word saying why. **A ticked line is faded** (TEC-206) and sits at
- * the bottom of the List. **+ Cart asks once** ("Add 1 to the cart?"), in the row.
+ * **One line per item** (TEC-196): the name truncates with an ellipsis and the full text is
+ * the row's `title`; the box, price and button never shrink. **Shaded by deal**, and what
+ * says why rides on the price's `title` and accessible name. **A ticked line is faded**
+ * (TEC-206). **+ Cart goes at once** (TEC-211). A line a send did not take reads a red
+ * "not sent" in its price spot until the next send.
  */
-function ListRow(props: {
+export function ListRow(props: {
   item: ShoppingLine;
   onTick: () => void;
   onQuantity: (q: number) => void;
   canAdd: boolean;
   adding: boolean;
-  confirming: boolean;
-  onAskAdd: () => void;
-  onCancel: () => void;
+  notSent: string | null;
   onAdd: () => void;
 }) {
   const { item } = props;
-  const mark = item.mark ?? "+";
   // A ticked line is done: no shade, no bubble.
   const deal = item.checked ? null : item.deal;
-  const ask = confirmWords("add", item.quantity);
+  const name = item.view?.name ?? item.name;
   return (
     <li
-      title={lineTitle({ ...item, deal }, details(item))}
-      className={`flex items-center gap-2.5 rounded-[10px] bg-surface py-2 pl-2 pr-2.5 ${SHADE_CLASS[deal?.shade ?? "plain"]} ${item.checked ? "opacity-60" : ""}`}
+      title={[name, dealWords(deal)].filter(Boolean).join(" · ")}
+      className={`flex items-center gap-2 rounded-[10px] bg-surface py-2 pl-2 pr-2.5 ${SHADE_CLASS[deal?.shade ?? "plain"]} ${item.checked ? "opacity-60" : ""}`}
     >
       <label className="flex shrink-0 cursor-pointer items-center self-stretch">
         <input type="checkbox" checked={item.checked} onChange={props.onTick} aria-label={`Got ${item.name}`} className="size-6 accent-accent" />
       </label>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <a
-          href={item.href}
-          target="_blank"
-          rel="noreferrer"
-          className={`block truncate text-[15px] font-semibold ${item.checked ? "text-ink-soft line-through" : ""}`}
-        >
-          {item.view?.name ?? item.name}
-        </a>
-        <span className="flex min-w-0 items-center gap-1 overflow-hidden text-xs text-ink-soft">
-          {!item.checked ? (
-            <span title={MARK_WORDS[mark]} aria-label={MARK_WORDS[mark]} className={`shrink-0 font-bold ${MARK_TONE[mark]}`}>
-              {mark}
-            </span>
-          ) : null}
-          {/* **The sale/coupon bubble, from the nightly prices** (TEC-196). */}
-          <Why deal={deal} />
-          <span className="min-w-0 truncate">{details(item).join(" · ")}</span>
-        </span>
-      </span>
-      <span className="flex shrink-0 flex-col items-end gap-1">
-        <Price price={item.price} />
-        <Quantity key={`${item.id}:${item.quantity}`} item={item} onCommit={props.onQuantity} />
-      </span>
+      <a
+        href={item.href}
+        target="_blank"
+        rel="noreferrer"
+        className={`block min-w-0 flex-1 truncate text-[15px] font-semibold ${item.checked ? "text-ink-soft line-through" : ""}`}
+      >
+        {name}
+      </a>
+      <Quantity key={`${item.id}:${item.quantity}`} item={item} onCommit={props.onQuantity} />
+      <Price price={item.price} cue={dealWords(deal)} notSent={props.notSent} />
       {props.canAdd && !item.checked ? (
-        props.confirming ? (
-          <span role="group" aria-label="Are you sure?" className="flex shrink-0 flex-col items-stretch gap-1">
-            <span className="text-center text-[11px] font-semibold">{ask.ask}</span>
-            <span className="flex gap-1">
-              <button type="button" onClick={props.onCancel} className="h-8 rounded-lg border border-line px-2 text-xs text-ink-soft">
-                No
-              </button>
-              <button type="button" onClick={props.onAdd} className="h-8 rounded-lg bg-accent px-2.5 text-xs font-bold text-accent-ink">
-                {ask.yes}
-              </button>
-            </span>
-          </span>
-        ) : (
-          <button
-            type="button"
-            aria-label="Add to cart"
-            onClick={props.onAskAdd}
-            disabled={props.adding}
-            className="h-8 shrink-0 whitespace-nowrap rounded-lg bg-accent px-2.5 text-xs font-bold text-accent-ink disabled:opacity-50"
-          >
-            {props.adding ? "…" : "+ Cart"}
-          </button>
-        )
+        <button
+          type="button"
+          aria-label="Add to cart"
+          onClick={props.onAdd}
+          disabled={props.adding}
+          className="h-8 shrink-0 whitespace-nowrap rounded-lg bg-accent px-2.5 text-xs font-bold text-accent-ink disabled:opacity-50"
+        >
+          {props.adding ? "…" : "+ Cart"}
+        </button>
       ) : null}
     </li>
   );
 }
 
-/** A line's price from the nightly check, or “no price yet”: never $0. */
-function Price({ price }: { price: LinePrice | null | undefined }) {
+/**
+ * A line's price from the nightly check, or "no price yet": never $0. `cue` is what says
+ * why the line is shaded (a sale, a coupon, a good or high price), for the `title` and the
+ * accessible name. `notSent` replaces the price with a red "not sent" (TEC-211), with the
+ * reason in its `title`.
+ */
+function Price({ price, cue, notSent }: { price: LinePrice | null | undefined; cue?: string | null; notSent?: string | null }) {
+  if (notSent) {
+    return (
+      <span role="status" title={notSent} className="min-w-14 whitespace-nowrap text-right text-[11px] font-bold text-danger">
+        not sent
+      </span>
+    );
+  }
   return price ? (
-    <span className="whitespace-nowrap text-[13px] tabular-nums" title={price.onSale ? "On sale in the last nightly check" : undefined}>
+    <span
+      className="min-w-14 whitespace-nowrap text-right text-[13px] tabular-nums"
+      title={[price.onSale ? "On sale in the last nightly check" : null, cue].filter(Boolean).join(" · ") || undefined}
+      aria-label={cue ? `${money(price.total)}, ${cue}` : undefined}
+    >
       {money(price.total)}
     </span>
   ) : (
-    <span className="whitespace-nowrap text-[11px] text-ink-soft">no price yet</span>
+    <span className="min-w-14 whitespace-nowrap text-right text-[11px] text-ink-soft">no price yet</span>
   );
 }
 
 /**
- * One In cart line: what Cookbook sent, **the product it used with a Change link**
- * (TEC-206), its price (today's, once Refresh cart has read it; else the nightly
- * check's; "no price" when Kroger can't price it, never $0), and **Remove**
- * (Take back for this line, after one "Take 1 out of the cart?").
+ * One In cart line: **item · qty · price** and **Remove** (TEC-211). The price is today's
+ * once Refresh cart has read it, else the nightly check's; "no price" when Kroger can't
+ * price it, never $0. The ×N box is the quantity that was sent, so it does not edit.
+ * **Remove** is Take back for this line, after one "Take 1 out of the cart?".
  */
-function InCartRow(props: {
+export function InCartRow(props: {
   item: ShoppingLine;
   live: { total: number | null } | null;
   disabled: boolean;
@@ -783,39 +795,26 @@ function InCartRow(props: {
   onAskRemove: () => void;
   onCancel: () => void;
   onRemove: () => void;
-  onChange: () => void;
 }) {
   const { item } = props;
-  const small = [item.quantity > 1 ? `×${item.quantity}` : null, ...details(item)].filter((x): x is string => !!x);
-  const used = item.used ? [item.used.product, item.used.size].filter(Boolean).join(" · ") : null;
+  const name = item.view?.name ?? item.name;
   const ask = confirmWords("remove", 1);
   return (
-    <li title={lineTitle(item, small)} className={`flex items-center gap-2.5 rounded-[10px] bg-raised py-2 pl-2 pr-2.5 ${SHADE_CLASS[item.deal?.shade ?? "plain"]}`}>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <a href={item.href} target="_blank" rel="noreferrer" className="block truncate text-[15px] font-semibold">
-          {item.view?.name ?? item.name}
-        </a>
-        <span className="flex min-w-0 items-center gap-1 overflow-hidden text-xs text-ink-soft">
-          <Why deal={item.deal} />
-          <span className="min-w-0 truncate">{small.join(" · ")}</span>
-        </span>
-        {used ? (
-          <span className="flex min-w-0 items-baseline gap-2 text-xs text-ink-soft">
-            <span className="min-w-0 truncate">Used: {used}</span>
-            <button type="button" onClick={props.onChange} disabled={props.disabled} className="shrink-0 text-accent underline-offset-2 hover:underline disabled:opacity-50">
-              Change
-            </button>
-          </span>
-        ) : null}
+    <li title={[name, dealWords(item.deal)].filter(Boolean).join(" · ")} className={`flex items-center gap-2 rounded-[10px] bg-raised py-2 pl-3 pr-2.5 ${SHADE_CLASS[item.deal?.shade ?? "plain"]}`}>
+      <a href={item.href} target="_blank" rel="noreferrer" className="block min-w-0 flex-1 truncate text-[15px] font-semibold">
+        {name}
+      </a>
+      <span className="flex shrink-0 items-center rounded-lg border border-line bg-surface px-2 py-1 text-sm font-semibold" aria-label={`${item.quantity} in the cart`}>
+        ×{item.quantity}
       </span>
       {props.live ? (
         props.live.total === null ? (
-          <span className="whitespace-nowrap text-[11px] text-ink-soft">no price</span>
+          <span className="min-w-14 whitespace-nowrap text-right text-[11px] text-ink-soft">no price</span>
         ) : (
-          <span className="whitespace-nowrap text-[13px] tabular-nums">{money(props.live.total)}</span>
+          <span className="min-w-14 whitespace-nowrap text-right text-[13px] tabular-nums">{money(props.live.total)}</span>
         )
       ) : (
-        <Price price={item.price} />
+        <Price price={item.price} cue={dealWords(item.deal)} />
       )}
       {props.confirming ? (
         <span role="group" aria-label="Are you sure?" className="flex shrink-0 flex-col items-stretch gap-1">
@@ -832,7 +831,7 @@ function InCartRow(props: {
       ) : (
         <button
           type="button"
-          aria-label={`Remove ${item.view?.name ?? item.name} from the cart`}
+          aria-label={`Remove ${name} from the cart`}
           onClick={props.onAskRemove}
           disabled={props.disabled}
           className="min-h-11 shrink-0 whitespace-nowrap rounded-[10px] border border-line bg-transparent px-3 text-[13px] disabled:opacity-50"
