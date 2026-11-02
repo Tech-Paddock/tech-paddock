@@ -1,6 +1,6 @@
 -- Cookbook · the King Soopers connection, and what Kroger last said about each brand
 --
--- Joel reversed the list's no-OAuth rule for King Soopers on 2026-09-26
+-- The owner reversed the list's no-OAuth rule for King Soopers on 2026-09-26
 -- (TEC-90; `apps/cookbook/RULES.md`, *Send to cart*). Send to cart needs a
 -- stored Kroger sign-in and a chosen store. On 2026-10-20 he added a product
 -- cache and a weekly refresh to the same build. The code that reads this is
@@ -23,12 +23,12 @@
 -- written here by a mistake in code: the convention is a constraint. A leaked
 -- row, or a leaked backup, is then not a Kroger sign-in. Even decrypted, the
 -- token's scope is `cart.basic:write product.compact` — the worst case is
--- items in Joel's cart, which is what `RULES.md` says out loud.
+-- items in the owner's cart, which is what `RULES.md` says out loud.
 --
 -- **The access token is not stored at all.** It lives thirty minutes and each
 -- request refreshes once; storing it would be a second secret for no gain.
 --
--- `location_id` and `store_name` are the store Joel picked through Kroger's
+-- `location_id` and `store_name` are the store the owner picked through Kroger's
 -- Locations API. **Plain text, not sealed**: a store's public ID is not a
 -- credential, and the list tab shows its name. A reconnect keeps them.
 --
@@ -37,8 +37,8 @@
 -- ## brand_products — Kroger's view of a remembered brand
 --
 -- A row per *this exact product* brand in `brand_preferences`, written only by
--- a refresh, **never by Joel and never by a model**. The brand row stays the
--- record of what Joel chose; this row is what Kroger last said about it at his
+-- a refresh, **never by the owner and never by a model**. The brand row stays the
+-- record of what the owner chose; this row is what Kroger last said about it at his
 -- store — the product number, its description, brand and size, its page, the
 -- last price, whether it was in stock, and when that was checked. Its own table
 -- rather than more columns on `brand_preferences`, because the two have
@@ -49,7 +49,7 @@
 --
 -- **`missing_since` is the flag, and a flagged row is kept.** When Kroger stops
 -- returning a product, the refresh sets it and Your brands says so; nothing is
--- deleted or silently re-pointed, because the brand was Joel's decision and a
+-- deleted or silently re-pointed, because the brand was the owner's decision and a
 -- replacement is his to make. It clears itself the next time Kroger returns the
 -- product.
 --

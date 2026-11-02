@@ -1,6 +1,6 @@
 -- The grocery list: one table, and deliberately not much of one.
 --
--- Asked for by Joel on 2026-09-19 — a list built from recipes or from things
+-- Asked for by the owner on 2026-09-19 — a list built from recipes or from things
 -- you just add, then taken to King Soopers. This is the **cheap version** he
 -- chose: the list lives here and leaves as a copied block of text or a search
 -- link per item. **No retailer credential, no OAuth, no `middleware.ts`
@@ -12,7 +12,7 @@
 -- ## Why the items are text
 --
 -- Ingredients are plain text, because recipes store them as text — a
--- consequence of Joel's decision that a recipe's macros are estimated once at
+-- consequence of the owner's decision that a recipe's macros are estimated once at
 -- creation rather than derived from linked items. So a grocery line is a
 -- string, and *2 cloves garlic* and *1 tbsp minced garlic* are two rows until
 -- something merges them. That is what `/api/grocery/tidy` is for, and it is a

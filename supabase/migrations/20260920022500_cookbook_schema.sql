@@ -8,7 +8,7 @@
 -- **The tables are the Cookbook agent's to design, not the scaffold's.** The
 -- charter is explicit about this: "the tables are this agent's to design in
 -- full, the same way Health's were, not pre-empted here." Two are implied by
--- decisions already settled with Joel — recipes storing the whole pot with
+-- decisions already settled with the owner — recipes storing the whole pot with
 -- static macros, and a grocery list with a `source` column — but implied is not
 -- designed, and shaping them before the agent exists is exactly the "set of
 -- decisions nobody made" the protocol warns about.

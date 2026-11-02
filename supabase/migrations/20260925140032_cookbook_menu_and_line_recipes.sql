@@ -1,6 +1,6 @@
 -- Cookbook · recipe names on list lines, and "On the menu"
 --
--- Joel's asks of 2026-09-24, sections B and C of TEC-39. Reasoning here; the
+-- The owner's asks of 2026-09-24, sections B and C of TEC-39. Reasoning here; the
 -- code that reads it is `lib/grocery.ts` and `lib/menu.ts`.
 --
 -- Shape: **additive.** One column with a default every existing row already
@@ -12,7 +12,7 @@
 --
 -- A line pushed from a recipe said only "from a recipe". It now says which:
 -- `olive oil · Green bean almondine, Chicken thighs`. **Names, not ids, and no
--- join table** — Joel chose plain text because it is cheaper, and accepted what
+-- join table** — the owner chose plain text because it is cheaper, and accepted what
 -- that costs: the names are a snapshot, so renaming or removing a recipe does
 -- not change a line already on the list. That is the same shape as the
 -- ingredients themselves, which were copied as text rather than linked.
@@ -25,7 +25,7 @@
 -- ## C. On the menu — what you are eating this week
 --
 -- Every recipe whose ingredients went to the list in the last seven days,
--- rolling from when it was added (Joel's pick over a calendar week). **One row
+-- rolling from when it was added (the owner's pick over a calendar week). **One row
 -- per recipe**: adding the same recipe again restarts its seven days by
 -- updating `added_at`, rather than stacking a second row.
 --

@@ -1,6 +1,6 @@
 -- Cookbook · On the menu gets a day
 --
--- Joel, 2026-10-05: adding a recipe to the list put it on the menu "today" with
+-- The owner, 2026-10-05: adding a recipe to the list put it on the menu "today" with
 -- no say in it. He plans the week, so a menu entry now carries **the day he
 -- means to cook it**, picked when the ingredients go to the list and changeable
 -- from the menu afterwards. The code that reads it is `lib/menu.ts`.
@@ -12,14 +12,14 @@
 --
 -- ## Still one row per recipe
 --
--- Joel was asked whether a recipe could sit on two days and said no: he is not
+-- The owner was asked whether a recipe could sit on two days and said no: he is not
 -- meal-prepping, and does not cook the same thing twice in a week. So
 -- `recipe_id` stays the primary key, and adding a recipe already on the menu
 -- moves it to the new day rather than listing it twice.
 --
 -- ## Nothing falls off by itself any more
 --
--- The seven rolling days are gone, by Joel's choice: **he clears the menu
+-- The seven rolling days are gone, by the owner's choice: **he clears the menu
 -- himself**, all at once or one row at a time. `added_at` stays, unread by the
 -- menu, as the record of when a row was last written. A row older than seven
 -- days that the old code had stopped showing is shown again until he clears it.

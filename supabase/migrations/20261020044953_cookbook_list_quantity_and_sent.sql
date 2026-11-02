@@ -1,7 +1,7 @@
 -- Cookbook · a quantity on each list line, and when it last went to the cart
 --
 -- Send to cart (TEC-90). The Kroger Cart API takes a quantity per product, and
--- a line stored none: Joel chose a column, default 1, over always sending one.
+-- a line stored none: the owner chose a column, default 1, over always sending one.
 -- And the Cart API **only adds** — it cannot read the cart back — so a second
 -- send of the same line doubles it unless this app remembers the first.
 -- `RULES.md`: *a second send warns and shows what was already sent.* The code
@@ -25,7 +25,7 @@
 -- ## sent_at
 --
 -- When the line was last added to the Kroger cart by this app. Null means
--- never. A send that includes a line with a value is refused until Joel says
+-- never. A send that includes a line with a value is refused until the owner says
 -- "again", and the refusal names the lines and when. A Tidy merge carries the
 -- latest value of any line it absorbed, so a merge never erases the warning.
 -- It is never cleared by this app: the list line's lifetime is the shop, and
