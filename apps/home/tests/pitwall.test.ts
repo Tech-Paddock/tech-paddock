@@ -12,9 +12,9 @@ describe("the next step on a card", () => {
     const body = [
       "## Next steps",
       "",
-      "1. **TechPad Gen:** done 2026-09-26. Built and pushed.",
+      "1. **Builder:** done 2026-09-26. Built and pushed.",
       "2. **TD:** ~~draft the line~~",
-      "3. **Health:** ✅ reconciled.",
+      "3. **Deployment:** ✅ reconciled.",
       "4. **Deployment:** open the pull request, gate it and merge it.",
     ].join("\n");
     expect(nextStep(body)).toEqual({ actor: "Deployment", text: "open the pull request, gate it and merge it.", star: false });
