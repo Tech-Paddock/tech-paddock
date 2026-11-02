@@ -18,12 +18,12 @@ import { verifyPassword } from "./password";
 /**
  * POST /api/login for every app. Each `app/api/login/route.ts` re-exports it.
  *
- * It was seven hand-copied routes in three slightly different versions, which
- * made every fix to the login path seven edits. It is stamped from
+ * It was a hand-copied route per app in three slightly different versions, which
+ * made every fix to the login path one edit per app. It is stamped from
  * packages/shared now, like the session code it calls.
  *
- * Node-only, because it imports lib/password.ts (bcryptjs). Never import it
- * from the gate file (middleware.ts, or proxy.ts on Next 16).
+ * It imports lib/password.ts (bcryptjs). Never import it from the gate file,
+ * proxy.ts.
  *
  * The attempts counter is advisory — see lib/auth.ts. The password is the
  * control.

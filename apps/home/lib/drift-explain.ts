@@ -23,6 +23,10 @@ const FAMILIES: [RegExp, string][] = [
     /^(middleware|proxy)\.ts/,
     "There is one password gate, and every app runs the same copy. An app whose gate differs has changed shape.",
   ],
+  [
+    /^hub holds no database credential/,
+    "The hub keeps no database key, so a leak from the hub cannot reach the data. A database file, client or variable appearing in it breaks that.",
+  ],
   [/^password gate/, "Every app must sit behind the password gate. An app without one is public."],
   [
     /^(CI derives|one stable gate|each app's build|each ignoreCommand|every build watches)/,

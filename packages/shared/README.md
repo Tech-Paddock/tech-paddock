@@ -18,7 +18,7 @@ node scripts/stamp-shared.mjs --check  # verify, write nothing
 | `lib/login.ts` | Handler behind every `POST /api/login`. Node-only. |
 | `lib/logout.ts` | Handler behind every `POST /api/logout`. Clears the domain-wide cookie, so it logs out of every app. |
 | `lib/safe-redirect.ts` | Where a successful login may redirect. Pure; imported by client login pages. |
-| `lib/theme.css` | The token system. Hand-written, its contrast measured by hand; the "GENERATED" header is wrong (TEC-169). |
+| `lib/theme.css` | The token system. Hand-written, its contrast measured by hand. |
 | `lib/theme.ts` | The other half of the theme; drifts silently if unstamped. |
 | `next.config.mjs` | Security headers, including `frame-ancestors`. |
 | `app/ThemeControl.tsx` | Light/dark switch and the message that carries it into the hub's frames. |
@@ -26,8 +26,7 @@ node scripts/stamp-shared.mjs --check  # verify, write nothing
 
 Each copy lands at the same path under `apps/<app>/`. The login path is stamped because a fix
 applied to some copies of the password gate is a hole that looks closed. The routes that re-export
-the two handlers (`app/api/login/route.ts`, `app/api/logout/route.ts`) are byte-identical in every
-app today, but neither stamped nor checked by `drift`.
+the two handlers (`app/api/login/route.ts`, `app/api/logout/route.ts`) are stamped too.
 
 A public app (`PUBLIC_APPS` in `scripts/stamp-shared.mjs`) is stamped only with the entries marked
 `public`, today only the theme tokens (`lib/theme.css`).

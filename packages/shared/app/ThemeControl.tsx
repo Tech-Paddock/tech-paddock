@@ -7,10 +7,10 @@ import { LIVERIES, isPaddockOrigin, type Livery, type Mode, themeCookieString } 
  * The header control: which livery this app wears, what it is drawn from, and
  * the light/dark switch.
  *
- * Byte-identical in all seven apps — stamped from packages/shared, not copied
+ * Byte-identical in every app — stamped from packages/shared, not copied
  * by hand. It styles itself from plain classes in
  * lib/theme.css rather than utility classes, which is what lets the same file
- * drop into home (hand-written CSS) and the six tools (Tailwind) without
+ * drop into home (hand-written CSS) and every tool (Tailwind) without
  * either one growing a second copy.
  *
  * **One switch per page, which takes both halves below.** Home embeds the
@@ -105,7 +105,7 @@ export default function ThemeControl({ onBar = false }: { onBar?: boolean }) {
   // once and will not read it again — so the parent says so directly.
   //
   // Home listens too, and nothing ever posts to home. That is the cost of
-  // this file being one file rather than seven, and it is a dormant listener.
+  // this file being one file for every app, and it is a dormant listener.
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (!isPaddockOrigin(event.origin)) return;
@@ -132,7 +132,7 @@ export default function ThemeControl({ onBar = false }: { onBar?: boolean }) {
     // reloads them. Tell each one instead.
     //
     // Written as "every frame on this page" rather than "the tools", so the
-    // same file works in all seven apps — the six tools contain no iframe and
+    // same file works in every app — the tools contain no iframe and
     // this loop does nothing there.
     document.querySelectorAll("iframe").forEach((frame) => {
       try {

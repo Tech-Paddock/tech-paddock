@@ -5,15 +5,15 @@ import type { Config } from "tailwindcss";
  *
  * It used to be: four hexes, compiled in at build time, so `bg-paper` became
  * `background-color: #FBF4EC` and there was no way for a theme to reach it.
- * Every value now comes from lib/theme.css, which is byte-identical in all five
- * apps and keyed off [data-livery][data-mode] on <html>.
+ * Every value now comes from lib/theme.css, which is byte-identical in every
+ * app and keyed off [data-livery][data-mode] on <html>.
  *
  * The triplet form is not a style choice. Tailwind can only interpolate an
  * alpha into a bare `R G B`, so `rgb(var(--ink-rgb) / <alpha-value>)` is what
- * keeps the 83 existing uses of text-ink/60 and its siblings compiling. A hex
+ * keeps every use of text-ink/60 and its siblings compiling. A hex
  * or an `rgb(...)` string silently drops the opacity modifier instead.
  *
- * This file is identical in all four tools. apps/home has no Tailwind at all.
+ * This file is identical in every tool. apps/home has no Tailwind at all.
  */
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
