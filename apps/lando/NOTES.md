@@ -7,19 +7,25 @@
   sticky, evenly spaced, opening on Log (RULES.md holds the owner's override of the one-screen rule).
 - **Upcoming items** (TEC-192, no tab since TEC-199): plans in `lando.upcoming` (kind vet, vaccine, medication or other; title,
   due day, optional time and note, optional repeat of N weeks, months or years, status open, done or cancelled). **A future
-  When on any form creates one** (`lib/future.ts`; below), and the old Add/Edit sheet is gone, so nothing is edited in place
-  from the app any more (the `edit` action stays in the route, unused); an item is **cancelled, never deleted** (the row
+  When on any form creates one** (`lib/future.ts`; below). **An open item is edited in place** (TEC-203): tapping its words
+  in Next 7 days or the Upcoming filter opens the form its title names (`formForItem`, `editUpcoming` in `Journal`) with the
+  item's own day, time, repeat, note, medication and dose and attachments (`donePrefill` feeds the fields, `plan` on
+  `LogForm` says it is an edit), and Save posts `{action: "edit", id, item}`: the same row, nothing inserted, the journal
+  untouched. The When may be past (an overdue item is a plan, not an error). An item with no form of its own (an old Other
+  with its own words, made by the retired Add sheet) has no edit, only Done and Cancel; a done or cancelled item is never
+  listed, so never opened, and the server refuses its edit with a 409. An item is **cancelled, never deleted** (the row
   keeps `status`). Reads and writes go through `/api/upcoming`: `GET` the open items, `POST {action: add | edit | cancel |
   done}`. The journal read (`/api/journal`) is untouched; upcoming loads beside it, and one failing never blanks the other.
   * **Next 7 days** (the box under the pills on Log, `nextWeek`): open items due within `SOON_DAYS` (7) of the phone's day,
     overdue ones too, soonest first. Absent when nothing is due. **The Upcoming filter** (the last pill of the feed's Show-only
     row; exclusive of the form pills) lists every open item soonest first (`allUpcoming`), with Cancel as well as Done. Both use
     `app/UpcomingList.tsx`: each row wears the pills' status colours (`.lando-pill[data-status]`: due today to 7 days out is
-    amber/`yellow`, overdue `red`, later neutral; `upcomingTone`, by calendar day on the phone's day), says when it is due, how
-    it repeats and its note, and the tone in words for screen readers.
+    amber/`yellow`, overdue `red`, later neutral; `upcomingTone`, by calendar day on the phone's day). The first line reads
+    "Title · note" and truncates (`titleLine`); the second keeps the due date, "overdue" and the repeat (`detailLine`). The tone
+    is in words for screen readers, placed right after the title: a span placed after a long note would widen the page.
   * **A future When** (`isFutureWhen`, or `isFutureDay` for a weight, which is a day): the form says "Future: saves as upcoming",
-    shows a **Repeat** (every N weeks, months or years; only then), hides the photos and Box 3, and Save reads "Save as
-    upcoming". Save posts an upcoming item through `onUpcoming` (awaited: a refusal stays on the form) and writes no journal
+    shows a **Repeat** (every N weeks, months or years; only then), hides Box 3 (the attachments stay, TEC-203), and Save reads
+    "Save as upcoming". Save posts an upcoming item through `onUpcoming` (awaited: a refusal stays on the form) and writes no journal
     entry. The item's kind comes from the form (`futureKind`): a Vet visit is `vet`, a Medication `medication`, everything else
     `other`; its title is the form's name (`futureTitle`: "Potty", "Training", "Medical issue", "Vet visit · Check-up",
     "Name · 5 mg"), which is how Done finds the form again. A saved entry cannot be moved to the future (the form says so, and
@@ -54,7 +60,7 @@
   them when the When is in the future; **Box 2**, the entry; **Box 3**, the secondary things (Potty: the treat count then
   Medical issue on one line; Training and Fun: the treat count, and Fun's Pee/Poop buttons; Vet visit: Medical issue; none on Food,
   Weight, Medical issue or Medication); then **Note** (a full-width `<textarea>`, two rows, scrolling past two; required for a vet
-  visit or an issue, optional elsewhere), **Photos** under it where the form has photos (Potty, Fun, Training, Health), and Save
+  visit or an issue, optional elsewhere), **Attachments** under it on every form (TEC-203), and Save
   last. Per form, Box 2: *Potty* What (Pee, Poop, Both, No potty; **nothing preselected, and a save without one is refused**) ·
   Where with Leash (outside) or Spot (inside) on one line · Time outside (outside). *Food* Type (Meal, Snuffle mat, Treat) · What
   and a small Amount on one line (the scroller is `SCROLLER_WIDTH` 44, it was 88 then 52; the unit is a small word beside it, not in the label; a treat's count box is 52px). *Training* Where and Time on one line ·
@@ -115,7 +121,7 @@
   shown only through signed URLs; an event stores only the path, `health/<uuid>.<jpg|png|webp>`
   (`PHOTO_PATH`; the `health/` prefix stays for exercise photos too, one pattern, one bucket). The phone shrinks each photo through a canvas first (`lib/image.ts`, a local
   copy of Coffee's; 1568px, jpeg) and uploads it the moment it is picked (`app/Photos.tsx`, a
-  local pattern: Take photo opens the camera, Choose photos the library). Each photo is
+  local pattern: Take photo opens the camera, Attach the library). Each photo is
   uploading, failed (it stays on screen with Retry and ✕) or done; **Save is disabled until every
   photo is done**, and the server refuses an entry naming a path with no object behind it
   (`writeEvent` -> `missingPhotos`), so an entry never shows as saved without its photos. The
@@ -126,6 +132,29 @@
   and the voided entry keeps all of its own; a delete is a void. **Nothing is ever deleted from
   the bucket**, so a photo removed in a correction, discarded with an unsaved entry, or uploaded
   and abandoned stays there, unreferenced.
+- **Attachments: photos and files on every form and upcoming item** (TEC-203; this widens the Health-photos note above, which
+  still holds for pictures). Any file type, up to `MAX_PHOTOS` (6) on an entry; **Take photo** (camera) and **Attach** (any
+  file, many). A jpeg/png/webp-like picture is still shrunk on the phone (`isShrinkable`: raster pictures, not GIF or SVG) and
+  shown as a thumbnail; anything else goes up as it is and **must be 4 MB or less** (the bucket's limit; `tooBigText`): a bigger
+  file is refused on pick with a red line on the form naming it, never dropped silently. A picture this browser cannot decode
+  (a HEIC) is sent as a file when it fits, else the shot fails with the reason. **Stored shape**: `photos` is still the list of
+  paths (the key name is history's; it holds files too) and a new optional **`names`** holds `{path: original name}` for each
+  attachment that is not a picture (pictures need none; `cleanFileName`, at most 120 characters). Old entries have neither and
+  stay valid. The path is `health/<uuid>` with an optional `.ext` (`PHOTO_PATH`, `lando.details_ok` holds the same pattern):
+  a picture's from its type, a file's from its name (1 to 10 lowercase letters or digits, else none). A path ending in
+  jpg, png or webp is a picture (`isImagePath`); every other path is a chip with its type and name (`attachmentLabel`: the name
+  kept, else "PDF file"/"File"), a link opening the signed URL in a new tab. `parseAttachments` is the one parse, in every
+  kind and in an upcoming item; `names` for a path not in `photos` is dropped. A file is stored with its own content type
+  except one a browser would run (html, xml, svg, scripts), which is stored as `application/octet-stream` (`storedContentType`).
+  The feed row shows thumbnails and small type-and-name chips (not links: the row is a button; open a file from its entry) and
+  "1 photo" / "2 files" / "3 attachments" (`attachmentsText`). **Upcoming items** hold `attachments`
+  (`{photos, names?}`, null when none; the column added by `lando_upcoming_attachments`); `GET /api/upcoming` returns a `photos`
+  signed-URL map beside `items`; add and edit check every path is in the bucket (`checkAttachments`, `missingPhotos`) as an
+  entry does. **A Done carries them**: `donePrefill` hands the item's paths and names to the form, which opens with them
+  (editable) and saves them on the entry it creates. A repeating item's **next** occurrence does not carry them (the files
+  belong to the visit just done). Migrations, apply in order: `lando_photos_any_file_type` (the bucket's `allowed_mime_types`
+  to null; private, 4 MB kept), `lando_upcoming_attachments`, `lando_attachments_details_ok` (the function: Food and Weight
+  take `photos`, every kind takes `names`, the path pattern widened).
 - **Pill status colours** (TEC-142). Each pill but Fun wears a status from how long ago its
   last event was (`pillStatus`, with the thresholds as named constants, all in `lib/events.ts`):
   **pee and poop** green under 1 h, yellow from 1 h up to and including 3 h, red over 3 h
@@ -220,7 +249,7 @@
   (`lib/events.ts`) map between the six forms and the five kinds: a walk or playtime is Fun, a
   training is Training. Fun's Type offers Walk and Playtime only (`FUN_TYPES`); Training has no
   Type and always has Commands practised.
-  **Photos on both** (TEC-139): the same Photos block as Health (Take photo, Choose photos, upload
+  **Photos on both** (TEC-139): the same Photos block as Health (Take photo, Attach, upload
   on pick, Save waits for every photo, `missingPhotos` refuses an entry whose photo is not in the
   bucket), stored as an optional `photos` on the exercise details (1 to `MAX_PHOTOS`, same
   `PHOTO_PATH`; no key when none). Old exercise entries have none and stay valid. A correction
@@ -442,7 +471,7 @@
   `PhotoPicker` after the shared Note field (When and Human, then Note, then Photos), not inside each
   kind's block. Health keeps its own Note and then its Photos, as before.
 - **Potty's photos and Related issue** (TEC-142): below Leash and Spot, the Medical issue checkbox and its select; the
-  same Photos block as Health, Fun and Training (Take photo, Choose photos, Save waits for each,
+  same Photos block as Health, Fun and Training (Take photo, Attach, Save waits for each,
   `missingPhotos` backs it) comes after the Note; stored as optional `photos` on the potty details. Feed: "Poop"
   "accident, inside · re: Stomach & appetite, Oct 24 · 1 photo" with the thumbnails. The note stays optional.
 - **Exercise's Other dogs** is one pick (TEC-129, replacing TEC-125's multi-select): a plain
@@ -640,7 +669,7 @@
   `tests/health.test.ts` reads the newest migration defining the function (by version; it must be
   no older than `lando_health_picklist`) and fails if its two reason arrays differ from the code's
   unions or drop an id `lando_health_events` held, if it lacks the health branch, the
-  `MAX_PHOTOS` bound, the `PHOTO_PATH` pattern or exercise's `photos` key, or if that file holds
+  `MAX_PHOTOS` bound, the `PHOTO_PATH` pattern or exercise's `photos` and `names` keys, or if that file holds
   anything but `set local lock_timeout` and the function. The next widening is simply a newer
   file; the test follows it.
   A new offered pick is a new id in the code and the function (never a reused retired one with
@@ -668,10 +697,14 @@
   different bytes are a `PhotoConflict`, answered 409 by `POST /api/photos`, and the stored photo
   stays. Retry re-sends the blob `Photos.tsx` kept, so it is byte-identical; a re-encode under the
   same id would be a conflict.
-- **The photo upload is one request under Vercel's body limit** (about 4.5MB; the route and the
-  bucket cap at 4MB). The canvas downscale is what keeps a phone shot under it. If a browser
-  cannot decode the file (a HEIC on a browser that cannot read it), the photo fails with the
-  reason and Retry will fail again until it is removed.
+- **The upload is one request under Vercel's body limit** (about 4.5MB; the route and the
+  bucket cap at 4MB). The canvas downscale is what keeps a phone shot under it; a file that is not shrunk is held to 4 MB
+  on the phone and again by `photoPath` on the server. If a browser cannot decode a picture (a HEIC) it goes up as a file
+  when it fits; over 4 MB it fails with the reason and Retry will fail again until it is removed.
+- **The attachment shape is in three places:** `parseAttachments` / `PHOTO_PATH` (`lib/events.ts`), `photoPath` (`lib/storage.ts`,
+  which makes the path) and `lando.details_ok`. A path pattern or a `names` rule in the app alone fails every save of it with a
+  503. `tests/attachments.test.ts` reads the newest function's text for the pattern and the keys; the paths a file can take
+  (`nameExt`) must stay inside `PHOTO_PATH`.
 - **The potty `what` list is in two places:** `POTTY_WHAT` in `lib/events.ts` and `lando.details_ok`. A value in the app alone fails every save of it with a 503.
 - **The dogs check is a jsonpath filter in `strict` mode.** A CHECK cannot hold a subquery, so each
   id is tested with `jsonb_path_exists`; lax mode unwraps nested arrays and would let `[[id]]`

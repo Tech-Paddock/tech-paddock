@@ -37,6 +37,7 @@ export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
 };
 
 export const RELEASES: readonly Release[] = [
+  { date: "2026-11-02", text: "Every form, Food and Weight included, and every upcoming item can now carry up to 6 photos or files, such as a PDF from the vet. Take photo is still there, and Attach opens the phone's file picker for anything. Photos are still shrunk first; other files can be up to 4 MB, and a bigger one says so on the form. Photos show as thumbnails and other files as a tag with their name, which opens the file when tapped. Tapping an item in Next 7 days or the Upcoming list now opens it to change anything, and its row reads the title and note together on one line. When you mark an item done, its photos and files come along to the entry." },
   { date: "2026-11-02", text: "The top boxes are tappable again. Pee and Poop open Potty with that one picked, Meals opens Food, and Fun opens Fun. The Log buttons are back to Treats, Training, Weight and Health, and the Potty, Food and Fun buttons are gone." },
   { date: "2026-11-02", text: "The boxes on the forms now sit side by side as meant. On Health's Medication tab, the dose no longer covers the medication, and Medication, Dose and Unit share one line. When is only as wide as it needs to be and matches Logging as in height, and the Food form's Amount box is smaller." },
   { date: "2026-11-01", text: "The tabs are now Log, Analytics and Patch notes. What's new has a new name, and the Upcoming tab is gone: anything planned for later now lives in the Log." },

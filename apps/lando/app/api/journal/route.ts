@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       listFoods(db),
       listMedications(db),
     ]);
-    // Signed URLs for the live entries' photos (Health, Potty, Fun, Training), by
+    // Signed URLs for the live entries' photos and files (every kind, TEC-203), by
     // path. A path that could not be signed is absent and the screen says so
     // on that photo.
     const paths = liveEvents(events).flatMap((e) => eventPhotos(e));

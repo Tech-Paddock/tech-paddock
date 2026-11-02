@@ -134,8 +134,10 @@ export type PottyDetails = {
   minutes?: number;
   /** A medical issue this relates to (TEC-142): the id of a Health issue event, possibly a superseded copy; `resolveIssue` finds the live one. */
   issue?: string;
-  /** Storage paths of photos (TEC-142), 1 to MAX_PHOTOS; no key when there are none. */
+  /** Storage paths of attachments (TEC-142), 1 to MAX_PHOTOS; no key when there are none. Pictures and, since TEC-203, any file. */
   photos?: string[];
+  /** The original name of each attached file that is not a picture, by its path (TEC-203). */
+  names?: Record<string, string>;
 };
 
 /** A snapshot of the catalogue item at log time, plus how much. */
@@ -146,6 +148,9 @@ export type FoodDetails = {
   kcal_per: number | null;
   unit: string | null;
   amount: number | null;
+  /** Attachments (TEC-203): same as Potty's. */
+  photos?: string[];
+  names?: Record<string, string>;
 };
 
 export const EXERCISE_TYPES = ["walk", "playtime", "training"] as const;
@@ -187,6 +192,7 @@ export type ExerciseDetails = {
   dogs?: string[];
   /** Storage paths of photos (TEC-139), 1 to MAX_PHOTOS; no key when there are none. Same bucket and path as Health's. */
   photos?: string[];
+  names?: Record<string, string>;
 };
 
 /** A friend's dog, from `lando.dogs`. Names live in the database, never in the repo. */
@@ -242,6 +248,9 @@ export type WeightDetails = {
   unit: Unit;
   /** Set when a vet visit's Weight field saved it (TEC-151): the id of that visit, possibly a superseded copy; `resolveVisit` finds the live one. */
   visit?: string;
+  /** Attachments (TEC-203): same as Potty's. */
+  photos?: string[];
+  names?: Record<string, string>;
 };
 
 /* ── Health (TEC-137) ────────────────────────────────────────────────────── */
@@ -372,11 +381,46 @@ export function checkHealthReasons(next: { details: Details }, target: { kind: s
 export const MAX_PHOTOS = 6;
 
 /**
- * A photo's storage path in the private bucket: `health/<id>.<ext>`, the id
- * chosen by the phone and the extension by the upload's type. Only this path
- * is stored in the event, never the picture or a URL (a signed URL expires).
+ * An attachment's storage path in the private bucket: `health/<id>` and an optional `.<ext>`, the id chosen by
+ * the phone and the extension by the upload (a picture's from its type, any other file's from its name, 1 to 10
+ * lowercase letters or digits; TEC-203). Only this path is stored in the event, never the file or a URL (a signed
+ * URL expires). `lando.details_ok` holds the same pattern.
  */
-export const PHOTO_PATH = /^health\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/;
+export const PHOTO_PATH = /^health\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\.[a-z0-9]{1,10})?$/;
+
+/** The extensions of the pictures the app shows as thumbnails (the ones the phone's shrink produces). */
+const IMAGE_EXT = new Set(["jpg", "png", "webp"]);
+/** The extension of a stored path, lowercase, or "" when it has none. */
+export const pathExt = (path: string) => /\.([a-z0-9]{1,10})$/.exec(path)?.[1] ?? "";
+/** Whether a stored path is a picture: shown as a thumbnail. Anything else is a file, shown as a chip with its name. */
+export const isImagePath = (path: string) => IMAGE_EXT.has(pathExt(path));
+
+/** The longest original file name kept (the database allows 200). */
+export const NAME_MAX = 120;
+
+/** A file name made safe to show and store: control characters gone, runs of space one, trimmed, cut at NAME_MAX. */
+export function cleanFileName(raw: string): string {
+  // eslint-disable-next-line no-control-regex
+  return raw.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, NAME_MAX).trim();
+}
+
+/** "Check-up scan.pdf" for a stored file, from its name when one was kept, else from its type ("PDF file", "File"). */
+export function attachmentLabel(path: string, names?: Record<string, string> | null): string {
+  const name = names?.[path];
+  if (name) return name;
+  const ext = pathExt(path);
+  return ext ? `${ext.toUpperCase()} file` : "File";
+}
+
+/** "2 photos", "1 file", "3 attachments": what a count of attachments reads as, by what they are. */
+export function attachmentsText(paths: readonly string[]): string {
+  const n = paths.length;
+  if (!n) return "";
+  const pics = paths.filter(isImagePath).length;
+  if (pics === n) return `${n} ${n === 1 ? "photo" : "photos"}`;
+  if (pics === 0) return `${n} ${n === 1 ? "file" : "files"}`;
+  return `${n} attachments`;
+}
 
 export type HealthDetails = {
   type: HealthType;
@@ -390,6 +434,7 @@ export type HealthDetails = {
   route?: MedRoute;
   /** Storage paths, 1 to MAX_PHOTOS; no key when there are none. */
   photos?: string[];
+  names?: Record<string, string>;
   /** A vet visit or a medication dose (TEC-142, TEC-199): the id of the Health issue event it relates to; `resolveIssue` finds the live one. */
   issue?: string;
 };
@@ -414,11 +459,18 @@ export const exercise = (e: Pick<JournalEvent, "details">) => e.details as Exerc
 export const weight = (e: Pick<JournalEvent, "details">) => e.details as WeightDetails;
 export const health = (e: Pick<JournalEvent, "details">) => e.details as HealthDetails;
 
-/** The photo paths an entry names: Health's, Fun's, Training's and Potty's (TEC-139, TEC-142); none for any other kind. */
+/** The attachment paths an entry names, pictures and files: every kind but a void has them (TEC-203; Food and Weight since then). */
 export function eventPhotos(e: Pick<JournalEvent, "kind" | "details">): string[] {
-  if (e.kind !== "health" && e.kind !== "exercise" && e.kind !== "potty") return [];
+  if (e.kind === "void") return [];
   const p = (e.details as { photos?: unknown }).photos;
   return Array.isArray(p) ? (p as string[]) : [];
+}
+
+/** The original file names an entry kept, by path (TEC-203); none for an entry without any. */
+export function eventNames(e: Pick<JournalEvent, "kind" | "details">): Record<string, string> {
+  if (e.kind === "void") return {};
+  const n = (e.details as { names?: unknown }).names;
+  return n && typeof n === "object" && !Array.isArray(n) ? (n as Record<string, string>) : {};
 }
 
 /**
@@ -1028,11 +1080,10 @@ export function describe(
             ]
               .filter(Boolean)
               .join(" · ");
-      const n = p.photos?.length ?? 0;
       const detail = [
         base,
         p.issue ? issueLinkText(events, p.issue) : "",
-        n ? `${n} ${n === 1 ? "photo" : "photos"}` : "",
+        attachmentsText(p.photos ?? []),
       ]
         .filter(Boolean)
         .join(" · ");
@@ -1042,7 +1093,10 @@ export function describe(
       const f = food(e);
       const amount =
         f.amount === null ? "" : f.unit ? `${formatAmount(f.amount)} ${unitLabel(f.unit, f.amount)}` : formatAmount(f.amount);
-      return { title: f.type === "treat" ? "Treat" : f.type === "snuffle" ? "Snuffle mat" : "Meal", detail: [f.item_name, amount].filter(Boolean).join(" · ") };
+      return {
+        title: f.type === "treat" ? "Treat" : f.type === "snuffle" ? "Snuffle mat" : "Meal",
+        detail: [f.item_name, amount, attachmentsText(f.photos ?? [])].filter(Boolean).join(" · "),
+      };
     }
     case "exercise": {
       const x = exercise(e);
@@ -1056,17 +1110,16 @@ export function describe(
             : "",
         x.treats ? `${x.treats} ${x.treats === 1 ? "treat" : "treats"}` : "",
         (x.commands ?? []).map((c) => COMMAND_LABEL[c] ?? c).join(", "),
-        x.photos?.length ? `${x.photos.length} ${x.photos.length === 1 ? "photo" : "photos"}` : "",
+        attachmentsText(x.photos ?? []),
       ];
       return { title: EXERCISE_LABELS[x.type] ?? "Exercise", detail: parts.filter(Boolean).join(" · ") };
     }
     case "weight": {
       const w = weight(e);
-      return { title: "Weight", detail: `${round1(w.value)} ${w.unit}` };
+      return { title: "Weight", detail: [`${round1(w.value)} ${w.unit}`, attachmentsText(w.photos ?? [])].filter(Boolean).join(" · ") };
     }
     case "health": {
       const h = health(e);
-      const n = h.photos?.length ?? 0;
       // A vet visit's linked weight (TEC-151): "Check-up · 7.6 lb".
       const w = h.type === "vet" && e.id ? linkedWeight(events, e.id) : null;
       // A medication dose reads "Medication  Name · 5 mg · by mouth" (TEC-199).
@@ -1081,7 +1134,7 @@ export function describe(
         (h.reasons ?? []).map((id) => healthReasonLabel(h.type, id)).join(", "),
         w ? `${round1(weight(w).value)} ${weight(w).unit}` : "",
         h.issue ? issueLinkText(events, h.issue) : "",
-        n ? `${n} ${n === 1 ? "photo" : "photos"}` : "",
+        attachmentsText(h.photos ?? []),
       ];
       return { title: HEALTH_LABELS[h.type] ?? "Health", detail: parts.filter(Boolean).join(" · ") };
     }
@@ -1124,6 +1177,31 @@ function parsePhotos(raw: unknown): string[] | undefined {
   const photos = [...new Set(raw as string[])];
   if (photos.length > MAX_PHOTOS) throw new InvalidEvent(`at most ${MAX_PHOTOS} photos on one entry`);
   return photos.length ? photos : undefined;
+}
+
+/**
+ * The attachments an entry or an upcoming item sends ({photos?, names?}), checked: paths this app wrote, once each,
+ * at most MAX_PHOTOS; `names` only for those paths, cleaned (`cleanFileName`), the rest dropped. Neither key is
+ * present when there are none. That each path has an object behind it is the server's check (`missingPhotos`).
+ */
+export function parseAttachments(raw: Record<string, unknown>): { photos?: string[]; names?: Record<string, string> } {
+  const photos = parsePhotos(raw.photos);
+  if (!photos) return {};
+  const out: { photos: string[]; names?: Record<string, string> } = { photos };
+  const given = raw.names;
+  if (given !== undefined && given !== null) {
+    if (typeof given !== "object" || Array.isArray(given)) throw new InvalidEvent("names must be an object");
+    const names: Record<string, string> = {};
+    for (const path of photos) {
+      const v = (given as Record<string, unknown>)[path];
+      if (v === undefined || v === null) continue;
+      if (typeof v !== "string") throw new InvalidEvent("a file name must be text");
+      const name = cleanFileName(v);
+      if (name) names[path] = name;
+    }
+    if (Object.keys(names).length) out.names = names;
+  }
+  return out;
 }
 
 /** A linked issue's id, lowercased; none is undefined (no key). That it is a Health issue is the server's check (`checkIssueTarget`). */
@@ -1212,8 +1290,7 @@ function medicationDetails(r: Record<string, unknown>, meds: readonly Medication
   } as HealthDetails;
   const issue = parseIssue(r.issue);
   if (issue) out.issue = issue;
-  const photos = parsePhotos(r.photos);
-  if (photos) out.photos = photos;
+  Object.assign(out, parseAttachments(r));
   return out;
 }
 
@@ -1254,8 +1331,7 @@ export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood
       }
       const issue = parseIssue(r.issue);
       if (issue) out.issue = issue;
-      const photos = parsePhotos(r.photos);
-      if (photos) out.photos = photos;
+      Object.assign(out, parseAttachments(r));
       return out;
     }
     case "food": {
@@ -1268,7 +1344,7 @@ export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood
         }
         amount = Math.round(r.amount * 1000) / 1000;
       }
-      return foodSnapshot(type, r.item_id, amount, added);
+      return { ...foodSnapshot(type, r.item_id, amount, added), ...parseAttachments(r) };
     }
     case "exercise": {
       const type = oneOf(r.type, EXERCISE_TYPES, "type");
@@ -1298,8 +1374,7 @@ export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood
           out.dogs = ids;
         }
       }
-      const photos = parsePhotos(r.photos);
-      if (photos) out.photos = photos;
+      Object.assign(out, parseAttachments(r));
       return out;
     }
     case "weight": {
@@ -1310,6 +1385,7 @@ export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood
       const out: WeightDetails = { value, unit: oneOf(r.unit, UNITS, "unit") };
       const visit = parseVisit(r.visit);
       if (visit) out.visit = visit;
+      Object.assign(out, parseAttachments(r));
       return out;
     }
     case "health": {
@@ -1330,8 +1406,7 @@ export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood
         if (type !== "vet") throw new InvalidEvent("only a vet visit links to an issue");
         out.issue = issue;
       }
-      const photos = parsePhotos(r.photos);
-      if (photos) out.photos = photos;
+      Object.assign(out, parseAttachments(r));
       return out;
     }
   }

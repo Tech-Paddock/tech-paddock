@@ -22,7 +22,11 @@ import {
   followText,
   food as asFood,
   formOf,
+  eventNames,
   eventPhotos,
+  attachmentLabel,
+  isImagePath,
+  pathExt,
   formatAgo,
   isAccident,
   latestWeight,
@@ -75,10 +79,11 @@ type Pending = { body: LogBody; status: "saving" | "failed"; error?: string; the
 type Stored = LogBody & { then?: LogBody[] };
 
 /**
- * `doneFor` is the upcoming item a Done opened this form for (TEC-199); `healthType` is Health's tab on a new entry;
+ * `doneFor` is the upcoming item a Done opened this form for (TEC-199) and `plan` the open item being edited in place
+ * (TEC-203); `healthType` is Health's tab on a new entry;
  * `quick` is the pill or Treats button that opened the form (TEC-181, TEC-186).
  */
-type Open = { form: FormKind; event?: JournalEvent; healthType?: HealthType; doneFor?: Upcoming; quick?: QuickLog } | null;
+type Open = { form: FormKind; event?: JournalEvent; healthType?: HealthType; doneFor?: Upcoming; plan?: Upcoming; quick?: QuickLog } | null;
 type Tab = "log" | "analytics" | "new";
 
 async function postJson(url: string, body: unknown): Promise<{ ok: boolean; status: number; data: any }> {
@@ -177,6 +182,8 @@ export default function Journal() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setUpcoming(data.items);
+      // Signed URLs for the items' attachments, so an edit or a Done shows them (TEC-203).
+      setPhotoUrls((prev) => ({ ...prev, ...(data.photos ?? {}) }));
       setUpcomingError(null);
     } catch (e) {
       setUpcomingError((e as Error).message || "couldn't reach the server");
@@ -408,13 +415,17 @@ export default function Journal() {
    * A future When on any form (TEC-199): the form's item is saved as an upcoming item, awaited, so a refused
    * one stays on its form with the reason. The sheet closes once it is in.
    */
-  async function addUpcoming(item: UpcomingInput): Promise<{ error: string | null }> {
+  async function addUpcoming(item: UpcomingInput, id?: string): Promise<{ error: string | null }> {
     try {
-      const { ok, data } = await postJson("/api/upcoming", { action: "add", item });
-      if (!ok) return { error: data.error ?? "couldn't save" };
+      // With an id this is an edit of an open item, in place (TEC-203): the plan changes, the journal is untouched.
+      const { ok, status, data } = await postJson("/api/upcoming", id ? { action: "edit", id, item } : { action: "add", item });
+      if (!ok) {
+        if (status === 409) void loadUpcoming();
+        return { error: data.error ?? "couldn't save" };
+      }
       setUpcoming((prev) => [...(prev ?? []).filter((i) => i.id !== data.item.id), data.item]);
       setOpen(null);
-      say(`${item.title} scheduled`);
+      say(id ? `${item.title} updated` : `${item.title} scheduled`);
       return { error: null };
     } catch (e) {
       return { error: e instanceof TypeError ? "no connection — try again" : (e as Error).message };
@@ -434,6 +445,12 @@ export default function Journal() {
     } catch (e) {
       return { error: e instanceof TypeError ? "no connection — try again" : (e as Error).message };
     }
+  }
+
+  /** Tapping an open item opens it in its form, on its own When, to edit in place (TEC-203). Done and cancelled never get here. */
+  function editUpcoming(item: Upcoming) {
+    const target = formForItem(item);
+    if (target) setOpen({ form: target.form, healthType: target.healthType, plan: item });
   }
 
   /**
@@ -688,7 +705,7 @@ export default function Journal() {
           {week.length > 0 && (
             <section aria-label="Next 7 days" className="-mt-2 grid gap-1 rounded-xl border border-line bg-paper p-2">
               <h2 className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Next 7 days</h2>
-              <UpcomingList items={week} today={today} onDone={doneUpcoming} />
+              <UpcomingList items={week} today={today} onDone={doneUpcoming} onEdit={editUpcoming} />
             </section>
           )}
 
@@ -839,7 +856,7 @@ export default function Journal() {
                 {upcomingError && !upcoming && <p className="text-urgent">Couldn&apos;t load upcoming items. ({upcomingError})</p>}
                 {upcoming && allOpen.length === 0 && <p className="text-ink-soft">Nothing upcoming. Pick a future When on any form to add one.</p>}
                 {!upcoming && !upcomingError && <p className="text-ink-soft">Loading…</p>}
-                {allOpen.length > 0 && <UpcomingList items={allOpen} today={today} onDone={doneUpcoming} onCancel={cancelItem} />}
+                {allOpen.length > 0 && <UpcomingList items={allOpen} today={today} onDone={doneUpcoming} onEdit={editUpcoming} onCancel={cancelItem} />}
               </>
             )}
             {!showUpcoming && days.length === 0 && (
@@ -915,9 +932,19 @@ export default function Journal() {
                                 {e.note && <span className="ml-1.5 text-sm text-ink-soft">“{e.note}”</span>}
                               </span>
                               {eventPhotos(e).length > 0 && (
-                                <span className="mt-1 flex gap-1">
+                                <span className="mt-1 flex min-w-0 gap-1 overflow-hidden">
                                   {eventPhotos(e).slice(0, 4).map((path, i) =>
-                                    photoUrls[path] ? (
+                                    !isImagePath(path) ? (
+                                      // A file that is not a picture (TEC-203): its type and name; it opens from the entry.
+                                      <span
+                                        key={path}
+                                        title={attachmentLabel(path, eventNames(e))}
+                                        className="flex h-10 min-w-0 max-w-[8.5rem] shrink items-center gap-1 rounded-md border border-line px-1.5 text-[12px] text-ink-soft"
+                                      >
+                                        <b className="shrink-0 text-[10px] uppercase">{pathExt(path) || "file"}</b>
+                                        <span className="truncate">{attachmentLabel(path, eventNames(e))}</span>
+                                      </span>
+                                    ) : photoUrls[path] ? (
                                       // eslint-disable-next-line @next/next/no-img-element
                                       <img key={path} src={photoUrls[path]} alt={`Photo ${i + 1}`} loading="lazy" className="h-10 w-10 shrink-0 rounded-md border border-line object-cover" />
                                     ) : (
@@ -951,19 +978,22 @@ export default function Journal() {
           title={
             open.event
               ? `Edit ${describe(open.event).title.toLowerCase()}`
-              : open.doneFor && open.form === "health"
-                ? HEALTH_LABELS[open.healthType ?? "vet"]
-                : FORM_LABELS[open.form]
+              : open.plan
+                ? "Edit upcoming"
+                : open.doneFor && open.form === "health"
+                  ? HEALTH_LABELS[open.healthType ?? "vet"]
+                  : FORM_LABELS[open.form]
           }
           onClose={() => setOpen(null)}
         >
           <LogForm
-            key={open.event?.id ?? (open.doneFor ? `done-${open.doneFor.id}` : open.form)}
+            key={open.event?.id ?? (open.plan ? `plan-${open.plan.id}` : open.doneFor ? `done-${open.doneFor.id}` : open.form)}
             form={open.form}
             healthType={open.healthType}
             quick={open.quick}
             event={open.event}
             done={open.doneFor ? donePrefill(open.doneFor, medications) : undefined}
+            plan={open.plan}
             sessionTreats={(open.form === "training" || open.form === "potty" || open.form === "fun") && open.event && loaded ? treatsWith(loaded.events, open.event) : undefined}
             people={people}
             dogs={dogs}

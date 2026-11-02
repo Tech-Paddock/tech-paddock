@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
 import { InvalidEvent } from "@/lib/events";
-import { PhotoConflict, photoPath, signedPhotoUrls, uploadPhoto, type PhotoType } from "@/lib/storage";
+import { PhotoConflict, photoPath, signedPhotoUrls, uploadPhoto } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
 /**
- * One health photo, already downscaled on the phone: multipart `id` (the
- * phone's UUID for it) and `file`. Answers its storage path and a signed URL.
+ * One attachment: a photo already downscaled on the phone, or any other file up to 4 MB (TEC-203). Multipart `id`
+ * (the phone's UUID for it), `file`, and `name` (the file's original name, used only for its extension). Answers
+ * its storage path and a signed URL.
  * Behind the gate like every route. A failure is a status the form shows on
  * that photo with a Retry; the entry cannot be saved around it. A path that
  * already holds a different photo is a 409: a stored photo never changes.
@@ -15,13 +16,13 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
-  if (!form || !(file instanceof File)) return NextResponse.json({ error: "expected a photo" }, { status: 400 });
+  if (!form || !(file instanceof File)) return NextResponse.json({ error: "expected a file" }, { status: 400 });
   try {
-    const path = photoPath(form.get("id"), file.type, file.size);
+    const path = photoPath(form.get("id"), file.type, file.size, form.get("name"));
     const db = getServiceClient();
-    await uploadPhoto(db, path, await file.arrayBuffer(), file.type as PhotoType);
+    await uploadPhoto(db, path, await file.arrayBuffer(), file.type);
     const url = (await signedPhotoUrls(db, [path])).get(path);
-    if (!url) throw new Error("the photo was stored but could not be read back");
+    if (!url) throw new Error("the file was stored but could not be read back");
     return NextResponse.json({ path, url });
   } catch (e) {
     if (e instanceof PhotoConflict) return NextResponse.json({ error: e.message }, { status: 409 });
