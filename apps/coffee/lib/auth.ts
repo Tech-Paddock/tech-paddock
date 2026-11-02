@@ -117,24 +117,6 @@ async function unpack<T>(value: string | undefined): Promise<T | null> {
 }
 
 /**
- * Constant-time string equality, for comparing a presented secret against the
- * configured one. Pure JavaScript, so it needs nothing from node:crypto.
- *
- * Every byte of the longer input is visited whatever the contents, so the time
- * taken says nothing about where the first difference is. It does reveal the
- * lengths, which is the accepted cost of every such comparison and says nothing
- * useful about a random secret.
- */
-export function safeEqual(a: string, b: string): boolean {
-  const x = new TextEncoder().encode(a);
-  const y = new TextEncoder().encode(b);
-  let diff = x.length ^ y.length;
-  const n = Math.max(x.length, y.length);
-  for (let i = 0; i < n; i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
-  return diff === 0;
-}
-
-/**
  * The failed-attempts counter is **advisory, and deliberately unsigned.**
  *
  * It lives in a cookie the client controls: a script that does not send it
