@@ -469,9 +469,9 @@ describe("Done opens the matching form, prefilled", () => {
 
 describe("the Log screen", () => {
   const html = renderToStaticMarkup(createElement(Journal));
-  it("has three tabs, Log, Analytics and Patch notes, in that order", () => {
+  it("has four tabs, Log, Notes, Analytics and Patch notes, in that order (TEC-204)", () => {
     const tabs = [...html.matchAll(/role="tab"[^>]*>([^<]+)</g)].map((m) => m[1]);
-    expect(tabs).toEqual(["Log", "Analytics", "Patch notes"]);
+    expect(tabs).toEqual(["Log", "Notes", "Analytics", "Patch notes"]);
     expect(html).not.toContain("Upcoming</button>");
     expect(html).not.toContain("What&#x27;s new");
   });

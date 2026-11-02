@@ -60,7 +60,10 @@ import type { MedUnit, Medication } from "@/lib/medications";
 import { isMealType, type AddedFood, type FoodUnit, type ListType } from "@/lib/foods";
 import { nameBoxWidth } from "@/lib/names";
 import { saveThen } from "@/lib/saveOrder";
+import { liveNotes, withoutNotes } from "@/lib/notes";
 import Analytics from "./Analytics";
+import Notes from "./Notes";
+import NoteForm from "./NoteForm";
 import WhatsNew from "./WhatsNew";
 import UpcomingList from "./UpcomingList";
 import LogForm, { type LogBody, type Person } from "./LogForm";
@@ -84,7 +87,7 @@ type Stored = LogBody & { then?: LogBody[] };
  * `quick` is the pill or Treats button that opened the form (TEC-181, TEC-186).
  */
 type Open = { form: FormKind; event?: JournalEvent; healthType?: HealthType; doneFor?: Upcoming; plan?: Upcoming; quick?: QuickLog } | null;
-type Tab = "log" | "analytics" | "new";
+type Tab = "log" | "notes" | "analytics" | "new";
 
 async function postJson(url: string, body: unknown): Promise<{ ok: boolean; status: number; data: any }> {
   const res = await fetch(url, {
@@ -155,6 +158,9 @@ export default function Journal() {
   const [remembered, setRemembered] = useState<Remembered>({});
   const [storageRead, setStorageRead] = useState(false);
   const [open, setOpen] = useState<Open>(null);
+  // The Note form (TEC-204): a new note, or the one being corrected. Its own sheet; a note has no place in `Open`
+  // because it is no Log form and has no filter pill.
+  const [noteOpen, setNoteOpen] = useState<{ event?: JournalEvent } | null>(null);
   // The feed shows the picked forms' entries, or all when none is picked (TEC-129, TEC-136,
   // TEC-177). Not remembered.
   const [only, setOnly] = useState<FormKind[]>([]);
@@ -512,6 +518,12 @@ export default function Journal() {
     void save(body, true, then);
   }
 
+  // A new note (TEC-204): the sheet closes at once and the note shows in the Notes tab as "Saving…", like any entry.
+  function logNote(body: LogBody) {
+    setNoteOpen(null);
+    void save(body, true);
+  }
+
   // Fun's Pee and Poop (TEC-186): saved at once through the usual pending row; the sheet stays open.
   function logPotty(body: LogBody) {
     void save(body, true);
@@ -530,10 +542,13 @@ export default function Journal() {
         return { error: data.error ?? "couldn't save" };
       }
       mergeEvent(data.event);
+      const wasNote = noteOpen !== null;
       setOpen(null);
+      setNoteOpen(null);
       // Treats added to a corrected training: saved now, each with its own Retry.
       for (const t of then ?? []) void save(t, false);
-      say(body.kind === "void" ? "Entry deleted" : "Entry corrected");
+      const what = wasNote ? "Note" : "Entry";
+      say(body.kind === "void" ? `${what} deleted` : `${what} corrected`);
       return { error: null };
     } catch (e) {
       return { error: e instanceof TypeError ? "no connection — try again" : (e as Error).message };
@@ -552,27 +567,33 @@ export default function Journal() {
     window.scrollTo(0, 0);
   }
 
-  const clocks = useMemo(() => (loaded ? sinceLast(loaded.events, now) : null), [loaded, now]);
+  // Notes (TEC-204) are kept out of everything the Log tab and Analytics read: the pills, the feed, the meal and
+  // weight reads and the charts all get `entries`, and only the Notes tab gets `notes`.
+  const entries = useMemo(() => (loaded ? withoutNotes(loaded.events) : []), [loaded]);
+  const notes = useMemo(() => (loaded ? liveNotes(loaded.events) : []), [loaded]);
+  const feedPending = useMemo(() => pending.filter((p) => p.body.kind !== "note"), [pending]);
+  const notePending = useMemo(() => pending.filter((p) => p.body.kind === "note"), [pending]);
+  const clocks = useMemo(() => (loaded ? sinceLast(entries, now) : null), [loaded, entries, now]);
   // The feed (TEC-136): every live entry in the read's window (today and the
   // HORIZON_DAYS before it; older weights stay in Analytics' growth chart),
   // plus anything not saved yet, under one chip's filter.
   const live = useMemo(() => {
     if (!loaded) return [];
     const start = since.getTime() - HORIZON_DAYS * 86_400_000; // the same window the server reads
-    return liveEvents(loaded.events).filter((e) => Date.parse(e.at) >= start);
-  }, [loaded, since]);
+    return liveEvents(entries).filter((e) => Date.parse(e.at) >= start);
+  }, [loaded, entries, since]);
   type Row = { saved: JournalEvent } | { pending: Pending };
   const days = useMemo(() => {
     const rows: FeedRow<Row>[] = [
-      ...pending.map((p) => ({ kind: p.body.kind, at: p.body.at, created_at: null, item: { pending: p } })),
+      ...feedPending.map((p) => ({ kind: p.body.kind, at: p.body.at, created_at: null, item: { pending: p } })),
       ...live.map((e) => ({ kind: e.kind, at: e.at, created_at: e.created_at, item: { saved: e } })),
     ];
     const shown = rows.filter((r) => inPicks(only, formOf("saved" in r.item ? r.item.saved : r.item.pending.body)));
     return feedDays(shown, now);
-  }, [live, pending, only, now]);
-  const anything = live.length > 0 || pending.length > 0;
-  const lastWeight = loaded ? latestWeight(loaded.events) : null;
-  const weightUnit = loaded ? displayUnit(loaded.events) : "lb";
+  }, [live, feedPending, only, now]);
+  const anything = live.length > 0 || feedPending.length > 0;
+  const lastWeight = loaded ? latestWeight(entries) : null;
+  const weightUnit = loaded ? displayUnit(entries) : "lb";
   const weightNote = lastWeight
     ? `last ${round1(asWeight(lastWeight).value)} ${asWeight(lastWeight).unit}, ${
         Date.parse(lastWeight.at) >= since.getTime() ? "today" : shortDate(lastWeight.at)
@@ -589,7 +610,7 @@ export default function Journal() {
   const allOpen = upcoming ? allUpcoming(upcoming) : [];
 
   const tabClass = (t: Tab) =>
-    `border-b-[3px] pb-2 pt-2.5 font-bold ${t === tab ? "border-pinstripe text-ink" : "border-transparent text-ink-soft"}`;
+    `whitespace-nowrap border-b-[3px] pb-2 pt-2.5 text-[15px] font-bold ${t === tab ? "border-pinstripe text-ink" : "border-transparent text-ink-soft"}`;
 
   return (
     <>
@@ -599,9 +620,12 @@ export default function Journal() {
         className="sticky z-10 border-b border-line bg-paper"
         style={{ top: "env(safe-area-inset-top, 0px)" }}
       >
-        <div className="mx-auto grid max-w-md grid-cols-3 gap-2 px-3">
+        <div className="mx-auto grid max-w-md grid-cols-4 gap-1 px-3">
           <button role="tab" type="button" id="tab-log" aria-selected={tab === "log"} aria-controls="panel-log" onClick={() => showTab("log")} className={tabClass("log")}>
             Log
+          </button>
+          <button role="tab" type="button" id="tab-notes" aria-selected={tab === "notes"} aria-controls="panel-notes" onClick={() => showTab("notes")} className={tabClass("notes")}>
+            Notes
           </button>
           <button role="tab" type="button" id="tab-analytics" aria-selected={tab === "analytics"} aria-controls="panel-analytics" onClick={() => showTab("analytics")} className={tabClass("analytics")}>
             Analytics
@@ -624,9 +648,27 @@ export default function Journal() {
           </div>
         )}
 
+        <div id="panel-notes" role="tabpanel" aria-labelledby="tab-notes" hidden={tab !== "notes"}>
+          {tab === "notes" && (
+            <Notes
+              notes={notes}
+              pending={notePending}
+              loaded={!!loaded}
+              loadError={loadError}
+              now={now}
+              nameOf={nameOf}
+              photoUrls={photoUrls}
+              onAdd={() => setNoteOpen({})}
+              onEdit={(event) => setNoteOpen({ event })}
+              onRetry={(body) => void save(body, true)}
+              onDiscard={(id) => updatePending((list) => list.filter((x) => x.body.id !== id))}
+            />
+          )}
+        </div>
+
         <div id="panel-analytics" role="tabpanel" aria-labelledby="tab-analytics" hidden={tab !== "analytics"}>
           {tab === "analytics" &&
-            (loaded ? <Analytics events={loaded.events} now={now} /> : <p className="text-sm text-ink-soft">{loadError ? "" : "Loading…"}</p>)}
+            (loaded ? <Analytics events={entries} now={now} /> : <p className="text-sm text-ink-soft">{loadError ? "" : "Loading…"}</p>)}
         </div>
 
         <div id="panel-new" role="tabpanel" aria-labelledby="tab-new" hidden={tab !== "new"}>
@@ -652,7 +694,7 @@ export default function Journal() {
               const tap = clocks ? quickLog(c, clocks.food, foods) : null;
               // The Meal pill reads today's meals and cups (TEC-194); the others keep their name.
               const isMeal = c === "food";
-              const face = isMeal && loaded ? mealPillLabel(loaded.events, now) : isMeal ? "Meals" : CLOCK_LABELS[c];
+              const face = isMeal && loaded ? mealPillLabel(entries, now) : isMeal ? "Meals" : CLOCK_LABELS[c];
               return (
                 <Pill
                   key={c}
@@ -909,7 +951,7 @@ export default function Journal() {
                         );
                       }
                       const e = item.saved;
-                      const { title, detail } = describe(e, dogs, loaded?.events);
+                      const { title, detail } = describe(e, dogs, entries);
                       const accident = isAccident(e);
                       return (
                         <li key={e.id}>
@@ -994,7 +1036,7 @@ export default function Journal() {
             event={open.event}
             done={open.doneFor ? donePrefill(open.doneFor, medications) : undefined}
             plan={open.plan}
-            sessionTreats={(open.form === "training" || open.form === "potty" || open.form === "fun") && open.event && loaded ? treatsWith(loaded.events, open.event) : undefined}
+            sessionTreats={(open.form === "training" || open.form === "potty" || open.form === "fun") && open.event && loaded ? treatsWith(entries, open.event) : undefined}
             people={people}
             dogs={dogs}
             onAddDog={addDog}
@@ -1003,7 +1045,7 @@ export default function Journal() {
             medications={medications}
             onAddMedication={addMedication}
             phonePerson={person?.id ?? null}
-            events={loaded?.events ?? []}
+            events={entries}
             photoUrls={photoUrls}
             onPhotoUrl={rememberPhotoUrl}
             remembered={remembered}
@@ -1014,6 +1056,21 @@ export default function Journal() {
             onPotty={logPotty}
             unsaved={Object.fromEntries(pending.map((p) => [p.body.id, p.status]))}
             onRetry={retryPending}
+          />
+        </Sheet>
+      )}
+
+      {noteOpen && !askWho && (
+        <Sheet title={noteOpen.event ? "Edit note" : "Add note"} onClose={() => setNoteOpen(null)}>
+          <NoteForm
+            key={noteOpen.event?.id ?? "new"}
+            event={noteOpen.event}
+            people={people}
+            phonePerson={person?.id ?? null}
+            photoUrls={photoUrls}
+            onPhotoUrl={rememberPhotoUrl}
+            onLog={logNote}
+            onChange={change}
           />
         </Sheet>
       )}

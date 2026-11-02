@@ -32,7 +32,7 @@ function listValues(sql: string): Set<string> {
   let kind = "";
   for (const raw of fnBody(sql).split("\n")) {
     const line = raw.trim().replace(/\s+/g, " ");
-    kind = line.match(/^WHEN '(potty|food|exercise|weight|health|void)' THEN/)?.[1] ?? kind;
+    kind = line.match(/^WHEN '(potty|food|exercise|weight|health|note|void)' THEN/)?.[1] ?? kind;
     const add = (label: string, values: string[]) => values.forEach((v) => out.add(`${kind} | ${label} | ${v}`));
     for (const m of line.matchAll(/ARRAY\[([^\]]*)\]/g)) add(line.replace(m[0], "ARRAY[]"), quoted(m[1]));
     for (const m of line.matchAll(/\bIN \(([^)]*)\)/g)) add(line.replace(m[0], "IN ()"), quoted(m[1]));

@@ -150,7 +150,7 @@ type Props = {
 
 /* ── Small parts ─────────────────────────────────────────────────────────── */
 
-function Field({ label, htmlFor, children, className = "" }: { label: string; htmlFor?: string; children: React.ReactNode; className?: string }) {
+export function Field({ label, htmlFor, children, className = "" }: { label: string; htmlFor?: string; children: React.ReactNode; className?: string }) {
   const lbl = "text-[11px] uppercase tracking-[0.06em] text-ink-soft";
   return (
     <div className={`grid min-w-0 content-start gap-0.5 ${className}`}>
@@ -209,7 +209,7 @@ function Seg<T extends string>({
  * A box of a form (TEC-199): Box 1 is When and Logging as, Box 2 the entry, Box 3 the secondary things. The
  * `data-section` marks them in order for the tests and for anyone reading the form.
  */
-function Box({ section, label, children }: { section: string; label: string; children: React.ReactNode }) {
+export function Box({ section, label, children }: { section: string; label: string; children: React.ReactNode }) {
   return (
     <section data-section={section} aria-label={label} className="grid gap-1.5 rounded-xl border border-line bg-paper p-2">
       {children}
@@ -227,10 +227,10 @@ const MED_ADD = "__add_med";
  * `w-[64px]` and `w-auto`, so a width here would beat every narrow field. Each field names its own width:
  * `inputFull` where it fills its column, `w-[..]` or the content's own width elsewhere.
  */
-const input =
+export const input =
   "min-w-0 min-h-[44px] rounded-[10px] border border-line bg-surface px-2 py-1.5 text-[15px] outline-none focus:border-accent";
 
-const inputFull = `${input} w-full`;
+export const inputFull = `${input} w-full`;
 
 const WHERE_OPTS = [
   ["outside", "Outside"],
@@ -280,7 +280,7 @@ export default function LogForm({
   unsaved,
   onRetry,
 }: Props) {
-  const kind: LogKind = kindOfForm(form);
+  const kind: Exclude<LogKind, "note"> = kindOfForm(form);
   const editing = !!event;
   const openedAt = useRef(new Date().toISOString());
   // A weight is a day, not a moment: its When picks a date, stored at local noon.
