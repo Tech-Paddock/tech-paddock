@@ -6,9 +6,9 @@ import type { Candidate, CartLine, CartPick, Plan, ReviewLine } from "./cart";
  *
  * **Pure; the browser runs it.** A line goes in as its best guess, with no list
  * to read first:
- * - one saved product, or the name's default: that product;
- * - several saved products and no default: the **most-bought** (the plan lists
- *   them most-bought first);
+ * - one saved product, the name's default, or (TEC-214) the pack that fits the
+ *   amount, else the most purchased: that product;
+ * - still a tie: the first the plan lists (most counted);
  * - nothing saved: **Kroger's top match** for the item.
  * A line with nothing to add is still sent along with no product, so the server
  * reports it ("No product to add.") rather than losing it. No model runs.
@@ -98,13 +98,11 @@ export function needsSplash(plan: Plan): boolean {
   return plan.kind === "settle" && plan.options.length > 1;
 }
 
-/** The pick a tapped option sends; `makeDefault` only for a name that matched several saved products. */
-export function pickOf(line: Pick<CartLine, "id"> & { plan: Plan }, option: PickerOption, makeDefault: boolean): CartPick {
+/** The pick a tapped option sends. **Never a default** (TEC-214): only Your brands' Make default sets one. */
+export function pickOf(line: Pick<CartLine, "id"> & { plan: Plan }, option: PickerOption): CartPick {
   const plan = line.plan;
-  const matched = plan.kind === "exact" || plan.kind === "settle" ? plan.matched : null;
-  const defaulting = makeDefault && matched && pickerOptions(plan).length > 1 ? { makeDefault: true as const } : {};
-  if (plan.kind === "exact" && option.upc === plan.upc) return { id: line.id, upc: option.upc, ...defaulting };
-  return { id: line.id, upc: option.upc, match: option.url, ...(option.fresh && option.size ? { size: option.size } : {}), ...defaulting };
+  if (plan.kind === "exact" && option.upc === plan.upc) return { id: line.id, upc: option.upc };
+  return { id: line.id, upc: option.upc, match: option.url, ...(option.fresh && option.size ? { size: option.size } : {}) };
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import { decider, type Decision } from "./brands";
 import { readProducts } from "./productStore";
+import { purchasesForPicking } from "./purchaseStore";
 import { readPreferences } from "./preferences";
 import { lineView, type Pack } from "./lineView";
 
@@ -22,8 +23,8 @@ export function packOf(decision: Decision): Pack | null {
 export async function quantityRule(): Promise<(line: { name: string; note: string | null }) => number> {
   let decide: (name: string, note?: string | null) => Decision = () => null;
   try {
-    const [products, words] = await Promise.all([readProducts(), readPreferences()]);
-    decide = decider(products, words);
+    const [products, words, purchases] = await Promise.all([readProducts(), readPreferences(), purchasesForPicking()]);
+    decide = decider(products, words, purchases);
   } catch {
     // Counted without conversions; see above.
   }

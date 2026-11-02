@@ -12,6 +12,7 @@ import {
 import { errorResponse } from "@/lib/respond";
 import { linkFor, readPreferences } from "@/lib/preferences";
 import { readProducts } from "@/lib/productStore";
+import { purchasesForPicking } from "@/lib/purchaseStore";
 import { decider } from "@/lib/decide";
 import { lineMark } from "@/lib/brands";
 import { lineView } from "@/lib/lineView";
@@ -49,8 +50,9 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    const [items, words, products] = await Promise.all([readList(), readPreferences(), readProducts()]);
-    const decide = decider(products, words);
+    // The purchases read degrades to an empty map (the count decides), never to an error.
+    const [items, words, products, purchases] = await Promise.all([readList(), readPreferences(), readProducts(), purchasesForPicking()]);
+    const decide = decider(products, words, purchases);
     const decisions = items.map((item) => decide(item.name, item.note));
 
     // **Prices are the nightly check's** (TEC-190): each line's saved product at

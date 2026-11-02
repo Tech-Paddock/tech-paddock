@@ -1,6 +1,8 @@
 import { pageFor, productIdFromUrl } from "./kingsoopers";
 import { itemInName, itemWords, sameWord, wordsOf } from "./itemWords";
 import { bagOf } from "./lineView";
+import { fitting, lineAmount, packCapacity } from "./sizeFit";
+import type { Bought } from "./purchases";
 
 /**
  * Your brands, one row per King Soopers product code (TEC-131; `RULES.md`,
@@ -18,15 +20,19 @@ import { bagOf } from "./lineView";
  *    the line's item words beyond the matched name ("sourdough" in
  *    "sourdough english muffins") all appear in exactly one candidate's
  *    official name or names. Otherwise **the name's default** goes in, when it
- *    has exactly one. Either is `chosen`, and moves to the front.
+ *    has exactly one. Otherwise (TEC-214) **the pack that fits the amount**
+ *    ("4 lb chicken": the smallest that covers it, else the closest), then
+ *    **the most purchased** in the last 12 weeks, then the most recent
+ *    purchase; with no purchases for any, the count. Each is `chosen`, and
+ *    moves to the front. A tie all the way down is still *Pick one*.
  * 3. **Only when no name matched**, the item alone (`lib/itemWords.ts`) against
  *    each saved product's official Kroger name, as whole words. **These are
  *    unconfirmed**: Send offers one only when Kroger's own search for the item
  *    also returns its code (`planLine`, `lib/cart.ts`), so "spaghetti" never
  *    goes in as a pasta sauce.
  *
- * Candidates are ranked **most counted first, then most recently updated**.
- * The count ranks; it never claims what was bought.
+ * Candidates are listed **most counted first, then most recently updated**.
+ * The count orders the list; it never claims what was bought.
  */
 
 export type Successor = {
@@ -95,6 +101,12 @@ export type Candidate = {
   isDefault?: boolean;
 };
 
+/** Why a line goes in without a pick: a named product, the name's default, the pack that fits, or the most purchased (TEC-214). */
+export type Chosen = "named" | "default" | "fit" | "bought";
+
+/** The last 12 weeks of purchases per saved product (its row `id`). Empty when they could not be read. */
+export type Purchases = Map<string, Pick<Bought, "orders" | "last_ordered_on">>;
+
 /** What decides a line. One copy, for the cart review, the estimate, the deal scan and the list's links. */
 export type Decision =
   | {
@@ -105,7 +117,7 @@ export type Decision =
       /** The saved name that matched, as matched; only on `via: "name"`. What Make default sets. */
       matched?: string | null;
       /** Why `candidates[0]` goes in without a pick when there are several (TEC-135). */
-      chosen?: "default" | "named" | null;
+      chosen?: Chosen | null;
     }
   | { kind: "terms"; phrase: string; terms: string }
   | { kind: "plain"; phrase: string }
@@ -240,8 +252,53 @@ function longestName(line: string, p: SavedProduct): string {
   return best;
 }
 
+/** How far ahead `a` is of `b` by purchases: more orders in the window, then a later last order. */
+function boughtCompare(a: string, b: string, purchases: Purchases): number {
+  const x = purchases.get(a);
+  const y = purchases.get(b);
+  const orders = (x?.orders ?? 0) - (y?.orders ?? 0);
+  if (orders !== 0) return orders;
+  return (x?.last_ordered_on ?? "").localeCompare(y?.last_ordered_on ?? "");
+}
+
+/**
+ * **The pick when nothing named or defaulted** (TEC-214), among several saved
+ * products for one name:
+ * 1. **The pack that fits the amount** in the line ("4 lb chicken"): the
+ *    smallest that covers it, else the closest. Skipped when the line has no
+ *    amount or no pack has a size in the same kind of unit.
+ * 2. Of what is left, **the most purchased** in the last 12 weeks, then the
+ *    most recent purchase.
+ * 3. **No purchases for any of them:** the count.
+ * Null when it is still a tie, which is *Pick one*, as before.
+ */
+export function pickByFitAndPurchases(
+  line: string,
+  hits: SavedProduct[],
+  purchases: Purchases
+): { product: SavedProduct; chosen: "fit" | "bought" } | null {
+  let pool = hits;
+  const amount = lineAmount(line);
+  if (amount) {
+    const keep = fitting(
+      hits.map((p) => packCapacity(p.size) ?? packCapacity(p.size_first)),
+      amount
+    );
+    if (keep.length > 0) pool = keep.map((i) => hits[i]);
+  }
+  if (pool.length === 1) return { product: pool[0], chosen: "fit" };
+
+  const anyBought = pool.some((p) => (purchases.get(p.id)?.orders ?? 0) > 0);
+  const ahead = anyBought
+    ? (a: SavedProduct, b: SavedProduct) => boughtCompare(b.id, a.id, purchases)
+    : (a: SavedProduct, b: SavedProduct) => (b.count ?? 0) - (a.count ?? 0);
+  const ordered = [...pool].sort(ahead);
+  if (ahead(ordered[0], ordered[1]) === 0) return null;
+  return { product: ordered[0], chosen: "bought" };
+}
+
 /** What decides this line. See the header for the order. */
-export function decide(line: string, products: SavedProduct[], words: WordRow[]): Decision {
+export function decide(line: string, products: SavedProduct[], words: WordRow[], purchases: Purchases = new Map()): Decision {
   const name = cleanName(line);
 
   // 1. A product code typed as the line.
@@ -291,7 +348,7 @@ export function decide(line: string, products: SavedProduct[], words: WordRow[])
     // One name matched; two of the same length on different rows is no one name to default.
     const matched = matchedBy.size === 1 ? [...matchedBy][0] : null;
     const ranked = [...hits].sort(byRank);
-    let chosen: "default" | "named" | null = null;
+    let chosen: Chosen | null = null;
     let first: SavedProduct | null = null;
     if (ranked.length > 1 && matched) {
       // **A named product beats the default** (RULES.md).
@@ -300,6 +357,14 @@ export function decide(line: string, products: SavedProduct[], words: WordRow[])
       else {
         first = defaultFor(matched, ranked);
         if (first) chosen = "default";
+        else {
+          // **Then the pack that fits, then the most purchased** (TEC-214).
+          const picked = pickByFitAndPurchases(name, ranked, purchases);
+          if (picked) {
+            first = picked.product;
+            chosen = picked.chosen;
+          }
+        }
       }
     }
     const ordered = first ? [first, ...ranked.filter((p) => p !== first)] : ranked;
@@ -334,17 +399,21 @@ export function lineMark(decision: Decision): LineMark {
 }
 
 /** `decide`, bound to the rows. */
-export function decider(products: SavedProduct[], words: WordRow[]): (name: string, note?: string | null) => Decision {
+export function decider(
+  products: SavedProduct[],
+  words: WordRow[],
+  purchases: Purchases = new Map()
+): (name: string, note?: string | null) => Decision {
   return (name, note = null) => {
     // **Bulk produce is decided as its bag** (TEC-190): "5 onions" as "onions 3 lb bag". Only a
     // product that is itself a bag can decide it, by a name that says the bag's size or an
     // official name with "bag" in it; otherwise a saved loose "onions" would go in once, for five.
     const bag = bagOf({ name, note });
-    if (!bag) return decide(name, products, words);
+    if (!bag) return decide(name, products, words, purchases);
     const bagged = products.filter(
       (p) => p.names.some((n) => mentions(n, bag.size)) || (p.description ? wordsOf(p.description).includes("bag") : false)
     );
-    return decide(bag.phrase, bagged, words);
+    return decide(bag.phrase, bagged, words, purchases);
   };
 }
 

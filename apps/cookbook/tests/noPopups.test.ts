@@ -332,13 +332,10 @@ describe("the splash, the one picker that stays", () => {
     ]);
   });
 
-  it("a tap sends that product with its page; Make default rides along only when a name matched", () => {
+  it("a tap sends that product with its page, and never a default (TEC-214)", () => {
     const line = review("muffins", settle());
     const [, second] = pickerOptions(line.plan);
-    expect(pickOf(line, second, false)).toEqual({ id: "muffins", upc: B, match: `https://www.kingsoopers.com/p/test/${B}` });
-    expect(pickOf(line, second, true)).toMatchObject({ upc: B, makeDefault: true });
-    const unmatched = review("muffins", { ...(settle() as Extract<Plan, { kind: "settle" }>), matched: null });
-    expect(pickOf(unmatched, second, true)).not.toHaveProperty("makeDefault");
+    expect(pickOf(line, second)).toEqual({ id: "muffins", upc: B, match: `https://www.kingsoopers.com/p/test/${B}` });
   });
 
   it("Add an item opens it from the new lines; Change is gone (TEC-211)", () => {
@@ -346,7 +343,7 @@ describe("the splash, the one picker that stays", () => {
     const list = readFileSync(resolve(__dirname, "../app/List.tsx"), "utf8");
     expect(list).toMatch(/cart\.offerChoices\(/);
     expect(cart).toMatch(/needsSplash\(l\.plan\)/);
-    expect(cart).toMatch(/Make default/);
+    expect(cart).not.toMatch(/Make default/);
     expect(cart).not.toMatch(/change: true|changeLine/);
   });
 });

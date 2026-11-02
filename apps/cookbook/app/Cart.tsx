@@ -19,8 +19,8 @@ import { useToast } from "./Toast";
  *
  * **No review, no pop-up lists** (TEC-206; owner, 2026-11-02: "I don't want to
  * reconfirm and read a list"). **Send all** and **+ Cart** go in as the best
- * guess (`lib/cartGuess.ts`): the one saved product or the name's default, the
- * most-bought of several, else Kroger's top match. After a send every line
+ * guess (`lib/cartGuess.ts`): the one saved product, the name's default, the pack that fits, the
+ * most purchased of several (TEC-214), else Kroger's top match. After a send every line
  * reports added, skipped or failed. Whatever goes in is
  * remembered in Your brands (TEC-128). **No model picks anything.**
  *
@@ -540,14 +540,14 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     setSplash((s) => (s && s.queue.length > 1 ? { ...s, queue: s.queue.slice(1) } : null));
   }
 
-  /** A tap in the splash: that product goes into the cart now (and becomes the default with the tick). */
-  async function chooseProduct(option: PickerOption, makeDefault: boolean) {
+  /** A tap in the splash: that product goes into the cart now. It never becomes a default (TEC-214). */
+  async function chooseProduct(option: PickerOption) {
     const current = splash;
     const line = current?.queue[0];
     if (!current || !line || busy) return;
     setBusy("add");
     try {
-      const sent = await post([pickOf(line, option, makeDefault)], [line.id]);
+      const sent = await post([pickOf(line, option)], [line.id]);
       if ("conflict" in sent) throw new Error(`${line.name} is already in the cart.`);
       const outcome = (sent.body.outcomes as Outcome[]).find((o) => o.id === line.id);
       if (outcome?.result === "added") toast.notice(`${outcome.name} is in the cart. ${outcome.detail}`);
@@ -816,7 +816,7 @@ export function TakeBackResults({ results, onClose }: { results: TakeBackResult;
 /**
  * **The one picker that stays** (TEC-206; owner: "Add an item opens a choice of
  * products when several match and none is the default"). A splash over the
- * list: tap a product to use it, tick **Make default** to keep it for that name.
+ * list: tap a product to use it. It never sets a default (TEC-214).
  * Anything else about a send is settled without asking.
  */
 export function ProductSplash({ cart }: { cart: CartState }) {
@@ -827,9 +827,7 @@ export function ProductSplash({ cart }: { cart: CartState }) {
 }
 
 function SplashBody({ cart, line, more }: { cart: CartState; line: ReviewLine; more: number }) {
-  const [makeDefault, setMakeDefault] = useState(false);
   const options = pickerOptions(line.plan);
-  const matched = (line.plan.kind === "exact" || line.plan.kind === "settle") && line.plan.matched && options.length > 1;
   const working = cart.busy === "add";
 
   useEffect(() => {
@@ -846,7 +844,7 @@ function SplashBody({ cart, line, more }: { cart: CartState; line: ReviewLine; m
         <div className="flex flex-col gap-0.5">
           <h2 className="text-lg font-bold">Which {line.name}?</h2>
           <p className="text-[13px] text-ink-soft">
-            Several match and none is your default. Tap one to add it to the cart.
+            Several match and none stands out. Tap one to add it to the cart.
             {more > 0 ? ` ${more} more to choose after this.` : ""}
           </p>
         </div>
@@ -856,7 +854,7 @@ function SplashBody({ cart, line, more }: { cart: CartState; line: ReviewLine; m
               key={o.upc}
               type="button"
               disabled={working}
-              onClick={() => void cart.chooseProduct(o, makeDefault)}
+              onClick={() => void cart.chooseProduct(o)}
               className="flex min-h-11 items-center gap-2.5 rounded-[10px] border border-line bg-raised px-3 py-2.5 text-left text-ink disabled:opacity-50"
             >
               <span className="flex min-w-0 flex-1 flex-col">
@@ -870,12 +868,6 @@ function SplashBody({ cart, line, more }: { cart: CartState; line: ReviewLine; m
             </button>
           ))}
         </div>
-        {matched ? (
-          <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm">
-            <input type="checkbox" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} className="size-[22px] accent-accent" />
-            Make default
-          </label>
-        ) : null}
         <button type="button" onClick={cart.leaveSplash} disabled={working} className="min-h-11 self-start rounded-[10px] px-2 text-[15px] text-accent underline-offset-2 hover:underline disabled:opacity-50">
           Leave it on the list
         </button>
