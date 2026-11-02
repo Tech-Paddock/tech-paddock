@@ -10,8 +10,8 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 ## Surface: app
 
 - Three tabs, Log, Analytics and Patch notes, opening on Log: the owner's override (2026-10-20,
-  widened 2026-10-27 TEC-182, narrowed 2026-11-01 TEC-199) of the app surface's one screen and no
-  tabs. One-handed, thumb-first. Pills show numbers only; the way into a form is a Log button.
+  widened 2026-10-27 TEC-182, narrowed 2026-11-01 TEC-199, pills restored 2026-11-02 TEC-202) of the app surface's one screen and no
+  tabs. One-handed, thumb-first. Pills open a quick log: Pee and Poop open Potty on that pick, Meals opens Food, Fun opens Fun (TEC-181, TEC-186, restored TEC-202). The Log buttons are Treats, Training, Weight and Health.
 - An app bar over the tabs: theme, logout and the livery badge (Meals today left, TEC-193).
 - Every form opens as a bottom sheet.
 - Installable through `/app.webmanifest`.
