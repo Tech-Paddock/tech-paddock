@@ -38,6 +38,22 @@ describe("validateGuide", () => {
     expect(guide.dropped).toEqual([{ field: "time", value: "3:00", reason: "no source sentence" }]);
   });
 
+  it("keeps a grind that carries a source sentence, and drops one that does not", () => {
+    const quoted = validateGuide(
+      raw({
+        params: { grind: "medium-fine" },
+        quotes: [{ field: "grind", text: "Grind medium-fine, like table salt.", url: PRODUCT }],
+      }),
+      REACHED
+    );
+    expect(quoted.params.grind).toBe("medium-fine");
+    expect(quoted.dropped).toEqual([]);
+
+    const unquoted = validateGuide(raw({ params: { ratio: "1:16", grind: "medium-fine" } }), REACHED);
+    expect(unquoted.params.grind).toBeUndefined();
+    expect(unquoted.dropped).toEqual([{ field: "grind", value: "medium-fine", reason: "no source sentence" }]);
+  });
+
   it("rejects a quote citing a page the model never reported reading", () => {
     const guide = validateGuide(
       raw({ quotes: [{ field: "ratio", text: "Use 1:16.", url: "https://coffeeblog.example/lot" }] }),
@@ -195,7 +211,7 @@ describe("webHost", () => {
 // as a sentence — the text read off the image is the quote, the page is its
 // URL — and on one more: the image itself is stored beside it, to be shown.
 describe("validateGuide, for values read off an image", () => {
-  const PAGE = "https://www.middlestatecoffee.com/shop/jos-ramirez-guatemala";
+  const PAGE = "https://www.northfieldroasters.example/shop/example-lot";
   const CARD = "https://images.squarespace-cdn.com/content/v1/abc/recipe-card.jpg?format=1500w";
   const ELSEWHERE = "https://images.squarespace-cdn.com/content/v1/abc/about-us.jpg?format=1500w";
   const IN_GALLERY = [{ url: CARD, inGallery: true }];
@@ -215,7 +231,7 @@ describe("validateGuide, for values read off an image", () => {
   }
 
   it("keeps a value read off an image in this coffee's gallery, with the image beside its quote", () => {
-    const guide = validateGuide(card(), ["middlestatecoffee.com"], IN_GALLERY);
+    const guide = validateGuide(card(), ["northfieldroasters.example"], IN_GALLERY);
     expect(guide.status).toBe("coffee_specific");
     expect(guide.params).toEqual({ dose: "139.5g", water: "2300ml" });
     expect(guide.quotes.map((q) => q.image)).toEqual([CARD, CARD]);
@@ -224,14 +240,14 @@ describe("validateGuide, for values read off an image", () => {
 
   it("checks the page for the roaster's site, not the image's CDN host", () => {
     // The card lives on Squarespace's CDN; the roaster's site is the page.
-    expect(validateGuide(card(), ["middlestatecoffee.com"], IN_GALLERY).status).toBe("coffee_specific");
+    expect(validateGuide(card(), ["northfieldroasters.example"], IN_GALLERY).status).toBe("coffee_specific");
     const onRetailer = card({
-      product_url: "https://retailer.example/p/ramirez",
-      guide_url: "https://retailer.example/p/ramirez",
-      quotes: [{ field: "dose", text: "dose 139.5g", url: "https://retailer.example/p/ramirez", image: CARD }],
+      product_url: "https://retailer.example/p/example-lot",
+      guide_url: "https://retailer.example/p/example-lot",
+      quotes: [{ field: "dose", text: "dose 139.5g", url: "https://retailer.example/p/example-lot", image: CARD }],
     });
     // A page that was not reached is refused, whatever its image.
-    expect(validateGuide(onRetailer, ["middlestatecoffee.com"], IN_GALLERY).status).toBe("none");
+    expect(validateGuide(onRetailer, ["northfieldroasters.example"], IN_GALLERY).status).toBe("none");
   });
 
   it("drops a value whose quote has no image to show", () => {
@@ -242,7 +258,7 @@ describe("validateGuide, for values read off an image", () => {
           { field: "water", text: "water 2300ml", url: PAGE },
         ],
       }),
-      ["middlestatecoffee.com"],
+      ["northfieldroasters.example"],
       IN_GALLERY
     );
     expect(guide.params).toEqual({ dose: "139.5g" });
@@ -252,7 +268,7 @@ describe("validateGuide, for values read off an image", () => {
   it("drops a value citing an image that was never read", () => {
     const guide = validateGuide(
       card({ quotes: [{ field: "dose", text: "dose 139.5g", url: PAGE, image: "https://evil.example/x.jpg" }] }),
-      ["middlestatecoffee.com"],
+      ["northfieldroasters.example"],
       IN_GALLERY
     );
     expect(guide.status).toBe("none");
@@ -267,7 +283,7 @@ describe("validateGuide, for values read off an image", () => {
           { field: "water", text: "water 2300ml", url: PAGE, image: ELSEWHERE },
         ],
       }),
-      ["middlestatecoffee.com"],
+      ["northfieldroasters.example"],
       [{ url: ELSEWHERE, inGallery: false }]
     );
     expect(guide.status).toBe("roaster_generic");

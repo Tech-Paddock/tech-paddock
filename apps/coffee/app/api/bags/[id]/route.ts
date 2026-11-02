@@ -5,18 +5,16 @@ import { isIsoDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
-// Only the my_* fields are editable. The guide_* values and their quotes are
-// a record of what the roaster published at a point in time — editing them
-// would make the stored quotes stop matching the stored numbers, which is
-// exactly the thing the quotes exist to prevent. Re-run the search to change
-// them.
-// The dial-in moved to coffee.brews, so what remains editable on a bag is
-// what belongs to the purchase rather than to any one attempt at brewing it.
+// Only what belongs to the purchase is editable: my_notes, purchased_date and
+// roast_date. The guide_* values and their quotes are a record of what the
+// roaster published at a point in time — editing them would make the stored
+// quotes stop matching the stored numbers, which is exactly the thing the
+// quotes exist to prevent. Re-run the search to change them. The dial-in
+// lives in coffee.brews, one row per attempt.
 //
-// roast_date joins them because it is the bag's, not the roaster's: it is read
-// off the label by a vision model that is told to report only what is legible,
-// so a smudged or oddly formatted one has to be typeable afterwards. It is not
-// a guide_* value and editing it makes no stored quote stop matching anything.
+// roast_date is the bag's, not the roaster's: it is read off the label by a
+// vision model that is told to report only what is legible, so a smudged or
+// oddly formatted one has to be typeable afterwards.
 const EDITABLE = ["my_notes", "purchased_date", "roast_date"] as const;
 
 const DATES: readonly string[] = ["purchased_date", "roast_date"];

@@ -1,7 +1,7 @@
 /**
  * A roaster's recipe published as a picture (TEC-47, under the rule in TEC-46).
  *
- * Some roasters print their recipe only as an image — Middlestate puts a
+ * Some roasters print their recipe only as an image — One roaster puts a
  * recipe card in the product gallery — and `web_fetch` hands the search model
  * a page as text, so the card never reaches it. The search answers `none`, and
  * a suggestion then takes the place of a recipe the roaster did publish.
@@ -61,6 +61,55 @@ export function isFetchableUrl(url: string | null | undefined): boolean {
   if (!hostname.includes(".")) return false;
   if (/(^|\.)(localhost|local|internal|localdomain|home|lan)$/.test(hostname)) return false;
   return true;
+}
+
+/** Redirects followed before a fetch gives up. A storefront needs one or two. */
+export const MAX_REDIRECTS = 5;
+
+/** A fetch that went somewhere the server may not: a hop failed `isFetchableUrl`, or there were too many. */
+export class RedirectRefused extends Error {}
+
+/**
+ * A GET that checks every hop (TEC-167).
+ *
+ * `fetch` with `redirect: "follow"` only lets the first URL through
+ * `isFetchableUrl`; a public page can redirect to `http://169.254.169.254/` or
+ * an internal name and the server would follow it. So redirects are taken one
+ * at a time with `redirect: "manual"`, and each `Location` is resolved against
+ * the URL that sent it and must pass the same check before it is requested.
+ * Returns the final response and the URL it was served from. Throws
+ * `RedirectRefused` rather than following a hop it may not.
+ */
+export async function fetchChecked(
+  url: string,
+  init: RequestInit,
+  fetcher: typeof fetch = fetch
+): Promise<{ response: Response; url: string }> {
+  let current = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    if (!isFetchableUrl(current)) {
+      throw new RedirectRefused(
+        hop === 0 ? "the address is not a public web page" : `a redirect led to an address the server will not fetch (${hostLabel(current)})`
+      );
+    }
+    const response = await fetcher(current, { ...init, redirect: "manual" });
+    const location = response.headers.get("location");
+    if (response.status < 300 || response.status >= 400 || !location) return { response, url: current };
+    try {
+      current = new URL(location, current).toString();
+    } catch {
+      throw new RedirectRefused("a redirect named an address that is not a URL");
+    }
+  }
+  throw new RedirectRefused(`more than ${MAX_REDIRECTS} redirects`);
+}
+
+function hostLabel(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "an unreadable address";
+  }
 }
 
 /**
@@ -297,7 +346,7 @@ function text(v: unknown): string | null {
  * reshapes. Never throws: a malformed copy-out is no recipes.
  *
  * **A printed column heading is printed text.** "batch" at the top of a
- * column is how Middlestate says what the column is for, so it is the method
+ * column is how a roaster says what the column is for, so it is the method
  * when nothing else names one, and part of the method's quote when something
  * does — the method is then normalised from that quote, as it always is.
  */

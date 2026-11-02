@@ -25,7 +25,7 @@ import {
 } from "@/lib/brews";
 import { MY_BREWERS, MY_BREWER_LABELS, GRINDERS, type MyBrewer } from "@/lib/brewers";
 import type { Guide, GuideStatus } from "@/lib/guide";
-import { guidePresentation, IMAGE_SOURCE_PRESENTATION, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
+import { describeDropped, guidePresentation, IMAGE_SOURCE_PRESENTATION, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
 import type { Suggestion } from "@/lib/suggestion";
 import { roastDateFromLabel } from "@/lib/dates";
 import { searchIsRunning, searchIsStale, SEARCH_START_GRACE_MS, STALE_SEARCH_MESSAGE } from "@/lib/searchClock";
@@ -669,12 +669,7 @@ function GuideCard({ guide }: { guide: Guide }) {
 
       <RecipeImages quotes={guide.quotes} />
 
-      {guide.dropped.length > 0 && (
-        <p className="text-xs text-ink-soft">
-          {guide.dropped.length} value{guide.dropped.length === 1 ? "" : "s"} discarded for having no source on the
-          page.
-        </p>
-      )}
+      <DroppedValues dropped={guide.dropped} />
     </section>
   );
 }
@@ -931,6 +926,7 @@ function BagCard({ bag, onChanged }: { bag: Bag; onChanged: () => void }) {
                 <p className="text-sm text-ink/60">Nothing recorded from the roaster.</p>
               )}
               <RecipeImages quotes={bag.guide_quotes ?? []} />
+              <DroppedValues dropped={bag.guide_dropped ?? []} />
             </div>
 
             {/* Only where the roaster published nothing. A tier-2 house guide
@@ -1749,13 +1745,12 @@ function GuideStatusHeader({
 }
 
 /**
- * What the page actually said, above the parsed values rather than folded
- * away beneath them.
+ * What the page actually said (or, for a value copied off an image, the text
+ * read off it), listed inside the status header's disclosure, one tap under
+ * the indicator and above the roaster's link.
  *
  * The parsed row is a reading of the quote, so the quote is the thing with
- * authority — and a misparse is only visible if you meet the source before
- * the summary of it. It was a collapsed `<details>` under the table, which
- * put the evidence one tap away from the claim it backs.
+ * authority, and a misparse is only visible next to its source.
  */
 function Quotes({ quotes }: { quotes: { text: string; image?: string }[] }) {
   if (!quotes?.length) return null;
@@ -1769,6 +1764,32 @@ function Quotes({ quotes }: { quotes: { text: string; image?: string }[] }) {
             {q.image && <span className="not-italic text-xs text-ink-soft"> — {IMAGE_SOURCE_PRESENTATION.quoteNote}</span>}
           </li>
         ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Values the search read and did not keep, each with its real reason
+ * (TEC-167). Shown on the scan card and the shelf card alike; "Search again"
+ * replaces them, so this is where they can be seen.
+ */
+function DroppedValues({ dropped }: { dropped: { field: string; value: string; reason: string }[] }) {
+  if (!dropped?.length) return null;
+  return (
+    <div className="flex flex-col gap-1 mt-3">
+      <p className="text-xs text-ink-soft">
+        {dropped.length} value{dropped.length === 1 ? "" : "s"} read but not kept
+      </p>
+      <ul className="flex flex-col gap-1">
+        {dropped.map((d, i) => {
+          const { label, value, reason } = describeDropped(d);
+          return (
+            <li key={i} className="text-xs text-ink-soft">
+              {label} &ldquo;{value}&rdquo; &mdash; {reason}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
