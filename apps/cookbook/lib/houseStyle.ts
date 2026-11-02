@@ -2,7 +2,7 @@
  * The house style (TEC-201): how every recipe in the book reads.
  *
  * **Written once, used by every model path that writes a recipe**: Ask Claude,
- * a link, a file, a typed recipe, and Tidy. The prompt text (`HOUSE_STYLE`) goes
+ * a link, a file and a typed recipe. The prompt text (`HOUSE_STYLE`) goes
  * into each of those prompts, and the checks below (`spellUnits`,
  * `restyleProblem`) run in code on what comes back, because a prompt can only ask.
  *

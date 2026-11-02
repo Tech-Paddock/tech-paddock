@@ -4,7 +4,7 @@ import { round, type Macros, type MacroSource } from "./macros";
 import { addItems } from "./grocery";
 import { quantityRule } from "./lineQuantity";
 import { readMeta, readRating, type RecipeMeta } from "./metadata";
-import type { RecipeEdit, Reprice } from "./edit";
+import type { RecipeEdit, Reestimate } from "./edit";
 import { isEstimated, perServing, servingOrNull, type PotMacros } from "./recipeSteps";
 
 // The helpers the browser runs live in `lib/recipeSteps.ts`, which imports no `./supabase`.
@@ -218,7 +218,7 @@ export async function getRecipe(id: string): Promise<Recipe | null> {
 /**
  * Is this name already in the book? **A courtesy, not the rule** — the unique
  * index is the rule, and `saveRecipe` still catches the collision from the
- * insert. This exists so a typed recipe is refused before it pays for a pricing
+ * insert. This exists so a typed recipe is refused before it pays for an estimate
  * call it can never keep (TEC-29 item 8). Compared through `normalizeName`, the
  * index's own expression.
  */
@@ -237,7 +237,7 @@ export async function nameTaken(name: string): Promise<boolean> {
  * Why a draft is refused rather than tidied up.
  *
  * A recipe is a number you will trust for as long as it is in the book, and
- * re-costing one is a deliberate act. A zero, a fraction of a serving or a
+ * estimating one again is a deliberate act. A zero, a fraction of a serving or a
  * missing model must not become a row that later reads like something somebody
  * checked. Returns a message, or null when the draft is sound.
  */
@@ -323,10 +323,10 @@ export async function nameTakenByOther(name: string, exceptId: string): Promise<
 }
 
 /**
- * Write an edit (`lib/edit.ts` decides what it is and whether it re-prices).
+ * Write an edit (`lib/edit.ts` decides what it is and whether it re-estimates the macros).
  * **One statement**, so an edit lands whole or not at all.
  *
- * With a `reprice`, the pot's macros, `source: estimate`, the model and the
+ * With a `reestimate`, the pot's macros, `source: estimate`, the model and the
  * estimate's caveat replace the old ones — a hand-set number whose ingredients
  * changed is no longer the hand's. Without one, none of those four is sent, and
  * a field not sent is not overwritten. `origin` and `source_url` are never sent:
@@ -335,39 +335,31 @@ export async function nameTakenByOther(name: string, exceptId: string): Promise<
 export async function updateRecipe(
   id: string,
   edit: RecipeEdit,
-  reprice: Reprice | null,
-  /**
-   * A kept Tidy (TEC-201): `styled` stamps `house_style_at`; `clearMacros` puts the
-   * macros back to "not estimated yet" when the new text could not be priced, so
-   * the old numbers never sit beside ingredients they were not worked out from.
-   */
-  opts: { styled?: boolean; clearMacros?: boolean } = {}
+  reestimate: Reestimate | null
 ): Promise<Recipe> {
-  const priced = opts.clearMacros && !reprice
-    ? { kcal: null, protein_g: null, carbs_g: null, fat_g: null, source: null, model: null, note: null }
-    : reprice
+  const macroFields = reestimate
     ? {
-        kcal: reprice.macros.kcal,
-        protein_g: reprice.macros.protein_g,
-        carbs_g: reprice.macros.carbs_g,
-        fat_g: reprice.macros.fat_g,
+        kcal: reestimate.macros.kcal,
+        protein_g: reestimate.macros.protein_g,
+        carbs_g: reestimate.macros.carbs_g,
+        fat_g: reestimate.macros.fat_g,
         source: "estimate" as const,
-        model: reprice.model,
-        note: reprice.note,
+        model: reestimate.model,
+        note: reestimate.note,
       }
     : {};
-  if (reprice) {
+  if (reestimate) {
     const problem = validateDraft({
       name: edit.name,
       servings: edit.servings,
-      macros: reprice.macros,
+      macros: reestimate.macros,
       origin: "manual",
       source: "estimate",
-      model: reprice.model,
+      model: reestimate.model,
       source_url: null,
       ingredients: edit.ingredients,
       method: edit.method,
-      note: reprice.note,
+      note: reestimate.note,
       meta: edit.meta,
     });
     if (problem) throw new InputError(problem);
@@ -380,9 +372,8 @@ export async function updateRecipe(
       servings: edit.servings,
       ingredients: edit.ingredients.map((i) => i.trim()).filter(Boolean),
       method: edit.method?.trim() || null,
-      ...(opts.styled ? { house_style_at: new Date().toISOString() } : {}),
       ...edit.meta,
-      ...priced,
+      ...macroFields,
     })
     .eq("id", id)
     .select(COLUMNS)

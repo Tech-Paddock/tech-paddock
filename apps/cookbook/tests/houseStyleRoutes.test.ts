@@ -2,10 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 /**
- * Tidy's routes and the house style on every way in (TEC-201). The model is
- * mocked (a queue of replies, as `anthropic.test.ts`) and so is the database
- * (`@/lib/recipes`, `@/lib/tidyStore`), so each test reads what would have been
- * sent and what would have been written. No recipe data, only invented text.
+ * Revert and the house style on every way in (TEC-201, kept by TEC-207; the recipe
+ * Tidy itself is gone). The model is mocked (a queue of replies, as
+ * `anthropic.test.ts`) and so is the database (`@/lib/recipes`,
+ * `@/lib/importedStore`), so each test reads what would have been sent and what
+ * would have been written. No recipe data, only invented text.
  */
 
 const sent: Array<Record<string, unknown>> = [];
@@ -56,12 +57,9 @@ const row = {
 };
 const IMPORTED = { ingredients: row.ingredients, directions: row.method, yield_text: "" };
 
-const updateRecipe = vi.fn(async (id: string, edit: Record<string, unknown>, reprice: unknown, opts: unknown) => ({ ...row, id, ...edit, reprice, opts }));
+const updateRecipe = vi.fn(async (id: string, edit: Record<string, unknown>, estimate: unknown) => ({ ...row, id, ...edit, estimate }));
 const saveRecipe = vi.fn();
-const saveDraft = vi.fn(async () => {});
-const deleteDraft = vi.fn(async () => {});
 const revertRecipe = vi.fn(async (id: string, fields: Record<string, unknown>) => ({ ...row, id, ...fields, kcal: null }));
-let storedDraft: Record<string, unknown> | null = null;
 let storedOriginal: unknown = IMPORTED;
 
 vi.mock("@/lib/recipes", async (importOriginal) => ({
@@ -74,14 +72,8 @@ vi.mock("@/lib/recipes", async (importOriginal) => ({
   saveRecipe: (...args: unknown[]) => saveRecipe(...args),
 }));
 
-vi.mock("@/lib/tidyStore", () => ({
-  listDrafts: async () => [],
-  getDraft: async () => storedDraft,
-  saveDraft: (...args: unknown[]) => (saveDraft as (...a: unknown[]) => Promise<void>)(...args),
-  deleteDraft: (...args: unknown[]) => (deleteDraft as (...a: unknown[]) => Promise<void>)(...args),
-  deleteDrafts: async () => {},
+vi.mock("@/lib/importedStore", () => ({
   getOriginal: async () => storedOriginal,
-  getOriginals: async () => new Map([["r1", storedOriginal]]),
   revertRecipe: (...args: unknown[]) => (revertRecipe as (...a: unknown[]) => Promise<unknown>)(...(args as [string, Record<string, unknown>])),
 }));
 
@@ -104,95 +96,9 @@ beforeEach(() => {
   replies.length = 0;
   updateRecipe.mockClear();
   saveRecipe.mockClear();
-  saveDraft.mockClear();
-  deleteDraft.mockClear();
   revertRecipe.mockClear();
-  storedDraft = null;
   storedOriginal = IMPORTED;
   process.env.ANTHROPIC_API_KEY = "test";
-});
-
-describe("making a Tidy draft", () => {
-  it("makes one model call, saves one draft, and writes no recipe", async () => {
-    const { POST } = await import("@/app/api/recipes/tidy/route");
-    replies.push(reply(STYLED));
-    const response = await POST(post("/api/recipes/tidy", { id: "r1" }));
-
-    expect(response.status).toBe(200);
-    expect(sent).toHaveLength(1);
-    expect(saveDraft).toHaveBeenCalledTimes(1);
-    expect(updateRecipe).not.toHaveBeenCalled();
-    expect(saveRecipe).not.toHaveBeenCalled();
-
-    const { draft } = await response.json();
-    expect(draft.name).toBe("Onion pot");
-    expect(draft.before.ingredients).toEqual(row.ingredients);
-    expect(draft.after.ingredients).toEqual(["1 cup onion", "2 tbsp olive oil"]);
-    // The imported yield gave no count: the servings are the model's, and marked.
-    expect(draft.servings_estimated).toBe(true);
-    expect(draft.after.servings).toBe(6);
-  });
-
-  it("sends the house style, and the imported text rather than the row", async () => {
-    const { POST } = await import("@/app/api/recipes/tidy/route");
-    replies.push(reply(STYLED));
-    await POST(post("/api/recipes/tidy", { id: "r1" }));
-    expect(String(sent[0].system)).toContain("THE HOUSE STYLE");
-    expect(JSON.stringify(sent[0].messages)).toContain("1 cup onions, chopped");
-  });
-
-  it("throws away a tidy that dropped an ingredient or changed an amount, and saves no draft", async () => {
-    const { POST } = await import("@/app/api/recipes/tidy/route");
-    replies.push(reply(JSON.stringify({ ingredients: ["1 cup onion"], method: "1. Chop.", servings: 4 })));
-    const dropped = await POST(post("/api/recipes/tidy", { id: "r1" }));
-    expect(dropped.status).toBe(500);
-    expect((await dropped.json()).error).toMatch(/changed the recipe/);
-
-    replies.push(reply(JSON.stringify({ ingredients: ["2 cup onion", "2 tbsp olive oil"], method: "1. Chop.", servings: 4 })));
-    const changed = await POST(post("/api/recipes/tidy", { id: "r1" }));
-    expect(changed.status).toBe(500);
-
-    expect(saveDraft).not.toHaveBeenCalled();
-    expect(updateRecipe).not.toHaveBeenCalled();
-  });
-});
-
-describe("keeping a Tidy draft", () => {
-  const draft = { recipe_id: "r1", ingredients: ["1 cup onion", "2 tbsp olive oil"], method: "1. Chop the onion.", servings: 6, servings_estimated: true };
-
-  it("prices the whole pot at once and writes the tidy with the macros, the model named", async () => {
-    storedDraft = draft;
-    const { POST } = await import("@/app/api/recipes/tidy/keep/route");
-    replies.push(reply(MACROS));
-    const response = await POST(post("/api/recipes/tidy/keep", { id: "r1", servings: 5 }));
-
-    expect(response.status).toBe(200);
-    expect((await response.json()).estimated).toBe(true);
-    expect(sent).toHaveLength(1);
-    expect(updateRecipe).toHaveBeenCalledTimes(1);
-    const [id, edit, reprice, opts] = updateRecipe.mock.calls[0];
-    expect(id).toBe("r1");
-    expect(edit).toMatchObject({ name: "Onion pot", servings: 5, ingredients: draft.ingredients });
-    expect(reprice).toMatchObject({ macros: { kcal: 900, protein_g: 10, carbs_g: 90, fat_g: 60 }, model: "claude-sonnet-5-5" });
-    expect(opts).toEqual({ styled: true });
-    expect(deleteDraft).toHaveBeenCalledWith("r1");
-  });
-
-  it("a failed estimate still keeps the tidy and says the macros are not estimated", async () => {
-    storedDraft = draft;
-    const { POST } = await import("@/app/api/recipes/tidy/keep/route");
-    replies.push(reply(MACROS, "max_tokens"));
-    const response = await POST(post("/api/recipes/tidy/keep", { id: "r1" }));
-
-    expect(response.status).toBe(200);
-    expect((await response.json()).estimated).toBe(false);
-    expect(updateRecipe).toHaveBeenCalledTimes(1);
-    const [, edit, reprice, opts] = updateRecipe.mock.calls[0];
-    expect(edit).toMatchObject({ ingredients: draft.ingredients });
-    expect(reprice).toBeNull();
-    expect(opts).toEqual({ styled: true, clearMacros: true });
-    expect(deleteDraft).toHaveBeenCalledWith("r1");
-  });
 });
 
 describe("Revert", () => {
@@ -259,7 +165,7 @@ describe("the house style on every way in", () => {
 
   const typed = { mode: "manual", name: "Onion pot", servings: 4, ingredients: ["1 cup onions, chopped", "2 tablespoons olive oil"], method: "" };
 
-  it("typed: one restyle call, then the pricing call, and the draft keeps every ingredient", async () => {
+  it("typed: one restyle call, then the macro estimate, and the draft keeps every ingredient", async () => {
     const { POST } = await import("@/app/api/recipes/draft/route");
     replies.push(reply(STYLED), reply(MACROS));
     const { draft } = await (await POST(draftPost(typed))).json();
@@ -270,7 +176,7 @@ describe("the house style on every way in", () => {
     expect(draft.ingredients).toHaveLength(typed.ingredients.length);
     expect(draft.servings).toBe(4);
     expect(draft.styled).toBe(true);
-    // The pricing call sees the styled text.
+    // The macro estimate sees the styled text.
     expect(JSON.stringify(sent[1].messages)).toContain("1 cup onion");
   });
 

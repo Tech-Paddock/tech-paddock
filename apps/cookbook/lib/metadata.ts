@@ -1,6 +1,6 @@
 /**
  * Recipe metadata (TEC-52): time, meal, main, cuisine, equipment, diet, tags,
- * rating. What you decide what to cook by, as opposed to what it costs you.
+ * rating. What you decide what to cook by, as opposed to the work it takes.
  *
  * **Pure, and imported by the browser** — so it must never import `supabase.ts`
  * (nor anything that does; `NOTES.md`, *Client components*). The migration

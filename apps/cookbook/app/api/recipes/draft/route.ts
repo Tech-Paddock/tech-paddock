@@ -10,7 +10,7 @@ import { EMPTY_META, readMeta } from "@/lib/metadata";
 import { hasPicks, readPicks, tagWithPicks } from "@/lib/tuning";
 
 export const dynamic = "force-dynamic";
-// Reading a page and then pricing it is two model calls, one of them with a
+// Reading a page and then estimating its macros is two model calls, one of them with a
 // server tool that may pause and resume. Both think at medium effort (TEC-133),
 // so the room is Coffee's search route's, not the Vercel default.
 export const maxDuration = 300;
@@ -18,13 +18,13 @@ export const maxDuration = 300;
 /**
  * Four ways into the book, and **none of them writes anything.**
  *
- * - `manual` — you typed the recipe; the model only prices it.
- * - `generate` — you described what you wanted; the model writes it, then prices
- *   what it wrote.
- * - `import` — you pasted a link; the model reads the page, then prices what it
- *   read.
- * - `file` — you uploaded a photo or a PDF; the model reads it, then prices what
- *   it read. Added 2026-09-22. It lands as `imported` with no `source_url`,
+ * - `manual` — you typed the recipe; the model only estimates its macros.
+ * - `generate` — you described what you wanted; the model writes it, then estimates
+ *   the macros of what it wrote.
+ * - `import` — you pasted a link; the model reads the page, then estimates the
+ *   macros of what it read.
+ * - `file` — you uploaded a photo or a PDF; the model reads it, then estimates the
+ *   macros of what it read. Added 2026-09-22. It lands as `imported` with no `source_url`,
  *   because there is nowhere to point back to, and the file itself is not kept.
  *
  * All four end at the same approval, `POST /api/recipes`. **This route is the
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Before the pricing call, not after it: a typed recipe saves straight away,
+      // Before the macro estimate, not after it: a typed recipe saves straight away,
       // so a name already in the book would pay for a model call and then be
       // refused at the insert.
       if (await nameTaken(name)) {

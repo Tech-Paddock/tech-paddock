@@ -20,7 +20,7 @@ import { HOUSE_STYLE, restyleProblem, spellUnits } from "./houseStyle";
  *
  * **Every response's `stop_reason` is checked** (`finished`). A turn cut off at
  * `max_tokens` is a truncated answer, and reading JSON out of one is how a
- * half-priced recipe would look like a whole one.
+ * half-estimated recipe would look like a whole one.
  *
  * **Nothing here writes anything.** Every function returns a draft or a
  * proposal; the write is a separate, deliberate approval.
@@ -197,7 +197,7 @@ export type RecipeFields = {
 };
 
 // ---------------------------------------------------------------------------
-// 1 · Pricing a dish — the judgement, and the only call all four ways in make
+// 1 · Estimating a dish's macros — the judgement, and the only call all four ways in make
 // ---------------------------------------------------------------------------
 
 export type RecipeEstimate = { macros: Macros; note: string | null };
@@ -574,7 +574,7 @@ export function idForNumber(items: { id: string }[], n: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
-// 5 · Putting a recipe in the house style — Tidy, and a typed recipe
+// 5 · Putting a recipe in the house style — a typed recipe
 // ---------------------------------------------------------------------------
 
 const STYLE_SCHEMA = {
@@ -606,8 +606,8 @@ export type StyledRecipe = {
 };
 
 /**
- * Put one recipe in the house style (`lib/houseStyle.ts`): the one call Tidy
- * makes per recipe, and the one a typed recipe makes before it is priced.
+ * Put one recipe in the house style (`lib/houseStyle.ts`): the one call a typed
+ * recipe makes before its macros are estimated.
  *
  * **Nothing here writes.** The result is checked in code (`restyleProblem`): a
  * restyle that dropped an ingredient, changed an amount or lost a time or

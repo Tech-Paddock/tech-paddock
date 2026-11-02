@@ -375,9 +375,9 @@ export default function AddRecipe({
         className="rounded-lg bg-accent px-4 py-3 text-base font-semibold text-accent-ink disabled:opacity-50"
       >
         {/* **The label says what the press actually does, and that now differs
-            by mode.** On the typed path it prices and saves in one go, so
+            by mode.** On the typed path it estimates the macros and saves in one go, so
             promising only macros would understate a write. On the other two it
-            invents or reads a recipe and then prices it, and nothing is saved
+            invents or reads a recipe and then estimates its macros, and nothing is saved
             until Keep it — so it must not say "save". */}
         {busy === "drafting"
           ? "Working it out…"
@@ -404,7 +404,7 @@ export default function AddRecipe({
               <h4 className="text-xs font-semibold text-ink-soft">One serving</h4>
               <MacroRow
                 macros={perServing({ ...draft.macros, servings: draft.servings })}
-                per="what a bowl costs you"
+                per="in one bowl"
               />
             </div>
             {draft.note ? <p className="text-xs text-ink-soft">{draft.note}</p> : null}

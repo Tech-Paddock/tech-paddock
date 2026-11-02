@@ -9,15 +9,15 @@ import { ConflictError, InputError } from "./errors";
  *
  * **Pure: no database, no model, no Next** — the route hands in what it needs as
  * `EditDeps`, so the rules below have tests without either. That matters most
- * for the one rule that has to hold absolutely: **a failed re-price writes
+ * for the one rule that has to hold absolutely: **a failed re-estimate writes
  * nothing.** The estimate runs before the single write, and the write is never
  * reached if it throws.
  *
- * **What re-prices, and what does not.** The book stores the whole pot and
+ * **What re-estimates the macros, and what does not.** The book stores the whole pot and
  * divides on the way out (`RULES.md`), so the pot's macros depend on the
  * ingredients and nothing else in an edit:
  *
- * - **Ingredients changed → one pricing call**, through `estimateRecipeMacros`,
+ * - **Ingredients changed → one estimate call**, through `estimateRecipeMacros`,
  *   the same path every way in uses. The new pot, its model and its caveat
  *   replace the old ones.
  * - **Servings changed alone → no call.** Same pot, a different divisor: "I got
@@ -44,8 +44,8 @@ export type RecipeEdit = {
 /** The fields of a stored recipe an edit compares against. */
 export type EditTarget = Pick<RecipeEdit, "name" | "ingredients"> & { id: string };
 
-/** A re-price's result, as it lands on the row. */
-export type Reprice = { macros: Macros; model: ModelId; note: string | null };
+/** A re-estimate's result, as it lands on the row. */
+export type Reestimate = { macros: Macros; model: ModelId; note: string | null };
 
 const MAX_NAME = 200;
 const MAX_INGREDIENTS = 80;
@@ -90,7 +90,7 @@ export function cleanIngredients(value: unknown): string[] {
 /**
  * **Does this edit change the pot?** Only when the ingredient list does — as
  * written, in order, after trimming. Reordering is a change: it is cheap to
- * re-price and not worth a rule of its own. Servings is deliberately not here.
+ * re-estimate and not worth a rule of its own. Servings is deliberately not here.
  */
 export function changesThePot(current: Pick<RecipeEdit, "ingredients">, edit: Pick<RecipeEdit, "ingredients">): boolean {
   const a = cleanIngredients(current.ingredients);
@@ -104,19 +104,19 @@ export type EditDeps<R> = {
   /** Is this name held by a recipe other than `exceptId`? */
   nameTakenByOther: (name: string, exceptId: string) => Promise<boolean>;
   estimate: (recipe: RecipeEdit) => Promise<{ macros: Macros; note: string | null }>;
-  /** The one write. `reprice` null leaves the macros, source, model and note as they are. */
-  update: (id: string, edit: RecipeEdit, reprice: Reprice | null) => Promise<R>;
+  /** The one write. `reestimate` null leaves the macros, source, model and note as they are. */
+  update: (id: string, edit: RecipeEdit, reestimate: Reestimate | null) => Promise<R>;
   normalizeName: (name: string) => string;
 };
 
 /**
- * Apply an edit: check, price if the pot changed, then write once.
+ * Apply an edit: check, estimate the macros if the pot changed, then write once.
  *
  * **Order is the guarantee.** Everything that can refuse — the recipe gone, the
  * name taken, the model failing — happens before `update`, and `update` is one
  * statement. So a refused edit has written nothing, and the recipe on screen is
  * still the recipe in the book. The name is checked before the call so a
- * collision does not pay for a pricing it could never keep; the unique index
+ * collision does not pay for an estimate it could never keep; the unique index
  * still catches a race at the write.
  */
 export async function applyEdit<R>(
@@ -124,12 +124,12 @@ export async function applyEdit<R>(
   id: string,
   edit: RecipeEdit,
   /**
-   * `always` prices even when the ingredient text is the same (TEC-201): a kept
-   * Tidy prices at once, and "Estimate macros" prices a recipe whose macros were
+   * `always` estimates even when the ingredient text is the same (TEC-201):
+   * "Estimate macros" does it for a recipe whose macros were
    * never estimated. Every other edit leaves it off.
    */
   opts: { always?: boolean } = {}
-): Promise<{ recipe: R; repriced: boolean }> {
+): Promise<{ recipe: R; reestimated: boolean }> {
   const current = await deps.getRecipe(id);
   if (!current) throw new InputError("That recipe is not in the book any more.");
 
@@ -137,13 +137,13 @@ export async function applyEdit<R>(
     throw new ConflictError(`"${edit.name}" is already in the book. Pick another name.`);
   }
 
-  let reprice: Reprice | null = null;
+  let reestimate: Reestimate | null = null;
   if (opts.always || changesThePot(current, edit)) {
     // Throws on any failure, and nothing below runs.
     const estimate = await deps.estimate(edit);
-    // The one model every call runs on (TEC-133), recorded as what priced it.
-    reprice = { macros: estimate.macros, model: MODEL, note: estimate.note };
+    // The one model every call runs on (TEC-133), recorded as what estimated it.
+    reestimate = { macros: estimate.macros, model: MODEL, note: estimate.note };
   }
 
-  return { recipe: await deps.update(id, edit, reprice), repriced: reprice !== null };
+  return { recipe: await deps.update(id, edit, reestimate), reestimated: reestimate !== null };
 }

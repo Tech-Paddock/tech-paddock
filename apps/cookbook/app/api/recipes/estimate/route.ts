@@ -10,9 +10,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 /**
- * Estimate the macros of a recipe that has none yet (TEC-200, TEC-201): the retry
- * after a kept Tidy whose estimate failed, and the way to price an imported
- * recipe that was never tidied. `{ id }` answers `{ recipe }`.
+ * Estimate the macros of a recipe that has none yet (TEC-200, TEC-201): the way
+ * to get them for an imported recipe, after a Revert, or after a failed estimate.
+ * `{ id }` answers `{ recipe }`.
  *
  * The same path as an ingredient edit, with the text unchanged: one call, the
  * whole pot, `source = estimate`, the model named, and a failure writes nothing.

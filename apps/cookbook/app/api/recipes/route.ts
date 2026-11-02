@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     ? (raw.source as RecipeDraft["source"])
     : "estimate";
   // Today's model, or one used before TEC-133: a draft made before a deploy and
-  // kept after it names the model that really priced it.
+  // kept after it names the model that really estimated it.
   const model = isRecordedModel(raw.model) ? raw.model : null;
 
   const draft: RecipeDraft = {
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     // from, which is why nothing here tries to infer a source from it.
     source_url: typeof raw.source_url === "string" && raw.source_url.startsWith("http") ? raw.source_url : null,
     // Whether the way in applied the house style (TEC-201); the draft says so, the mark is
-    // `house_style_at`. A browser claiming it only hides a recipe from Tidy.
+    // `house_style_at`. A browser claiming it only changes how the book labels the recipe.
     styled: raw.styled === true,
     ingredients: Array.isArray(raw.ingredients)
       ? raw.ingredients.map((i) => (typeof i === "string" ? i.trim() : "")).filter(Boolean)

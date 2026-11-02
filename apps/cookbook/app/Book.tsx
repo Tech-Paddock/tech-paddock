@@ -9,7 +9,6 @@ import type { Recipe } from "@/lib/recipes";
 import { menuDayLabel } from "@/lib/menuDay";
 import { FIRST_RECIPE_TAB, factsLine, macrosLine, type RecipeTab } from "@/lib/recipeView";
 import EditRecipe from "./EditRecipe";
-import TidyReview from "./TidyReview";
 import { BookFilters } from "./Tuning";
 import { NO_FILTER, cuisinesIn, filterActive, matchesFilter, type BookFilter } from "@/lib/tuning";
 
@@ -49,8 +48,6 @@ export default function Book({
   // Bumped whenever the menu may have changed: a recipe added to the list, or
   // one removed from the book (which takes it off the menu too).
   const [menuVersion, setMenuVersion] = useState(0);
-  // Bumped when a recipe changes here, so Tidy's count of recipes to tidy follows.
-  const [tidyVersion, setTidyVersion] = useState(0);
 
   /** From the menu: open that recipe in the book and bring it into view. */
   function openFromMenu(recipeId: string) {
@@ -140,7 +137,6 @@ export default function Book({
   /** A recipe changed by Revert or by "Estimate macros" (TEC-201): the row that came back replaces it. */
   function replaced(updated: Recipe, message: string) {
     setRecipes((all) => (all ? all.map((r) => (r.id === updated.id ? updated : r)) : all));
-    setTidyVersion((n) => n + 1);
     if (message) toast.notice(message);
   }
 
@@ -161,9 +157,9 @@ export default function Book({
   }
 
   /** An edit saved (`EditRecipe`): the row that came back replaces the one on screen. */
-  function edited(updated: Recipe, repriced: boolean) {
+  function edited(updated: Recipe, reestimated: boolean) {
     setRecipes((all) => (all ? all.map((r) => (r.id === updated.id ? updated : r)) : all));
-    toast.notice(repriced ? `"${updated.name}" is saved and re-priced.` : `"${updated.name}" is saved.`);
+    toast.notice(reestimated ? `"${updated.name}" is saved and its macros re-estimated.` : `"${updated.name}" is saved.`);
   }
 
   async function remove(recipe: Recipe) {
@@ -226,7 +222,6 @@ export default function Book({
             </p>
           ) : null}
         </div>
-        {recipes !== null ? <TidyReview onChanged={() => void load()} refreshKey={version + tidyVersion} /> : null}
         {recipes !== null && recipes.length > 0 ? (
           <input
             value={query}
@@ -307,7 +302,7 @@ export function RecipeCard({
   onList: (day: string) => void;
   onRate: (value: number | null) => void;
   onRemove: () => void;
-  onEdited: (recipe: Recipe, repriced: boolean) => void;
+  onEdited: (recipe: Recipe, reestimated: boolean) => void;
   /** Revert to the imported original (TEC-201); offered only for a recipe that has one. */
   onRevert?: () => void;
   /** Macros estimated from the Macros tab (TEC-201). */
@@ -349,9 +344,9 @@ export function RecipeCard({
           <EditRecipe
             recipe={recipe}
             onCancel={() => setEditing(false)}
-            onSaved={(updated, repriced) => {
+            onSaved={(updated, reestimated) => {
               setEditing(false);
-              onEdited(updated, repriced);
+              onEdited(updated, reestimated);
             }}
           />
         </div>
@@ -372,7 +367,7 @@ export function RecipeCard({
             onRevert={recipe.has_original ? onRevert : undefined}
           />
           <p className="text-[11px] text-ink-soft">
-            Editing re-prices only when the ingredients change. Removing takes the recipe out of the book and
+            Editing re-estimates the macros only when the ingredients change. Removing takes the recipe out of the book and
             leaves your shopping list alone.
           </p>
         </div>

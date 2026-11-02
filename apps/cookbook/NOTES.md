@@ -21,11 +21,11 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 - Install icon: `app/apple-touch-icon.png` (No. 12, full-bleed) with `appleWebApp` metadata; its
   colours are fixed in dark mode too.
 - No GET route is cached; caching would serve Health stale servings.
-- **One model, set in `lib/models.ts`** (TEC-133): every call (pricing, Ask Claude, link, file, edit
-  re-price, the list's Tidy, the house-style restyle, and a resumed `pause_turn`) goes out as `claude-sonnet-5-5` at effort `medium`
+- **One model, set in `lib/models.ts`** (TEC-133): every call (the macro estimate, Ask Claude, link, file, edit
+  re-estimate, the list's Tidy, the house-style restyle, and a resumed `pause_turn`) goes out as `claude-sonnet-5-5` at effort `medium`
   through `requestShape`, with `THINKING_HEADROOM` added to `max_tokens` because thinking counts
   against it. No picker; the draft and edit routes ignore a `model` an older page sends. A kept
-  recipe keeps the model that priced it, and `modelLabel` still names Haiku 4.5 and Sonnet 5 for
+  recipe keeps the model that estimated it, and `modelLabel` still names Haiku 4.5 and Sonnet 5 for
   those rows; the save route accepts any model `lib/models.ts` labels, so a draft made before a
   deploy and kept after it is not refused. `tests/models.test.ts` fails if any other file under
   `app/` or `lib/` names a model id, an effort, a thinking or sampling setting, `tool_choice` or a
@@ -72,7 +72,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 - **Add to list** is a card under the tabs (`AddToListCard`, TEC-189): "When are you cooking it?" is
   **one date box opening on today** with an Add to list button beside it (the day chips and "Pick a
   date…" are gone, with `dayChips` and `addButtonLabel`), then Edit and Remove as outlined buttons
-  (Remove keeps its confirm). The helpings estimator and the pricing note are gone. The day sent is
+  (Remove keeps its confirm). The helpings estimator and its note are gone. The day sent is
   still `YYYY-MM-DD` from `parseDay`; a cleared date disables the button.
 - **Tests render with `react-dom/server`** (`tests/recipeOpen.test.ts`): there is no DOM or click
   harness here, so a tab "switch" is asserted by rendering `RecipeOpen` with each `tab`, not by a
@@ -88,7 +88,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 - **The split divides by the macros' own calories at 4/4/9, not the stored kcal**, rounded by
   largest remainder so it adds to 100, and is labelled approximate. (The book's High protein
   filter, which divided by the stored kcal, was dropped in TEC-189.)
-- The typed path runs a name check before its pricing call.
+- The typed path runs a name check before its macro estimate.
 - An import is also refused when no fetch returned a page (`lib/fetchRun.ts`).
 - **Something else** re-asks with every turned-down draft and its reason (`lib/reroll.ts`); **Bin
   it** is a turn-down. The pile is browser state, cleared by Keep it or a new ask.
@@ -110,39 +110,39 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   (reordering counts), in one call before the one write; servings alone re-divides the pot. Confirmed for TEC-140: changing
   ingredients updates the macros, and the breakdown reads the row that comes back, so it follows.
 - **The house style** (TEC-201, `lib/houseStyle.ts`) is written once: `HOUSE_STYLE` is the prompt text
-  in Ask Claude, link, file and the restyle call (`styleRecipe`, `lib/anthropic.ts`), which Tidy and a
-  typed recipe both use. An ingredient is amount, unit, item ("1 cup onion"); prep words move into the
+  in Ask Claude, link, file and the restyle call (`styleRecipe`, `lib/anthropic.ts`), which a
+  typed recipe also uses. An ingredient is amount, unit, item ("1 cup onion"); prep words move into the
   method ("Chop the onion."); the method is numbered imperative steps; one spelling per unit (tsp, tbsp,
   cup, oz, lb, °F). **`cup` is "cup" at 1 or less and "cups" above 1** (TD's call); every other unit has one spelling.
   Code backs the prompt: `spellUnits` runs on everything a model wrote (`readRecipeFields`,
   `styleRecipe`), and `restyleProblem` throws away a restyle with a different number of ingredient lines,
   a different leading amount or unit on any line, or a number the method lost. **It checks the leading
-  amount only**: a "(14 oz)" size or the item words are the review screen's job. A link or file draft is
+  amount only**: a "(14 oz)" size or the item words are not checked. A link or file draft is
   not compared with anything (there is no source text to compare), only styled by the prompt.
-- **A typed recipe is restyled too**, one extra call before pricing. If the restyle is refused it is
-  saved as typed, with a note, and not marked `house_style_at`, so Tidy offers it later.
-- **Tidy for recipes** (TEC-201, not the grocery list's Tidy below): `lib/tidy.ts` (pure, deps injected)
-  and `lib/tidyStore.ts`. One model call per recipe, made one at a time from the browser
-  (`TidyReview.tsx`, top of the Recipes tab) so no request runs long; the draft is stored in
-  `recipe_tidy_drafts`, so the review survives a reload. **A draft never changes a recipe**, and has no
-  name in it. It reads `imported_original` when it has ingredients, else the current row. **Servings are
-  estimated only for an imported recipe whose `yield_text` is blank or has no whole number** (a pan size
-  like "9x13" counts as none); the review marks them and the box edits them. Which recipes Tidy offers:
-  `house_style_at` null and no draft.
-- **Keep** (`/api/recipes/tidy/keep`, once per recipe from the browser) is `applyEdit` with `always`: it
-  prices the whole pot (`source = estimate`, the model named) even if the text is unchanged, stamps
-  `house_style_at`, deletes the draft. **A failed estimate keeps the tidy anyway** and clears the macros
-  (`updateRecipe` with `clearMacros`), so old numbers never sit beside new ingredients; the Macros tab
-  then shows "Estimate macros" (`/api/recipes/estimate`, the same path), which also prices any imported
-  recipe nobody has tidied.
+- **A typed recipe is restyled too**, one extra call before the macro estimate. If the restyle is refused it is
+  saved as typed, with a note, and not marked `house_style_at`.
+- **The recipe Tidy is gone** (TEC-207; it was TEC-201's batch rewrite and review screen). All the imported
+  recipes were tidied before it went, so the house style now only applies on the way in. Deleted: the
+  Tidy card, `TidyReview.tsx`, `/api/recipes/tidy` and `/keep`, `lib/tidy.ts`, `lib/tidyStore.ts`,
+  `lib/tidyView.ts` and their tests. **The grocery list's Tidy stays** (below). Nothing reads or writes
+  `cookbook.recipe_tidy_drafts` any more (see Tables).
+- **Recipe-side wording: "estimate macros", never price** (TEC-207, owner: price lives with the grocery
+  list and Deals). Labels, toasts, errors and comments on the recipe side say "estimate" / "re-estimate
+  the macros" ("Save and re-estimate macros", `reestimated` in the edit route's answer, `Reestimate` in
+  `lib/edit.ts`). `tests/recipeSideWords.test.ts` reads the recipe-side files whole and fails on
+  price/pricing/priced/re-price/re-cost/dollar, so a new file on the recipe side is added to its list.
+  Dollar wording on the list and Deals is untouched.
+- **Estimate macros** (the Macros tab button, `POST /api/recipes/estimate`) is `applyEdit` with `always`: one
+  call on the whole pot (`source = estimate`, the model named) even if the text is unchanged. It is the way
+  to get macros for an imported recipe, and after a Revert or a failed estimate. A failed call writes nothing.
 - **Revert** (`/api/recipes/revert`, on a recipe with `has_original`) puts back `imported_original`'s
   ingredients, method and servings, nulls the macros, source, model and note, and clears
   `house_style_at`. No model. **Servings come from the original's `servings`, else its yield text's
   count, else the recipe's current value.**
 - **Trap: the shape of `imported_original` is read, not owned here.** `readOriginal` takes `ingredients`
   (list or text), the method from `directions`, `method` or `instructions`, and `yield_text` /
-  `servings`. If the load wrote other keys, Tidy falls back to the current row (and never estimates
-  servings), and Revert is refused with a sentence.
+  `servings`. If the load wrote other keys, `readOriginal` finds no ingredients and Revert is refused with
+  a sentence. The code is `lib/imported.ts` (pure) and `lib/importedStore.ts` (database).
 - `methodSteps` splits only on the next number in a run ("gas mark 4" stays); its tests hold the
   edges.
 
@@ -155,13 +155,14 @@ Reasoning is in the migration headers.
   `cookbook_recipe_macros_optional`): `kcal`, `protein_g`, `carbs_g`, `fat_g` and `source` are
   null together or set together (`recipe_macros_together`), and `model` is null when they are.
   `imported_original` (jsonb object, nullable) holds the recipe as imported; a trigger refuses to
-  change it once set, so Tidy's Revert can trust it. Null is "not estimated yet", never 0.
+  change it once set, so Revert can trust it. Null is "not estimated yet", never 0.
   `house_style_at` (TEC-201, `cookbook_recipe_tidy_drafts`) is when the recipe was put in the house
-  style (a Tidy kept, or kept from a way in that applied it); null is "not tidied yet". `hydrate` turns
+  style (a way in that applied it, or a Tidy kept before TEC-207); null is "not house-styled". Nothing
+  offers by it any more; it only marks. `hydrate` turns
   `imported_original` into `has_original` and drops the jsonb, so it never reaches the browser.
-- `recipe_tidy_drafts` (TEC-201): one row per recipe (`recipe_id` primary key, cascade on delete),
-  `ingredients`, `method`, `servings`, `servings_estimated`. Replaced by a second Tidy, deleted on Keep,
-  Revert or Discard. RLS on, no policies.
+- `recipe_tidy_drafts` (TEC-201): **unused since TEC-207 and empty when retired**; no code reads or writes it. It
+  stays until a follow-on migration drops it (a DROP, so by the TD's NOTES trap and `supabase/README.md`).
+  Do not start using it again.
 - `grocery_items`: `quantity` 1–99; `recipes` is a snapshot of names, so a rename never reaches
   it. Tidy (checked by `validateTidy`) unions names, takes the larger of the largest absorbed
   quantity and the fixed rules' quantity for the merged line, and the latest `sent_at`. "Milk — the
@@ -600,9 +601,8 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   and `source` null (`Number(null)` would make them 0); `Recipe` is `PotMacros`, and a reader asks
   `isEstimated` or `servingOrNull` (`lib/recipeSteps.ts`) before doing arithmetic. The list, the
   menu row and the Macros tab say "Macros not estimated yet"; `toServingRows` leaves the recipe out
-  of `GET /api/servings`. Any new total, filter or reader must skip it the same way. There is no
-  estimate button yet (a follow-on); an ingredient edit re-prices through the model, so it also
-  gives an unestimated recipe its macros.
+  of `GET /api/servings`. Any new total, filter or reader must skip it the same way. The Macros tab's
+  Estimate macros button gives such a recipe its macros, and so does an ingredient edit.
 
 - **In cart is what Cookbook sent, not the account** (TEC-190). Anything added in the King Soopers
   app, and anything bought since, is invisible; a line cleared from the list while in the cart
@@ -617,7 +617,7 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   that has nights is caught up on the next run; a week with no nights never rolls up and pushes
   the date out, which `coloursFrom` cannot know.
 
-- **"Invalid API key" comes from Supabase.** Only drafting, an ingredient edit and Tidy call a
+- **"Invalid API key" comes from Supabase.** Only drafting, an ingredient edit, Estimate macros and the list's Tidy call a
   model.
 - Health reads a 503, or a `SESSION_SECRET` mismatch, as "couldn't reach the Cookbook".
 - `tests/servings.test.ts` holds the contract's exact fields; metadata never enters it.
