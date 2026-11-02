@@ -585,6 +585,32 @@ export const CLOCKS: Clock[] = ["pee", "poop", "food", "exercise"];
 export const CLOCK_LABELS: Record<Clock, string> = { pee: "Pee", poop: "Poop", food: "Meal", exercise: "Fun" };
 
 /**
+ * What a tapped pill, or the Treats button, opens its form on (TEC-181, TEC-186). Pee and Poop: Potty,
+ * outside, leashed, which is the form's own default, so only the `what` is set. Meal: Food with the last
+ * meal's item and amount; null item and amount mean the form's usual defaults. Fun: the Fun form on a new
+ * entry, all defaults. Treats (the button, not a pill): Food on a treat, with a treat's usual defaults.
+ */
+export type QuickLog =
+  | { form: "potty"; what: "pee" | "poop" }
+  | { form: "food"; itemId: string | null; amount: number | null; type?: "treat" }
+  | { form: "fun" };
+
+/** The Treats button: the Food form opened on a treat (the meal/treat choice stays in the form). */
+export const TREAT_QUICK_LOG: QuickLog = { form: "food", itemId: null, amount: null, type: "treat" };
+
+export function quickLog(clock: Clock, lastMeal: JournalEvent | null, added: readonly AddedFood[] = []): QuickLog | null {
+  if (clock === "pee" || clock === "poop") return { form: "potty", what: clock };
+  if (clock === "exercise") return { form: "fun" };
+  // `lastMeal` is `sinceLast`'s food clock: a live meal, never a treat. A meal whose item the
+  // catalogue no longer lists opens on the usual defaults rather than an id the form cannot show.
+  const none: QuickLog = { form: "food", itemId: null, amount: null };
+  if (!lastMeal || lastMeal.kind !== "food") return none;
+  const f = food(lastMeal);
+  if (!isMealType(f.type) || !findFood("meal", f.item_id, added)) return none;
+  return { form: "food", itemId: f.item_id, amount: typeof f.amount === "number" ? f.amount : null };
+}
+
+/**
  * The potty a Fun form's Pee or Poop button logs (TEC-186), from the form's current state. A walk is
  * outside and leashed; playtime outside is outside; playtime inside is inside, an accident. Training has
  * no such buttons (null). Pure; the form adds the time (the tap) and the person.

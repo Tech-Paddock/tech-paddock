@@ -11,6 +11,7 @@ import {
   KIND_LABELS,
   LOG_KINDS,
   PILL_STATUS_WORDS,
+  TREAT_QUICK_LOG,
   describe,
   displayUnit,
   emptyFeedText,
@@ -27,6 +28,7 @@ import {
   latestWeight,
   liveEvents,
   pillStatus,
+  quickLog,
   round1,
   sinceLast,
   treatsWith,
@@ -37,6 +39,7 @@ import {
   type HealthType,
   mealPillLabel,
   type JournalEvent,
+  type QuickLog,
 } from "@/lib/events";
 import {
   DEFAULTS_KEY,
@@ -71,8 +74,11 @@ type Pending = { body: LogBody; status: "saving" | "failed"; error?: string; the
 /** What `lando.unsaved` holds per entry: the body, plus its treats when it has any. */
 type Stored = LogBody & { then?: LogBody[] };
 
-/** `doneFor` is the upcoming item a Done opened this form for (TEC-199); `healthType` is Health's tab on a new entry. */
-type Open = { form: FormKind; event?: JournalEvent; healthType?: HealthType; doneFor?: Upcoming } | null;
+/**
+ * `doneFor` is the upcoming item a Done opened this form for (TEC-199); `healthType` is Health's tab on a new entry;
+ * `quick` is the pill or Treats button that opened the form (TEC-181, TEC-186).
+ */
+type Open = { form: FormKind; event?: JournalEvent; healthType?: HealthType; doneFor?: Upcoming; quick?: QuickLog } | null;
 type Tab = "log" | "analytics" | "new";
 
 async function postJson(url: string, body: unknown): Promise<{ ok: boolean; status: number; data: any }> {
@@ -92,23 +98,40 @@ const isLogBody = (b: unknown): b is LogBody =>
 const PILL_SIZE = "flex min-h-[44px] flex-col justify-center";
 const BTN = "flex min-h-[44px] min-w-0 items-center justify-center rounded-xl px-0.5 py-1";
 
-/**
- * A since-last pill (TEC-199): it only shows its numbers and is not tappable. The way in is the Log buttons
- * (TEC-181's quick log, which opened a form from a pill, is retired).
- */
-function Pill({ title, status, children }: { title: string | undefined; status: string | null; children: React.ReactNode }) {
+/** A since-last pill; a button once the journal has loaded, so tapping it logs (TEC-181, TEC-186), a plain box before. */
+function Pill({
+  tap,
+  title,
+  status,
+  onTap,
+  children,
+}: {
+  tap: QuickLog | null;
+  title: string | undefined;
+  status: string | null;
+  onTap?: () => void;
+  children: React.ReactNode;
+}) {
+  const cls = `lando-pill ${PILL_SIZE} w-full min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center`;
+  if (!tap) return <div title={title} data-status={status ?? undefined} className={cls}>{children}</div>;
   return (
-    <div title={title} data-status={status ?? undefined} className={`lando-pill ${PILL_SIZE} w-full min-w-0 rounded-xl border border-line bg-surface px-1.5 py-1 text-center`}>
+    <button
+      type="button"
+      title={title}
+      data-status={status ?? undefined}
+      onClick={onTap}
+      className={`${cls} cursor-pointer focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-pinstripe`}
+    >
       {children}
-    </div>
+    </button>
   );
 }
 
 /**
  * Three tabs, Log, Analytics and Patch notes, opening on Log (RULES.md, Surface: app, the owner's
- * override, 2026-10-20). Log: four since-last pills that only show their numbers (Pee, Poop, Meal, Fun),
- * the Next 7 days box, six buttons that open a short form (Potty, Food, Training, Fun, Weight, Health;
- * TEC-199), who is logging, and a feed of every loaded day, by when each entry happened, with a filter
+ * override, 2026-10-20). Log: four since-last pills that each open a quick log (Pee, Poop, Meal, Fun; TEC-181,
+ * TEC-186, back in TEC-202), the Next 7 days box, four buttons that open a short form (Treats, Training,
+ * Weight, Health), who is logging, and a feed of every loaded day, by when each entry happened, with a filter
  * matching the buttons and an Upcoming filter. Analytics: the last fourteen days and the growth chart.
  *
  * **Save never waits.** The sheet closes at once and the entry shows as
@@ -601,30 +624,37 @@ export default function Journal() {
           hidden={tab !== "log"}
           className={tab === "log" ? "flex flex-col gap-4" : "hidden"}
         >
-          {/* Since-last pills: one row, label over value; the clock time is in the title. They only show their
-              numbers and are not tappable (TEC-199). */}
+          {/* Since-last pills: one row, label over value; the clock time is in the title. All four open a quick
+              log once the journal has loaded (TEC-181, Fun since TEC-186; TEC-199 took it away, TEC-202 put it back). */}
           <section aria-label="Since last" className="grid grid-cols-4 gap-1.5">
             {CLOCKS.map((c) => {
               const last = clocks?.[c] ?? null;
               // Green, yellow or red by how long ago (TEC-142); Fun and "none" stay plain.
               const status = last ? pillStatus(c, now.getTime() - Date.parse(last.at)) : null;
+              // Pee, Poop, Meal and Fun open a quick log, once the journal has loaded.
+              const tap = clocks ? quickLog(c, clocks.food, foods) : null;
               // The Meal pill reads today's meals and cups (TEC-194); the others keep their name.
               const isMeal = c === "food";
               const face = isMeal && loaded ? mealPillLabel(loaded.events, now) : isMeal ? "Meals" : CLOCK_LABELS[c];
               return (
                 <Pill
                   key={c}
+                  tap={tap}
                   title={
-                    last
+                    last || tap
                       ? [
                           isMeal && loaded ? face : "",
-                          `${isMeal ? "Last meal" : CLOCK_LABELS[c]} at ${clockTime(last.at)}${status ? ` — ${PILL_STATUS_WORDS[status]}` : ""}`,
+                          last
+                            ? `${isMeal ? "Last meal" : CLOCK_LABELS[c]} at ${clockTime(last.at)}${status ? ` — ${PILL_STATUS_WORDS[status]}` : ""}`
+                            : "",
+                          tap ? "tap to log" : "",
                         ]
                           .filter(Boolean)
                           .join(", ")
                       : undefined
                   }
                   status={status}
+                  onTap={tap ? () => setOpen({ form: tap.form, quick: tap }) : undefined}
                 >
                   {/* The Meal label is longer ("Meals: 2 · 1⅛ cups"): it may wrap at the dot instead of clipping. */}
                   <div
@@ -646,6 +676,7 @@ export default function Journal() {
                       : clocks
                         ? ` in ${HORIZON_DAYS} days`
                         : ""}
+                    {tap ? ", tap to log" : ""}
                   </span>
                 </Pill>
               );
@@ -661,20 +692,26 @@ export default function Journal() {
             </section>
           )}
 
-          {/* Six buttons, the pills' height, three across (TEC-199): Potty, Food, Training, Fun, Weight, Health.
-              Treats are logged through Food's Type or a treat count on a form. The Weight button keeps its
-              newest weight as a small second line; its date is in the title and for screen readers. */}
-          <section aria-label="Log" className="-mt-2 grid grid-cols-3 gap-1.5">
-            {(["potty", "food", "training", "fun"] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setOpen({ form: f })}
-                className={`${BTN} bg-[var(--tone-2-bg)] text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]`}
-              >
-                <b className="truncate text-[15px] leading-tight">{FORM_LABELS[f]}</b>
-              </button>
-            ))}
+          {/* Four buttons in one row, the pills' size and grid, directly under them (TEC-188, back in TEC-202):
+              Treats, Training, Weight, Health. Potty, Food and Fun are reached through the pills (and Fun's own
+              Pee and Poop). Treats opens Food on a treat; the meal/treat choice stays in the form. The Weight
+              button keeps its newest weight as a small second line (it fits at pill width); its date is in the
+              title and for screen readers. */}
+          <section aria-label="Log" className="-mt-2 grid grid-cols-4 gap-1.5">
+            <button
+              type="button"
+              onClick={() => setOpen({ form: "food", quick: TREAT_QUICK_LOG })}
+              className={`${BTN} bg-[var(--tone-2-bg)] text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]`}
+            >
+              <b className="truncate text-[15px] leading-tight">Treats</b>
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen({ form: "training" })}
+              className={`${BTN} bg-[var(--tone-2-bg)] text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]`}
+            >
+              <b className="truncate text-[15px] leading-tight">{FORM_LABELS.training}</b>
+            </button>
             <button
               type="button"
               onClick={() => setOpen({ form: "weight" })}
@@ -924,6 +961,7 @@ export default function Journal() {
             key={open.event?.id ?? (open.doneFor ? `done-${open.doneFor.id}` : open.form)}
             form={open.form}
             healthType={open.healthType}
+            quick={open.quick}
             event={open.event}
             done={open.doneFor ? donePrefill(open.doneFor, medications) : undefined}
             sessionTreats={(open.form === "training" || open.form === "potty" || open.form === "fun") && open.event && loaded ? treatsWith(loaded.events, open.event) : undefined}

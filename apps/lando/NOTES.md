@@ -38,23 +38,26 @@
     day, or the last day of a shorter month, so Jan 31 + 1 month is Feb 28/29), same kind, title, note, time and repeat. If that
     insert fails the item is put back to open so Done can be tried again.
   * No phone notifications (the owner's pick); the box on Log and the colours are the whole reminder.
-- **Log** (TEC-199): four since-last pills in one row (Pee, Poop, Meal, **Fun**; label over value, the clock time in the title and
-  for screen readers; coloured by TEC-142, below) that **only show their numbers and are not tappable** (TEC-181's quick log is
-  retired: `quickLog`, `QuickLog`, `TREAT_QUICK_LOG` and their tests are gone), then the **Next 7 days** box when anything is due,
-  then **six buttons, three across** (Potty, Food, Training, Fun, Weight, Health; Weight keeps "7.3 lb" as a small second line,
-  the date in its title; there is **no Treats button**: a treat is logged through Food's Type or a treat count), then "Logging as",
-  then the **Feed** under a row of filter pills (TEC-171, below). There is one Potty button and nothing preset on its form. No
+- **Log** (TEC-199, pills and buttons rolled back by TEC-202): four since-last pills in one row (Pee, Poop, Meal, **Fun**; label
+  over value, the clock time in the title and for screen readers; coloured by TEC-142, below) that **are buttons once the journal
+  has loaded** and open a quick log (TEC-181, TEC-186; `quickLog`, `QuickLog`, `TREAT_QUICK_LOG` in `lib/events.ts`, prop `quick`
+  on `LogForm`): Pee or Poop open Potty with that one picked, Meals opens Food on the last meal's item and amount, Fun opens Fun;
+  before the journal loads they are plain boxes. Then the **Next 7 days** box when anything is due, then **four buttons in one
+  row** (Treats, Training, Weight, Health; Treats opens Food on a treat; Weight keeps "7.3 lb" as a small second line, the date in
+  its title). **There is no Potty, Food or Fun button** (TEC-199 added them, TEC-202 took them out at the owner's word). A `quick`
+  is ignored when correcting an entry, so a Potty opened from a feed row keeps its saved values. Then "Logging as",
+  then the **Feed** under a row of filter pills (TEC-171, below). Potty opens with nothing preselected (TEC-199) unless a Pee or Poop pill opened it. No
   growth chart on Log since TEC-129: it lives in Analytics only. Each button opens a bottom sheet (`app/Sheet.tsx`) with that form
   (`app/LogForm.tsx`, prop `form`). Tapping a feed row opens the matching form on that entry to correct or delete it.
 - **Every form is boxed and compact** (TEC-199, `app/LogForm.tsx`; the order is held by `tests/boxedforms.test.ts` through
-  `data-section`): **Box 1** When and Logging as on one line (the form's old "Human" label), with the future line and Repeat under
+  `data-section`): **Box 1** When and Logging as on one line (the form's old "Human" label; When is as wide as its label, "Now" or "Tue 8:00 AM", both boxes exactly 44px tall), with the future line and Repeat under
   them when the When is in the future; **Box 2**, the entry; **Box 3**, the secondary things (Potty: the treat count then
   Medical issue on one line; Training and Fun: the treat count, and Fun's Pee/Poop buttons; Vet visit: Medical issue; none on Food,
   Weight, Medical issue or Medication); then **Note** (a full-width `<textarea>`, two rows, scrolling past two; required for a vet
   visit or an issue, optional elsewhere), **Photos** under it where the form has photos (Potty, Fun, Training, Health), and Save
   last. Per form, Box 2: *Potty* What (Pee, Poop, Both, No potty; **nothing preselected, and a save without one is refused**) ·
   Where with Leash (outside) or Spot (inside) on one line · Time outside (outside). *Food* Type (Meal, Snuffle mat, Treat) · What
-  and a half-size Amount on one line (the scroller is `SCROLLER_WIDTH` 52, it was 88). *Training* Where and Time on one line ·
+  and a small Amount on one line (the scroller is `SCROLLER_WIDTH` 44, it was 88 then 52; the unit is a small word beside it, not in the label; a treat's count box is 52px). *Training* Where and Time on one line ·
   Commands practised and Other dogs on one line (a half-width native multi-select beside the dogs pick; the "Picked:" line shows
   only when something is picked). *Fun* Type · Where and Length · Other dogs. *Weight* weight and unit on one line. *Health* Type
   (Vet visit, Medical issue, Medication) then each tab's own fields. **Compact controls**: chips, pills, buttons, pick lists and
@@ -62,6 +65,10 @@
   is kept as the hit area (a chip's `label` or `button` is 44px tall and the chip is its inner span; boxes are `min-h-[44px]`).
   The Potty form lost its extra boxes and helper text (the accident line, "Defaults are filled in"); nothing else changed in the
   data. Only existing tokens are used (the boxes are `paper` on the sheet's `surface`, inputs `surface`).
+- **Field widths** (TEC-202): the shared `input` class in `LogForm.tsx` carries **no width**; `inputFull` (`input` plus `w-full`) is for
+  fields that fill their column, and a narrow field (`w-[64px]`, `w-[76px]`, `w-[96px]`, `w-auto`) is built on `input`.
+  **Trap:** Tailwind emits `.w-full` after `.w-[..]` and `.w-auto`, so a `w-full` inside the shared class beats every narrow width
+  (it made Dose cover the Medication pick). `tests/fieldwidths.test.ts` holds it.
 - **Health** (TEC-137, reworked by TEC-139, **Medication added by TEC-199**): a sixth form, kind `health`, with a Type of **Vet
   visit**, **Medical issue** or **Medication**. A vet visit and an issue have **one plain full-width `<select>`** of high-level picks
   (styled like Other dogs'), a required **Note** ("What happened?"), up to `MAX_PHOTOS` (6) photos, and the usual When and Logging
@@ -132,10 +139,11 @@
   with the ink text unchanged. Contrast, checked against the mcl39 tokens: each edge at least 4.4:1
   on both the surface and the paper in light and dark; ink on a tint at least 11:1.
   **The food clock is the last meal** (`sinceLast`): a treat no longer resets it (before TEC-142 a
-  treat did). The pill's face is **"Meals: N · X cups"** (TEC-194, below; `CLOCK_LABELS` still says Meal for the others' titles); the Food button and form keep
+  treat did). The pill's face is **"Meals: N · X cups"** (TEC-194, below; `CLOCK_LABELS` still says Meal for the others' titles); the Food form keeps
   their name because they log treats too.
-- **The pills are display-only** (TEC-199, retiring TEC-181's quick log and TEC-186's tap to log): `Pill` in `Journal.tsx` is a plain
-  `div`; the title no longer ends "tap to log". Fun's own Pee and Poop buttons (below) are unchanged.
+- **The pills open a quick log** (TEC-181, TEC-186; TEC-199 made them display-only, TEC-202 put them back): `Pill` in
+  `Journal.tsx` is a `button` once `clocks` is set, else a `div`; the title ends "tap to log". Fun's own Pee and Poop buttons
+  (below) are unchanged.
 - **The Fun clock** (TEC-186; the `exercise` clock id, labelled Fun in `CLOCK_LABELS`): the last live **walk or
   playtime** (`countsFor`); a training does not reset it. Plain, no status colour. Analytics still says exercise.
 - **Fun's Pee and Poop buttons** (TEC-186), on the Fun form of a **new** entry only (not on a correction, whose

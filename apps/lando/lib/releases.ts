@@ -25,6 +25,7 @@ export const DAYS_SHOWN = 7;
  * once written, is not rewritten.
  */
 export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
+  "2026-11-02": "The top boxes open a quick entry again, and the form boxes line up.",
   "2026-11-01": "Tidier forms, one Potty button, a Medication tab, and plans for the days ahead.",
   "2026-10-30": "A snuffle mat counts as half a meal.",
   "2026-10-29": "Royal Canin Dachshund Puppy joins the meal list, and you can add your own foods.",
@@ -36,6 +37,8 @@ export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
 };
 
 export const RELEASES: readonly Release[] = [
+  { date: "2026-11-02", text: "The top boxes are tappable again. Pee and Poop open Potty with that one picked, Meals opens Food, and Fun opens Fun. The Log buttons are back to Treats, Training, Weight and Health, and the Potty, Food and Fun buttons are gone." },
+  { date: "2026-11-02", text: "The boxes on the forms now sit side by side as meant. On Health's Medication tab, the dose no longer covers the medication, and Medication, Dose and Unit share one line. When is only as wide as it needs to be and matches Logging as in height, and the Food form's Amount box is smaller." },
   { date: "2026-11-01", text: "The tabs are now Log, Analytics and Patch notes. What's new has a new name, and the Upcoming tab is gone: anything planned for later now lives in the Log." },
   { date: "2026-11-01", text: "Pick a time in the future on any form and it saves as something coming up instead of an entry. You can repeat it every few weeks, months or years. A Next 7 days box under the top boxes shows what is due this week, in amber when it is close and red when it is late, and an Upcoming choice in the feed lists everything coming up. Done opens the form it came from, filled in, and closes the item once you save." },
   { date: "2026-11-01", text: "Health has a Medication tab beside Vet visit and Medical issue. Pick a medication, say how much and how it was given, and every dose shows in the feed. Add a new medication from the list any time." },
