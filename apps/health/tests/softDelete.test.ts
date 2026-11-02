@@ -149,7 +149,7 @@ describe("the migration", () => {
   it("adds a nullable deleted_at to health.entries and nothing destructive", () => {
     const dir = resolve(__dirname, "../../../supabase/migrations");
     const name = readdirSync(dir).find((f) => f.endsWith("_health_entries_deleted_at.sql"));
-    expect(name).toBe("20261102001200_health_entries_deleted_at.sql");
+    expect(name).toBe("20261102002758_health_entries_deleted_at.sql");
     const sql = readFileSync(resolve(dir, name!), "utf8").replace(/^--.*$/gm, "");
     expect(sql).toMatch(/alter table health\.entries add column deleted_at timestamptz;/);
     expect(sql).not.toMatch(/not null|drop |delete from|truncate/i);
