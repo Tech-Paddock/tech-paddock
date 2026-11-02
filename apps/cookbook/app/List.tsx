@@ -480,34 +480,43 @@ export default function List({
           </div>
         )}
 
-        {/* **Adding sits below the filters** (TEC-206; it was at the top from 2026-09-22). */}
-        <div className="flex gap-2">
-          {/* One line to look at; a paste of several lines shows them all, one
-              item each. Enter adds; Shift+Enter starts another line. */}
-          <textarea
-            ref={box}
-            rows={1}
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                void add();
-              }
-            }}
-            placeholder="Add an item — notes after a dash"
-            aria-label="Add items, one per line"
-            className="min-h-11 min-w-0 flex-1 resize-none overflow-hidden rounded-xl border border-line bg-surface px-3.5 py-2.5 text-base leading-snug"
-          />
-          <button
-            type="button"
-            onClick={() => void add()}
-            disabled={typed.trim() === "" || busy !== null}
-            className="min-h-11 self-start rounded-xl bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-50"
-          >
-            {busy === "adding" ? "Adding…" : typedLines(typed).length > 1 ? `Add ${typedLines(typed).length}` : "Add"}
-          </button>
-        </div>
+        {/* **Adding sits below the filters** (TEC-206; it was at the top from 2026-09-22).
+            TEC-212: its own card, a 2px accent frame, so it does not get lost. A local
+            pattern, tokens only. The Add button is full accent whether or not there is
+            text: with none it does nothing (`add` returns), and is never faded. */}
+        <section aria-label="Add to the list" className="rounded-2xl border-2 border-accent bg-surface p-3">
+          <h2 className="mb-1 text-sm font-bold text-ink">Add to the list</h2>
+          <div className="flex items-start gap-2">
+            <span aria-hidden="true" className="flex h-11 shrink-0 items-center text-2xl font-bold leading-none text-accent">
+              ＋
+            </span>
+            {/* One line to look at; a paste of several lines shows them all, one
+                item each. Enter adds; Shift+Enter starts another line. */}
+            <textarea
+              ref={box}
+              rows={1}
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void add();
+                }
+              }}
+              placeholder="Eggs, 2 lb chicken — notes after a dash"
+              aria-label="Add items, one per line"
+              className="min-h-11 min-w-0 flex-1 resize-none overflow-hidden rounded-xl bg-transparent px-1 py-2.5 text-base font-medium leading-snug text-ink placeholder:font-medium placeholder:text-ink"
+            />
+            <button
+              type="button"
+              onClick={() => void add()}
+              aria-disabled={typed.trim() === "" || busy !== null}
+              className="min-h-11 shrink-0 self-start whitespace-nowrap rounded-xl bg-accent px-4 text-sm font-semibold text-accent-ink"
+            >
+              {busy === "adding" ? "Adding…" : typedLines(typed).length > 1 ? `Add ${typedLines(typed).length}` : "Add"}
+            </button>
+          </div>
+        </section>
 
         {items === null ? (
           readError ? (

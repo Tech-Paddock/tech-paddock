@@ -591,7 +591,7 @@ array**; each element is a product row or a search-word row.
 ## List lines (TEC-131)
 
 - **The tab** (TEC-135): the header (**N still to buy** · about $N · the store, and Pickup/Delivery),
-  an add box that looks one line high and grows to show a paste: **one item per line**
+  **the Add box** (TEC-212, below), which looks one line high and grows to show a paste: **one item per line**
   (`typedLines`, `lib/typedLines.ts`; owner, 2026-10-23, "Keep multi-line paste"; Enter adds,
   Shift+Enter starts a line; "notes after a dash"), **Cooking this week** (the menu as day and
   recipe chips with a two-tap Clear; names come from the book via `Cookbook.tsx`; moving a day
@@ -602,6 +602,15 @@ array**; each element is a product row or a search-word row.
   status. Each List row is **the tick, the name, the ×N box, the price and + Cart** on one line
   (32px, 12px bold, accessible name "Add to cart"; `h-8`, not the 44px floor, by the owner's word);
   the recipes, mark, bubble, amount and note no longer show (TEC-211).
+- **The Add box is its own card** (TEC-212, `app/List.tsx`; owner: "Make the add an item pop more it gets
+  lost and is a great feature"): a `section` with a 2px `border-accent` frame on `bg-surface`, a bold
+  "Add to the list" heading, a ＋ in accent at the start, and the placeholder "Eggs, 2 lb chicken — notes
+  after a dash" in full `text-ink` (`placeholder:text-ink`, never faded). Same place, below the filters.
+  **The Add button is full accent always and has no `disabled` attribute or opacity**: with nothing typed
+  (or while adding) `add()` returns before any request and the button carries `aria-disabled`. Enter
+  adds, Shift+Enter starts a line, a paste adds one per line, as before. The card is a local pattern
+  (existing tokens only). `tests/addBox.test.ts` reads the source, as there is no DOM harness. **Trap:**
+  do not put `disabled` back on the button for the empty state; the owner wants it unfaded.
 - **Each line's mark** (`lineMark`, `lib/brands.ts`; `GET /api/grocery` adds `mark`): ★ goes in
   as a saved product (code, only product, default, or named), ? needs a pick at Send, + anything
   else, including a product found only by its Kroger name and a typed code that is not saved.
