@@ -34,9 +34,9 @@ export function MacroTiles({ macros }: { macros: Macros }) {
 }
 
 /**
- * "Macros not estimated yet", and the way to get them (TEC-201): one pricing call
- * on the recipe as it is, the same path as an ingredient edit. The retry after a
- * kept Tidy whose estimate failed, and for an imported recipe nobody has priced.
+ * "Macros not estimated yet", and the way to get them (TEC-201): one estimate
+ * call on the recipe as it is, the same path as an ingredient edit. For an
+ * imported recipe nobody has estimated, after a Revert, or after a failed estimate.
  */
 function NotEstimated({ recipe, onEstimated }: { recipe: Recipe; onEstimated?: (recipe: Recipe) => void }) {
   const toast = useToast();
@@ -53,7 +53,7 @@ function NotEstimated({ recipe, onEstimated }: { recipe: Recipe; onEstimated?: (
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't estimate that.");
-      toast.notice(`"${recipe.name}" is priced.`);
+      toast.notice(`"${recipe.name}" has its macros estimated.`);
       onEstimated?.(body.recipe as Recipe);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't estimate that.");

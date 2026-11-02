@@ -2,8 +2,8 @@
  * The one model every call in Cookbook runs on, and the one effort level
  * (TEC-133, 2026-10-22).
  *
- * Drafting (Ask Claude), reading a link, reading a file, pricing every way in,
- * re-pricing an edit and Tidy all go out as exactly this. There is no picker and
+ * Drafting (Ask Claude), reading a link, reading a file, estimating the macros
+ * every way in, re-estimating an edit and the grocery list's Tidy all go out as exactly this. There is no picker and
  * no effort dial anywhere, and the draft and edit routes ignore a `model` an
  * older copy of the page still sends. Changing either is the owner's call and
  * needs `tests/models.test.ts` to change with it.
@@ -60,7 +60,7 @@ export function requestShape(opts: { maxTokens: number; schema?: Record<string, 
 
 /**
  * Display names, including models no call uses any more: a kept recipe keeps the
- * model that priced it (provenance never moves), and the book names it as it
+ * model that estimated it (provenance never moves), and the book names it as it
  * was. This is a lookup for reading rows, not a choice.
  */
 const LABELS: Record<string, string> = {
@@ -75,9 +75,9 @@ export function modelLabel(id: string): string {
 }
 
 /**
- * Is this a model a draft may say priced it? Today's, or one this app used
+ * Is this a model a draft may say estimated it? Today's, or one this app used
  * before TEC-133 — a draft made before a deploy and kept after it still names
- * the model that really priced it.
+ * the model that really estimated it.
  */
 export function isRecordedModel(value: unknown): value is string {
   return typeof value === "string" && value in LABELS;

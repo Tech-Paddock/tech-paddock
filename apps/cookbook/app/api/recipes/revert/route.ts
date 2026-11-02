@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRecipe } from "@/lib/recipes";
-import { revertToImported } from "@/lib/tidy";
-import { deleteDraft, getOriginal, revertRecipe } from "@/lib/tidyStore";
+import { revertToImported } from "@/lib/imported";
+import { getOriginal, revertRecipe } from "@/lib/importedStore";
 import { errorResponse } from "@/lib/respond";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   if (!id) return NextResponse.json({ error: "Which recipe?" }, { status: 400 });
 
   try {
-    const recipe = await revertToImported({ getRecipe, getOriginal, write: revertRecipe, deleteDraft }, id);
+    const recipe = await revertToImported({ getRecipe, getOriginal, write: revertRecipe }, id);
     return NextResponse.json({ recipe });
   } catch (e) {
     return errorResponse(e, "Couldn't put that recipe back.");

@@ -23,7 +23,7 @@ export default function Provenance({
   model?: string | null;
   url?: string | null;
 }) {
-  // A kept recipe names the model that priced it, even one no call uses now.
+  // A kept recipe names the model that estimated it, even one no call uses now.
   const modelName = model ? modelLabel(model) : null;
 
   // Yours is the quiet one because it is the trustworthy one; an estimate is the

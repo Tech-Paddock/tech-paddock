@@ -38,7 +38,7 @@ vi.mock("@/lib/recipes", async (importOriginal) => ({
   nameTaken: async () => false,
   getRecipe: async () => STORED,
   nameTakenByOther: async () => false,
-  updateRecipe: async (_id: string, edit: unknown, reprice: unknown) => ({ ...STORED, ...(edit as object), reprice }),
+  updateRecipe: async (_id: string, edit: unknown, reestimate: unknown) => ({ ...STORED, ...(edit as object), reestimate }),
 }));
 
 const { estimateRecipeMacros, generateRecipe, importRecipe, readRecipeFile, styleRecipe, tidyList } = await import("@/lib/anthropic");
@@ -108,7 +108,7 @@ beforeEach(() => {
 });
 
 describe("every model request", () => {
-  it("covers pricing, Ask Claude, both turns of a link, a file, Tidy of the list and the house style", async () => {
+  it("covers the macro estimate, Ask Claude, both turns of a link, a file, Tidy of the list and the house style", async () => {
     await everyCall();
     expect(sent).toHaveLength(7);
   });
@@ -157,7 +157,7 @@ describe("a stale `model` from an installed copy of the page", () => {
     expect(sent.map((b) => b.model)).toEqual(["claude-sonnet-5-5", "claude-sonnet-5-5"]);
   });
 
-  it("is ignored by the edit route, and the re-price records the one model", async () => {
+  it("is ignored by the edit route, and the re-estimate records the one model", async () => {
     const { POST } = await import("@/app/api/recipes/edit/route");
     replies.push(reply(MACROS));
     const response = await POST(
@@ -172,8 +172,8 @@ describe("a stale `model` from an installed copy of the page", () => {
     );
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.repriced).toBe(true);
-    expect(body.recipe.reprice.model).toBe("claude-sonnet-5-5");
-    expectOneModel(sent[0], "edit re-price");
+    expect(body.reestimated).toBe(true);
+    expect(body.recipe.reestimate.model).toBe("claude-sonnet-5-5");
+    expectOneModel(sent[0], "edit re-estimate");
   });
 });

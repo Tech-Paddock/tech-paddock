@@ -6,16 +6,16 @@ import { statusOf } from "@/lib/errors";
 import { errorResponse } from "@/lib/respond";
 
 export const dynamic = "force-dynamic";
-// An edit that changes the ingredients makes one pricing call before it writes,
+// An edit that changes the ingredients makes one estimate call before it writes,
 // thinking at medium effort (TEC-133).
 export const maxDuration = 120;
 
 /**
  * Edit a recipe in the book: every field (2026-09-26). `lib/edit.ts` has
- * the rules — what re-prices, and why a failed re-price writes nothing.
+ * the rules — what re-estimates the macros, and why a failed re-estimate writes nothing.
  *
  * Body: `{ id, edit:{ name, servings, ingredients, method, meta } }`.
- * Answers `{ recipe, repriced }`. **Not contract** — `/api/servings` is the only
+ * Answers `{ recipe, reestimated }`. **Not contract** — `/api/servings` is the only
  * route Health reads, and it reads the edited row the next time it asks.
  */
 export async function POST(request: NextRequest) {
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   if ("error" in read) return NextResponse.json({ error: read.error }, { status: 400 });
 
   // A `model` in the body (an installed copy of the page from before TEC-133)
-  // is ignored, not refused: a re-price runs on lib/models.ts's one model.
+  // is ignored, not refused: a re-estimate runs on lib/models.ts's one model.
 
   try {
     const result = await applyEdit<Recipe>(
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     // 500, never a 200, and nothing was written; the screen says "not saved".
     if (statusOf(e) !== 500) return errorResponse(e, "");
     return NextResponse.json(
-      { error: e instanceof Error && e.message ? e.message : "Couldn't re-price that. Nothing was changed." },
+      { error: e instanceof Error && e.message ? e.message : "Couldn't re-estimate that. Nothing was changed." },
       { status: 500 }
     );
   }

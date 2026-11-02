@@ -7,8 +7,8 @@ import { ConflictError, InputError, statusOf } from "@/lib/errors";
 
 /**
  * Editing a kept recipe (2026-09-26). What has to hold: an edit that
- * changes the ingredients re-prices with one call, one that does not calls
- * nothing, and **a failed re-price writes nothing and never looks like success.**
+ * changes the ingredients re-estimates the macros with one call, one that does not calls
+ * nothing, and **a failed re-estimate writes nothing and never looks like success.**
  */
 
 const stored: EditTarget = {
@@ -42,7 +42,7 @@ function deps(over: Partial<EditDeps<string>> = {}) {
   return d;
 }
 
-describe("what re-prices", () => {
+describe("what re-estimates the macros", () => {
   it("a changed ingredient does, with one call, and the new pot is what is written", async () => {
     const d = deps();
     const next = edit({ ingredients: ["750g beef mince", "1 tin kidney beans"] });
@@ -53,7 +53,7 @@ describe("what re-prices", () => {
       model: "claude-sonnet-5-5",
       note: "assumed 1 tbsp oil",
     });
-    expect(result.repriced).toBe(true);
+    expect(result.reestimated).toBe(true);
   });
 
   it("servings alone does not: same pot, a new divisor", async () => {
@@ -61,7 +61,7 @@ describe("what re-prices", () => {
     const result = await applyEdit(d, "r1", edit({ servings: 8 }));
     expect(d.estimate).not.toHaveBeenCalled();
     expect(d.update).toHaveBeenCalledWith("r1", edit({ servings: 8 }), null);
-    expect(result.repriced).toBe(false);
+    expect(result.reestimated).toBe(false);
   });
 
   it("name, method and metadata do not", async () => {
@@ -81,7 +81,7 @@ describe("what re-prices", () => {
   });
 });
 
-describe("a failed re-price", () => {
+describe("a failed re-estimate", () => {
   it("writes nothing and throws — it never returns as if it saved", async () => {
     const d = deps({
       estimate: vi.fn(async () => {
@@ -101,7 +101,7 @@ describe("a failed re-price", () => {
 });
 
 describe("refusals before any call", () => {
-  it("a name another recipe holds is a 409, and pays for no pricing", async () => {
+  it("a name another recipe holds is a 409, and pays for no estimate", async () => {
     const d = deps({ nameTakenByOther: vi.fn(async () => true) });
     const run = applyEdit(d, "r1", edit({ name: "Beef stew", ingredients: ["other"] }));
     await expect(run).rejects.toBeInstanceOf(ConflictError);

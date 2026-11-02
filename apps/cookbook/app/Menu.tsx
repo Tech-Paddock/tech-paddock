@@ -24,7 +24,7 @@ import { useToast } from "./Toast";
  *
  * **Names and numbers come from the book, not from the menu's rows.** The menu
  * stores only which recipe and which day; the book on this page is already the
- * current recipe, so an edit that re-prices it shows here at once, and a recipe
+ * current recipe, so an edit shows here at once, and a recipe
  * removed from the book has left the menu by the foreign key's cascade.
  */
 export default function Menu({
