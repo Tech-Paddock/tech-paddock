@@ -226,8 +226,8 @@ Reasoning is in the migration headers.
   rotated refresh token. `tests/kroger.test.ts` checks no route body carries a token.
 - Scopes: `cart.basic:write product.compact`. A missing variable is named on the list tab and in
   `/api/health`.
-- `GET /api/kroger/cart` is the review. **Which products decide a line** is `decide`
-  (`lib/brands.ts`), one copy for the review, the list's prices, the deal scan, the list's links and
+- `GET /api/kroger/cart` looks lines up (their plans). **Which products decide a line** is `decide`
+  (`lib/brands.ts`), one copy for the lookup, the list's prices, the deal scan, the list's links and
   marks: (1) a line that is 8–14 digits is that code, saved or not; (2) saved names as whole words,
   longest first, every product carrying the longest matching name a candidate; a search-word
   phrase longer than that decides instead, and on equal length products win. Among several
@@ -239,56 +239,69 @@ Reasoning is in the migration headers.
   against each product's `description`, every item word a whole word in any order, a trailing
   s/es either side: `via: "description"`, **unconfirmed** until Send checks it. Candidates are
   most counted, then most recently updated.
-- `planLine` (`lib/cart.ts`): one candidate, or a `chosen` one, is `exact` (*Going in*, carrying
-  every option for "tap to change" and `chosen: one | default | named`); several and none chosen
-  is `settle` (*Pick one*, carrying `matched`); anything else is a Kroger search (`match` /
+- `planLine` (`lib/cart.ts`): one candidate, or a `chosen` one, is `exact` (carrying
+  every option and `chosen: one | default | named`); several and none chosen
+  is `settle` (carrying `matched`; the splash opens for it, and Send takes the most-bought); anything else is a Kroger search (`match` /
   `none`). **The official-name check** (TEC-135): `search` returns up to `CHECK_RESULTS` of
   Kroger's results for the item (`searchProducts`); a `description` candidate passes only when its
   code is among them. One passing is `exact`, several `settle`; none falls to `match` with that
   search's top result. Tests: `tests/sendDefaults.test.ts` ("8 oz spaghetti" vs a sauce, "1 tsp
   salt" vs caramels, `fetch` stubbed).
-- **The review** (`SendView`, `app/Cart.tsx`) replaces the list on the list tab, with *← Back to
-  the list*; nothing goes in until **Send N to cart**. One list in sections: *Pick one* (most
-  bought pre-picked; opens on the first), *Going in* (tap to change) and *Not saved yet* (ticked;
-  *Paste a product page*). **Since TEC-190 it holds only lines still on the List**: `GET
-  /api/kroger/cart` leaves out lines with `sent_at` (it still returns `alreadySent`), the *Already
-  sent* section and its "add again" box are gone from the screen, and `?ids=a,b` limits the review
-  to those lines (Add to cart on one line).
-  A picked option is filled with the accent. **Make default** (a checkbox, only where `matched`
-  and several options) rides on the pick as `makeDefault`. **Not this trip** is the only way a
-  line with a product stays out; a line with nothing to add is sent as a bare `{id}` and comes
-  back "No product to add.". After Send the same view shows every outcome, and **Still on your
-  list** names every line this send left unsent. The rows, filled options, boxes and section
-  headings are local patterns in `app/Cart.tsx`.
+- **No review, no pop-up lists** (TEC-206). `SendView`, `ReviewRow`, `Choice`, `startingChoice`,
+  `pickFor` and `sectionOf` are gone from `app/Cart.tsx`. **Send all** runs `lookUp(null)` (`GET
+  /api/kroger/cart`, only lines still on the List), then `guessPicks` (`lib/cartGuess.ts`, pure), then
+  one `POST /api/kroger/cart`. The best guess: `exact` goes in as its product (no page sent, never
+  re-saved); `settle` sends the most-bought option with its page (so it is remembered); `match` sends
+  Kroger's top match with its page and size; `none` is a bare `{id}` and comes back "No product to
+  add.". Every line then reports in `SendResults` on the list (added, skipped or failed; Dismiss).
+  `?ids=a,b` limits the lookup (+ Cart on one line); `include=sent` also looks up a line already in
+  the cart (Change). **Confirms** are `confirmWords` (`lib/cartGuess.ts`): a count, never names;
+  `List.tsx` holds `confirm` for the section buttons and `rowConfirm` for a row's + Cart and Remove.
 - **Make default on Send**: the route reads each ticked line's `matched` name **before** sending
   (remembering a pick can add the line's own name to the product, which would change what it
   matches), and `sendLines` calls `makeDefault` only after that line's add succeeded, after
   remembering. A failure is appended to the line ("Couldn't make it the default … do it in Your
   brands"); the line stays added.
-- A line left out of the picks reports skipped, "Not this trip — still on your list."
-- The state is `useCart` (`app/Cart.tsx`); `List.tsx` lays out `SendView`, the **List** and **In
-  cart** sections, `RefreshLog` and `CartPanel` (connection, store, Refresh now; **no deals since
-  TEC-132**, they live on the Deals tab). The sticky `CartBar` is gone (TEC-190): **Send all to
-  cart** ends the List section, **Clear cart** and **Go to checkout** end In cart.
-  `serialKroger` is module-level, so the list and Your brands' Refresh share one Kroger queue.
-- **List and In cart** (TEC-190): a line is In cart when `sent_at` is set (Send sets it, a whole
-  Take back clears it), so the sections need no new column and no migration. **Add to cart** on a
-  line (`addOne`): `GET /api/kroger/cart?ids=<id>`, and when the plan is `exact` the pick is
-  posted at once (`POST` with `only: [id]`, which limits what the server sends and reports) and the
-  outcome is a toast; a Pick one, Not saved yet or no-product line opens `SendView` with that line
-  alone (`reviewOnly`). **Remove** (`removeOne`) is `POST /api/kroger/cart/take-back` with `ids:
-  [id]`; **Clear cart** is the old two-tap Take back (GET preview, then `confirm: true`, no `ids`).
-  The In cart total and the "Shows what Cookbook put in your cart" caveat are the screen's own
-  statement that the API cannot read the account. A ticked line that is also in the cart sits in
-  In cart (no tick there). **Tidy and Clear all / Clear ticked / Copy read the List only**: a line
-  in the cart is never merged into a tidy or deleted without a take back.
+- The state is `useCart` (`app/Cart.tsx`); `List.tsx` lays out the header, the **List** and **In
+  cart** sections, `SendResults`, `RefreshLog` and `CartPanel` (connection, Refresh now; **no deals
+  since TEC-132**, they live on the Deals tab). The store is chosen in the list's header
+  (`StorePicker`, ZIP only: Kroger's Locations API has no city filter). `serialKroger` is
+  module-level, so the list and Your brands' Refresh share one Kroger queue.
+- **List and In cart** (TEC-190, TEC-206): a line is In cart when `sent_at` is set (Send sets it, a
+  whole Take back clears it), so the sections need no new column. **In cart is the whole King
+  Soopers cart**: every add comes from this app, and the King Soopers app is only for checkout, so
+  no screen says an add elsewhere is hidden. **+ Cart** (`addOne`) asks "Add 1 to the cart?" in the
+  row, then sends `guessPick` with `only: [id]` and reports in a toast. **Remove** (`removeOne`) and
+  **Clear cart** (`clearCart`) both go through `takeBackRequest`: `POST
+  /api/kroger/cart/take-back` with `confirm: true`, and `ids` for Remove only. Clear cart calls no
+  GET preview and has no King Soopers step. **Ticked lines sort to the bottom** of the List, faded
+  (`tickedLast`, `lib/listOrder.ts`, also applied client-side so a tick moves the line at once); In
+  cart has no ticks. **Tidy applies at once** after its confirm (`tidyNow`: POST then PUT; the
+  route still runs `validateTidy` on both). **Tidy and Clear all / Clear ticked / Copy read the List
+  only**: a line in the cart is never merged into a tidy or deleted without a take back.
+- **Refresh cart** (TEC-206): `POST /api/kroger/cart/refresh`, `lib/cartRefresh.ts` (`reconcile`,
+  `priceHeld`, `refreshCart`, deps injected). It compares the list with the `cart_sends` ledger
+  (a line the ledger holds is marked sent; a sent line whose ledger nets to zero goes back on the
+  List; a sent line with no ledger rows at all is left alone and reads "no price"), then prices each
+  In cart line today at the chosen store with `appToken` and `productsByIds`: **the app token,
+  never `withAccessToken`**, so it is not in `serial`. A product Kroger does not return or prices
+  at nothing makes its line "no price", never $0. The client keeps the result in `cartCheck` (not
+  stored; it is read again on each open, and by `useCart` once on open when connected with a
+  store): the live In cart total with the time, and each In cart row's live price.
+  `GET /api/grocery` adds `used` ({product, size}, from the ledger and Your brands) on In cart
+  items for "Used: …"; display only, null when the read fails.
+- **The splash** (`ProductSplash`, `app/Cart.tsx`) is the only picker. After Add an item,
+  `offerChoices(ids)` looks the new lines up and opens it for each `needsSplash` plan (`settle` with
+  two or more options). Tapping a product (`chooseProduct`) adds it to the cart now, with **Make
+  default** ticked or not (`pickOf`, `lib/cartGuess.ts`). **Change** on an In cart row
+  (`changeLine`) reuses it: the old product is taken back first, then the new one goes in.
 - **Searching by the item alone** (TEC-131): `lineTerm` (`lib/cart.ts`) is
   `searchTerm(itemWords(name)) ?? searchTerm(name)`, used by `planLine` and `targetFor`; a
   phrase's search words are searched as written. The list's links use `itemWords` too
   (`linkFor`, `lib/preferences.ts`). Rule and edges: `lib/itemWords.ts`,
   `tests/itemWords.test.ts`.
-- **Remembering** (TEC-128, TEC-131): whatever goes in other than a Going in line's own product,
-  a Pick one pick, a changed Going in pick, a pasted page or the tapped top match, goes through
+- **Remembering** (TEC-128, TEC-131): whatever goes in other than an exact line's own product,
+  a best-guess or splash pick or Kroger's top match, goes through
   `rememberProduct`: the line's name
   (`splitLine`, so never the note) is added to the names of the row with that code, or a new row
   is made (`size_first` = the match's `size`, which the client sends beside `match`; null for a
@@ -303,8 +316,8 @@ Reasoning is in the migration headers.
 - A send appends a `sent` row per added line (`sentRows` in `lib/cart.ts`): the UPC that went in,
   the quantity sent, and the modality it actually went with (null when Kroger refused the choice).
   A failed append is named in `recordError`; the items are still in the cart.
-- **Take back** (TEC-127): rules in `lib/takeBack.ts`, route `/api/kroger/cart/take-back`. GET
-  reads the ledger for the confirm (no Kroger call); POST needs `confirm: true`. Only lines still
+- **Take back** (TEC-127): rules in `lib/takeBack.ts`, route `/api/kroger/cart/take-back`. POST
+  needs `confirm: true` (the screen no longer calls the GET preview, which still exists). Only lines still
   on the list, ticked or not. Per line it appends the `taken_back` rows first, then sends
   `PUT /cart/add` with the negated quantity and the recorded modality (`takeBackFromCart`), never
   retried without it; a refusal appends `refused` rows and the line stays sent. Only lines wholly
@@ -356,8 +369,8 @@ Reasoning is in the migration headers.
   `PRICE_WINDOW_NIGHTS`, 5, counts for the price), takes each product's newest
   night, and gives each line `price: {unit, total, onSale, night}` or `null`. The product a line is
   priced as is `productFor`: the only saved product, a chosen one (default or named) or the single
-  Kroger-name match; an unsettled Pick one is **not guessed**, so it reads "no price yet" until a
-  pick makes it one. A line with no product or no night is "no price yet", never $0, and each
+  Kroger-name match; several saved products with no default are **not guessed**, so the line reads "no price yet"
+  until a default or a splash pick makes it one. A line with no product or no night is "no price yet", never $0, and each
   section's total line counts them ("about $21.46 · 1 no price yet"). The header names the night
   the prices are from ("prices from the night of Oct 28", or "Oct 26 to Oct 28" when lines differ).
   A failed price read comes back as `priceError` beside the list, which still renders. Totals are
@@ -648,9 +661,9 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 - Matching by official name only runs when no saved name matched, and only after a refresh has
   filled `description`; a freshly pasted seed matches by names only until **Refresh now**. Since
   TEC-135 Send offers such a match only when Kroger's top `CHECK_RESULTS` for the item include
-  its code, so a real match that Kroger ranks lower falls to Not saved yet; tap the right product
-  (it is remembered) or add the name in Your brands.
-- A Pick one pick is remembered, so the line's whole name joins that product's names; the next
+  its code, so a real match that Kroger ranks lower falls to Kroger's top match; add the name in Your brands or pick it in the
+  splash (it is remembered).
+- A best-guess or splash pick is remembered, so the line's whole name joins that product's names; the next
   time that exact line has one match and goes straight in, whatever the default.
 - The list's link and price for a line decided by default follow the default; changing the
   default in Your brands changes them on the next read.

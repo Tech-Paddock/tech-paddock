@@ -77,7 +77,7 @@ section and closing comment before changing anything in this file.
 - **The list's totals are summed, not asked for** (TEC-190). Each line is priced from its saved
   product's latest night in `price_nights` (the sale price on a night it was on sale) times its
   quantity; List and In cart each show a total, labelled with the night the prices are from. A
-  line with no saved product, no recent price or an unsettled Pick one is "no price yet", counted
+  line with no saved product, no recent price or several saved products and no default is "no price yet", counted
   in the total's line and never $0. Nothing calls Kroger to price the list.
 - **A list line says what its price means, from the same nightly data** (TEC-196). On List and In
   cart each line stays **on one line**: the name truncates with an ellipsis and the full text is the
@@ -116,43 +116,28 @@ section and closing comment before changing anything in this file.
 - The redirect URI is a fixed constant, never built from the Host header.
 - Pick a store once; lookups price and stock there.
 - Send adds; it never checks out. "Go to checkout" opens the King Soopers cart.
-- **The Grocery list is two sections, List and In cart** (TEC-190). List is what is still to send;
-  In cart is what Cookbook sent and has not taken back (`sent_at`, with the ledger behind it). A
-  line is in one, never both: sending moves it to In cart, taking it back returns it to List.
-  - **Add to cart** on a line sends it through the same matching as Send all: a line that goes in
-    as one saved product goes in at once and reports; Pick one, Not saved yet and no product open
-    the review with that line alone, so nothing is added unseen.
-  - **Remove** is Take back for that line; **Clear cart** is Take back for every line Cookbook has
-    in the cart, behind the confirm. **Send all** sends the whole List.
-  - **In cart is only what Cookbook sent and has not taken back.** The API cannot read the
-    account, so the screen says that anything added in the King Soopers app is not shown.
-- **Send all groups the List into Going in, Pick one and Not saved yet.**
-  - **Going in:** a line that matches one product, its name's default, or a saved product the line
-    names.
-  - **Pick one:** a line that matches several products and has no default. The most-bought is
-    pre-picked, and a **Make default** checkbox sets it as the default.
-  - **Not saved yet:** Kroger's top match, ticked to add, or replaced with a product URL.
-  - Whichever goes in is remembered: the line's name is added to that product's names, or a new
-    product row is made.
+- **The Grocery list is two sections, List and In cart.** List is what is still to send; In cart is what Cookbook sent and has not taken back (`sent_at`, with the ledger behind it). A line is in one, never both.
+- **Cookbook is the only way anything enters the cart** (owner, 2026-11-02): In cart is the whole King Soopers cart; the King Soopers app is only for checkout.
+- **No secondary pop-up lists.** Send all, Add to cart, Remove, Clear cart, Tidy, Clear ticked and Clear all each ask one "Are you sure?" with a count, and no list.
+- **Send is a best guess, with no review** (owner, 2026-11-02). One saved product or the name's default goes in; of several with no default, the most-bought; with none saved, Kroger's top match. Whatever goes in is remembered as before. Every line reports added, skipped or failed after Send. Add to cart on one line uses the same guess.
+- **The one picker that stays:** Add an item opens a choice of products when several match and none is the default, with Make default; tapping one adds it to the cart. Change on an In cart line reuses it.
+- **Ticked lines sort to the bottom of the List, faded.**
+- **Refresh cart** fixes In cart from the ledger, then prices each In cart line today at the chosen store from the product read with the app token, never the account token, and shows the live In cart total with the time checked. A line Kroger cannot price reads "no price", never $0.
+- **The header** holds Pickup/Delivery and the store; tapping the store opens a ZIP search. **Add an item** sits below the List's filters.
 - **A named product beats the default.** "english muffins" gets the default; "sourdough english
   muffins" gets the saved sourdough.
-- **Nothing is skipped silently.** A line stays unsent only on **Not this trip**, or when it has no
-  product to add ("No product to add."). After Send, every unsent line stays listed under **Still
-  on your list**.
 - **A line is searched by its item alone.** A fixed rule drops quantities, units and prep words,
   and reads "X of Y" as "Y X": "6 cloves of garlic" searches "garlic cloves". No model runs.
 - **A line that is a product code goes in as that product.** A line that matches none of the saved
   names is matched against each saved product's official Kroger name, and that product is offered
   only when Kroger's own search for the item also returns it, so "spaghetti" never matches a sauce.
-  One hit goes straight in; several go to Pick one.
+  One hit goes straight in; of several, the most-bought goes in.
 - No model picks a product or runs anywhere in this flow.
 - Every line reports added, skipped or failed; a partial send never reads as whole.
 - A line already in the cart is not offered again, and the server still refuses to send it twice
   without an explicit "again", because the Cart API only adds.
 - **Take back** (Remove on one line, Clear cart on all) removes what Cookbook sent, by sending negative quantities of the same products,
-  and marks those lines unsent. It never claims the cart is empty: anything added elsewhere stays,
-  and the confirm says so. If Kroger refuses a negative quantity, it reports that per line and
-  offers the cart page.
+  and marks those lines unsent. Clear cart takes back every In cart line after one confirm with a count.
 - Take back writes its `taken_back` rows before the negative add, so a failure never removes
   twice. It acts only on lines still on the list, and is never retried without the recorded
   Pickup/Delivery choice.

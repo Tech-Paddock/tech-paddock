@@ -114,8 +114,8 @@ const MARK_WORDS: Record<LineMark, string> = { "★": "Your default", "?": "Need
  * Top to bottom: the header (how many are **Still to buy**, the live cart total, the
  * store, Pickup/Delivery), **Cooking this week**, the filters, the add box, the lines with
  * a ★ / ? / + marker each, the King Soopers panel, and **Send to cart** and
- * **Take back** at the bottom. Send to cart opens the review in place of the
- * list (`SendView`, `Cart.tsx`).
+ * **Take back** at the bottom. Send to cart goes in as a best guess after one
+ * confirm, with no review screen (`useCart`, `Cart.tsx`, TEC-206).
  *
  * **It leaves three ways**: a block of text you copy, a King Soopers search you
  * tap, or **Send to cart** — the no-OAuth rule was reversed for King Soopers on
