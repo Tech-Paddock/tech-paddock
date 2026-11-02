@@ -1,49 +1,44 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { CHECKOUT_URL, isKingSoopersProduct } from "@/lib/kingsoopers";
+import { CHECKOUT_URL } from "@/lib/kingsoopers";
 import { refreshDue, scanDue } from "@/lib/refreshDue";
-import type { Candidate, CartLine, Outcome, Plan, ReviewLine } from "@/lib/cart";
-import { describeDrift, sizeDrift } from "@/lib/sizeDrift";
+import type { CartLine, CartPick, Outcome, ReviewLine } from "@/lib/cart";
+import { guessPick, guessPicks, needsSplash, pickOf, pickerOptions, type PickerOption } from "@/lib/cartGuess";
+import type { CartRefresh } from "@/lib/cartRefresh";
 import type { Modality } from "@/lib/modality";
 import type { ScanRecord } from "@/lib/pricing";
 import { refreshSummary } from "@/lib/refreshNote";
-import { describe as describeHeld, type TakeBackLine, type TakeBackOutcome } from "@/lib/takeBack";
+import type { TakeBackOutcome } from "@/lib/takeBack";
 import { useToast } from "./Toast";
 
 /**
  * Send to cart — King Soopers (TEC-90; `RULES.md`, *Send to cart*), on the
- * list tab. Connect once, pick a store once, then **Send to cart** opens the
- * review (TEC-135, the owner's mockup of 2026-10-23): **one list in three
- * sections** —
- * - **Pick one**: several saved products and no default; the most-bought is
- *   pre-picked, and **Make default** (a plain checkbox) makes the pick the
- *   name's default when it goes in.
- * - **Going in**: one saved product, the name's default, or one the line
- *   names; tap to change.
- * - **Not saved yet**: Kroger's top match, ticked to add, or a pasted page.
+ * list tab. Connect once, pick a store once.
  *
- * **Nothing is skipped silently**: every line goes unless **Not this trip** is
- * tapped, and after Send every unsent line stays listed under **Still on your
- * list**. Whichever goes in is remembered in Your brands (TEC-128). **No model
- * picks anything.** Every line reports added, skipped or failed, and **a line
- * already sent is not sent again without saying so**, because the Cart API
- * only adds. Checkout stays at King Soopers.
+ * **No review, no pop-up lists** (TEC-206; owner, 2026-11-02: "I don't want to
+ * reconfirm and read a list"). **Send all** and **+ Cart** go in as the best
+ * guess (`lib/cartGuess.ts`): the one saved product or the name's default, the
+ * most-bought of several, else Kroger's top match. After a send every line
+ * reports added, skipped or failed (`SendResults`). Whatever goes in is
+ * remembered in Your brands (TEC-128). **No model picks anything.**
+ *
+ * **Cookbook is the only way anything enters the cart** (owner): In cart is the
+ * whole King Soopers cart. **Refresh cart** re-reads the ledger and prices the
+ * cart today with the app's token, never the account's.
+ *
+ * **The one picker that stays** is `ProductSplash`: Add an item opens a choice
+ * of products when several match and none is the default; **Change** on an In
+ * cart line opens the same one.
  *
  * **Refresh** (2026-10-20): opening the tab with the last refresh over a week
  * old starts one in the background; *Refresh now* starts one by hand.
- * **Prices (TEC-121)**: Pickup/Delivery and the deal scan. The live estimate left
- * in TEC-190: the list's totals are summed from the nightly check.
- * **Every request that borrows a Kroger token goes through `serial`**, one at
- * a time: two at once can race the refresh token's rotation.
- * **Take back (TEC-127)**: removes what Cookbook sent, after a second tap that
- * shows what will come out. Never says the cart is empty.
+ * **Every request that borrows the account's Kroger token goes through
+ * `serial`**, one at a time: two at once can race the refresh token's rotation.
  *
- * The state lives in `useCart`; `List.tsx` lays out `SendView`, `CartPanel`
- * and `CartBar`. Local patterns, named so they are a decision deferred rather
- * than drift: the review's line rows, option buttons (filled when picked) and
- * section headings, the result chips, the Take back confirm and the store
- * picker. They reuse the theme's tokens only.
+ * The state lives in `useCart`; `List.tsx` lays it out. Local patterns, named so
+ * they are a decision deferred rather than drift: the result chips, the splash
+ * and the store picker. They reuse the theme's tokens only.
  */
 
 type Status = {
@@ -57,19 +52,17 @@ type Status = {
 
 type Store = { locationId: string; name: string; address: string };
 
-/**
- * What the user has decided for one line in the review. `on` is false only
- * after *Not this trip* (or for a line with nothing to add); `pick` is the
- * product chosen among the options; `url` a pasted product page.
- */
-export type Choice = { on: boolean; pick: string | null; url: string; pasting: boolean; makeDefault: boolean };
-
 type Results = {
   outcomes: Outcome[];
   summary: string;
   recordError: string | null;
   modalityWarning: string | null;
 };
+
+type TakeBackResult = { outcomes: TakeBackOutcome[]; summary: string; recordError: string | null; failed: boolean };
+
+/** The lines a splash still has to settle, and whether it is Change on an In cart line. */
+type Splash = { queue: ReviewLine[]; change: boolean };
 
 const CALLBACK_WORDS: Record<string, string> = {
   connected: "King Soopers connected.",
@@ -82,66 +75,11 @@ const CALLBACK_WORDS: Record<string, string> = {
 const LINK = "underline decoration-dotted underline-offset-2";
 const HEADING = "text-xs font-bold uppercase tracking-wider";
 
-function when(iso: string): string {
+export function when(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? iso
     : d.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-}
-
-function money(n: number | null): string | null {
-  return n === null ? null : `$${n.toFixed(2)}`;
-}
-
-/** "bought N×" — the times-bought count, never a quantity (TEC-135). */
-function bought(count: number): string {
-  return count > 0 ? `bought ${count}×` : "new";
-}
-
-/** The options a product plan offers, the one it goes in as first. */
-function optionsOf(plan: Plan): Candidate[] {
-  return plan.kind === "exact" ? plan.options : plan.kind === "settle" ? plan.options : [];
-}
-
-/** Which section a line sits in (TEC-135). A line already sent sits apart, because sending it again doubles it. */
-export function sectionOf(line: ReviewLine): "pick" | "going" | "new" | "sent" {
-  if (line.sent_at !== null) return "sent";
-  if (line.plan.kind === "settle") return "pick";
-  if (line.plan.kind === "exact") return "going";
-  return "new";
-}
-
-/** Before anyone taps: **every line goes**, Pick one with its most-bought pre-picked. A line already sent waits for a tap. */
-function startingChoice(line: ReviewLine): Choice {
-  const plan = line.plan;
-  const fresh = line.sent_at === null;
-  const pick = plan.kind === "exact" ? plan.upc : plan.kind === "settle" ? (plan.options[0]?.upc ?? null) : null;
-  const on = fresh && (plan.kind === "exact" || plan.kind === "settle" || plan.kind === "match");
-  return { on, pick, url: "", pasting: false, makeDefault: false };
-}
-
-type Pick = { id: string; upc?: string; url?: string; match?: string; size?: string; makeDefault?: true };
-
-/** What a line sends, or null for Not this trip. */
-export function pickFor(line: ReviewLine, choice: Choice): Pick | null {
-  const plan = line.plan;
-  if (choice.url.trim()) return { id: line.id, url: choice.url.trim() };
-  if (!choice.on) return null;
-  if (plan.kind === "exact" || plan.kind === "settle") {
-    const option = optionsOf(plan).find((o) => o.upc === choice.pick);
-    if (!option) return null;
-    const matched = plan.matched;
-    const defaulting = choice.makeDefault && matched && optionsOf(plan).length > 1 ? { makeDefault: true as const } : {};
-    // The product a Going in line went in as, untouched, is never re-saved.
-    if (plan.kind === "exact" && option.upc === plan.upc) return { id: line.id, upc: option.upc, ...defaulting };
-    // The pick's page goes with it, so it is remembered the way a match is (TEC-131).
-    return { id: line.id, upc: option.upc, match: option.url, ...defaulting };
-  }
-  if (plan.kind === "match") {
-    const p = plan.product;
-    return { id: line.id, upc: p.upc, match: p.url, ...(p.size ? { size: p.size } : {}) };
-  }
-  return null;
 }
 
 /**
@@ -178,30 +116,22 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   const [stores, setStores] = useState<Store[] | null>(null);
   const [choosingStore, setChoosingStore] = useState(false);
 
-  const [busy, setBusy] = useState<null | "stores" | "review" | "add" | "send" | "disconnect" | "take-back-look" | "take-back">(null);
-  // Take back (TEC-127): the first tap reads what would go, the second takes it.
-  const [takeBackPreview, setTakeBackPreview] = useState<TakeBackLine[] | null>(null);
-  const [takeBackResults, setTakeBackResults] = useState<{
-    outcomes: TakeBackOutcome[];
-    summary: string;
-    recordError: string | null;
-    failed: boolean;
-  } | null>(null);
-  const [review, setReview] = useState<ReviewLine[] | null>(null);
-  const [choices, setChoices] = useState<Record<string, Choice>>({});
-  const [open, setOpen] = useState<string | null>(null);
-  // Add to cart on one line (TEC-190): the review then holds only that line.
-  const [reviewOnly, setReviewOnly] = useState<string[] | null>(null);
+  const [busy, setBusy] = useState<null | "stores" | "lookup" | "add" | "send" | "disconnect" | "take-back" | "cart-check">(null);
+  const [takeBackResults, setTakeBackResults] = useState<TakeBackResult | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
-  const [refused, setRefused] = useState<CartLine[] | null>(null);
-  // After Send (TEC-135): the results, and the review they came from, so every
-  // unsent line stays listed under Still on your list.
+  // After Send (TEC-206): every line reports added, skipped or failed.
   const [results, setResults] = useState<Results | null>(null);
+  // The one picker that stays (TEC-206).
+  const [splash, setSplash] = useState<Splash | null>(null);
+  // Refresh cart (TEC-206): today's prices for what is in the cart, and when they were read.
+  const [cartCheck, setCartCheck] = useState<CartRefresh | null>(null);
+  const [cartCheckError, setCartCheckError] = useState<string | null>(null);
 
   const [refreshing, setRefreshing] = useState(false);
   const [refreshNote, setRefreshNote] = useState<{ text: string; failed: boolean; summary?: { line: string; needsLook: boolean } } | null>(null);
   const autoRefreshed = useRef(false);
+  const autoChecked = useRef(false);
 
   const [latestScan, setLatestScan] = useState<ScanRecord | null>(null);
   // Only a failure is shown (TEC-132): the scan fills a Deals row for a
@@ -244,6 +174,38 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
       setRefreshing(false);
     }
   }, [loadStatus, serial]);
+
+  /**
+   * **Refresh cart** (TEC-206): the ledger fixes In cart, and today's price is read for each
+   * In cart line at the chosen store. The server uses the app's token, so this is not in
+   * `serial`. `quiet` (on open) says nothing unless something was fixed or it failed.
+   */
+  const refreshCart = useCallback(async (quiet = false) => {
+    setBusy((b) => b ?? "cart-check");
+    try {
+      const response = await fetch("/api/kroger/cart/refresh", { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "Couldn't refresh the cart.");
+      const check = body as CartRefresh;
+      setCartCheck(check);
+      setCartCheckError(null);
+      const { added, removed } = check.fixed;
+      if (added > 0 || removed > 0) {
+        listChanged.current();
+        toastRef.current.notice(
+          `In cart now matches what Cookbook sent: ${added} put in, ${removed} back on the List.`
+        );
+      } else if (!quiet) {
+        toastRef.current.notice("The cart is up to date.");
+      }
+    } catch (e) {
+      const text = e instanceof Error ? e.message : "Couldn't refresh the cart.";
+      setCartCheckError(text);
+      if (!quiet) toastRef.current.error(text);
+    } finally {
+      setBusy((b) => (b === "cart-check" ? null : b));
+    }
+  }, []);
 
   /** The latest appended scan, or null for never. */
   const loadScan = useCallback(async (): Promise<ScanRecord | null | undefined> => {
@@ -303,6 +265,11 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
         autoRefreshed.current = true;
         void refresh(); // not awaited: the page is never held for it
       }
+      // The cart, read from the ledger and priced today (TEC-206), once on open.
+      if (s?.configured && s.connected && s.store && !autoChecked.current) {
+        autoChecked.current = true;
+        void refreshCart(true);
+      }
       // The deal scan, on the refresh's rule (TEC-121). Queued behind any
       // refresh by `serial`, and likewise never awaited by the page.
       if (s?.store) {
@@ -313,7 +280,7 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
         }
       }
     });
-  }, [loadStatus, refresh, loadScan, scan]);
+  }, [loadStatus, refresh, refreshCart, loadScan, scan]);
 
   async function chooseModality(modality: Modality) {
     if (!status) return;
@@ -359,10 +326,10 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
       if (!response.ok) throw new Error(body.error ?? "Couldn't save the store.");
       setStores(null);
       setChoosingStore(false);
-      setReview(null);
       await loadStatus();
       // A new store means new prices: check them now rather than in a week.
       void refresh();
+      void refreshCart(true);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't save the store.");
     }
@@ -374,8 +341,8 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     try {
       const response = await fetch("/api/kroger", { method: "DELETE" });
       if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't disconnect.");
-      setReview(null);
       setResults(null);
+      setSplash(null);
       await loadStatus();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't disconnect.");
@@ -384,116 +351,22 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     }
   }
 
-  /** Look lines up at Kroger. `ids` limits it to those lines (Add to cart on one line, TEC-190). */
-  async function lookUp(ids: string[] | null): Promise<ReviewLine[]> {
-    const url = ids ? `/api/kroger/cart?ids=${encodeURIComponent(ids.join(","))}` : "/api/kroger/cart";
-    const response = await serial(() => fetch(url, { cache: "no-store" }));
+  /** Look lines up at Kroger. `ids` limits it to those lines; `includeSent` lets Change look up a line already in the cart. */
+  async function lookUp(ids: string[] | null, includeSent = false): Promise<ReviewLine[]> {
+    const query = ids ? `?ids=${encodeURIComponent(ids.join(","))}${includeSent ? "&include=sent" : ""}` : "";
+    const response = await serial(() => fetch(`/api/kroger/cart${query}`, { cache: "no-store" }));
     const body = await response.json();
     if (!response.ok) throw new Error(body.error ?? "Couldn't get the list ready.");
     return body.lines as ReviewLine[];
   }
 
-  function openReview(lines: ReviewLine[], only: string[] | null) {
-    setReview(lines);
-    setReviewOnly(only);
-    setChoices(Object.fromEntries(lines.map((l) => [l.id, startingChoice(l)])));
-    // The first line to settle starts open, as on the mockup.
-    setOpen(lines.find((l) => sectionOf(l) === "pick")?.id ?? null);
-    window.scrollTo({ top: 0 });
-  }
-
   function clearNotes() {
     setResults(null);
-    setTakeBackPreview(null);
     setTakeBackResults(null);
-    setRefused(null);
   }
-
-  /**
-   * **Send all** (TEC-135; RULES.md): look every line still on the List up and
-   * open the review. Nothing goes in until **Send N to cart**: the review is
-   * one list, every line ticked, Pick one pre-picked to the most bought. Lines
-   * already in the cart are not in it (TEC-190).
-   */
-  async function startReview() {
-    if (busy) return;
-    setBusy("review");
-    clearNotes();
-    try {
-      openReview(await lookUp(null), null);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't get the list ready.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  /**
-   * **Add to cart on one line** (TEC-190): the same matching as Send all. A line
-   * that goes in as one saved product is sent at once and reports in a toast;
-   * anything that needs a look (Pick one, Not saved yet, nothing to add) opens
-   * the review with just that line, so nothing is added unseen.
-   */
-  async function addOne(id: string) {
-    if (busy) return;
-    setBusy("add");
-    setAdding(id);
-    clearNotes();
-    try {
-      const [line] = await lookUp([id]);
-      if (!line) throw new Error("That line isn't on the List any more, so there was nothing to add. It may already be in the cart.");
-      const pick = pickFor(line, startingChoice(line));
-      if (line.plan.kind !== "exact" || !pick) {
-        openReview([line], [id]);
-        return;
-      }
-      const sent = await post([pick], [id]);
-      if ("conflict" in sent) {
-        toast.error(`${line.name} is already in the cart. The cart only adds, so it wasn't sent again.`);
-        listChanged.current();
-        return;
-      }
-      const outcome = (sent.body.outcomes as Outcome[]).find((o) => o.id === id);
-      if (outcome?.result === "added") toast.notice(`${outcome.name} is in the cart. ${outcome.detail}`);
-      else toast.error(`${line.name} wasn't added. ${outcome?.detail ?? "Kroger didn't say why."}`);
-      if (sent.body.modalityWarning) toast.error(sent.body.modalityWarning as string);
-      if (sent.body.recordError) toast.error(sent.body.recordError as string);
-      brandsChanged.current();
-      listChanged.current();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't add that to the cart.");
-    } finally {
-      setBusy(null);
-      setAdding(null);
-    }
-  }
-
-  function closeReview() {
-    setReview(null);
-    setReviewOnly(null);
-    setResults(null);
-    setRefused(null);
-  }
-
-  function choose(id: string, change: Partial<Choice>) {
-    setChoices((current) => ({ ...current, [id]: { ...current[id], ...change } }));
-  }
-
-  const picks = (review ?? []).flatMap((line) => {
-    const choice = choices[line.id];
-    const pick = choice ? pickFor(line, choice) : null;
-    if (pick) return [pick];
-    // A fresh line with nothing to add still asks, so the server reports it rather than calling it Not this trip.
-    return line.sent_at === null && line.plan.kind === "none" ? [{ id: line.id } as Pick] : [];
-  });
-  const going = picks.filter((p) => p.upc || p.url);
-  const badUrl = (review ?? []).some((l) => {
-    const url = choices[l.id]?.url.trim();
-    return !!url && !isKingSoopersProduct(url);
-  });
 
   /** One POST of picks; `only` limits what the server sends and reports. A repeat (409) comes back as `conflict`. */
-  async function post(chosen: Pick[], only: string[] | null): Promise<{ body: Record<string, unknown> } | { conflict: CartLine[] }> {
+  async function post(chosen: CartPick[], only: string[] | null): Promise<{ body: Record<string, unknown> } | { conflict: CartLine[] }> {
     const response = await serial(() =>
       fetch("/api/kroger/cart", {
         method: "POST",
@@ -507,31 +380,45 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     return { body };
   }
 
-  async function send() {
-    if (busy || going.length === 0) return;
+  /** What a send changed, told once: the modality warning and a failed record. */
+  function afterSend(body: Record<string, unknown>) {
+    if (body.modalityWarning) toast.error(body.modalityWarning as string);
+    if (body.recordError) toast.error(body.recordError as string);
+    brandsChanged.current();
+    listChanged.current();
+    void refreshCart(true);
+  }
+
+  /**
+   * **Send all** (TEC-206): the caller has already asked "Send N items?". Every line still
+   * on the List goes in as its best guess, and the results say added, skipped or failed for each.
+   */
+  async function sendAll() {
+    if (busy) return;
     setBusy("send");
-    setRefused(null);
+    clearNotes();
     try {
-      const sent = await post(picks, reviewOnly);
+      const lines = await lookUp(null);
+      const picks = guessPicks(lines);
+      if (picks.length === 0) {
+        toast.notice("Nothing on the List to send.");
+        return;
+      }
+      const sent = await post(picks, null);
       if ("conflict" in sent) {
-        setRefused(sent.conflict);
+        toast.error(`Already in the cart: ${sent.conflict.map((l) => l.name).join(", ")}. The cart only adds, so nothing was sent.`);
         listChanged.current();
         return;
       }
       const body = sent.body;
-      // Only the lines this review held; the server's summary counts every line it was given.
-      const shown = new Set((review ?? []).map((l) => l.id));
-      const outcomes = (body.outcomes as Outcome[]).filter((o) => shown.has(o.id));
+      const shown = new Set(lines.map((l) => l.id));
       setResults({
-        outcomes,
+        outcomes: (body.outcomes as Outcome[]).filter((o) => shown.has(o.id)),
         summary: body.summary as string,
         recordError: (body.recordError as string | null) ?? null,
         modalityWarning: (body.modalityWarning as string | null) ?? null,
       });
-      setOpen(null);
-      window.scrollTo({ top: 0 });
-      brandsChanged.current();
-      listChanged.current();
+      afterSend(body);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't send to the cart.");
     } finally {
@@ -539,96 +426,153 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     }
   }
 
-  /**
-   * **Take back, first tap**: read what Cookbook sent and is still on the list.
-   * The ledger only, no Kroger call. Nothing is removed until the second tap.
-   */
-  async function lookTakeBack() {
+  /** **+ Cart on one line** (TEC-206): the caller has asked "Add 1 to the cart?"; it goes in as the best guess and reports in a toast. */
+  async function addOne(id: string) {
     if (busy) return;
-    setBusy("take-back-look");
-    setTakeBackResults(null);
+    setBusy("add");
+    setAdding(id);
+    clearNotes();
     try {
-      const response = await fetch("/api/kroger/cart/take-back", { cache: "no-store" });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Couldn't read what Cookbook sent.");
-      setTakeBackPreview(body.lines as TakeBackLine[]);
+      const [line] = await lookUp([id]);
+      if (!line) throw new Error("That line isn't on the List any more, so there was nothing to add. It may already be in the cart.");
+      const sent = await post([guessPick(line)], [id]);
+      if ("conflict" in sent) {
+        toast.error(`${line.name} is already in the cart. The cart only adds, so it wasn't sent again.`);
+        listChanged.current();
+        return;
+      }
+      const outcome = (sent.body.outcomes as Outcome[]).find((o) => o.id === id);
+      if (outcome?.result === "added") toast.notice(`${outcome.name} is in the cart. ${outcome.detail}`);
+      else toast.error(`${line.name} wasn't added. ${outcome?.detail ?? "Kroger didn't say why."}`);
+      afterSend(sent.body);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't read what Cookbook sent.");
+      toast.error(e instanceof Error ? e.message : "Couldn't add that to the cart.");
+    } finally {
+      setBusy(null);
+      setAdding(null);
+    }
+  }
+
+  /**
+   * **The one picker that stays** (TEC-206): after Add an item, look the new lines up and open
+   * the splash for each that matches several saved products with no default.
+   */
+  async function offerChoices(ids: string[]) {
+    if (!status?.configured || !status.connected || !status.store || ids.length === 0) return;
+    try {
+      const lines = (await lookUp(ids)).filter((l) => needsSplash(l.plan));
+      if (lines.length > 0) setSplash({ queue: lines, change: false });
+    } catch {
+      // The lines are on the List either way; a failed look-up only means no splash.
+    }
+  }
+
+  /** **Change** on an In cart line: the same picker, for the product that went in. */
+  async function changeLine(id: string) {
+    if (busy) return;
+    setBusy("lookup");
+    try {
+      const [line] = await lookUp([id], true);
+      if (!line || pickerOptions(line.plan).length === 0) {
+        toast.error("There's nothing else to choose for that line.");
+        return;
+      }
+      setSplash({ queue: [line], change: true });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't look that up.");
     } finally {
       setBusy(null);
     }
   }
 
+  function leaveSplash() {
+    setSplash((s) => (s && s.queue.length > 1 ? { ...s, queue: s.queue.slice(1) } : null));
+  }
+
   /**
-   * **Take back, second tap.** Two taps, like the list's Clear: it can't be
-   * undone from here (putting things back is another Send). Through `serial`,
-   * because it borrows a Kroger token.
+   * A tap in the splash. Add an item: that product goes into the cart now (and becomes the
+   * default with the tick). Change: the old product is taken back out first, then this one goes in.
    */
-  async function confirmTakeBack() {
-    if (busy) return;
-    setBusy("take-back");
+  async function chooseProduct(option: PickerOption, makeDefault: boolean) {
+    const current = splash;
+    const line = current?.queue[0];
+    if (!current || !line || busy) return;
+    setBusy("add");
     try {
-      const response = await serial(() =>
-        fetch("/api/kroger/cart/take-back", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ confirm: true }),
-        })
-      );
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Couldn't take back from the cart.");
-      setTakeBackResults({
-        outcomes: body.outcomes,
-        summary: body.summary,
-        recordError: body.recordError ?? null,
-        failed: body.failed === true,
-      });
-      setTakeBackPreview(null);
-      // What was sent has changed; a review or send result held here is now stale.
-      setReview(null);
-      setResults(null);
+      if (current.change) {
+        const gone = await takeBackRequest([line.id]);
+        if (gone.failed) {
+          setTakeBackResults(gone);
+          throw new Error("The old product wouldn't come out of the cart, so nothing was changed.");
+        }
+      }
+      const sent = await post([pickOf(line, option, makeDefault)], [line.id]);
+      if ("conflict" in sent) throw new Error(`${line.name} is already in the cart.`);
+      const outcome = (sent.body.outcomes as Outcome[]).find((o) => o.id === line.id);
+      if (outcome?.result === "added") toast.notice(`${outcome.name} is in the cart. ${outcome.detail}`);
+      else toast.error(`${line.name} wasn't added. ${outcome?.detail ?? "Kroger didn't say why."}`);
+      afterSend(sent.body);
+      leaveSplash();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't add that to the cart.");
       listChanged.current();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't take back from the cart.");
+      setSplash(null);
     } finally {
       setBusy(null);
     }
   }
 
   /**
-   * **Remove** (TEC-190): Take back for one In cart line, in one tap. The ledger
-   * rows are written before Kroger is asked and the recorded Pickup/Delivery
-   * choice goes with the negative add (`lib/takeBack.ts`); nothing is retried
-   * without it. A line Kroger refuses stays in the cart, and the result says so.
+   * Take back: `ids`, or every line Cookbook sent when null. The ledger rows are written
+   * before Kroger is asked and the recorded Pickup/Delivery choice goes with the negative
+   * add (`lib/takeBack.ts`); a line Kroger refuses stays in the cart, and the result says so.
    */
+  async function takeBackRequest(ids: string[] | null): Promise<TakeBackResult> {
+    const response = await serial(() =>
+      fetch("/api/kroger/cart/take-back", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: true, ...(ids ? { ids } : {}) }),
+      })
+    );
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error ?? "Couldn't take back from the cart.");
+    listChanged.current();
+    void refreshCart(true);
+    return { outcomes: body.outcomes, summary: body.summary, recordError: body.recordError ?? null, failed: body.failed === true };
+  }
+
+  /** **Remove** one In cart line; the caller has asked "Take 1 out of the cart?". */
   async function removeOne(id: string) {
     if (busy) return;
     setBusy("take-back");
     setRemoving(id);
     setTakeBackResults(null);
-    setTakeBackPreview(null);
     try {
-      const response = await serial(() =>
-        fetch("/api/kroger/cart/take-back", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ confirm: true, ids: [id] }),
-        })
-      );
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Couldn't take that back out of the cart.");
-      setTakeBackResults({
-        outcomes: body.outcomes,
-        summary: body.summary,
-        recordError: body.recordError ?? null,
-        failed: body.failed === true,
-      });
-      listChanged.current();
+      setTakeBackResults(await takeBackRequest([id]));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't take that back out of the cart.");
     } finally {
       setBusy(null);
       setRemoving(null);
+    }
+  }
+
+  /**
+   * **Clear cart** (TEC-206): takes back every line in In cart, by negative quantities as
+   * Take back always has. The caller has asked "Clear the cart?"; there is no preview list
+   * and no step at King Soopers.
+   */
+  async function clearCart() {
+    if (busy) return;
+    setBusy("take-back");
+    setResults(null);
+    try {
+      setTakeBackResults(await takeBackRequest(null));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't clear the cart.");
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -644,46 +588,97 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     choosingStore,
     setChoosingStore,
     busy,
-    takeBackPreview,
-    setTakeBackPreview,
     takeBackResults,
-    review,
-    choices,
-    open,
-    setOpen,
-    choose,
-    picks,
-    going,
-    badUrl,
-    refused,
+    dismissTakeBack: () => setTakeBackResults(null),
     adding,
     removing,
     results,
+    dismissResults: () => setResults(null),
+    splash,
+    leaveSplash,
+    chooseProduct,
+    cartCheck,
+    cartCheckError,
     refreshing,
     refreshNote,
     latestScan,
     scanNote,
     refresh,
+    refreshCart: () => refreshCart(false),
     chooseModality,
     findStores,
     pickStore,
     disconnect,
-    startReview,
+    sendAll,
     addOne,
+    offerChoices,
+    changeLine,
     removeOne,
-    closeReview,
-    send,
-    lookTakeBack,
-    confirmTakeBack,
+    clearCart,
   };
 }
 
 // ---------------------------------------------------------------------------
-// The panel under the list: connection, store and refresh. Take back moved to the
-// In cart section (TEC-190).
+// The panel under the list: connection and refresh. The store is chosen in the
+// list's header (TEC-206).
 // Deals are not here since TEC-132: they live on the Deals tab, and the list
 // keeps only each line's sale bubble (TEC-196, from the nightly prices).
 // ---------------------------------------------------------------------------
+
+/** Search for a store by ZIP and pick one. In the list's header; also the first-time step in the panel. */
+export function StorePicker({ cart }: { cart: CartState }) {
+  const { status } = cart;
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-ink-soft">Pick your store, so matches are priced and stocked there.</p>
+      <div className="flex gap-2">
+        <input
+          value={cart.zip}
+          onChange={(e) => cart.setZip(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && /^\d{5}$/.test(cart.zip.trim()) && cart.busy === null) void cart.findStores();
+          }}
+          inputMode="numeric"
+          placeholder="ZIP"
+          aria-label="ZIP code"
+          className="w-28 rounded-lg border border-line bg-surface p-2 text-base"
+        />
+        <button
+          type="button"
+          onClick={() => void cart.findStores()}
+          disabled={!/^\d{5}$/.test(cart.zip.trim()) || cart.busy !== null}
+          className="rounded-lg border border-line px-3 py-1.5 text-sm disabled:opacity-50"
+        >
+          {cart.busy === "stores" ? "Looking…" : "Find stores"}
+        </button>
+        {status?.store ? (
+          <button type="button" onClick={() => cart.setChoosingStore(false)} className="text-sm text-ink-soft">
+            Cancel
+          </button>
+        ) : null}
+      </div>
+      {cart.stores !== null ? (
+        cart.stores.length === 0 ? (
+          <p className="text-sm text-ink-soft">No King Soopers near that ZIP.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-line rounded-lg border border-line">
+            {cart.stores.map((s) => (
+              <li key={s.locationId} className="flex items-center gap-2 px-3 py-2 text-sm">
+                <span className="min-w-0 flex-1">
+                  {s.name}
+                  <span className="block text-[11px] text-ink-soft">{s.address}</span>
+                </span>
+                <button type="button" onClick={() => void cart.pickStore(s)} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs">
+                  Use this store
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : null}
+    </div>
+  );
+}
 
 export function CartPanel({ cart }: { cart: CartState }) {
   const { status } = cart;
@@ -708,61 +703,12 @@ export function CartPanel({ cart }: { cart: CartState }) {
         </a>
       </div>
     );
-  } else if (!status.store || cart.choosingStore) {
-    body = (
-      <div className="flex flex-col gap-2">
-        <p className="text-sm text-ink-soft">Pick your store once, so matches are priced and stocked there.</p>
-        <div className="flex gap-2">
-          <input
-            value={cart.zip}
-            onChange={(e) => cart.setZip(e.target.value)}
-            inputMode="numeric"
-            placeholder="ZIP"
-            aria-label="ZIP code"
-            className="w-28 rounded-lg border border-line bg-surface p-2 text-base"
-          />
-          <button
-            type="button"
-            onClick={() => void cart.findStores()}
-            disabled={!/^\d{5}$/.test(cart.zip.trim()) || cart.busy !== null}
-            className="rounded-lg border border-line px-3 py-1.5 text-sm disabled:opacity-50"
-          >
-            {cart.busy === "stores" ? "Looking…" : "Find stores"}
-          </button>
-          {status.store ? (
-            <button type="button" onClick={() => cart.setChoosingStore(false)} className="text-sm text-ink-soft">
-              Cancel
-            </button>
-          ) : null}
-        </div>
-        {cart.stores !== null ? (
-          cart.stores.length === 0 ? (
-            <p className="text-sm text-ink-soft">No King Soopers near that ZIP.</p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-line rounded-lg border border-line">
-              {cart.stores.map((s) => (
-                <li key={s.locationId} className="flex items-center gap-2 px-3 py-2 text-sm">
-                  <span className="min-w-0 flex-1">
-                    {s.name}
-                    <span className="block text-[11px] text-ink-soft">{s.address}</span>
-                  </span>
-                  <button type="button" onClick={() => void cart.pickStore(s)} className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs">
-                    Use this store
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )
-        ) : null}
-      </div>
-    );
+  } else if (!status.store) {
+    body = <StorePicker cart={cart} />;
   } else {
     body = (
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
-          <button type="button" onClick={() => cart.setChoosingStore(true)} className={LINK}>
-            change store
-          </button>
           <button type="button" onClick={() => void cart.disconnect()} className={LINK}>
             disconnect
           </button>
@@ -820,34 +766,6 @@ export function RefreshLog({ cart }: { cart: CartState }) {
   );
 }
 
-export function TakeBackResults({ results }: { results: { outcomes: TakeBackOutcome[]; summary: string; recordError: string | null; failed: boolean } }) {
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
-      <h3 className="text-sm font-semibold">{results.summary}</h3>
-      <ul className="flex flex-col gap-1 text-sm">
-        {results.outcomes.map((o) => (
-          <li key={o.id} className="flex items-baseline gap-2">
-            <ResultChip result={o.result} good="taken back" />
-            <span className="min-w-0">
-              {o.name} <span className="text-ink-soft">— {o.detail}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-      {results.recordError ? <p className="text-xs text-danger">{results.recordError}</p> : null}
-      {results.failed ? (
-        <p role="alert" className="text-xs text-warn">
-          Not everything came back out.{" "}
-          <a href={CHECKOUT_URL} target="_blank" rel="noreferrer" className={LINK}>
-            Open the King Soopers cart
-          </a>{" "}
-          to remove the rest by hand.
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 function ResultChip({ result, good }: { result: string; good: string }) {
   return (
     <span
@@ -861,384 +779,151 @@ function ResultChip({ result, good }: { result: string; good: string }) {
 }
 
 /**
- * Take back's confirm (TEC-127): **what will come out, before it does**, and
- * that nothing else in the cart is touched.
+ * What a Clear cart or Remove did. **One summary line**; only a line Kroger
+ * refused is named, because a partial take-back must never read as whole. It
+ * never claims the cart is empty beyond what the ledger says.
  */
-export function TakeBackConfirm(props: { lines: TakeBackLine[]; working: boolean; onConfirm: () => void; onCancel: () => void }) {
-  const recorded = props.lines.filter((l) => l.held.length > 0);
-  const unrecorded = props.lines.filter((l) => l.held.length === 0);
-
-  if (props.lines.length === 0) {
-    return (
-      <div className="flex items-baseline gap-2 rounded-lg border border-line p-3 text-sm text-ink-soft">
-        <span className="flex-1">Cookbook hasn&rsquo;t sent anything on this list to the cart, so there&rsquo;s nothing to take back.</span>
-        <button type="button" onClick={props.onCancel} className={`text-xs ${LINK}`}>
-          OK
+export function TakeBackResults({ results, onClose }: { results: TakeBackResult; onClose: () => void }) {
+  const trouble = results.outcomes.filter((o) => o.result !== "taken back");
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
+      <div className="flex items-baseline gap-2">
+        <h3 className="flex-1 text-sm font-semibold">{results.summary}</h3>
+        <button type="button" onClick={onClose} className={`text-xs ${LINK}`}>
+          Dismiss
         </button>
       </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border border-warn/60 p-3 text-sm">
-      <p className="font-semibold">Take these back out of the King Soopers cart?</p>
-      {recorded.length > 0 ? (
-        <ul className="flex flex-col gap-0.5">
-          {recorded.map((l) => (
-            <li key={l.id}>
-              {l.name} <span className="text-ink-soft">{describeHeld(l.held)}</span>
+      {trouble.length > 0 ? (
+        <ul className="flex flex-col gap-1 text-sm">
+          {trouble.map((o) => (
+            <li key={o.id} className="flex items-baseline gap-2">
+              <ResultChip result={o.result} good="taken back" />
+              <span className="min-w-0">
+                {o.name} <span className="text-ink-soft">— {o.detail}</span>
+              </span>
             </li>
           ))}
         </ul>
       ) : null}
-      {unrecorded.length > 0 ? (
-        <p className="text-xs text-ink-soft">
-          Skipped — sent before Cookbook recorded what went in: {unrecorded.map((l) => l.name).join(", ")}. Remove those on the King
-          Soopers cart page.
+      {results.recordError ? <p className="text-xs text-danger">{results.recordError}</p> : null}
+      {results.failed ? (
+        <p role="alert" className="text-xs text-warn">
+          Not everything came back out. Tap Refresh cart to see what is still in.
         </p>
       ) : null}
-      <p className="text-xs text-ink-soft">
-        Only what Cookbook sent comes out; anything added to the cart elsewhere stays. This can&rsquo;t be undone from here — send again
-        to put them back.
-      </p>
-      <div className="flex gap-2">
-        <button type="button" onClick={props.onCancel} className="rounded-lg border border-line px-3 py-2 text-sm text-ink-soft">
-          Keep them
-        </button>
-        <button
-          type="button"
-          onClick={props.onConfirm}
-          disabled={props.working || recorded.length === 0}
-          className="ml-auto rounded-lg border border-danger/60 px-3 py-2 text-sm text-danger disabled:opacity-50"
-        >
-          {props.working ? "Taking back…" : `Take back ${recorded.length} — sure?`}
-        </button>
-      </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Send to cart, the review (TEC-135; the mockup's SendFinal)
-// ---------------------------------------------------------------------------
-
-/** "was 12 oz, now 10 oz" on a saved product whose size changed since it was first bought (TEC-131). */
-function DriftNote({ candidate }: { candidate: Candidate }) {
-  const drift = sizeDrift(candidate.sizeFirst, candidate.size, candidate.price);
-  return drift ? <span className="block text-[11px] text-warn">{describeDrift(drift)}</span> : null;
-}
-
-/** A tick box, drawn: filled with a ✓ when on. */
-function Box({ on }: { on: boolean }) {
+/**
+ * After Send (TEC-206): **every line reports added, skipped or failed**, so a
+ * partial send never reads as whole. Shown in place on the list, not in front
+ * of it, and dismissed with a tap.
+ */
+export function SendResults({ cart }: { cart: CartState }) {
+  const results = cart.results;
+  if (!results) return null;
+  const added = results.outcomes.filter((o) => o.result === "added");
+  const left = results.outcomes.filter((o) => o.result !== "added");
   return (
-    <span
-      aria-hidden="true"
-      className={`flex size-[22px] shrink-0 items-center justify-center rounded-md text-sm font-bold ${
-        on ? "bg-accent text-accent-ink" : "border-2 border-ink-soft"
-      }`}
-    >
-      {on ? "✓" : ""}
-    </span>
-  );
-}
-
-function optionLabel(o: Candidate): string {
-  return o.description ?? o.names[0] ?? `Product ${o.upc}`;
-}
-
-function detailOf(o: Candidate): string {
-  return [o.size, money(o.price)].filter(Boolean).join(" · ");
-}
-
-/** One line of the review: the row (tap to open), and when open its options, Make default, Not this trip and a page box. */
-function ReviewRow({ cart, line }: { cart: CartState; line: ReviewLine }) {
-  const choice = cart.choices[line.id];
-  if (!choice) return null;
-  const plan = line.plan;
-  const options = optionsOf(plan);
-  const picked = options.find((o) => o.upc === choice.pick) ?? null;
-  const pasted = choice.url.trim();
-  const isOpen = cart.open === line.id;
-  const fresh = plan.kind === "match" || plan.kind === "none";
-  const on = !!pasted || choice.on;
-
-  let summary: string;
-  if (pasted) summary = "A pasted page — remembered when it goes in";
-  else if (!choice.on) summary = plan.kind === "none" ? plan.reason : line.sent_at ? `Sent ${when(line.sent_at)} — tap to send again` : "Not this trip";
-  else if (picked) summary = [optionLabel(picked), detailOf(picked), line.note].filter(Boolean).join(" · ");
-  else if (plan.kind === "match")
-    summary = `Kroger's pick: ${[plan.product.description, plan.product.size, money(plan.product.price)].filter(Boolean).join(" · ")}${
-      plan.product.inStock === false ? " · out of stock" : ""
-    }`;
-  else summary = "";
-
-  let badge = "";
-  let strong = false;
-  if (plan.kind === "exact" && choice.pick === plan.upc && plan.chosen === "default") {
-    badge = "★ default";
-    strong = true;
-  } else if (plan.kind === "exact" && choice.pick === plan.upc && plan.chosen === "named") badge = "named";
-  else if (plan.kind === "settle") badge = `${options.length} options`;
-  else if (picked) badge = bought(picked.count);
-
-  // A Not saved yet line ticks on and off; the rest open.
-  const tap = () => {
-    if (fresh && plan.kind === "match" && !pasted) cart.choose(line.id, { on: !choice.on });
-    else cart.setOpen(isOpen ? null : line.id);
-  };
-
-  return (
-    <li className="flex flex-col border-t border-line/40 first:border-t-0">
-      <button type="button" onClick={tap} aria-expanded={fresh ? undefined : isOpen} className="flex min-h-11 items-center gap-2.5 px-3.5 py-3 text-left">
-        <Box on={on} />
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[15px] font-semibold">{line.name}</span>
-          <span className="truncate text-xs text-ink-soft">{summary}</span>
-        </span>
-        {badge ? <span className={`shrink-0 text-xs ${strong ? "font-bold text-accent" : "text-ink-soft"}`}>{badge}</span> : null}
-        <span className="min-w-7 shrink-0 text-right text-[15px] font-semibold">×{line.quantity}</span>
-      </button>
-
-      {fresh && plan.kind === "match" ? (
-        <div className="-mt-1 flex gap-4 pb-2 pl-12 pr-3.5 text-[13px]">
-          <a href={plan.product.url} target="_blank" rel="noreferrer" className={`text-accent ${LINK}`}>
-            See it at King Soopers
-          </a>
-          <button type="button" onClick={() => cart.choose(line.id, { pasting: !choice.pasting })} className={`text-accent ${LINK}`}>
-            Paste a product page
-          </button>
-        </div>
-      ) : null}
-      {fresh && plan.kind === "none" && !pasted ? (
-        <div className="-mt-1 pb-2 pl-12 pr-3.5 text-[13px]">
-          <button type="button" onClick={() => cart.choose(line.id, { pasting: !choice.pasting })} className={`text-accent ${LINK}`}>
-            Paste a product page
-          </button>
-        </div>
-      ) : null}
-
-      {isOpen && !fresh ? (
-        <div className="flex flex-col gap-1.5 pb-3 pl-12 pr-3.5">
-          <div role="radiogroup" aria-label={`Which ${line.name}`} className="flex flex-col gap-1.5">
-            {options.map((o) => {
-              const sel = choice.on && !pasted && o.upc === choice.pick;
-              return (
-                <button
-                  key={o.upc}
-                  type="button"
-                  role="radio"
-                  aria-checked={sel}
-                  onClick={() => cart.choose(line.id, { pick: o.upc, on: true, url: "" })}
-                  className={`flex min-h-11 items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left ${
-                    sel ? "bg-accent text-accent-ink" : "border border-line bg-raised text-ink"
-                  }`}
-                >
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-sm font-semibold">{optionLabel(o)}</span>
-                    <span className="text-xs opacity-85">{detailOf(o) || "not priced yet"}</span>
-                    {o.missing ? <span className="text-[11px]">Kroger stopped returning it at the last refresh</span> : null}
-                    {!sel ? <DriftNote candidate={o} /> : null}
-                  </span>
-                  <span className="shrink-0 text-xs font-semibold">
-                    {o.isDefault ? "★ " : ""}
-                    {bought(o.count)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          {options.length > 1 && (plan.kind === "exact" || plan.kind === "settle") && plan.matched ? (
-            <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm">
-              <input
-                type="checkbox"
-                checked={choice.makeDefault}
-                onChange={(e) => cart.choose(line.id, { makeDefault: e.target.checked })}
-                className="size-[22px] accent-accent"
-              />
-              Make default
-            </label>
-          ) : null}
-          <div className="flex gap-4 text-[13px]">
-            <button
-              type="button"
-              onClick={() => {
-                cart.choose(line.id, { on: false, url: "", pasting: false });
-                cart.setOpen(null);
-              }}
-              className={`text-accent ${LINK}`}
-            >
-              Not this trip
-            </button>
-            <button type="button" onClick={() => cart.choose(line.id, { pasting: !choice.pasting })} className={`text-accent ${LINK}`}>
-              Paste a product page
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {choice.pasting || pasted ? (
-        <div className="px-3.5 pb-3 pl-12">
-          <input
-            value={choice.url}
-            onChange={(e) => cart.choose(line.id, { url: e.target.value })}
-            placeholder="https://www.kingsoopers.com/p/… — remembered when it goes in"
-            aria-label={`Exact product page for ${line.name}`}
-            className="w-full rounded-lg border border-line bg-surface p-2 text-sm"
-          />
-        </div>
-      ) : null}
-    </li>
-  );
-}
-
-function Section(props: { title: string; count: number; hint?: string; strong?: boolean; footnote?: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between px-2">
-        <h3 className={`${HEADING} ${props.strong ? "text-accent" : "text-ink-soft"}`}>
-          {props.title} · {props.count}
+    <section aria-label="Send results" className="flex flex-col gap-1.5">
+      <div className="flex items-baseline justify-between gap-3 px-2">
+        <h3 className="text-lg font-bold">
+          Sent {added.length} item{added.length === 1 ? "" : "s"}
+          {left.length > 0 ? ` · ${left.length} not sent` : ""}
         </h3>
-        {props.hint ? <span className="text-xs text-ink-soft">{props.hint}</span> : null}
+        <button type="button" onClick={cart.dismissResults} className="text-[13px] text-accent underline-offset-2 hover:underline">
+          Dismiss
+        </button>
       </div>
-      <ul className="flex flex-col overflow-hidden rounded-xl bg-surface">{props.children}</ul>
-      {props.footnote ? <p className="px-2 text-xs text-ink-soft">{props.footnote}</p> : null}
+      <p className={`${HEADING} px-2 text-ink-soft`}>{results.summary}</p>
+      <ul className="flex flex-col overflow-hidden rounded-xl bg-surface">
+        {results.outcomes.map((o) => (
+          <li key={o.id} className="flex items-baseline gap-2 border-t border-line/40 px-3.5 py-2.5 text-sm first:border-t-0">
+            <ResultChip result={o.result} good="added" />
+            <span className="min-w-0">
+              {o.name} <span className="text-ink-soft">— {o.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {results.modalityWarning ? <p role="alert" className="px-2 text-xs text-warn">{results.modalityWarning}</p> : null}
+      {results.recordError ? <p className="px-2 text-xs text-danger">{results.recordError}</p> : null}
+      <a href={CHECKOUT_URL} target="_blank" rel="noreferrer" className="px-2 text-[13px] text-accent underline-offset-2 hover:underline">
+        Go to checkout on King Soopers
+      </a>
     </section>
   );
 }
 
 /**
- * The review, and after Send the results (TEC-135). Shown in place of the
- * list, with *← Back to the list*. One page, no new route.
+ * **The one picker that stays** (TEC-206; owner: "Add an item opens a choice of
+ * products when several match and none is the default"). A splash over the
+ * list: tap a product to use it, tick **Make default** to keep it for that name.
+ * The same splash is **Change** on an In cart line. Anything else about a send
+ * is settled without asking.
  */
-export function SendView({ cart }: { cart: CartState }) {
-  const review = cart.review ?? [];
-  const results = cart.results;
-  const byId = new Map(review.map((l) => [l.id, l]));
-
-  if (results) {
-    const added = results.outcomes.filter((o) => o.result === "added");
-    // **Still on your list**: every line this send left unsent. A line sent before stays sent.
-    const left = results.outcomes.filter((o) => o.result !== "added" && byId.get(o.id)?.sent_at === null);
-    const defaults = results.outcomes.filter((o) => o.detail.includes("Now your default.")).length;
-    return (
-      <div className="flex flex-col gap-3">
-        <BackLink cart={cart} />
-        <div className="flex flex-col gap-1 px-2">
-          <h2 className="text-xl font-bold">Send to cart</h2>
-          <p className="text-[13px] text-ink-soft">
-            Sent {added.length} item{added.length === 1 ? "" : "s"}.{defaults > 0 ? " Defaults saved." : ""} Go to checkout on King Soopers.
-          </p>
-        </div>
-        <section className="flex flex-col gap-1.5">
-          <h3 className={`${HEADING} px-2 text-ink-soft`}>{results.summary}</h3>
-          <ul className="flex flex-col overflow-hidden rounded-xl bg-surface">
-            {results.outcomes.map((o) => (
-              <li key={o.id} className="flex items-baseline gap-2 border-t border-line/40 px-3.5 py-2.5 text-sm first:border-t-0">
-                <ResultChip result={o.result} good="added" />
-                <span className="min-w-0">
-                  {o.name} <span className="text-ink-soft">— {o.detail}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-          {results.modalityWarning ? <p role="alert" className="px-2 text-xs text-warn">{results.modalityWarning}</p> : null}
-          {results.recordError ? <p className="px-2 text-xs text-danger">{results.recordError}</p> : null}
-        </section>
-        {left.length > 0 ? (
-          <section className="flex flex-col gap-1.5">
-            <h3 className={`${HEADING} px-2 text-ink-soft`}>Still on your list · {left.length}</h3>
-            <p className="rounded-xl bg-surface px-3.5 py-3 text-sm text-ink-soft">
-              {left.map((o) => o.name).join(", ")}. These stay here until you pick or remove them.
-            </p>
-          </section>
-        ) : null}
-        <div className="sticky bottom-0 z-10 -mx-4 border-t border-line bg-paper px-4 py-3">
-          <a
-            href={CHECKOUT_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-accent text-base font-semibold text-accent-ink"
-          >
-            Open King Soopers cart
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  const pick = review.filter((l) => sectionOf(l) === "pick");
-  const goingIn = review.filter((l) => sectionOf(l) === "going");
-  const fresh = review.filter((l) => sectionOf(l) === "new");
-  const left = review.filter((l) => l.sent_at === null && !cart.going.some((p) => p.id === l.id));
-  const row = (l: ReviewLine) => <ReviewRow key={l.id} cart={cart} line={l} />;
-
-  return (
-    <div className="flex flex-col gap-3.5">
-      <BackLink cart={cart} />
-      <div className="flex flex-col gap-1 px-2">
-        <h2 className="text-xl font-bold">Send to cart</h2>
-        <p className="text-[13px] text-ink-soft">
-          {review.length === 0
-            ? "Nothing on the List to send — ticked lines are already bought, and lines in the cart are not sent again."
-            : `${pick.length} to pick · ${cart.going.length} of ${review.length} lines going in`}
-        </p>
-      </div>
-
-      {pick.length > 0 ? (
-        <Section title="Pick one" count={pick.length} hint="most-bought is pre-picked" strong>
-          {pick.map(row)}
-        </Section>
-      ) : null}
-      {goingIn.length > 0 ? (
-        <Section title="Going in" count={goingIn.length} hint="tap to change">
-          {goingIn.map(row)}
-        </Section>
-      ) : null}
-      {fresh.length > 0 ? (
-        <Section title="Not saved yet" count={fresh.length} footnote="Ticked items are saved to Your brands when they go in.">
-          {fresh.map(row)}
-        </Section>
-      ) : null}
-      {left.length > 0 ? (
-        <section className="flex flex-col gap-1.5">
-          <h3 className={`${HEADING} px-2 text-ink-soft`}>Still on your list · {left.length}</h3>
-          <p className="rounded-xl bg-surface px-3.5 py-3 text-sm text-ink-soft">
-            {left.map((l) => l.name).join(", ")}. These stay here until you pick or remove them.
-          </p>
-        </section>
-      ) : null}
-
-      {cart.refused ? (
-        <p role="alert" className="px-2 text-xs text-danger">
-          Not sent — already in the cart: {cart.refused.map((l) => l.name).join(", ")}. The cart only adds, so they were not sent again; the list has been refreshed.
-        </p>
-      ) : null}
-      {cart.badUrl ? <p className="px-2 text-xs text-danger">A pasted address isn&rsquo;t a King Soopers product page.</p> : null}
-
-      <p className="px-2 text-xs text-ink-soft">
-        ★ your default · ✓ the one product saved for that line · other options only when you name them on the line
-      </p>
-
-      <div className="sticky bottom-0 z-10 -mx-4 border-t border-line bg-paper px-4 py-3">
-        <button
-          type="button"
-          onClick={() => void cart.send()}
-          disabled={cart.going.length === 0 || cart.busy !== null || cart.badUrl}
-          className="min-h-12 w-full rounded-xl bg-accent text-base font-semibold text-accent-ink disabled:opacity-50"
-        >
-          {cart.busy === "send" ? "Sending…" : `Send ${cart.going.length} to cart`}
-        </button>
-      </div>
-    </div>
-  );
+export function ProductSplash({ cart }: { cart: CartState }) {
+  const splash = cart.splash;
+  const line = splash?.queue[0];
+  if (!splash || !line) return null;
+  return <SplashBody key={line.id} cart={cart} line={line} change={splash.change} more={splash.queue.length - 1} />;
 }
 
-function BackLink({ cart }: { cart: CartState }) {
+function SplashBody({ cart, line, change, more }: { cart: CartState; line: ReviewLine; change: boolean; more: number }) {
+  const [makeDefault, setMakeDefault] = useState(false);
+  const options = pickerOptions(line.plan);
+  const matched = (line.plan.kind === "exact" || line.plan.kind === "settle") && line.plan.matched && options.length > 1;
+  const working = cart.busy === "add";
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") cart.leaveSplash();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cart]);
+
   return (
-    <div>
-      <button type="button" onClick={cart.closeReview} className="inline-block px-2 py-2.5 text-sm text-accent underline-offset-2 hover:underline">
-        ← Back to the list
-      </button>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 sm:items-center">
+      <div role="dialog" aria-modal="true" aria-label={`Which ${line.name}`} className="flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl bg-paper p-4">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-lg font-bold">{change ? `Change ${line.name}` : `Which ${line.name}?`}</h2>
+          <p className="text-[13px] text-ink-soft">
+            {change ? "Tap the one that should be in the cart instead." : "Several match and none is your default. Tap one to add it to the cart."}
+            {more > 0 ? ` ${more} more to choose after this.` : ""}
+          </p>
+        </div>
+        <div role="group" aria-label={`Which ${line.name}`} className="flex flex-col gap-1.5">
+          {options.map((o) => (
+            <button
+              key={o.upc}
+              type="button"
+              disabled={working}
+              onClick={() => void cart.chooseProduct(o, makeDefault)}
+              className="flex min-h-11 items-center gap-2.5 rounded-[10px] border border-line bg-raised px-3 py-2.5 text-left text-ink disabled:opacity-50"
+            >
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-sm font-semibold">{o.label}</span>
+                <span className="text-xs text-ink-soft">{o.detail || "not priced yet"}</span>
+              </span>
+              <span className="shrink-0 text-xs font-semibold">
+                {o.isDefault ? "★ " : ""}
+                {o.fresh ? "Kroger's pick" : o.count > 0 ? `bought ${o.count}×` : "new"}
+              </span>
+            </button>
+          ))}
+        </div>
+        {matched ? (
+          <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm">
+            <input type="checkbox" checked={makeDefault} onChange={(e) => setMakeDefault(e.target.checked)} className="size-[22px] accent-accent" />
+            Make default
+          </label>
+        ) : null}
+        <button type="button" onClick={cart.leaveSplash} disabled={working} className="min-h-11 self-start rounded-[10px] px-2 text-[15px] text-accent underline-offset-2 hover:underline disabled:opacity-50">
+          {change ? "Cancel" : "Leave it on the list"}
+        </button>
+      </div>
     </div>
   );
 }

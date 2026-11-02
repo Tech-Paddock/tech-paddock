@@ -4,6 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { typedLines } from "@/lib/typedLines";
 import { MAX_QUANTITY, asText } from "@/lib/groceryText";
 import type { GroceryItem, TidyLine } from "@/lib/grocery";
+import { confirmWords, type ConfirmKind } from "@/lib/cartGuess";
+import { tickedLast } from "@/lib/listOrder";
 import type { ResolvedLink } from "@/lib/preferences";
 import type { LineMark } from "@/lib/brands";
 import type { MenuEntry } from "@/lib/menu";
@@ -14,7 +16,7 @@ import type { Shade } from "@/lib/dealSignal";
 import { CHECKOUT_URL } from "@/lib/kingsoopers";
 import { totalsOf, type LinePrice, type Totals } from "@/lib/listPrices";
 import { shortDay } from "@/lib/dealFilter";
-import { CartPanel, RefreshLog, SendView, TakeBackConfirm, TakeBackResults, useCart } from "./Cart";
+import { CartPanel, ProductSplash, RefreshLog, SendResults, StorePicker, TakeBackResults, useCart, when } from "./Cart";
 import { useToast } from "./Toast";
 
 /**
@@ -36,6 +38,8 @@ type ShoppingLine = GroceryItem &
     price?: LinePrice | null;
     /** The sale/coupon bubble, the shade and Best, from the nightly prices (TEC-196; `lib/lineDeal.ts`). */
     deal?: LineDeal | null;
+    /** The product an In cart line went in as (TEC-206), from the ledger. */
+    used?: { product: string; size: string | null } | null;
   };
 
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -107,8 +111,8 @@ const MARK_WORDS: Record<LineMark, string> = { "★": "Your default", "?": "Need
  * the book rather than beside a food log, settled on 2026-09-20. **Named for
  * where it goes, since 2026-09-22.**
  *
- * Top to bottom: the header (how many are **Still to buy**, the estimate, the
- * store, Pickup/Delivery), the add box, **Cooking this week**, the lines with
+ * Top to bottom: the header (how many are **Still to buy**, the live cart total, the
+ * store, Pickup/Delivery), **Cooking this week**, the filters, the add box, the lines with
  * a ★ / ? / + marker each, the King Soopers panel, and **Send to cart** and
  * **Take back** at the bottom. Send to cart opens the review in place of the
  * list (`SendView`, `Cart.tsx`).
@@ -138,10 +142,12 @@ export default function List({
   // The read only; everything else is a toast. Same split as the book.
   const [readError, setReadError] = useState<string | null>(null);
   const toast = useToast();
-  const [confirmingClear, setConfirmingClear] = useState(false);
+  // **One "Are you sure?" with a count, never a list** (TEC-206). Section buttons use
+  // `confirm`; a row's + Cart and Remove use `rowConfirm`.
+  const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
+  const [rowConfirm, setRowConfirm] = useState<{ kind: "add" | "remove"; id: string } | null>(null);
   const [typed, setTyped] = useState("");
-  const [busy, setBusy] = useState<null | "adding" | "tidying" | "applying">(null);
-  const [proposal, setProposal] = useState<TidyLine[] | null>(null);
+  const [busy, setBusy] = useState<null | "adding" | "tidying">(null);
   const [copied, setCopied] = useState(false);
   const [reloads, setReloads] = useState(0);
   // Prices come with the list, from the nightly check (TEC-190).
@@ -203,9 +209,12 @@ export default function List({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lines }),
       });
-      if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't add that.");
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Couldn't add that.");
       setTyped("");
       await load();
+      // The one picker that stays: several saved products and no default opens a choice (TEC-206).
+      void cart.offerChoices(((body.items ?? []) as { id: string }[]).map((i) => i.id));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't add that.");
     } finally {
@@ -263,7 +272,6 @@ export default function List({
       });
       if (!response.ok) throw new Error((await response.json()).error ?? "Couldn't clear the list.");
       await load();
-      setConfirmingClear(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't clear the list.");
     }
@@ -285,36 +293,30 @@ export default function List({
     }
   }
 
-  async function propose() {
+  /**
+   * **Tidy applies at once** (TEC-206), after the one confirm: nothing to read first.
+   * The route still checks the model's answer (`validateTidy`) before it is applied and
+   * again as it is, so a tidy that would drop or double a line is refused, not shown.
+   */
+  async function tidyNow() {
     if (busy) return;
     setBusy("tidying");
     try {
       const response = await fetch("/api/grocery/tidy", { method: "POST" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't work out a tidier list.");
-      setProposal(body.lines as TidyLine[]);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't work out a tidier list.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function applyProposal() {
-    if (!proposal || busy) return;
-    setBusy("applying");
-    try {
-      const response = await fetch("/api/grocery/tidy", {
+      const lines = body.lines as TidyLine[];
+      const applied = await fetch("/api/grocery/tidy", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines: proposal }),
+        body: JSON.stringify({ lines }),
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Couldn't apply that.");
-      setProposal(null);
+      const result = await applied.json();
+      if (!applied.ok) throw new Error(result.error ?? "Couldn't apply that.");
+      toast.notice(`Tidied to ${lines.length} line${lines.length === 1 ? "" : "s"}.`);
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't apply that.");
+      toast.error(e instanceof Error ? e.message : "Couldn't tidy the list.");
     } finally {
       setBusy(null);
     }
@@ -334,8 +336,8 @@ export default function List({
   }
 
   // **Two sections** (TEC-190): List is what is still to send; In cart is what Cookbook
-  // put in the King Soopers cart and has not taken back (`sent_at`, with the ledger
-  // behind it). A line is in one or the other, never both.
+  // put in the King Soopers cart. Since TEC-206 that is the whole cart, because every add
+  // comes from this app. A line is in one or the other, never both.
   const all = items ?? [];
   const onList = all.filter((i) => i.sent_at === null);
   const inCart = all.filter((i) => i.sent_at !== null);
@@ -344,36 +346,74 @@ export default function List({
   // **Best** (TEC-196): the List lines at, or within 5% of, their 12-week nightly low.
   // The server decided it (`lib/bestPrice.ts`, the Deals board's function); this only filters.
   const shownLines = bestOnly ? onList.filter((i) => i.deal?.best) : onList;
-
-  // **The review replaces the list** (the mockup's Send to cart screen), with a way back.
-  if (cart.review !== null) {
-    return (
-      <section id="shop" className="flex scroll-mt-4 flex-col gap-3">
-        <SendView cart={cart} />
-      </section>
-    );
-  }
+  // **Ticked lines go to the bottom** (TEC-206), here as well as on a reload, so ticking moves the line at once.
+  const ordered = tickedLast(shownLines);
 
   const status = cart.status;
   // **Totals are summed from the nightly check**, per section, never $0 (TEC-190).
   const listTotals = totalsOf(open.map((i) => i.price));
-  const cartTotals = totalsOf(inCart.map((i) => i.price));
   const everything = totalsOf([...open, ...inCart].map((i) => i.price));
   const nightWords =
     everything.from === null ? null : everything.from === everything.to ? shortDay(everything.from) : `${shortDay(everything.from)} to ${shortDay(everything.to as string)}`;
   const canAdd = cart.ready && cart.busy === null;
+  const check = cart.cartCheck;
+  const checkById = new Map((check?.lines ?? []).map((l) => [l.id, l]));
+  // **The live In cart total** (TEC-206): today's price at the store, read by Refresh cart. Never $0.
+  const cartTotalWords = !check
+    ? null
+    : inCart.length === 0
+      ? null
+      : check.total === null
+        ? "In cart: no price"
+        : `In cart ${money(check.total)}${check.unpriced > 0 ? ` · ${check.unpriced} no price` : ""}`;
+  const storeLine = status?.connected && status.store;
+
+  /** A section's "Are you sure?": the count, Cancel and the button. No list. */
+  const sure = (kind: ConfirmKind, count: number, run: () => void, tone: "danger" | "accent" = "danger") => {
+    const words = confirmWords(kind, count);
+    return (
+      <div role="group" aria-label="Are you sure?" className="flex flex-wrap items-center gap-2 rounded-[10px] border border-line bg-surface px-3 py-2 text-[13px]">
+        <span className="min-w-0 flex-1 font-semibold">{words.ask}</span>
+        <button type="button" onClick={() => setConfirm(null)} className="min-h-9 rounded-lg border border-line px-3 text-ink-soft">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setConfirm(null);
+            run();
+          }}
+          className={`min-h-9 rounded-lg px-3 font-bold ${tone === "danger" ? "border border-danger text-danger" : "bg-accent text-accent-ink"}`}
+        >
+          {words.yes}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <section id="shop" className="flex scroll-mt-4 flex-col gap-3">
-      {/* The header: the counts, the store, where the prices are from, and Pickup/Delivery. */}
-      <div className="flex items-end justify-between gap-3 px-2">
+      <ProductSplash cart={cart} />
+
+      {/* The header: the counts, the live cart total, Pickup/Delivery and the store. */}
+      <div className="flex flex-col gap-2 px-2">
         <div className="flex min-w-0 flex-col gap-1">
           <h2 className="text-xl font-bold">Grocery list</h2>
           <p className="text-[13px] text-ink-soft">
             {items !== null ? `${open.length} still to buy · ${inCart.length} in cart` : "Reading…"}
-            {priceStore ? ` · ${priceStore}` : status?.store ? ` · ${status.store.name}` : ""}
             {nightWords ? ` · prices from the night of ${nightWords}` : ""}
           </p>
+          {cartTotalWords && check ? (
+            <p className="text-[15px] font-bold">
+              {cartTotalWords}
+              <span className="text-[13px] font-normal text-ink-soft"> · checked {clock(check.checkedAt)}</span>
+            </p>
+          ) : null}
+          {cart.cartCheckError ? (
+            <p role="alert" className="text-xs text-danger">
+              {cart.cartCheckError} In cart prices stay as they were until Refresh cart works.
+            </p>
+          ) : null}
           {priceError ? (
             <p role="alert" className="text-xs text-danger">
               {priceError} Lines read “no price yet” until it can.
@@ -385,42 +425,29 @@ export default function List({
             </p>
           ) : null}
         </div>
-        {cart.ready && status ? (
-          <ModeSwitch value={status.modality} onChange={(m) => void cart.chooseModality(m)} disabled={cart.busy === "send" || cart.busy === "take-back"} />
+        {storeLine && status ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <ModeSwitch value={status.modality} onChange={(m) => void cart.chooseModality(m)} disabled={cart.busy === "send" || cart.busy === "take-back"} />
+            <button
+              type="button"
+              onClick={() => cart.setChoosingStore(!cart.choosingStore)}
+              aria-expanded={cart.choosingStore}
+              aria-label={`Store: ${status.store?.name}. Change store`}
+              className="min-h-9 min-w-0 truncate rounded-[10px] bg-raised px-3 text-left text-xs"
+            >
+              {status.store?.name} <span className="text-accent">· change</span>
+            </button>
+          </div>
+        ) : null}
+        {cart.choosingStore ? (
+          <div className="rounded-xl bg-surface p-3">
+            <StorePicker cart={cart} />
+          </div>
         ) : null}
       </div>
 
       {/* **The refresh log is collapsed** (TEC-190): one summary line, the detail on a tap. */}
       <RefreshLog cart={cart} />
-
-      {/* **Adding sits at the top** (2026-09-22): it is what you do most here. */}
-      <div className="flex gap-2">
-        {/* One line to look at; a paste of several lines shows them all, one
-            item each. Enter adds; Shift+Enter starts another line. */}
-        <textarea
-          ref={box}
-          rows={1}
-          value={typed}
-          onChange={(e) => setTyped(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              void add();
-            }
-          }}
-          placeholder="Add an item — notes after a dash"
-          aria-label="Add items, one per line"
-          className="min-h-11 min-w-0 flex-1 resize-none overflow-hidden rounded-xl border border-line bg-surface px-3.5 py-2.5 text-base leading-snug"
-        />
-        <button
-          type="button"
-          onClick={() => void add()}
-          disabled={typed.trim() === "" || busy !== null}
-          className="min-h-11 self-start rounded-xl bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-50"
-        >
-          {busy === "adding" ? "Adding…" : typedLines(typed).length > 1 ? `Add ${typedLines(typed).length}` : "Add"}
-        </button>
-      </div>
 
       <CookingThisWeek refreshKey={refreshKey} recipeNames={recipeNames} />
 
@@ -430,73 +457,68 @@ export default function List({
           <h3 className="text-lg font-bold">List · {open.length}</h3>
           <span className="text-right text-[13px] text-ink-soft">{totalWords(listTotals, open.length)}</span>
         </div>
-        <div className="flex flex-wrap gap-x-3.5 gap-y-1 px-2">
-          {/* **Best** (TEC-196): only the lines at, or within 5% of, their 12-week low. */}
-          <button
-            type="button"
-            aria-pressed={bestOnly}
-            onClick={() => setBestOnly((b) => !b)}
-            className={`rounded-full px-2.5 py-0.5 text-[13px] ${bestOnly ? "bg-accent font-semibold text-accent-ink" : "border border-line text-accent"}`}
-          >
-            Best{bestOnly ? ` · ${shownLines.length}` : ""}
-          </button>
-          <button type="button" onClick={copyList} disabled={open.length === 0} className={LINK}>
-            {copied ? "Copied" : "Copy"}
-          </button>
-          <button type="button" onClick={propose} disabled={open.length < 2 || busy !== null} className={LINK}>
-            {busy === "tidying" ? "Thinking…" : "Tidy"}
-          </button>
-          <button type="button" onClick={clearBought} disabled={bought.length === 0} className={LINK}>
-            Clear ticked
-          </button>
-          {confirmingClear ? (
-            <>
-              <button type="button" onClick={clearEverything} className="text-[13px] text-danger underline-offset-2 hover:underline">
-                Clear all {onList.length} — sure?
-              </button>
-              <button type="button" onClick={() => setConfirmingClear(false)} className={LINK}>
-                Keep it
-              </button>
-            </>
+        {confirm === "tidy" || confirm === "clear-ticked" || confirm === "clear-all" ? (
+          confirm === "tidy" ? (
+            sure("tidy", open.length, () => void tidyNow(), "accent")
+          ) : confirm === "clear-ticked" ? (
+            sure("clear-ticked", bought.length, () => void clearBought())
           ) : (
-            <button type="button" onClick={() => setConfirmingClear(true)} disabled={onList.length === 0} className={LINK}>
+            sure("clear-all", onList.length, () => void clearEverything())
+          )
+        ) : (
+          <div className="flex flex-wrap gap-x-3.5 gap-y-1 px-2">
+            {/* **Best** (TEC-196): only the lines at, or within 5% of, their 12-week low. */}
+            <button
+              type="button"
+              aria-pressed={bestOnly}
+              onClick={() => setBestOnly((b) => !b)}
+              className={`rounded-full px-2.5 py-0.5 text-[13px] ${bestOnly ? "bg-accent font-semibold text-accent-ink" : "border border-line text-accent"}`}
+            >
+              Best{bestOnly ? ` · ${shownLines.length}` : ""}
+            </button>
+            <button type="button" onClick={copyList} disabled={open.length === 0} className={LINK}>
+              {copied ? "Copied" : "Copy"}
+            </button>
+            <button type="button" onClick={() => setConfirm("tidy")} disabled={open.length < 2 || busy !== null} className={LINK}>
+              {busy === "tidying" ? "Tidying…" : "Tidy"}
+            </button>
+            <button type="button" onClick={() => setConfirm("clear-ticked")} disabled={bought.length === 0} className={LINK}>
+              Clear ticked
+            </button>
+            <button type="button" onClick={() => setConfirm("clear-all")} disabled={onList.length === 0} className={LINK}>
               Clear all
             </button>
-          )}
-        </div>
-
-        {/* **A tidy is shown before it happens.** `validateTidy` has already
-            refused anything that drops or doubles a line; this is for the
-            judgement it cannot make. */}
-        {proposal ? (
-          <div className="rounded-xl border border-accent bg-surface p-3">
-            <h3 className="text-sm font-semibold">
-              {proposal.length} lines instead of {open.length}
-            </h3>
-            <ul className="mt-2 flex flex-col gap-1 text-sm">
-              {proposal.map((line, n) => (
-                <li key={n}>
-                  {line.name}
-                  {line.note ? <span className="text-ink-soft"> — {line.note}</span> : null}
-                  <span className="text-[11px] text-ink-soft"> ({line.absorbed.length})</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3 flex gap-2">
-              <button type="button" onClick={() => setProposal(null)} className="rounded-lg border border-line px-3 py-2 text-sm">
-                Leave it
-              </button>
-              <button
-                type="button"
-                onClick={applyProposal}
-                disabled={busy !== null}
-                className="ml-auto rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
-              >
-                {busy === "applying" ? "Tidying…" : "Use this list"}
-              </button>
-            </div>
           </div>
-        ) : null}
+        )}
+
+        {/* **Adding sits below the filters** (TEC-206; it was at the top from 2026-09-22). */}
+        <div className="flex gap-2">
+          {/* One line to look at; a paste of several lines shows them all, one
+              item each. Enter adds; Shift+Enter starts another line. */}
+          <textarea
+            ref={box}
+            rows={1}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void add();
+              }
+            }}
+            placeholder="Add an item — notes after a dash"
+            aria-label="Add items, one per line"
+            className="min-h-11 min-w-0 flex-1 resize-none overflow-hidden rounded-xl border border-line bg-surface px-3.5 py-2.5 text-base leading-snug"
+          />
+          <button
+            type="button"
+            onClick={() => void add()}
+            disabled={typed.trim() === "" || busy !== null}
+            className="min-h-11 self-start rounded-xl bg-accent px-4 text-sm font-semibold text-accent-ink disabled:opacity-50"
+          >
+            {busy === "adding" ? "Adding…" : typedLines(typed).length > 1 ? `Add ${typedLines(typed).length}` : "Add"}
+          </button>
+        </div>
 
         {items === null ? (
           readError ? (
@@ -523,7 +545,7 @@ export default function List({
           </div>
         ) : (
           <ul className="flex flex-col gap-1.5">
-            {shownLines.map((item) => (
+            {ordered.map((item) => (
               <ListRow
                 key={item.id}
                 item={item}
@@ -531,90 +553,118 @@ export default function List({
                 onQuantity={(q) => void setQuantity(item, q)}
                 canAdd={canAdd}
                 adding={cart.adding === item.id}
-                onAdd={() => void cart.addOne(item.id)}
+                confirming={rowConfirm?.kind === "add" && rowConfirm.id === item.id}
+                onAskAdd={() => setRowConfirm({ kind: "add", id: item.id })}
+                onCancel={() => setRowConfirm(null)}
+                onAdd={() => {
+                  setRowConfirm(null);
+                  void cart.addOne(item.id);
+                }}
               />
             ))}
           </ul>
         )}
-        <p className="px-2 text-xs text-ink-soft">★ default saved · ? needs a pick at Send · + not saved yet</p>
-        {/* **Send all stays** (owner): the whole List through Going in, Pick one and Not saved yet. */}
+        <p className="px-2 text-xs text-ink-soft">★ default saved · ? several, the most-bought goes in · + not saved yet, Kroger&rsquo;s top match goes in</p>
+        {/* **Send all** (TEC-206): one confirm with the count, then every line goes in as its best guess. */}
         {cart.ready ? (
-          <button
-            type="button"
-            onClick={() => void cart.startReview()}
-            disabled={cart.busy !== null || open.length === 0}
-            className="min-h-11 rounded-[10px] border border-accent bg-transparent text-[15px] font-bold text-accent disabled:opacity-50"
-          >
-            {cart.busy === "review" ? "Looking up…" : "Send all to cart"}
-          </button>
+          confirm === "send" ? (
+            sure("send", open.length, () => void cart.sendAll(), "accent")
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirm("send")}
+              disabled={cart.busy !== null || open.length === 0}
+              className="min-h-11 rounded-[10px] border border-accent bg-transparent text-[15px] font-bold text-accent disabled:opacity-50"
+            >
+              {cart.busy === "send" ? "Sending…" : "Send all to cart"}
+            </button>
+          )
         ) : null}
       </section>
+
+      <SendResults cart={cart} />
 
       {/* ---- In cart ---- */}
       {cart.ready || inCart.length > 0 ? (
         <section aria-label="In cart" className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between gap-3 px-2">
             <h3 className="text-lg font-bold">In cart · {inCart.length}</h3>
-            <span className="text-right text-[13px] text-ink-soft">{totalWords(cartTotals, inCart.length)}</span>
+            <span className="flex items-baseline gap-3 text-right text-[13px] text-ink-soft">
+              {cartTotalWords && check ? cartTotalWords.replace("In cart ", "") : ""}
+              {cart.ready ? (
+                <button type="button" onClick={() => void cart.refreshCart()} disabled={cart.busy !== null} className={LINK}>
+                  {cart.busy === "cart-check" ? "Checking…" : "Refresh cart"}
+                </button>
+              ) : null}
+            </span>
           </div>
           {inCart.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-line p-4 text-sm text-ink-soft">Nothing Cookbook has put in the cart.</p>
+            <p className="rounded-xl border border-dashed border-line p-4 text-sm text-ink-soft">Nothing in the cart.</p>
           ) : (
             <ul className="flex flex-col gap-1.5">
-              {inCart.map((item) => (
-                <InCartRow
-                  key={item.id}
-                  item={item}
-                  disabled={cart.busy !== null}
-                  removing={cart.removing === item.id}
-                  onRemove={() => void cart.removeOne(item.id)}
-                />
-              ))}
+              {inCart.map((item) => {
+                const live = checkById.get(item.id);
+                return (
+                  <InCartRow
+                    key={item.id}
+                    item={item}
+                    live={live ? { total: live.total } : null}
+                    disabled={cart.busy !== null}
+                    removing={cart.removing === item.id}
+                    confirming={rowConfirm?.kind === "remove" && rowConfirm.id === item.id}
+                    onAskRemove={() => setRowConfirm({ kind: "remove", id: item.id })}
+                    onCancel={() => setRowConfirm(null)}
+                    onRemove={() => {
+                      setRowConfirm(null);
+                      void cart.removeOne(item.id);
+                    }}
+                    onChange={() => void cart.changeLine(item.id)}
+                  />
+                );
+              })}
             </ul>
           )}
 
-          {cart.takeBackPreview ? (
-            <TakeBackConfirm
-              lines={cart.takeBackPreview}
-              working={cart.busy === "take-back"}
-              onConfirm={() => void cart.confirmTakeBack()}
-              onCancel={() => cart.setTakeBackPreview(null)}
-            />
-          ) : null}
-          {cart.takeBackResults ? <TakeBackResults results={cart.takeBackResults} /> : null}
+          {cart.takeBackResults ? <TakeBackResults results={cart.takeBackResults} onClose={cart.dismissTakeBack} /> : null}
 
-          {/* **Clear cart is Take back** (RULES.md): its two taps and its "anything added elsewhere stays". */}
+          {/* **Clear cart takes back every line in In cart** (TEC-206): one confirm with the count, no list, no King Soopers step. */}
           {cart.ready ? (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => void cart.lookTakeBack()}
-                disabled={cart.busy !== null || cart.takeBackPreview !== null || inCart.length === 0}
-                className="min-h-11 flex-1 rounded-[10px] border border-danger bg-transparent text-[15px] font-bold text-danger disabled:opacity-50"
-              >
-                {cart.busy === "take-back-look" ? "Checking…" : "Clear cart"}
-              </button>
-              <a
-                href={CHECKOUT_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="flex min-h-11 flex-1 items-center justify-center rounded-[10px] bg-raised text-[15px]"
-              >
-                Go to checkout
-              </a>
-            </div>
+            confirm === "clear-cart" ? (
+              sure("clear-cart", inCart.length, () => void cart.clearCart())
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirm("clear-cart")}
+                  disabled={cart.busy !== null || inCart.length === 0}
+                  className="min-h-11 flex-1 rounded-[10px] border border-danger bg-transparent text-[15px] font-bold text-danger disabled:opacity-50"
+                >
+                  {cart.busy === "take-back" && !cart.removing ? "Clearing…" : "Clear cart"}
+                </button>
+                <a
+                  href={CHECKOUT_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex min-h-11 flex-1 items-center justify-center rounded-[10px] bg-raised text-[15px]"
+                >
+                  Go to checkout
+                </a>
+              </div>
+            )
           ) : null}
-          {/* **The API cannot read the account**, so this is only what Cookbook sent (RULES.md). */}
-          <p className="px-2 text-xs text-ink-soft">
-            Shows what Cookbook put in your King Soopers cart. Anything you added in the King Soopers app stays there and isn&rsquo;t shown.
-          </p>
         </section>
       ) : null}
 
-      {/* Send to cart, King Soopers (TEC-90): connection, store and refresh. */}
+      {/* Send to cart, King Soopers (TEC-90): connection and refresh. */}
       <CartPanel cart={cart} />
     </section>
   );
+}
+
+/** "3:42 PM", for when the cart was last priced. */
+function clock(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? when(iso) : d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 /**
@@ -627,7 +677,8 @@ export default function List({
  * **One line per item** (TEC-196): the name and the small line each truncate with
  * an ellipsis, and the full text is the row's `title`. The mark, the bubble, the
  * price, the count and the button never shrink. **Shaded by deal**, with the
- * bubble or a word saying why.
+ * bubble or a word saying why. **A ticked line is faded** (TEC-206) and sits at
+ * the bottom of the List. **+ Cart asks once** ("Add 1 to the cart?"), in the row.
  */
 function ListRow(props: {
   item: ShoppingLine;
@@ -635,14 +686,21 @@ function ListRow(props: {
   onQuantity: (q: number) => void;
   canAdd: boolean;
   adding: boolean;
+  confirming: boolean;
+  onAskAdd: () => void;
+  onCancel: () => void;
   onAdd: () => void;
 }) {
   const { item } = props;
   const mark = item.mark ?? "+";
   // A ticked line is done: no shade, no bubble.
   const deal = item.checked ? null : item.deal;
+  const ask = confirmWords("add", item.quantity);
   return (
-    <li title={lineTitle({ ...item, deal }, details(item))} className={`flex items-center gap-2.5 rounded-[10px] bg-surface py-2 pl-2 pr-2.5 ${SHADE_CLASS[deal?.shade ?? "plain"]}`}>
+    <li
+      title={lineTitle({ ...item, deal }, details(item))}
+      className={`flex items-center gap-2.5 rounded-[10px] bg-surface py-2 pl-2 pr-2.5 ${SHADE_CLASS[deal?.shade ?? "plain"]} ${item.checked ? "opacity-60" : ""}`}
+    >
       <label className="flex shrink-0 cursor-pointer items-center self-stretch">
         <input type="checkbox" checked={item.checked} onChange={props.onTick} aria-label={`Got ${item.name}`} className="size-6 accent-accent" />
       </label>
@@ -671,14 +729,29 @@ function ListRow(props: {
         <Quantity key={`${item.id}:${item.quantity}`} item={item} onCommit={props.onQuantity} />
       </span>
       {props.canAdd && !item.checked ? (
-        <button
-          type="button"
-          aria-label="Add to cart"
-          onClick={props.onAdd}
-          className="h-8 shrink-0 whitespace-nowrap rounded-lg bg-accent px-2.5 text-xs font-bold text-accent-ink disabled:opacity-50"
-        >
-          {props.adding ? "…" : "+ Cart"}
-        </button>
+        props.confirming ? (
+          <span role="group" aria-label="Are you sure?" className="flex shrink-0 flex-col items-stretch gap-1">
+            <span className="text-center text-[11px] font-semibold">{ask.ask}</span>
+            <span className="flex gap-1">
+              <button type="button" onClick={props.onCancel} className="h-8 rounded-lg border border-line px-2 text-xs text-ink-soft">
+                No
+              </button>
+              <button type="button" onClick={props.onAdd} className="h-8 rounded-lg bg-accent px-2.5 text-xs font-bold text-accent-ink">
+                {ask.yes}
+              </button>
+            </span>
+          </span>
+        ) : (
+          <button
+            type="button"
+            aria-label="Add to cart"
+            onClick={props.onAskAdd}
+            disabled={props.adding}
+            className="h-8 shrink-0 whitespace-nowrap rounded-lg bg-accent px-2.5 text-xs font-bold text-accent-ink disabled:opacity-50"
+          >
+            {props.adding ? "…" : "+ Cart"}
+          </button>
+        )
       ) : null}
     </li>
   );
@@ -695,10 +768,27 @@ function Price({ price }: { price: LinePrice | null | undefined }) {
   );
 }
 
-/** One In cart line: what Cookbook sent, its price, and **Remove** (Take back for this line). */
-function InCartRow(props: { item: ShoppingLine; disabled: boolean; removing: boolean; onRemove: () => void }) {
+/**
+ * One In cart line: what Cookbook sent, **the product it used with a Change link**
+ * (TEC-206), its price (today's, once Refresh cart has read it; else the nightly
+ * check's; "no price" when Kroger can't price it, never $0), and **Remove**
+ * (Take back for this line, after one "Take 1 out of the cart?").
+ */
+function InCartRow(props: {
+  item: ShoppingLine;
+  live: { total: number | null } | null;
+  disabled: boolean;
+  removing: boolean;
+  confirming: boolean;
+  onAskRemove: () => void;
+  onCancel: () => void;
+  onRemove: () => void;
+  onChange: () => void;
+}) {
   const { item } = props;
   const small = [item.quantity > 1 ? `×${item.quantity}` : null, ...details(item)].filter((x): x is string => !!x);
+  const used = item.used ? [item.used.product, item.used.size].filter(Boolean).join(" · ") : null;
+  const ask = confirmWords("remove", 1);
   return (
     <li title={lineTitle(item, small)} className={`flex items-center gap-2.5 rounded-[10px] bg-raised py-2 pl-2 pr-2.5 ${SHADE_CLASS[item.deal?.shade ?? "plain"]}`}>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -709,17 +799,47 @@ function InCartRow(props: { item: ShoppingLine; disabled: boolean; removing: boo
           <Why deal={item.deal} />
           <span className="min-w-0 truncate">{small.join(" · ")}</span>
         </span>
+        {used ? (
+          <span className="flex min-w-0 items-baseline gap-2 text-xs text-ink-soft">
+            <span className="min-w-0 truncate">Used: {used}</span>
+            <button type="button" onClick={props.onChange} disabled={props.disabled} className="shrink-0 text-accent underline-offset-2 hover:underline disabled:opacity-50">
+              Change
+            </button>
+          </span>
+        ) : null}
       </span>
-      <Price price={item.price} />
-      <button
-        type="button"
-        aria-label={`Remove ${item.view?.name ?? item.name} from the cart`}
-        onClick={props.onRemove}
-        disabled={props.disabled}
-        className="min-h-11 shrink-0 whitespace-nowrap rounded-[10px] border border-line bg-transparent px-3 text-[13px] disabled:opacity-50"
-      >
-        {props.removing ? "Removing…" : "Remove"}
-      </button>
+      {props.live ? (
+        props.live.total === null ? (
+          <span className="whitespace-nowrap text-[11px] text-ink-soft">no price</span>
+        ) : (
+          <span className="whitespace-nowrap text-[13px] tabular-nums">{money(props.live.total)}</span>
+        )
+      ) : (
+        <Price price={item.price} />
+      )}
+      {props.confirming ? (
+        <span role="group" aria-label="Are you sure?" className="flex shrink-0 flex-col items-stretch gap-1">
+          <span className="text-center text-[11px] font-semibold">{ask.ask}</span>
+          <span className="flex gap-1">
+            <button type="button" onClick={props.onCancel} className="h-8 rounded-lg border border-line px-2 text-xs text-ink-soft">
+              No
+            </button>
+            <button type="button" onClick={props.onRemove} className="h-8 rounded-lg border border-danger px-2.5 text-xs font-bold text-danger">
+              {ask.yes}
+            </button>
+          </span>
+        </span>
+      ) : (
+        <button
+          type="button"
+          aria-label={`Remove ${item.view?.name ?? item.name} from the cart`}
+          onClick={props.onAskRemove}
+          disabled={props.disabled}
+          className="min-h-11 shrink-0 whitespace-nowrap rounded-[10px] border border-line bg-transparent px-3 text-[13px] disabled:opacity-50"
+        >
+          {props.removing ? "Removing…" : "Remove"}
+        </button>
+      )}
     </li>
   );
 }

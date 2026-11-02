@@ -55,9 +55,12 @@ export async function GET(request?: NextRequest) {
   try {
     const [open, words, products] = await Promise.all([openLines(), readPreferences(), readProducts()]);
     const decide = decider(products, words);
-    // **Only lines still on the List** (TEC-190): a line in the cart is not looked up or offered again.
-    const only = idsOf(request ? new URL(request.url).searchParams.get("ids") : null);
-    const toReview = open.filter((l) => l.sent_at === null && (!only || only.includes(l.id)));
+    // **Only lines still on the List** (TEC-190): a line in the cart is not looked up or offered again,
+    // except by `include=sent`, which Change on an In cart line asks for (TEC-206).
+    const params = request ? new URL(request.url).searchParams : null;
+    const only = idsOf(params?.get("ids") ?? null);
+    const withSent = params?.get("include") === "sent" && !!only;
+    const toReview = open.filter((l) => (withSent || l.sent_at === null) && (!only || only.includes(l.id)));
 
     const lines = await withAccessToken(async (accessToken, store) => {
       if (!store) throw new ConflictError("Pick a store first, so the matches are from your King Soopers.");
