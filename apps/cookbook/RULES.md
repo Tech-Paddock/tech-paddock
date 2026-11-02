@@ -121,6 +121,12 @@ section and closing comment before changing anything in this file.
 - **Each product carries a count.** It starts from the owner's own purchase history, which is
   supplied by hand and never stored or committed, and goes up by one each time Send adds it. It
   ranks choices; it never claims what was bought.
+- **Purchases are the record of what was actually bought** (TEC-213). Your brands, Import purchases
+  takes pasted King Soopers order history, one JSON object per line, into `cookbook.purchases`:
+  append only, one row per order line, a re-paste adds nothing. Signed in like every `/api` route;
+  there is no signed-out path. A line matches a saved product by code, then by its Kroger
+  description, and is kept unmatched otherwise; a match never adds a name. A bad line is counted
+  and skipped, never guessed. No purchase data is committed or kept in the repo.
 - **Each product keeps the size first bought beside the size Kroger reports now.** A refresh that
   sees a different size flags it, with price per unit, and never overwrites the size first bought.
 - **Paste a batch shows every row for a tick before anything is written,** and Your brands exports
