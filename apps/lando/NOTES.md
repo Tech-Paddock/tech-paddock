@@ -2,9 +2,41 @@
 
 ## State
 
-- v2 on Next.js 16: three tabs under the app bar, **Log**, **Analytics** and **Patch notes** (TEC-199; "What's new"
+- v2 on Next.js 16: four tabs under the app bar, **Log**, **Notes**, **Analytics** and **Patch notes** (TEC-199, Notes TEC-204; "What's new"
   renamed in the UI only, the file is still `app/WhatsNew.tsx` and the data `lib/releases.ts`; the Upcoming tab is gone),
-  sticky, evenly spaced, opening on Log (RULES.md holds the owner's override of the one-screen rule).
+  sticky, four equal columns in 15px bold with `whitespace-nowrap` (at 390px "Patch notes" wrapped to two lines at 16px),
+  opening on Log (RULES.md holds the owner's override of the one-screen rule).
+- **Notes** (TEC-204, the owner: "a notes after log section to capture misc notes and docs"): a journal entry of a new kind,
+  `note`, in `lando.events`; `details` is `{text, photos?, names?}`, `text` 1 to `NOTE_MAX` (2000) characters with its line
+  breaks kept (only its ends are trimmed) and the attachments exactly as every other kind has them (TEC-203; `PhotoPicker`,
+  `usePhotos`, `parseAttachments` reused, none copied). The event's own `note` column (500 at most) stays null for a note.
+  * **The tab** (`app/Notes.tsx`): an **Add note** button, then every live note of any age, newest first (`liveNotes`: by `at`, then
+  `created_at`). Each shows its date (`whenLabel`) and who wrote it, its text clamped to two lines (`line-clamp-2`; a tap on the
+  text expands it, "Tap to read all" / "Show less", offered only when `mayOverflow` guesses it needs more than two lines), its
+  attachments and an **Edit** button. **The text button and the Edit button are siblings, and so are the attachments:** a file
+  is an `<a>` on its signed URL (a thumbnail for a picture, a chip with type and name for any other file), and a link can't sit
+  inside a button, so a note is a `div` of separate controls, not one tappable row as in the feed. There is no search. A note
+  still saving, or not saved, sits above the list with Saving…, or Not saved with Retry and ✕ (`PendingNote`).
+  * **The form** (`app/NoteForm.tsx`, in the usual `Sheet`; it imports `Box`, `Field`, `input` and `inputFull` from `LogForm`, which
+  now exports them): Box 1 When and Logging as; Box 2 the required long text (`maxLength` 2000, a count of what is left) and the
+  attachments; Save. **No Repeat and no future When**: the When input has `max` of now, the form refuses a future time
+  (`noteWhenError`), and the server refuses a note more than 5 minutes past its clock (`NOTE_SKEW_MS`, for a phone's clock running
+  ahead; every other kind keeps its day). A new note saves like any entry (`save` through `logNote`: the sheet closes, a pending
+  row, Retry, the unsaved store).
+  * **Corrected like entries**: Edit opens the form on the note's words, and Save posts a new `note` with `voids`, Delete a `void`;
+  `change` is the same function the other forms use (it says "Note corrected" or "Note deleted" when the Note sheet is open).
+  `checkVoid` keeps the kind, so a note is never corrected into another kind or the reverse.
+  * **Out of everything else:** `LOG_KINDS` holds `note` (so it parses, and the unsaved store accepts it) but `FORM_KINDS` does not: a
+  note has no Log form, no filter pill and no colour (`formOf` is null). `Journal` splits the read once: `entries = withoutNotes(events)`
+  is what the pills (`sinceLast`), the feed (`liveEvents`), the meal and weight reads, Analytics, treats and the forms get;
+  `notes = liveNotes(events)` is the Notes tab's alone. A pending note is not a pending feed row (`feedPending`, `notePending`).
+  **Trap:** a new reader of `loaded.events` on the Log side must read `entries`, or a note leaks in; `tests/notes.test.ts` holds
+  the reads Journal makes.
+  * **The read** (`readJournal`): the filter is `at >= horizon or kind = weight or kind = note or voids is not null`, so a note
+  older than 30 days still lists, as every weight does; a note's attachments are signed with the live entries' (`/api/journal`).
+  * **The database**: migration `lando_notes` (a `note` branch in `lando.details_ok`, nothing else). `events_kind_check` was dropped
+  in `lando_health_events`, so the function is the only gate on a kind: a kind with no branch is refused. Without the migration a
+  note save fails with a 503 and nothing else changes. `tests/details-ok-superset.test.ts` reads `note` as a kind now.
 - **Upcoming items** (TEC-192, no tab since TEC-199): plans in `lando.upcoming` (kind vet, vaccine, medication or other; title,
   due day, optional time and note, optional repeat of N weeks, months or years, status open, done or cancelled). **A future
   When on any form creates one** (`lib/future.ts`; below). **An open item is edited in place** (TEC-203): tapping its words

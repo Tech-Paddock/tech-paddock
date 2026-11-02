@@ -4,13 +4,13 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 ## Scope
 
-- Potty, food, fun, training (both stored as exercise), weight and health (vet visits, medical issues and medications), with photos and files on every form and upcoming item (TEC-203), each logged through a short form with defaults; analytics over the same events.
+- Potty, food, fun, training (both stored as exercise), weight and health (vet visits, medical issues and medications), with photos and files on every form and upcoming item (TEC-203), each logged through a short form with defaults; analytics over the same events; and notes (misc notes and documents, TEC-204).
 - Who logged it is a person picked from names stored in the database, never in the repo.
 
 ## Surface: app
 
-- Three tabs, Log, Analytics and Patch notes, opening on Log: the owner's override (2026-10-20,
-  widened 2026-10-27 TEC-182, narrowed 2026-11-01 TEC-199, pills restored 2026-11-02 TEC-202) of the app surface's one screen and no
+- Four tabs, Log, Notes, Analytics and Patch notes, opening on Log: the owner's override (2026-10-20,
+  widened 2026-10-27 TEC-182, narrowed 2026-11-01 TEC-199, pills restored 2026-11-02 TEC-202, Notes added 2026-11-02 TEC-204) of the app surface's one screen and no
   tabs. One-handed, thumb-first. Pills open a quick log: Pee and Poop open Potty on that pick, Meals opens Food, Fun opens Fun (TEC-181, TEC-186, restored TEC-202). The Log buttons are Treats, Training, Weight and Health.
 - An app bar over the tabs: theme, logout and the livery badge (Meals today left, TEC-193).
 - Every form opens as a bottom sheet.
@@ -33,6 +33,8 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
   tab), edited in place while open (one made from a form, TEC-203), cancelled and never deleted; the journal stays append-only, and an entry saved from a Done
   links the item it closed (`done_event`) (TEC-192, TEC-199).
 - Login is the shared password until per-person logins ship (TEC-118).
+- Notes are a journal kind (`note`) on their own tab, never in the Log feed, the pills or Analytics;
+  a note is never dated in the future (TEC-204).
 - Livery: McLaren '25 (`mcl39`), the theme's own; changed only in the theme.
 - Every change a user would notice adds one plain-language entry to the release notes
   (`lib/releases.ts`, newest first, append-only) on the same branch: no issue numbers, file names,

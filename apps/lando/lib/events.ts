@@ -7,19 +7,20 @@
  * nothing voids it. Every screen reads live events only.
  *
  * Five kinds, each logged through a short form with defaults: potty, food,
- * exercise, weight, health. The shapes of `details` below are also enforced by
+ * exercise, weight, health; and, since TEC-204, a sixth, `note`, kept on the Notes tab and never in the Log
+ * feed, the since-last pills or Analytics. The shapes of `details` below are also enforced by
  * the database (migrations `lando_people_and_events`, then
  * `widen_lando_events_details_shape`, then `widen_lando_potty_none`, then
  * `lando_health_events`, `lando_health_picklist`, `lando_issue_links`, `lando_vet_weight`,
  * `lando_potty_inside_spot`, `lando_details_ok_search_path`, `lando_potty_minutes`,
- * `lando_box_leash_spot`); change both together.
+ * `lando_box_leash_spot`, `lando_notes`); change both together.
  */
 
 import { FOOD_TYPES, FOOD_UNITS, cleanFoodName, isMealType, listOf, findFood, foodNameTaken, formatAmount, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "./foods";
 import { dateLabel, fromDateInput, localMidnight, shortDate, toDateInput } from "./localtime";
 import { DOSE_MAX, MED_NAME_MAX, MED_ROUTES, MED_ROUTE_LABELS, MED_UNITS, cleanMedName, doseText, findMedication, medNameTaken, type MedRoute, type MedUnit, type Medication } from "./medications";
 
-export const LOG_KINDS = ["potty", "food", "exercise", "weight", "health"] as const;
+export const LOG_KINDS = ["potty", "food", "exercise", "weight", "health", "note"] as const;
 export type LogKind = (typeof LOG_KINDS)[number];
 export type Kind = LogKind | "void";
 
@@ -29,6 +30,7 @@ export const KIND_LABELS: Record<LogKind, string> = {
   exercise: "Exercise",
   weight: "Weight",
   health: "Health",
+  note: "Note",
 };
 
 /**
@@ -48,13 +50,14 @@ export const FORM_LABELS: Record<FormKind, string> = {
 };
 
 /** The kind a form saves. */
-export function kindOfForm(form: FormKind): LogKind {
+export function kindOfForm(form: FormKind): Exclude<LogKind, "note"> {
   return form === "fun" || form === "training" ? "exercise" : form;
 }
 
 /** The form an entry opens in, and the filter chip it falls under. Null for a void. */
 export function formOf(e: { kind: Kind; details: Details }): FormKind | null {
-  if (e.kind === "void") return null;
+  // A note has no form on the Log tab and no filter pill: it lives on the Notes tab (TEC-204).
+  if (e.kind === "void" || e.kind === "note") return null;
   if (e.kind === "exercise") return (e.details as ExerciseDetails).type === "training" ? "training" : "fun";
   return e.kind;
 }
@@ -439,6 +442,16 @@ export type HealthDetails = {
   issue?: string;
 };
 
+/** A note (TEC-204): free text, 1 to NOTE_MAX characters, and the same attachments as every other kind. */
+export type NoteDetails = {
+  text: string;
+  photos?: string[];
+  names?: Record<string, string>;
+};
+
+/** The longest note text; `lando.details_ok` holds the same. */
+export const NOTE_MAX = 2000;
+
 export type Details = Record<string, unknown>;
 
 export type JournalEvent = {
@@ -458,6 +471,7 @@ export const food = (e: Pick<JournalEvent, "details">) => e.details as FoodDetai
 export const exercise = (e: Pick<JournalEvent, "details">) => e.details as ExerciseDetails;
 export const weight = (e: Pick<JournalEvent, "details">) => e.details as WeightDetails;
 export const health = (e: Pick<JournalEvent, "details">) => e.details as HealthDetails;
+export const noteOf = (e: Pick<JournalEvent, "details">) => e.details as NoteDetails;
 
 /** The attachment paths an entry names, pictures and files: every kind but a void has them (TEC-203; Food and Weight since then). */
 export function eventPhotos(e: Pick<JournalEvent, "kind" | "details">): string[] {
@@ -1138,6 +1152,11 @@ export function describe(
       ];
       return { title: HEALTH_LABELS[h.type] ?? "Health", detail: parts.filter(Boolean).join(" · ") };
     }
+    case "note": {
+      // A note's text is the whole of it; the Notes tab shows it in full, so the title is only its kind.
+      const n = noteOf(e);
+      return { title: "Note", detail: [n.text ?? "", attachmentsText(n.photos ?? [])].filter(Boolean).join(" · ") };
+    }
     default:
       return { title: "", detail: "" };
   }
@@ -1156,6 +1175,9 @@ export type NewEvent = {
 };
 
 export class InvalidEvent extends Error {}
+
+/** How far past the server's clock a note's time may be: the phone's clock may run ahead a little. */
+const NOTE_SKEW_MS = 5 * 60_000;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (v: unknown): v is string => typeof v === "string" && UUID.test(v);
@@ -1388,6 +1410,16 @@ export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood
       Object.assign(out, parseAttachments(r));
       return out;
     }
+    case "note": {
+      // The text keeps its line breaks; only its ends are trimmed. A note without words is no note (TEC-204).
+      if (typeof r.text !== "string") throw new InvalidEvent("write the note");
+      const t = r.text.trim();
+      if (!t) throw new InvalidEvent("write the note");
+      if (t.length > NOTE_MAX) throw new InvalidEvent(`a note is at most ${NOTE_MAX} characters`);
+      const out: NoteDetails = { text: t };
+      Object.assign(out, parseAttachments(r));
+      return out;
+    }
     case "health": {
       const type = oneOf(r.type, HEALTH_TYPES, "type");
       if (type === "medication") return medicationDetails(r, meds);
@@ -1435,14 +1467,18 @@ export function parseNewEvent(body: unknown, now: Date, added: readonly AddedFoo
   if (kind !== "void" && b.at !== undefined && b.at !== null) {
     if (typeof b.at !== "string" || Number.isNaN(Date.parse(b.at))) throw new InvalidEvent("at must be a time");
     const t = Date.parse(b.at);
-    // A day ahead allows any time zone; past that it is a typo.
-    if (t > now.getTime() + 24 * 3600_000) throw new InvalidEvent("that time is in the future");
+    // A day ahead allows any time zone; past that it is a typo. A note is not a plan (TEC-204): it is dated now
+    // or earlier, with a few minutes for the phone's clock.
+    if (t > now.getTime() + (kind === "note" ? NOTE_SKEW_MS : 24 * 3600_000)) {
+      throw new InvalidEvent(kind === "note" ? "a note can't be dated in the future" : "that time is in the future");
+    }
     at = new Date(t).toISOString();
   }
 
   if (b.person_id !== undefined && b.person_id !== null && !isUuid(b.person_id)) throw new InvalidEvent("person_id must be a UUID");
 
-  const note = kind === "void" ? null : (text(b.note, "note", 500) ?? null);
+  // A note's words are its details.text (up to 2000); the event's own 500-character note stays empty for it.
+  const note = kind === "void" || kind === "note" ? null : (text(b.note, "note", 500) ?? null);
   const details = parseDetails(kind as Kind, b.details, added, meds);
   // A vet visit or an issue needs the story: the pick is only the headline (TEC-139). A dose does not (TEC-199).
   if (kind === "health" && !note && (details as HealthDetails).type !== "medication") {
