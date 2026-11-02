@@ -148,7 +148,7 @@ describe("GET /api/servings", () => {
 
 describe("the migration", () => {
   const sql = readFileSync(
-    resolve(__dirname, "../../../supabase/migrations/20261102001000_cookbook_recipe_macros_optional.sql"),
+    resolve(__dirname, "../../../supabase/migrations/20261102003758_cookbook_recipe_macros_optional.sql"),
     "utf8",
   );
   const code = sql.replace(/^--.*$/gm, "");
