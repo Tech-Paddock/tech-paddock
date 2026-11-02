@@ -1,8 +1,10 @@
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { deployError, whyGitHub, type LatestDeploy } from "@/lib/deploys";
 import { envErrors, explainError, explainResponse, forParked, type Probe } from "@/lib/diagnostics";
 import { budgetDistance, explainDrift } from "@/lib/drift-explain";
-import { HOME, HOME_ENV } from "@/lib/platform";
+import { HOME, HOME_ENV, type DriftCheck } from "@/lib/platform";
 import { parseDrift } from "../scripts/drift-parse.mjs";
 
 describe("a failure says what failed", () => {
@@ -79,22 +81,38 @@ describe("drift explained", () => {
 
   it("falls back to the check's family, and says nothing for a family it does not know", () => {
     expect(explainDrift(check("budget: CLAUDE.md"))).toMatch(/line limit/);
-    expect(explainDrift(check("fresh: coffee"))).toMatch(/handoff/);
+    expect(explainDrift(check("per-agent handoffs stay retired"))).toMatch(/Retired on purpose/);
+    expect(explainDrift(check("worklog stays retired"))).toMatch(/Retired on purpose/);
     expect(explainDrift(check("a check nobody has seen"))).toBeNull();
   });
 
   it("explains the gate-shape check under either gate file name (TEC-34)", () => {
-    const shape = /three deliberate versions/;
-    expect(explainDrift(check("middleware.ts / proxy.ts: a base copy plus the two scoped bypasses"))).toMatch(shape);
-    expect(explainDrift(check("proxy.ts: a base copy plus the two scoped bypasses"))).toMatch(shape);
+    const shape = /one password gate/;
+    expect(explainDrift(check("middleware.ts / proxy.ts: every app on the one gate"))).toMatch(shape);
+    expect(explainDrift(check("proxy.ts: every app on the one gate"))).toMatch(shape);
     expect(explainDrift(check("password gate: every app has the gate file its Next.js runs"))).toMatch(/is public/);
+  });
+
+  it("gives every check the drift script emits a sentence", () => {
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    let out = "";
+    try {
+      out = execFileSync("node", ["scripts/drift-check.mjs", "--json"], { cwd: root, encoding: "utf8" });
+    } catch (e) {
+      // A failing check exits non-zero but still prints its JSON.
+      out = (e as { stdout?: string }).stdout ?? "";
+    }
+    const checks = JSON.parse(out).checks as DriftCheck[];
+    expect(checks.length).toBeGreaterThan(0);
+    const bare = checks.filter((c) => explainDrift({ ...c, explain: undefined }) === null).map((c) => c.name);
+    expect(bare).toEqual([]);
   });
 
   it("says how far a budget is from its cap", () => {
     expect(budgetDistance(check("budget: CLAUDE.md", "79 / 80"))).toBe("79 of 80 lines — 1 to spare");
     expect(budgetDistance(check("budget: CLAUDE.md", "82 / 80"))).toBe("82 of 80 lines — 2 over");
     expect(budgetDistance(check("budget: CLAUDE.md", "unreadable"))).toBeNull();
-    expect(budgetDistance(check("fresh: coffee", "79 / 80"))).toBeNull();
+    expect(budgetDistance(check("identical: lib/auth.ts", "79 / 80"))).toBeNull();
   });
 });
 

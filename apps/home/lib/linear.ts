@@ -106,7 +106,8 @@ function plain(md: string): string {
  * tested directly.
  *
  * Steps are numbered and open with their actor in bold — `1. **TD:** …` — by
- * the rule the Linear hook enforces, with the owner's ⭐ before or after it. The
+ * the rule the Linear hook enforces (the actor is one of Owner, TD, Builder or
+ * Deployment), with the owner's ⭐ before or after it. The
  * way a step is marked finished has varied, so each of these counts as done:
  * "done", "skipped" or ✅ inside the bold lead (`**Done, 2026-09-25, Owner:**`),
  * or the text after it opening with "done", "skipped", ✅ or a strikethrough.
