@@ -277,7 +277,7 @@ describe("the meal-list migration (TEC-205)", () => {
   const statements = sql.replace(/--.*$/gm, "");
 
   it("exists under its agreed name", () => {
-    expect(file).toBe("20261102170000_cookbook_meal_list.sql");
+    expect(file).toBe("20261102183230_cookbook_meal_list.sql");
   });
 
   it("starts with a lock_timeout, before any DDL", () => {
