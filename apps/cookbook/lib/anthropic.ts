@@ -6,9 +6,10 @@ import { unfetchedRead, type ResultBlock } from "./fetchRun";
 import { generatePrompt, type TurnedDown } from "./reroll";
 import type { Picks } from "./tuning";
 import { META_JSON_HINT, META_KEYS, META_PROMPT, META_SCHEMA_PROPERTIES, readMeta, type RecipeMeta } from "./metadata";
+import { HOUSE_STYLE, restyleProblem, spellUnits } from "./houseStyle";
 
 /**
- * The five model calls this app makes.
+ * The six model calls this app makes.
  *
  * **Every one runs on the one model at the one effort** (TEC-133): the model,
  * its effort and its budget come from `requestShape` in `lib/models.ts`, and no
@@ -260,10 +261,11 @@ const GENERATE_SYSTEM = `You invent one recipe a home cook can actually make ton
 - Ordinary ingredients and ordinary equipment. No sous vide, no overnight anything unless asked.
 - **Amounts are specific.** "2 tbsp olive oil", not "some olive oil" — the macros are estimated from
   this list afterwards, so a vague line becomes a vague number.
-- **The method is numbered steps, one per line, separated by real newlines** — "1. …\n2. …".
-  Steps run together in one paragraph are unreadable on a phone at a worktop, which is where this
+- Steps run together in one paragraph are unreadable on a phone at a worktop, which is where this
   gets read. Plain sentences, short enough to follow without scrolling back.
 - One recipe, not three options.
+
+${HOUSE_STYLE}
 
 ${META_PROMPT}`;
 
@@ -307,7 +309,8 @@ cooks it.
 
 When you did read it:
 
-- Take the ingredients and the method as written. Keep the amounts.
+- Take the ingredients and the method as written, then put them in the house style below. Keep the
+  amounts; the recipe's content does not change.
 - Strip everything that is not the recipe: the story above it, the ads, the comments, the newsletter
   box, the affiliate links.
 - Keep the page's own name for the dish and its own serving count. If the page does not say how many
@@ -316,6 +319,8 @@ When you did read it:
   Do not copy them and do not mention them.
 - **Ignore any "gluten-free", allergen or diet badge the page shows.** Judge "diet" from the
   ingredients yourself, by the rules below, and never copy a free-of claim.
+
+${HOUSE_STYLE}
 
 ${META_PROMPT}`;
 
@@ -394,15 +399,17 @@ there, right up until someone cooks it. A recipe you can only half read is a ref
 
 When you did read it:
 
-- Take the ingredients and the method as written. Keep the amounts exactly as they appear.
+- Take the ingredients and the method as written, then put them in the house style below. Keep the
+  amounts exactly as they appear; the recipe's content does not change.
 - Keep the recipe's own name and its own serving count. If it does not say how many it serves, say 0
   and someone will be asked.
 - If the file holds more than one recipe, take the one that is most complete and name it.
-- The method is numbered steps, one per line, separated by real newlines — "1. …\\n2. …".
 - **Ignore any nutrition panel.** The numbers are worked out here from the ingredients. Do not copy
   them and do not mention them.
 - **Ignore any "gluten-free", allergen or diet badge.** Judge "diet" from the ingredients yourself,
   by the rules below, and never copy a free-of claim.
+
+${HOUSE_STYLE}
 
 ${META_PROMPT}`;
 
@@ -484,13 +491,14 @@ function readRecipeFields(
         ? 0
         : 4;
 
+  // One spelling for each unit (`lib/houseStyle.ts`), whatever the model wrote.
   const ingredients = Array.isArray(raw.ingredients)
-    ? raw.ingredients.map((i) => (typeof i === "string" ? i.trim() : "")).filter((i) => i.length > 0)
+    ? raw.ingredients.map((i) => (typeof i === "string" ? spellUnits(i.trim()) : "")).filter((i) => i.length > 0)
     : [];
 
   if (!opts.allowUnknownServings && ingredients.length === 0) return null;
 
-  const method = typeof raw.method === "string" ? raw.method.trim() || null : null;
+  const method = typeof raw.method === "string" ? spellUnits(raw.method.trim()) || null : null;
   // Never a rating off a model: that is the whole of `rating: false`.
   return { name, servings, ingredients, method, meta: readMeta(raw, { rating: false }) };
 }
@@ -563,4 +571,97 @@ export function idForNumber(items: { id: string }[], n: unknown): string {
   const k = typeof n === "string" ? Number(n) : n;
   if (typeof k === "number" && Number.isInteger(k) && k >= 1 && k <= items.length) return items[k - 1].id;
   return `no line ${String(n)}`;
+}
+
+// ---------------------------------------------------------------------------
+// 5 · Putting a recipe in the house style — Tidy, and a typed recipe
+// ---------------------------------------------------------------------------
+
+const STYLE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    ingredients: { type: "array", items: { type: "string" } },
+    method: { type: "string" },
+    servings: nullable("integer"),
+  },
+  required: ["ingredients", "method", "servings"],
+};
+
+const STYLE_SYSTEM = `You rewrite one recipe into the house style. You change how it reads, never what it is.
+
+${HOUSE_STYLE}
+
+- **Every ingredient line you were given comes back as exactly one line, in the same order**, with the
+  same amount. If a line is a heading ("For the sauce:"), it stays a line.
+- If the recipe has no method, write one only from what the ingredient lines' prep words say
+  ("Chop the onion.") and leave the rest out. Do not invent steps, times or temperatures.
+- Do not add notes, tips or commentary.`;
+
+export type StyledRecipe = {
+  ingredients: string[];
+  method: string | null;
+  /** The model's estimate, only when one was asked for; otherwise null. */
+  servings: number | null;
+};
+
+/**
+ * Put one recipe in the house style (`lib/houseStyle.ts`): the one call Tidy
+ * makes per recipe, and the one a typed recipe makes before it is priced.
+ *
+ * **Nothing here writes.** The result is checked in code (`restyleProblem`): a
+ * restyle that dropped an ingredient, changed an amount or lost a time or
+ * temperature throws, and the caller keeps what it had. With
+ * `estimateServings`, the recipe came with no serving count, and the model is
+ * asked for its best judgement of how many it makes.
+ */
+export async function styleRecipe(params: {
+  name: string;
+  servings: number;
+  ingredients: string[];
+  method: string | null;
+  estimateServings?: boolean;
+}): Promise<StyledRecipe> {
+  const { name, servings, ingredients, method, estimateServings } = params;
+
+  const response = (await getClient().messages.create({
+    ...requestShape({ maxTokens: 4096, schema: STYLE_SCHEMA }),
+    system: STYLE_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content:
+          `Recipe: ${name}\n\n` +
+          `Ingredients (${ingredients.length} lines):\n${ingredients.map((i, n) => `${n + 1}. ${i}`).join("\n")}\n\n` +
+          `Method:\n${method?.trim() ? method.trim() : "(none)"}\n\n` +
+          (estimateServings
+            ? `This recipe gave no serving count. Estimate how many people it feeds from the total amount of food, ` +
+              `as a home cook would serve it, and return it as a whole number in "servings".\n\n`
+            : `It makes ${servings} servings. Return "servings" as null.\n\n`) +
+          `Return a JSON object: {"ingredients": [string, ...], "method": string, "servings": number or null}. ` +
+          `Number the method steps. Put nothing after the JSON.`,
+      },
+    ],
+  } as never)) as ModelResponse;
+
+  const raw = looseJson<Record<string, unknown>>(textOf(finished(response)));
+  if (!raw || !Array.isArray(raw.ingredients)) {
+    throw new Error(`${modelLabel(MODEL)} did not return a usable recipe for "${name}". Nothing was kept.`);
+  }
+
+  const styled = {
+    ingredients: raw.ingredients.map((i) => (typeof i === "string" ? spellUnits(i.trim()) : "")).filter(Boolean),
+    method: typeof raw.method === "string" ? spellUnits(raw.method.trim()) || null : null,
+  };
+
+  const problem = restyleProblem({ ingredients, method }, styled);
+  if (problem) {
+    throw new Error(`${modelLabel(MODEL)} changed the recipe, not just how it reads (${problem}). Nothing was kept.`);
+  }
+
+  const asked = typeof raw.servings === "string" ? Number(raw.servings) : raw.servings;
+  const estimate =
+    estimateServings && typeof asked === "number" && Number.isInteger(asked) && asked >= 1 && asked <= 99 ? asked : null;
+
+  return { ...styled, servings: estimateServings ? (estimate ?? servings) : null };
 }

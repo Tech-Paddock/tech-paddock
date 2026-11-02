@@ -46,6 +46,13 @@ export type Recipe = PotMacros & RecipeMeta & {
   method: string | null;
   note: string | null;
   created_at: string;
+  /**
+   * When the recipe was put in the house style; null until it is (TEC-201).
+   * Optional so a recipe built by hand in a test need not carry it.
+   */
+  house_style_at?: string | null;
+  /** Does the recipe have an `imported_original` to Revert to? The jsonb itself stays in the database. */
+  has_original?: boolean;
 };
 
 /**
@@ -68,6 +75,11 @@ export type RecipeDraft = {
   method: string | null;
   note: string | null;
   /**
+   * Did the way in apply the house style (TEC-201)? Ask, link and file always do;
+   * a typed recipe does unless the restyle was refused. Kept as `house_style_at`.
+   */
+  styled?: boolean;
+  /**
    * Time, meal, main, cuisine, equipment, diet, tags — and the rating, which
    * only a person sets. A model's path arrives here with `rating: null`, and
    * `POST /api/recipes` reads a rating only because the user may set one on the
@@ -78,8 +90,8 @@ export type RecipeDraft = {
 
 // One literal, not a concatenation: supabase-js parses the select string's type,
 // and a `+` turns every row into an error type.
-const COLUMNS =
-  "id, name, servings, kcal, protein_g, carbs_g, fat_g, origin, source, model, source_url, ingredients, method, note, created_at, total_minutes, prep_minutes, cook_minutes, meal, mains, cuisine, equipment, diet, tags, rating";
+export const COLUMNS =
+  "id, name, servings, kcal, protein_g, carbs_g, fat_g, origin, source, model, source_url, ingredients, method, note, created_at, total_minutes, prep_minutes, cook_minutes, meal, mains, cuisine, equipment, diet, tags, rating, house_style_at, imported_original";
 
 /**
  * How two names are compared for collision.
@@ -158,8 +170,12 @@ export function hydrate(row: Record<string, unknown>): Recipe {
   // single null makes the whole pot "not estimated".
   const pot = [row.kcal, row.protein_g, row.carbs_g, row.fat_g].map((v) => (v === null || v === undefined ? null : Number(v)));
   const estimated = pot.every((v) => v !== null);
+  // `imported_original` is read only to say whether Revert has something to put back.
+  const { imported_original: original, ...rest } = row;
   return {
-    ...(row as unknown as Recipe),
+    ...(rest as unknown as Recipe),
+    has_original: original !== null && typeof original === "object",
+    house_style_at: typeof row.house_style_at === "string" ? row.house_style_at : null,
     servings: Number(row.servings),
     kcal: estimated ? pot[0] : null,
     protein_g: estimated ? pot[1] : null,
@@ -274,6 +290,7 @@ export async function saveRecipe(draft: RecipeDraft): Promise<Recipe> {
       ingredients: draft.ingredients.map((i) => i.trim()).filter(Boolean),
       method: draft.method?.trim() || null,
       note: draft.note?.trim() || null,
+      house_style_at: draft.styled ? new Date().toISOString() : null,
       ...draft.meta,
     })
     .select(COLUMNS)
@@ -315,8 +332,20 @@ export async function nameTakenByOther(name: string, exceptId: string): Promise<
  * a field not sent is not overwritten. `origin` and `source_url` are never sent:
  * where a recipe came from does not change because it was edited.
  */
-export async function updateRecipe(id: string, edit: RecipeEdit, reprice: Reprice | null): Promise<Recipe> {
-  const priced = reprice
+export async function updateRecipe(
+  id: string,
+  edit: RecipeEdit,
+  reprice: Reprice | null,
+  /**
+   * A kept Tidy (TEC-201): `styled` stamps `house_style_at`; `clearMacros` puts the
+   * macros back to "not estimated yet" when the new text could not be priced, so
+   * the old numbers never sit beside ingredients they were not worked out from.
+   */
+  opts: { styled?: boolean; clearMacros?: boolean } = {}
+): Promise<Recipe> {
+  const priced = opts.clearMacros && !reprice
+    ? { kcal: null, protein_g: null, carbs_g: null, fat_g: null, source: null, model: null, note: null }
+    : reprice
     ? {
         kcal: reprice.macros.kcal,
         protein_g: reprice.macros.protein_g,
@@ -351,6 +380,7 @@ export async function updateRecipe(id: string, edit: RecipeEdit, reprice: Repric
       servings: edit.servings,
       ingredients: edit.ingredients.map((i) => i.trim()).filter(Boolean),
       method: edit.method?.trim() || null,
+      ...(opts.styled ? { house_style_at: new Date().toISOString() } : {}),
       ...edit.meta,
       ...priced,
     })

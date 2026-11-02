@@ -41,7 +41,7 @@ vi.mock("@/lib/recipes", async (importOriginal) => ({
   updateRecipe: async (_id: string, edit: unknown, reprice: unknown) => ({ ...STORED, ...(edit as object), reprice }),
 }));
 
-const { estimateRecipeMacros, generateRecipe, importRecipe, readRecipeFile, tidyList } = await import("@/lib/anthropic");
+const { estimateRecipeMacros, generateRecipe, importRecipe, readRecipeFile, styleRecipe, tidyList } = await import("@/lib/anthropic");
 
 const reply = (text: string, stop_reason = "end_turn") => ({
   stop_reason,
@@ -57,6 +57,7 @@ const RECIPE = JSON.stringify({ name: "Chilli", servings: 4, ingredients: ["500g
 const READ = JSON.stringify({ read: true, reason: null, name: "Chilli", servings: 4, ingredients: ["500g beef mince"], method: "1. Cook." });
 const TIDY = JSON.stringify({ lines: [{ name: "garlic", note: null, absorbed: [1, 2] }] });
 const recipe = { name: "Chilli", servings: 4, ingredients: ["500g beef mince"], method: null };
+const STYLED = JSON.stringify({ ingredients: ["500g beef mince"], method: "1. Cook.", servings: null });
 
 /** Run every model call the app makes, once each. */
 async function everyCall() {
@@ -82,6 +83,9 @@ async function everyCall() {
     { id: "a", name: "2 cloves garlic", note: null },
     { id: "b", name: "1 tbsp minced garlic", note: null },
   ]);
+
+  replies.push(reply(STYLED));
+  await styleRecipe(recipe);
 }
 
 function expectOneModel(body: Record<string, unknown>, at: string) {
@@ -104,9 +108,9 @@ beforeEach(() => {
 });
 
 describe("every model request", () => {
-  it("covers pricing, Ask Claude, both turns of a link, a file and Tidy", async () => {
+  it("covers pricing, Ask Claude, both turns of a link, a file, Tidy of the list and the house style", async () => {
     await everyCall();
-    expect(sent).toHaveLength(6);
+    expect(sent).toHaveLength(7);
   });
 
   it("goes out as claude-sonnet-5-5 at effort medium, with nothing Sonnet 5.5 rejects", async () => {

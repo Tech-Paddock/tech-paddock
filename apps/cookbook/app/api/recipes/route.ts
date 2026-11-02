@@ -67,6 +67,9 @@ export async function POST(request: NextRequest) {
     // A URL records where the METHOD came from. It is never where a number came
     // from, which is why nothing here tries to infer a source from it.
     source_url: typeof raw.source_url === "string" && raw.source_url.startsWith("http") ? raw.source_url : null,
+    // Whether the way in applied the house style (TEC-201); the draft says so, the mark is
+    // `house_style_at`. A browser claiming it only hides a recipe from Tidy.
+    styled: raw.styled === true,
     ingredients: Array.isArray(raw.ingredients)
       ? raw.ingredients.map((i) => (typeof i === "string" ? i.trim() : "")).filter(Boolean)
       : [],
