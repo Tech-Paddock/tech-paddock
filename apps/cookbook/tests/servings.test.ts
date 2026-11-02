@@ -29,7 +29,7 @@ function recipe(over: Partial<Recipe> = {}): Recipe {
     // Metadata set, so the test below proves it does not leak into the contract.
     ...EMPTY_META,
     total_minutes: 45,
-    meal: "dinner",
+    meal: "main",
     mains: ["beef"],
     rating: 4,
     ...over,

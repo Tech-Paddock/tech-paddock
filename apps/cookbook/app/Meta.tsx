@@ -1,6 +1,6 @@
 "use client";
 
-import { DIETS, MEALS, type RecipeMeta } from "@/lib/metadata";
+import { DIETS, MEALS, mealLabel, type RecipeMeta } from "@/lib/metadata";
 
 /**
  * Recipe metadata on screen (TEC-52): the rating control, the typed form's
@@ -155,10 +155,10 @@ export function MetaFields({
           aria-label="Meal"
           className={input}
         >
-          <option value="">Meal</option>
+          <option value="">Other</option>
           {MEALS.map((m) => (
             <option key={m} value={m}>
-              {m}
+              {mealLabel(m)}
             </option>
           ))}
         </select>

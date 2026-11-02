@@ -5,6 +5,7 @@ import {
   DIETS,
   MEALS,
   META_PROMPT,
+  mealLabel,
   META_SCHEMA_PROPERTIES,
   formatMinutes,
   readList,
@@ -109,8 +110,25 @@ describe("reading the rest", () => {
   });
 
   it("takes a meal only from the list", () => {
-    expect(readMeta({ meal: "Dinner" }, { rating: false }).meal).toBe("dinner");
+    expect(readMeta({ meal: "Creami" }, { rating: false }).meal).toBe("creami");
     expect(readMeta({ meal: "brunch" }, { rating: false }).meal).toBeNull();
+    expect(readMeta({ meal: "other" }, { rating: false }).meal).toBeNull();
+  });
+
+  it("reads an old dinner or lunch, from any model or request, as main (TEC-205)", () => {
+    for (const w of ["dinner", "Dinner", " lunch "]) {
+      expect(readMeta({ meal: w }, { rating: false }).meal).toBe("main");
+    }
+  });
+
+  it("is Main, Side, Breakfast, Snack, Dessert, Creami, and tells a model so", () => {
+    expect([...MEALS]).toEqual(["main", "side", "breakfast", "snack", "dessert", "creami"]);
+    expect(META_PROMPT).toContain("main, side, breakfast, snack, dessert, creami");
+  });
+
+  it("names a meal with a capital, and no meal Other", () => {
+    expect(MEALS.map(mealLabel)).toEqual(["Main", "Side", "Breakfast", "Snack", "Dessert", "Creami"]);
+    expect(mealLabel(null)).toBe("Other");
   });
 
   it("takes minutes as a whole number up to two days", () => {
@@ -209,6 +227,8 @@ describe("prep and cook time (TEC-189)", () => {
 
 describe("the migration behind it", () => {
   const dir = resolve(__dirname, "../../../supabase/migrations");
+  const mealFile = readdirSync(dir).find((f) => f.endsWith("_cookbook_meal_list.sql"));
+  const mealStatements = (mealFile ? readFileSync(resolve(dir, mealFile), "utf8") : "").replace(/--.*$/gm, "");
   const file = readdirSync(dir).find((f) => f.endsWith("_cookbook_recipe_metadata.sql"));
   const sql = file ? readFileSync(resolve(dir, file), "utf8") : "";
   const statements = sql.replace(/--.*$/gm, "");
@@ -236,7 +256,8 @@ describe("the migration behind it", () => {
     // The check constraints and `lib/metadata.ts` disagreeing would mean a value
     // the app thinks is fine and the database refuses.
     const quoted = (list: string) => [...list.matchAll(/'([^']+)'/g)].map((m) => m[1]);
-    expect(quoted(statements.match(/meal in \(([^)]*)\)/)?.[1] ?? "")).toEqual([...MEALS]);
+    // The meal list moved into `cookbook.meal_ok` (TEC-205); its last body is the final list.
+    expect(quoted([...mealStatements.matchAll(/meal in \(([^)]*)\)/g)].at(-1)?.[1] ?? "")).toEqual([...MEALS]);
     expect(quoted(statements.match(/diet <@ array\[([^\]]*)\]/)?.[1] ?? "")).toEqual([...DIETS]);
     expect(statements).toMatch(/rating between 1 and 5/);
   });
@@ -246,5 +267,48 @@ describe("the migration behind it", () => {
     const names = [...statements.matchAll(/add column (\w+)/gi)].map((m) => m[1]);
     expect(names).toEqual(["total_minutes", "meal", "mains", "cuisine", "equipment", "diet", "tags", "rating"]);
     expect(names.join(" ")).not.toMatch(/allergen|gluten|free/i);
+  });
+});
+
+describe("the meal-list migration (TEC-205)", () => {
+  const dir = resolve(__dirname, "../../../supabase/migrations");
+  const file = readdirSync(dir).find((f) => f.endsWith("_cookbook_meal_list.sql"));
+  const sql = file ? readFileSync(resolve(dir, file), "utf8") : "";
+  const statements = sql.replace(/--.*$/gm, "");
+
+  it("exists under its agreed name", () => {
+    expect(file).toBe("20261102183230_cookbook_meal_list.sql");
+  });
+
+  it("starts with a lock_timeout, before any DDL", () => {
+    expect(statements.trim().startsWith("set local lock_timeout = '5s';")).toBe(true);
+  });
+
+  it("holds the rule in a function, widens it, moves the data, then narrows it", () => {
+    const bodies = [...statements.matchAll(/create or replace function cookbook\.meal_ok/g)];
+    expect(bodies).toHaveLength(2);
+    expect(statements).toMatch(/set search_path = ''/);
+    const widen = statements.indexOf("'main', 'creami'");
+    const move = statements.indexOf("set meal = 'creami'");
+    const narrow = statements.lastIndexOf("create or replace function cookbook.meal_ok");
+    expect(widen).toBeGreaterThan(-1);
+    expect(move).toBeGreaterThan(widen);
+    expect(narrow).toBeGreaterThan(move);
+  });
+
+  it("moves dinner and lunch to main, and tagged creami to creami", () => {
+    expect(statements).toMatch(/set meal = 'main'\s+where meal in \('dinner', 'lunch'\)/);
+    expect(statements).toMatch(/set meal = 'creami'\s+where 'creami' = any \(tags\)/);
+  });
+
+  it("drops only the one plain check, and drops no table, column or schema", () => {
+    expect(statements.match(/\bdrop\b/gi)).toHaveLength(1);
+    expect(statements).toMatch(/drop constraint recipes_meal_check;/);
+    expect(statements).not.toMatch(/drop (table|column|schema)/i);
+  });
+
+  it("validates the new constraint after the move", () => {
+    expect(statements).toMatch(/add constraint recipes_meal_ok check \(cookbook\.meal_ok\(meal\)\) not valid/);
+    expect(statements.indexOf("validate constraint recipes_meal_ok")).toBeGreaterThan(statements.indexOf("set meal = 'main'"));
   });
 });
