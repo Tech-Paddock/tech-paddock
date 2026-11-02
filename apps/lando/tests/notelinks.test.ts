@@ -355,7 +355,7 @@ describe("a link changes nothing on the Log", () => {
 
 describe("the migration and the release note", () => {
   it("the key is note_id in the migration, the types and the form", () => {
-    const sql = readFileSync(resolve(__dirname, "../../../supabase/migrations/20261102191500_lando_note_links.sql"), "utf8");
+    const sql = readFileSync(resolve(__dirname, "../../../supabase/migrations/20261102201016_lando_note_links.sql"), "utf8");
     expect(sql).toContain("'note_id'");
     expect(sql).toContain("set search_path = ''");
     expect(sql.replace(/--.*$/gm, "")).not.toMatch(/\b(drop|delete|truncate|alter table)\b/i);
