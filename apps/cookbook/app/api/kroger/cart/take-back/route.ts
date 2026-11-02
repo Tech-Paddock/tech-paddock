@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readList, markUnsent } from "@/lib/grocery";
+import { readList, markUnsent, markCleared } from "@/lib/grocery";
 import { appendSends, readSends } from "@/lib/cartSends";
 import { takeBackFromCart } from "@/lib/kroger";
 import { withAccessToken } from "@/lib/krogerConnection";
-import { summarizeTakeBack, takeBack, takeBackLines, type Held, type TakeBackLine, type TakeBackOutcome } from "@/lib/takeBack";
+import { summarizeClear, summarizeTakeBack, takeBack, takeBackLines, unaskedOutcomes, type Held, type TakeBackLine, type TakeBackOutcome } from "@/lib/takeBack";
 import { CHECKOUT_URL } from "@/lib/kingsoopers";
 import { InputError } from "@/lib/errors";
 import { errorResponse } from "@/lib/respond";
@@ -16,6 +16,11 @@ export const dynamic = "force-dynamic";
  * GET is what a take-back would remove — read from the ledger, no Kroger call —
  * so the confirm shows it. POST takes it back; it needs `confirm: true`, the
  * second tap, because it can't be undone from here. **No token in either body.**
+ *
+ * **`clear: true` is Clear cart (TEC-210):** the same negative adds, then every
+ * line given is marked cleared (`cleared_at`) whatever Kroger answered — a
+ * refusal, a failure, no sign-in. Nothing is retried. Remove (`ids`, no `clear`)
+ * is unchanged: it fails the line and leaves it In cart.
  */
 
 /** `only`: take back just these lines (Remove on one In cart line, TEC-190); omitted, every line Cookbook sent (Clear cart). */
@@ -50,6 +55,7 @@ export async function POST(request: NextRequest) {
   try {
     if (body.confirm !== true) throw new InputError("Take back needs a second tap to confirm.");
     const only = Array.isArray(body.ids) ? body.ids.filter((i: unknown): i is string => typeof i === "string") : null;
+    const clear = body.clear === true;
     const todo = await lines(only && only.length > 0 ? only : null);
     if (todo.length === 0) throw new InputError("Cookbook hasn't sent anything on this list to the cart.");
 
@@ -63,9 +69,29 @@ export async function POST(request: NextRequest) {
     // Kroger is only asked for a sign-in when something recorded is held; a
     // list sent before the ledger existed is skipped line by line, without one.
     // (Every line is then skipped, so `remove` is never called.)
-    const { outcomes, unsent }: { outcomes: TakeBackOutcome[]; unsent: string[] } = todo.some((l) => l.held.length > 0)
-      ? await withAccessToken((accessToken) => run((upc, quantity, modality) => takeBackFromCart(accessToken, upc, quantity, modality)))
-      : await run(() => Promise.reject(new Error("Not signed in to Kroger.")));
+    const asked = () => withAccessToken((accessToken) => run((upc, quantity, modality) => takeBackFromCart(accessToken, upc, quantity, modality)));
+    let outcomes: TakeBackOutcome[];
+    let unsent: string[];
+    if (!todo.some((l) => l.held.length > 0)) {
+      ({ outcomes, unsent } = await run(() => Promise.reject(new Error("Not signed in to Kroger."))));
+    } else if (clear) {
+      // Clear cart goes on whatever happens at King Soopers: no sign-in or an unreachable
+      // Kroger is a refusal like any other. `withAccessToken` throws only before any line is asked.
+      try {
+        ({ outcomes, unsent } = await asked());
+      } catch (e) {
+        outcomes = unaskedOutcomes(todo, e instanceof Error ? e.message : "King Soopers wasn't asked.");
+        unsent = [];
+      }
+    } else {
+      ({ outcomes, unsent } = await asked());
+    }
+
+    if (clear) {
+      // Every line leaves the list, marked and not deleted; sent_at and the ledger stay.
+      await markCleared(todo.map((l) => l.id), new Date().toISOString());
+      return NextResponse.json({ outcomes, ...summarizeClear(outcomes), checkoutUrl: CHECKOUT_URL });
+    }
 
     let recordError: string | null = null;
     try {

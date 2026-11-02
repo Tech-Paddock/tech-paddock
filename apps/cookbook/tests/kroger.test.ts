@@ -27,6 +27,7 @@ const mem = vi.hoisted(() => ({
   prefs: [] as Record<string, unknown>[],
   sent: [] as string[],
   unsent: [] as string[],
+  cleared: [] as string[],
   ledger: [] as Record<string, unknown>[],
   tokenWrites: [] as string[],
   scans: [] as Record<string, unknown>[],
@@ -86,6 +87,11 @@ vi.mock("@/lib/grocery", async (importOriginal) => ({
   },
   markUnsent: async (ids: string[]) => {
     mem.unsent.push(...ids);
+  },
+  markCleared: async (ids: string[]) => {
+    mem.cleared.push(...ids);
+    // Like the database: a cleared line is no longer read from the list.
+    mem.list = mem.list.filter((l) => !ids.includes(String(l.id)));
   },
 }));
 
@@ -179,6 +185,7 @@ beforeEach(() => {
   mem.bumps = [];
   mem.sent = [];
   mem.unsent = [];
+  mem.cleared = [];
   mem.ledger = [];
   mem.tokenWrites = [];
   mem.scans = [];
@@ -673,6 +680,90 @@ describe("Take back (TEC-127)", () => {
     // The reservation was reversed, so a later Take back still finds the milk.
     const { GET } = await import("@/app/api/kroger/cart/take-back/route");
     expect((await bodyOf(await GET())).lines[0].held).toEqual([{ upc: "0001111041700", quantity: 2, modality: "PICKUP" }]);
+  });
+
+  describe("Clear cart (TEC-210)", () => {
+    beforeEach(() => kroger.mockImplementation(defaultKroger)); // an earlier test may have left a refusing Kroger
+    const SENT = "2026-10-21T01:00:00Z";
+    function inCart() {
+      mem.list[0].sent_at = SENT;
+      mem.list[1].sent_at = SENT;
+      mem.ledger = [
+        { item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "PICKUP" },
+        { item_id: "b", name: "eggs", kind: "sent", upc: "0001111041701", quantity: 1, modality: "DELIVERY" },
+      ];
+    }
+    const clearPost = () => takeBackPost({ confirm: true, clear: true });
+    const refuse = (reason: string) =>
+      kroger.mockImplementation(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
+        if (url.endsWith("/cart/add")) return json({ errors: { reason } }, 400);
+        return json({ data: [PRODUCT] });
+      });
+
+    it("sends a negative for every In cart line, clears them all, and keeps the ledger", async () => {
+      inCart();
+      const body = await bodyOf(await clearPost());
+      expect(cartBodies()).toEqual([
+        { items: [{ upc: "0001111041700", quantity: -2, modality: "PICKUP" }] },
+        { items: [{ upc: "0001111041701", quantity: -1, modality: "DELIVERY" }] },
+      ]);
+      expect(mem.cleared).toEqual(["a", "b"]);
+      expect(mem.unsent).toEqual([]); // marked cleared, not returned to the List
+      expect(mem.list).toEqual([]); // and gone from what the list reads
+      expect(body).toMatchObject({ cleared: 2, refused: 0, text: "Cleared 2 from the cart." });
+      // The ledger is appended, never rewritten or deleted.
+      expect(mem.ledger).toHaveLength(4);
+      expect(mem.ledger.filter((r) => r.kind === "taken_back").map((r) => r.quantity)).toEqual([-2, -1]);
+    });
+
+    it("clears every line when Kroger refuses, appends the refused rows, and does not retry", async () => {
+      inCart();
+      refuse("quantity must be positive");
+      const body = await bodyOf(await clearPost());
+      expect(mem.cleared).toEqual(["a", "b"]);
+      expect(mem.list).toEqual([]);
+      expect(body).toMatchObject({ cleared: 2, refused: 2, checkoutUrl: "https://www.kingsoopers.com/cart" });
+      expect(body.text).toBe("Cleared 2 from the cart. King Soopers didn't take back 2; check its cart.");
+      expect(cartBodies()).toHaveLength(2); // one ask per line, no retry without the mode
+      expect(mem.ledger.filter((r) => r.kind === "refused")).toHaveLength(2);
+      expect(mem.ledger.filter((r) => r.kind === "sent")).toHaveLength(2);
+    });
+
+    it("clears every line when Kroger is not signed in, without asking it", async () => {
+      inCart();
+      mem.row = null;
+      const body = await bodyOf(await clearPost());
+      expect(kroger).not.toHaveBeenCalled();
+      expect(mem.cleared).toEqual(["a", "b"]);
+      expect(body).toMatchObject({ cleared: 2, refused: 2 });
+      expect(mem.ledger).toHaveLength(2); // nothing reserved when Kroger was never asked
+    });
+
+    it("clears a line sent before the ledger too, and says Kroger wasn't told", async () => {
+      mem.list[1].sent_at = "2026-10-01T00:00:00Z";
+      const body = await bodyOf(await clearPost());
+      expect(kroger).not.toHaveBeenCalled();
+      expect(mem.cleared).toEqual(["b"]);
+      expect(body).toMatchObject({ cleared: 1, refused: 1 });
+    });
+
+    it("Remove (no clear flag) still fails a refused line, leaves it In cart and never clears it", async () => {
+      inCart();
+      refuse("no");
+      const body = await bodyOf(await takeBackPost({ confirm: true, ids: ["a"] }));
+      expect(body.failed).toBe(true);
+      expect(mem.cleared).toEqual([]);
+      expect(mem.unsent).toEqual([]);
+    });
+
+    it("a Remove that succeeds returns its line to the List (sent_at cleared, not cleared_at)", async () => {
+      inCart();
+      await bodyOf(await takeBackPost({ confirm: true, ids: ["a"] }));
+      expect(mem.unsent).toEqual(["a"]);
+      expect(mem.cleared).toEqual([]);
+    });
   });
 
   it("a line sent before the ledger is skipped without asking Kroger, and an empty list says so", async () => {

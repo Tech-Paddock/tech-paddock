@@ -21,17 +21,18 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
  */
 
 type Kind = "notice" | "error";
-type Toast = { id: number; kind: Kind; text: string };
+type ToastLink = { href: string; label: string };
+type Toast = { id: number; kind: Kind; text: string; link?: ToastLink };
 
 const LIFETIME: Record<Kind, number> = { notice: 4000, error: 8000 };
 
-const ToastContext = createContext<(kind: Kind, text: string) => void>(() => {});
+const ToastContext = createContext<(kind: Kind, text: string, link?: ToastLink) => void>(() => {});
 
 export function useToast() {
   const push = useContext(ToastContext);
   return {
-    notice: (text: string) => push("notice", text),
-    error: (text: string) => push("error", text),
+    notice: (text: string, link?: ToastLink) => push("notice", text, link),
+    error: (text: string, link?: ToastLink) => push("error", text, link),
   };
 }
 
@@ -43,10 +44,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((current) => current.filter((t) => t.id !== id));
   }, []);
 
-  const push = useCallback((kind: Kind, text: string) => {
+  const push = useCallback((kind: Kind, text: string, link?: ToastLink) => {
     const id = next.current++;
     // Three at most: a burst of failures should not stack up the screen.
-    setToasts((current) => [...current.slice(-2), { id, kind, text }]);
+    setToasts((current) => [...current.slice(-2), { id, kind, text, link }]);
   }, []);
 
   return (
@@ -84,7 +85,17 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
         isError ? "border-danger/60 bg-surface text-danger" : "border-line bg-bar text-bar-ink"
       }`}
     >
-      <span className="min-w-0 flex-1">{toast.text}</span>
+      <span className="min-w-0 flex-1">
+        {toast.text}
+        {toast.link ? (
+          <>
+            {" "}
+            <a href={toast.link.href} target="_blank" rel="noreferrer" className="underline">
+              {toast.link.label}
+            </a>
+          </>
+        ) : null}
+      </span>
       <button
         type="button"
         onClick={onDismiss}

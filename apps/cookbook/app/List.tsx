@@ -627,8 +627,8 @@ export default function List({
 
           {cart.takeBackResults ? <TakeBackResults results={cart.takeBackResults} onClose={cart.dismissTakeBack} /> : null}
 
-          {/* **Clear cart takes back every line in In cart** (TEC-206): one confirm with the count, no list, no King Soopers step. */}
-          {cart.ready ? (
+          {/* **Clear cart clears every line in In cart whatever King Soopers answers** (TEC-206, TEC-210): one confirm with the count, no list, shown even when not signed in. */}
+          {cart.ready || inCart.length > 0 ? (
             confirm === "clear-cart" ? (
               sure("clear-cart", inCart.length, () => void cart.clearCart())
             ) : (
