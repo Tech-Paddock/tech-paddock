@@ -225,6 +225,8 @@ describe("a line with no slot outside Professional Experience", () => {
     const v = verdictFor({ coverage, findings: auditAts(parts, paras), changeLog });
     expect(v.pass).toBe(false);
     expect(v.reasons[0]).toMatch(/1 line of the source reached no part of the document/);
+    // The source did have a summary, so "the source did not fill" it is false (TEC-168).
+    expect(v.notes.join(" ")).not.toMatch(/did not fill/);
   });
 
   it("fails on a Career Highlight with no cell, naming both of its lines", async () => {

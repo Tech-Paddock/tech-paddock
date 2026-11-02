@@ -16,9 +16,10 @@ type Body = {
  * Reopen a stored render: its verdict, coverage and change log, as written.
  *
  * Coverage and the change log are read back from the row — never recomputed —
- * because they are the record of what this render did. The ATS findings were
- * never stored, so they are read off the stored output bytes: the document that
- * went out, audited by today's lint. Whether a verdict can be given at all is
+ * because they are the record of what this render did. A FAIL's ATS findings
+ * are stored (`template_snapshot.findings`) and shown as they were; where the
+ * output file exists they are read off its stored bytes instead: the document
+ * that went out, audited by today's lint. Whether a verdict can be given at all is
  * decided in `lib/storedRender.ts`.
  */
 export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {

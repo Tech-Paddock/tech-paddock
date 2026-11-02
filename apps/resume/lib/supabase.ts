@@ -16,11 +16,5 @@ export function getServiceClient() {
   });
 }
 
-// There is deliberately no client for `shared` here (TEC-26). One used to be
-// exported with a comment claiming it kept contacts deduplicated; nothing ever
-// called it, so the claim described a guarantee nobody provided. Reaching
-// `shared` from here is a contract change that goes to the owner through the
-// technical director.
-//
-// There is no client for `tracker` either. The Pipeline Tracker was retired on
-// 2026-10-20; this app reads and writes only the `resume` schema.
+// This app reads and writes only the `resume` schema: no client for any other,
+// and `tests/no-tracker.test.ts` keeps `shared` and `tracker` out.

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import JSZip from "jszip";
 import { readDocxParts } from "../lib/docx/read";
 import { extractParagraphs, type Para } from "../lib/docx/paragraphs";
 import { auditAts } from "../lib/docx/ats";
@@ -34,6 +35,60 @@ describe("ATS lint", () => {
   // thing five times over is worse, because you stop reading it.
   it("finds nothing in the current template's structure", async () => {
     expect(await audit("template-flat-sample.docx")).toEqual([]);
+  });
+});
+
+/**
+ * TEC-168: RULES.md asks for a plain bullet glyph. The check warns and never
+ * blocks, and only on bullets the document uses, so a real template is not
+ * taught to ignore it. Documents are built in memory from the fixture.
+ */
+describe("bullet glyph", () => {
+  async function withNumbering(edit: (numbering: string) => string) {
+    const zip = await JSZip.loadAsync(readFileSync(join(__dirname, "fixtures", "template-flat-sample.docx")));
+    zip.file("word/numbering.xml", edit(await zip.file("word/numbering.xml")!.async("string")));
+    const parts = await readDocxParts(await zip.generateAsync({ type: "nodebuffer" }));
+    return auditAts(parts, extractParagraphs(parts.document));
+  }
+  const WINGDINGS = '<w:rFonts w:ascii="Wingdings" w:hAnsi="Wingdings"/>';
+  /** One level of abstractNum 0, which is what the flat template's bullets use (numId 1). */
+  const level = (n: string, ilvl: number) =>
+    n.match(new RegExp(`<w:abstractNum\\s[^>]*w:abstractNumId="0"[\\s\\S]*?(<w:lvl\\s[^>]*w:ilvl="${ilvl}"[\\s\\S]*?</w:lvl>)`))![1];
+
+  it("does not warn on the current template's glyph", async () => {
+    expect(codes(await audit("template-flat-sample.docx"))).not.toContain("bullet_glyph");
+  });
+
+  it("warns, and does not block, on a used Wingdings bullet", async () => {
+    const found = await withNumbering((n) => {
+      const lvl = level(n, 0);
+      const wing = /<w:rFonts[^>]*\/>/.test(lvl)
+        ? lvl.replace(/<w:rFonts[^>]*\/>/, WINGDINGS)
+        : lvl.replace("</w:lvl>", `<w:rPr>${WINGDINGS}</w:rPr></w:lvl>`);
+      return n.replace(lvl, wing);
+    });
+    expect(found.find((x) => x.code === "bullet_glyph")?.severity).toBe("warning");
+    expect(found.some((x) => x.severity === "blocking")).toBe(false);
+  });
+
+  it("warns on a picture bullet", async () => {
+    const found = await withNumbering((n) => {
+      const lvl = level(n, 0);
+      return n.replace(lvl, lvl.replace("<w:numFmt", '<w:lvlPicBulletId w:val="0"/><w:numFmt'));
+    });
+    expect(codes(found)).toContain("bullet_glyph");
+  });
+
+  it("ignores a Wingdings level that no paragraph uses", async () => {
+    // Word's own default lists carry such levels; warning on them would be a false positive.
+    const found = await withNumbering((n) => {
+      const lvl = level(n, 5);
+      const wing = /<w:rFonts[^>]*\/>/.test(lvl)
+        ? lvl.replace(/<w:rFonts[^>]*\/>/, WINGDINGS)
+        : lvl.replace("</w:lvl>", `<w:rPr>${WINGDINGS}</w:rPr></w:lvl>`);
+      return n.replace(lvl, wing);
+    });
+    expect(codes(found)).not.toContain("bullet_glyph");
   });
 });
 

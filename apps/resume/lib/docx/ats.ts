@@ -9,7 +9,7 @@ export type AtsFinding = {
 };
 
 /**
- * Mechanical check of the ATS rules in CLAUDE.md. One table is permitted —
+ * Mechanical check of the ATS rules in `apps/resume/RULES.md`. One table is permitted —
  * Career Highlights, whose content is repeated in the body bullets — and any
  * other is blocking. Everything else here is a hard no.
  */
@@ -79,7 +79,59 @@ export function auditAts(parts: DocxParts, paras: Para[]): AtsFinding[] {
     });
   }
 
+  const glyph = oddBulletGlyphs(parts.numbering, paras);
+  if (glyph.length > 0) {
+    findings.push({
+      code: "bullet_glyph",
+      severity: "warning",
+      message: `Bullet glyph a parser may misread: ${glyph.join("; ")}. Use a plain "•", "-" or "–" in a text font.`,
+    });
+  }
+
   return findings;
+}
+
+/** Symbol-font families whose characters are drawn by code point, not by meaning:
+ *  a parser that ignores the font reads the bullet as a stray letter. Symbol
+ *  itself is Word's default bullet and parsers know it, so it is not listed. */
+const SYMBOL_FONT = /^(wingdings(\s*[23])?|webdings)$/i;
+
+/**
+ * The bullet levels the document actually uses whose glyph is a picture or sits
+ * in Wingdings/Webdings. Levels no paragraph uses are ignored: Word's default
+ * multilevel list carries Wingdings at a deeper level whether or not it is ever
+ * used, and warning about it would be a false positive. Warning only (TEC-168).
+ */
+export function oddBulletGlyphs(numbering: string | null, paras: Para[]): string[] {
+  if (!numbering) return [];
+  const used = new Set<string>();
+  for (const p of paras) if (p.listId !== null) used.add(`${p.listId}:${p.listLevel ?? "0"}`);
+  if (used.size === 0) return [];
+
+  const abstractOf = new Map<string, string>();
+  for (const m of numbering.matchAll(/<w:num\s[^>]*?w:numId="(\d+)"[^>]*>([\s\S]*?)<\/w:num>/g)) {
+    const a = m[2].match(/<w:abstractNumId\s+w:val="(\d+)"/);
+    if (a) abstractOf.set(m[1], a[1]);
+  }
+  const abstracts = new Map<string, string>();
+  for (const m of numbering.matchAll(/<w:abstractNum\s[^>]*?w:abstractNumId="(\d+)"[^>]*>([\s\S]*?)<\/w:abstractNum>/g)) {
+    abstracts.set(m[1], m[2]);
+  }
+
+  const out: string[] = [];
+  for (const key of [...used].sort()) {
+    const [numId, ilvl] = key.split(":");
+    const body = abstracts.get(abstractOf.get(numId) ?? "");
+    const lvl = body?.match(new RegExp(`<w:lvl\\s[^>]*?w:ilvl="${ilvl}"[^>]*>([\\s\\S]*?)</w:lvl>`))?.[1];
+    if (!lvl || !/<w:numFmt\s+w:val="bullet"/.test(lvl)) continue;
+    if (/<w:lvlPicBulletId/.test(lvl)) {
+      out.push(`list ${numId} level ${ilvl} is a picture`);
+      continue;
+    }
+    const font = lvl.match(/<w:rFonts\s[^>]*?w:ascii="([^"]*)"/)?.[1];
+    if (font && SYMBOL_FONT.test(font.trim())) out.push(`list ${numId} level ${ilvl} is set in ${font}`);
+  }
+  return out;
 }
 
 /** Text content of a header or footer part, with markup stripped. Matches only

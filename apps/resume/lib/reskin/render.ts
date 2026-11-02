@@ -380,7 +380,7 @@ function replaceRowLabelItems(rowRaw: string, label: string, items: string): str
  * decide.
  *
  * **A table here is the template's one blocking ATS defect that is also easy to
- * fix**: `CLAUDE.md` allows exactly one table, Career Highlights, whose content
+ * fix**: `RULES.md` allows exactly one table, Career Highlights, whose content
  * is repeated in the body bullets so a parser that drops it loses nothing. Core
  * Competencies as a second table is keyword coverage a parser may scramble or
  * skip, and those keywords are the whole point of the section.

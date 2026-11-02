@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 }
 
 /** Upload a template. Append-only: each upload is a new version, and the newest
- *  becomes active unless an older one has been deliberately pinned. */
+ *  becomes active. */
 export async function POST(request: NextRequest) {
   let form: FormData;
   try {

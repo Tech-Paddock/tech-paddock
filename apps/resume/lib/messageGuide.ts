@@ -52,6 +52,7 @@ export const VERDICT_GUIDE: GuideEntry[] = [
     causes: [
       "The template has no slot for that line in a section other than Professional Experience.",
       "The template is missing the section the line belongs to.",
+      "The export has a Summary and the template has no summary paragraph above its first heading to put it in.",
     ],
     check:
       "Open Not carried across. Each line names its section and why it was not placed. Fix the template so the section has room for it, then reformat again.",
@@ -73,8 +74,14 @@ export const VERDICT_GUIDE: GuideEntry[] = [
     effect: "fails",
     reads: "had nowhere to go in the template",
     where: "The verdict, and the Had nowhere to go panel.",
-    means: "A whole section of the export has no matching section in the template, so none of it was carried over.",
-    check: "Add that section's heading to the template, or remove the section from the export if you do not want it.",
+    means:
+      "Part of the export has no place in the template, so it was not carried over. Either a whole section of the export has no matching section in the template, or Career Highlights has more items than the template's table has cells.",
+    causes: [
+      "A section heading in the export that the template does not have.",
+      "More Career Highlights in the export than the template's table has cells. The table never gains a cell, so the surplus is dropped.",
+    ],
+    check:
+      "Add the missing section's heading to the template, or remove the section from the export if you do not want it. For Career Highlights, give the export no more items than the table has cells, or add cells to the template's table.",
   },
   {
     key: "section-partly",

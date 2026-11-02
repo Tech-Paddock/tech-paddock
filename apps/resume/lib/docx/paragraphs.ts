@@ -32,6 +32,8 @@ export type Para = {
   italic: boolean;
   /** w:numId — paragraphs sharing one are a single list. */
   listId: string | null;
+  /** w:ilvl — the list level this paragraph sits at; null outside a list. */
+  listLevel?: string | null;
   styleId: string | null;
   hasImage: boolean;
   inTable: boolean;
@@ -100,8 +102,8 @@ const PROPERTY_CONTAINERS = new Set([
   "w:pPr", "w:rPr", "w:sectPr", "w:tblPr", "w:trPr", "w:tcPr", "w:tblGrid", "w:tblPrEx",
 ]);
 
-/** Concatenate every <w:t> in document order. Text always comes from here — the
- *  model only ever labels these paragraphs, it never reproduces their text. */
+/** Concatenate every <w:t> in document order. Text always comes from here; no
+ *  other step supplies a paragraph's words. */
 function textOf(nodes: Node[]): string {
   let out = "";
   for (const node of nodes) {
@@ -180,6 +182,7 @@ function describe(
 
   const numPr = pPrKids.find((n) => tagOf(n) === "w:numPr");
   const numId = numPr ? findFirst(kidsOf(numPr, "w:numPr"), "w:numId") : null;
+  const ilvl = numPr ? findFirst(kidsOf(numPr, "w:numPr"), "w:ilvl") : null;
   const pStyle = pPrKids.find((n) => tagOf(n) === "w:pStyle");
 
   // First run's properties stand in for the paragraph's look. Jobright applies
@@ -195,6 +198,7 @@ function describe(
     bold: first?.bold ?? false,
     italic: first?.italic ?? false,
     listId: numId ? attrsOf(numId)["w:val"] ?? null : null,
+    listLevel: numId ? (ilvl ? attrsOf(ilvl)["w:val"] ?? "0" : "0") : null,
     styleId: pStyle ? attrsOf(pStyle)["w:val"] ?? null : null,
     hasImage: hasTag(body, "w:drawing") || hasTag(body, "w:pict"),
     inTable,
