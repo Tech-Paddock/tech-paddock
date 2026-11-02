@@ -13,7 +13,7 @@ node scripts/stamp-shared.mjs --check  # verify, write nothing
 
 | File | Why it is shared |
 |---|---|
-| `lib/auth.ts` | Session cookie and advisory attempts counter. A mismatch silently rejects valid sessions elsewhere. Its `safeEqual` has had no caller since TEC-117. |
+| `lib/auth.ts` | Session cookie and advisory attempts counter. A mismatch silently rejects valid sessions elsewhere. |
 | `lib/password.ts` | bcrypt wrapper. Node-only; never import it from the gate file. |
 | `lib/login.ts` | Handler behind every `POST /api/login`. Node-only. |
 | `lib/logout.ts` | Handler behind every `POST /api/logout`. Clears the domain-wide cookie, so it logs out of every app. |
