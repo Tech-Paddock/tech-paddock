@@ -55,6 +55,7 @@ import {
   type HealthType,
   type JournalEvent,
   type LogKind,
+  type QuickLog,
   type PottyWhat,
   type Unit,
 } from "@/lib/events";
@@ -88,6 +89,8 @@ type Props = {
   form: FormKind;
   /** Health's tab on a new entry (TEC-199): Vet visit unless a Done or a Medication opens it on another. */
   healthType?: HealthType;
+  /** A tapped since-last pill or the Treats button (TEC-181, TEC-186): a new entry opens on its pick. Ignored when correcting. */
+  quick?: QuickLog;
   /** Set when correcting an entry; the form opens on its values. */
   event?: JournalEvent;
   /**
@@ -213,9 +216,15 @@ const FOOD_ADD = "__add";
 /** The Medication pick's last option: opens the add-a-medication form, never a value. */
 const MED_ADD = "__add_med";
 
-/** A field box: narrow padding, 44px tall, sized by its parent. */
+/**
+ * A field box: narrow padding, 44px tall. It carries no width (TEC-202): Tailwind writes `w-full` after
+ * `w-[64px]` and `w-auto`, so a width here would beat every narrow field. Each field names its own width:
+ * `inputFull` where it fills its column, `w-[..]` or the content's own width elsewhere.
+ */
 const input =
-  "w-full min-w-0 min-h-[44px] rounded-[10px] border border-line bg-surface px-2 py-1.5 text-[15px] outline-none focus:border-accent";
+  "min-w-0 min-h-[44px] rounded-[10px] border border-line bg-surface px-2 py-1.5 text-[15px] outline-none focus:border-accent";
+
+const inputFull = `${input} w-full`;
 
 const WHERE_OPTS = [
   ["outside", "Outside"],
@@ -240,6 +249,7 @@ function LoggedTreats({ treats }: { treats: JournalEvent[] }) {
 export default function LogForm({
   form,
   healthType: startHealthType,
+  quick,
   event,
   done,
   sessionTreats = [],
@@ -284,9 +294,11 @@ export default function LogForm({
   const [repeatEvery, setRepeatEvery] = useState("1");
   const [repeatUnit, setRepeatUnit] = useState<RepeatUnit>("week");
 
-  // Potty: nothing is preselected for What (TEC-199); a save without one is refused.
+  // Potty: nothing is preselected for What (TEC-199) unless a Pee or Poop pill opened it; a save without one is refused.
   const p = event?.kind === "potty" ? asPotty(event) : null;
-  const [what, setWhat] = useState<PottyWhat | "">(p?.what ?? "");
+  const quickPotty = !event && quick?.form === "potty" ? quick : null;
+  const quickFood = !event && quick?.form === "food" ? quick : null;
+  const [what, setWhat] = useState<PottyWhat | "">(p?.what ?? quickPotty?.what ?? "");
   const [where, setWhere] = useState(p?.where ?? (event?.kind === "exercise" ? asExercise(event).where : "outside"));
   // Leashed by default. An outside entry from before the pick existed opens
   // with nothing picked, so a correction never invents one.
@@ -301,13 +313,16 @@ export default function LogForm({
 
   // Food
   const f = event?.kind === "food" ? asFood(event) : null;
-  const firstFoodType: FoodType = f?.type ?? "meal";
+  // The Treats button opens Food on a treat (TEC-186); the meal/treat choice stays in the form.
+  const firstFoodType: FoodType = f?.type ?? (quickFood?.type === "treat" ? "treat" : "meal");
   const [foodType, setFoodType] = useState<FoodType>(firstFoodType);
-  const [itemId, setItemId] = useState(f?.item_id ?? defaultFood(firstFoodType, remembered, foods));
+  const [itemId, setItemId] = useState(f?.item_id ?? quickFood?.itemId ?? defaultFood(firstFoodType, remembered, foods));
   // An amount from the ⅛ scroller (TEC-136). The amount it opened on stays on
   // the list even when it is not an eighth (an older 1/3), so an untouched
   // correction keeps it.
-  const [amount, setAmount] = useState<number | null>(f ? f.amount : defaultAmount(firstFoodType, remembered));
+  const [amount, setAmount] = useState<number | null>(
+    f ? f.amount : quickFood?.itemId ? quickFood.amount : defaultAmount(firstFoodType, remembered)
+  );
   const [openedAmount] = useState(amount);
   // "Add a food…" (TEC-191): the inline form under What. It never becomes the pick; the new food does.
   const [addingFood, setAddingFood] = useState(false);
@@ -719,7 +734,7 @@ export default function LogForm({
   );
   const issueSelect = hasIssue && (
     <Field label="Related issue" htmlFor="f-issue">
-      <select id="f-issue" value={issue} onChange={(e) => setIssue(e.target.value)} className={input}>
+      <select id="f-issue" value={issue} onChange={(e) => setIssue(e.target.value)} className={inputFull}>
         <option value="">None</option>
         {issueOptions.map((o) => (
           <option key={o.id} value={o.id}>
@@ -744,7 +759,7 @@ export default function LogForm({
             setDogError(null);
           } else setDogPick(e.target.value);
         }}
-        className={input}
+        className={inputFull}
       >
         <option value={DOGS_NONE}>None</option>
         {keptDogs && <option value={DOGS_KEPT}>{keptLabel}</option>}
@@ -794,16 +809,17 @@ export default function LogForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-2" noValidate>
-      {/* Box 1: When and Logging as, on one line (TEC-199). */}
+      {/* Box 1: When and Logging as, on one line (TEC-199). When is as wide as its label ("Now", "Tue 8:00 AM"),
+          not half the row, and both boxes are the same 44px tall (TEC-202). */}
       <Box section="when" label="When and who">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+        <div className="flex items-start gap-2">
           <Field label="When" htmlFor="f-when">
             {/* The native control is wider than half a phone and pushed into
                 Logging as, so a short label shows instead. The real input sits over
                 it, transparent: a tap opens the phone's own picker, and focus,
                 screen readers and keyboard editing still reach the input. */}
-            <div className="relative min-h-[44px] min-w-0 rounded-[10px] border border-line bg-surface focus-within:border-accent">
-              <span aria-hidden="true" className="block truncate px-2 py-2.5 text-[15px] tabular-nums">
+            <div className="relative h-[44px] min-w-0 rounded-[10px] border border-line bg-surface focus-within:border-accent">
+              <span aria-hidden="true" className="block truncate px-2 text-[15px] leading-[42px] tabular-nums">
                 {dateOnly
                   ? dateLabel(day, new Date()) || "Pick a date"
                   : !editing && !whenTouched
@@ -835,7 +851,7 @@ export default function LogForm({
               id="f-who"
               value={personId}
               onChange={(e) => setPersonId(e.target.value)}
-              className={input}
+              className={`${input} h-[44px]`}
               style={{ width: nameBoxWidth(people.map((p) => p.display_name)) }}
             >
               <option value="">Nobody</option>
@@ -951,7 +967,7 @@ export default function LogForm({
                       setFoodError(null);
                     } else setItemId(e.target.value);
                   }}
-                  className={input}
+                  className={inputFull}
                 >
                   {/* A retired item stays selectable on the entry that already has it. */}
                   {(item && !picklist(foodType, foods).includes(item) ? [item, ...picklist(foodType, foods)] : picklist(foodType, foods)).map((o) => (
@@ -962,7 +978,9 @@ export default function LogForm({
                   <option value={FOOD_ADD}>Add a food…</option>
                 </select>
               </Field>
-              <Field label={amountUnit ? `Amount (${amountUnit})` : "Amount"} htmlFor="f-amount" className="shrink-0">
+              <Field label="Amount" htmlFor="f-amount" className="shrink-0">
+                {/* Just the box, and the unit as a small word beside it (TEC-202), so the column is no wider than the box. */}
+                <div className="flex items-start gap-1">
                 {foodType === "treat" ? (
                   <TreatQty id="f-amount" label={amountUnit ? `Amount in ${amountUnit}` : "Amount"} value={amount} onChange={setAmount} />
                 ) : (
@@ -974,6 +992,8 @@ export default function LogForm({
                     onChange={setAmount}
                   />
                 )}
+                  {amountUnit && <span className="pt-2.5 text-[13px] text-ink-soft">{amountUnit}</span>}
+                </div>
               </Field>
             </div>
             {addingFood && (
@@ -991,12 +1011,12 @@ export default function LogForm({
                     }}
                     maxLength={60}
                     placeholder="Food name"
-                    className={input}
+                    className={inputFull}
                   />
                 </Field>
                 <div className="flex items-start gap-2">
                   <Field label="Unit" htmlFor="f-food-unit">
-                    <select id="f-food-unit" value={foodUnit} onChange={(e) => setFoodUnit(e.target.value as FoodUnit)} className={input}>
+                    <select id="f-food-unit" value={foodUnit} onChange={(e) => setFoodUnit(e.target.value as FoodUnit)} className={inputFull}>
                       {FOOD_UNITS.map((u) => (
                         <option key={u} value={u}>
                           {u}
@@ -1014,7 +1034,7 @@ export default function LogForm({
                         if (e.key === "Enter") void addFood(e);
                       }}
                       placeholder="Off the label"
-                      className={input}
+                      className={inputFull}
                     />
                   </Field>
                 </div>
@@ -1069,7 +1089,7 @@ export default function LogForm({
                       multiple
                       value={commands}
                       onChange={(e) => setCommands(Array.from(e.target.selectedOptions, (o) => o.value as CommandId))}
-                      className={input}
+                      className={inputFull}
                     >
                       {COMMANDS.map(([id, text]) => (
                         <option key={id} value={id}>
@@ -1120,7 +1140,7 @@ export default function LogForm({
             {healthType !== "medication" && (
               /* One plain select, like Other dogs (TEC-139); the detail goes in the note. */
               <Field label={healthType === "vet" ? "Why" : "What"} htmlFor="f-reason">
-                <select id="f-reason" value={reason} onChange={(e) => setReason(e.target.value)} className={input}>
+                <select id="f-reason" value={reason} onChange={(e) => setReason(e.target.value)} className={inputFull}>
                   <option value="">Pick one…</option>
                   {keptReasons && h?.type === healthType && (
                     <option value={HEALTH_KEPT}>{keptReasons.map((id) => healthReasonLabel(healthType, id)).join(", ")}</option>
@@ -1171,11 +1191,11 @@ export default function LogForm({
                           }}
                           maxLength={60}
                           placeholder="Medication name"
-                          className={input}
+                          className={inputFull}
                         />
                       </Field>
                       <Field label="Unit" htmlFor="f-med-new-unit">
-                        <select id="f-med-new-unit" value={newMedUnit} onChange={(e) => setNewMedUnit(e.target.value as MedUnit)} className={input}>
+                        <select id="f-med-new-unit" value={newMedUnit} onChange={(e) => setNewMedUnit(e.target.value as MedUnit)} className={inputFull}>
                           {MED_UNITS.map((u) => (
                             <option key={u} value={u}>
                               {u}
@@ -1218,7 +1238,7 @@ export default function LogForm({
                           const m = findMedication(medications, e.target.value);
                           if (m) setMedUnit(m.unit);
                         }}
-                        className={input}
+                        className={inputFull}
                       >
                         <option value="">Pick one…</option>
                         {/* A retired medication stays selectable on the dose that already has it. */}
@@ -1329,7 +1349,7 @@ export default function LogForm({
             required={kind === "health" && healthType !== "medication"}
             aria-required={kind === "health" && healthType !== "medication" ? "true" : undefined}
             placeholder={kind === "health" && healthType !== "medication" ? "What happened?" : "Optional"}
-            className={`${input} block resize-none overflow-y-auto leading-snug`}
+            className={`${inputFull} block resize-none overflow-y-auto leading-snug`}
           />
         </Field>
       </div>

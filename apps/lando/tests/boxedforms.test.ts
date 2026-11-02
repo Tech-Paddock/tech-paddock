@@ -152,7 +152,7 @@ describe("Food", () => {
     for (const t of ["Meal", "Snuffle mat", "Treat"]) expect(entry).toContain(t);
     expect(entry.indexOf("Type")).toBeLessThan(entry.indexOf("What"));
     expect(entry.indexOf("What")).toBeLessThan(entry.indexOf("Amount"));
-    expect(entry).toContain("max-width:52px");
+    expect(entry).toContain("max-width:44px"); // narrowed again by TEC-202
   });
 });
 
@@ -474,26 +474,22 @@ describe("the Log screen", () => {
     expect(html).not.toContain("Upcoming</button>");
     expect(html).not.toContain("What&#x27;s new");
   });
-  it("has the six buttons, Potty first, and no Treats button", () => {
+  it("has the four buttons Treats, Training, Weight, Health (TEC-202 put them back; no Potty, Food or Fun button)", () => {
     const log = html.slice(at(html, 'aria-label="Log"'), at(html, 'for="who"'));
     const labels = [...log.matchAll(/<b[^>]*>([^<]+)<\/b>/g)].map((m) => m[1]);
-    expect(labels).toEqual(["Potty", "Food", "Training", "Fun", "Weight", "Health"]);
-    expect(log).not.toContain("Treats");
+    expect(labels).toEqual(["Treats", "Training", "Weight", "Health"]);
   });
-  it("shows the pills but does not make them tappable", () => {
+  it("shows the four pills as plain boxes until the journal loads, then each is a button that opens a quick log (TEC-202)", () => {
     const pills = html.slice(at(html, 'aria-label="Since last"'), at(html, 'aria-label="Log"'));
     expect(pills).not.toContain("<button");
-    expect(pills).not.toContain("tap to log");
     for (const l of ["Pee", "Poop", "Meals", "Fun"]) expect(pills).toContain(l);
+    const journal = readFileSync(resolve(__dirname, "../app/Journal.tsx"), "utf8");
+    expect(journal).toContain("quickLog(c, clocks.food, foods)");
+    expect(journal).toContain("setOpen({ form: tap.form, quick: tap })");
   });
   it("has an Upcoming filter in the feed's Show only row", () => {
     const filter = html.slice(at(html, 'aria-label="Show only"'));
     expect(filter.indexOf("Health")).toBeLessThan(filter.indexOf("Upcoming"));
-  });
-  it("no longer has the quick-log wiring (TEC-181 is retired)", () => {
-    const events = readFileSync(resolve(__dirname, "../lib/events.ts"), "utf8");
-    expect(events).not.toContain("export function quickLog");
-    expect(events).not.toContain("TREAT_QUICK_LOG");
   });
 });
 
