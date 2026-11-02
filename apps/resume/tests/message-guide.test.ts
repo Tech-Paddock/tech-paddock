@@ -112,6 +112,54 @@ describe("the message guide", () => {
     for (const s of severities) expect(SEVERITY_GUIDE).toHaveProperty(s);
   });
 
+  /** TEC-168: two cases the guide got wrong. */
+  describe("a Summary the template has no slot for", () => {
+    const noSlot: VerdictInput = {
+      coverage: { missing: ["Operations lead with a representative record."] },
+      findings: [],
+      changeLog: [
+        { section: "Summary", action: "not-found-in-input", lines: ["Operations lead with a representative record."] },
+      ],
+    };
+
+    it("fails as a missing line and never says the source left the section empty", () => {
+      const v = verdictFor(noSlot);
+      expect(v.pass).toBe(false);
+      expect(v.reasons.some((s) => s.includes(guideEntry("missing").reads))).toBe(true);
+      expect(v.notes.join(" ")).not.toMatch(/did not fill/);
+    });
+
+    it("still reads as an empty section when the source really had none", () => {
+      const v = verdictFor(one("not-found-in-input", "Summary"));
+      expect(v.notes.some((s) => s.includes(guideEntry("section-empty").reads))).toBe(true);
+    });
+
+    it("is named among the causes of a missing line", () => {
+      expect((guideEntry("missing").causes ?? []).some((c) => /Summary/.test(c))).toBe(true);
+    });
+  });
+
+  describe("a surplus Career Highlight", () => {
+    const surplus: VerdictInput = {
+      ...clean,
+      changeLog: [
+        { section: "Career Highlights", action: "replaced" },
+        { section: "Career Highlights", action: "input-dropped", lines: ["31%", "Invented outcome."] },
+      ],
+    };
+
+    it("fails with the wording the input-dropped entry reads", () => {
+      const v = verdictFor(surplus);
+      expect(v.pass).toBe(false);
+      expect(v.reasons.some((s) => s.includes(guideEntry("input-dropped").reads))).toBe(true);
+    });
+
+    it("is explained by the input-dropped entry, which no longer says only whole sections", () => {
+      const entry = guideEntry("input-dropped");
+      expect(`${entry.means} ${(entry.causes ?? []).join(" ")} ${entry.check}`).toMatch(/Career Highlights/);
+    });
+  });
+
   it("covers the panels a person reads on Diagnostics", () => {
     expect(PANEL_GUIDE.map((g) => g.key)).toEqual(["not-carried-across", "ats-check", "no-verdict"]);
   });

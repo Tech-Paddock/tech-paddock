@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
  *
  * The template is a deliverable in its own right: it doubles as the
  * general-purpose resume to hand someone when there is no specific job. That is
- * why the original bytes are kept rather than only the extracted spec, and this
+ * why the original bytes are kept, and this
  * is the route that makes keeping them useful. An archived template still
  * downloads — archiving hides it from the list, it does not retire the file.
  */

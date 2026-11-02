@@ -28,7 +28,7 @@ const para = (text: string) => ({ type: "p" as const, raw: `<w:p><w:r><w:t>${tex
 const texts = (blocks: Block[]) => blocks.map((b) => extractText(b.raw).trim()).filter(Boolean);
 
 /**
- * Core Competencies is the section `CLAUDE.md`'s one-table rule actually costs
+ * Core Competencies is the section `RULES.md`'s one-table rule actually costs
  * something to obey, so the template's table was flattened into `Label:⇥items`
  * paragraphs and the renderer had to learn the shape.
  *

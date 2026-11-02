@@ -11,7 +11,7 @@ import type { Para } from "./paragraphs";
  * its five jobs as five sibling sections, because its rule was run size alone and
  * the template's headings and entry lines are both 11pt.
  *
- * That is the drift `CLAUDE.md` names: one fact with three homes, and no way to
+ * That is the drift `RULES.md` names: one fact with three homes, and no way to
  * fix it once. It is one home now.
  */
 

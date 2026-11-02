@@ -14,6 +14,13 @@ Current state and traps. Rules are in `RULES.md`; open work is in Linear under `
   verdict. `tests/message-guide.test.ts` runs `verdictFor` per category, so a new action, a note
   that starts failing, or a reworded verdict phrase (`reads`) fails it. The rail scrolls inside
   itself on desktop (`lg:max-h`) so the open guide never hides under the sticky edge.
+- A source Summary with no summary paragraph in the template is `not-found-in-input` with `lines`.
+  It fails through `coverage.missing`; the verdict skips the "source did not fill" note for any
+  `not-found-in-input` entry that carries `lines`. A surplus Career Highlight is `input-dropped`;
+  its guide entry covers both that and a whole unmatched section.
+- ATS lint also warns `bullet_glyph` (`oddBulletGlyphs`): a bullet level a paragraph actually uses
+  that is a picture or set in Wingdings/Webdings. Symbol, "•", "-" and "–" pass. Never blocks; the
+  flat template audits clean.
 - Resumes is one list (`/api/resumes`), filtered Template / Input / Output; a render is up to two
   rows sharing its id. Templates are added and activated there.
 - **Verdict FAIL:** a missing source line, a blocking ATS finding, `input-dropped`, or a section
@@ -24,12 +31,14 @@ Current state and traps. Rules are in `RULES.md`; open work is in Linear under `
   (`template_snapshot.findings`); Diagnostics lists each missing line from `coverage.missingDetail`.
 - A source heading with no section is `input-dropped`; its text is in `unplacedSections[].texts`.
 - Career Highlights cells that do not pair as one metric and one description are `input-not-read`.
+- The "Reopened:" line under the ATS check shows only on a reopened render (`reopened`, set by the
+  client in `openRender`), not on every result without bytes, which a fresh FAIL also is.
 - *Open* reopens a render from its stored record, never a re-render. An unreadable record is NO
   VERDICT (`lib/storedRender.ts`).
 - `templates.spec` is nullable and unused. Activation is one transaction,
   `resume.activate_template`.
 - No tracker. The `tracker` schema and `renders.thread_id` are dropped, and
-  `tests/no-tracker.test.ts` keeps them out; a render records only `submitted_at`, set by **Mark as sent**
+  `tests/no-tracker.test.ts` keeps them out, and holds no client for `shared` either; a render records only `submitted_at`, set by **Mark as sent**
   (`PATCH /api/renders/[id]`, which takes nothing else). The Resumes list shows no company or stage.
 - Next.js 16, React 19, `proxy.ts` on the Node runtime. Route handlers await `params`; tests pass
   `Promise.resolve({ id })`. No route opts into a cache.

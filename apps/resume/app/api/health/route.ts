@@ -55,6 +55,6 @@ const probes: Record<string, () => Promise<Omit<Check, "name">>> = {
     if (error) return { ok: false, detail: error.message };
     return data
       ? { ok: true, detail: `${data.name} (v${data.version})` }
-      : { ok: false, detail: "none set — upload one on the Templates tab" };
+      : { ok: false, detail: "none set — upload one on the Resumes tab" };
   },
 };
