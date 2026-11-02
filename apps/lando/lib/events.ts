@@ -196,6 +196,8 @@ export type ExerciseDetails = {
   /** Storage paths of photos (TEC-139), 1 to MAX_PHOTOS; no key when there are none. Same bucket and path as Health's. */
   photos?: string[];
   names?: Record<string, string>;
+  /** Training only (TEC-208): the id of a note from the Notes tab, possibly a superseded copy; `resolveNote` finds the live one. */
+  note_id?: string;
 };
 
 /** A friend's dog, from `lando.dogs`. Names live in the database, never in the repo. */
@@ -440,6 +442,8 @@ export type HealthDetails = {
   names?: Record<string, string>;
   /** A vet visit or a medication dose (TEC-142, TEC-199): the id of the Health issue event it relates to; `resolveIssue` finds the live one. */
   issue?: string;
+  /** Any health type (TEC-208): the id of a note from the Notes tab, possibly a superseded copy; `resolveNote` finds the live one. */
+  note_id?: string;
 };
 
 /** A note (TEC-204): free text, 1 to NOTE_MAX characters, and the same attachments as every other kind. */
@@ -888,6 +892,27 @@ export function issueLinkText(events: JournalEvent[], id: string): string {
   return `re: ${issuePick(link.event)}, ${shortDate(link.event.at)}`;
 }
 
+/* ── Linking to a note (TEC-208) ─────────────────────────────────────────── */
+
+const isNoteEvent = (e: Pick<JournalEvent, "kind" | "details">) => e.kind === "note";
+
+/**
+ * Follow a note link through the `voids` chain to the live version of the note, the way an issue link is
+ * followed. `events` must hold the notes and the voids (the whole read, not the Log's `withoutNotes`). Pure.
+ */
+export function resolveNote(events: JournalEvent[], id: string): Link {
+  return followLink(linkIndex(events), id, isNoteEvent);
+}
+
+/**
+ * The server's check on a note link: the id must be a note event. It may be a voided one, since a note
+ * corrected after it was linked leaves the old id behind. `target` is the row with that id, or null.
+ * Throws `InvalidEvent`.
+ */
+export function checkNoteTarget(target: Pick<JournalEvent, "kind" | "details"> | null): void {
+  if (!target || !isNoteEvent(target)) throw new InvalidEvent("that note doesn't exist — reload");
+}
+
 /** How many recent issues the Related issue select lists. */
 export const ISSUE_CHOICES_MAX = 20;
 
@@ -1233,6 +1258,13 @@ function parseIssue(raw: unknown): string | undefined {
   return raw.toLowerCase();
 }
 
+/** A linked note's id, lowercased; none is undefined (no key). That it is a note is the server's check (`checkNoteTarget`). */
+export function parseNoteId(raw: unknown): string | undefined {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  if (!isUuid(raw)) throw new InvalidEvent("the related note must be one from the list");
+  return raw.toLowerCase();
+}
+
 /** A weight's linked vet visit id, lowercased; none is undefined (no key). That it is a vet visit is the server's check (`checkVisitTarget`). */
 function parseVisit(raw: unknown): string | undefined {
   if (raw === undefined || raw === null || raw === "") return undefined;
@@ -1312,6 +1344,8 @@ function medicationDetails(r: Record<string, unknown>, meds: readonly Medication
   } as HealthDetails;
   const issue = parseIssue(r.issue);
   if (issue) out.issue = issue;
+  const noteId = parseNoteId(r.note_id);
+  if (noteId) out.note_id = noteId;
   Object.assign(out, parseAttachments(r));
   return out;
 }
@@ -1396,6 +1430,11 @@ export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood
           out.dogs = ids;
         }
       }
+      const noteId = parseNoteId(r.note_id);
+      if (noteId) {
+        if (type !== "training") throw new InvalidEvent("only a training session links to a note");
+        out.note_id = noteId;
+      }
       Object.assign(out, parseAttachments(r));
       return out;
     }
@@ -1438,6 +1477,8 @@ export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood
         if (type !== "vet") throw new InvalidEvent("only a vet visit links to an issue");
         out.issue = issue;
       }
+      const noteId = parseNoteId(r.note_id);
+      if (noteId) out.note_id = noteId;
       Object.assign(out, parseAttachments(r));
       return out;
     }

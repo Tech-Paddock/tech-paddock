@@ -73,6 +73,25 @@ describe("lando.details_ok only widens", () => {
     }
   });
 
+  it("allows the note link (TEC-208) on every health type and on training, and on nothing else", () => {
+    const newest = fnBody(all.at(-1)![1]);
+    const branch = (kind: string, next: string) => newest.slice(newest.indexOf(`WHEN '${kind}' THEN`), newest.indexOf(`WHEN '${next}' THEN`));
+    const listing = (b: string) => [...b.matchAll(/ARRAY\[([^\]]*)\]/g)].filter((m) => quoted(m[1]).includes("note_id"));
+    // Health: the medication branch and the vet / issue branch both list it; so does exercise, which gates it on training.
+    expect(listing(branch("health", "note"))).toHaveLength(2);
+    const exercise = branch("exercise", "weight");
+    expect(listing(exercise)).toHaveLength(1);
+    expect(exercise).toMatch(/details \? 'note_id' THEN\s+details ->> 'type' = 'training'/);
+    // No other kind takes it.
+    for (const [kind, next] of [["potty", "food"], ["food", "exercise"], ["weight", "health"], ["note", "void"]]) {
+      expect(branch(kind, next), kind).not.toContain("note_id");
+    }
+    // It is a uuid string, checked like `issue`: one check for each of the three places.
+    expect(newest.match(/details ->> 'note_id' ~\* '\^\[0-9a-f\]\{8\}/g)).toHaveLength(3);
+    // The body before it had no such key: this migration is what adds it.
+    expect(all.find(([f]) => f.endsWith("_lando_notes.sql"))![1]).not.toContain("note_id");
+  });
+
   it("fails a narrowed copy: a body taken from an older file, or one with a value removed", () => {
     const newest = all.at(-1)![1];
     const vetWeight = all.find(([f]) => f.endsWith("_lando_vet_weight.sql"))![1];

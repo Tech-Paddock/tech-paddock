@@ -85,8 +85,9 @@ describe("section order per form", () => {
     ["Training", "training", {}, ORDER],
     ["Fun", "fun", {}, ORDER],
     ["Vet visit", "health", { healthType: "vet" }, ORDER],
-    ["Medical issue", "health", { healthType: "issue" }, ["when", "entry", "note", "photos", "save"]],
-    ["Medication", "health", { healthType: "medication" }, ["when", "entry", "note", "photos", "save"]],
+    // Every Health type has the secondary box now: the Related note (TEC-208).
+    ["Medical issue", "health", { healthType: "issue" }, ORDER],
+    ["Medication", "health", { healthType: "medication" }, ORDER],
     // Photos and files are on every form (TEC-203).
     ["Food", "food", {}, ["when", "entry", "note", "photos", "save"]],
     ["Weight", "weight", {}, ["when", "entry", "note", "photos", "save"]],
@@ -238,14 +239,15 @@ describe("Medication", () => {
     expect(type.indexOf("Medical issue")).toBeLessThan(type.indexOf("Medication"));
   });
 
-  it("lays out Medication, Dose and Unit on one line, then Given, then For a medical issue", () => {
+  it("lays out Medication, Dose and Unit on one line, then Given, then Related issue", () => {
     const html = render("health", { healthType: "medication" });
     const entry = html.slice(at(html, 'data-section="entry"'), at(html, 'data-section="note"'));
     expect(entry.indexOf("Medication")).toBeLessThan(entry.indexOf("Dose"));
     expect(entry.indexOf("Dose")).toBeLessThan(entry.indexOf("Unit"));
     expect(entry.indexOf("Unit")).toBeLessThan(entry.indexOf("Given"));
     for (const [, label] of MED_ROUTES) expect(entry).toContain(label);
-    expect(entry.indexOf("Given")).toBeLessThan(entry.indexOf("For a medical issue"));
+    expect(entry.indexOf("Given")).toBeLessThan(entry.indexOf("Related issue"));
+    expect(entry).not.toContain("For a medical issue");
     expect(entry).toContain("Add a medication…");
     expect(entry).toContain("Test Tablet");
     expect(entry).not.toContain("Old Syrup"); // retired: off the list

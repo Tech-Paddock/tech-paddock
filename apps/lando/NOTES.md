@@ -90,8 +90,8 @@
 - **Every form is boxed and compact** (TEC-199, `app/LogForm.tsx`; the order is held by `tests/boxedforms.test.ts` through
   `data-section`): **Box 1** When and Logging as on one line (the form's old "Human" label; When is as wide as its label, "Now" or "Tue 8:00 AM", both boxes exactly 44px tall), with the future line and Repeat under
   them when the When is in the future; **Box 2**, the entry; **Box 3**, the secondary things (Potty: the treat count then
-  Medical issue on one line; Training and Fun: the treat count, and Fun's Pee/Poop buttons; Vet visit: Medical issue; none on Food,
-  Weight, Medical issue or Medication); then **Note** (a full-width `<textarea>`, two rows, scrolling past two; required for a vet
+  Medical issue checkbox on one line; Training and Fun: the treat count, and Fun's Pee/Poop buttons; **Health, every type
+  (TEC-208): a vet visit's Related issue, then Related note; Training: Related note after the treat count**; none on Food and Weight); then **Note** (a full-width `<textarea>`, two rows, scrolling past two; required for a vet
   visit or an issue, optional elsewhere), **Attachments** under it on every form (TEC-203), and Save
   last. Per form, Box 2: *Potty* What (Pee, Poop, Both, No potty; **nothing preselected, and a save without one is refused**) ·
   Where with Leash (outside) or Spot (inside) on one line · Time outside (outside). *Food* Type (Meal, Snuffle mat, Treat) · What
@@ -118,7 +118,7 @@
   `note`. Feed: "Vet visit  Check-up · 2 photos" with up to four 40px thumbnails and the note after it; the chip is Health.
   Analytics and the since-last pills ignore it.
 - **Medication** (TEC-199, `lib/medications.ts`): a Health entry of Type Medication, one dose. Its Box 2 is **Medication (a pick
-  list), Dose and Unit on one line**, **Given** (By mouth, On skin, Ear/eye, Shot; opens on By mouth), and **For a medical issue**
+  list), Dose and Unit on one line**, **Given** (By mouth, On skin, Ear/eye, Shot; opens on By mouth), and **Related issue** (always shown, TEC-208)
   (the same checkbox and select as a vet visit's). Stored shape `{type: 'medication', med_id, med_name, dose, unit, route, issue?,
   photos?}`: **no `reasons` key**; `med_name` is a snapshot taken by the server from the medication (the phone's is ignored,
   like a food's), `dose` is above 0 and at most `DOSE_MAX` (10 000), `unit` one of `MED_UNITS` (mg, ml, g, tablet, chew, capsule,
@@ -233,22 +233,40 @@
   and the time-since value stay. The title starts with the label and then "Last meal at ..."; the label is the
   visible text, so screen readers get it too. The label may wrap at the dot (the other pills' labels still
   truncate). Trap: it is the one pill whose label is not a constant; do not read `CLOCK_LABELS.food` for its face.
-- **Related issue** (TEC-142), on **Potty** and on a **vet visit** (not on a medical issue), behind a
-  **Medical issue** checkbox (TEC-161): unticked, the select is hidden and no `issue` is saved;
-  ticked, a plain `<select>` of None and the newest 20 live medical issues, labelled by date and pick ("Oct 24 ·
+- **Related issue** (TEC-142), on **Potty**, a **vet visit** and a **medication dose** (not on a medical issue). **Potty** keeps its
+  **Medical issue** checkbox (TEC-161, the owner chose it to stay at TEC-208): unticked, the select is hidden and no `issue` is
+  saved. **Health has no checkbox since TEC-208:** the select always shows (a vet visit in Box 3, a dose in Box 2 after Given),
+  opening on None, and None saves no `issue`; a correction with a stored link opens on it. The select is a plain `<select>` of None and the newest 20 live medical issues, labelled by date and pick ("Oct 24 ·
   Stomach & appetite", `issueChoices`). Stored as an optional `issue` (the linked event's id) in
   details. A link is an id, and a correction creates a new event, so it is **resolved when read**
   (`resolveIssue`, pure): follow the `voids` chain to the live version; a chain that ends in a
   delete is `removed`; an id no event read holds is `unknown`. The feed reads "re: Stomach &
   appetite, Oct 24" (the live version's first pick and date), "removed issue" for a deleted one, and
   "re: earlier issue" for an unknown one (an issue older than the read's 30 days whose correction
-  was not read). A correction with a stored link opens ticked on it and keeps it unless it is changed;
-  unticking it and saving removes the link (a new event, as any correction);
+  was not read). A correction with a stored link opens on it (Potty: ticked) and keeps it unless it is changed;
+  choosing None (Potty: unticking) and saving removes the link (a new event, as any correction);
   when the list would not show it (a superseded copy, a deleted or an old issue) `issueChoices`
   adds it as the first option, so an untouched correction saves it unchanged. The **server refuses a
   link to an id that is not a Health issue event** (`writeEvent` -> `checkIssueTarget`, the dogs
   check's twin), voided copies included, since an old link may name a superseded one. Changing
   an issue's pick or note never touches the entries that link to it.
+- **Related note** (TEC-208, the owner: "a lookup to notes so we can associate a note with a form"), on **every Health type**
+  (vet visit, medical issue, medication) and on **Training** (not Fun, Potty, Food or Weight, and not a future entry, which
+  keeps no links): a plain `<select>` in Box 3, **Related note**, of None and the newest 20 live notes (`noteChoices` in
+  `lib/notes.ts`), each labelled by date and the note's first words ("Oct 28 · Breeder sent the pedigree papers", `noteLabel`:
+  40 characters cut at a word, "…" when cut). It opens on None. Stored as an optional **`note_id`** (the note event's id) in
+  `health` details and in `exercise` details when the type is `training`; None saves no key (`noteLink`, parsed by `parseNoteId`).
+  A link is an id and a correction of the note is a new event, so it is resolved the way an issue link is (`resolveNote`,
+  `followLink`): a correction opens on the stored pick and keeps it unless changed or cleared (a new event, as any correction);
+  a superseded, deleted or older-than-the-list note is kept as the first option ("Oct 22 · <live words>", "Removed note",
+  "Earlier note"). **The server refuses an id that is not a note event** (`writeEvent` -> `checkNoteTarget`; a voided note
+  passes); `parseDetails` refuses `note_id` on a Training-less exercise ("only a training session links to a note") and ignores
+  it for kinds that take none. **Notes stay off the Log (TEC-204): the link is not in the feed, the pills or Analytics**, and
+  `describe` ignores it. **Trap:** the form's `events` prop is the Log's read (`entries`, no notes); the lookup reads the
+  separate `allEvents` prop (`loaded.events`: notes and voids). A new place that opens `LogForm` must pass both, or the
+  select lists no notes. **The database:** migration `lando_note_links` (a `note_id` check on `health`, all types, and on
+  `exercise` when `type` is `training`, in `lando.details_ok`; nothing else; `tests/details-ok-superset.test.ts` reads it).
+  Without the migration a save with a note link fails with a 503 and an entry without one is unaffected.
 - **A vet visit's Weight** (TEC-151), on **Vet visit** only (not Medical issue): an optional Weight
   and Unit under Related issue. A new visit opens it empty, in this phone's last weight unit
   (`remembered.unit`, else the newest weight's). A filled one is **its own ordinary weight entry**:
@@ -502,7 +520,7 @@
 - **Photos sit below the Note** (TEC-172) on Potty, Fun and Training: `LogForm` renders one
   `PhotoPicker` after the shared Note field (When and Human, then Note, then Photos), not inside each
   kind's block. Health keeps its own Note and then its Photos, as before.
-- **Potty's photos and Related issue** (TEC-142): below Leash and Spot, the Medical issue checkbox and its select; the
+- **Potty's photos and Related issue** (TEC-142): below Leash and Spot, the Medical issue checkbox and its select (Potty keeps the checkbox, TEC-208); the
   same Photos block as Health, Fun and Training (Take photo, Attach, Save waits for each,
   `missingPhotos` backs it) comes after the Note; stored as optional `photos` on the potty details. Feed: "Poop"
   "accident, inside · re: Stomach & appetite, Oct 24 · 1 photo" with the thumbnails. The note stays optional.

@@ -7,8 +7,9 @@
  * since-last pills, not in the meal and weight reads, and not in Analytics. Everything that reads the journal
  * for those is handed `withoutNotes(events)`.
  */
-import { liveEvents, newestFirst, type JournalEvent, type NoteDetails } from "./events";
+import { liveEvents, newestFirst, resolveNote, type JournalEvent, type NoteDetails } from "./events";
 import { isFutureWhen } from "./future";
+import { shortDate } from "./localtime";
 
 /** The events with every note taken out: what the Log tab and Analytics read. A void is kept (it may void an entry). */
 export function withoutNotes(events: readonly JournalEvent[]): JournalEvent[] {
@@ -47,4 +48,37 @@ export function mayOverflow(text: string, charsPerLine = 40): boolean {
 export function noteText(e: Pick<JournalEvent, "details">): string {
   const t = (e.details as Partial<NoteDetails>).text;
   return typeof t === "string" ? t : "";
+}
+
+/** How many recent notes the Related note select lists. */
+export const NOTE_CHOICES_MAX = 20;
+/** How many characters of a note's words label its option. */
+export const NOTE_LABEL_CHARS = 40;
+
+/** A note's first words as an option label: line breaks as spaces, cut at a word where it can be, "…" when cut. */
+export function noteLabel(e: Pick<JournalEvent, "at" | "details">): string {
+  const words = noteText(e).replace(/\s+/g, " ").trim();
+  const head = words.length <= NOTE_LABEL_CHARS ? words : `${words.slice(0, NOTE_LABEL_CHARS).replace(/\s+\S*$/, "") || words.slice(0, NOTE_LABEL_CHARS)}…`;
+  return `${shortDate(e.at)} · ${head || "Note"}`;
+}
+
+/**
+ * The Related note select's options (TEC-208): the newest live notes, labelled by date and first words
+ * ("Oct 24 · Ask the vet about the…"). `events` is the whole read, notes and voids included. When the entry
+ * being corrected already links somewhere the list would not show (a superseded copy, a deleted note, an old
+ * one), that link is kept as an extra first option so an untouched correction keeps it. `current` is the stored id.
+ */
+export function noteChoices(events: readonly JournalEvent[], current: string | null): { id: string; label: string }[] {
+  const live = liveNotes(events)
+    .slice(0, NOTE_CHOICES_MAX)
+    .map((e) => ({ id: e.id, label: noteLabel(e) }));
+  if (!current || live.some((c) => c.id === current)) return live;
+  const link = resolveNote([...events], current);
+  const label = link.state === "removed" ? "Removed note" : link.state === "unknown" ? "Earlier note" : noteLabel(link.event);
+  return [{ id: current, label }, ...live];
+}
+
+/** What a form adds to its details for a note pick: the key, or nothing for None. */
+export function noteLink(noteId: string): { note_id?: string } {
+  return noteId ? { note_id: noteId } : {};
 }

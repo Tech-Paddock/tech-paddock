@@ -1046,6 +1046,7 @@ export default function Journal() {
             onAddMedication={addMedication}
             phonePerson={person?.id ?? null}
             events={entries}
+            allEvents={loaded?.events}
             photoUrls={photoUrls}
             onPhotoUrl={rememberPhotoUrl}
             remembered={remembered}
