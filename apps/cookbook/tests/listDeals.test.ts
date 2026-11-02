@@ -117,10 +117,10 @@ describe("the surfaces", () => {
     const cart = read("../app/Cart.tsx");
     expect(cart).not.toMatch(/DealsPanel/);
     expect(cart).not.toMatch(/Scan for deals/);
-    // What stays: Take back (it is Clear cart now), and the connection. The live estimate is gone (TEC-190).
+    // What stays: Take back (it is Clear cart now, with one count confirm and no list, TEC-206), and the connection. The live estimate is gone (TEC-190).
     expect(cart).not.toMatch(/EstimatePanel/);
     expect(cart).not.toMatch(/\/api\/kroger\/estimate/);
-    expect(cart).toMatch(/TakeBackConfirm/);
+    expect(cart).toMatch(/async function clearCart/);
   });
 
   it("a list line's sale bubble now reads the nightly prices, not the weekly scan (TEC-196)", () => {

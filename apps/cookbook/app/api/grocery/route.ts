@@ -24,6 +24,8 @@ import { PRICE_WINDOW_NIGHTS, latestNights, priceLines, productFor, type LinePri
 import { lineDeals, type LineDeal } from "@/lib/lineDeal";
 import { FRESH_NIGHTS } from "@/lib/dealRows";
 import { HISTORY_WEEKS } from "@/lib/stoplight";
+import { readSends } from "@/lib/cartSends";
+import { heldByLine } from "@/lib/takeBack";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +89,22 @@ export async function GET() {
       priceError = e instanceof Error ? e.message : "Couldn't read the nightly prices.";
     }
 
+    // **The product an In cart line went in as** (TEC-206), from the ledger and Your brands,
+    // for "Used: …" and its Change link. Display only: a failed read leaves the lines without it.
+    const used = new Map<string, { product: string; size: string | null }>();
+    try {
+      const sent = items.filter((i) => i.sent_at !== null).map((i) => i.id);
+      if (sent.length > 0) {
+        const held = heldByLine(await readSends(sent));
+        for (const [id, h] of held) {
+          const saved = products.find((p) => p.product_id === h[0]?.upc);
+          if (saved) used.set(id, { product: saved.description ?? saved.names[0] ?? saved.product_id, size: saved.size });
+        }
+      }
+    } catch {
+      // The ledger is the truth for Take back; this is only a label.
+    }
+
     return NextResponse.json({
       store,
       priceError,
@@ -97,7 +115,7 @@ export async function GET() {
         // was only amounts. Display only; the stored line is not rewritten.
         const { quantity: _rule, ...view } = lineView(item, packOf(decision));
         // ★ / ? / + (TEC-135): what Send will do with it, said before Send.
-        return { ...item, ...linkFor(item.name, decision, item.note), view, mark: lineMark(decision), price: prices.get(item.id) ?? null, deal: deals.get(item.id) ?? null };
+        return { ...item, ...linkFor(item.name, decision, item.note), view, mark: lineMark(decision), price: prices.get(item.id) ?? null, deal: deals.get(item.id) ?? null, used: used.get(item.id) ?? null };
       }),
     });
   } catch (e) {
