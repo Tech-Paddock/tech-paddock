@@ -527,19 +527,25 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
    * before Kroger is asked and the recorded Pickup/Delivery choice goes with the negative
    * add (`lib/takeBack.ts`); a line Kroger refuses stays in the cart, and the result says so.
    */
-  async function takeBackRequest(ids: string[] | null): Promise<TakeBackResult> {
+  async function takeBackRequest(ids: string[] | null, clear = false): Promise<TakeBackResult & { refused: number }> {
     const response = await serial(() =>
       fetch("/api/kroger/cart/take-back", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm: true, ...(ids ? { ids } : {}) }),
+        body: JSON.stringify({ confirm: true, ...(ids ? { ids } : {}), ...(clear ? { clear: true } : {}) }),
       })
     );
     const body = await response.json();
     if (!response.ok) throw new Error(body.error ?? "Couldn't take back from the cart.");
     listChanged.current();
     void refreshCart(true);
-    return { outcomes: body.outcomes, summary: body.summary, recordError: body.recordError ?? null, failed: body.failed === true };
+    return {
+      outcomes: body.outcomes,
+      summary: body.summary ?? body.text,
+      recordError: body.recordError ?? null,
+      failed: body.failed === true,
+      refused: typeof body.refused === "number" ? body.refused : 0,
+    };
   }
 
   /** **Remove** one In cart line; the caller has asked "Take 1 out of the cart?". */
@@ -559,16 +565,19 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   }
 
   /**
-   * **Clear cart** (TEC-206): takes back every line in In cart, by negative quantities as
-   * Take back always has. The caller has asked "Clear the cart?"; there is no preview list
-   * and no step at King Soopers.
+   * **Clear cart** (TEC-206, TEC-210): sends a negative for every line in In cart, then clears
+   * every line whatever King Soopers answers. The caller has asked "Clear the cart?"; the
+   * answer is one toast (the server's words), with the cart page when Kroger refused any.
    */
   async function clearCart() {
     if (busy) return;
     setBusy("take-back");
     setResults(null);
+    setTakeBackResults(null);
     try {
-      setTakeBackResults(await takeBackRequest(null));
+      const done = await takeBackRequest(null, true);
+      if (done.refused > 0) toast.error(done.summary, { href: CHECKOUT_URL, label: "Check the King Soopers cart" });
+      else toast.notice(done.summary);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't clear the cart.");
     } finally {

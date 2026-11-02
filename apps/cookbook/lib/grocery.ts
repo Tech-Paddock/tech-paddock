@@ -133,6 +133,7 @@ export async function readList(): Promise<GroceryItem[]> {
   const { data, error } = await getServiceClient()
     .from("grocery_items")
     .select(COLUMNS)
+    .is("cleared_at", null)
     .order("checked", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -198,6 +199,17 @@ export async function markUnsent(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const { error } = await getServiceClient().from("grocery_items").update({ sent_at: null }).in("id", ids);
   if (error) throw new LookupError(`Couldn't mark those as no longer sent: ${error.message}`);
+}
+
+/**
+ * Clear cart (TEC-210): these lines leave the list, marked and not deleted, so
+ * the purchase and its `cart_sends` rows stay on record. `readList` skips them.
+ * Never un-set, and `sent_at` is kept.
+ */
+export async function markCleared(ids: string[], at: string): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await getServiceClient().from("grocery_items").update({ cleared_at: at }).in("id", ids);
+  if (error) throw new LookupError(`Couldn't clear those from the list: ${error.message}`);
 }
 
 export async function removeItems(ids: string[]): Promise<void> {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { heldByLine, summarizeTakeBack, takeBack, takeBackLines, type SendRow, type TakeBackDeps, type TakeBackLine } from "@/lib/takeBack";
+import { heldByLine, summarizeClear, summarizeTakeBack, unaskedOutcomes, takeBack, takeBackLines, type SendRow, type TakeBackDeps, type TakeBackLine } from "@/lib/takeBack";
 import { sentRows, type Outcome } from "@/lib/cart";
 import { KrogerError } from "@/lib/kroger";
 
@@ -162,6 +162,30 @@ describe("what a send records", () => {
     expect(sentRows(outcomes, "DELIVERY")).toEqual([
       { item_id: "a", name: "milk", kind: "sent", upc: MILK, quantity: 2, modality: "DELIVERY" },
       { item_id: "b", name: "eggs", kind: "sent", upc: OAT, quantity: 1, modality: null },
+    ]);
+  });
+});
+
+describe("Clear cart words (TEC-210)", () => {
+  const out = (result: "taken back" | "skipped" | "failed") => ({ id: "x", name: "x", result, detail: "" });
+
+  it("says how many cleared, and only adds the refusals when there were some", () => {
+    expect(summarizeClear([out("taken back"), out("taken back")])).toEqual({ cleared: 2, refused: 0, text: "Cleared 2 from the cart." });
+    expect(summarizeClear([out("taken back"), out("failed"), out("skipped")])).toEqual({
+      cleared: 3,
+      refused: 2,
+      text: "Cleared 3 from the cart. King Soopers didn't take back 2; check its cart.",
+    });
+  });
+
+  it("when Kroger was never asked, held lines read failed and unrecorded ones skipped", () => {
+    const lines = [
+      { id: "a", name: "milk", sent_at: "t", held: [{ upc: "0001111041700", quantity: 2, modality: "PICKUP" as const }] },
+      { id: "b", name: "salt", sent_at: "t", held: [] },
+    ];
+    expect(unaskedOutcomes(lines, "Connect King Soopers first.").map((o) => [o.id, o.result])).toEqual([
+      ["a", "failed"],
+      ["b", "skipped"],
     ]);
   });
 });

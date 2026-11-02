@@ -22,7 +22,7 @@ import { ConflictError } from "./errors";
  * Pure, with the database and Kroger passed in. No model runs.
  */
 
-export type CartListLine = { id: string; name: string; sent_at: string | null };
+export type CartListLine = { id: string; name: string; sent_at: string | null; cleared_at?: string | null };
 
 /** What the ledger says should change on the list. */
 export type Fix = { markSent: string[]; markUnsent: string[] };
@@ -34,6 +34,8 @@ export function reconcile(list: CartListLine[], rows: SendRow[]): Fix & { held: 
   const markSent: string[] = [];
   const markUnsent: string[] = [];
   for (const line of list) {
+    // A line Clear cart cleared (TEC-210) is gone: never put back In cart, never returned to the List.
+    if (line.cleared_at) continue;
     const holds = (held.get(line.id)?.length ?? 0) > 0;
     if (holds && line.sent_at === null) markSent.push(line.id);
     if (!holds && line.sent_at !== null && recorded.has(line.id)) markUnsent.push(line.id);
@@ -95,7 +97,7 @@ export async function refreshCart(deps: CartRefreshDeps): Promise<CartRefresh> {
   const store = await deps.store();
   if (!store) throw new ConflictError("Pick a store first, so the cart is priced at your King Soopers.");
   const at = deps.now();
-  const list = await deps.readList();
+  const list = (await deps.readList()).filter((l) => !l.cleared_at);
   const rows = await deps.readSends(list.map((l) => l.id));
   const fix = reconcile(list, rows);
 

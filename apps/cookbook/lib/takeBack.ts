@@ -13,7 +13,8 @@ import type { Modality } from "./modality";
  *   quantity and Pickup/Delivery choice a send put in. The line's quantity may
  *   have changed since, its product re-picked, or it was sent "again".
  * - **Only lines still on the list.** A cleared line may have been bought, and
- *   nothing here claims to know.
+ *   nothing here claims to know. Clear cart (TEC-210) marks every In cart line
+ *   cleared whatever Kroger answers, so a cleared line is never taken back.
  * - **Reserve, then ask Kroger.** The negative rows are written first, so a
  *   failed write after Kroger has removed something can never make a second
  *   Take back remove it again — that would take the shopper's own items. A
@@ -173,6 +174,29 @@ export async function takeBack(
   }
 
   return { outcomes, unsent };
+}
+
+/** Clear cart's outcomes when Kroger was never asked (no sign-in, or it could not be reached). */
+export function unaskedOutcomes(lines: TakeBackLine[], why: string): TakeBackOutcome[] {
+  return lines.map((l) => ({
+    id: l.id,
+    name: l.name,
+    result: l.held.length > 0 ? "failed" : "skipped",
+    detail: l.held.length > 0 ? why : "Sent before Cookbook recorded what went in, so it can't say what to take back.",
+  }));
+}
+
+/**
+ * Clear cart (TEC-210): **every line is cleared whatever Kroger answered.**
+ * `cleared` is every line given; `refused` counts the ones Kroger did not take
+ * back (refused, unreachable, no sign-in, or nothing recorded to take back).
+ * The toast says both and nothing more. Nothing is retried.
+ */
+export function summarizeClear(outcomes: TakeBackOutcome[]): { cleared: number; refused: number; text: string } {
+  const cleared = outcomes.length;
+  const refused = outcomes.filter((o) => o.result !== "taken back").length;
+  const text = `Cleared ${cleared} from the cart.`;
+  return { cleared, refused, text: refused > 0 ? `${text} King Soopers didn't take back ${refused}; check its cart.` : text };
 }
 
 /**

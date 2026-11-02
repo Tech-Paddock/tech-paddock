@@ -262,6 +262,21 @@ describe("Refresh cart", () => {
     expect(out.lines).toEqual([]);
   });
 
+  it("a line Clear cart cleared is gone: never put back In cart, never returned to the List (TEC-210)", async () => {
+    const cleared = { id: "bought", name: "milk", sent_at: "2026-10-30T00:00:00Z", cleared_at: "2026-11-02T17:00:00Z" };
+    // The ledger still holds it (nothing was taken back) — and it must still not come back.
+    const fix = reconcile([cleared, { ...cleared, id: "bought2", sent_at: null }], [row("bought", A, 1), row("bought2", B, 1)]);
+    expect(fix.markSent).toEqual([]);
+    expect(fix.markUnsent).toEqual([]);
+    const d = deps({ list: [cleared, { id: "kale", name: "kale", sent_at: "2026-10-30T00:00:00Z" }], rows: [row("bought", A, 1), row("kale", C, 1)], found: [product(C, { price: 4 })] });
+    const out = await refreshCart(d);
+    expect(d.markSent).not.toHaveBeenCalled();
+    expect(d.markUnsent).not.toHaveBeenCalled();
+    expect(d.byIds).toHaveBeenCalledWith("app-token", [C], "62000001");
+    expect(out.lines.map((l) => l.id)).toEqual(["kale"]);
+    expect(out.total).toBe(4);
+  });
+
   it("the route uses the app token and never the account's", () => {
     const route = readFileSync(resolve(__dirname, "../app/api/kroger/cart/refresh/route.ts"), "utf8");
     expect(route).toMatch(/appToken/);
@@ -294,7 +309,7 @@ describe("Clear cart", () => {
 
   it("needs no King Soopers step and sends no ids from the button", () => {
     const cart = readFileSync(resolve(__dirname, "../app/Cart.tsx"), "utf8");
-    expect(cart).toMatch(/async function clearCart\(\)[\s\S]*takeBackRequest\(null\)/);
+    expect(cart).toMatch(/async function clearCart\(\)[\s\S]*takeBackRequest\(null, true\)/);
     expect(cart).not.toMatch(/Open the King Soopers cart/);
     expect(cart).not.toMatch(/\/api\/kroger\/cart\/take-back"[^)]*\{ cache/);
   });

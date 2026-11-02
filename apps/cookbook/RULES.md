@@ -111,7 +111,7 @@ section and closing comment before changing anything in this file.
   the chosen store. Never sent to the browser or logged. Scope: add-to-cart and product read.
 - The Kroger access token is never stored.
 - `cart_sends`, the cart ledger, is append-only except `item_id`, which follows a line through a
-  Tidy.
+  Tidy. A line Clear cart clears is marked, not deleted, so its ledger rows keep their `item_id`.
 - **Your brands is one row per King Soopers product code.** The row holds its names: every way a
   list line may refer to it, each matched as whole words. A name may sit on several products; a
   product code is never saved twice. Search words stay their own kind: a name with search words
@@ -133,7 +133,7 @@ section and closing comment before changing anything in this file.
 - The redirect URI is a fixed constant, never built from the Host header.
 - Pick a store once; lookups price and stock there.
 - Send adds; it never checks out. "Go to checkout" opens the King Soopers cart.
-- **The Grocery list is two sections, List and In cart.** List is what is still to send; In cart is what Cookbook sent and has not taken back (`sent_at`, with the ledger behind it). A line is in one, never both.
+- **The Grocery list is two sections, List and In cart.** List is what is still to send; In cart is what Cookbook sent and has not taken back or cleared (`sent_at`, with the ledger behind it). A line is in one, never both. A cleared line (`cleared_at`) is in neither.
 - **Cookbook is the only way anything enters the cart** (owner, 2026-11-02): In cart is the whole King Soopers cart; the King Soopers app is only for checkout.
 - **No secondary pop-up lists.** Send all, Add to cart, Remove, Clear cart, Tidy, Clear ticked and Clear all each ask one "Are you sure?" with a count, and no list.
 - **Send is a best guess, with no review** (owner, 2026-11-02). One saved product or the name's default goes in; of several with no default, the most-bought; with none saved, Kroger's top match. Whatever goes in is remembered as before. Every line reports added, skipped or failed after Send. Add to cart on one line uses the same guess.
@@ -153,10 +153,11 @@ section and closing comment before changing anything in this file.
 - Every line reports added, skipped or failed; a partial send never reads as whole.
 - A line already in the cart is not offered again, and the server still refuses to send it twice
   without an explicit "again", because the Cart API only adds.
-- **Take back** (Remove on one line, Clear cart on all) removes what Cookbook sent, by sending negative quantities of the same products,
-  and marks those lines unsent. Clear cart takes back every In cart line after one confirm with a count.
+- **Take back** (Remove on one line) removes what Cookbook sent, by sending negative quantities of the same products,
+  and marks those lines unsent.
+- **Clear cart always clears** (owner, 2026-11-02): after one confirm with a count it sends a negative for every In cart line, with its recorded Pickup/Delivery choice, then marks every one of those lines cleared (`cleared_at`) whatever King Soopers answers: a refusal, a failure or no sign-in. Nothing is retried. Cleared lines leave the grocery list and do not return to the List; the line and its ledger rows are kept, never deleted. The result is one toast: "Cleared N from the cart.", and when King Soopers refused any, "King Soopers didn't take back M; check its cart" with the cart link. Refresh cart never puts a cleared line back. There is no Done shopping button.
 - Take back writes its `taken_back` rows before the negative add, so a failure never removes
-  twice. It acts only on lines still on the list, and is never retried without the recorded
+  twice. It acts only on lines still on the list (not cleared), and is never retried without the recorded
   Pickup/Delivery choice.
 - Each saved brand keeps product ID, page, size, last price, stock and when checked. Refresh runs
   when any Cookbook page loads over seven days after the last, or on **Refresh now**; the weekly
