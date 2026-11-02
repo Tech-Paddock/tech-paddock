@@ -213,7 +213,7 @@ describe("the fixed lists", () => {
   it("gives Fun and Training the photos key, the same shape as Health's", () => {
     const fn = body(latest().sql);
     const exercise = fn.slice(fn.indexOf("WHEN 'exercise' THEN"), fn.indexOf("WHEN 'weight' THEN"));
-    expect(exercise).toContain("'commands', 'dogs', 'photos', 'names'] = '{}'::jsonb");
+    expect(exercise).toContain("'commands', 'dogs', 'photos', 'names', 'note_id'] = '{}'::jsonb");
     expect(exercise).toContain("jsonb_array_length(details -> 'photos') BETWEEN 1 AND 6");
     expect(exercise).toContain("^health/[0-9a-f]{8}");
   });

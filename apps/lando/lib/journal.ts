@@ -11,6 +11,7 @@ import {
   type ExerciseDetails,
   checkHealthReasons,
   checkIssueTarget,
+  checkNoteTarget,
   checkVisitTarget,
   eventPhotos,
   type JournalEvent,
@@ -105,6 +106,10 @@ export async function writeEvent(db: SupabaseClient, body: unknown, now = new Da
   // old link may point at a superseded copy; the screen follows `voids`.
   const issueId = (next.details as { issue?: string }).issue;
   if (issueId) checkIssueTarget(await findEvent(db, issueId));
+
+  // A linked note (TEC-208) is checked the same way: it must be a note event, a voided copy included.
+  const noteId = (next.details as { note_id?: string }).note_id;
+  if (noteId) checkNoteTarget(await findEvent(db, noteId));
 
   // A weight saved from a vet visit (TEC-151) names it the same way: it must be
   // a vet visit event, a voided copy included.

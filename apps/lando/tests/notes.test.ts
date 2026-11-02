@@ -332,11 +332,14 @@ describe("the migration and the release note", () => {
     expect(sql.replace(/--.*$/gm, "")).not.toMatch(/\b(drop|delete|truncate|alter table)\b/i);
   });
 
-  it("is the newest definition of the function", () => {
+  it("is the newest definition of the function, or every later one keeps the note branch", () => {
+    // lando_note_links (TEC-208) is the next definer; a later one must still carry the branch this one added.
     const definers = readdirSync(dir)
       .filter((f) => f.endsWith(".sql") && readFileSync(resolve(dir, f), "utf8").includes("create or replace function lando.details_ok(kind"))
       .sort();
-    expect(definers.at(-1)).toBe(file);
+    const later = definers.slice(definers.indexOf(file) + 1);
+    expect(definers).toContain(file);
+    for (const f of later) expect(readFileSync(resolve(dir, f), "utf8"), f).toContain("WHEN 'note' THEN");
   });
 
   it("has a plain line in the release notes", () => {

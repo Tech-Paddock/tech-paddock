@@ -71,6 +71,7 @@ import TreatCount from "./TreatCount";
 import PhotoPicker, { usePhotos } from "./Photos";
 import { clockTime, dateLabel, fromDateInput, fromLocalInput, toDateInput, toLocalInput, whenLabel } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
+import { noteChoices, noteLink } from "@/lib/notes";
 
 export type Person = { id: string; display_name: string };
 
@@ -122,6 +123,11 @@ type Props = {
   phonePerson: string | null;
   /** Everything the journal read, voids included: the Related issue select lists its recent medical issues (TEC-142). */
   events: JournalEvent[];
+  /**
+   * The whole read, notes and voids too (TEC-208): the Related note select lists the newest live notes. `events`
+   * above is the Log's own read and holds no note, so a note never reaches the Log by this form.
+   */
+  allEvents?: JournalEvent[];
   /** Signed URLs by storage path, for the photos an entry being corrected already has. */
   photoUrls: Record<string, string>;
   /** A photo just uploaded: its signed URL, kept so the feed can show it once the entry is saved. */
@@ -269,6 +275,7 @@ export default function LogForm({
   onAddMedication,
   phonePerson,
   events,
+  allEvents = [],
   photoUrls,
   onPhotoUrl,
   remembered,
@@ -383,11 +390,16 @@ export default function LogForm({
   // it is changed; `issueChoices` adds it as an option when the list would not.
   const [firstIssue] = useState(p?.issue ?? h?.issue ?? "");
   const [issue, setIssue] = useState(firstIssue);
-  // The "Medical issue" checkbox (TEC-161) gates the select: a correction with a
+  // Potty's "Medical issue" checkbox (TEC-161) gates the select: a correction with a
   // stored link opens ticked on it; unticked, no link is saved (the pick is kept, so
-  // ticking again brings it back).
+  // ticking again brings it back). Health has no checkbox (TEC-208): its select always shows, on None.
   const [hasIssue, setHasIssue] = useState(firstIssue !== "");
   const issueOptions = issueChoices(events, firstIssue || null);
+  // Related note (TEC-208), on every Health type and on Training: the id of a note from the Notes tab, or none.
+  // A correction opens on the stored pick and keeps it unless it is changed or cleared.
+  const [firstNote] = useState(h?.note_id ?? x?.note_id ?? "");
+  const [noteId, setNoteId] = useState(firstNote);
+  const noteOptions = noteChoices(allEvents, firstNote || null);
   // One high-level pick (TEC-139). An entry from before it, with several or
   // retired reasons, opens on them as a kept option and saves them unchanged
   // until another pick is made.
@@ -562,7 +574,7 @@ export default function LogForm({
           // The treats a session counts are its treat entries (as Training always did): 1 when a count was
           // added now, on top of any already logged with it.
           treats: (x?.treats ?? 0) + (treatQty > 0 ? 1 : 0),
-          ...(exType === "training" ? { commands } : {}),
+          ...(exType === "training" ? { commands, ...noteLink(noteId) } : {}),
           ...dogsFromPick(dogPick, keptDogs),
           ...attachments,
         };
@@ -577,14 +589,16 @@ export default function LogForm({
             dose: Number(dose.replace(",", ".")),
             unit: medUnit,
             route,
-            ...(hasIssue && issue ? { issue } : {}),
+            ...(issue ? { issue } : {}),
+            ...noteLink(noteId),
             ...attachments,
           };
         }
         return {
           type: healthType,
           reasons: healthReasonsFromPick(reason === HEALTH_KEPT && h?.type !== healthType ? "" : reason, keptReasons),
-          ...(healthType === "vet" && hasIssue && issue ? { issue } : {}),
+          ...(healthType === "vet" && issue ? { issue } : {}),
+          ...noteLink(noteId),
           ...attachments,
         };
     }
@@ -742,19 +756,35 @@ export default function LogForm({
     form === "fun" ? EXERCISE_LABELS[exType] : form === "health" ? HEALTH_LABELS[healthType] : FORM_LABELS[form];
   const photoBlock = photos.working || photos.failed;
 
-  // The medical issue link, on Potty, a vet visit and a medication dose (TEC-142, TEC-199): a checkbox, and
-  // behind it None and the recent live medical issues, newest first, by date and pick.
+  // The medical issue link (TEC-142, TEC-199): None and the recent live medical issues, newest first, by date
+  // and pick. Potty puts it behind a checkbox (TEC-161); a vet visit and a medication dose show it all the time
+  // (TEC-208), opening on None.
   const issueCheck = (label: string) => (
     <label className="flex min-h-[44px] items-center gap-2">
       <input type="checkbox" checked={hasIssue} onChange={(e) => setHasIssue(e.target.checked)} className="h-5 w-5 accent-accent" />
       <span>{label}</span>
     </label>
   );
-  const issueSelect = hasIssue && (
+  const issueField = (
     <Field label="Related issue" htmlFor="f-issue">
       <select id="f-issue" value={issue} onChange={(e) => setIssue(e.target.value)} className={inputFull}>
         <option value="">None</option>
         {issueOptions.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+  const issueSelect = hasIssue && issueField;
+  // The note link (TEC-208), on every Health type and on Training: None and the newest live notes, newest first,
+  // by date and first words. The same plain select as Related issue.
+  const noteField = (
+    <Field label="Related note" htmlFor="f-note-id">
+      <select id="f-note-id" value={noteId} onChange={(e) => setNoteId(e.target.value)} className={inputFull}>
+        <option value="">None</option>
+        {noteOptions.map((o) => (
           <option key={o.id} value={o.id}>
             {o.label}
           </option>
@@ -1285,24 +1315,28 @@ export default function LogForm({
                 <Field label="Given">
                   <Seg name="route" label="Given" value={route} onChange={setRoute} options={MED_ROUTES} />
                 </Field>
-                {issueCheck("For a medical issue")}
-                {issueSelect}
+                {issueField}
               </>
             )}
           </>
         )}
       </Box>
 
-      {/* Box 3: the secondary things (TEC-199). Potty: the treats count then the medical issue, on one line.
-          Training and Fun: the treats count. A vet visit: the medical issue. Not on a future entry, which
-          keeps no treats or issue link. */}
-      {!planning && (kind === "potty" || kind === "exercise" || (kind === "health" && healthType === "vet")) && (
-        <Box section="secondary" label="Treats and issue">
-          <div className="flex flex-wrap items-center gap-x-4">
-            {(kind === "potty" || kind === "exercise") && treatCount}
-            {(kind === "potty" || (kind === "health" && healthType === "vet")) && issueCheck("Medical issue")}
-          </div>
-          {issueSelect}
+      {/* Box 3: the secondary things (TEC-199). Potty: the treats count then the medical issue checkbox, on one line.
+          Training and Fun: the treats count. Health (TEC-208): a vet visit's Related issue, then the Related note
+          on every Health type; Training has the Related note too. Not on a future entry, which keeps no
+          treats or links. */}
+      {!planning && (kind === "potty" || kind === "exercise" || kind === "health") && (
+        <Box section="secondary" label="Treats and links">
+          {(kind === "potty" || kind === "exercise") && (
+            <div className="flex flex-wrap items-center gap-x-4">
+              {treatCount}
+              {kind === "potty" && issueCheck("Medical issue")}
+            </div>
+          )}
+          {kind === "potty" && issueSelect}
+          {kind === "health" && healthType === "vet" && issueField}
+          {(kind === "health" || (kind === "exercise" && exType === "training")) && noteField}
           {sessionTreats.length > 0 && <LoggedTreats treats={sessionTreats} />}
           {/* Pee and Poop (TEC-186): a Fun form only, on a new entry. Each tap is its own potty entry,
               saved at once and independent of whether this Fun entry is. */}
