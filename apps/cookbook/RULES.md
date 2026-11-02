@@ -97,14 +97,16 @@ section and closing comment before changing anything in this file.
   line with no saved product, no recent price or several saved products and no default is "no price yet", counted
   in the total's line and never $0. Nothing calls Kroger to price the list.
 - **A list line says what its price means, from the same nightly data** (TEC-196). On List and In
-  cart each line stays **on one line**: the name truncates with an ellipsis and the full text is the
-  line's `title`, while the price, the bubble and the button keep their size. The **bubble** reads
-  "Sale $2.99" when the saved product's night has promo below regular, and "Coupon" only when a
-  staged coupon (`cookbook.coupons`) lists its code; never invented. The line is **shaded by the
+  cart each line is **item · qty · price** on **one line** (owner, 2026-11-02): the name truncates
+  with an ellipsis and the full text is the line's `title`, while the quantity, the price and the
+  buttons keep their size. No recipe names, mark, bubble, amount or note show. The **bubble**
+  ("Sale $2.99" when the saved product's night has promo below regular, "Coupon" only when a staged
+  coupon (`cookbook.coupons`) lists its code; never invented) and the shade's words are on the
+  price's `title` and accessible name. The line is **shaded by the
   Deals stoplight for that product**: green when Deals calls it green, red when red, plain
   otherwise; **before 4 weeks of history, on sale or with a coupon is good, else plain, never red**.
   A line with no saved product or no recent price stays plain. Colour is never the only cue: the
-  bubble or a word ("Good price", "High price") says why. A line's shade and the Deals board come
+  price's `title` and accessible name ("Good price", "High price", the bubble) say why. A line's shade and the Deals board come
   from one function and never disagree. A **Best** toggle on the List shows only the lines that are
   Best (below). No Kroger call, no model.
 - Kroger is the only stored credential: one refresh token, encrypted under `KROGER_TOKEN_KEY`, plus
@@ -126,7 +128,7 @@ section and closing comment before changing anything in this file.
 
 ## Send to cart — King Soopers
 
-- Connect once from the list tab. Kroger returns to `/kroger/callback`, a page route behind the
+- Connect once from the list's header. Kroger returns to `/kroger/callback`, a page route behind the
   password gate with no gate-file exception. Client ID and secret stay server-side.
 - The OAuth `state` is a signed nonce, double-submitted in an httpOnly cookie, and checked before
   anything else.
@@ -135,12 +137,12 @@ section and closing comment before changing anything in this file.
 - Send adds; it never checks out. "Go to checkout" opens the King Soopers cart.
 - **The Grocery list is two sections, List and In cart.** List is what is still to send; In cart is what Cookbook sent and has not taken back or cleared (`sent_at`, with the ledger behind it). A line is in one, never both. A cleared line (`cleared_at`) is in neither.
 - **Cookbook is the only way anything enters the cart** (owner, 2026-11-02): In cart is the whole King Soopers cart; the King Soopers app is only for checkout.
-- **No secondary pop-up lists.** Send all, Add to cart, Remove, Clear cart, Tidy, Clear ticked and Clear all each ask one "Are you sure?" with a count, and no list.
-- **Send is a best guess, with no review** (owner, 2026-11-02). One saved product or the name's default goes in; of several with no default, the most-bought; with none saved, Kroger's top match. Whatever goes in is remembered as before. Every line reports added, skipped or failed after Send. Add to cart on one line uses the same guess.
-- **The one picker that stays:** Add an item opens a choice of products when several match and none is the default, with Make default; tapping one adds it to the cart. Change on an In cart line reuses it.
+- **No secondary pop-up lists.** **Adds never ask** (owner, 2026-11-02: "No confirmation. I clicked it, it goes."): Send all and Add to cart go at once. Remove, Clear cart, Tidy, Clear ticked and Clear all each ask one "Are you sure?" with a count, and no list.
+- **Send is a best guess, with no review** (owner, 2026-11-02). One saved product or the name's default goes in; of several with no default, the most-bought; with none saved, Kroger's top match. Whatever goes in is remembered as before. A send reports in one toast, "Sent 12" or "Sent 12 · 2 not sent"; a line that did not go reads a red "not sent" in its price spot until the next send. There is no Sent list. Add to cart on one line uses the same guess.
+- **The one picker that stays:** Add an item opens a choice of products when several match and none is the default, with Make default; tapping one adds it to the cart. There is no Change on an In cart line.
 - **Ticked lines sort to the bottom of the List, faded.**
 - **Refresh cart** fixes In cart from the ledger, then prices each In cart line today at the chosen store from the product read with the app token, never the account token, and shows the live In cart total with the time checked. A line Kroger cannot price reads "no price", never $0.
-- **The header** holds Pickup/Delivery and the store; tapping the store opens a ZIP search. **Add an item** sits below the List's filters.
+- **The header holds King Soopers** (owner, 2026-11-02): a live status always visible (Connected, Sign-in expired, Can't reach King Soopers, Not connected or Not set up), checked on open, after any King Soopers call fails and when tapped, plus connect, Pickup/Delivery, the store (tap for a ZIP search), prices checked, Refresh now and disconnect. Nothing King Soopers sits below In cart. The check proves the sign-in works; the API cannot read the cart. `GET /api/kroger/check` is signed-in only like every `/api` route, and returns a state, never a token. **Add an item** sits below the List's filters.
 - **A named product beats the default.** "english muffins" gets the default; "sourdough english
   muffins" gets the saved sourdough.
 - **A line is searched by its item alone.** A fixed rule drops quantities, units and prep words,
