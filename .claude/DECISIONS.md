@@ -43,6 +43,9 @@ would get something wrong without it: the rule, one line of why. App rules live 
 - **`RULES.md` changes are the TD's** (2026-10-26, TEC-149): a revert undoes them and `/build` already
   gates the work. Loosening auth, Showcase, secrets or personal data still asks; so do `CLAUDE.md`
   and hooks, which bind the TD itself.
+- **The owner runs every `DROP` or `DELETE` in the SQL Editor** (2026-11-02, superseding
+  2026-10-24's "agents apply migrations"). Through the connector they time out every time; only
+  what has failed is on the list (`supabase/README.md`).
 
 ## Mistakes
 

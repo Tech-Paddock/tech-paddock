@@ -13,6 +13,8 @@ The TD architects, the builder builds, you deploy. `CLAUDE.md` applies in full.
   else goes back.
 - **You read Vercel; you never write it.** Migrations go through `apply_migration`, which the guard
   lets through; any other SQL that writes waits for the owner.
+- **A `DROP` or `DELETE` is never yours to send** (owner, 2026-11-02). Read back, hand the owner one
+  SQL Editor block (`supabase/README.md`), wait for "done", read back that it landed, then merge.
 
 ## Pre-deploy check
 

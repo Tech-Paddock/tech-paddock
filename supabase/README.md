@@ -72,15 +72,21 @@ via the `merge` skill. Then:
 
 A matching version is something to read back, never to assume.
 
-**Agents apply migrations; avoid the DROP instead of handing it to the owner** (owner, 2026-10-24).
-A DROP has timed out through the connector, so design around it: put a widening check in a function
+**A `DROP` or `DELETE` is the owner's to run, in the SQL Editor** (owner, 2026-11-02: "Any
+supabase deletions scripts are to be manually ran"). Through the connector they have failed every
+time: `drop_editor_tracker_shared`, TEC-209's drop through `apply_migration` twice, and a row
+`DELETE` through `execute_sql` twice, each timing out at 60s on an approval no tap could answer in
+time. So Deployment never sends one through `apply_migration` or `execute_sql`. It reads back
+first (the row count), hands the owner one block (the file inside `begin; … commit;` with
+`insert into supabase_migrations.schema_migrations (version, name)` for its version and name),
+then reads back that it landed and merges. Everything else (additive DDL, `create or replace`,
+`update`) stays with Deployment; widen this list only when something else fails.
+
+**Still avoid the DROP where you can.** Design around it: put a widening check in a function
 (`lando.details_ok`) and widen with `create or replace function`, and start any constraint swap
 with `set local lock_timeout = '5s'`. Each replacement copies the newest file's whole body, and the
 function pins `set search_path = ''`; without it the security advisor warns, as it did for
-`lando.details_ok` until TEC-164. Only if a DROP still times out, and a read-back shows it did
-not land, does the owner run the file once in the SQL Editor inside `begin; … commit;` with
-`insert into supabase_migrations.schema_migrations (version, name)` for its version, as
-`drop_editor_tracker_shared` was. A drop of data stays a destructive migration (CLAUDE.md).
+`lando.details_ok` until TEC-164. A drop of data stays a destructive migration (CLAUDE.md).
 
 ## Dropping a schema
 
