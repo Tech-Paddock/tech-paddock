@@ -195,6 +195,8 @@ Reasoning is in the migration headers.
   PICKUP; a disconnect deletes the row and the choice with it).
 - `brand_products`: no longer read or written (TEC-131); its fields were copied onto `products`.
   Its drop, with the old product rows, is TEC-131 (parked).
+- `purchases` (`cookbook_purchases`, TEC-213): what was actually bought, one row per order line,
+  insert only; see *Import purchases*.
 - `cart_sends` (TEC-127): the cart ledger, insert only (`lib/cartSends.ts`) except `item_id`,
   which a Tidy moves onto the merged line before deleting the old ones. Signed quantity: `sent`
   and `refused` positive, `taken_back` negative; the sum per line, UPC and modality is what Take
@@ -538,7 +540,7 @@ Reasoning is in the migration headers.
   *when the line says "…"* (`namingHint`: up to two words of its Kroger name no other member is
   known by) and **Make default** on the others. Make default posts `POST /api/brands/default`
   with every shared name that product carries. A lone product is its own group and its own
-  default. Footer: Remember a product · Paste a batch · Export · Search words. The cards, rows,
+  default. Footer: Remember a product · Paste a batch · Export · Import purchases · Search words. The cards, rows,
   Fix these panel and the filter are local patterns.
 - Routes: `GET/POST/DELETE /api/brands` (POST a product: `names` as one comma-separated field or a
   list, `product` as a page or code, optional `size_first`, `pack_*`; `id` to edit, whose names are
@@ -587,6 +589,53 @@ array**; each element is a product row or a search-word row.
 - **Export** (`GET /api/brands/export`) downloads `cookbook-brands-<date>.json`: products by first
   name, then phrases; counts always present. Pasted back, every row reviews as `already`; an old
   `plain` row exports as `"kind": "plain"` and is refused by name on the way back in.
+
+## Import purchases (TEC-213)
+
+What was actually bought, as a running record. Kroger's API has no order history, so the owner's
+weekly Claude-in-Chrome task reads King Soopers order history in the owner's signed-in browser and
+pastes it into **Your brands, Import purchases** (the footer link; a box and an Import button). The
+box posts `{ text }` to `POST /api/purchases`, signed in like every `/api` route (the gate is
+untouched; the Chrome task uses the owner's session). The result is one line: "Imported N from M
+orders · K matched · J skipped" (N and K count what was new; M the orders pasted; J the bad lines).
+No model call. Code: `lib/purchases.ts` (pure), `lib/purchaseStore.ts`, `app/api/purchases/route.ts`.
+
+**The paste format: one JSON object per line.** This is what the Chrome task's instructions quote.
+
+```
+{"ordered_on":"2026-10-30","order_ref":"100-200-300","description":"Test Brand Oat Milk","upc":"0001111000001","size":"64 fl oz","quantity":2,"price":4.99}
+{"ordered_on":"2026-10-30","order_ref":"100-200-300","description":"Test Brand Long Grain Rice","size":"2 lb","quantity":1}
+{"ordered_on":"2026-10-30","order_ref":"100-200-300","description":"Test Bananas","quantity":2.35,"price":1.4}
+```
+
+- Required: `ordered_on` (a real `YYYY-MM-DD`), `order_ref` (the order number, never invented),
+  `description` (the name as the order shows it), `quantity` (a number above 0; a weight is fine).
+  Optional: `upc` (8 to 14 digits, when the page or its product link shows it), `size`, `price`
+  (the line's price, 0 or more).
+- **A bad line is counted and skipped, never guessed**: not JSON, not an object, a missing or empty
+  required field, a wrong type, a date that is not real, a `upc` that is not digits. Blank lines
+  are not lines. Extra keys are ignored. Paste at most 500,000 characters at once.
+- **A re-paste adds nothing.** A line's identity is its `order_ref` plus its `line_key`: the `upc`
+  (leading zeros ignored) when shown, else the description as lower-case words, then the size as
+  words. The table is unique on that and written with `ignoreDuplicates`. The same item twice in one
+  order and size is one line with the quantities added; a `price` is the first one seen. So the
+  Chrome task may re-paste a whole page of orders each week, but it must give the same description
+  and size each time for the same line, or the second pass is a new line.
+- **Matching** (`matcher`): the `upc` against a saved product's code (leading zeros ignored), then the
+  line's `description` against a saved product's Kroger `description` as whole words (case and
+  punctuation ignored). **Two saved products with one description match nothing.** An unmatched
+  purchase is kept with `product_id` null. A match never adds a name to a product; names stay
+  owner-made. Matching happens once, at import: a product saved after a purchase was imported does
+  not claim it (a re-paste cannot either, since the line already exists).
+- Table `cookbook.purchases` (`cookbook_purchases`): one row per order line, insert only,
+  `product_id` is the products row's `id` (`on delete set null`, so forgetting a brand keeps its
+  purchases). RLS on, no policies.
+- **What picking will read** (TEC-214): `purchasesPerProduct(weeks, now?)` in `lib/purchaseStore.ts`
+  returns a map from the products row `id` to `{ product_id, orders, quantity, last_ordered_on }`
+  over the last `weeks` weeks (distinct orders, summed quantity); a product not bought in the window
+  is absent; unmatched purchases are left out. `tally` is its pure half. Nothing in picking
+  (`decide`, `lib/cart.ts`, `lib/cartGuess.ts`) reads purchases yet, and `products.count` still
+  counts Sends.
 
 ## List lines (TEC-131)
 

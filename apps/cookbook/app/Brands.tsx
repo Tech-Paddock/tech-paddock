@@ -415,7 +415,7 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [view, setView] = useState<View>("all");
-  const [panel, setPanel] = useState<null | "batch" | "words">(null);
+  const [panel, setPanel] = useState<null | "batch" | "words" | "purchases">(null);
   const [editing, setEditing] = useState<{ kind: "product"; row: SavedProduct | null } | { kind: "words"; row: Preference | null } | null>(null);
   const [replacing, setReplacing] = useState<string | null>(null);
   const [making, setMaking] = useState<string | null>(null);
@@ -426,6 +426,9 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
   const [preview, setPreview] = useState<PreviewEntry[] | null>(null);
   const [ticked, setTicked] = useState<Set<number>>(new Set());
   const [writing, setWriting] = useState(false);
+  const [orders, setOrders] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState<{ text: string; failed: boolean } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -539,6 +542,29 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
   }
 
   /** Step one: the review. **Nothing is written here.** */
+  /** Import purchases (TEC-213): the pasted order history goes in as it is; the server counts and skips. */
+  async function importOrders() {
+    setImporting(true);
+    setImported(null);
+    try {
+      const res = await fetch("/api/purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: orders }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setImported({ text: data.error ?? "Couldn't save those purchases.", failed: true });
+      else {
+        setImported({ text: data.line, failed: false });
+        setOrders("");
+      }
+    } catch {
+      setImported({ text: "Couldn't reach the server. Try again.", failed: true });
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function reviewRows() {
     setOutcome(null);
     setPreview(null);
@@ -768,6 +794,9 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
         <a href="/api/brands/export" download className={LINK}>
           Export
         </a>
+        <button type="button" onClick={() => setPanel(panel === "purchases" ? null : "purchases")} className={LINK}>
+          Import purchases
+        </button>
         <button type="button" onClick={() => setPanel(panel === "words" ? null : "words")} className={LINK}>
           Search words{words.length > 0 ? ` · ${words.length}` : ""}
         </button>
@@ -811,6 +840,39 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
               Add search words
             </button>
           )}
+        </div>
+      ) : null}
+
+      {/* Import purchases (TEC-213): what was actually bought, pasted from King Soopers
+          order history by the weekly Chrome task or by hand. One JSON object per line;
+          NOTES.md, *Import purchases*. Local pattern: the same card as Paste a batch. */}
+      {panel === "purchases" ? (
+        <div className="flex flex-col gap-2 rounded-xl bg-surface p-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-soft">Import purchases</h3>
+          <textarea
+            value={orders}
+            onChange={(e) => {
+              setOrders(e.target.value);
+              setImported(null);
+            }}
+            rows={5}
+            placeholder={'{"ordered_on":"2026-11-01","order_ref":"100-200","description":"Test Oat Milk","quantity":2}'}
+            aria-label="Order lines, one JSON object per line"
+            className="w-full rounded-lg border border-line bg-surface p-2 font-mono text-xs"
+          />
+          <button
+            type="button"
+            onClick={() => void importOrders()}
+            disabled={importing || orders.trim() === ""}
+            className="self-start rounded-lg border border-line px-3 py-1.5 text-xs text-ink-soft disabled:opacity-50"
+          >
+            {importing ? "Importing…" : "Import"}
+          </button>
+          {imported ? (
+            <p role={imported.failed ? "alert" : undefined} className={`text-xs ${imported.failed ? "text-danger" : "text-ink-soft"}`}>
+              {imported.text}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
