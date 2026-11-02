@@ -125,7 +125,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   recipes were tidied before it went, so the house style now only applies on the way in. Deleted: the
   Tidy card, `TidyReview.tsx`, `/api/recipes/tidy` and `/keep`, `lib/tidy.ts`, `lib/tidyStore.ts`,
   `lib/tidyView.ts` and their tests. **The grocery list's Tidy stays** (below). Nothing reads or writes
-  `cookbook.recipe_tidy_drafts` any more (see Tables).
+  `cookbook.recipe_tidy_drafts` any more: the table is dropped (TEC-209, `cookbook_drop_recipe_tidy_drafts`).
 - **Recipe-side wording: "estimate macros", never price** (TEC-207, owner: price lives with the grocery
   list and Deals). Labels, toasts, errors and comments on the recipe side say "estimate" / "re-estimate
   the macros" ("Save and re-estimate macros", `reestimated` in the edit route's answer, `Reestimate` in
@@ -156,13 +156,12 @@ Reasoning is in the migration headers.
   null together or set together (`recipe_macros_together`), and `model` is null when they are.
   `imported_original` (jsonb object, nullable) holds the recipe as imported; a trigger refuses to
   change it once set, so Revert can trust it. Null is "not estimated yet", never 0.
-  `house_style_at` (TEC-201, `cookbook_recipe_tidy_drafts`) is when the recipe was put in the house
+  `house_style_at` (TEC-201, `cookbook_recipe_tidy_drafts`; the Tidy table is gone) is when the recipe was put in the house
   style (a way in that applied it, or a Tidy kept before TEC-207); null is "not house-styled". Nothing
   offers by it any more; it only marks. `hydrate` turns
   `imported_original` into `has_original` and drops the jsonb, so it never reaches the browser.
-- `recipe_tidy_drafts` (TEC-201): **unused since TEC-207 and empty when retired**; no code reads or writes it. It
-  stays until a follow-on migration drops it (a DROP, so by the TD's NOTES trap and `supabase/README.md`).
-  Do not start using it again.
+- `recipe_tidy_drafts` (TEC-201) **no longer exists**: dropped empty by `cookbook_drop_recipe_tidy_drafts`
+  (TEC-209). Do not recreate it; there is no recipe Tidy.
 - `grocery_items`: `quantity` 1–99; `recipes` is a snapshot of names, so a rename never reaches
   it. Tidy (checked by `validateTidy`) unions names, takes the larger of the largest absorbed
   quantity and the fixed rules' quantity for the merged line, and the latest `sent_at`. "Milk — the
