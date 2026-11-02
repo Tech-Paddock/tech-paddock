@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guidePresentation, IMAGE_SOURCE_PRESENTATION, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
+import { describeDropped, guidePresentation, IMAGE_SOURCE_PRESENTATION, SUGGESTION_PRESENTATION } from "@/lib/guideDisplay";
 import { GUIDE_FIELDS } from "@/lib/guide";
 import type { GuideStatus } from "@/lib/guide";
 
@@ -95,5 +95,18 @@ describe("IMAGE_SOURCE_PRESENTATION", () => {
     expect(IMAGE_SOURCE_PRESENTATION.caption).not.toMatch(forbidden);
     expect(IMAGE_SOURCE_PRESENTATION.alt).not.toMatch(forbidden);
     expect(IMAGE_SOURCE_PRESENTATION.quoteNote).not.toMatch(forbidden);
+  });
+});
+
+describe("describeDropped", () => {
+  it("carries the real reason, not a fixed one", () => {
+    const d = describeDropped({ field: "temp", value: "205F", reason: "no image stored to show beside it" });
+    expect(d).toEqual({ label: "Temperature", value: "205F", reason: "no image stored to show beside it" });
+  });
+
+  it("never shows an empty reason or value", () => {
+    const d = describeDropped({ field: "grind", value: " ", reason: "" });
+    expect(d.value).not.toBe("");
+    expect(d.reason).not.toBe("");
   });
 });

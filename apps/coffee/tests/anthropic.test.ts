@@ -131,6 +131,35 @@ describe("a response that did not finish", () => {
     expect(read).toEqual({ kind: "failed", message: "the image reader declined to read them" });
   });
 
+  it("is a failed card read, not 'no card', when the page has no gallery the detector knows and no og:image", async () => {
+    vi.stubGlobal("fetch", async () => new Response(`<div class="x"><img src="/a.jpg"></div>`, { headers: { "content-type": "text/html" } }));
+    const read = await readRecipeImages("https://roaster.example/shop/c", AbortSignal.timeout(5_000));
+    expect(read.kind).toBe("failed");
+  });
+
+  it("does not follow a redirect from the product page to an internal address", async () => {
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (url: string) => {
+      asked.push(url);
+      return new Response(null, { status: 302, headers: { location: "http://169.254.169.254/latest/meta-data" } });
+    });
+    const read = await readRecipeImages("https://roaster.example/shop/c", AbortSignal.timeout(5_000));
+    expect(read.kind).toBe("failed");
+    expect(asked).toEqual(["https://roaster.example/shop/c"]);
+  });
+
+  it("does not follow a gallery image's redirect to an internal address", async () => {
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (url: string) => {
+      asked.push(url);
+      if (url.endsWith("/shop/c")) return new Response(`<div class="product-gallery"><img src="/p/card.jpg"></div>`, { headers: { "content-type": "text/html" } });
+      return new Response(null, { status: 301, headers: { location: "http://10.0.0.5/secret.jpg" } });
+    });
+    const read = await readRecipeImages("https://roaster.example/shop/c", AbortSignal.timeout(5_000));
+    expect(read.kind).toBe("failed");
+    expect(asked.some((u) => u.includes("10.0.0.5"))).toBe(false);
+  });
+
   it("is a failed search, not a none", async () => {
     replies.push(reply("", "refusal"));
     await expect(searchBrewGuide({ roaster: "R", coffeeName: "C" })).rejects.toThrow(/declined/);

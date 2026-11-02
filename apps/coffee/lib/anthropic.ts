@@ -8,7 +8,9 @@ import {
   combineReads,
   galleryImagesIn,
   imageGuide,
+  fetchChecked,
   isFetchableUrl,
+  RedirectRefused,
   RECIPE_CARD_SCHEMA,
   shouldReadImages,
   type ImageRead,
@@ -342,24 +344,32 @@ export async function readRecipeImages(productUrl: string, signal: AbortSignal):
   try {
     if (!isFetchableUrl(productUrl)) return { kind: "skipped" };
 
-    const page = await fetch(productUrl, { headers: FETCH_HEADERS, redirect: "follow", cache: "no-store", signal: bounded(signal, 20_000) });
+    // Every redirect hop is checked, not only the first URL (TEC-167).
+    const { response: page, url: reachedUrl } = await fetchChecked(productUrl, {
+      headers: FETCH_HEADERS,
+      cache: "no-store",
+      signal: bounded(signal, 20_000),
+    });
     if (!page.ok) return { kind: "failed", message: `the product page returned ${page.status}` };
     const type = page.headers.get("content-type") ?? "";
     if (!/html/i.test(type)) return { kind: "failed", message: `the product page is not HTML (${type || "no type"})` };
-    // A redirect lands wherever it lands; the check that it is still the
-    // roaster's site is `validateGuide`'s, against this URL.
-    const reachedUrl = page.url || productUrl;
+    // A redirect that passed the public-host check can still land on another
+    // site; whether it is still the roaster's is `validateGuide`'s, against this URL.
     const html = (await page.text()).slice(0, MAX_PAGE_BYTES);
 
     const gallery = galleryImagesIn(html, reachedUrl).filter((i) => isFetchableUrl(i.url));
-    // A page with no gallery has no card to read. That is an answer, not a failure.
-    if (gallery.length === 0) return { kind: "read", guide: imageGuide({ recipes: [] }, { url: productUrl, reachedUrl }, []).guide, espresso: false };
+    // No images found is not "no card": the detector is a class/id pattern, and
+    // a theme it misses with no `og:image` looks exactly like a page with
+    // nothing on it. An unread gallery is a warning, never a clean empty read (TEC-167).
+    if (gallery.length === 0) {
+      return { kind: "failed", message: "no product gallery or page image was recognised on it, so its images were not looked at" };
+    }
 
     const loaded = (
       await Promise.all(
         gallery.map(async (image) => {
           try {
-            const res = await fetch(image.url, { headers: FETCH_HEADERS, cache: "no-store", signal: bounded(signal, 15_000) });
+            const { response: res } = await fetchChecked(image.url, { headers: FETCH_HEADERS, cache: "no-store", signal: bounded(signal, 15_000) });
             const mediaType = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
             if (!res.ok || !IMAGE_TYPES.has(mediaType)) return null;
             const bytes = Buffer.from(await res.arrayBuffer());
@@ -418,6 +428,7 @@ export async function readRecipeImages(productUrl: string, signal: AbortSignal):
     };
   } catch (error) {
     if (signal.aborted) return { kind: "failed", message: "the search's time ran out before they were read" };
+    if (error instanceof RedirectRefused) return { kind: "failed", message: error.message };
     return { kind: "failed", message: error instanceof Error ? error.message : "an unknown error" };
   }
 }

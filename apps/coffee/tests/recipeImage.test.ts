@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   chooseRecipe,
   combineReads,
+  fetchChecked,
+  RedirectRefused,
   galleryImagesIn,
   imageGuide,
   isFetchableUrl,
@@ -13,9 +15,9 @@ import {
 import type { Guide } from "@/lib/guide";
 import type { SearchOutcome } from "@/lib/searchRun";
 
-// The case that surfaced TEC-47: Middlestate prints its recipe as a card in
+// The case that surfaced TEC-47: Northfield prints its recipe as a card in
 // the product gallery, in two columns, batch and espresso.
-const PAGE = "https://www.middlestatecoffee.com/shop/jos-ramirez-guatemala?category=Coffee";
+const PAGE = "https://www.northfieldroasters.example/shop/example-lot?category=Coffee";
 const BAG = "https://images.squarespace-cdn.com/content/v1/ms/bag-front.jpg?format=1500w";
 const CARD = "https://images.squarespace-cdn.com/content/v1/ms/recipe-card.jpg?format=1500w";
 const IMAGES: CardImage[] = [
@@ -79,7 +81,7 @@ describe("galleryImagesIn", () => {
       <meta property="og:image" content="https://images.squarespace-cdn.com/content/v1/ms/og.jpg">
       <script>var fake = '<div class="ProductItem-gallery"><img src="https://x.example/in-script.jpg"></div>';</script>
     </head><body>
-      <header><img src="/logo.png" alt="Middlestate"></header>
+      <header><img src="/logo.png" alt="Northfield"></header>
       <!-- <div class="product-gallery"><img src="https://x.example/commented.jpg"></div> -->
       <div class="ProductItem-gallery">
         <div class="ProductItem-gallery-slides">
@@ -135,6 +137,57 @@ describe("galleryImagesIn", () => {
   });
 });
 
+describe("fetchChecked", () => {
+  const redirect = (to: string, status = 302) => new Response(null, { status, headers: { location: to } });
+  const ok = () => new Response("ok", { status: 200 });
+  /** A fetcher that answers each URL from a table and records what it was asked for. */
+  function table(routes: Record<string, Response>) {
+    const asked: { url: string; redirect?: string }[] = [];
+    const fetcher = (async (url: string, init?: RequestInit) => {
+      asked.push({ url, redirect: init?.redirect });
+      return routes[url] ?? new Response("missing", { status: 404 });
+    }) as typeof fetch;
+    return { fetcher, asked };
+  }
+
+  it("follows a redirect to another public page, checking it first", async () => {
+    const { fetcher, asked } = table({ "https://a.example/x": redirect("/y"), "https://a.example/y": ok() });
+    const { url } = await fetchChecked("https://a.example/x", {}, fetcher);
+    expect(url).toBe("https://a.example/y");
+    expect(asked.every((a) => a.redirect === "manual")).toBe(true);
+  });
+
+  it("refuses a hop to an IP literal, and never requests it", async () => {
+    const { fetcher, asked } = table({ "https://a.example/x": redirect("http://169.254.169.254/latest/meta-data") });
+    await expect(fetchChecked("https://a.example/x", {}, fetcher)).rejects.toBeInstanceOf(RedirectRefused);
+    expect(asked.map((a) => a.url)).toEqual(["https://a.example/x"]);
+  });
+
+  it("refuses a later hop, not only the first", async () => {
+    const { fetcher } = table({
+      "https://a.example/x": redirect("https://b.example/y"),
+      "https://b.example/y": redirect("http://localhost:8080/admin"),
+    });
+    await expect(fetchChecked("https://a.example/x", {}, fetcher)).rejects.toThrow(/will not fetch/);
+  });
+
+  it("refuses a redirect to a non-web scheme", async () => {
+    const { fetcher } = table({ "https://a.example/x": redirect("file:///etc/passwd") });
+    await expect(fetchChecked("https://a.example/x", {}, fetcher)).rejects.toBeInstanceOf(RedirectRefused);
+  });
+
+  it("gives up on a redirect loop", async () => {
+    const { fetcher } = table({ "https://a.example/x": redirect("/x") });
+    await expect(fetchChecked("https://a.example/x", {}, fetcher)).rejects.toThrow(/redirects/);
+  });
+
+  it("refuses a first URL that is not fetchable", async () => {
+    const { fetcher, asked } = table({});
+    await expect(fetchChecked("http://10.0.0.1/", {}, fetcher)).rejects.toBeInstanceOf(RedirectRefused);
+    expect(asked).toEqual([]);
+  });
+});
+
 describe("isFetchableUrl", () => {
   it("accepts a public web page", () => {
     expect(isFetchableUrl(PAGE)).toBe(true);
@@ -184,7 +237,7 @@ describe("sizedImageUrl", () => {
 describe("shouldReadImages", () => {
   it("reads when the text search came back below tier 1 with a product page", () => {
     expect(shouldReadImages(guide())).toBe(true);
-    expect(shouldReadImages(guide({ status: "roaster_generic", guide_url: "https://www.middlestatecoffee.com/brew" }))).toBe(true);
+    expect(shouldReadImages(guide({ status: "roaster_generic", guide_url: "https://www.northfieldroasters.example/brew" }))).toBe(true);
   });
 
   it("does not read over a tier-1 answer, or with no product page to read", () => {
@@ -255,7 +308,7 @@ describe("chooseRecipe", () => {
 describe("imageGuide", () => {
   const page = { url: PAGE, reachedUrl: PAGE };
 
-  it("stores the batch recipe off Middlestate's card as tier 1, the card beside every value", () => {
+  it("stores the batch recipe off Northfield's card as tier 1, the card beside every value", () => {
     const { guide: g, espresso } = imageGuide({ recipes: [BATCH, ESPRESSO] }, page, IMAGES);
     expect(g.status).toBe("coffee_specific");
     expect(g.method).toBe("batch");
@@ -319,7 +372,7 @@ describe("combineReads", () => {
 
   it("takes a tier-1 image recipe over a tier-2 text one", () => {
     const generic: SearchOutcome = {
-      guide: guide({ status: "roaster_generic", guide_url: "https://www.middlestatecoffee.com/brew", method: "v60", params: { ratio: "1:16" } }),
+      guide: guide({ status: "roaster_generic", guide_url: "https://www.northfieldroasters.example/brew", method: "v60", params: { ratio: "1:16" } }),
       warning: null,
     };
     expect(combineReads(generic, { kind: "read", ...found }).guide.status).toBe("coffee_specific");
@@ -327,7 +380,7 @@ describe("combineReads", () => {
 
   it("keeps a filter recipe from the text search over an espresso-only card", () => {
     const generic: SearchOutcome = {
-      guide: guide({ status: "roaster_generic", guide_url: "https://www.middlestatecoffee.com/brew", method: "v60", params: { ratio: "1:16" } }),
+      guide: guide({ status: "roaster_generic", guide_url: "https://www.northfieldroasters.example/brew", method: "v60", params: { ratio: "1:16" } }),
       warning: null,
     };
     const espressoOnly = imageGuide({ recipes: [ESPRESSO] }, { url: PAGE, reachedUrl: PAGE }, IMAGES);

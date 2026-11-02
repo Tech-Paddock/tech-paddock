@@ -40,7 +40,15 @@ What is true now and its traps. Rules are in `RULES.md`; open work is in Linear 
   pure in `lib/recipeImage.ts`; fetches are in `anthropic.ts`.
 - The image URL is a key on each quote in `guide_quotes`. Tier 1 needs every image in the gallery.
   A text answer's `image` key is stripped.
-- A failed image read is a warning beside the text answer, never a silent `none`.
+- A failed image read is a warning beside the text answer, never a silent `none`. That includes a
+  page where no gallery and no `og:image` was recognised: it is `failed` ("no product gallery or
+  page image was recognised"), not a clean read with no card.
+- Every fetch in the image read (the page and each image) goes through `fetchChecked`
+  (`lib/recipeImage.ts`): `redirect: "manual"`, each hop resolved and checked with
+  `isFetchableUrl` before it is requested, at most five hops. A refused hop on the page is a
+  `failed` read naming the host; on an image it drops that image.
+- Dropped values show on both cards with `validateGuide`'s own reason (`DroppedValues`,
+  `describeDropped`). Search again replaces them with the new run's.
 - `RecipeImages` renders the image under the values it backs, outside the quote disclosure.
 - Nothing detects cross-bag boilerplate (identical values on two bags from one roaster).
 
@@ -57,8 +65,13 @@ What is true now and its traps. Rules are in `RULES.md`; open work is in Linear 
 - `maxDuration = 300` in `app/api/search/route.ts` is a literal Next reads statically. It must equal
   `SEARCH_STALE_MS`.
 - No model call runs from a sandbox, so the image read is untested on a real page. Gallery
-  detection is a class/id pattern (`GALLERY`), and a theme it misses reads as "no card" with no
-  warning.
+  detection is a class/id pattern (`GALLERY`), and a theme it misses (with no `og:image`) now warns
+  that the images were not looked at. It cannot tell that from a page with no images, and warns
+  for both.
+- `guide_model` records the model that answered; it is not a setting. Its column comment says so
+  (`20261102001100_coffee_guide_model_comment`).
+- Test fixtures use invented producers (`northfieldroasters.example`, `sweetbloomcoffee.com`
+  predates that and is in older cases); keep real producers out of new ones.
 - TDS, extraction, beverage yield and grinder have no `guide_*` column. The copy-out is told not to
   put a yield in `water`.
 - `parseRatio` reads larger over smaller: "16:1" and "1:16" are both 16; "2:1" is 2.
