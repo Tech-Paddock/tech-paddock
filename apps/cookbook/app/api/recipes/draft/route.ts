@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { estimateRecipeMacros, generateRecipe, importRecipe, readRecipeFile, type RecipeFields } from "@/lib/anthropic";
+import { estimateRecipeMacros, generateRecipe, importRecipe, readRecipeFile, styleRecipe, type RecipeFields } from "@/lib/anthropic";
 import { validateRecipeFile } from "@/lib/upload";
 import { MAX_STEER, readTurnedDown } from "@/lib/reroll";
 import { nameTaken, type RecipeDraft } from "@/lib/recipes";
@@ -48,6 +48,10 @@ export async function POST(request: NextRequest) {
     let sourceUrl: string | null = null;
     // What the tuning pickers asked for, and anything the draft fell short of.
     let pickNotes: string[] = [];
+    // Did the house style apply (`lib/houseStyle.ts`)? Every way in applies it; a typed
+    // recipe is the one that can fall back to what was typed, and then says so.
+    let styled = true;
+    let styleNote: string | null = null;
 
     if (mode === "manual") {
       const name = typeof body.name === "string" ? body.name.trim() : "";
@@ -86,6 +90,18 @@ export async function POST(request: NextRequest) {
         meta: readMeta(body.meta, { rating: true }),
       };
       origin = "manual";
+
+      // **The house style applies to a typed recipe too** (TEC-201): one call that
+      // moves prep words into the method and spells the units one way, checked in
+      // code to have kept every ingredient and amount. If it cannot, the recipe is
+      // saved as typed and the note says so; typing never fails on style.
+      try {
+        const restyled = await styleRecipe({ name, servings, ingredients, method: fields.method });
+        fields = { ...fields, ingredients: restyled.ingredients, method: restyled.method };
+      } catch {
+        styled = false;
+        styleNote = "Couldn't put this in the house style, so it is saved as you typed it.";
+      }
     } else if (mode === "generate") {
       const brief = typeof body.brief === "string" ? body.brief.trim() : "";
       // The pickers (2026-09-26): meal, diet, cuisine, time. With any
@@ -170,6 +186,7 @@ export async function POST(request: NextRequest) {
       source: "estimate",
       model: MODEL,
       source_url: sourceUrl,
+      styled,
       ingredients: fields.ingredients,
       method: fields.method,
       // Off a model, `readRecipeFields` already read these with no rating. The
@@ -178,6 +195,7 @@ export async function POST(request: NextRequest) {
       note:
         [
           assumedServings ? `${mode === "file" ? "The file" : "The page"} did not say how many it serves; 4 assumed — change it.` : null,
+          styleNote,
           ...pickNotes,
           estimate.note,
         ]

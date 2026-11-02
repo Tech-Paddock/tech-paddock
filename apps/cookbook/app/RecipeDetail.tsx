@@ -29,6 +29,7 @@ export function RecipeOpen({
   onTab,
   onRate,
   rating,
+  onEstimated,
 }: {
   recipe: Recipe;
   tab: RecipeTab;
@@ -36,6 +37,8 @@ export function RecipeOpen({
   onRate: (value: number | null) => void;
   /** True while a rating is being saved. */
   rating: boolean;
+  /** Macros were estimated from the Macros tab (TEC-201): the row that came back. */
+  onEstimated?: (recipe: Recipe) => void;
 }) {
   const steps = methodSteps(recipe.method);
   return (
@@ -122,7 +125,7 @@ export function RecipeOpen({
             <p className="text-sm text-ink-soft">No method.</p>
           )
         ) : (
-          <MacroTab recipe={recipe} />
+          <MacroTab recipe={recipe} onEstimated={onEstimated} />
         )}
       </div>
     </div>
@@ -144,6 +147,7 @@ export function AddToListCard({
   onList,
   onEdit,
   onRemove,
+  onRevert,
   today = localToday(),
 }: {
   name: string;
@@ -152,11 +156,14 @@ export function AddToListCard({
   onList: (day: string) => void;
   onEdit: () => void;
   onRemove: () => void;
+  /** Only for a recipe with an imported original (TEC-201): put the import back. */
+  onRevert?: () => void;
   /** Injected by the tests; the browser's own today otherwise. */
   today?: string;
 }) {
   const [day, setDay] = useState(today);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [confirmingRevert, setConfirmingRevert] = useState(false);
   const picked = parseDay(day);
   const outline = "min-h-11 rounded-xl border border-line px-4 text-base";
 
@@ -188,6 +195,29 @@ export function AddToListCard({
         <button type="button" onClick={onEdit} className={outline}>
           Edit
         </button>
+        {onRevert ? (
+          confirmingRevert ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmingRevert(false);
+                  onRevert();
+                }}
+                className={`${outline} font-semibold`}
+              >
+                Revert — sure?
+              </button>
+              <button type="button" onClick={() => setConfirmingRevert(false)} className={`${outline} text-ink-soft`}>
+                Not now
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={() => setConfirmingRevert(true)} className={outline}>
+              Revert to imported
+            </button>
+          )
+        ) : null}
         {confirmingRemove ? (
           <>
             <button

@@ -22,7 +22,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   colours are fixed in dark mode too.
 - No GET route is cached; caching would serve Health stale servings.
 - **One model, set in `lib/models.ts`** (TEC-133): every call (pricing, Ask Claude, link, file, edit
-  re-price, Tidy, and a resumed `pause_turn`) goes out as `claude-sonnet-5-5` at effort `medium`
+  re-price, the list's Tidy, the house-style restyle, and a resumed `pause_turn`) goes out as `claude-sonnet-5-5` at effort `medium`
   through `requestShape`, with `THINKING_HEADROOM` added to `max_tokens` because thinking counts
   against it. No picker; the draft and edit routes ignore a `model` an older page sends. A kept
   recipe keeps the model that priced it, and `modelLabel` still names Haiku 4.5 and Sonnet 5 for
@@ -100,6 +100,40 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 - Editing (`lib/edit.ts`) re-estimates the whole pot whenever the ingredient list changes at all
   (reordering counts), in one call before the one write; servings alone re-divides the pot. Confirmed for TEC-140: changing
   ingredients updates the macros, and the breakdown reads the row that comes back, so it follows.
+- **The house style** (TEC-201, `lib/houseStyle.ts`) is written once: `HOUSE_STYLE` is the prompt text
+  in Ask Claude, link, file and the restyle call (`styleRecipe`, `lib/anthropic.ts`), which Tidy and a
+  typed recipe both use. An ingredient is amount, unit, item ("1 cup onion"); prep words move into the
+  method ("Chop the onion."); the method is numbered imperative steps; one spelling per unit (tsp, tbsp,
+  cup, oz, lb, °F). **`cup` is "cup" at 1 or less and "cups" above 1** (TD's call); every other unit has one spelling.
+  Code backs the prompt: `spellUnits` runs on everything a model wrote (`readRecipeFields`,
+  `styleRecipe`), and `restyleProblem` throws away a restyle with a different number of ingredient lines,
+  a different leading amount or unit on any line, or a number the method lost. **It checks the leading
+  amount only**: a "(14 oz)" size or the item words are the review screen's job. A link or file draft is
+  not compared with anything (there is no source text to compare), only styled by the prompt.
+- **A typed recipe is restyled too**, one extra call before pricing. If the restyle is refused it is
+  saved as typed, with a note, and not marked `house_style_at`, so Tidy offers it later.
+- **Tidy for recipes** (TEC-201, not the grocery list's Tidy below): `lib/tidy.ts` (pure, deps injected)
+  and `lib/tidyStore.ts`. One model call per recipe, made one at a time from the browser
+  (`TidyReview.tsx`, top of the Recipes tab) so no request runs long; the draft is stored in
+  `recipe_tidy_drafts`, so the review survives a reload. **A draft never changes a recipe**, and has no
+  name in it. It reads `imported_original` when it has ingredients, else the current row. **Servings are
+  estimated only for an imported recipe whose `yield_text` is blank or has no whole number** (a pan size
+  like "9x13" counts as none); the review marks them and the box edits them. Which recipes Tidy offers:
+  `house_style_at` null and no draft.
+- **Keep** (`/api/recipes/tidy/keep`, once per recipe from the browser) is `applyEdit` with `always`: it
+  prices the whole pot (`source = estimate`, the model named) even if the text is unchanged, stamps
+  `house_style_at`, deletes the draft. **A failed estimate keeps the tidy anyway** and clears the macros
+  (`updateRecipe` with `clearMacros`), so old numbers never sit beside new ingredients; the Macros tab
+  then shows "Estimate macros" (`/api/recipes/estimate`, the same path), which also prices any imported
+  recipe nobody has tidied.
+- **Revert** (`/api/recipes/revert`, on a recipe with `has_original`) puts back `imported_original`'s
+  ingredients, method and servings, nulls the macros, source, model and note, and clears
+  `house_style_at`. No model. **Servings come from the original's `servings`, else its yield text's
+  count, else the recipe's current value.**
+- **Trap: the shape of `imported_original` is read, not owned here.** `readOriginal` takes `ingredients`
+  (list or text), the method from `directions`, `method` or `instructions`, and `yield_text` /
+  `servings`. If the load wrote other keys, Tidy falls back to the current row (and never estimates
+  servings), and Revert is refused with a sentence.
 - `methodSteps` splits only on the next number in a run ("gas mark 4" stays); its tests hold the
   edges.
 
@@ -113,6 +147,12 @@ Reasoning is in the migration headers.
   null together or set together (`recipe_macros_together`), and `model` is null when they are.
   `imported_original` (jsonb object, nullable) holds the recipe as imported; a trigger refuses to
   change it once set, so Tidy's Revert can trust it. Null is "not estimated yet", never 0.
+  `house_style_at` (TEC-201, `cookbook_recipe_tidy_drafts`) is when the recipe was put in the house
+  style (a Tidy kept, or kept from a way in that applied it); null is "not tidied yet". `hydrate` turns
+  `imported_original` into `has_original` and drops the jsonb, so it never reaches the browser.
+- `recipe_tidy_drafts` (TEC-201): one row per recipe (`recipe_id` primary key, cascade on delete),
+  `ingredients`, `method`, `servings`, `servings_estimated`. Replaced by a second Tidy, deleted on Keep,
+  Revert or Discard. RLS on, no policies.
 - `grocery_items`: `quantity` 1–99; `recipes` is a snapshot of names, so a rename never reaches
   it. Tidy (checked by `validateTidy`) unions names, takes the larger of the largest absorbed
   quantity and the fixed rules' quantity for the merged line, and the latest `sent_at`. "Milk — the

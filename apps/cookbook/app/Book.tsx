@@ -9,6 +9,7 @@ import type { Recipe } from "@/lib/recipes";
 import { menuDayLabel } from "@/lib/menuDay";
 import { FIRST_RECIPE_TAB, factsLine, macrosLine, type RecipeTab } from "@/lib/recipeView";
 import EditRecipe from "./EditRecipe";
+import TidyReview from "./TidyReview";
 import { BookFilters } from "./Tuning";
 import { NO_FILTER, cuisinesIn, filterActive, matchesFilter, type BookFilter } from "@/lib/tuning";
 
@@ -48,6 +49,8 @@ export default function Book({
   // Bumped whenever the menu may have changed: a recipe added to the list, or
   // one removed from the book (which takes it off the menu too).
   const [menuVersion, setMenuVersion] = useState(0);
+  // Bumped when a recipe changes here, so Tidy's count of recipes to tidy follows.
+  const [tidyVersion, setTidyVersion] = useState(0);
 
   /** From the menu: open that recipe in the book and bring it into view. */
   function openFromMenu(recipeId: string) {
@@ -134,6 +137,29 @@ export default function Book({
     }
   }
 
+  /** A recipe changed by Revert or by "Estimate macros" (TEC-201): the row that came back replaces it. */
+  function replaced(updated: Recipe, message: string) {
+    setRecipes((all) => (all ? all.map((r) => (r.id === updated.id ? updated : r)) : all));
+    setTidyVersion((n) => n + 1);
+    if (message) toast.notice(message);
+  }
+
+  /** Put the imported recipe back; the macros return to "not estimated yet". */
+  async function revert(recipe: Recipe) {
+    try {
+      const response = await fetch("/api/recipes/revert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: recipe.id }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Couldn't put that back.");
+      replaced(body.recipe as Recipe, `"${recipe.name}" is back as imported. Its macros are not estimated yet.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't put that back.");
+    }
+  }
+
   /** An edit saved (`EditRecipe`): the row that came back replaces the one on screen. */
   function edited(updated: Recipe, repriced: boolean) {
     setRecipes((all) => (all ? all.map((r) => (r.id === updated.id ? updated : r)) : all));
@@ -200,6 +226,7 @@ export default function Book({
             </p>
           ) : null}
         </div>
+        {recipes !== null ? <TidyReview onChanged={() => void load()} refreshKey={version + tidyVersion} /> : null}
         {recipes !== null && recipes.length > 0 ? (
           <input
             value={query}
@@ -247,6 +274,8 @@ export default function Book({
                 onRate={(value) => rate(recipe, value)}
                 onRemove={() => remove(recipe)}
                 onEdited={edited}
+                onRevert={() => revert(recipe)}
+                onEstimated={(updated) => replaced(updated, "")}
               />
             ))}
           </ul>
@@ -267,6 +296,8 @@ export function RecipeCard({
   onRate,
   onRemove,
   onEdited,
+  onRevert,
+  onEstimated,
 }: {
   recipe: Recipe;
   open: boolean;
@@ -277,6 +308,10 @@ export function RecipeCard({
   onRate: (value: number | null) => void;
   onRemove: () => void;
   onEdited: (recipe: Recipe, repriced: boolean) => void;
+  /** Revert to the imported original (TEC-201); offered only for a recipe that has one. */
+  onRevert?: () => void;
+  /** Macros estimated from the Macros tab (TEC-201). */
+  onEstimated?: (recipe: Recipe) => void;
 }) {
   // Which tab is showing; the card stays mounted, so it is held while the book is.
   const [tab, setTab] = useState<RecipeTab>(FIRST_RECIPE_TAB);
@@ -326,7 +361,7 @@ export function RecipeCard({
         // by a date box (TEC-189) with Edit and Remove under it. The helpings estimator and the
         // keywords are gone; Health's `GET /api/servings` is untouched.
         <div className="flex flex-col gap-4 border-t border-line/40 px-3.5 py-3">
-          <RecipeOpen recipe={recipe} tab={tab} onTab={setTab} onRate={onRate} rating={rating} />
+          <RecipeOpen recipe={recipe} tab={tab} onTab={setTab} onRate={onRate} rating={rating} onEstimated={onEstimated} />
           <AddToListCard
             name={recipe.name}
             hasIngredients={recipe.ingredients.length > 0}
@@ -334,6 +369,7 @@ export function RecipeCard({
             onList={onList}
             onEdit={() => setEditing(true)}
             onRemove={onRemove}
+            onRevert={recipe.has_original ? onRevert : undefined}
           />
           <p className="text-[11px] text-ink-soft">
             Editing re-prices only when the ingredients change. Removing takes the recipe out of the book and

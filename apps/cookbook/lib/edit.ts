@@ -122,7 +122,13 @@ export type EditDeps<R> = {
 export async function applyEdit<R>(
   deps: EditDeps<R>,
   id: string,
-  edit: RecipeEdit
+  edit: RecipeEdit,
+  /**
+   * `always` prices even when the ingredient text is the same (TEC-201): a kept
+   * Tidy prices at once, and "Estimate macros" prices a recipe whose macros were
+   * never estimated. Every other edit leaves it off.
+   */
+  opts: { always?: boolean } = {}
 ): Promise<{ recipe: R; repriced: boolean }> {
   const current = await deps.getRecipe(id);
   if (!current) throw new InputError("That recipe is not in the book any more.");
@@ -132,7 +138,7 @@ export async function applyEdit<R>(
   }
 
   let reprice: Reprice | null = null;
-  if (changesThePot(current, edit)) {
+  if (opts.always || changesThePot(current, edit)) {
     // Throws on any failure, and nothing below runs.
     const estimate = await deps.estimate(edit);
     // The one model every call runs on (TEC-133), recorded as what priced it.
