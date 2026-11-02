@@ -7,8 +7,10 @@ export const dynamic = "force-dynamic";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Delete a logged meal and its lines (TEC-53). **Never the food**: the items
- * and their versions stay, so logging it again later still finds your numbers.
+ * Delete a logged meal (TEC-53). **A soft delete (TEC-165)**: it sets
+ * `deleted_at` and removes nothing, so the entry and its lines are kept and
+ * only the reads skip them. The food and its versions stay either way, so
+ * logging it again later still finds your numbers.
  * Database only — no model.
  */
 export async function DELETE(_request: NextRequest, props: { params: Promise<{ id: string }> }) {

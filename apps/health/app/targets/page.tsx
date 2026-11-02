@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 /**
  * Setting the day's target — a second screen, reached from a quiet footer link
  * and never a tab. Setting a budget is a different moment
- * from logging a meal, which is the charter's test for a second screen; what is
+ * from logging a meal, which is RULES.md's test for a second screen; what is
  * left of it shows on the log screen, where it is read.
  *
  * It needs no `proxy.ts` edit: the matcher is a catch-all

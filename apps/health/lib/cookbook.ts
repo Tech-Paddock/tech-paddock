@@ -5,7 +5,7 @@ import { parseMacros, type Macros } from "./macros";
 /**
  * Reading a recipe's macros from the Cookbook (TEC-25).
  *
- * **The contract is Cookbook's, in its charter** — `GET /api/servings`, every
+ * **The contract is Cookbook's, in its RULES.md** — `GET /api/servings`, every
  * recipe per serving. This file is Health's side of it and holds nothing the
  * contract does not say.
  *
@@ -101,7 +101,7 @@ export async function fetchServings(params: {
   fetchImpl?: FetchLike;
   timeoutMs?: number;
 }): Promise<Recipe[]> {
-  // Middleware admits no request here without a session, so a missing one is
+  // proxy.ts admits no request here without a session, so a missing one is
   // a broken request rather than an empty book.
   if (!params.session) throw new CookbookUnreachable("no session to forward");
 
