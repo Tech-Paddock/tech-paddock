@@ -28,8 +28,9 @@ export const HOUSE_STYLE = `THE HOUSE STYLE. Every recipe in this book reads the
   Each step starts with a verb ("Chop", "Add", "Simmer"). Put each moved prep action where the cook
   needs it, at the start of the step that uses the item. Every time, temperature and amount the
   method already had stays in it.
-- **One spelling for each unit**, in the ingredients and in the method: tsp, tbsp, cup, oz, lb, °F
-  (and °C). Never "teaspoon", "Tbsp", "cups", "ounces", "pounds", "degrees F".
+- **One spelling for each unit**, in the ingredients and in the method: tsp, tbsp, oz, lb, °F (and °C),
+  and "cup" for an amount of 1 or less ("1 cup", "½ cup") but "cups" above 1 ("2 cups", "1½ cups").
+  Never "teaspoon", "Tbsp", "ounces", "pounds", "degrees F".
 - **THE RECIPE ITSELF NEVER CHANGES.** Do not add, drop, merge or split an ingredient. Do not change
   an amount or a unit's quantity. Keep the ingredients in their order and every ingredient line,
   headings included, as a line. Do not change the name.`;
@@ -85,19 +86,22 @@ const VULGAR = "¼½¾⅓⅔⅛⅜⅝⅞";
 /**
  * A recipe's text with each unit in its one spelling. Only a unit that follows a
  * number is touched ("2 tablespoons" becomes "2 tbsp"), so "cup" in "a cupboard"
- * or "pound the chicken" is left alone. A trailing full stop is taken only when
+ * or "pound the chicken" is left alone. A cup is "cup" for 1 or less and "cups" above 1. A trailing full stop is taken only when
  * the abbreviation is followed by more of the line ("1 tbsp. olive oil"), so the
  * end of a sentence keeps its own.
  */
 export function spellUnits(text: string): string {
   const unitWords = "teaspoons?|tsps?|tablespoons?|tbsps?|tbs|cups?|ounces?|oz|pounds?|lbs?";
-  const unit = new RegExp(`([\\d${VULGAR}])\\s*(${unitWords})(?![A-Za-z])(\\.)?`, "gi");
+  const unit = new RegExp(`(\\d+\\s+\\d+\\/\\d+|\\d+\\s*[${VULGAR}]|\\d+\\/\\d+|\\d+(?:\\.\\d+)?|[${VULGAR}])\\s*(${unitWords})(?![A-Za-z])(\\.)?`, "gi");
   return text
-    .replace(unit, (m: string, digit: string, word: string, dot: string | undefined, offset: number, whole: string) => {
+    .replace(unit, (m: string, qty: string, word: string, dot: string | undefined, offset: number, whole: string) => {
       // The abbreviation's full stop goes only when more of the line follows it, in lower case or a number;
       // before a capital it is the end of a sentence and stays.
       const abbreviation = dot && /^\s*[a-z0-9,(]/.test(whole.slice(offset + m.length));
-      return `${digit} ${UNIT_SPELLINGS[word.toLowerCase()]}${dot && !abbreviation ? "." : ""}`;
+      const spelled = UNIT_SPELLINGS[word.toLowerCase()];
+      // A cup is "cup" up to 1 and "cups" above it; every other unit has the one spelling.
+      const name = spelled === "cup" && qtyValue(qty) > 1 ? "cups" : spelled;
+      return `${qty} ${name}${dot && !abbreviation ? "." : ""}`;
     })
     .replace(/(\d)\s*(?:°|º|degrees?\s|deg\.?\s?)\s*(F|Fahrenheit|C|Celsius)\b/gi, (_m, d: string, scale: string) => `${d}°${scale[0].toUpperCase()}`)
     .replace(/(?<![\w/.])(\d{3})\s?°?\s?F\b/g, "$1°F");

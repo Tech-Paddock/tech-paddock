@@ -104,7 +104,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   in Ask Claude, link, file and the restyle call (`styleRecipe`, `lib/anthropic.ts`), which Tidy and a
   typed recipe both use. An ingredient is amount, unit, item ("1 cup onion"); prep words move into the
   method ("Chop the onion."); the method is numbered imperative steps; one spelling per unit (tsp, tbsp,
-  cup, oz, lb, °F). **`cup` is always singular** ("2 cup flour"), the literal reading of "one spelling".
+  cup, oz, lb, °F). **`cup` is "cup" at 1 or less and "cups" above 1** (TD's call); every other unit has one spelling.
   Code backs the prompt: `spellUnits` runs on everything a model wrote (`readRecipeFields`,
   `styleRecipe`), and `restyleProblem` throws away a restyle with a different number of ingredient lines,
   a different leading amount or unit on any line, or a number the method lost. **It checks the leading

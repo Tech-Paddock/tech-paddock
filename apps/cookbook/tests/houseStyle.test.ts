@@ -13,7 +13,12 @@ describe("one spelling for each unit", () => {
     ["1 Tablespoon olive oil", "1 tbsp olive oil"],
     ["3 tbsps butter", "3 tbsp butter"],
     ["1/2 cups milk", "1/2 cup milk"],
-    ["2 cups flour", "2 cup flour"],
+    ["½ cups milk", "½ cup milk"],
+    ["1 cups rice", "1 cup rice"],
+    ["2 cup flour", "2 cups flour"],
+    ["1½ cup sugar", "1½ cups sugar"],
+    ["1 1/2 cup oats", "1 1/2 cups oats"],
+    ["1-2 cup stock", "1-2 cups stock"],
     ["8 ounces pasta", "8 oz pasta"],
     ["1 pound beef", "1 lb beef"],
     ["2 lbs potatoes", "2 lb potatoes"],
@@ -146,7 +151,7 @@ describe("the serving count in a yield text", () => {
 
 describe("the prompt", () => {
   it("states every rule once, for every path to use", () => {
-    for (const rule of ["amount, unit, item", "Prep words", "numbered, imperative steps", "tsp, tbsp, cup, oz, lb, °F", "NEVER CHANGES"]) {
+    for (const rule of ["amount, unit, item", "Prep words", "numbered, imperative steps", "tsp, tbsp, oz, lb, °F", "\"cups\" above 1", "NEVER CHANGES"]) {
       expect(HOUSE_STYLE).toContain(rule);
     }
   });
