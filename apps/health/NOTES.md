@@ -39,8 +39,10 @@
   refuses a date more than a day from UTC's. A target, none (`{ target: null }`) and a failed read
   (503, shown as an error; `/targets` then offers no form) stay distinct. "Left today" is signed;
   the clamp at zero belongs to the `/targets` split (`setCalories`, `setMacro`).
-- **Deleting a meal** (`lib/entries.ts`) is a hard delete until TEC-165: it cascades to its lines;
-  items and versions stay.
+- **Deleting a meal** (`lib/entries.ts`, migration `health_entries_deleted_at`, TEC-165) is a soft
+  delete: `DELETE /api/entries/[id]` sets `entries.deleted_at` and removes nothing; lines, foods and
+  versions stay. `readDay` filters `deleted_at is null`, and the list, the total and Left today all
+  come from it. A second delete of the same meal is a 404. Nothing in the app undoes one.
 - **Cookbook** (`lib/cookbook.ts`): `/list` redirects to Cookbook's list. A food whose normalised
   name equals a recipe's is the Cookbook's. `GET /api/servings` is read once per request,
   forwarding only `paddock_session` to `COOKBOOK_BASE_URL`. Approving re-reads it, refuses a draft
@@ -48,6 +50,10 @@
   typed-over recipe number is refused everywhere. Same-name recipes are refused, never guessed.
 
 ## Traps
+
+- `readDay` is the only read of `entries`. A new read must filter `deleted_at is null` or a deleted
+  meal comes back. `saveEntry`'s cleanup of a half-written entry is the one remaining hard delete
+  (the row was never shown).
 
 - `lib/supabase.ts` sends `cache: "no-store"`; keep it. On Next 14 a GET-only route served its
   first read all day.

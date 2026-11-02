@@ -15,7 +15,7 @@ import { MODEL } from "./models";
 /**
  * The lookup order, the draft it produces, and what approving one writes.
  *
- * **The order is the product** — the charter says so — and it is here rather
+ * **The order is the product** (RULES.md, Lookup order) and it is here rather
  * than in a route so that the route is transport and this is the decision.
  */
 
@@ -70,11 +70,11 @@ export async function resolveItem(params: {
     error: null as string | null,
   };
 
-  // Tier 1 and 2 read first, because an outage needs them. A throw here is a
+  // Step 1 (the exact match) reads first, because an outage needs it. A throw here is a
   // broken database and must reach the caller.
   const remembered = await findItem(params.name);
 
-  // Tier 0: the Cookbook, which answers before the table. During an outage a
+  // The Cookbook, which answers before the table. During an outage a
   // name stored from the Cookbook is a known recipe and fails on this line;
   // any other resolves as an ordinary food (`findRecipe`). Two recipes of one
   // name are this line's problem too.
@@ -129,7 +129,7 @@ export async function resolveItem(params: {
     };
   }
 
-  // Tier 3. Only reached on a genuine miss.
+  // Step 2, the model. Only reached on a genuine miss.
   // The one model (`lib/models.ts`), recorded on the line so its provenance
   // names what produced the number.
   const model = MODEL;
@@ -319,7 +319,8 @@ export async function saveEntry(draft: Draft, recipes: RecipeBook): Promise<{ id
 
   if (itemsError) {
     // The entry without its items is a row that renders as an empty meal, which
-    // is worse than no row. Remove it rather than leave it.
+    // is worse than no row. Remove it rather than leave it. This is the one
+    // hard delete left: the row was never shown, so there is nothing to keep.
     await supabase.from("entries").delete().eq("id", entry.id);
     throw new LookupError(`Couldn't save that entry's items: ${itemsError.message}`);
   }
@@ -387,6 +388,10 @@ export function snapshotOf(line: SnapshotColumns): Macros | null {
  * without them is refused as a `LookupError` rather than summed as zero,
  * because a silently missing total is the failure this app is least allowed to
  * have.
+ *
+ * **A deleted meal is skipped** (TEC-165): `deleted_at` set means hidden, so it
+ * is in neither the list nor the total, and Left today (which reads the total)
+ * gets it back. This is the only read of `entries`; a new one must filter too.
  */
 export async function readDay(date: string): Promise<Day> {
   const supabase = getServiceClient();
@@ -395,6 +400,7 @@ export async function readDay(date: string): Promise<Day> {
     .from("entries")
     .select("id, dictated_text, meal, eaten_on, created_at, entry_items(id, item_id, quantity, position, resolved_source, resolved_model, item_version_id, kcal, protein_g, carbs_g, fat_g)")
     .eq("eaten_on", date)
+    .is("deleted_at", null)
     .order("created_at", { ascending: true });
 
   if (error) throw new LookupError(`Couldn't read ${date}: ${error.message}`);

@@ -162,7 +162,7 @@ export function eraFor(versions: ItemVersion[], onDate: string): string {
 export type RememberedItem = { item: Item; versions: ItemVersion[] };
 
 /**
- * Tier 1 and 2 of the lookup order: an exact match on the normalised name.
+ * Step 1 of the lookup order: an exact match on the normalised name.
  *
  * Returns null only for a genuine miss. A failed query throws `LookupError`, so
  * a caller cannot accidentally treat an unreachable database as a food it has
