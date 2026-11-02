@@ -112,5 +112,8 @@ Waiting
 - …
 ```
 
+A command the owner should type next (`/build TEC-n`, `/deploy`) goes after the report, in its own
+fenced code block holding only that line.
+
 A decision that lives only in this chat is fixed by writing it down (a Linear issue or
 `NOTES.md`), not by keeping the chat. Issues, pull requests and apps are links.
