@@ -46,7 +46,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   (`macrosLine`). The four macro tiles are gone from the list (`MacroTiles` still draws the Macros
   tab). **Origin is not on the facts line** (it did not fit beside Prep and Cook at 360px); the open
   recipe still says it. **The meal is the one keyword shown** (TEC-205): after the rating on the list
-  line and after the origin on the open recipe, by its capitalised name, and nothing for a recipe with
+  line and after the origin on the open recipe, by its capitalised name, and "Other" for a recipe with
   none. Main, cuisine, equipment, diet and tags are stored and editable in Edit and the typed form,
   and **render nowhere**: not on the list, the open recipe or Add's draft.
   *On the menu* stays beside the book.

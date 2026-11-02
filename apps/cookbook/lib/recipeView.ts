@@ -56,7 +56,7 @@ export function factsLine(r: {
 }): { stars: string | null; rest: string } {
   return {
     stars: ratingPill(r.rating),
-    rest: [...(r.meal ? [mealLabel(r.meal)] : []), ...timeParts(r), `makes ${r.servings}`].join(" · "),
+    rest: [mealLabel(r.meal ?? null), ...timeParts(r), `makes ${r.servings}`].join(" · "),
   };
 }
 

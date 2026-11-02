@@ -26,26 +26,26 @@ describe("the tabs", () => {
 });
 
 describe("the list line (TEC-189)", () => {
-  const base = { rating: 5, servings: 4, total_minutes: null, prep_minutes: 15, cook_minutes: 30 };
+  const base = { rating: 5, meal: "main" as const, servings: 4, total_minutes: null, prep_minutes: 15, cook_minutes: 30 };
   const text = (r: Parameters<typeof factsLine>[0]) => {
     const f = factsLine(r);
     return f.stars ? `${f.stars} · ${f.rest}` : f.rest;
   };
-  it("reads rating · Prep · Cook · makes N", () => {
-    expect(text(base)).toBe("5★ · Prep 15m · Cook 30m · makes 4");
+  it("reads rating · meal · Prep · Cook · makes N", () => {
+    expect(text(base)).toBe("5★ · Main · Prep 15m · Cook 30m · makes 4");
   });
-  it("names the meal after the rating when there is one, and says nothing for none (TEC-205)", () => {
+  it("names the meal after the rating, and Other when there is none (TEC-205)", () => {
     expect(text({ ...base, meal: "creami" })).toBe("5★ · Creami · Prep 15m · Cook 30m · makes 4");
-    expect(text({ ...base, meal: null })).toBe("5★ · Prep 15m · Cook 30m · makes 4");
+    expect(text({ ...base, meal: null })).toBe("5★ · Other · Prep 15m · Cook 30m · makes 4");
   });
   it("drops each part that is unset", () => {
-    expect(text({ ...base, rating: null })).toBe("Prep 15m · Cook 30m · makes 4");
-    expect(text({ ...base, cook_minutes: null })).toBe("5★ · Prep 15m · makes 4");
-    expect(text({ ...base, prep_minutes: null, cook_minutes: null })).toBe("5★ · makes 4");
+    expect(text({ ...base, rating: null })).toBe("Main · Prep 15m · Cook 30m · makes 4");
+    expect(text({ ...base, cook_minutes: null })).toBe("5★ · Main · Prep 15m · makes 4");
+    expect(text({ ...base, prep_minutes: null, cook_minutes: null })).toBe("5★ · Main · makes 4");
   });
   it("shows the old total only when neither prep nor cook is set", () => {
-    expect(text({ ...base, prep_minutes: null, cook_minutes: null, total_minutes: 35 })).toBe("5★ · 35 min · makes 4");
-    expect(text({ ...base, total_minutes: 35 })).toBe("5★ · Prep 15m · Cook 30m · makes 4");
+    expect(text({ ...base, prep_minutes: null, cook_minutes: null, total_minutes: 35 })).toBe("5★ · Main · 35 min · makes 4");
+    expect(text({ ...base, total_minutes: 35 })).toBe("5★ · Main · Prep 15m · Cook 30m · makes 4");
   });
   it("gives one serving's numbers as text", () => {
     expect(macrosLine({ kcal: 519.6, protein_g: 38.2, carbs_g: 41.5, fat_g: 18 })).toBe("520 kcal · 38p · 42c · 18f");

@@ -46,7 +46,7 @@ export function RecipeOpen({
       <div className="flex flex-col gap-1">
         <h3 className="text-lg font-bold">{recipe.name}</h3>
         <p className="text-xs text-ink-soft">
-          {[ORIGIN_LABELS[recipe.origin], ...(recipe.meal ? [mealLabel(recipe.meal)] : []), ...timeParts(recipe), `makes ${recipe.servings}`].join(" · ")}
+          {[ORIGIN_LABELS[recipe.origin], mealLabel(recipe.meal), ...timeParts(recipe), `makes ${recipe.servings}`].join(" · ")}
         </p>
         <div className="flex items-center gap-2">
           <Stars rating={recipe.rating} onRate={onRate} busy={rating} size="text-2xl" />
