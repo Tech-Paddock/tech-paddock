@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { perServing } from "@/lib/recipeSteps";
+import { servingOrNull } from "@/lib/recipeSteps";
+import { menuServingLine } from "@/lib/recipeView";
 import type { Recipe } from "@/lib/recipes";
-import { round } from "@/lib/macros";
 import type { MenuEntry } from "@/lib/menu";
 import { menuDayLabel, parseDay } from "@/lib/menuDay";
 import { useToast } from "./Toast";
@@ -151,7 +151,6 @@ export default function Menu({
         <ul className="flex flex-col gap-1.5">
           {shown.map((m) => {
             const recipe = byId.get(m.recipe_id)!;
-            const s = round(perServing(recipe));
             return (
               <li
                 key={m.recipe_id}
@@ -185,7 +184,7 @@ export default function Menu({
                   {recipe.name}
                 </button>
                 <span className="col-span-2 col-start-2 row-start-2 whitespace-nowrap text-[11px] tabular-nums text-ink-soft sm:col-span-1 sm:col-start-auto sm:row-start-auto lg:col-span-3 lg:col-start-1 lg:row-start-2">
-                  {s.kcal} cal · {s.protein_g}g P · {s.fat_g}g F · {s.carbs_g}g C /serv
+                  {menuServingLine(servingOrNull(recipe))}
                 </span>
                 <button
                   type="button"

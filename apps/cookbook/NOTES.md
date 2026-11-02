@@ -108,6 +108,11 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 Reasoning is in the migration headers.
 
 - `recipes`: `macro_source` has no `web`; a unique index refuses a duplicate name.
+  **A recipe can be saved before its macros are estimated** (TEC-200,
+  `cookbook_recipe_macros_optional`): `kcal`, `protein_g`, `carbs_g`, `fat_g` and `source` are
+  null together or set together (`recipe_macros_together`), and `model` is null when they are.
+  `imported_original` (jsonb object, nullable) holds the recipe as imported; a trigger refuses to
+  change it once set, so Tidy's Revert can trust it. Null is "not estimated yet", never 0.
 - `grocery_items`: `quantity` 1–99; `recipes` is a snapshot of names, so a rename never reaches
   it. Tidy (checked by `validateTidy`) unions names, takes the larger of the largest absorbed
   quantity and the fixed rules' quantity for the merged line, and the latest `sent_at`. "Milk — the
@@ -528,6 +533,14 @@ not answer), `InputError` 400, `ConflictError` 409, `UpstreamError` 502 (Kroger;
 when the stored sign-in failed), `SetupError` 501 (missing variable), anything else 500.
 
 ## Traps
+
+- **Unestimated recipes are null all the way through** (TEC-200). `hydrate` keeps the four macros
+  and `source` null (`Number(null)` would make them 0); `Recipe` is `PotMacros`, and a reader asks
+  `isEstimated` or `servingOrNull` (`lib/recipeSteps.ts`) before doing arithmetic. The list, the
+  menu row and the Macros tab say "Macros not estimated yet"; `toServingRows` leaves the recipe out
+  of `GET /api/servings`. Any new total, filter or reader must skip it the same way. There is no
+  estimate button yet (a follow-on); an ingredient edit re-prices through the model, so it also
+  gives an unestimated recipe its macros.
 
 - **In cart is what Cookbook sent, not the account** (TEC-190). Anything added in the King Soopers
   app, and anything bought since, is invisible; a line cleared from the list while in the cart

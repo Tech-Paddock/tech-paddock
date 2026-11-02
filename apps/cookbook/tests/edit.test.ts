@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { applyEdit, changesThePot, readEdit, type EditDeps, type EditTarget, type RecipeEdit } from "@/lib/edit";
 import { EMPTY_META } from "@/lib/metadata";
 import { normalizeName, perServing, toServingRows, type Recipe } from "@/lib/recipes";
+import type { Macros } from "@/lib/macros";
 import { ConflictError, InputError, statusOf } from "@/lib/errors";
 
 /**
@@ -164,7 +165,7 @@ describe("what Health reads after an edit", () => {
     } as Recipe;
     const [served] = toServingRows([row]);
     expect(Object.keys(served).sort()).toEqual(["id", "name", "per_serving", "servings"]);
-    expect(served.per_serving).toEqual(perServing(row));
+    expect(served.per_serving).toEqual(perServing(row as Recipe & Macros));
     expect(served.per_serving.kcal).toBe(300);
   });
 });

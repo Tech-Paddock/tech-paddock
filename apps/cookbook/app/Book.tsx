@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Menu from "./Menu";
 import { AddToListCard, RecipeOpen } from "./RecipeDetail";
 import { useToast } from "./Toast";
-import { perServing } from "@/lib/recipeSteps";
+import { servingOrNull } from "@/lib/recipeSteps";
 import type { Recipe } from "@/lib/recipes";
 import { menuDayLabel } from "@/lib/menuDay";
 import { FIRST_RECIPE_TAB, factsLine, macrosLine, type RecipeTab } from "@/lib/recipeView";
@@ -306,7 +306,7 @@ export function RecipeCard({
           ) : null}
           {facts.rest}
         </span>
-        <span className="text-xs tabular-nums text-ink-soft">{macrosLine(perServing(recipe))}</span>
+        <span className="text-xs tabular-nums text-ink-soft">{macrosLine(servingOrNull(recipe))}</span>
       </button>
 
       {open && editing ? (

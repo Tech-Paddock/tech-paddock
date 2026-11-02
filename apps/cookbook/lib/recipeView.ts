@@ -1,5 +1,6 @@
 import { timeParts } from "./metadata";
 import { round, type Macros } from "./macros";
+import { NOT_ESTIMATED } from "./recipeSteps";
 
 /**
  * What the book's recipe pill and the open recipe say (TEC-183). Pure, so the
@@ -28,6 +29,13 @@ export type RecipeTab = (typeof RECIPE_TABS)[number]["key"];
 
 export const FIRST_RECIPE_TAB: RecipeTab = RECIPE_TABS[0].key;
 
+/** The menu row's numbers: "520 cal · 38g P · 18g F · 42g C /serv", or the not-estimated line. */
+export function menuServingLine(m: Macros | null): string {
+  if (!m) return NOT_ESTIMATED;
+  const r = round(m);
+  return `${r.kcal} cal · ${r.protein_g}g P · ${r.fat_g}g F · ${r.carbs_g}g C /serv`;
+}
+
 /* ---------------------------------------------------------------------- */
 /* The list line and the open recipe's facts (TEC-189)                      */
 /* ---------------------------------------------------------------------- */
@@ -51,8 +59,12 @@ export function factsLine(r: {
   };
 }
 
-/** The third line: one serving's numbers as text, "520 kcal · 38p · 42c · 18f". */
-export function macrosLine(m: Macros): string {
+/**
+ * The third line: one serving's numbers as text, "520 kcal · 38p · 42c · 18f".
+ * **A recipe with no macros yet says so (TEC-200), never "0 kcal".**
+ */
+export function macrosLine(m: Macros | null): string {
+  if (!m) return NOT_ESTIMATED;
   const r = round(m);
   return `${r.kcal} kcal · ${r.protein_g}p · ${r.carbs_g}c · ${r.fat_g}f`;
 }
