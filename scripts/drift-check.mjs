@@ -208,6 +208,37 @@ for (const rel of ["lib/auth.ts", "lib/password.ts", "lib/theme.css", "lib/theme
       (APPS.length > apps.length ? `; ${APPS.filter((a) => !apps.includes(a)).join(", ")} public by design (check 2c)` : ""));
 }
 
+/* 2b-hub ── The hub holds no database credential (TEC-169). CLAUDE.md says
+   `lib/supabase.ts` is per-app and "the hub has none", and the packages/shared
+   README calls it a property worth keeping: a hub with no database key cannot
+   leak one. Three ways it would stop being true, each measured: the file
+   appears, a database client lands in package.json, or the env list the Garage
+   reads starts asking for a SUPABASE_ name. Any of them fails. */
+{
+  const name = "hub holds no database credential";
+  const home = R("apps", "home");
+  if (!existsSync(home)) {
+    add(name, "ok", "no apps/home — nothing to hold");
+  } else {
+    const bad = [];
+    if (existsSync(join(home, "lib", "supabase.ts"))) bad.push("apps/home/lib/supabase.ts exists");
+    const pkgText = read(join(home, "package.json"));
+    if (pkgText === null) bad.push("apps/home/package.json is unreadable, so its dependencies were not measured");
+    else {
+      let pkg = {};
+      try { pkg = JSON.parse(pkgText); } catch { bad.push("apps/home/package.json is not valid JSON"); }
+      const deps = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies, ...pkg.optionalDependencies, ...pkg.peerDependencies });
+      for (const d of deps) if (d.startsWith("@supabase/") || d === "pg" || d === "postgres") bad.push(`apps/home depends on ${d}`);
+    }
+    const platform = read(join(home, "lib", "platform.ts"));
+    const block = platform?.match(/export const HOME_ENV\b[^=]*=\s*\[([\s\S]*?)\n\];/);
+    if (!block) bad.push("HOME_ENV was not found in apps/home/lib/platform.ts, so its names were not measured");
+    else for (const m of block[1].matchAll(/name:\s*"([A-Z0-9_]+)"/g)) if (m[1].startsWith("SUPABASE_")) bad.push(`HOME_ENV names ${m[1]}`);
+    add(name, bad.length ? "fail" : "ok",
+      bad.length ? bad.join("; ") : "apps/home has no lib/supabase.ts, no @supabase/* or pg dependency, and no SUPABASE_ name in HOME_ENV");
+  }
+}
+
 /* 2c ── The public app holds nothing a password would have protected.
    apps/showcase has no password (TEC-99), and it sits on
    .techpaddock.io, so the browser sends it the session cookie. That is safe
@@ -686,10 +717,39 @@ add("ledger stays retired", existsSync(R(".claude/OPEN-ITEMS.md")) ? "fail" : "o
 {
   const words = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
   const num = (w) => words[w.toLowerCase()] ?? Number(w);
-  const { files: docs, how } = trackedFiles((f) => f.endsWith(".md") && f !== ".claude/DECISIONS.md", ["*.md"]);
+  const { files: mds, how } = trackedFiles((f) => f.endsWith(".md") && f !== ".claude/DECISIONS.md", ["*.md"]);
+  /* The stamped files' comments say "all seven apps" in every app at once, and
+     this check never read them: it looked only at .md. Only the comment text of
+     packages/shared is read — a number in code is not prose — and it is the
+     canonical copy, so one finding is one edit and not one per app. */
+  const { files: sources } = trackedFiles((f) => /\.(ts|tsx|css|mjs)$/.test(f), [SHARED_DIR]);
+  const docs = [...mds, ...sources];
+  const commentLines = (text) => {
+    let block = false;
+    return text.split("\n").map((line) => {
+      let out = "";
+      let rest = line;
+      while (rest.length) {
+        if (block) {
+          const end = rest.indexOf("*/");
+          out += end < 0 ? rest : rest.slice(0, end);
+          if (end < 0) break;
+          block = false;
+          rest = rest.slice(end + 2);
+        } else {
+          const open = rest.search(/\/\*|(^|\s)\/\//);
+          if (open < 0) break;
+          if (rest.startsWith("/*", open)) { block = true; rest = rest.slice(open + 2); }
+          else { out += rest.slice(open); break; }
+        }
+      }
+      return out;
+    });
+  };
   const hits = [];
   for (const rel of docs) {
-    read(R(rel))?.split("\n").forEach((line, i) => {
+    const text = read(R(rel));
+    (text === null ? undefined : mds.includes(rel) ? text.split("\n") : commentLines(text))?.forEach((line, i) => {
       if (/^\s*>/.test(line)) return; // quotes carry examples
       if (/\b\d+\s+tests?\b/i.test(line)) { hits.push(`${rel}:${i + 1} names a test count`); return; }
       if (/^\s*\|/.test(line)) return; // tables carry examples for the rules below
@@ -772,7 +832,7 @@ add("ledger stays retired", existsSync(R(".claude/OPEN-ITEMS.md")) ? "fail" : "o
     });
   }
   add("no computable facts written as prose", hits.length === 0 ? "ok" : "warn",
-    hits.length === 0 ? `${docs.length} ${how} .md files: no test counts, commit SHAs or wrong app counts` : hits.join("; "));
+    hits.length === 0 ? `${mds.length} ${how} .md files and the comments of ${sources.length} ${SHARED_DIR} sources: no test counts, commit SHAs or wrong app counts` : hits.join("; "));
 }
 
 /* ── Output ──────────────────────────────────────────────────────────────── */

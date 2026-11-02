@@ -10,6 +10,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { appsOnDisk, PUBLIC_APPS } from "./stamp-shared.mjs";
 import {
   API_PROBE_PATH, SESSION_COOKIE, appForDeployment, chooseApps, probeApp, readApps, readExpectedHeaders, smoke,
 } from "./smoke-check.mjs";
@@ -165,9 +167,19 @@ test("smoke reports failures per app and counts them", async () => {
 
 // ---- the app list and the headers come from the repo, not from this file ----
 
+/* The expected list is the folders under apps/ — the roster CI and the stamper
+   already derive — less the public app (it has no password to probe) and any
+   parked entry (paused on purpose). A new app whose platform.ts entry is
+   misshapen, so readApps cannot match it, is missing from the result and fails. */
+const expectedSlugs = () => {
+  const src = readFileSync(new URL("../apps/home/lib/platform.ts", import.meta.url), "utf8");
+  const parked = [...(src.split(/export const PARKED\b/)[1] ?? "").matchAll(/slug:\s*"([a-z0-9-]+)"/g)].map((m) => m[1]);
+  return appsOnDisk().filter((a) => !PUBLIC_APPS.includes(a) && !parked.includes(a)).sort();
+};
+
 test("the app list is read from platform.ts: home and every tool, none retyped", () => {
   const apps = readApps();
-  assert.deepEqual(apps.map((a) => a.slug).sort(), ["coffee", "cookbook", "health", "home", "lando", "resume"]);
+  assert.deepEqual(apps.map((a) => a.slug).sort(), expectedSlugs());
   const coffee = apps.find((a) => a.slug === "coffee");
   assert.equal(coffee.url, "https://coffee.techpaddock.io");
   assert.equal(coffee.vercelProject, "tp-coffee-app");

@@ -21,7 +21,7 @@ function secret() {
   // **Use at least 32 random bytes** — `openssl rand -base64 32` — never a
   // word or a phrase. Every session cookie is a known payload next to its
   // HMAC, so a short or guessable secret can be recovered offline at GPU
-  // speed, and whoever has it can mint a session for all seven apps.
+  // speed, and whoever has it can mint a session for every app.
   //
   // Length is deliberately not enforced here: the live value cannot be read
   // back out of Vercel, and a throw would take every app down at once. Rotate
@@ -31,10 +31,9 @@ function secret() {
   return s;
 }
 
-// Web Crypto (not node:crypto) so this works wherever the password gate runs:
-// Edge for middleware.ts (Next 14), Node for proxy.ts (Next 16). crypto.subtle
-// and HMAC-SHA256 are the same on both, so a cookie signed on one verifies on
-// the other.
+// Web Crypto (not node:crypto): the gate file, proxy.ts, runs on Node, and
+// crypto.subtle with HMAC-SHA256 gives one signing path for the gate and the
+// login and logout routes, so a cookie signed by one verifies in the other.
 //
 // The imported key is cached per instance, keyed by the secret string itself,
 // so a request pays for importKey once rather than on every sign and verify.
@@ -119,9 +118,7 @@ async function unpack<T>(value: string | undefined): Promise<T | null> {
 
 /**
  * Constant-time string equality, for comparing a presented secret against the
- * configured one. Pure JavaScript because the gate may run on the Edge runtime
- * (middleware.ts, Next 14), where node:crypto's timingSafeEqual does not exist;
- * proxy.ts (Next 16) runs on Node, where this works unchanged.
+ * configured one. Pure JavaScript, so it needs nothing from node:crypto.
  *
  * Every byte of the longer input is visited whatever the contents, so the time
  * taken says nothing about where the first difference is. It does reveal the

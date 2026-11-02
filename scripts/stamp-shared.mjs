@@ -67,6 +67,10 @@ export const MANIFEST = [
   // out before; the cookie is domain-wide, so one handler serves every app.
   { from: "lib/logout.ts", to: "lib/logout.ts" },
   { from: "app/LogoutControl.tsx", to: "app/LogoutControl.tsx" },
+  // The two routes that re-export those handlers. Byte-identical in every app
+  // since the handlers were stamped; now written and checked like the handlers.
+  { from: "app/api/login/route.ts", to: "app/api/login/route.ts" },
+  { from: "app/api/logout/route.ts", to: "app/api/logout/route.ts" },
 ];
 
 export const SHARED_DIR = "packages/shared";
