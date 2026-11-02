@@ -146,9 +146,8 @@ export function blankBrew(): BrewDraft {
  * can tell you.
  *
  * This rounds *your* numbers, derived from your own dose and water.
- * `parseRatio` still reports the roaster's ratio as they published it —
- * rounding that one would be inventing on their authority, which is the
- * thing this app refuses everywhere else.
+ * `parseRatio` rounds the roaster's ratio only to 0.1, so it keeps the
+ * precision they printed (16.7, not 17).
  */
 export function waterFor(doseG: number | null, ratio: number | null): number | null {
   if (!doseG || !ratio) return null;

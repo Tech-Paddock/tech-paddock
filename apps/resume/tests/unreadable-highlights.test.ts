@@ -12,7 +12,7 @@ import { makeDocx, para, table } from "./helpers/docx";
  * TEC-79. A Career Highlights pipe table whose rows do not pair up is refused
  * rather than guessed at — and that refusal used to read as "the input had no
  * highlights": `kept-unchanged`, nothing named anywhere, while the source's
- * highlight text reached the document nowhere. The charter's rule is that
+ * highlight text reached the document nowhere. The rule in `RULES.md` is that
  * coverage must not be able to lie; this is the case where it did.
  *
  * **What the verdict does about it, since 2026-09-29 (TEC-87, option 3): keep

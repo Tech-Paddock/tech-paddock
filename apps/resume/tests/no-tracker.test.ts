@@ -33,6 +33,14 @@ describe("the Resume Formatter no longer reaches the Pipeline Tracker", () => {
     expect(offenders.map((o) => o.file)).toEqual([]);
   });
 
+  it("holds no client for the shared schema (TEC-26)", () => {
+    // Reaching `shared` from here is a cross-schema contract change, not an edit.
+    const offenders = code.filter(({ text }) =>
+      /schema:\s*["']shared["']|clientFor\(\s*["']shared["']\)|\.schema\(\s*["']shared["']\)|getSharedClient/.test(text)
+    );
+    expect(offenders.map((o) => o.file)).toEqual([]);
+  });
+
   it("names neither pipeline_threads nor renders.thread_id", () => {
     const offenders = code.filter(({ text }) => /pipeline_threads|thread_id/.test(text));
     expect(offenders.map((o) => o.file)).toEqual([]);

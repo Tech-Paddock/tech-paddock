@@ -14,7 +14,7 @@ import type { Probe } from "./diagnostics";
  * leaves the page; a failure stays until something newer succeeds.
  *
  * **A parked project is left out.** Its Vercel project is paused, so it
- * deploys red on `main` itself (`CLAUDE.md`). That is expected, and The
+ * deploys red on `main` itself. That is expected, and The
  * Garage's live connections already show it grey.
  *
  * **Blind spot:** a rollback or redeploy started from the Vercel dashboard

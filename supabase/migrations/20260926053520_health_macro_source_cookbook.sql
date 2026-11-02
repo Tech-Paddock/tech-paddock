@@ -1,7 +1,7 @@
 -- A fourth provenance for a number in `health`: `cookbook`, a recipe's macros
 -- per serving as the Cookbook's `GET /api/servings` returned them.
 --
--- Joel picked "Health's plan" on 2026-09-26 (TEC-25): a line naming a Cookbook
+-- The owner picked "Health's plan" on 2026-09-26 (TEC-25): a line naming a Cookbook
 -- recipe asks the Cookbook before Health's own table, and the recipe is stored
 -- as a `health.items` row with a version whose source is `cookbook` whenever
 -- its numbers differ, so the snapshot and a backfill work unchanged.

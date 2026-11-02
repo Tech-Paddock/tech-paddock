@@ -7,6 +7,32 @@ import type { Macros } from "./macros";
  * from there as before.
  */
 
+/**
+ * A recipe's pot as the book stores it: **all four macros, or none** (TEC-200).
+ * Null is "not estimated yet", a state of its own and never a zero; the database
+ * holds the four together (`cookbook_recipe_macros_optional`).
+ */
+export type PotMacros = { [K in keyof Macros]: Macros[K] | null };
+
+/** Does this recipe have macros? Narrows to the four numbers, so nothing downstream sees a null. */
+export function isEstimated<T extends PotMacros>(recipe: T): recipe is T & Macros {
+  return (
+    recipe.kcal !== null && recipe.protein_g !== null && recipe.carbs_g !== null && recipe.fat_g !== null
+  );
+}
+
+/** What every screen says in place of the numbers. */
+export const NOT_ESTIMATED = "Macros not estimated yet";
+
+/**
+ * One serving of a recipe that may not have macros: **null when it has none**.
+ * The reader's way to skip an unestimated recipe, so a missing number can never
+ * become a 0 on a screen, in a total or in the servings contract.
+ */
+export function servingOrNull(recipe: { servings: number } & PotMacros): Macros | null {
+  return isEstimated(recipe) ? perServing(recipe) : null;
+}
+
 /** One serving: the pot divided by how many it feeds. */
 export function perServing(recipe: { servings: number } & Macros): Macros {
   // Guarding the divisor rather than trusting it. `validateDraft` refuses a

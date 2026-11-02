@@ -94,6 +94,8 @@ type Reformatted = {
   downloadHref?: string | null;
   unread?: string[];
   submittedAt?: string | null;
+  /** Set by the client when the record came from `GET /api/renders/[id]`, never by the server. */
+  reopened?: boolean;
 };
 
 type ContentCheck = { totalLines: number; present: number; missing: string[]; percent: number; notRead?: string[] };
@@ -273,7 +275,7 @@ function Workbench({ rail, children }: { rail: React.ReactNode; children: React.
  * gone after Cookbook's error lifetime or by hand. Solid red rather than
  * Cookbook's red outline because it is the only word on a click that produced
  * no file. Whether it becomes a shared component
- * is TechPad Gen's call.
+ * is the TD's call.
  */
 function ErrorToast({ text, onDismiss, onOpen }: { text: string; onDismiss: () => void; onOpen: () => void }) {
   const dismissRef = useRef(onDismiss);
@@ -513,7 +515,7 @@ function ReformatShell() {
       const res = await fetch(`/api/renders/${id}`, { cache: "no-store" });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? `Couldn't open that render (${res.status}).`);
-      const opened = data as Reformatted;
+      const opened = { ...(data as Reformatted), reopened: true };
       setResult(opened);
       setSaved(opened.submittedAt ? `Marked sent on ${shortDate(opened.submittedAt)}.` : null);
       setTab("reformat");
@@ -1182,7 +1184,7 @@ function ReformatShell() {
                     <p className="text-xs opacity-60">
                       The output is your template with the text swapped, so a finding here is almost always about the
                       template. Fix it there and every future render inherits the fix.
-                      {!result.docxBase64 && " Reopened: this is today's check, read off the stored file."}
+                      {result.reopened && " Reopened: this is today's check, read off the stored file."}
                     </p>
                   </div>
                 </Panel>

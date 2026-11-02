@@ -17,7 +17,7 @@
   `LogoutControl` hidden in a frame.
 - `PARKED` is empty. A parked app would be probed and shown grey.
 - `TOOLS`: resume, coffee, health, cookbook, lando (TEC-119); Lando went last as the neutral
-  choice. It is also in the Pit Wall's `ROSTER`, before showcase.
+  choice. The Pit Wall's `ROSTER` is derived from `PROJECTS` plus showcase, so Lando is there with no second list.
 - Sidebar icons are emoji, except Lando's: `image: "/lando-icon.svg"` in `app/apps.ts`, rendered
   as an `<img class="icon-image">` sized to the emoji box. Every sidebar icon is in full colour
   (owner, 2026-10-21); nothing greys `.icon`. Parked grey is The Garage's stoplight only.
@@ -49,8 +49,9 @@
   by drift. Re-copy it when Lando's logo changes. It sits behind home's gate (not in
   `PUBLIC_ICONS`), which is fine: only a signed-in page shows the sidebar.
 - Drift's JSON shape is the TD's. A renamed check family loses its sentence until the check emits
-  `explain`. It has fired: the `fresh:` and owning-agent families match no check, and some checks
-  have no sentence (TEC-163).
+  `explain`. `tests/garage.test.ts` runs `scripts/drift-check.mjs --json` and fails if any check
+  has no sentence, so a new or renamed check fails home's gate until `lib/drift-explain.ts` covers
+  it (TEC-163).
 - `theme.css` says it is generated from "the palette set the contrast gate checks". No such gate
   or palette source is in the repo; a new livery is hand-written and measured by hand (header fix:
   TEC-169).

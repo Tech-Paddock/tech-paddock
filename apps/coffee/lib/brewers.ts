@@ -8,8 +8,8 @@
  * AIR", a real dripper that no shared five-item list would have room for.
  *
  * So the roaster's list stays broad and describes the world; yours describes
- * your kitchen. That is the charter's "the roaster's values stay separate
- * from yours", applied to the vocabulary rather than only to the columns.
+ * your kitchen. That is RULES.md's "the roaster's values stay separate
+ * from the user's", applied to the vocabulary rather than only to the columns.
  */
 
 /** What roasters publish. Broad on purpose — this records the world, not the shelf. */

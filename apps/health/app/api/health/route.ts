@@ -38,7 +38,7 @@ const probes: Record<string, () => Promise<Omit<Check, "name">>> = {
    *
    * **A schema missing from that dashboard list fails here as a permissions
    * error**, which reads like a bad key and is not one. That step is outside
-   * this repo and is the one the standup protocol says gets missed, so this
+   * this repo and is the one that gets missed, so this
    * probe is the thing that tells you it was.
    *
    * **A real table read, not an RPC.** It was `rpc("version")`, which resolves

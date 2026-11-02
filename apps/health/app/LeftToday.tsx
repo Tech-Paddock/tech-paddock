@@ -24,7 +24,7 @@ const UNIT: Record<keyof Macros, string> = { kcal: " kcal", protein_g: "g", carb
  *
  * **Over target is `--danger`, locally, not `--sev-warn`**: every livery maps
  * `--sev-warn` onto the accent, so "over" would read the same as the bar above
- * it (TEC-12). That is TechPad Gen's to settle; this is the flagged copy.
+ * it (TEC-12). That is the TD's to settle; this is the flagged copy.
  */
 export default function LeftToday({
   target, eaten, onRetry,

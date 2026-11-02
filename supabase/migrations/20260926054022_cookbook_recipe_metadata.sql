@@ -1,6 +1,6 @@
 -- Cookbook · recipe metadata: time, meal, main, cuisine, equipment, diet, tags, rating
 --
--- Agreed with Joel on 2026-09-22 (TEC-52). Reasoning here; the code that reads
+-- Agreed with the owner on 2026-09-22 (TEC-52). Reasoning here; the code that reads
 -- and writes it is `lib/metadata.ts` and `lib/recipes.ts`.
 --
 -- Shape: **additive.** Eight new columns on `cookbook.recipes`, every one either
@@ -30,7 +30,7 @@
 -- count is corrected. It is computed from the macros when it is wanted, never
 -- stored — so there is no column for it, and the code refuses it as a tag.
 --
--- ## `rating` is Joel's
+-- ## `rating` is the owner's
 --
 -- 1 to 5, or not rated. No model writes it: not a draft, not the backfill. It is
 -- set on a draft before Keep it, on the typed form, or on a recipe already in the

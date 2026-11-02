@@ -9,9 +9,11 @@ import { fileLabel } from "@/lib/resumes";
  *
  * **Nothing here re-renders.** Coverage is `renders.coverage` and the change log
  * is `renders.template_snapshot.changeLog`, both written once when the render
- * ran. The ATS findings were never stored, so the route reads them off the
- * stored output bytes — the document that went out, not a new one — and they
- * are the one part that reflects today's lint rather than the lint of the day.
+ * ran. The ATS findings are stored too (`template_snapshot.findings`, TEC-105)
+ * and a reopened FAIL shows those; where the output file exists the route
+ * audits its stored bytes instead — the document that went out, not a new one
+ * — so they are the one part that reflects today's lint rather than the lint of
+ * the day.
  *
  * **An unread record must not look like a clean one.** A render written before
  * the change log was stored, or whose log uses an action the verdict no longer

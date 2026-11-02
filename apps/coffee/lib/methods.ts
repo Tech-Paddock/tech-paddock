@@ -1,11 +1,10 @@
 import { ROASTER_BREWERS, ROASTER_BREWER_LABELS, type RoasterBrewer } from "./brewers";
 
-// Brew method is a fixed vocabulary, not free text. "V60", "v60" and
-// "Hario V60" as three distinct values would quietly break grouping and
-// filtering in the library, and the roaster's own wording varies more than
-// that. A lookup table carrying your standard technique per method is the
-// obvious next step and deliberately isn't built yet — promoting this enum
-// to a table later is an additive migration.
+// The roaster's brew method (`guide_method`, and the suggestion's) is a fixed
+// vocabulary, not free text. "V60", "v60" and "Hario V60" as three distinct
+// values would quietly break grouping, and the roaster's own wording varies
+// more than that. A brew's own method is free text (owner, 2026-10-26,
+// TEC-162). Promoting this enum to a table later is an additive migration.
 
 // The roaster-facing vocabulary now lives in brewers.ts alongside yours, so
 // the two lists sit next to each other and the reason they differ is written

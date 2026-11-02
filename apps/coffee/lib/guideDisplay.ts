@@ -93,3 +93,31 @@ export const SUGGESTION_PRESENTATION = {
   /** Deliberately not a tier colour. This is not a fourth light. */
   dot: "bg-ink/40",
 } as const;
+
+/**
+ * A value the search read but could not keep, with the reason it gave
+ * (TEC-167). Dropped values are shown beside the kept ones, never silently
+ * discarded; the reason is `validateGuide`'s own, so the card never says a
+ * value had "no source" when it was refused for another cause.
+ */
+const FIELD_LABELS: Record<string, string> = {
+  method: "Method",
+  ratio: "Ratio",
+  dose: "Dose",
+  water: "Water",
+  temp: "Temperature",
+  grind: "Grind",
+  time: "Time",
+};
+
+export function describeDropped(d: { field: string; value: string; reason: string }): {
+  label: string;
+  value: string;
+  reason: string;
+} {
+  return {
+    label: FIELD_LABELS[d.field] ?? d.field,
+    value: d.value?.trim() ? d.value.trim() : "(no value given)",
+    reason: d.reason?.trim() ? d.reason.trim() : "no reason was recorded",
+  };
+}

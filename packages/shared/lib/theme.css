@@ -1,8 +1,8 @@
 /* Paddock theme tokens.
  *
- * GENERATED — do not hand-edit. Source of truth is the palette set the contrast
- * gate checks; every value here has passed 4.5:1 for text and 3:1 for non-text
- * against the ground it is actually painted on.
+ * Hand-written, and its contrast measured by hand: nothing generates this file.
+ * Every value here is meant to hold 4.5:1 for text and 3:1 for non-text against
+ * the ground it is actually painted on. Edit it here, then restamp.
  *
  * Stamped into every app from packages/shared, the same arrangement lib/auth.ts
  * and lib/password.ts now use too. Unlike those, drift here is loud rather than
@@ -1071,7 +1071,7 @@
 /* ====================================================================
    The header control — the livery's name, what it is drawn from, and the
    light/dark switch. Plain CSS rather than utility classes so the markup is
-   identical in home (hand-written CSS) and in the four tools (Tailwind).
+   identical in home (hand-written CSS) and in every tool (Tailwind).
    ==================================================================== */
 
 .pd-theme {

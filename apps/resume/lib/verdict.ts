@@ -23,7 +23,7 @@
 export type VerdictInput = {
   coverage: { missing: string[] };
   findings: { severity: "blocking" | "warning"; message: string }[];
-  changeLog: { section: string; action: string }[];
+  changeLog: { section: string; action: string; lines?: string[] }[];
 };
 
 export type Verdict = {
@@ -90,7 +90,14 @@ export function verdictFor(r: VerdictInput): Verdict {
   // same way, so older records reopen with the verdict this rule gives them.
   // Source text that existed and had no slot is a third case, and fails above
   // through `coverage.missing`.
-  const unfilled = r.changeLog.filter((c) => c.action === "not-found-in-input");
+  //
+  // A `not-found-in-input` entry that carries `lines` is the other way round:
+  // the source had text and the template had no slot for it (a Summary with no
+  // summary paragraph). That text is in `coverage.missing`, which fails above, so
+  // saying "the source did not fill" the section would be false (TEC-168).
+  const unfilled = r.changeLog.filter(
+    (c) => c.action === "not-found-in-input" && !(c.lines && c.lines.length > 0)
+  );
   const written = new Set(r.changeLog.filter((c) => WROTE_SOURCE.has(c.action)).map((c) => c.section));
   const partly = unfilled.filter((c) => written.has(c.section));
   const wholly = unfilled.filter((c) => !written.has(c.section));

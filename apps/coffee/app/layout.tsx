@@ -30,10 +30,10 @@ export const metadata: Metadata = {
   },
 
   // Imported rather than referenced by path, deliberately. A static import is
-  // served from /_next/static, which is the one prefix this app's proxy.ts
-  // matcher excludes outright. Next's own metadata conventions (app/icon.png,
-  // app/apple-icon.png) are served from routes that sit behind the password
-  // gate, so iOS would fetch them, get the login redirect, and fall back to a
+  // served from /_next/static, which the gate's matcher skips outright. Since
+  // TEC-27 the gate also passes the exact icon paths, so app/apple-icon.png
+  // would load signed out too; this keeps working without relying on that.
+  // An icon behind the login redirect would make iOS fall back to a
   // screenshot of the page as the home screen icon.
   icons: {
     apple: [{ url: appleTouchIcon.src, sizes: "180x180", type: "image/png" }],

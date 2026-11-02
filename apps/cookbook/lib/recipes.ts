@@ -5,7 +5,7 @@ import { addItems } from "./grocery";
 import { quantityRule } from "./lineQuantity";
 import { readMeta, readRating, type RecipeMeta } from "./metadata";
 import type { RecipeEdit, Reprice } from "./edit";
-import { perServing } from "./recipeSteps";
+import { isEstimated, perServing, servingOrNull, type PotMacros } from "./recipeSteps";
 
 // The helpers the browser runs live in `lib/recipeSteps.ts`, which imports no `./supabase`.
 export { perServing, methodSteps } from "./recipeSteps";
@@ -33,12 +33,13 @@ export type RecipeOrigin = "manual" | "generated" | "imported";
  * **The metadata sits flat on the row** (TEC-52, the `cookbook_recipe_metadata`
  * migration) and is never part of the servings contract.
  */
-export type Recipe = Macros & RecipeMeta & {
+export type Recipe = PotMacros & RecipeMeta & {
   id: string;
   name: string;
   servings: number;
   origin: RecipeOrigin;
-  source: MacroSource;
+  /** Null exactly when the macros are (TEC-200); `model` is null then too. */
+  source: MacroSource | null;
   model: string | null;
   source_url: string | null;
   ingredients: string[];
@@ -104,9 +105,10 @@ export function wholeRecipe(perServingMacros: Macros, servings: number): Macros 
   };
 }
 
-/** What the screen shows per serving, rounded only for display. */
-export function servingLabel(recipe: Recipe): Macros {
-  return round(perServing(recipe));
+/** What the screen shows per serving, rounded only for display. Null when not estimated yet. */
+export function servingLabel(recipe: Recipe): Macros | null {
+  const s = servingOrNull(recipe);
+  return s ? round(s) : null;
 }
 
 /**
@@ -130,11 +132,14 @@ export type ServingRow = {
  * by however many servings were eaten; rounding here would round before the
  * multiply. Display rounding is the reader's.
  *
+ * **A recipe with no macros yet is left out** (TEC-200), so the response keeps its
+ * shape and Health never reads a missing number as a zero.
+ *
  * **Additive only.** A new field is free; renaming or removing one is a contract
  * change and the technical director's.
  */
 export function toServingRows(recipes: Recipe[]): ServingRow[] {
-  return recipes.map((r) => ({
+  return recipes.filter(isEstimated).map((r) => ({
     id: r.id,
     name: r.name,
     servings: r.servings,
@@ -147,14 +152,20 @@ export function toServingRows(recipes: Recipe[]): ServingRow[] {
  * back null on an older row. Both would render as `NaN` and a crash rather than
  * as a number and an empty list.
  */
-function hydrate(row: Record<string, unknown>): Recipe {
+export function hydrate(row: Record<string, unknown>): Recipe {
+  // `Number(null)` is 0, which is the one conversion a recipe with no macros
+  // yet must not get (TEC-200). The database holds the four together, so a
+  // single null makes the whole pot "not estimated".
+  const pot = [row.kcal, row.protein_g, row.carbs_g, row.fat_g].map((v) => (v === null || v === undefined ? null : Number(v)));
+  const estimated = pot.every((v) => v !== null);
   return {
     ...(row as unknown as Recipe),
     servings: Number(row.servings),
-    kcal: Number(row.kcal),
-    protein_g: Number(row.protein_g),
-    carbs_g: Number(row.carbs_g),
-    fat_g: Number(row.fat_g),
+    kcal: estimated ? pot[0] : null,
+    protein_g: estimated ? pot[1] : null,
+    carbs_g: estimated ? pot[2] : null,
+    fat_g: estimated ? pot[3] : null,
+    source: estimated ? ((row.source as MacroSource | null) ?? null) : null,
     ingredients: Array.isArray(row.ingredients) ? (row.ingredients as string[]) : [],
     // Through the same reader as a request body, so a row and a draft cannot
     // disagree about what a field may hold. The rating is read: it is stored,

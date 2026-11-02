@@ -1,7 +1,7 @@
 -- Snapshot an item's numbers onto each logged line, with the version they came
 -- from, so a past day's total never moves.
 --
--- Settled by Joel on 2026-09-22, answering #116, and given the go on
+-- Settled by the owner on 2026-09-22, answering #116, and given the go on
 -- 2026-09-24 (TEC-21). It reverses the 2026-09-18 design recorded in
 -- `20260919135856_health_macro_tables.sql`, where `entry_items` referenced an
 -- item's identity only and every read re-resolved the version for that day. A

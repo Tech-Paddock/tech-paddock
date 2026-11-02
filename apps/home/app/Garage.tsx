@@ -75,8 +75,8 @@ function DriftRow({ check }: { check: DriftCheck }) {
 }
 
 /**
- * Checks sharing an explanation, in first-seen order — seven budgets say what a
- * budget is once rather than seven times. A check with no explanation stands in
+ * Checks sharing an explanation, in first-seen order — a budget says what it is once
+ * rather than once per file. A check with no explanation stands in
  * a group of its own.
  */
 function byExplanation(checks: DriftCheck[]) {
@@ -217,7 +217,7 @@ export default async function Garage() {
             <>
               {withHealth.join(", ")} {withHealth.length === 1 ? "has" : "have"} a{" "}
               <code>/api/health</code> route, but each sits behind the password gate, so home gets
-              401. Opening it up is a gate-file change — shared auth plumbing, not this app401. Opening it up is a middleware change — shared auth plumbing, not this app&apos;s.apos;s.
+              401. Opening it up is a gate-file change — shared auth plumbing, not this app&apos;s.
             </>
           )}
         </li>

@@ -21,7 +21,11 @@ const FAMILIES: [RegExp, string][] = [
   ],
   [
     /^(middleware|proxy)\.ts/,
-    "The password gate comes in three deliberate versions. Anything else means an app's gate has changed shape.",
+    "There is one password gate, and every app runs the same copy. An app whose gate differs has changed shape.",
+  ],
+  [
+    /^hub holds no database credential/,
+    "The hub keeps no database key, so a leak from the hub cannot reach the data. A database file, client or variable appearing in it breaks that.",
   ],
   [/^password gate/, "Every app must sit behind the password gate. An app without one is public."],
   [
@@ -33,12 +37,15 @@ const FAMILIES: [RegExp, string][] = [
     "This file has a line limit so it stays readable in one sitting. Drift warns within ten lines of the limit and fails past it — compact it before adding to it.",
   ],
   [
-    /^fresh: /,
-    "An agent's handoff must be rewritten after its area changes. A stale one means the next session starts from an out-of-date picture.",
+    /^public app holds nothing/,
+    "The one public app must hold nothing: no code, no data, no secret. Anything in it is visible to everyone.",
   ],
-  [/^every app has an owning agent/, "Every app folder needs an agent that owns it, or nobody is looking after it."],
+  [
+    /^every app has RULES\.md and NOTES\.md/,
+    "Each app keeps its rules and its current state in these two files. An app without them has nowhere for the next session to start.",
+  ],
   [/^migration versions/, "Wherever a migration is cited by its version, that migration must exist."],
-  [/stays retired/, "Retired on purpose. Bringing it back would split the same information across two places again."],
+  [/stays? retired/, "Retired on purpose. Bringing it back would split the same information across two places again."],
   [
     /computable facts/,
     "A number that can be measured is measured, not typed into a document — a typed number goes stale and nothing says so.",

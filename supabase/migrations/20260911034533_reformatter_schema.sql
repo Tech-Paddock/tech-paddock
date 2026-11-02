@@ -1,6 +1,6 @@
 -- Resume Formatter rebuild.
 --
--- The app reformats a Jobright-tailored resume into Joel's own template and
+-- The app reformats a Jobright-tailored resume into the owner's own template and
 -- records the submission. It does not author resume content — Jobright does —
 -- so the content tables from the original build go away. All four were empty.
 

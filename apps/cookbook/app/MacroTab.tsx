@@ -1,7 +1,7 @@
 import Provenance from "./Provenance";
 import { MACRO_LABELS, round, type Macros } from "@/lib/macros";
 import { calorieSplit, potAndServing, SPLIT_KEYS } from "@/lib/breakdown";
-import { perServing } from "@/lib/recipeSteps";
+import { isEstimated, NOT_ESTIMATED, perServing } from "@/lib/recipeSteps";
 import type { Recipe } from "@/lib/recipes";
 
 /**
@@ -39,6 +39,10 @@ const SWATCH = ["bg-accent", "bg-accent/50", "bg-ink-soft/60"] as const;
  * only; nothing is called. Local patterns: the tiles, a thin split bar.
  */
 export default function MacroTab({ recipe }: { recipe: Recipe }) {
+  // TEC-200: saved before its macros were estimated. Say so; show no tiles, no 0.
+  if (!isEstimated(recipe) || !recipe.source) {
+    return <p className="text-sm text-ink-soft">{NOT_ESTIMATED}</p>;
+  }
   const { pot } = potAndServing(recipe);
   const split = calorieSplit(recipe);
 

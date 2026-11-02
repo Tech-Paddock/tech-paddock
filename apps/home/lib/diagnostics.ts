@@ -66,8 +66,8 @@ const VERCEL_ERRORS: Record<string, string> = {
   DNS_HOSTNAME_NOT_FOUND: "Vercel could not resolve the address it routes to",
   FUNCTION_INVOCATION_FAILED: "the app crashed answering",
   FUNCTION_INVOCATION_TIMEOUT: "the app took too long to answer",
-  MIDDLEWARE_INVOCATION_FAILED: "the app's middleware crashed",
-  MIDDLEWARE_INVOCATION_TIMEOUT: "the app's middleware took too long",
+  MIDDLEWARE_INVOCATION_FAILED: "the app's gate file crashed",
+  MIDDLEWARE_INVOCATION_TIMEOUT: "the app's gate file took too long",
   NO_RESPONSE_FROM_FUNCTION: "the app sent no response",
 };
 

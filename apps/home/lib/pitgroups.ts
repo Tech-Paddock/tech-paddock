@@ -1,4 +1,5 @@
 import type { Column, PitIssue } from "./linear";
+import { PROJECTS } from "./platform";
 
 /**
  * How the Pit Wall arranges its issues — by status, or by app, behind one toggle.
@@ -21,12 +22,13 @@ export const COLUMNS: { id: Exclude<Column, "later">; name: string }[] = [
 ];
 
 /**
- * The apps in a fixed order. A
+ * The apps in a fixed order: every project in `PROJECTS`, then showcase, which has no
+ * project of its own. A
  * label not in this list still gets its own group, after these, rather than
  * being dropped: the board must never hide an issue for carrying a new name.
  * Issues with no `app:` label are platform work and come last (TEC-115).
  */
-const ROSTER = ["home", "resume", "coffee", "health", "cookbook", "lando", "showcase"];
+const ROSTER = [...PROJECTS.map((p) => p.slug), "showcase"];
 const NONE = "Platform";
 
 const STAGE: Record<Column, number> = { progress: 1, review: 2, todo: 3, later: 4 };

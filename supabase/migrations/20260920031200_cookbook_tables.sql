@@ -4,7 +4,7 @@
 -- that was created empty by `20260920022500` and granted by `20260920022508`.
 -- Nothing existing is touched, and nothing outside this schema is referenced.
 --
--- This is the design argued out with Joel across 2026-09-18 and 19 on
+-- This is the design argued out with the owner across 2026-09-18 and 19 on
 -- `claude/health-recipes`, which is kept on purpose rather than deleted. That
 -- branch's `20260919232121_health_recipes.sql` was **never applied** — history
 -- ends at `20260919225229` — so extracting recipes into their own app cost
@@ -37,7 +37,7 @@
 --
 -- ## Macros are static, so ingredients are text
 --
--- Joel on 2026-09-18, against Health's own recommendation that macros be derived
+-- The owner on 2026-09-18, against Health's own recommendation that macros be derived
 -- from linked ingredient rows: *"Recipes would have static macros."* A recipe's
 -- numbers are estimated once, when it is kept, and re-costing one means
 -- estimating it again on purpose. That makes `ingredients` a text array rather
@@ -48,7 +48,7 @@
 --
 -- `health.macro_source` is ('hand', 'web', 'estimate'), because Health's log
 -- reads published nutrition panels for chains and packaged food. **The Cookbook
--- never does.** Joel settled what an import keeps — *"Only retain recipe. Then
+-- never does.** The owner settled what an import keeps — *"Only retain recipe. Then
 -- calculate macros and cals."* — so a recipe's numbers are always this app's own
 -- estimate of its ingredients, even when the page it came from published a
 -- nutrition panel. That panel is thrown away.
@@ -160,7 +160,7 @@ comment on column cookbook.recipes.origin is
 -- app never writes that table and never assumes it disappears on any date.
 --
 -- The shape is Health's `20260919225229` carried over, including the **cheap
--- version** Joel chose on 2026-09-19: the list leaves as copied text or a search
+-- version** the owner chose on 2026-09-19: the list leaves as copied text or a search
 -- link per line, with no retailer credential, no OAuth and no `middleware.ts`
 -- carve-out. That constraint moved with the list rather than being reopened.
 --
