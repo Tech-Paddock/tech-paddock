@@ -1,6 +1,6 @@
 -- Cookbook · a recipe can be saved before its macros are estimated
 --
--- Agreed with Joel on 2026-11-01 (TEC-200): "Don't worry about finding any
+-- Agreed with the owner on 2026-11-01 (TEC-200): "Don't worry about finding any
 -- macros yet. Just add them to my database." The Recipe Keeper export holds
 -- recipes with no numbers, and estimating each on import was the other option;
 -- the owner chose save now, macros later. The code that reads this is
