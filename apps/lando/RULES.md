@@ -4,7 +4,7 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 ## Scope
 
-- Potty, food, fun, training (both stored as exercise), weight and health (vet visits, medical issues and medications), with photos and files on every form and upcoming item (TEC-203), each logged through a short form with defaults; analytics over the same events; and notes (misc notes and documents, TEC-204).
+- Potty, food, fun, training (both stored as exercise), weight and health (vet visits, medical issues and medications), with photos and files on every form and upcoming item (TEC-203), each logged through a short form with defaults; analytics over the same events; and notes (misc notes and documents, TEC-204), which a Health or Training entry can link to (TEC-208).
 - Who logged it is a person picked from names stored in the database, never in the repo.
 
 ## Surface: app
@@ -35,6 +35,12 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 - Login is the shared password until per-person logins ship (TEC-118).
 - Notes are a journal kind (`note`) on their own tab, never in the Log feed, the pills or Analytics;
   a note is never dated in the future (TEC-204).
+- Related issue (TEC-142, TEC-161, TEC-208): Potty keeps its Medical issue checkbox, the select behind it. A vet
+  visit and a medication dose show the select always, opening on None, which saves no `issue`. A medical issue
+  links to no other issue.
+- Related note (TEC-208): every Health type and Training carry an optional link (`note_id`) to a live note, picked
+  from None and the newest notes. Changing or clearing it is a correction; the link never shows in the Log feed,
+  the pills or Analytics.
 - Livery: McLaren '25 (`mcl39`), the theme's own; changed only in the theme.
 - Every change a user would notice adds one plain-language entry to the release notes
   (`lib/releases.ts`, newest first, append-only) on the same branch: no issue numbers, file names,
