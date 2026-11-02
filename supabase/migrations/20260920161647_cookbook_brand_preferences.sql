@@ -6,7 +6,7 @@
 --
 -- **Three shapes, because "no brand" is a real answer.** A preference is a
 -- product link, better search words, or deliberately nothing. The third is not a
--- missing row: it is how a narrow phrase overrides a broad one. Joel's own
+-- missing row: it is how a narrow phrase overrides a broad one. The owner's own
 -- example is exactly this — `milk` means Fairlife 2%, and `whole milk` means
 -- plain whole milk, which only works if `whole milk` can be written down as
 -- "search this plainly" rather than left out.

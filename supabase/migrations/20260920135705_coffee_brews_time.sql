@@ -1,6 +1,6 @@
 -- How long the brew took.
 --
--- Joel, 2026-09-20: "Add brew time." The brew log recorded every decision —
+-- The owner, 2026-09-20: "Add brew time." The brew log recorded every decision —
 -- brewer, grinder, dial, dose, water — and then stopped short of the one
 -- number you are actually watching while the bed drains. A dial-in reads as a
 -- sequence of attempts, and without a time two of those attempts that differ

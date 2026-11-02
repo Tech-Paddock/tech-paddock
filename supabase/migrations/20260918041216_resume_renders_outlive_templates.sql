@@ -1,6 +1,6 @@
 -- A render outlives the template it was built from.
 --
--- Approved by Joel on 2026-09-17: "Generally I want the renders to stay even if
+-- Approved by the owner on 2026-09-17: "Generally I want the renders to stay even if
 -- the templates go." Until now `renders.template_id` was `not null` with no
 -- delete action, so deleting a template any render pointed at was refused by the
 -- database and, one step earlier, by the API. That was the right default while

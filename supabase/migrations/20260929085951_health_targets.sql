@@ -1,6 +1,6 @@
 -- Health: a daily macro target, dated from when it applies (TEC-53).
 --
--- Approved by Joel on 2026-09-19 as four commitments, and shaped by his answers
+-- Approved by the owner on 2026-09-19 as four commitments, and shaped by his answers
 -- of 2026-09-29: the target is shown only as a "Left today" card on the log
 -- screen, it is set on a second screen (`/targets`), a new one applies from
 -- today and is never backdated, and which macros are locked is remembered.
@@ -29,7 +29,7 @@
 -- ## `locked`
 --
 -- The macros held still when the others rebalance on `/targets`. Stored with
--- the target so the lock is remembered (Joel, 2026-09-29), and constrained to
+-- the target so the lock is remembered (owner, 2026-09-29), and constrained to
 -- the three macro column names so a typo cannot quietly lock nothing.
 --
 -- ## RLS
