@@ -4,13 +4,21 @@ import { InvalidEvent } from "@/lib/events";
 import { Conflict } from "@/lib/journal";
 import { parseAction } from "@/lib/upcoming";
 import { applyAction, listOpen } from "@/lib/upcoming-db";
+import { signedPhotoUrls } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
-/** The Upcoming tab's read: open items, soonest first. A failure is a 503, never an empty list. */
+/**
+ * The open items, soonest first, and a signed URL for each of their attachments by path (TEC-203; a path that
+ * could not be signed is absent). A failure is a 503, never an empty list.
+ */
 export async function GET() {
   try {
-    return NextResponse.json({ items: await listOpen(getServiceClient()) });
+    const db = getServiceClient();
+    const items = await listOpen(db);
+    const paths = [...new Set(items.flatMap((i) => i.attachments?.photos ?? []))];
+    const photos = Object.fromEntries(await signedPhotoUrls(db, paths).catch(() => new Map<string, string>()));
+    return NextResponse.json({ items, photos });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 503 });
   }

@@ -14,6 +14,7 @@ import {
   openItems,
   parseUpcoming,
   visitPrefill,
+  type Attachments,
   type RepeatUnit,
   type Upcoming,
   type UpcomingInput,
@@ -50,6 +51,9 @@ export type FutureForm = {
   reason?: string;
   /** A medication's name, dose and unit, when picked. */
   med?: { name: string; dose: number | null; unit: string } | null;
+  /** The photos and files on the form (TEC-203): paths, and the original name of each file that is not a picture. */
+  photos?: readonly string[];
+  names?: Record<string, string>;
 };
 
 /** The item's kind for a form: a vet visit and a medication have their own, everything else is Other. */
@@ -97,6 +101,7 @@ export function futureItem(x: FutureForm): UpcomingInput {
     note: x.note,
     repeat_every: x.repeatEvery,
     repeat_unit: x.repeatUnit,
+    ...(x.photos?.length ? { attachments: { photos: x.photos, ...(x.names ? { names: x.names } : {}) } } : {}),
   });
 }
 
@@ -129,6 +134,9 @@ export type DonePrefill = {
   medId: string;
   dose: string;
   unit: string;
+  /** The item's attachments (TEC-203), which the entry a Done creates carries, or the form of an edit opens with. */
+  photos: string[];
+  names: Record<string, string>;
 };
 
 /**
@@ -138,7 +146,7 @@ export type DonePrefill = {
  * the dose and the unit.
  */
 export function donePrefill(
-  item: Pick<Upcoming, "kind" | "title" | "note" | "due_on" | "due_time">,
+  item: Pick<Upcoming, "kind" | "title" | "note" | "due_on" | "due_time"> & { attachments?: Attachments | null },
   meds: readonly Medication[] = []
 ): DonePrefill {
   const base = visitPrefill(item);
@@ -163,6 +171,8 @@ export function donePrefill(
     medId,
     dose,
     unit,
+    photos: item.attachments?.photos ? [...item.attachments.photos] : [],
+    names: item.attachments?.names ? { ...item.attachments.names } : {},
   };
 }
 

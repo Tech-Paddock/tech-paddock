@@ -1,5 +1,6 @@
 import type { getServiceClient } from "./supabase";
 import { InvalidEvent } from "./events";
+import { missingPhotos } from "./storage";
 import { Conflict } from "./journal";
 import { needsVisit, repeatOf, type Upcoming, type UpcomingAction, type UpcomingInput } from "./upcoming";
 
@@ -12,11 +13,22 @@ import { needsVisit, repeatOf, type Upcoming, type UpcomingAction, type Upcoming
 type SupabaseClient = ReturnType<typeof getServiceClient>;
 
 const COLUMNS =
-  "id, kind, title, due_on, due_time, note, repeat_every, repeat_unit, status, done_on, done_event, created_at, updated_at";
+  "id, kind, title, due_on, due_time, note, repeat_every, repeat_unit, status, done_on, done_event, attachments, created_at, updated_at";
 
 /** `due_time` comes back as HH:MM:SS; the screen holds HH:MM. */
 function row(r: Upcoming): Upcoming {
   return { ...r, due_time: r.due_time ? r.due_time.slice(0, 5) : null };
+}
+
+/** The columns written for an item: its attachments are null when it has none, so an edit clears them. */
+const written = (item: UpcomingInput) => ({ ...item, attachments: item.attachments ?? null });
+
+/** An item never saves naming a file that is not in the bucket (RULES.md, Never 5), whatever the phone sent. */
+async function checkAttachments(db: SupabaseClient, item: UpcomingInput): Promise<void> {
+  const paths = item.attachments?.photos ?? [];
+  if (paths.length && (await missingPhotos(db, paths)).length) {
+    throw new InvalidEvent("a file didn't finish uploading — retry it, or remove it");
+  }
 }
 
 /** Open items only; done and cancelled stay in the table and off the screen. */
@@ -32,7 +44,7 @@ export async function listOpen(db: SupabaseClient): Promise<Upcoming[]> {
 }
 
 async function insert(db: SupabaseClient, item: UpcomingInput): Promise<Upcoming> {
-  const { data, error } = await db.from("upcoming").insert(item).select(COLUMNS).single();
+  const { data, error } = await db.from("upcoming").insert(written(item)).select(COLUMNS).single();
   if (error) throw new Error(`couldn't add: ${error.message}`);
   return row(data as Upcoming);
 }
@@ -51,7 +63,10 @@ export async function applyAction(
   a: UpcomingAction,
   now = new Date()
 ): Promise<{ item: Upcoming; next: Upcoming | null }> {
-  if (a.action === "add") return { item: await insert(db, a.item), next: null };
+  if (a.action === "add") {
+    await checkAttachments(db, a.item);
+    return { item: await insert(db, a.item), next: null };
+  }
 
   const current = await findOpen(db, a.id);
   const stamp = now.toISOString();
@@ -68,7 +83,10 @@ export async function applyAction(
     return row((data as Upcoming[])[0]);
   };
 
-  if (a.action === "edit") return { item: await update(a.item), next: null };
+  if (a.action === "edit") {
+    await checkAttachments(db, a.item);
+    return { item: await update(written(a.item)), next: null };
+  }
   if (a.action === "cancel") return { item: await update({ status: "cancelled" }), next: null };
 
   // Done. A vet visit or vaccine is closed by the visit it names, which must be saved: the server

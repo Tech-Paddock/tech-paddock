@@ -4,7 +4,7 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 ## Scope
 
-- Potty, food, fun, training (both stored as exercise), weight and health (vet visits, medical issues and medications, with photos), with photos on Potty, Fun and Training too, each logged through a short form with defaults; analytics over the same events.
+- Potty, food, fun, training (both stored as exercise), weight and health (vet visits, medical issues and medications), with photos and files on every form and upcoming item (TEC-203), each logged through a short form with defaults; analytics over the same events.
 - Who logged it is a person picked from names stored in the database, never in the repo.
 
 ## Surface: app
@@ -24,13 +24,13 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 4. Call a model. A weekly summary would be its own issue, through a new `lib/models.ts` (Sonnet 5.5
    at medium) with its own test.
 5. Lose a tap. A failed save stays on screen with a retry; it never shows as logged.
-6. Replace or delete a stored photo (the owner, 2026-10-26, TEC-162). Entries name photos by path,
+6. Replace or delete a stored photo or file (the owner, 2026-10-26, TEC-162). Entries name photos by path,
    voided ones too, so what is stored under a path is history like the entry.
 
 ## Settled
 
 - Upcoming items are plans kept in `lando.upcoming`, created by a future When on any form (no
-  tab), cancelled and never deleted; the journal stays append-only, and an entry saved from a Done
+  tab), edited in place while open (one made from a form, TEC-203), cancelled and never deleted; the journal stays append-only, and an entry saved from a Done
   links the item it closed (`done_event`) (TEC-192, TEC-199).
 - Login is the shared password until per-person logins ship (TEC-118).
 - Livery: McLaren '25 (`mcl39`), the theme's own; changed only in the theme.
@@ -42,5 +42,6 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
   TEC-199; a dose holds the id and a name snapshot), health reason ids, `lando.dogs` ids, `COMMANDS`, and the potty what, leash and spot lists. Retire one (a food
   item: `retired: true`); never delete or re-id it, because old entries hold it. `lando.details_ok`
   only ever widens: `create or replace` re-checks no rows.
-- Photos (on Health, Potty, Fun and Training entries) live in the private `lando-photos` bucket, shown through
-  signed URLs; an event stores only the path.
+- Photos and files (on every entry and upcoming item, any type, TEC-203) live in the private `lando-photos` bucket,
+  shown through signed URLs; a picture is shrunk on the phone and any other file is 4 MB at most; an event stores
+  the path, and a file's original name.

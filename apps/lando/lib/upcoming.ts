@@ -1,4 +1,4 @@
-import { InvalidEvent } from "./events";
+import { InvalidEvent, parseAttachments } from "./events";
 
 /**
  * Upcoming (TEC-192): vet visits, vaccines, medications and other plans, kept in `lando.upcoming`.
@@ -23,6 +23,9 @@ export type RepeatUnit = (typeof REPEAT_UNITS)[number];
 export const UPCOMING_STATUSES = ["open", "done", "cancelled"] as const;
 export type UpcomingStatus = (typeof UPCOMING_STATUSES)[number];
 
+/** An item's photos and files (TEC-203): the same two keys an entry's `details` holds. Null when there are none. */
+export type Attachments = { photos: string[]; names?: Record<string, string> };
+
 /** A row of `lando.upcoming` as the screen holds it (`due_time` is `HH:MM`). */
 export type Upcoming = {
   id: string;
@@ -36,6 +39,7 @@ export type Upcoming = {
   status: UpcomingStatus;
   done_on: string | null;
   done_event: string | null;
+  attachments?: Attachments | null;
   created_at: string;
   updated_at: string;
 };
@@ -49,6 +53,8 @@ export type UpcomingInput = {
   note: string | null;
   repeat_every: number | null;
   repeat_unit: RepeatUnit | null;
+  /** Absent when there are none; an edit without it clears the item's. */
+  attachments?: Attachments;
 };
 
 export const TITLE_MAX = 80;
@@ -148,6 +154,16 @@ export function upcomingTone(item: Pick<Upcoming, "due_on">, today: string): Upc
 /** When an item is due, for its row: "Thu Nov 6" or "Thu Nov 6, 9:30 AM". */
 export function dueText(item: Pick<Upcoming, "due_on" | "due_time">): string {
   return item.due_time ? `${dayText(item.due_on)}, ${timeText(item.due_time)}` : dayText(item.due_on);
+}
+
+/** An upcoming row's first line: "Title · note", or the title alone. The row cuts it off with an ellipsis. */
+export function titleLine(item: Pick<Upcoming, "title" | "note">): string {
+  return item.note ? `${item.title} · ${item.note}` : item.title;
+}
+
+/** An upcoming row's second line: due date, "overdue" when it is, and the repeat. */
+export function detailLine(item: Pick<Upcoming, "due_on" | "due_time" | "repeat_every" | "repeat_unit">, tone: UpcomingTone): string {
+  return [dueText(item), tone === "red" ? "overdue" : "", repeatText(item.repeat_every, item.repeat_unit)].filter(Boolean).join(" · ");
 }
 
 /** "every 2 weeks", "every month", "every 3 years". */
@@ -264,7 +280,13 @@ export function parseUpcoming(raw: unknown): UpcomingInput {
     repeat_unit = raw.repeat_unit as RepeatUnit;
   }
 
-  return { kind: kind as UpcomingKind, title, due_on: raw.due_on as string, due_time, note, repeat_every, repeat_unit };
+  const out: UpcomingInput = { kind: kind as UpcomingKind, title, due_on: raw.due_on as string, due_time, note, repeat_every, repeat_unit };
+  if (raw.attachments !== undefined && raw.attachments !== null) {
+    if (!isObject(raw.attachments)) throw new InvalidEvent("attachments must be an object");
+    const a = parseAttachments(raw.attachments);
+    if (a.photos) out.attachments = { photos: a.photos, ...(a.names ? { names: a.names } : {}) };
+  }
+  return out;
 }
 
 /** What a request to `/api/upcoming` asks for. */
