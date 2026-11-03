@@ -34,4 +34,5 @@ asks the owner as each builder starts, so the plan in step 2 is what those appro
    where to stop. Describe the job, not the code; a line-by-line brief is building.
 6. **One report to the owner** when they are all back: each branch as a link, whether it deploys
    alone or what it waits on, the merge order (migration first), the combined blast radius, and
-   their questions as one multiple-choice question. Record the branches on each issue.
+   their questions as one multiple-choice question. Record the branches on each issue. The next
+   command (`/deploy`) ends the report in its own fenced code block holding only that line.

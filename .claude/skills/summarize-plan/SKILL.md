@@ -36,12 +36,15 @@ Plan · <scope> · YYYY-MM-DD HH:MM
 Not in this plan
 - TEC-n: why (waits on the owner, parked, another session's)
 
-Run it: `/execute-plan <scope>`
+Run it:
 ```
 
 **The command** names the plan exactly: `/execute-plan <app>` when the plan is every ready issue of
 one app, otherwise `/execute-plan TEC-a TEC-b …` in plan order. Nothing ready: say so, and give no
 command.
+
+**The command stands alone** after `Run it:`, in its own fenced code block holding only that one
+line, so one tap copies it on a phone.
 
 **Record it** in `.claude/state/plan.json`, overwriting any earlier one:
 `{"command": "/execute-plan lando", "issues": ["TEC-176", "TEC-177"], "at": "<ISO time>"}`. This is

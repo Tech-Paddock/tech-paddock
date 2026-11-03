@@ -94,6 +94,11 @@ how a demo renders it are convention, guarded only here. A demo that needs state
 - **Verify from the code, not a summary of it.**
 - **Put decisions to the owner as multiple choice** (`AskUserQuestion`): two to four options,
   recommendation first and marked, each with its consequence.
+- **A command for the owner stands alone.** Anything the owner should type (`/build TEC-n`,
+  `/execute-plan cookbook`, a one-word reply) ends the message in its own fenced code block holding
+  only that line, one block per command, never inside a sentence. On a phone a code block has a
+  copy button; inline code does not (owner, 2026-11-02: "the skills are difficult to copy on my
+  phone").
 - **Keep reports short.** A final report, yours or a helper's you relay, ends with a
   `### Ready to Archive` or `### Do Not Archive` heading and its reasons below (the `closeout` skill).
 - **No phone check by default.** Write one as a ⭐ step only when the owner asks or the change

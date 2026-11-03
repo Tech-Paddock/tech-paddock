@@ -85,7 +85,8 @@ go, go fully and do not reopen it.
   order, how to verify, what breaks if a step is skipped. "Nothing — deploys on merge" is valid.
 - **Migrations land before the code that needs them.** Additive changes ride with their code.
   Destructive changes take two pull requests: stop using it, then drop it. Deployment applies them
-  at merge. Cite a migration by name, not number.
+  at merge, except a `DROP` or `DELETE`: the owner runs that in the SQL Editor from Deployment's
+  block (`supabase/README.md`). Cite a migration by name, not number.
 - **Stale branches are the owner's to delete.** Agents cannot delete or rename remote branches;
   the TD lists them as links.
 - **One session per working directory.** The builder uses its own worktree.
