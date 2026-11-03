@@ -810,3 +810,9 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 - Kroger sends categories as a list; the aisle is the first. A product with none is under "Other".
 - The cron route must stay GET and must stay out of any other gate exception; adding a second path
   to the gate is shared auth plumbing (owner approval).
+- **Price fixtures must be relative to today, or the clock pinned** (TEC-218). `GET /api/grocery`
+  keeps only nights within `PRICE_WINDOW_NIGHTS` of `denverDate(new Date())`, so a test with
+  hard-coded night dates goes red on `main` once they age out. `tests/groceryPrices.test.ts` pins
+  `Date` with `vi.useFakeTimers({ toFake: ["Date"] })`; a new test that feeds dated nights through a
+  route that windows by date does the same. The other date literals in `tests/` pass their own
+  `asOf` or `now`, so they do not age.

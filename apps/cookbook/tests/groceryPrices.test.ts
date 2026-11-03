@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * `GET /api/grocery` carries each line's price from the nightly check
@@ -67,7 +67,11 @@ const line = (id: string, name: string, quantity = 1, over: Record<string, unkno
   ...over,
 });
 
+// The route windows prices by date (PRICE_WINDOW_NIGHTS back from today, Denver), so the
+// fixture nights below are only "recent" on a pinned day. Only Date is faked.
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-29T18:00:00Z"));
   vi.stubGlobal("fetch", vi.fn(async () => new Response("no network in this test", { status: 500 })));
   mem.store = true;
   mem.failNights = false;
@@ -76,6 +80,10 @@ beforeEach(() => {
     { product_id: MILK, location_id: "62000001", night: "2026-10-27", regular: 4, sale: null, in_stock: true, aisle: null },
     { product_id: MILK, location_id: "62000001", night: "2026-10-28", regular: 4, sale: 3.25, in_stock: true, aisle: null },
   ];
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("GET /api/grocery prices", () => {
