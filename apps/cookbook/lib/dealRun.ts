@@ -1,6 +1,7 @@
 import { withAccessToken } from "./krogerConnection";
 import { productsByIds, topProduct } from "./kroger";
 import { readProducts } from "./productStore";
+import { purchasesForPicking } from "./purchaseStore";
 import { readPreferences } from "./preferences";
 import { readList } from "./grocery";
 import { decider } from "./decide";
@@ -40,8 +41,9 @@ async function openLines() {
 export async function runDealScan(trigger: ScanTrigger): Promise<{ scan: ScanRecord; message: string }> {
   return withAccessToken(async (accessToken, store) => {
     if (!store) throw new ConflictError(NEED_STORE);
-    const [words, products, open] = await Promise.all([readPreferences(), readProducts(), openLines()]);
-    const entries = scanEntries(products, words, open, decider(products, words));
+    // The purchases read degrades to an empty map (the count decides), never to a failed scan.
+    const [words, products, open, purchases] = await Promise.all([readPreferences(), readProducts(), openLines(), purchasesForPicking()]);
+    const entries = scanEntries(products, words, open, decider(products, words, purchases));
     const found = await lookUp(
       entries.map((e) => e.target),
       lookups(accessToken, store.locationId)

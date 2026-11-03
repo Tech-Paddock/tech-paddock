@@ -4,7 +4,7 @@ import { ConflictError } from "./errors";
 import { modalityWord, type Modality } from "./modality";
 import { itemWords } from "./itemWords";
 import { bagOf, readAs } from "./lineView";
-import type { Candidate, Decision } from "./brands";
+import type { Candidate, Chosen, Decision } from "./brands";
 
 /**
  * Send to cart — what each line becomes, and what happened to it (TEC-90).
@@ -14,11 +14,12 @@ import type { Candidate, Decision } from "./brands";
  *
  * Three sections, one list (TEC-135; `RULES.md`, *Send to cart*):
  * - **Going in** (`exact`): a line that matches one product in Your brands
- *   (by its code or its saved names), its name's default, or a saved product
- *   the line names. Its other options stay a tap away.
- * - **Pick one** (`settle`): several products and no default. The most-bought
- *   is first, and the list tab pre-picks it; a Make default tick on the send
- *   makes the pick the name's default.
+ *   (by its code or its saved names), its name's default, a saved product
+ *   the line names, or (TEC-214) the pack that fits its amount, else the most
+ *   purchased. Its other options stay a tap away.
+ * - **Pick one** (`settle`): several products, no default and still a tie after
+ *   fit and purchases, so now rare. Nothing here sets a default: only Your
+ *   brands' Make default does (TEC-214).
  * - **Not saved yet** (`match` / `none`): Kroger's top match at the chosen
  *   store for the item alone, ticked to add, or replaced with a product page.
  * - **The official-name fallback is checked against Kroger** (TEC-135): a
@@ -56,7 +57,7 @@ export type Plan =
       via: "code" | "name" | "description";
       option: Candidate;
       /** Why it goes in without a pick: the only product, the name's default, or named on the line (TEC-135). */
-      chosen: "one" | "default" | "named";
+      chosen: "one" | Chosen;
       /** Every product the line could go in as, `option` first: what "tap to change" offers. */
       options: Candidate[];
       /** The saved name that matched, when one did: Make default sets this name's default. */
@@ -94,7 +95,7 @@ export function lineTerm(name: string, note: string | null = null): string | nul
 function goingIn(
   options: Candidate[],
   decision: Extract<Decision, { kind: "products" }>,
-  chosen: "one" | "default" | "named"
+  chosen: "one" | Chosen
 ): Plan {
   const [first] = options;
   return {
@@ -189,11 +190,9 @@ export function alreadySent(lines: CartLine[]): CartLine[] {
  * sent only for a match, a Pick one pick or a changed Going in line, never for
  * the product a line went in as untouched: it is what gets remembered. `size`
  * is the size Kroger showed for the match, kept as the size first bought when
- * the product is new to Your brands. **`makeDefault`** (TEC-135) is the Make
- * default tick: once the add went in, the product becomes the default for the
- * name that matched the line.
+ * the product is new to Your brands. **A send never sets a default** (TEC-214).
  */
-export type CartPick = { id: string; upc?: string; url?: string; match?: string; size?: string; makeDefault?: true };
+export type CartPick = { id: string; upc?: string; url?: string; match?: string; size?: string };
 
 export type Outcome = {
   id: string;
@@ -237,7 +236,6 @@ export function readPicks(raw: unknown): CartPick[] {
         pick.match = o.match.trim();
         if (typeof o.size === "string" && o.size.trim()) pick.size = o.size.trim().slice(0, 60);
       }
-      if (o.makeDefault === true) pick.makeDefault = true;
     }
     picks.push(pick);
   }
@@ -259,12 +257,6 @@ export type SendDeps = {
    * new product row (TEC-131).
    */
   remember: (name: string, url: string, upc: string, size: string | null) => Promise<void>;
-  /**
-   * **Make default** (TEC-135): this product becomes the default for the name
-   * that matched this line. Called only after the add went in; throws with a
-   * sentence when it can't.
-   */
-  makeDefault?: (line: CartLine, upc: string) => Promise<void>;
 };
 
 /**
@@ -353,8 +345,7 @@ export async function sendLines(
     // **Only after the add went in.** A failed save is said on the line and
     // never undoes or hides the add: the product is in the cart either way.
     const remembered = page ? await rememberPage(deps, readAs(line), page, upc, pick.url ? null : (pick.size ?? null)) : "";
-    const defaulted = pick.makeDefault ? await defaultIt(deps, line, upc) : "";
-    outcomes.push({ ...sent, result: "added", ...added, detail: `${added.detail}${remembered}${defaulted}` });
+    outcomes.push({ ...sent, result: "added", ...added, detail: `${added.detail}${remembered}` });
   }
   return outcomes;
 }
@@ -373,18 +364,6 @@ async function rememberPage(deps: SendDeps, name: string, page: string, upc: str
   } catch (e) {
     const why = e instanceof Error && e.message ? ` (${e.message.replace(/\.$/, "")})` : "";
     return ` Couldn't remember it in Your brands${why} — save it there by hand.`;
-  }
-}
-
-/** Make it the default, and say how that went. The product is in the cart either way. */
-async function defaultIt(deps: SendDeps, line: CartLine, upc: string): Promise<string> {
-  if (!deps.makeDefault) return "";
-  try {
-    await deps.makeDefault(line, upc);
-    return " Now your default.";
-  } catch (e) {
-    const why = e instanceof Error && e.message ? ` (${e.message.replace(/\.$/, "")})` : "";
-    return ` Couldn't make it the default${why} — do it in Your brands.`;
   }
 }
 

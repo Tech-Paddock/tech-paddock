@@ -4,7 +4,8 @@ import { readPreferences } from "@/lib/preferences";
 import { decider } from "@/lib/decide";
 import { addToCart, searchProducts } from "@/lib/kroger";
 import { withAccessToken } from "@/lib/krogerConnection";
-import { bumpCounts, readProducts, rememberProduct, setDefault } from "@/lib/productStore";
+import { bumpCounts, readProducts, rememberProduct } from "@/lib/productStore";
+import { purchasesForPicking } from "@/lib/purchaseStore";
 import { appendSends } from "@/lib/cartSends";
 import {
   CHECK_RESULTS,
@@ -53,8 +54,8 @@ function idsOf(raw: string | null): string[] | null {
 
 export async function GET(request?: NextRequest) {
   try {
-    const [open, words, products] = await Promise.all([openLines(), readPreferences(), readProducts()]);
-    const decide = decider(products, words);
+    const [open, words, products, purchases] = await Promise.all([openLines(), readPreferences(), readProducts(), purchasesForPicking()]);
+    const decide = decider(products, words, purchases);
     // **Only lines still on the List** (TEC-190): a line in the cart is not looked up or offered again.
     // (`include=sent` went with Change, TEC-211.)
     const params = request ? new URL(request.url).searchParams : null;
@@ -91,20 +92,6 @@ export async function POST(request: NextRequest) {
       if (repeats.length > 0) throw new RepeatSendError(repeats);
     }
 
-    // **Make default** (TEC-135): the name each ticked line matched, read
-    // *before* the send, because remembering a pick can add the line's own
-    // name to the product and change what the line matches afterwards.
-    const defaultNames = new Map<string, string>();
-    if (picks.some((p) => p.makeDefault)) {
-      const [words, products] = await Promise.all([readPreferences(), readProducts()]);
-      const decide = decider(products, words);
-      for (const line of open) {
-        if (!picks.some((p) => p.id === line.id && p.makeDefault)) continue;
-        const decision = decide(line.name, line.note);
-        if (decision?.kind === "products" && decision.matched) defaultNames.set(line.id, decision.matched);
-      }
-    }
-
     const { outcomes, modality } = await withAccessToken(async (accessToken, _store, modality) => ({
       modality,
       outcomes: await sendLines(
@@ -116,13 +103,8 @@ export async function POST(request: NextRequest) {
           // TEC-131): a pick, a replacement or the tapped match — the line's
           // name (never its note) added to that product's names, or a new
           // product row. `sendLines` calls this only after the add succeeded.
+          // **A send never sets a default** (TEC-214): only Your brands' Make default does.
           remember: (name, page, upc, size) => rememberProduct(splitLine(name).name, upc, page, size),
-          // Only for a name that matched several saved products (RULES.md).
-          makeDefault: async (line, upc) => {
-            const name = defaultNames.get(line.id);
-            if (!name) throw new ConflictError("this line no longer matches a saved name");
-            await setDefault([name], upc);
-          },
         }
       ),
     }));

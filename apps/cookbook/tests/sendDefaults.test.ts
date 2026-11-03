@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { decide, defaultFor, defaultPatches, keptDefaults, lineMark, namedAmong, type SavedProduct } from "@/lib/brands";
 import { CHECK_RESULTS, planLine, readPicks, reviewLines, sendLines, type CartLine } from "@/lib/cart";
@@ -59,10 +61,19 @@ const raisin = () => product({ product_id: "0009990000002", names: ["english muf
 const sourdough = () => product({ product_id: "0009990000003", names: ["english muffins"], description: "Test Bakery Sourdough English Muffins", count: 1 });
 
 describe("a name's default (TEC-135)", () => {
-  it("with no default, several products are Pick one, most bought first", () => {
+  it("with no default and nothing else to go on, the count decides (TEC-214)", () => {
     const d = decide("english muffins", [sourdough(), original(), raisin()], []);
-    expect(d).toMatchObject({ kind: "products", via: "name", matched: "english muffins", chosen: null });
+    expect(d).toMatchObject({ kind: "products", via: "name", matched: "english muffins", chosen: "bought" });
     expect(d?.kind === "products" && d.candidates.map((c) => c.count)).toEqual([8, 4, 1]);
+    expect(lineMark(d)).toBe("★");
+  });
+
+  it("with nothing to tell them apart, several products are still Pick one", () => {
+    const a = original();
+    const b = raisin();
+    b.count = a.count;
+    const d = decide("english muffins", [a, b], []);
+    expect(d).toMatchObject({ kind: "products", chosen: null });
     expect(lineMark(d)).toBe("?");
   });
 
@@ -97,12 +108,14 @@ describe("a name's default (TEC-135)", () => {
     expect(first(d)?.upc).toBe(sour.product_id);
   });
 
-  it("two claims on one name read as no default — Pick one, never the wrong product", () => {
+  it("two claims on one name read as no default — the next step decides, never a claim", () => {
     const a = original();
     const b = raisin();
     a.default_for = ["english muffins"];
     b.default_for = ["english muffins"];
     expect(defaultFor("english muffins", [a, b])).toBeNull();
+    expect(decide("english muffins", [a, b], [])).toMatchObject({ chosen: "bought" });
+    b.count = a.count;
     expect(decide("english muffins", [a, b], [])).toMatchObject({ chosen: null });
   });
 
@@ -160,10 +173,18 @@ describe("what Send plans, with defaults (TEC-135)", () => {
     expect(noSearch).not.toHaveBeenCalled();
   });
 
-  it("several and no default is Pick one, carrying the name Make default sets", async () => {
+  it("several and no default, with different counts, is Going in as the most counted (TEC-214)", async () => {
     const products = [original(), raisin()];
     const plan = await planLine(line({ id: "a", name: "english muffins" }), (x) => decide(x, products, []), noSearch);
-    expect(plan).toMatchObject({ kind: "settle", matched: "english muffins", options: [{ count: 8 }, { count: 4 }] });
+    expect(plan).toMatchObject({ kind: "exact", chosen: "bought", upc: "0009990000001", options: [{ count: 8 }, { count: 4 }] });
+  });
+
+  it("several that nothing tells apart are Pick one", async () => {
+    const a = original();
+    const b = raisin();
+    b.count = a.count;
+    const plan = await planLine(line({ id: "a", name: "english muffins" }), (x) => decide(x, [a, b], []), noSearch);
+    expect(plan).toMatchObject({ kind: "settle", matched: "english muffins" });
   });
 });
 
@@ -247,58 +268,35 @@ describe("the official-name fallback is checked against Kroger's own search (TEC
 // The send: Make default, and Not this trip
 // ---------------------------------------------------------------------------
 
-describe("sending with Make default, and Not this trip (TEC-135)", () => {
+describe("a send never sets a default, and Not this trip (TEC-135, TEC-214)", () => {
   const PAGE = "https://www.kingsoopers.com/p/test/0009990000002";
 
-  it("reads the Make default tick only on a product pick", () => {
-    expect(readPicks([{ id: "a", upc: "0009990000002", match: PAGE, makeDefault: true }])).toEqual([
-      { id: "a", upc: "0009990000002", match: PAGE, makeDefault: true },
-    ]);
+  it("drops a Make default tick from a pick: the request cannot ask for one", () => {
+    const ask = { id: "a", upc: "0009990000002", match: PAGE, makeDefault: true };
+    expect(readPicks([ask])).toEqual([{ id: "a", upc: "0009990000002", match: PAGE }]);
     expect(readPicks([{ id: "a", url: PAGE, makeDefault: true }])).toEqual([{ id: "a", url: PAGE }]);
   });
 
-  it("makes it the default only after its add went in, and says so on the line", async () => {
+  it("a send adds and remembers, and sets no default even when a pick asks", async () => {
     const calls: string[] = [];
+    const picks = readPicks([{ id: "a", upc: "0009990000002", match: PAGE, makeDefault: true }]);
     const outcomes = await sendLines(
-      { open: [line({ id: "a", name: "english muffins" })], picks: [{ id: "a", upc: "0009990000002", match: PAGE, makeDefault: true }], again: false },
+      { open: [line({ id: "a", name: "english muffins" })], picks, again: false },
       {
         add: async () => void calls.push("add"),
         remember: async () => void calls.push("remember"),
-        makeDefault: async (l, upc) => void calls.push(`default ${l.id} ${upc}`),
+        // A stray hook is never called: the deps have no place for one.
+        ...({ makeDefault: async () => void calls.push("default") } as object),
       }
     );
-    expect(calls).toEqual(["add", "remember", "default a 0009990000002"]);
-    expect(outcomes[0]).toMatchObject({ result: "added", detail: expect.stringContaining("Now your default.") });
+    expect(calls).toEqual(["add", "remember"]);
+    expect(outcomes[0].detail).not.toMatch(/default/i);
   });
 
-  it("a failed add makes nothing the default", async () => {
-    const makeDefault = vi.fn(async () => {});
-    const outcomes = await sendLines(
-      { open: [line({ id: "a", name: "english muffins" })], picks: [{ id: "a", upc: "0009990000002", makeDefault: true }], again: false },
-      {
-        add: async () => {
-          throw new Error("Kroger refused it.");
-        },
-        remember: async () => {},
-        makeDefault,
-      }
-    );
-    expect(outcomes[0].result).toBe("failed");
-    expect(makeDefault).not.toHaveBeenCalled();
-  });
-
-  it("a default that can't be saved is said, and the line stays added", async () => {
-    const outcomes = await sendLines(
-      { open: [line({ id: "a", name: "english muffins" })], picks: [{ id: "a", upc: "0009990000002", makeDefault: true }], again: false },
-      {
-        add: async () => {},
-        remember: async () => {},
-        makeDefault: async () => {
-          throw new Error("this line no longer matches a saved name");
-        },
-      }
-    );
-    expect(outcomes[0]).toMatchObject({ result: "added", detail: expect.stringContaining("Couldn't make it the default") });
+  it("nothing in the send path, the route or the splash can set a default", () => {
+    for (const file of ["../app/api/kroger/cart/route.ts", "../lib/cart.ts", "../lib/cartGuess.ts", "../app/Cart.tsx"]) {
+      expect(readFileSync(resolve(__dirname, file), "utf8")).not.toMatch(/setDefault|makeDefault|defaultNames/);
+    }
   });
 
   it("a line left out is Not this trip, and says it is still on the list", async () => {

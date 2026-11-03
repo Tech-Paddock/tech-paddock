@@ -183,7 +183,9 @@ Reasoning is in the migration headers.
   other row before adding it, and `defaultFor` reads two claims as none, so a race reads as Pick
   one. An element that is no longer one of the row's names is ignored, and an edit of the names
   drops it (`keptDefaults`). A successor replace keeps it. **Not in the batch format**: Export
-  leaves it out and Paste a batch never sets it.
+  leaves it out and Paste a batch never sets it. **Only Your brands' Make default sets one**
+  (TEC-214): Send and the splash never do, and the migration `cookbook_clear_default_presets`
+  cleared every preset on 2026-11-02 (owner: "Leave it but clear it").
 - `brand_preferences`: since TEC-131 **only its `terms` and old `plain` rows are read**
   (`readPreferences` filters `kind <> 'product'`). Its `product` rows were copied to `products` by
   the migration and are kept, unread (their drop is TEC-131, parked); their phrases still hold the
@@ -242,15 +244,21 @@ Reasoning is in the migration headers.
   phrase longer than that decides instead, and on equal length products win. Among several
   (TEC-135), **a product the line names** wins (`namedAmong`: the line's item words beyond the
   matched name all in exactly one candidate's description or names, "sourdough" in "sourdough
-  english muffins"), else **the matched name's default** (`defaultFor`); either is `chosen` and
-  moves first. `matched` is the one name that matched (null when two different names of equal
+  english muffins"), else **the matched name's default** (`defaultFor`), else (TEC-214)
+  `pickByFitAndPurchases`: the pack that **fits the amount** in the line ("4 lb chicken": smallest
+  that covers it, else the closest; `lib/sizeFit.ts`, reusing `parseSize`, so 1 lb is 16 oz, and a
+  range like "3-5 lb" counts as its larger end; a size in another unit, or none, takes no part),
+  then of what is left the **most purchased** in the last 12 weeks (distinct orders, then the latest
+  order), or with no purchases for any of them the **count**. Each is `chosen`
+  (`named | default | fit | bought`) and moves first. A tie all the way down leaves `chosen` null:
+  *Pick one*. `decider(products, words, purchases)` carries the purchases map (empty = count). `matched` is the one name that matched (null when two different names of equal
   length did: no default then). (3) Only when no name matched, the item alone (`itemWords`)
   against each product's `description`, every item word a whole word in any order, a trailing
   s/es either side: `via: "description"`, **unconfirmed** until Send checks it. Candidates are
   most counted, then most recently updated.
 - `planLine` (`lib/cart.ts`): one candidate, or a `chosen` one, is `exact` (carrying
-  every option and `chosen: one | default | named`); several and none chosen
-  is `settle` (carrying `matched`; the splash opens for it, and Send takes the most-bought); anything else is a Kroger search (`match` /
+  every option and `chosen: one | named | default | fit | bought`); several and none chosen
+  is `settle` (now rare, a true tie; carrying `matched`; the splash opens for it, and Send takes the first listed, the most counted); anything else is a Kroger search (`match` /
   `none`). **The official-name check** (TEC-135): `search` returns up to `CHECK_RESULTS` of
   Kroger's results for the item (`searchProducts`); a `description` candidate passes only when its
   code is among them. One passing is `exact`, several `settle`; none falls to `match` with that
@@ -260,18 +268,21 @@ Reasoning is in the migration headers.
   `pickFor` and `sectionOf` are gone from `app/Cart.tsx`. **Send all** runs `lookUp(null)` (`GET
   /api/kroger/cart`, only lines still on the List), then `guessPicks` (`lib/cartGuess.ts`, pure), then
   one `POST /api/kroger/cart`. **No confirm, no Sent list** (TEC-211): see *The live check and the one-line list* below. The best guess: `exact` goes in as its product (no page sent, never
-  re-saved); `settle` sends the most-bought option with its page (so it is remembered); `match` sends
+  re-saved); `settle` sends its first option (most counted) with its page (so it is remembered); `match` sends
   Kroger's top match with its page and size; `none` is a bare `{id}` and comes back "No product to
   add.". The send then reports in one toast (`sentWords`, `app/Cart.tsx`).
   `?ids=a,b` limits the lookup (+ Cart on one line); the route looks up only lines still on the List
   (`include=sent` went with Change, TEC-211). **Confirms** are `confirmWords` (`lib/cartGuess.ts`): a
   count, never names, for Remove, Clear cart, Tidy, Clear ticked and Clear all only; `List.tsx` holds
   `confirm` for the section buttons and `removeConfirm` for a row's Remove.
-- **Make default on Send**: the route reads each ticked line's `matched` name **before** sending
-  (remembering a pick can add the line's own name to the product, which would change what it
-  matches), and `sendLines` calls `makeDefault` only after that line's add succeeded, after
-  remembering. A failure is appended to the line ("Couldn't make it the default … do it in Your
-  brands"); the line stays added.
+- **Nothing sets a default on Send** (TEC-214). `makeDefault` is gone from `CartPick`, `readPicks`,
+  `SendDeps`, `sendLines`, `pickOf` and the route, and the splash has no tick; a `makeDefault` in a
+  request is dropped. `tests/sendDefaults.test.ts` reads the source for `setDefault|makeDefault`.
+  Only Your brands' **Make default** (`POST /api/brands/default`) sets one.
+- **The purchases read cannot break a read** (TEC-214). Every `decider` caller (the list, the cart
+  review, the deal scan, `quantityRule`) gets its map from `purchasesForPicking()`
+  (`lib/purchaseStore.ts`, `PICK_WEEKS` = 12), which returns an empty map when the read fails, so
+  picking falls to the count instead of an error.
 - The state is `useCart` (`app/Cart.tsx`); `List.tsx` lays out the header (with `KingSoopersStatus`), the
   **List** and **In cart** sections and `RefreshLog`. `SendResults` and `CartPanel` are gone (TEC-211);
   **no deals since TEC-132**, they live on the Deals tab. The store is chosen in the list's header
@@ -341,8 +352,8 @@ Reasoning is in the migration headers.
   send or reload).
 - **The splash** (`ProductSplash`, `app/Cart.tsx`) is the only picker. After Add an item,
   `offerChoices(ids)` looks the new lines up and opens it for each `needsSplash` plan (`settle` with
-  two or more options). Tapping a product (`chooseProduct`) adds it to the cart now, with **Make
-  default** ticked or not (`pickOf`, `lib/cartGuess.ts`). **Change on an In cart row is gone**
+  two or more options). Tapping a product (`chooseProduct`) adds it to the cart now (`pickOf`,
+  `lib/cartGuess.ts`); it never sets a default. **Change on an In cart row is gone**
   (TEC-211): to use another product, Remove the line and add it again.
 - **Searching by the item alone** (TEC-131): `lineTerm` (`lib/cart.ts`) is
   `searchTerm(itemWords(name)) ?? searchTerm(name)`, used by `planLine` and `targetFor`; a
@@ -398,7 +409,7 @@ Reasoning is in the migration headers.
 - Pure logic in `lib/pricing.ts` (the deal scan; `lookUp`, `targetFor`), wired in `lib/dealRun.ts`;
   `lib/decide.ts` is the one brand decider for the review, the list's prices and the scan, so a
   line is priced as what Send would add
-  (its default or named product first). A line decided only by a product's Kroger name is priced
+  (its named product, default, the pack that fits or the most purchased first). A line decided only by a product's Kroger name is priced
   as Kroger's top match for the item (`targetFor`), because only Send checks that product.
   Exact IDs go in one `productsByIds` call (50 per request); searches run four at a time.
 - Deal scan: `GET`/`POST /api/kroger/deals`. Every saved product (by code), every search-word
@@ -417,8 +428,8 @@ Reasoning is in the migration headers.
   and `readNightsSince` (12 weeks since TEC-196, for Best; the newest night within
   `PRICE_WINDOW_NIGHTS`, 5, counts for the price), takes each product's newest
   night, and gives each line `price: {unit, total, onSale, night}` or `null`. The product a line is
-  priced as is `productFor`: the only saved product, a chosen one (default or named) or the single
-  Kroger-name match; several saved products with no default are **not guessed**, so the line reads "no price yet"
+  priced as is `productFor`: the only saved product, a chosen one (named, default, fit or bought) or the single
+  Kroger-name match; several saved products that nothing separates (a true tie) are **not guessed**, so the line reads "no price yet"
   until a default or a splash pick makes it one. A line with no product or no night is "no price yet", never $0, and each
   section's total line counts them ("about $21.46 · 1 no price yet"). The header names the night
   the prices are from ("prices from the night of Oct 28", or "Oct 26 to Oct 28" when lines differ).
@@ -630,12 +641,13 @@ No model call. Code: `lib/purchases.ts` (pure), `lib/purchaseStore.ts`, `app/api
 - Table `cookbook.purchases` (`cookbook_purchases`): one row per order line, insert only,
   `product_id` is the products row's `id` (`on delete set null`, so forgetting a brand keeps its
   purchases). RLS on, no policies.
-- **What picking will read** (TEC-214): `purchasesPerProduct(weeks, now?)` in `lib/purchaseStore.ts`
+- **What picking reads** (TEC-214): `purchasesPerProduct(weeks, now?)` in `lib/purchaseStore.ts`
   returns a map from the products row `id` to `{ product_id, orders, quantity, last_ordered_on }`
   over the last `weeks` weeks (distinct orders, summed quantity); a product not bought in the window
-  is absent; unmatched purchases are left out. `tally` is its pure half. Nothing in picking
-  (`decide`, `lib/cart.ts`, `lib/cartGuess.ts`) reads purchases yet, and `products.count` still
-  counts Sends.
+  is absent; unmatched purchases are left out. `tally` is its pure half. `decide` reads it (12
+  weeks, via `purchasesForPicking`) after the default and the pack that fits; `products.count`
+  still counts Sends and decides only when no candidate has a purchase. **Trap:** a pack size that
+  does not parse (free text) takes no part in the fit, so such a product is decided by purchases.
 
 ## List lines (TEC-131)
 
@@ -661,7 +673,7 @@ No model call. Code: `lib/purchases.ts` (pure), `lib/purchaseStore.ts`, `app/api
   (existing tokens only). `tests/addBox.test.ts` reads the source, as there is no DOM harness. **Trap:**
   do not put `disabled` back on the button for the empty state; the owner wants it unfaded.
 - **Each line's mark** (`lineMark`, `lib/brands.ts`; `GET /api/grocery` adds `mark`): ★ goes in
-  as a saved product (code, only product, default, or named), ? needs a pick at Send, + anything
+  as a saved product (code, only product, default, named, fit or bought), ? needs a pick (a true tie) at Send, + anything
   else, including a product found only by its Kroger name and a typed code that is not saved.
   **Not shown since TEC-211**; the route still sends it.
 - **Shown as what you buy** (`lib/lineView.ts`, display only; `GET /api/grocery` adds `view` to
@@ -772,8 +784,11 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   splash (it is remembered).
 - A best-guess or splash pick is remembered, so the line's whole name joins that product's names; the next
   time that exact line has one match and goes straight in, whatever the default.
-- The list's link and price for a line decided by default follow the default; changing the
-  default in Your brands changes them on the next read.
+- The list's link and price for a line decided by default, fit or purchases follow that pick; a
+  new default in Your brands, or a new import of purchases, changes them on the next read.
+- With every preset cleared, Your brands' **Pick a default** filter and each multi-product card's
+  "needs a default" read list every group until a default is made by hand. That is expected; the
+  line itself already goes in by fit and purchases.
 - Your brands' groups chain through shared names, so one broad name ("milk") can pull unrelated
   products into one card. Make default sets only the shared names that product carries; when it
   does not carry the card's title name, the card still reads as needing a default.

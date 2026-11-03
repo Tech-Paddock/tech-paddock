@@ -94,7 +94,7 @@ section and closing comment before changing anything in this file.
 - **The list's totals are summed, not asked for** (TEC-190). Each line is priced from its saved
   product's latest night in `price_nights` (the sale price on a night it was on sale) times its
   quantity; List and In cart each show a total, labelled with the night the prices are from. A
-  line with no saved product, no recent price or several saved products and no default is "no price yet", counted
+  line with no saved product, no recent price or several saved products that nothing separates (no default, fit, purchases or count) is "no price yet", counted
   in the total's line and never $0. Nothing calls Kroger to price the list.
 - **A list line says what its price means, from the same nightly data** (TEC-196). On List and In
   cart each line is **item · qty · price** on **one line** (owner, 2026-11-02): the name truncates
@@ -117,7 +117,7 @@ section and closing comment before changing anything in this file.
 - **Your brands is one row per King Soopers product code.** The row holds its names: every way a
   list line may refer to it, each matched as whole words. A name may sit on several products; a
   product code is never saved twice. Search words stay their own kind: a name with search words
-  and no product. Each name may mark one of its products as the **default**.
+  and no product. Each name may mark one of its products as the **default**, set only by hand with Make default in Your brands. Nothing sets one automatically: not Send, not the splash.
 - **Each product carries a count.** It starts from the owner's own purchase history, which is
   supplied by hand and never stored or committed, and goes up by one each time Send adds it. It
   ranks choices; it never claims what was bought.
@@ -144,8 +144,8 @@ section and closing comment before changing anything in this file.
 - **The Grocery list is two sections, List and In cart.** List is what is still to send; In cart is what Cookbook sent and has not taken back or cleared (`sent_at`, with the ledger behind it). A line is in one, never both. A cleared line (`cleared_at`) is in neither.
 - **Cookbook is the only way anything enters the cart** (owner, 2026-11-02): In cart is the whole King Soopers cart; the King Soopers app is only for checkout.
 - **No secondary pop-up lists.** **Adds never ask** (owner, 2026-11-02: "No confirmation. I clicked it, it goes."): Send all and Add to cart go at once. Remove, Clear cart, Tidy, Clear ticked and Clear all each ask one "Are you sure?" with a count, and no list.
-- **Send is a best guess, with no review** (owner, 2026-11-02). One saved product or the name's default goes in; of several with no default, the most-bought; with none saved, Kroger's top match. Whatever goes in is remembered as before. A send reports in one toast, "Sent 12" or "Sent 12 · 2 not sent"; a line that did not go reads a red "not sent" in its price spot until the next send. There is no Sent list. Add to cart on one line uses the same guess.
-- **The one picker that stays:** Add an item opens a choice of products when several match and none is the default, with Make default; tapping one adds it to the cart. There is no Change on an In cart line.
+- **Send is a best guess, with no review** (owner, 2026-11-02). One saved product or the name's default goes in; of several with no default, the pack that fits the line's amount (the smallest that covers it, else the closest; 1 lb is 16 oz), then the most purchased in the last 12 weeks from Import purchases, then the most recent purchase, then the count when nothing has been purchased; with none saved, Kroger's top match. A send never sets a default. Whatever goes in is remembered as before. A send reports in one toast, "Sent 12" or "Sent 12 · 2 not sent"; a line that did not go reads a red "not sent" in its price spot until the next send. There is no Sent list. Add to cart on one line uses the same guess.
+- **The one picker that stays:** Add an item opens a choice of products only when several match and nothing separates them (no default, no fit, no purchases, equal counts); tapping one adds it to the cart. It never sets a default. There is no Change on an In cart line.
 - **Ticked lines sort to the bottom of the List, faded.**
 - **Refresh cart** fixes In cart from the ledger, then prices each In cart line today at the chosen store from the product read with the app token, never the account token, and shows the live In cart total with the time checked. A line Kroger cannot price reads "no price", never $0.
 - **The header holds King Soopers** (owner, 2026-11-02): a live status always visible (Connected, Sign-in expired, Can't reach King Soopers, Not connected or Not set up), checked on open, after any King Soopers call fails and when tapped, plus connect, Pickup/Delivery, the store (tap for a ZIP search), prices checked, Refresh now and disconnect. Nothing King Soopers sits below In cart. The check proves the sign-in works; the API cannot read the cart. `GET /api/kroger/check` is signed-in only like every `/api` route, and returns a state, never a token. **Add an item** sits below the List's filters.

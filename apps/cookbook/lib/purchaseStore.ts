@@ -62,3 +62,20 @@ export async function purchasesPerProduct(weeks: number, now: Date = new Date())
   }
   return tally(rows, weeks, today);
 }
+
+/** The weeks of purchases that pick a product (TEC-214; `RULES.md`, *Send to cart*). */
+export const PICK_WEEKS = 12;
+
+/**
+ * What picking a product reads (TEC-214): `purchasesPerProduct` over `PICK_WEEKS`,
+ * **or an empty map when it fails**. A purchases read that errors must never
+ * break the list, its prices, the deal scan or a send: the pick falls back to
+ * the count, which is what picking did before any import.
+ */
+export async function purchasesForPicking(now: Date = new Date()): Promise<Map<string, Bought>> {
+  try {
+    return await purchasesPerProduct(PICK_WEEKS, now);
+  } catch {
+    return new Map();
+  }
+}
