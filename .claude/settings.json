@@ -48,7 +48,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "input=$(cat); case \"$input\" in *push*|*repair*|*schema_migrations*|*plan-approved*|*\"pr \"*|*pull-request*) ;; *) exit 0 ;; esac; g=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard.mjs\"; if ! command -v node >/dev/null 2>&1 || [ ! -f \"$g\" ]; then echo \"The repo's guard needs node and $g, and one is missing, so this command is refused rather than run unchecked.\" >&2; exit 2; fi; printf '%s' \"$input\" | node \"$g\" || exit 2",
+            "command": "input=$(cat); case \"$input\" in *push*|*repair*|*schema_migrations*|*plan-approved*|*\"pr \"*|*pull-request*|*\"gh \"*|*hosts.y*) ;; *) exit 0 ;; esac; g=\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard.mjs\"; if ! command -v node >/dev/null 2>&1 || [ ! -f \"$g\" ]; then echo \"The repo's guard needs node and $g, and one is missing, so this command is refused rather than run unchecked.\" >&2; exit 2; fi; printf '%s' \"$input\" | node \"$g\" || exit 2",
             "timeout": 20
           }
         ]

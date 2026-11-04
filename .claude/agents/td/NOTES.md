@@ -20,6 +20,13 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **The guard knows Deployment by `agent_type: "deployment"` with an `agent_id`;** only Deployment
   writes to a pull request. The main session, the builder and a main session claiming the type are
   all refused.
+- **The guard also refuses, for every role (TEC-221):** deleting a remote branch, pushing to any
+  branch but `claude/…` (tags only as `refs/tags/…`), `gh repo` / `secret` / `variable` / `release`
+  writes, any `gh api` write (a field without `-X GET` is a POST), and printing the GitHub token
+  (`gh auth token`, `gh/hosts.yml`). On the owner's PC `gh` is the owner's own login, so this is
+  the only stop.
+- **A builder or Deployment start is not held in auto mode (TEC-220, parked).** The guard asks;
+  auto mode approves it without the owner. Only the rule "start one on the owner's command" holds.
 - **Migration history is clean:** repo and `list_migrations` differ by exactly `20260908235234`,
   withheld because it seeds personal data.
 - **This container cannot reach `*.techpaddock.io`.** Use Vercel runtime logs, or ask the owner.
@@ -45,8 +52,9 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **The auto-mode classifier can refuse work under `.claude/`.** It clears once the owner's own
   words name the change. Never route around it or probe the guard by editing it live.
 - **A Linear patch matches stored text.** Copy the anchor from `get_issue`, tags and all.
-- **Remote branches cannot be deleted or renamed from here.** The proxy refusal looks like a network
-  blip; stop after one try. Merged branches auto-delete; the owner deletes stale ones.
+- **Remote branches cannot be deleted or renamed from here.** The guard refuses a delete; in a cloud
+  session the proxy refuses a rename too, and that refusal looks like a network blip: stop after one
+  try. Merged branches auto-delete; the owner deletes stale ones.
 - **A container restart kills the builder.** Unpushed work survives in `.claude/worktrees/agent-*`
   until the container goes; brief a fresh builder to carry it over.
 - **Parallel builders can pick the same migration timestamp.** Check before merging.
