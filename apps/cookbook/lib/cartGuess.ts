@@ -113,7 +113,7 @@ export function pickOf(line: Pick<CartLine, "id"> & { plan: Plan }, option: Pick
 // Taking out, tidying and clearing keep their one confirm.
 // ---------------------------------------------------------------------------
 
-export type ConfirmKind = "remove" | "clear-cart" | "tidy" | "clear-ticked" | "clear-all";
+export type ConfirmKind = "clear-cart" | "tidy" | "clear-ticked" | "clear-all";
 
 function items(n: number): string {
   return `${n} item${n === 1 ? "" : "s"}`;
@@ -126,10 +126,8 @@ function lines(n: number): string {
 /** The question and the button, for a count. No names: the owner does not want to read a list (TEC-206). */
 export function confirmWords(kind: ConfirmKind, n: number): { ask: string; yes: string } {
   switch (kind) {
-    case "remove":
-      return { ask: n === 1 ? "Take 1 out of the cart?" : `Take ${n} out of the cart?`, yes: "Remove" };
     case "clear-cart":
-      return { ask: `Clear the cart? ${items(n)} come out.`, yes: "Clear cart" };
+      return { ask: `Clear the cart? ${items(n)} leave Cookbook, not King Soopers.`, yes: "Clear cart" };
     case "tidy":
       return { ask: `Tidy ${lines(n)}?`, yes: "Tidy" };
     case "clear-ticked":

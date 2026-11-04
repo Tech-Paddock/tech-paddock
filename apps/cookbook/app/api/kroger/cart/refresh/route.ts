@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readList, markSent, markUnsent } from "@/lib/grocery";
+import { readList, markUnsent } from "@/lib/grocery";
 import { readSends } from "@/lib/cartSends";
 import { readConnectionRow } from "@/lib/krogerStore";
 import { appToken, productsByIds } from "@/lib/kroger";
@@ -26,7 +26,6 @@ export async function POST() {
         now: () => new Date(),
         readList: async () => (await readList()).map((i) => ({ id: i.id, name: i.name, sent_at: i.sent_at })),
         readSends,
-        markSent,
         markUnsent,
         store: async () => {
           const row = await readConnectionRow();

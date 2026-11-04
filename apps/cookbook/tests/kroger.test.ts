@@ -87,6 +87,8 @@ vi.mock("@/lib/grocery", async (importOriginal) => ({
   },
   markUnsent: async (ids: string[]) => {
     mem.unsent.push(...ids);
+    // Like the database: sent_at is cleared, so the line reads as on the List.
+    for (const l of mem.list) if (ids.includes(String(l.id))) l.sent_at = null;
   },
   markCleared: async (ids: string[]) => {
     mem.cleared.push(...ids);
@@ -620,7 +622,7 @@ describe("prices on the list tab (TEC-121)", () => {
   });
 });
 
-describe("Take back (TEC-127)", () => {
+describe("Send record, Clear cart and Back to list (TEC-127, TEC-228)", () => {
   const secrets = () => [STORED_RT, NEW_RT, ACCESS, CLIENT_SECRET, String(mem.row?.refresh_token_sealed ?? "never")];
   async function bodyOf(res: Response) {
     const text = await res.text();
@@ -629,10 +631,19 @@ describe("Take back (TEC-127)", () => {
   }
   const cartBodies = () =>
     kroger.mock.calls.filter(([url]) => String(url).endsWith("/cart/add")).map(([, init]) => JSON.parse(String((init as RequestInit).body)));
-  const takeBackPost = async (body: unknown) => {
-    const { POST } = await import("@/app/api/kroger/cart/take-back/route");
-    return POST(new NextRequest("https://cookbook.techpaddock.io/api/kroger/cart/take-back", { method: "POST", body: JSON.stringify(body) }));
+  const post = async (route: "clear" | "back-to-list", body: unknown) => {
+    const { POST } = await import(`@/app/api/kroger/cart/${route}/route`);
+    return POST(new NextRequest(`https://cookbook.techpaddock.io/api/kroger/cart/${route}`, { method: "POST", body: JSON.stringify(body) }));
   };
+  const SENT = "2026-10-21T01:00:00Z";
+  function inCart() {
+    mem.list[0].sent_at = SENT;
+    mem.list[1].sent_at = SENT;
+    mem.ledger = [
+      { item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "PICKUP" },
+      { item_id: "b", name: "eggs", kind: "sent", upc: "0001111041701", quantity: 1, modality: "DELIVERY" },
+    ];
+  }
 
   it("a send records the product, quantity and mode that went in", async () => {
     mem.row = { ...mem.row, modality: "DELIVERY" };
@@ -649,175 +660,79 @@ describe("Take back (TEC-127)", () => {
     expect(mem.ledger).toEqual([{ item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "DELIVERY" }]);
   });
 
-  it("takes back what was sent — not the line's quantity now — with the same mode, after a confirm, and marks it unsent", async () => {
-    mem.list[0].sent_at = "2026-10-21T01:00:00Z";
-    mem.list[0].quantity = 5; // changed since the send
-    mem.ledger = [{ item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "PICKUP" }];
-
-    const { GET } = await import("@/app/api/kroger/cart/take-back/route");
-    const preview = await bodyOf(await GET());
-    expect(preview.lines).toEqual([
-      { id: "a", name: "milk", sent_at: "2026-10-21T01:00:00Z", held: [{ upc: "0001111041700", quantity: 2, modality: "PICKUP" }] },
-    ]);
-    expect(cartBodies()).toEqual([]);
-
-    // The first tap alone takes nothing.
-    const unconfirmed = await takeBackPost({});
-    expect(unconfirmed.status).toBe(400);
-    expect(cartBodies()).toEqual([]);
-
-    const body = await bodyOf(await takeBackPost({ confirm: true }));
-    expect(cartBodies()).toEqual([{ items: [{ upc: "0001111041700", quantity: -2, modality: "PICKUP" }] }]);
-    expect(body.outcomes).toEqual([{ id: "a", name: "milk", result: "taken back", detail: "Took back ×2." }]);
-    expect(body.summary).toBe("1 taken back, 0 skipped, 0 failed. Anything added to the cart elsewhere is still there.");
-    expect(body.failed).toBe(false);
-    expect(mem.unsent).toEqual(["a"]);
-    expect(mem.ledger.at(-1)).toMatchObject({ kind: "taken_back", quantity: -2, modality: "PICKUP" });
+  it("take-back is gone: no route, so no negative quantity can reach Kroger", async () => {
+    await expect(import("@/app/api/kroger/cart/take-back/route" as string)).rejects.toThrow();
   });
 
-  it("Remove takes back one line only; the ledger row is written before Kroger is asked, with the recorded mode (TEC-190)", async () => {
-    mem.list[0].sent_at = "2026-10-21T01:00:00Z";
-    mem.list[1].sent_at = "2026-10-21T01:00:00Z";
-    mem.ledger = [
-      { item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "PICKUP" },
-      { item_id: "b", name: "eggs", kind: "sent", upc: "0001111041701", quantity: 1, modality: "DELIVERY" },
-    ];
-    // The write happens before the negative add reaches Kroger.
-    let ledgerWhenAsked: number | null = null;
-    kroger.mockImplementation(async (input: string | URL | Request) => {
-      const url = String(input);
-      if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
-      if (url.endsWith("/cart/add")) {
-        ledgerWhenAsked = mem.ledger.filter((r) => r.kind === "taken_back").length;
-        return new Response(null, { status: 204 });
-      }
-      return json({ data: [PRODUCT] });
-    });
-
-    const body = await bodyOf(await takeBackPost({ confirm: true, ids: ["b"] }));
-    expect(body.outcomes).toEqual([{ id: "b", name: "eggs", result: "taken back", detail: "Took back ×1." }]);
-    expect(cartBodies()).toEqual([{ items: [{ upc: "0001111041701", quantity: -1, modality: "DELIVERY" }] }]);
-    expect(ledgerWhenAsked).toBe(1);
-    expect(mem.unsent).toEqual(["b"]);
-    // Milk is still held.
-    expect(mem.ledger.filter((r) => r.item_id === "a")).toHaveLength(1);
-  });
-
-  it("when Kroger refuses a negative quantity, the line fails, stays sent, and the panel offers the cart page", async () => {
-    kroger.mockImplementation(async (input: string | URL | Request) => {
-      const url = String(input);
-      if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
-      if (url.endsWith("/cart/add")) return json({ errors: { reason: "quantity must be positive" } }, 400);
-      return json({ data: [PRODUCT] });
-    });
-    mem.list[0].sent_at = "2026-10-21T01:00:00Z";
-    mem.ledger = [{ item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "PICKUP" }];
-
-    const body = await bodyOf(await takeBackPost({ confirm: true }));
-    expect(body.outcomes[0]).toMatchObject({ result: "failed", detail: expect.stringMatching(/Still marked sent/) });
-    expect(body.failed).toBe(true);
-    expect(body.checkoutUrl).toBe("https://www.kingsoopers.com/cart");
-    expect(mem.unsent).toEqual([]);
-    // Not retried without the mode.
-    expect(cartBodies()).toHaveLength(1);
-    // The reservation was reversed, so a later Take back still finds the milk.
-    const { GET } = await import("@/app/api/kroger/cart/take-back/route");
-    expect((await bodyOf(await GET())).lines[0].held).toEqual([{ upc: "0001111041700", quantity: 2, modality: "PICKUP" }]);
-  });
-
-  describe("Clear cart (TEC-210)", () => {
-    beforeEach(() => kroger.mockImplementation(defaultKroger)); // an earlier test may have left a refusing Kroger
-    const SENT = "2026-10-21T01:00:00Z";
-    function inCart() {
-      mem.list[0].sent_at = SENT;
-      mem.list[1].sent_at = SENT;
-      mem.ledger = [
-        { item_id: "a", name: "milk", kind: "sent", upc: "0001111041700", quantity: 2, modality: "PICKUP" },
-        { item_id: "b", name: "eggs", kind: "sent", upc: "0001111041701", quantity: 1, modality: "DELIVERY" },
-      ];
-    }
-    const clearPost = () => takeBackPost({ confirm: true, clear: true });
-    const refuse = (reason: string) =>
-      kroger.mockImplementation(async (input: string | URL | Request) => {
-        const url = String(input);
-        if (url.endsWith("/connect/oauth2/token")) return json({ access_token: ACCESS, refresh_token: NEW_RT });
-        if (url.endsWith("/cart/add")) return json({ errors: { reason } }, 400);
-        return json({ data: [PRODUCT] });
-      });
-
-    it("sends a negative for every In cart line, clears them all, and keeps the ledger", async () => {
+  describe("Clear cart (TEC-228)", () => {
+    it("needs the second tap, and sends nothing to Kroger without it", async () => {
       inCart();
-      const body = await bodyOf(await clearPost());
-      expect(cartBodies()).toEqual([
-        { items: [{ upc: "0001111041700", quantity: -2, modality: "PICKUP" }] },
-        { items: [{ upc: "0001111041701", quantity: -1, modality: "DELIVERY" }] },
-      ]);
+      const res = await post("clear", {});
+      expect(res.status).toBe(400);
+      expect(mem.cleared).toEqual([]);
+      expect(kroger).not.toHaveBeenCalled();
+    });
+
+    it("clears every In cart line, sends nothing to Kroger and writes no ledger rows", async () => {
+      inCart();
+      const ledgerBefore = JSON.stringify(mem.ledger);
+      const body = await bodyOf(await post("clear", { confirm: true }));
+      expect(kroger).not.toHaveBeenCalled(); // not even a token
+      expect(cartBodies()).toEqual([]);
       expect(mem.cleared).toEqual(["a", "b"]);
       expect(mem.unsent).toEqual([]); // marked cleared, not returned to the List
-      expect(mem.list).toEqual([]); // and gone from what the list reads
-      expect(body).toMatchObject({ cleared: 2, refused: 0, text: "Cleared 2 from the cart." });
-      // The ledger is appended, never rewritten or deleted.
-      expect(mem.ledger).toHaveLength(4);
-      expect(mem.ledger.filter((r) => r.kind === "taken_back").map((r) => r.quantity)).toEqual([-2, -1]);
-    });
-
-    it("clears every line when Kroger refuses, appends the refused rows, and does not retry", async () => {
-      inCart();
-      refuse("quantity must be positive");
-      const body = await bodyOf(await clearPost());
-      expect(mem.cleared).toEqual(["a", "b"]);
       expect(mem.list).toEqual([]);
-      expect(body).toMatchObject({ cleared: 2, refused: 2, checkoutUrl: "https://www.kingsoopers.com/cart" });
-      expect(body.text).toBe("Cleared 2 from the cart. King Soopers didn't take back 2; check its cart.");
-      expect(cartBodies()).toHaveLength(2); // one ask per line, no retry without the mode
-      expect(mem.ledger.filter((r) => r.kind === "refused")).toHaveLength(2);
-      expect(mem.ledger.filter((r) => r.kind === "sent")).toHaveLength(2);
+      expect(body).toEqual({ cleared: 2, text: "Cleared 2 from Cookbook. Items in your King Soopers cart are not affected.", checkoutUrl: "https://www.kingsoopers.com/cart" });
+      expect(JSON.stringify(mem.ledger)).toBe(ledgerBefore); // no taken_back or refused rows
     });
 
-    it("clears every line when Kroger is not signed in, without asking it", async () => {
-      inCart();
+    it("works signed out, and leaves a List line alone", async () => {
+      mem.list[1].sent_at = SENT; // "b" only; "a" is on the List
       mem.row = null;
-      const body = await bodyOf(await clearPost());
-      expect(kroger).not.toHaveBeenCalled();
-      expect(mem.cleared).toEqual(["a", "b"]);
-      expect(body).toMatchObject({ cleared: 2, refused: 2 });
-      expect(mem.ledger).toHaveLength(2); // nothing reserved when Kroger was never asked
-    });
-
-    it("clears a line sent before the ledger too, and says Kroger wasn't told", async () => {
-      mem.list[1].sent_at = "2026-10-01T00:00:00Z";
-      const body = await bodyOf(await clearPost());
+      const body = await bodyOf(await post("clear", { confirm: true }));
       expect(kroger).not.toHaveBeenCalled();
       expect(mem.cleared).toEqual(["b"]);
-      expect(body).toMatchObject({ cleared: 1, refused: 1 });
+      expect(body.cleared).toBe(1);
     });
 
-    it("Remove (no clear flag) still fails a refused line, leaves it In cart and never clears it", async () => {
-      inCart();
-      refuse("no");
-      const body = await bodyOf(await takeBackPost({ confirm: true, ids: ["a"] }));
-      expect(body.failed).toBe(true);
+    it("says so when nothing is In cart", async () => {
+      const res = await post("clear", { confirm: true });
+      expect(res.status).toBe(400);
       expect(mem.cleared).toEqual([]);
+    });
+  });
+
+  describe("Back to list (TEC-228)", () => {
+    it("returns one In cart line to the List unsent, with no Kroger call and no ledger rows", async () => {
+      inCart();
+      const ledgerBefore = JSON.stringify(mem.ledger);
+      const body = await bodyOf(await post("back-to-list", { id: "a" }));
+      expect(body.text).toBe("Back on the list. Your King Soopers cart is not affected.");
+      expect(mem.unsent).toEqual(["a"]);
+      expect(mem.cleared).toEqual([]);
+      expect(mem.list[0].sent_at).toBeNull();
+      expect(mem.list[1].sent_at).toBe(SENT); // the other line stays In cart
+      expect(kroger).not.toHaveBeenCalled();
+      expect(JSON.stringify(mem.ledger)).toBe(ledgerBefore);
+    });
+
+    it("refuses a line that is not In cart", async () => {
+      inCart();
+      mem.list[1].sent_at = null;
+      expect((await post("back-to-list", { id: "b" })).status).toBe(400);
+      expect((await post("back-to-list", { id: "nope" })).status).toBe(400);
+      expect((await post("back-to-list", {})).status).toBe(400);
       expect(mem.unsent).toEqual([]);
     });
 
-    it("a Remove that succeeds returns its line to the List (sent_at cleared, not cleared_at)", async () => {
+    it("Refresh cart does not put it back In cart, though the ledger still holds it", async () => {
       inCart();
-      await bodyOf(await takeBackPost({ confirm: true, ids: ["a"] }));
-      expect(mem.unsent).toEqual(["a"]);
-      expect(mem.cleared).toEqual([]);
+      await post("back-to-list", { id: "a" });
+      mem.row = { ...mem.row, location_id: "62000001", store_name: "Test" };
+      const { POST } = await import("@/app/api/kroger/cart/refresh/route");
+      await POST();
+      expect(mem.sent).toEqual([]);
+      expect(mem.list[0].sent_at).toBeNull();
     });
-  });
-
-  it("a line sent before the ledger is skipped without asking Kroger, and an empty list says so", async () => {
-    mem.list[1].sent_at = "2026-10-01T00:00:00Z";
-    const body = await bodyOf(await takeBackPost({ confirm: true }));
-    expect(body.outcomes).toEqual([expect.objectContaining({ id: "b", result: "skipped" })]);
-    expect(kroger).not.toHaveBeenCalled();
-
-    mem.list[1].sent_at = null;
-    const none = await takeBackPost({ confirm: true });
-    expect(none.status).toBe(400);
-    expect((await bodyOf(none)).error).toMatch(/hasn't sent anything/);
   });
 });

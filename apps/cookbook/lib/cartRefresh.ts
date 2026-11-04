@@ -9,10 +9,13 @@ import { ConflictError } from "./errors";
  * In cart is treated as the whole King Soopers cart, so the ledger
  * (`cart_sends`) is the truth about it. A refresh:
  *
- * 1. **Fixes In cart from the ledger.** A line the ledger holds product for is
- *    marked sent; a line marked sent whose ledger nets to nothing (everything
- *    taken back) is returned to the List. A sent line with *no ledger rows at
- *    all* (sent before the ledger existed) is left as it is and reads "no
+ * 1. **Fixes In cart from the ledger, one way only** (TEC-228). A line marked sent
+ *    whose ledger nets to nothing (an old successful take-back) is returned to the
+ *    List. A line the ledger still holds product for but that is not marked sent is
+ *    **left on the List**: Back to list clears `sent_at` and leaves the ledger
+ *    alone (Kroger cannot remove, so the ledger still shows what was added), and a
+ *    refresh must not put that line back In cart. A sent line with *no ledger rows
+ *    at all* (sent before the ledger existed) is left as it is and reads "no
  *    price", because there is nothing to price it by.
  * 2. **Prices today's cart** from Kroger's product read at the chosen store,
  *    with the app's own token (`appToken`, product read), **never the owner's
@@ -25,22 +28,20 @@ import { ConflictError } from "./errors";
 export type CartListLine = { id: string; name: string; sent_at: string | null; cleared_at?: string | null };
 
 /** What the ledger says should change on the list. */
-export type Fix = { markSent: string[]; markUnsent: string[] };
+export type Fix = { markUnsent: string[] };
 
 /** Compare the list with the ledger. Rows for lines no longer on the list (`item_id` null) are ignored. */
 export function reconcile(list: CartListLine[], rows: SendRow[]): Fix & { held: Map<string, Held[]> } {
   const held = heldByLine(rows);
   const recorded = new Set(rows.flatMap((r) => (r.item_id ? [r.item_id] : [])));
-  const markSent: string[] = [];
   const markUnsent: string[] = [];
   for (const line of list) {
     // A line Clear cart cleared (TEC-210) is gone: never put back In cart, never returned to the List.
     if (line.cleared_at) continue;
     const holds = (held.get(line.id)?.length ?? 0) > 0;
-    if (holds && line.sent_at === null) markSent.push(line.id);
     if (!holds && line.sent_at !== null && recorded.has(line.id)) markUnsent.push(line.id);
   }
-  return { markSent, markUnsent, held };
+  return { markUnsent, held };
 }
 
 export type CartLinePrice = {
@@ -56,8 +57,8 @@ export type CartLinePrice = {
 export type CartRefresh = {
   checkedAt: string;
   store: string;
-  /** Lines the ledger put back in the cart / took out of it. */
-  fixed: { added: number; removed: number };
+  /** Lines the ledger took out of the cart (back on the List). */
+  fixed: { removed: number };
   lines: CartLinePrice[];
   /** The sum of the priced lines, or null when none could be priced. */
   total: number | null;
@@ -84,7 +85,6 @@ export type CartRefreshDeps = {
   now: () => Date;
   readList: () => Promise<CartListLine[]>;
   readSends: (ids: string[]) => Promise<SendRow[]>;
-  markSent: (ids: string[], at: string) => Promise<void>;
   markUnsent: (ids: string[]) => Promise<void>;
   /** The chosen store, or null. */
   store: () => Promise<{ locationId: string; name: string } | null>;
@@ -101,11 +101,10 @@ export async function refreshCart(deps: CartRefreshDeps): Promise<CartRefresh> {
   const rows = await deps.readSends(list.map((l) => l.id));
   const fix = reconcile(list, rows);
 
-  // The ledger is written to the list before Kroger is asked, so a price lookup that fails still leaves In cart right.
-  if (fix.markSent.length > 0) await deps.markSent(fix.markSent, at.toISOString());
+  // The fix is written to the list before Kroger is asked, so a price lookup that fails still leaves In cart right.
   if (fix.markUnsent.length > 0) await deps.markUnsent(fix.markUnsent);
 
-  const inCart = list.filter((l) => (fix.held.get(l.id)?.length ?? 0) > 0 || (l.sent_at !== null && !fix.markUnsent.includes(l.id)));
+  const inCart = list.filter((l) => l.sent_at !== null && !fix.markUnsent.includes(l.id));
   const upcs = [...new Set(inCart.flatMap((l) => (fix.held.get(l.id) ?? []).map((h) => h.upc)))];
   const found = new Map<string, Product>();
   if (upcs.length > 0) {
@@ -121,7 +120,7 @@ export async function refreshCart(deps: CartRefreshDeps): Promise<CartRefresh> {
   return {
     checkedAt: at.toISOString(),
     store: store.name,
-    fixed: { added: fix.markSent.length, removed: fix.markUnsent.length },
+    fixed: { removed: fix.markUnsent.length },
     lines,
     total: priced.length === 0 ? null : Math.round(priced.reduce((sum, l) => sum + (l.total as number), 0) * 100) / 100,
     unpriced: lines.length - priced.length,

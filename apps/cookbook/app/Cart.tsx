@@ -11,7 +11,7 @@ import type { CartRefresh } from "@/lib/cartRefresh";
 import type { Modality } from "@/lib/modality";
 import type { ScanRecord } from "@/lib/pricing";
 import { refreshSummary } from "@/lib/refreshNote";
-import type { TakeBackOutcome } from "@/lib/takeBack";
+import { BACK_TO_LIST_WORDS, clearedWords } from "@/lib/takeBack";
 import { useToast } from "./Toast";
 
 /**
@@ -62,8 +62,6 @@ type Status = {
 };
 
 type Store = { locationId: string; name: string; address: string };
-
-type TakeBackResult = { outcomes: TakeBackOutcome[]; summary: string; recordError: string | null; failed: boolean };
 
 /** The lines a splash still has to settle. */
 type Splash = { queue: ReviewLine[] };
@@ -129,9 +127,8 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   const [choosingStore, setChoosingStore] = useState(false);
 
   const [busy, setBusy] = useState<null | "stores" | "lookup" | "add" | "send" | "disconnect" | "take-back" | "cart-check">(null);
-  const [takeBackResults, setTakeBackResults] = useState<TakeBackResult | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
-  const [removing, setRemoving] = useState<string | null>(null);
+  const [returning, setReturning] = useState<string | null>(null);
   // A line a send did not take, and why (TEC-211): "not sent" in its price spot until the next send.
   const [notSent, setNotSent] = useState<Map<string, string>>(new Map());
   // The live check (TEC-211): null until the first answer.
@@ -237,12 +234,10 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
       const check = body as CartRefresh;
       setCartCheck(check);
       setCartCheckError(null);
-      const { added, removed } = check.fixed;
-      if (added > 0 || removed > 0) {
+      const { removed } = check.fixed;
+      if (removed > 0) {
         listChanged.current();
-        toastRef.current.notice(
-          `In cart now matches what Cookbook sent: ${added} put in, ${removed} back on the List.`
-        );
+        toastRef.current.notice(`In cart now matches what Cookbook sent: ${removed} back on the List.`);
       } else if (!quiet) {
         toastRef.current.notice("The cart is up to date.");
       }
@@ -418,7 +413,6 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   }
 
   function clearNotes() {
-    setTakeBackResults(null);
   }
 
   /** One POST of picks; `only` limits what the server sends and reports. A repeat (409) comes back as `conflict`. */
@@ -565,63 +559,51 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
   }
 
   /**
-   * Take back: `ids`, or every line Cookbook sent when null. The ledger rows are written
-   * before Kroger is asked and the recorded Pickup/Delivery choice goes with the negative
-   * add (`lib/takeBack.ts`); a line Kroger refuses stays in the cart, and the result says so.
+   * **Back to list** (TEC-228) replaces Remove on an In cart line, with no confirm. The line
+   * goes back to the List unsent. King Soopers is never asked: its Cart API cannot remove.
    */
-  async function takeBackRequest(ids: string[] | null, clear = false): Promise<TakeBackResult & { refused: number }> {
-    const response = await serial(() =>
-      fetch("/api/kroger/cart/take-back", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm: true, ...(ids ? { ids } : {}), ...(clear ? { clear: true } : {}) }),
-      })
-    );
-    const body = await response.json();
-    if (!response.ok) {
-      void runCheck();
-      throw new Error(body.error ?? "Couldn't take back from the cart.");
-    }
-    listChanged.current();
-    void refreshCart(true);
-    return {
-      outcomes: body.outcomes,
-      summary: body.summary ?? body.text,
-      recordError: body.recordError ?? null,
-      failed: body.failed === true,
-      refused: typeof body.refused === "number" ? body.refused : 0,
-    };
-  }
-
-  /** **Remove** one In cart line; the caller has asked "Take 1 out of the cart?". */
-  async function removeOne(id: string) {
+  async function backToList(id: string) {
     if (busy) return;
     setBusy("take-back");
-    setRemoving(id);
-    setTakeBackResults(null);
+    setReturning(id);
     try {
-      setTakeBackResults(await takeBackRequest([id]));
+      const response = await fetch("/api/kroger/cart/back-to-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "Couldn't move that back to the list.");
+      listChanged.current();
+      void refreshCart(true);
+      toast.notice(BACK_TO_LIST_WORDS);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't take that back out of the cart.");
+      toast.error(e instanceof Error ? e.message : "Couldn't move that back to the list.");
     } finally {
       setBusy(null);
-      setRemoving(null);
+      setReturning(null);
     }
   }
 
   /**
-   * **Clear cart** (TEC-206, TEC-210): sends a negative for every line in In cart, then clears
-   * every line whatever King Soopers answers. The caller has asked "Clear the cart?"; the
-   * answer is one toast (the server's words), with the cart page when Kroger refused any.
+   * **Clear cart** (TEC-206, TEC-210, TEC-228): marks every In cart line cleared in Cookbook and
+   * nothing more. King Soopers is never asked (its Cart API cannot remove), and the toast says
+   * its cart is not affected, with a link to it. The caller has asked "Clear the cart?".
    */
   async function clearCart() {
     if (busy) return;
     setBusy("take-back");
-    setTakeBackResults(null);
     try {
-      const done = await takeBackRequest(null, true);
-      if (done.refused > 0) toast.error(done.summary, { href: CHECKOUT_URL, label: "Check the King Soopers cart" });
-      else toast.notice(done.summary);
+      const response = await fetch("/api/kroger/cart/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: true }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "Couldn't clear the cart.");
+      listChanged.current();
+      void refreshCart(true);
+      toast.notice(clearedWords(typeof body.cleared === "number" ? body.cleared : 0), { href: CHECKOUT_URL, label: "Open the King Soopers cart" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't clear the cart.");
     } finally {
@@ -641,10 +623,8 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     choosingStore,
     setChoosingStore,
     busy,
-    takeBackResults,
-    dismissTakeBack: () => setTakeBackResults(null),
     adding,
-    removing,
+    returning,
     notSent,
     check,
     lastWorked,
@@ -667,7 +647,7 @@ export function useCart({ onBrandsChanged, onListChanged }: { onBrandsChanged: (
     sendAll,
     addOne,
     offerChoices,
-    removeOne,
+    backToList,
     clearCart,
   };
 }
@@ -762,55 +742,6 @@ export function RefreshLog({ cart }: { cart: CartState }) {
     <p role={note.failed ? "alert" : undefined} className={`px-2 text-xs ${note.failed ? "text-danger" : "text-ink-soft"}`}>
       {note.text}
     </p>
-  );
-}
-
-function ResultChip({ result, good }: { result: string; good: string }) {
-  return (
-    <span
-      className={`shrink-0 rounded border px-1.5 text-[11px] ${
-        result === good ? "border-accent text-accent" : result === "failed" ? "border-danger/60 text-danger" : "border-line text-ink-soft"
-      }`}
-    >
-      {result}
-    </span>
-  );
-}
-
-/**
- * What a Clear cart or Remove did. **One summary line**; only a line Kroger
- * refused is named, because a partial take-back must never read as whole. It
- * never claims the cart is empty beyond what the ledger says.
- */
-export function TakeBackResults({ results, onClose }: { results: TakeBackResult; onClose: () => void }) {
-  const trouble = results.outcomes.filter((o) => o.result !== "taken back");
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border border-line p-3">
-      <div className="flex items-baseline gap-2">
-        <h3 className="flex-1 text-sm font-semibold">{results.summary}</h3>
-        <button type="button" onClick={onClose} className={`text-xs ${LINK}`}>
-          Dismiss
-        </button>
-      </div>
-      {trouble.length > 0 ? (
-        <ul className="flex flex-col gap-1 text-sm">
-          {trouble.map((o) => (
-            <li key={o.id} className="flex items-baseline gap-2">
-              <ResultChip result={o.result} good="taken back" />
-              <span className="min-w-0">
-                {o.name} <span className="text-ink-soft">— {o.detail}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {results.recordError ? <p className="text-xs text-danger">{results.recordError}</p> : null}
-      {results.failed ? (
-        <p role="alert" className="text-xs text-warn">
-          Not everything came back out. Tap Refresh cart to see what is still in.
-        </p>
-      ) : null}
-    </div>
   );
 }
 
