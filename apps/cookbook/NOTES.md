@@ -679,6 +679,21 @@ No model call. Code: `lib/purchases.ts` (pure), `lib/purchaseStore.ts`, `app/api
   status. Each List row is **the tick, the name, the ×N box, the price and + Cart** on one line
   (32px, 12px bold, accessible name "Add to cart"; `h-8`, not the 44px floor, by the owner's word);
   the recipes, mark, bubble, amount and note no longer show (TEC-211).
+- **A name opens the matches popup** (TEC-226; owner, 2026-11-04: "I want it to pop up a window like
+  the search function for everything"). Tapping a List or In cart line's name no longer follows
+  `item.href` to a browser search. `app/ItemMatches.tsx` opens the same sheet as the Which-chicken
+  picker (`SheetFrame`, shared in `app/Cart.tsx`: bottom sheet on phones, `role=dialog`, Escape, Close).
+  It reads `GET /api/kroger/matches?id=` (signed-in only, read-only: no POST, no cart add, no default,
+  no token), which plans the line with `planLine` as Send does, then `lib/itemMatches.ts` orders the
+  products (default, most bought, plan order) and words them (`optionTag`, shared with the picker).
+  Each product is a `target=_blank` link to its `/p/` page (built with `pageFor` when the saved url is not
+  one); **a phone hands that link to the King Soopers app, which could not be checked from a build
+  session (kingsoopers.com is blocked), so it is a phone check**. Every line works, in cart or not. No
+  match: the reason and a **Search King Soopers** link (the item alone, never the quantity). Not connected,
+  no store or no answer: the saved products only, with the reason, plus the search link. The route and
+  the popup run in `serialKroger` like every call that borrows the token. `item.href` is still sent by
+  `/api/grocery`, now only the popup's loading and error fallback. **Trap:** the rows' name is a
+  `button`, not a link; `tests/itemMatches.test.ts` and `tests/lineDeal.test.ts` read the source for it.
 - **The Add box is its own card** (TEC-212, `app/List.tsx`; owner: "Make the add an item pop more it gets
   lost and is a great feature"): a `section` with a 2px `border-accent` frame on `bg-surface`, a bold
   "Add to the list" heading, a ＋ in accent at the start, and the placeholder "Eggs, 2 lb chicken — notes
