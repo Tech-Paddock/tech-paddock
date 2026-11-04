@@ -59,6 +59,15 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   plus cook (whichever is set), else the total: the book's "Under N minutes" filter and Ask Claude's
   overrun note use it, and a recipe with nothing set never matches. Health's `GET /api/servings`
   does not carry either column.
+- **Rows grey out while cooking** (TEC-222, `app/RecipeDetail.tsx`, `lib/greyedRows.ts`): tapping
+  an ingredient or a step greys it (line-through, `text-ink-soft`); tapping again restores it. Each
+  row is a `<button aria-pressed>`, 44px tall. The state lives **in this browser's `localStorage`
+  only** (`cookbook:greyed:<recipe id>`: row indexes and the time of the last tap); nothing goes to
+  the database, so it does not follow the owner to another phone. It clears itself 24 hours after
+  the last tap on that recipe (the exact 24h mark counts as expired), checked on read, on open and
+  when the page becomes visible; there is no Clear button. Every storage touch is in try/catch and
+  the page renders normally without storage. Editing a recipe's ingredients or method can shift
+  which row an index points at; the grey is by position and ends within a day.
 - **An open recipe is in tabs** (TEC-183, `app/RecipeDetail.tsx`; replaces TEC-140's layout): the
   name, "origin · makes N · time", the rating as five tappable stars (the PATCH call; tapping the
   set star clears it) with "N of 5" or "Not rated", then a `role="tablist"` of **Ingredients ·
