@@ -105,6 +105,13 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   only where the model agrees, else noted. Book filters are the same four, as **one row of
   four compact selects** under the search at 360px (`BookFilters`, `app/Tuning.tsx`; High protein
   was dropped, TEC-189); an unset field never matches.
+- **The book has a sort** (TEC-224, `app/Book.tsx`, `lib/recipeSort.ts`): a "Sort" select under the
+  filters, Book order (the server's order, the default) or A to Z. A to Z ignores case and accents,
+  drops a leading "The" (a bare "The" stays), compares with `localeCompare("en", base)`, and keeps
+  the incoming order on a tie. It sorts first, then search and the filters narrow, so all three
+  work together. The choice is **this browser's `localStorage` only** (`cookbook:book-sort`, read
+  and written in try/catch; no storage means Book order). Not a jump-to-letter row, by the owner's
+  word ("A-z").
 - Metadata sits flat on `recipes`, read by `lib/metadata.ts`. `meal` and `diet` are
   check-constrained to `MEALS` and `DIETS`; `readMeta` drops free-of claims and macro tags. **The
   meal list is Main · Side · Breakfast · Snack · Dessert · Creami** (TEC-205), held by

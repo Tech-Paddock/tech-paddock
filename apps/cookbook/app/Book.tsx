@@ -10,6 +10,7 @@ import { menuDayLabel } from "@/lib/menuDay";
 import { FIRST_RECIPE_TAB, factsLine, macrosLine, type RecipeTab } from "@/lib/recipeView";
 import EditRecipe from "./EditRecipe";
 import { BookFilters } from "./Tuning";
+import { DEFAULT_SORT, SORT_CHOICES, readSort, sortRecipes, type BookSort } from "@/lib/recipeSort";
 import { NO_FILTER, cuisinesIn, filterActive, matchesFilter, type BookFilter } from "@/lib/tuning";
 
 /**
@@ -20,6 +21,8 @@ import { NO_FILTER, cuisinesIn, filterActive, matchesFilter, type BookFilter } f
  * stay mounted side by side, so a recipe kept there reaches this one through
  * `version` rather than through shared state.
  */
+
+const SORT_KEY = "cookbook:book-sort";
 
 export default function Book({
   onAddedToList,
@@ -38,6 +41,23 @@ export default function Book({
   const [readError, setReadError] = useState<string | null>(null);
   const toast = useToast();
   const [filter, setFilter] = useState<BookFilter>(NO_FILTER);
+  // The sort (TEC-224): kept in this browser's localStorage only; every touch is in try/catch.
+  const [sort, setSort] = useState<BookSort>(DEFAULT_SORT);
+  useEffect(() => {
+    try {
+      setSort(readSort(window.localStorage.getItem(SORT_KEY)));
+    } catch {
+      // No storage: the book order, and the select still works for this visit.
+    }
+  }, []);
+  function chooseSort(next: BookSort) {
+    setSort(next);
+    try {
+      window.localStorage.setItem(SORT_KEY, next);
+    } catch {
+      // Not remembered; nothing else depends on it.
+    }
+  }
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -186,7 +206,7 @@ export default function Book({
    * Filtered in the browser because the whole book is already here. When it stops
    * being, this moves to the query — the shape of the answer does not change.
    */
-  const shown = (recipes ?? []).filter((recipe) => {
+  const shown = sortRecipes(recipes ?? [], sort).filter((recipe) => {
     // The filters first (`matchesFilter`): every one set must hold.
     if (!matchesFilter(recipe, filter)) return false;
     const q = query.trim().toLowerCase();
@@ -234,6 +254,23 @@ export default function Book({
         ) : null}
         {recipes !== null && recipes.length > 0 ? (
           <BookFilters value={filter} onChange={setFilter} cuisines={cuisinesIn(recipes)} />
+        ) : null}
+        {recipes !== null && recipes.length > 0 ? (
+          <label className="flex items-center gap-2 text-[13px] text-ink-soft">
+            Sort
+            <select
+              value={sort}
+              onChange={(e) => chooseSort(readSort(e.target.value))}
+              aria-label="Sort the book"
+              className="rounded-lg border border-line bg-surface px-1.5 py-1.5 text-[13px] text-ink"
+            >
+              {SORT_CHOICES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
         ) : null}
 
         {recipes === null ? (
