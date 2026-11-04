@@ -410,6 +410,88 @@ const SQL_CLIENTS = new Set(["psql", "pgcli", "usql"]);
 const GH_PR_WRITES = new Set(["create", "new", "merge", "edit", "close", "reopen", "review", "comment", "ready", "lock", "unlock", "update-branch"]);
 const isSupabase = (w) => /^supabase(@[^/\s]*)?$/.test(base(w));
 
+/* ------------------------------------------------------------------------- */
+/* gh beyond pull requests (TEC-221)                                         */
+/* ------------------------------------------------------------------------- */
+
+/* A session on the owner's PC runs `gh` with the owner's own login: every
+   repository, admin rights. A cloud session's GitHub App could do none of
+   this, so these refusals put the cloud's limits back, for everyone,
+   Deployment included. They refuse rather than ask: an ask is approved
+   without the owner in auto mode (TEC-220). */
+const GH_REFUSED = {
+  repo: new Set(["delete", "rename", "archive", "unarchive", "edit", "transfer"]),
+  secret: new Set(["set", "delete", "remove"]),
+  variable: new Set(["set", "delete", "remove"]),
+  release: new Set(["create", "delete", "edit", "upload", "delete-asset"]),
+  ruleset: new Set(["create", "delete", "edit", "update"]),
+};
+const GH_OWNER =
+  "That changes the repository itself, which is the owner's alone. Say what you need and stop; the owner runs it.";
+const TOKEN =
+  "That prints the owner's GitHub token, which must never reach a chat, a file or a log. `gh auth status` without `--show-token` says who is signed in.";
+
+/** A `gh` command's group and subcommand: the first two words that are not flags or a `-R` value. */
+function ghWords(args) {
+  const out = [];
+  for (let i = 1; i < args.length && out.length < 2; i++) {
+    const w = args[i];
+    if (w === "-R" || w === "--repo" || w === "--hostname") i++;
+    else if (!w.startsWith("-")) out.push(w);
+  }
+  return out;
+}
+
+const API_FIELDS = new Set(["-f", "-F", "--field", "--raw-field", "--input"]);
+
+/** `gh api`: reads go ahead; anything that writes is refused. */
+function ghApi(args) {
+  const at = args.indexOf("api");
+  let method = null;
+  let body = false;
+  let endpoint = null;
+  for (let i = at + 1; i < args.length; i++) {
+    const w = args[i];
+    if (w === "-X" || w === "--method") method = String(args[++i] ?? "");
+    else if (/^-X./.test(w)) method = w.slice(2);
+    else if (w.startsWith("--method=")) method = w.slice(9);
+    else if (API_FIELDS.has(w)) {
+      body = true;
+      i++;
+    } else if (/^-[fF]./.test(w) || /^--(field|raw-field|input)=/.test(w)) body = true;
+    else if (/^-(H|q|t|p)$|^--(header|jq|template|preview|cache|hostname)$/.test(w)) i++;
+    else if (!w.startsWith("-") && endpoint === null) endpoint = w;
+  }
+  const m = (method ?? (body ? "POST" : "GET")).toUpperCase();
+  const graphql = endpoint === "graphql";
+  if (graphql) {
+    if (args.some((a) => /\bmutation\b/i.test(a) || /^@|=@/.test(a))) {
+      return deny(`\`gh api graphql\` with a mutation (or a query read from a file the guard cannot see) writes to GitHub. ${GH_OWNER}`);
+    }
+    return null;
+  }
+  if (m === "GET" || m === "HEAD") return null;
+  if (m.includes("$") || m.includes(SUB)) return deny(`\`gh api\` with a method only known at run time could write. Spell out \`-X GET\` to read.`);
+  return deny(`\`gh api\` with ${method ? `\`-X ${m}\`` : "a field or input (which makes it a POST)"} writes to GitHub. To read, pass \`-X GET\`. ${GH_OWNER}`);
+}
+
+/** Every `gh` rule but the pull request ones, which are Deployment's (below). */
+function ghCommand(args) {
+  const [group, sub] = ghWords(args);
+  if (group === "auth") {
+    if (sub === "token") return deny(TOKEN);
+    if (sub === "status" && args.some((a) => a === "--show-token" || /^-[a-z]*t[a-z]*$/.test(a))) return deny(TOKEN);
+    return null;
+  }
+  if (group === "api") return ghApi(args);
+  if (GH_REFUSED[group]?.has(sub)) return deny(`\`gh ${group} ${sub}\`: ${GH_OWNER}`);
+  return null;
+}
+
+/** The plain-text file the owner's GitHub token is stored in on WSL. */
+const isTokenFile = (w) => /(^|\/)gh\/hosts\.ya?ml$/.test(w);
+const PRINTS_ONLY = new Set(["echo", "printf"]);
+
 function bash(command, cwd, depth = 0, deploy = false) {
   if (depth > 5) return null;
   const dirs = new Map([["0", cwd]]);
@@ -455,6 +537,11 @@ function bash(command, cwd, depth = 0, deploy = false) {
 
     // `gh pr create`, `gh pr merge`, `hub pull-request`: the same writes as the
     // GitHub tools, from a shell. Reading (`gh pr view`, `list`, `diff`) is anyone's.
+    if (!PRINTS_ONLY.has(cmd) && args.slice(1).some(isTokenFile)) return deny(TOKEN);
+    if (cmd === "gh") {
+      const d = ghCommand(args);
+      if (d) return d;
+    }
     if (!deploy && cmd === "gh") {
       const at = args.indexOf("pr");
       if (at > 0 && GH_PR_WRITES.has(args[at + 1])) return deny(`\`gh pr ${args[at + 1]}\` writes to a pull request. ${MAIN_ONLY}`);
@@ -575,7 +662,23 @@ function refspec(spec, del, ctx) {
     const what = del || src === "" ? "deletes main" : "lands on main";
     return deny(`\`${spec}\` ${what}. Never push to main: every change goes through a pull request. ${PUSH_OWN_BRANCH}`);
   }
-  return null;
+  if (del || src === "") return deny(DELETE_BRANCH);
+  return ownBranch(dst);
+}
+
+/* TEC-221: on the owner's PC nothing but this guard stops a remote branch
+   delete (the cloud's git proxy did), and Remote Control's worktrees sit on
+   local branches named `worktree-*` that must never reach GitHub. */
+const DELETE_BRANCH =
+  "Deleting a remote branch is the owner's (CLAUDE.md: stale branches are the owner's to delete; merged ones delete themselves). List it as a link in your report and stop.";
+const BRANCH_PREFIX = "claude/";
+
+/** A push may land only on a `claude/…` branch, or a tag named in full. */
+function ownBranch(dst) {
+  const r = String(dst).replace(/^refs\/heads\//, "");
+  if (r.startsWith("refs/tags/")) return null;
+  if (r.startsWith(BRANCH_PREFIX)) return null;
+  return deny(`\`${r}\` is not a \`${BRANCH_PREFIX}…\` branch. Every branch pushed here is \`${BRANCH_PREFIX}<area>-<description>\` (CLAUDE.md); a session's own \`worktree-…\` branch stays local. Cut one and push that: \`git switch -c ${BRANCH_PREFIX}<area>-<change> && git push -u origin ${BRANCH_PREFIX}<area>-<change>\`.`);
 }
 
 /** A push with no refspec: git decides from config and the current branch. */
@@ -611,7 +714,7 @@ function barePush(remote, ctx) {
   if (merge && targetsMain(merge)) {
     return deny(`\`${cur}\` tracks main (it was cut from origin/main), so a bare \`git push\` can land on main. Push it by name, which also fixes the tracking: \`git push -u origin ${cur}\`.`);
   }
-  return null;
+  return ownBranch(merge ? merge.replace(/^refs\/heads\//, "") : cur);
 }
 
 function cantTell(why) {

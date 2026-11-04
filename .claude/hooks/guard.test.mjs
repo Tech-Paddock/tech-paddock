@@ -105,8 +105,7 @@ test("pushes of a branch that is not main go ahead", () => {
       ["git push origin HEAD", "allow"],
       ["git push -u origin HEAD", "allow"],
       ["git push --force-with-lease origin claude/feature", "allow"],
-      ["git push origin --delete claude/old", "allow"],
-      ["git push origin v1.0.0", "allow"],
+      ["git push origin refs/tags/v1.0.0", "allow"],
       ["git push --dry-run origin main", "allow"],
       ["git push -n origin main", "allow"],
       ["git push -o ci.skip origin claude/feature", "allow"],
@@ -115,6 +114,94 @@ test("pushes of a branch that is not main go ahead", () => {
     ],
     (c) => bash(c),
   );
+});
+
+/* TEC-221: the owner's PC has no git proxy to stop these, and Remote Control's
+   worktrees sit on local `worktree-*` branches. */
+test("a push never deletes a remote branch, and lands only on a claude/ branch", () => {
+  expectAll(
+    [
+      ["git push origin --delete claude/old", "deny"], // was allowed; the cloud's proxy refused it instead
+      ["git push origin -d claude/old", "deny"],
+      ["git push -fd origin claude/old", "deny"],
+      ["git push origin :claude/old", "deny"],
+      ["git push origin +:claude/old", "deny"],
+      ["git push origin worktree-bridge-cse_abc", "deny"],
+      ["git push -u origin HEAD:worktree-agent-a1", "deny"],
+      ["git push origin feature", "deny"],
+      ["git push origin refs/heads/fix", "deny"],
+      ["git push origin v1.0.0", "deny"], // a bare name could be a branch; tags are named in full
+      ["git push origin refs/heads/claude/x", "allow"],
+      ["git push --dry-run origin --delete claude/old", "allow"],
+    ],
+    (c) => bash(c),
+  );
+  // The branch a bare push or `HEAD` resolves to counts too.
+  const bridge = repo({ branch: "worktree-bridge-cse_abc", merge: "worktree-bridge-cse_abc" });
+  expectAll(
+    [
+      ["git push", "deny"],
+      ["git push origin HEAD", "deny"],
+      ["git push -u origin HEAD:claude/platform-x", "allow"],
+    ],
+    (c) => bash(c, bridge),
+  );
+});
+
+test("gh: the repository itself, its secrets and releases are the owner's, for every role", () => {
+  const sh = (command, who = {}) => verdict(decide({ tool_name: "Bash", tool_input: { command }, cwd: FEATURE, ...who }));
+  const refused = [
+    "gh repo delete Tech-Paddock/tech-paddock --yes",
+    "gh repo rename x",
+    "gh repo archive -y",
+    "gh repo edit --visibility public",
+    "gh -R o/r repo edit --default-branch dev",
+    "gh secret set SESSION_SECRET -b x",
+    "gh secret delete X",
+    "gh variable set X --body y",
+    "gh release create v1",
+    "gh release delete v1 -y",
+    "bash -c 'gh repo delete o/r --yes'",
+  ];
+  for (const c of refused) for (const who of [MAIN, HELPER, DEPLOY]) assert.equal(sh(c, who), "deny", `${c} ${JSON.stringify(who)}`);
+  for (const c of ["gh repo view", "gh repo clone o/r", "gh secret list", "gh variable list", "gh release list", "gh release view v1", "gh ruleset list", "gh run list", "gh issue list", "gh search code foo", "echo 'gh repo delete'"]) {
+    assert.equal(sh(c), "allow", c);
+  }
+});
+
+test("gh api: reads go ahead, writes are refused, for every role", () => {
+  const sh = (command, who = {}) => verdict(decide({ tool_name: "Bash", tool_input: { command }, cwd: FEATURE, ...who }));
+  const writes = [
+    "gh api -X DELETE repos/o/r/git/refs/heads/claude/x",
+    "gh api --method PATCH repos/o/r -f default_branch=dev",
+    "gh api --method=PUT repos/o/r/branches/main/protection --input p.json",
+    "gh api -XPOST repos/o/r/rulesets",
+    "gh api repos/o/r/issues -f title=x", // a field makes it a POST
+    "gh api repos/o/r/hooks -F active=false",
+    "gh api repos/o/r/hooks --raw-field=x",
+    "gh api graphql -f query='mutation { deleteRef(input: {}) { clientMutationId } }'",
+    "gh api graphql -F query=@q.graphql",
+    'gh api -X "$M" repos/o/r',
+  ];
+  for (const c of writes) for (const who of [MAIN, HELPER, DEPLOY]) assert.equal(sh(c, who), "deny", `${c} ${JSON.stringify(who)}`);
+  const reads = [
+    "gh api repos/o/r",
+    "gh api repos/o/r/pulls --paginate --jq '.[].number'",
+    "gh api -X GET search/code -f q='repo:o/r foo' --paginate",
+    "gh api --method GET search/issues -f q=x",
+    "gh api -H 'Accept: application/vnd.github+json' repos/o/r/commits/abc/check-runs",
+    "gh api graphql -f query='query { viewer { login } }'",
+  ];
+  for (const c of reads) assert.equal(sh(c), "allow", c);
+});
+
+test("the GitHub token is never printed", () => {
+  for (const c of ["gh auth token", "gh auth status --show-token", "gh auth status -t", "cat ~/.config/gh/hosts.yml", "grep oauth /home/u/.config/gh/hosts.yml", "cp ~/.config/gh/hosts.yaml /tmp/x"]) {
+    assert.equal(verdict(bash(c)), "deny", c);
+  }
+  for (const c of ["gh auth status", "gh auth login --web", "echo 'never cat gh/hosts.yml'", "ls ~/.config"]) {
+    assert.equal(verdict(bash(c)), "allow", c);
+  }
 });
 
 test("commands that only mention main or a push are not pushes", () => {
@@ -537,6 +624,12 @@ test("end to end: the real commands deny, ask and allow", () => {
     assert.equal(push("git push -u origin claude/feature").decision, "allow", shell);
     assert.equal(push("ls -la").decision, "allow", shell);
     assert.equal(push("ls -la").status, 0, shell);
+    // TEC-221: the hook's word filter lets these reach the guard.
+    assert.equal(push("gh repo delete o/r --yes").decision, "deny", shell);
+    assert.equal(push("gh api -X DELETE repos/o/r/git/refs/heads/claude/x").decision, "deny", shell);
+    assert.equal(push("cat ~/.config/gh/hosts.yml").decision, "deny", shell);
+    assert.equal(push("gh auth token").decision, "deny", shell);
+    assert.equal(push("gh api repos/o/r").decision, "allow", shell);
     const pr = run(hookFor("mcp__github__merge_pull_request"), { tool_name: "mcp__github__merge_pull_request", tool_input: { merge_method: "rebase" } }, { shell });
     assert.equal(pr.decision, "deny", shell);
     const auto = run(hookFor("mcp__github__enable_pr_auto_merge"), { tool_name: "mcp__github__enable_pr_auto_merge", tool_input: {}, ...DEPLOY }, { shell });
