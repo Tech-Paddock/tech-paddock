@@ -9,7 +9,7 @@ Not reopened here. The design record is the kept branch `claude/health-recipes`;
 section and closing comment before changing anything in this file.
 
 - Name: Cookbook ("recipe" is Coffee's word, for a brew). Own app, own schema `cookbook`.
-- Macros are static; ingredients are text, not a join. Changing the ingredients means estimating the macros again.
+- Macros are static; ingredients are text, not a join. Changing the ingredients or servings clears the macros, and the nightly job (below) works them out again.
 - The grocery list lives here. Health does not own recipes.
 - The livery is the theme's; it is not changed here.
 
@@ -27,26 +27,31 @@ section and closing comment before changing anything in this file.
 
 ## Recipes
 
-- Four ways in, in this order: ask Claude (it writes, then estimates the macros); from a link
-  (read, then macros estimated); from a file (photo or PDF, read, then macros estimated, never
-  stored); type it (the model only estimates the macros). Every way in applies the house style
-  (`lib/houseStyle.ts`).
+- Four ways in, in this order: ask Claude (it writes the recipe); from a link (read); from a file
+  (photo or PDF, read, never stored); type it (the model only restyles it). Every way in applies
+  the house style (`lib/houseStyle.ts`). **No way in estimates macros:** a recipe is saved with its
+  macros, source and model all null.
+- **Macros come from a nightly Cowork job, not the API** (owner, 2026-11-04). A Cowork scheduled task
+  with the Supabase connector runs at **2 am Denver time**, finds recipes with no macros and writes
+  them straight to `cookbook.recipes`: the whole pot, `source = 'estimate'`, the model named. It
+  writes only recipes that have none. No Cookbook route calls a model for macros, and there is no
+  button for it. The exact write is in `NOTES.md`.
 - Anything a model wrote lands as a draft; keeping it is the write. A typed recipe's draft is kept
-  at once, without a tap. **The one exception is an ingredient edit:** it re-estimates the macros of the
-  whole pot through the model and writes at once, with no draft.
-- **Import keeps only the recipe.** Published nutrition is discarded and re-estimated; the macro
-  source is `estimate`, never `web`. `source_url` records where the method came from, never a
-  number.
+  at once, without a tap. **The one exception is an edit:** it writes at once, with no draft, calls
+  no model, and an edit that changes the ingredients or the servings sets the macros, source and
+  model to null together for the nightly job to redo. Any other edit leaves them alone.
+- **Import keeps only the recipe.** Published nutrition is discarded; the nightly job works the
+  macros out from the ingredients, and the macro source is `estimate`, never `web`. `source_url`
+  records where the method came from, never a number.
 - **There is no recipe Tidy** (owner, 2026-11-02). Every way in applies the house style, so a recipe
   arrives in it; nothing rewrites the book in a batch. **Revert to imported** puts back
   `imported_original` (ingredients, method, servings), clears the macros and `house_style_at`, and
-  runs no model. **Estimate macros** (Macros tab) estimates a recipe that has none. The grocery
-  list's Tidy is a separate feature and stays.
+  runs no model. The grocery list's Tidy is a separate feature and stays.
 - **The recipe side never says price** (owner, 2026-11-02): "estimate macros" is the word. Dollars
   live only on the grocery list and Deals. `tests/recipeSideWords.test.ts` enforces it on the
   recipe-side files.
-- **A recipe can be saved before its macros are estimated** (TEC-200): kcal, protein_g, carbs_g,
-  fat_g and source are then all null, and model too, never a zero. Readers say "Macros not
+- **A recipe has no macros until the nightly job writes them** (TEC-200, TEC-223): kcal, protein_g,
+  carbs_g, fat_g and source are then all null, and model too, never a zero. Readers say "Macros not
   estimated yet" and skip it in arithmetic; `GET /api/servings` leaves it out.
 - **The meal is one of Main · Side · Breakfast · Snack · Dessert · Creami, or none, which reads as
   Other** (owner, 2026-11-02). Other is never stored or offered to a model; a model's or a

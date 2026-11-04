@@ -21,8 +21,8 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 - Install icon: `app/apple-touch-icon.png` (No. 12, full-bleed) with `appleWebApp` metadata; its
   colours are fixed in dark mode too.
 - No GET route is cached; caching would serve Health stale servings.
-- **One model, set in `lib/models.ts`** (TEC-133): every call (the macro estimate, Ask Claude, link, file, edit
-  re-estimate, the list's Tidy, the house-style restyle, and a resumed `pause_turn`) goes out as `claude-sonnet-5-5` at effort `medium`
+- **One model, set in `lib/models.ts`** (TEC-133): every call (Ask Claude, link, file, the list's Tidy, the
+  house-style restyle, and a resumed `pause_turn`; **no macro estimate**, TEC-223) goes out as `claude-sonnet-5-5` at effort `medium`
   through `requestShape`, with `THINKING_HEADROOM` added to `max_tokens` because thinking counts
   against it. No picker; the draft and edit routes ignore a `model` an older page sends. A kept
   recipe keeps the model that estimated it, and `modelLabel` still names Haiku 4.5 and Sonnet 5 for
@@ -33,7 +33,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   `refusal` or `max_tokens` throws a sentence with no retry or fallback.
 - **Sonnet 5.5 400s on** `thinking: {type: "disabled"}`, `budget_tokens`, non-default
   `temperature`/`top_p`/`top_k`, forced `tool_choice`, and a prefill. Its default effort is `high`,
-  so `medium` is always sent. The draft route allows 300 s, the edit route 120 s.
+  so `medium` is always sent. The draft route allows 300 s; the edit route calls no model and has no `maxDuration`.
 
 ## Recipes
 
@@ -97,7 +97,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 - **The split divides by the macros' own calories at 4/4/9, not the stored kcal**, rounded by
   largest remainder so it adds to 100, and is labelled approximate. (The book's High protein
   filter, which divided by the stored kcal, was dropped in TEC-189.)
-- The typed path runs a name check before its macro estimate.
+- The typed path runs a name check before its restyle call.
 - An import is also refused when no fetch returned a page (`lib/fetchRun.ts`).
 - **Something else** re-asks with every turned-down draft and its reason (`lib/reroll.ts`); **Bin
   it** is a turn-down. The pile is browser state, cleared by Keep it or a new ask.
@@ -122,9 +122,16 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   as `main`, so the code works either side of the migration, which moved dinner and lunch to main
   and every recipe tagged `creami` to `creami` (one-way). The
   rating is read only from this app's forms. Older rows read "not set" until supplied (TEC-52).
-- Editing (`lib/edit.ts`) re-estimates the whole pot whenever the ingredient list changes at all
-  (reordering counts), in one call before the one write; servings alone re-divides the pot. Confirmed for TEC-140: changing
-  ingredients updates the macros, and the breakdown reads the row that comes back, so it follows.
+- **Macros come from a nightly Cowork job, not the API** (TEC-223, owner 2026-11-04: "I don't want to use
+  the API to re-calculate the macros on a recipe"). No route estimates macros: `estimateRecipeMacros`,
+  its prompt, `POST /api/recipes/estimate` and the Macros tab's Estimate macros button are deleted. Every way in
+  saves a recipe with kcal, protein_g, carbs_g, fat_g, source and model all null (`saveRecipe`; the save
+  route ignores any `macros`, `source` or `model` in the body), and the Macros tab says "Macros not
+  estimated yet" with no button. The job is below.
+- Editing (`lib/edit.ts`) calls no model. **An edit that changes the ingredient list (reordering counts) or the
+  servings sets kcal, protein_g, carbs_g, fat_g, source and model to null in the one write**
+  (`clearsMacros`, `updateRecipe(id, edit, clearMacros)`); name, method and metadata edits leave the macros
+  alone. The route answers `{ recipe, macrosCleared }`. `note` is left as it is.
 - **The house style** (TEC-201, `lib/houseStyle.ts`) is written once: `HOUSE_STYLE` is the prompt text
   in Ask Claude, link, file and the restyle call (`styleRecipe`, `lib/anthropic.ts`), which a
   typed recipe also uses. An ingredient is amount, unit, item ("1 cup onion"); prep words move into the
@@ -135,7 +142,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   a different leading amount or unit on any line, or a number the method lost. **It checks the leading
   amount only**: a "(14 oz)" size or the item words are not checked. A link or file draft is
   not compared with anything (there is no source text to compare), only styled by the prompt.
-- **A typed recipe is restyled too**, one extra call before the macro estimate. If the restyle is refused it is
+- **A typed recipe is restyled too**, one extra call before it is saved. If the restyle is refused it is
   saved as typed, with a note, and not marked `house_style_at`.
 - **The recipe Tidy is gone** (TEC-207; it was TEC-201's batch rewrite and review screen). All the imported
   recipes were tidied before it went, so the house style now only applies on the way in. Deleted: the
@@ -143,14 +150,10 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   `lib/tidyView.ts` and their tests. **The grocery list's Tidy stays** (below). Nothing reads or writes
   `cookbook.recipe_tidy_drafts` any more: the table is dropped (TEC-209, `cookbook_drop_recipe_tidy_drafts`).
 - **Recipe-side wording: "estimate macros", never price** (TEC-207, owner: price lives with the grocery
-  list and Deals). Labels, toasts, errors and comments on the recipe side say "estimate" / "re-estimate
-  the macros" ("Save and re-estimate macros", `reestimated` in the edit route's answer, `Reestimate` in
-  `lib/edit.ts`). `tests/recipeSideWords.test.ts` reads the recipe-side files whole and fails on
+  list and Deals). Labels, toasts, errors and comments on the recipe side say "estimate" / "macros"
+  ("Save and clear macros", `macrosCleared` in the edit route's answer). `tests/recipeSideWords.test.ts` reads the recipe-side files whole and fails on
   price/pricing/priced/re-price/re-cost/dollar, so a new file on the recipe side is added to its list.
   Dollar wording on the list and Deals is untouched.
-- **Estimate macros** (the Macros tab button, `POST /api/recipes/estimate`) is `applyEdit` with `always`: one
-  call on the whole pot (`source = estimate`, the model named) even if the text is unchanged. It is the way
-  to get macros for an imported recipe, and after a Revert or a failed estimate. A failed call writes nothing.
 - **Revert** (`/api/recipes/revert`, on a recipe with `has_original`) puts back `imported_original`'s
   ingredients, method and servings, nulls the macros, source, model and note, and clears
   `house_style_at`. No model. **Servings come from the original's `servings`, else its yield text's
@@ -161,6 +164,44 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   a sentence. The code is `lib/imported.ts` (pure) and `lib/importedStore.ts` (database).
 - `methodSteps` splits only on the next number in a run ("gas mark 4" stays); its tests hold the
   edges.
+
+## The nightly macro job (TEC-223)
+
+A Cowork scheduled task with the Supabase connector, **2 am Denver time** (owner, 2026-11-04), writes
+macros **straight to `cookbook.recipes`**. It is the only thing that writes them; the app never does.
+Nothing in this repo runs or checks it. The contract it must follow:
+
+- **Which rows:** `kcal is null` (the table's `recipe_macros_together` check makes the remaining macro columns null
+  and `source` null with it, and `recipe_model_matches_source` makes `model` null). Select
+  `id, name, servings, ingredients, method` for those rows only. Skip a row with no ingredients.
+- **What it writes, per row, in one `update`:**
+  - `kcal`, `protein_g`, `carbs_g`, `fat_g`: **the whole pot**, not a serving, in kcal and grams
+    (`numeric`, two decimals; the table only checks each is at least 0, but write kcal above 0, since a 0
+    reads as a dish nobody estimated) It reports everything the ingredient list puts in
+    the pot; the app divides by `servings` on the way out (`perServing`). Dividing first would make
+    every number in the book, and Health's `GET /api/servings`, wrong by a factor of `servings`.
+    Work from the ingredients and `servings`; ignore any nutrition figure on the page.
+  - `source = 'estimate'`. The enum `cookbook.macro_source` holds only `hand` and `estimate`; `hand` is for
+    a person's own figure and is not the job's. **No schema change is needed.**
+  - `model` = the model id the task runs on, as plain text (for example `claude-sonnet-5-5`). The
+    table requires it non-null with `source = 'estimate'` and puts no other check on the text. The book
+    labels `claude-sonnet-5-5`, `claude-sonnet-5` and `claude-haiku-4-5` by name (`modelLabel`) and
+    shows any other id as written.
+  - **All five in the same statement**, because `recipe_macros_together` refuses any mix of set and null.
+- **What it never writes:** `note`, `name`, `servings`, `ingredients`, `method`, `origin`, `source_url`,
+  `house_style_at`, `imported_original`, the metadata columns or `rating`. (`note` stays untouched, so the
+  job's usual caveat, such as an assumed amount of oil, has no home yet.)
+- **It never touches a recipe that has macros.** The `where kcal is null` in the update is the guard, so a
+  recipe the owner edits (which clears its macros) or one the job already filled is not overwritten if
+  the two overlap. Never write a zero for "could not estimate": leave the row null and it is tried again
+  tomorrow.
+- **Guard against an edit during the run.** An edit clears the macros, but one landing between the job's
+  select and its update would otherwise be written over with numbers for the old ingredients. So the update
+  also matches what the job read: `where id = $1 and kcal is null and servings = $2 and ingredients = $3`.
+  A row that changed matches nothing and is picked up by tomorrow's run.
+- **A recipe the job fills shows "Estimated" with the model name** on the Macros tab, and Health's
+  `GET /api/servings` includes it from the next read. Until then the recipe is left out of that route.
+- The service role key bypasses RLS; the connector's own access is the owner's setup, outside this repo.
 
 ## Tables (`cookbook`)
 
@@ -749,8 +790,9 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   and `source` null (`Number(null)` would make them 0); `Recipe` is `PotMacros`, and a reader asks
   `isEstimated` or `servingOrNull` (`lib/recipeSteps.ts`) before doing arithmetic. The list, the
   menu row and the Macros tab say "Macros not estimated yet"; `toServingRows` leaves the recipe out
-  of `GET /api/servings`. Any new total, filter or reader must skip it the same way. The Macros tab's
-  Estimate macros button gives such a recipe its macros, and so does an ingredient edit.
+  of `GET /api/servings`. Any new total, filter or reader must skip it the same way. The Macros tab has no
+  button: the nightly job gives such a recipe its macros, and an ingredient or servings edit clears them
+  again for the job to redo.
 
 - **In cart is what Cookbook sent, not the account** (TEC-190). Anything added in the King Soopers
   app, and anything bought since, is invisible; a line cleared from the list while in the cart
@@ -765,7 +807,7 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   that has nights is caught up on the next run; a week with no nights never rolls up and pushes
   the date out, which `coloursFrom` cannot know.
 
-- **"Invalid API key" comes from Supabase.** Only drafting, an ingredient edit, Estimate macros and the list's Tidy call a
+- **"Invalid API key" comes from Supabase.** Only drafting, the typed restyle and the list's Tidy call a
   model.
 - Health reads a 503, or a `SESSION_SECRET` mismatch, as "couldn't reach the Cookbook".
 - `tests/servings.test.ts` holds the contract's exact fields; metadata never enters it.

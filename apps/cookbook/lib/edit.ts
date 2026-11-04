@@ -1,31 +1,27 @@
 import { readMeta, type RecipeMeta } from "./metadata";
-import type { Macros } from "./macros";
-import { MODEL, type ModelId } from "./models";
 import { ConflictError, InputError } from "./errors";
 
 /**
- * Editing a recipe already in the book (2026-09-26): any part of it can change,
- * and changing the ingredients updates the macros.
+ * Editing a recipe already in the book (2026-09-26): any part of it can change.
+ * Since TEC-223 no edit calls a model: **the macros come from a nightly Cowork
+ * job** (`NOTES.md`, *The nightly macro job*), so an edit that could change them
+ * clears them and the job fills them in again.
  *
- * **Pure: no database, no model, no Next** — the route hands in what it needs as
- * `EditDeps`, so the rules below have tests without either. That matters most
- * for the one rule that has to hold absolutely: **a failed re-estimate writes
- * nothing.** The estimate runs before the single write, and the write is never
- * reached if it throws.
+ * **Pure: no database, no Next** — the route hands in what it needs as
+ * `EditDeps`, so the rules below have tests without either.
  *
- * **What re-estimates the macros, and what does not.** The book stores the whole pot and
- * divides on the way out (`RULES.md`), so the pot's macros depend on the
- * ingredients and nothing else in an edit:
+ * **What clears the macros, and what does not.** The book stores the whole pot,
+ * so the pot's macros depend on the ingredients and the servings:
  *
- * - **Ingredients changed → one estimate call**, through `estimateRecipeMacros`,
- *   the same path every way in uses. The new pot, its model and its caveat
- *   replace the old ones.
- * - **Servings changed alone → no call.** Same pot, a different divisor: "I got
- *   eight bowls, not six" is the cheap edit, and
- *   `/api/servings` divides the stored pot by the new count on the next read.
- *   Asking a model to re-estimate an unchanged list would buy a noisier number
- *   of the same pot.
- * - **Name, method, metadata → no call.** None of them is in the pot.
+ * - **Ingredients changed → macros cleared.**
+ * - **Servings changed → macros cleared.** The pot is the same, but the job
+ *   works from ingredients and servings together, and a recipe that has macros
+ *   is one the job never touches. Clearing is what makes it look again.
+ * - **Name, method, metadata → macros left alone.** None of them is in the pot.
+ *
+ * Clearing sets kcal, protein_g, carbs_g, fat_g, source and model to null
+ * together, which is the only shape the table's `recipe_macros_together` and
+ * `recipe_model_matches_source` checks allow.
  *
  * **What an edit never touches**: grocery lines (text, copied with the recipe's
  * name at the time — TEC-39 B), the menu row (which recipe and when, nothing
@@ -42,10 +38,7 @@ export type RecipeEdit = {
 };
 
 /** The fields of a stored recipe an edit compares against. */
-export type EditTarget = Pick<RecipeEdit, "name" | "ingredients"> & { id: string };
-
-/** A re-estimate's result, as it lands on the row. */
-export type Reestimate = { macros: Macros; model: ModelId; note: string | null };
+export type EditTarget = Pick<RecipeEdit, "name" | "ingredients" | "servings"> & { id: string };
 
 const MAX_NAME = 200;
 const MAX_INGREDIENTS = 80;
@@ -70,7 +63,7 @@ export function readEdit(raw: unknown): { edit: RecipeEdit } | { error: string }
   }
 
   const ingredients = cleanIngredients(o.ingredients);
-  if (ingredients.length === 0) return { error: "List what goes in it — the macros come from that." };
+  if (ingredients.length === 0) return { error: "List what goes in it." };
   if (ingredients.length > MAX_INGREDIENTS) return { error: "That is a very long ingredient list." };
   if (ingredients.some((i) => i.length > MAX_LINE)) return { error: "One ingredient line is too long." };
 
@@ -89,8 +82,8 @@ export function cleanIngredients(value: unknown): string[] {
 
 /**
  * **Does this edit change the pot?** Only when the ingredient list does — as
- * written, in order, after trimming. Reordering is a change: it is cheap to
- * re-estimate and not worth a rule of its own. Servings is deliberately not here.
+ * written, in order, after trimming. Reordering is a change: it is cheap for the
+ * nightly job to redo and not worth a rule of its own.
  */
 export function changesThePot(current: Pick<RecipeEdit, "ingredients">, edit: Pick<RecipeEdit, "ingredients">): boolean {
   const a = cleanIngredients(current.ingredients);
@@ -98,38 +91,35 @@ export function changesThePot(current: Pick<RecipeEdit, "ingredients">, edit: Pi
   return a.length !== b.length || a.some((line, i) => line !== b[i]);
 }
 
+/** Does this edit clear the macros? The ingredients or the servings differ (TEC-223). */
+export function clearsMacros(
+  current: Pick<RecipeEdit, "ingredients" | "servings">,
+  edit: Pick<RecipeEdit, "ingredients" | "servings">
+): boolean {
+  return changesThePot(current, edit) || current.servings !== edit.servings;
+}
+
 /** What `applyEdit` needs from the outside world. The route passes the real ones; the tests pass fakes. */
 export type EditDeps<R> = {
   getRecipe: (id: string) => Promise<EditTarget | null>;
   /** Is this name held by a recipe other than `exceptId`? */
   nameTakenByOther: (name: string, exceptId: string) => Promise<boolean>;
-  estimate: (recipe: RecipeEdit) => Promise<{ macros: Macros; note: string | null }>;
-  /** The one write. `reestimate` null leaves the macros, source, model and note as they are. */
-  update: (id: string, edit: RecipeEdit, reestimate: Reestimate | null) => Promise<R>;
+  /** The one write. `clearMacros` sets kcal, protein_g, carbs_g, fat_g, source and model to null; false leaves them as they are. */
+  update: (id: string, edit: RecipeEdit, clearMacros: boolean) => Promise<R>;
   normalizeName: (name: string) => string;
 };
 
 /**
- * Apply an edit: check, estimate the macros if the pot changed, then write once.
- *
- * **Order is the guarantee.** Everything that can refuse — the recipe gone, the
- * name taken, the model failing — happens before `update`, and `update` is one
- * statement. So a refused edit has written nothing, and the recipe on screen is
- * still the recipe in the book. The name is checked before the call so a
- * collision does not pay for an estimate it could never keep; the unique index
- * still catches a race at the write.
+ * Apply an edit: check, then write once, clearing the macros if the ingredients
+ * or servings changed. Everything that can refuse — the recipe gone, the name
+ * taken — happens before `update`, and `update` is one statement, so a refused
+ * edit has written nothing. The unique index still catches a name race at the write.
  */
 export async function applyEdit<R>(
   deps: EditDeps<R>,
   id: string,
-  edit: RecipeEdit,
-  /**
-   * `always` estimates even when the ingredient text is the same (TEC-201):
-   * "Estimate macros" does it for a recipe whose macros were
-   * never estimated. Every other edit leaves it off.
-   */
-  opts: { always?: boolean } = {}
-): Promise<{ recipe: R; reestimated: boolean }> {
+  edit: RecipeEdit
+): Promise<{ recipe: R; macrosCleared: boolean }> {
   const current = await deps.getRecipe(id);
   if (!current) throw new InputError("That recipe is not in the book any more.");
 
@@ -137,13 +127,6 @@ export async function applyEdit<R>(
     throw new ConflictError(`"${edit.name}" is already in the book. Pick another name.`);
   }
 
-  let reestimate: Reestimate | null = null;
-  if (opts.always || changesThePot(current, edit)) {
-    // Throws on any failure, and nothing below runs.
-    const estimate = await deps.estimate(edit);
-    // The one model every call runs on (TEC-133), recorded as what estimated it.
-    reestimate = { macros: estimate.macros, model: MODEL, note: estimate.note };
-  }
-
-  return { recipe: await deps.update(id, edit, reestimate), reestimated: reestimate !== null };
+  const clear = clearsMacros(current, edit);
+  return { recipe: await deps.update(id, edit, clear), macrosCleared: clear };
 }

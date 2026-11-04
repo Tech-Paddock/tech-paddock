@@ -92,7 +92,6 @@ export function RecipeOpen({
   onTab,
   onRate,
   rating,
-  onEstimated,
 }: {
   recipe: Recipe;
   tab: RecipeTab;
@@ -100,8 +99,6 @@ export function RecipeOpen({
   onRate: (value: number | null) => void;
   /** True while a rating is being saved. */
   rating: boolean;
-  /** Macros were estimated from the Macros tab (TEC-201): the row that came back. */
-  onEstimated?: (recipe: Recipe) => void;
 }) {
   const steps = methodSteps(recipe.method);
   const { greyed, toggle } = useGreyed(recipe.id);
@@ -207,7 +204,7 @@ export function RecipeOpen({
             <p className="text-sm text-ink-soft">No method.</p>
           )
         ) : (
-          <MacroTab recipe={recipe} onEstimated={onEstimated} />
+          <MacroTab recipe={recipe} />
         )}
       </div>
     </div>

@@ -1,6 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { MODEL, WEB_FETCH_TOOL, modelLabel, requestShape } from "./models";
-import { parseMacros, type Macros } from "./macros";
 import { FILE_TYPES, type RecipeFile } from "./upload";
 import { unfetchedRead, type ResultBlock } from "./fetchRun";
 import { generatePrompt, type TurnedDown } from "./reroll";
@@ -9,11 +8,11 @@ import { META_JSON_HINT, META_KEYS, META_PROMPT, META_SCHEMA_PROPERTIES, readMet
 import { HOUSE_STYLE, restyleProblem, spellUnits } from "./houseStyle";
 
 /**
- * The six model calls this app makes.
+ * The five model calls this app makes (no macro estimate: TEC-223).
  *
  * **Every one runs on the one model at the one effort** (TEC-133): the model,
  * its effort and its budget come from `requestShape` in `lib/models.ts`, and no
- * call here names any of them. **The four calls without a tool send a JSON
+ * call here names any of them. **The calls without a tool send a JSON
  * schema** (`output_config.format`); the import carries a server tool and keeps
  * asking for its JSON in the prompt. **Every response is still validated in code** — a
  * model response is untrusted input whatever constrained it.
@@ -120,19 +119,6 @@ async function runWithTools(params: {
 /** `["string", "null"]` and friends, for the schemas below. */
 const nullable = (type: string) => ({ type: [type, "null"] });
 
-const MACRO_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    kcal: { type: "number" },
-    protein_g: { type: "number" },
-    carbs_g: { type: "number" },
-    fat_g: { type: "number" },
-    note: nullable("string"),
-  },
-  required: ["kcal", "protein_g", "carbs_g", "fat_g", "note"],
-};
-
 const RECIPE_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -190,65 +176,16 @@ export type RecipeFields = {
   /**
    * Time, meal, main and the rest (TEC-52). **Always `rating: null`** off a
    * model — it is read with `readMeta(..., { rating: false })`, so a model that
-   * volunteers one has it discarded. Optional so the typed path and the macro
-   * estimate, which never ask for it, need not pass one.
+   * volunteers one has it discarded. Optional so the typed path, which never asks for it,
+   * need not pass one.
    */
   meta?: RecipeMeta;
 };
 
 // ---------------------------------------------------------------------------
-// 1 · Estimating a dish's macros — the judgement, and the only call all four ways in make
+// No macro estimate lives here (TEC-223): a nightly Cowork job writes the macros
+// straight to the database (`NOTES.md`, *The nightly macro job*).
 // ---------------------------------------------------------------------------
-
-export type RecipeEstimate = { macros: Macros; note: string | null };
-
-const RECIPE_MACRO_SYSTEM = `You estimate the calories and macronutrients of a whole cooked dish.
-
-- **Report the WHOLE recipe, not one serving.** Everything the ingredient list puts in the pot.
-  Dividing happens elsewhere and dividing twice is the failure mode.
-- Work from the ingredients. Where an amount is vague — "a drizzle of oil", "season to taste" —
-  assume what a cook would actually use and say so in the note.
-- Cooking losses are real but small for macros; do not model them. Water is not a macro.
-- **Ignore any nutrition figures you were shown or can remember for this dish.** The number you
-  report is your own arithmetic over this ingredient list, which is what makes it comparable with
-  every other recipe in this book.
-- Be honest about the width of the estimate in the note rather than hedging the numbers themselves.
-  A number you have quietly padded is worse than a number with a caveat beside it.`;
-
-/**
- * **The one judgement in this app.** Reading the book calls nothing; keeping a
- * draft calls nothing.
- *
- * No tools: this is arithmetic over a list that is already in hand, and a search
- * here would invite exactly the published-panel number the whole design throws
- * away.
- */
-export async function estimateRecipeMacros(params: { recipe: RecipeFields }): Promise<RecipeEstimate> {
-  const { recipe } = params;
-
-  const response = (await getClient().messages.create({
-    ...requestShape({ maxTokens: 2048, schema: MACRO_SCHEMA }),
-    system: RECIPE_MACRO_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content:
-          `Recipe: ${recipe.name}\nIt makes ${recipe.servings} servings.\n\n` +
-          `Ingredients:\n${recipe.ingredients.map((i) => `- ${i}`).join("\n")}\n\n` +
-          (recipe.method ? `Method:\n${recipe.method}\n\n` : "") +
-          `Return a JSON object: {"kcal": number, "protein_g": number, "carbs_g": number, ` +
-          `"fat_g": number, "note": string or null} for the WHOLE dish. Put nothing after the JSON.`,
-      },
-    ],
-  } as never)) as ModelResponse;
-
-  const parsed = looseJson<Record<string, unknown>>(textOf(finished(response)));
-  const macros = parseMacros(parsed);
-  if (!macros) {
-    throw new Error(`${modelLabel(MODEL)} did not return usable macros for "${recipe.name}".`);
-  }
-  return { macros, note: typeof parsed?.note === "string" ? parsed.note.trim() || null : null };
-}
 
 // ---------------------------------------------------------------------------
 // 2 · Writing one you described
@@ -259,7 +196,7 @@ const GENERATE_SYSTEM = `You invent one recipe a home cook can actually make ton
 - **Answer the constraint you were given**, not the recipe you would rather write. If they said
   high protein, chicken and twenty minutes, all three are requirements.
 - Ordinary ingredients and ordinary equipment. No sous vide, no overnight anything unless asked.
-- **Amounts are specific.** "2 tbsp olive oil", not "some olive oil" — the macros are estimated from
+- **Amounts are specific.** "2 tbsp olive oil", not "some olive oil" — the nightly macro job works from
   this list afterwards, so a vague line becomes a vague number.
 - Steps run together in one paragraph are unreadable on a phone at a worktop, which is where this
   gets read. Plain sentences, short enough to follow without scrolling back.
@@ -269,7 +206,7 @@ ${HOUSE_STYLE}
 
 ${META_PROMPT}`;
 
-/** Invent a recipe. Its macros are estimated separately, from what it produced. */
+/** Invent a recipe. It has no macros: the nightly job adds them. */
 export async function generateRecipe(params: {
   brief: string;
   /** "Something else": drafts already turned down this session, and why (TEC-39 D). */
@@ -338,7 +275,7 @@ export type RecipeImport = { read: boolean; fields: RecipeFields | null; reason:
  * actually brew it"*, and here you would actually cook it.
  *
  * **Only the recipe is kept.** The page's own nutrition panel, if it has one, is
- * discarded and the macros are re-estimated from the ingredients, so
+ * discarded and the nightly job works the macros out from the ingredients, so
  * the book's numbers stay comparable with each other. So `source_url` records
  * where the method came from, never where a number did.
  */
@@ -607,7 +544,7 @@ export type StyledRecipe = {
 
 /**
  * Put one recipe in the house style (`lib/houseStyle.ts`): the one call a typed
- * recipe makes before its macros are estimated.
+ * recipe makes before it is kept.
  *
  * **Nothing here writes.** The result is checked in code (`restyleProblem`): a
  * restyle that dropped an ingredient, changed an amount or lost a time or

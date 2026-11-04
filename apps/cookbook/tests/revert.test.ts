@@ -8,7 +8,7 @@ import { InputError } from "@/lib/errors";
 import type { Recipe } from "@/lib/recipes";
 
 /**
- * Revert and "Estimate macros" (TEC-201, kept by TEC-207 when the recipe Tidy
+ * Revert (TEC-201, kept by TEC-207 when the recipe Tidy
  * went). The model and the database are fakes. Revert only puts the import back;
  * the Macros tab offers the estimate for a recipe that has none. Invented text.
  */
@@ -102,14 +102,11 @@ const unestimated: Recipe = {
 };
 
 describe("Macros not estimated yet", () => {
-  it("offers Estimate macros when something can take the result", () => {
-    const html = renderToStaticMarkup(createElement(MacroTab, { recipe: unestimated, onEstimated: noop }));
+  it("says so and offers no button: the nightly job fills them in (TEC-223)", () => {
+    const html = renderToStaticMarkup(createElement(MacroTab, { recipe: unestimated }));
     expect(html).toContain("Macros not estimated yet");
-    expect(html).toContain("Estimate macros");
-  });
-
-  it("offers none where nothing is listening", () => {
-    expect(renderToStaticMarkup(createElement(MacroTab, { recipe: unestimated }))).not.toContain("Estimate macros");
+    expect(html).not.toContain("<button");
+    expect(html).not.toContain("Estimate macros");
   });
 });
 

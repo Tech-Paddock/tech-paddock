@@ -57,7 +57,7 @@ const row = {
 };
 const IMPORTED = { ingredients: row.ingredients, directions: row.method, yield_text: "" };
 
-const updateRecipe = vi.fn(async (id: string, edit: Record<string, unknown>, estimate: unknown) => ({ ...row, id, ...edit, estimate }));
+const updateRecipe = vi.fn(async (id: string, edit: Record<string, unknown>, clearMacros: unknown) => ({ ...row, id, ...edit, clearMacros }));
 const saveRecipe = vi.fn();
 const revertRecipe = vi.fn(async (id: string, fields: Record<string, unknown>) => ({ ...row, id, ...fields, kcal: null }));
 let storedOriginal: unknown = IMPORTED;
@@ -86,7 +86,6 @@ const reply = (text: string, stop_reason = "end_turn") => ({
 });
 
 const STYLED = JSON.stringify({ ingredients: ["1 cup onion", "2 tbsp olive oil"], method: "1. Chop the onion.\n2. Cook it in the oil.", servings: 6 });
-const MACROS = JSON.stringify({ kcal: 900, protein_g: 10, carbs_g: 90, fat_g: 60, note: null });
 
 const post = (path: string, body: unknown) =>
   new NextRequest(`http://x${path}`, { method: "POST", body: JSON.stringify(body) });
@@ -133,7 +132,7 @@ describe("the house style on every way in", () => {
 
   it("Ask Claude: the prompt carries it, units come back in one spelling, and the draft is marked styled", async () => {
     const { POST } = await import("@/app/api/recipes/draft/route");
-    replies.push(reply(RECIPE), reply(MACROS));
+    replies.push(reply(RECIPE));
     const { draft } = await (await POST(draftPost({ mode: "generate", brief: "chilli" }))).json();
 
     expect(String(sent[0].system)).toContain("THE HOUSE STYLE");
@@ -148,15 +147,14 @@ describe("the house style on every way in", () => {
 
     replies.push(
       { stop_reason: "pause_turn", content: [{ type: "web_fetch_tool_result", content: { type: "web_fetch_result", url: "https://x" } }] },
-      reply(READ),
-      reply(MACROS)
+      reply(READ)
     );
     const linked = await POST(draftPost({ mode: "import", url: "https://example.com/r" }));
     expect(linked.status).toBe(200);
     expect(String(sent[0].system)).toContain("THE HOUSE STYLE");
 
     sent.length = 0;
-    replies.push(reply(READ), reply(MACROS));
+    replies.push(reply(READ));
     const filed = await POST(draftPost({ mode: "file", file: { mediaType: "image/jpeg", data: "AAAA" } }));
     expect(filed.status).toBe(200);
     expect(String(sent[0].system)).toContain("THE HOUSE STYLE");
@@ -165,24 +163,23 @@ describe("the house style on every way in", () => {
 
   const typed = { mode: "manual", name: "Onion pot", servings: 4, ingredients: ["1 cup onions, chopped", "2 tablespoons olive oil"], method: "" };
 
-  it("typed: one restyle call, then the macro estimate, and the draft keeps every ingredient", async () => {
+  it("typed: one restyle call and nothing else, and the draft keeps every ingredient", async () => {
     const { POST } = await import("@/app/api/recipes/draft/route");
-    replies.push(reply(STYLED), reply(MACROS));
+    replies.push(reply(STYLED));
     const { draft } = await (await POST(draftPost(typed))).json();
 
-    expect(sent).toHaveLength(2);
+    expect(sent).toHaveLength(1);
     expect(String(sent[0].system)).toContain("THE HOUSE STYLE");
     expect(draft.ingredients).toEqual(["1 cup onion", "2 tbsp olive oil"]);
     expect(draft.ingredients).toHaveLength(typed.ingredients.length);
     expect(draft.servings).toBe(4);
     expect(draft.styled).toBe(true);
-    // The macro estimate sees the styled text.
-    expect(JSON.stringify(sent[1].messages)).toContain("1 cup onion");
+    expect(draft.macros).toBeNull();
   });
 
   it("typed: a restyle that changed an amount is dropped, and the recipe is saved as typed, with a note", async () => {
     const { POST } = await import("@/app/api/recipes/draft/route");
-    replies.push(reply(JSON.stringify({ ingredients: ["1 cup onion", "3 tbsp olive oil"], method: "1. Chop.", servings: null })), reply(MACROS));
+    replies.push(reply(JSON.stringify({ ingredients: ["1 cup onion", "3 tbsp olive oil"], method: "1. Chop.", servings: null })));
     const { draft } = await (await POST(draftPost(typed))).json();
 
     expect(draft.ingredients).toEqual(typed.ingredients);

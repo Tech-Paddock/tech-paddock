@@ -22,7 +22,6 @@ const RECIPE_SIDE = [
   "app/AddRecipe.tsx",
   "app/Book.tsx",
   "app/EditRecipe.tsx",
-  "app/MacroRow.tsx",
   "app/MacroTab.tsx",
   "app/Menu.tsx",
   "app/Meta.tsx",
@@ -30,7 +29,6 @@ const RECIPE_SIDE = [
   "app/RecipeDetail.tsx",
   "app/api/recipes/draft/route.ts",
   "app/api/recipes/edit/route.ts",
-  "app/api/recipes/estimate/route.ts",
   "app/api/recipes/revert/route.ts",
   "app/api/recipes/route.ts",
   "app/api/servings/route.ts",
@@ -88,11 +86,11 @@ describe("the recipe side never says price", () => {
   it("the screens a recipe shows say estimate macros", () => {
     const edit = renderToStaticMarkup(createElement(EditRecipe, { recipe, onSaved: noop, onCancel: noop }));
     expect(edit).not.toMatch(MONEY);
-    // The button that re-estimates only shows once the ingredients change, which a static render cannot do.
-    expect(readFileSync("app/EditRecipe.tsx", "utf8")).toContain("Save and re-estimate macros");
+    // The button that clears the macros only shows once the ingredients or servings change, which a static render cannot do.
+    expect(readFileSync("app/EditRecipe.tsx", "utf8")).toContain("Save and clear macros");
 
-    const macros = renderToStaticMarkup(createElement(MacroTab, { recipe, onEstimated: noop }));
-    expect(macros).toContain("Estimate macros");
+    const macros = renderToStaticMarkup(createElement(MacroTab, { recipe }));
+    expect(macros).toContain("Macros not estimated yet");
     expect(macros).not.toMatch(MONEY);
 
     const card = renderToStaticMarkup(

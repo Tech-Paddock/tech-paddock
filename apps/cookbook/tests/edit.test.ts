@@ -1,19 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyEdit, changesThePot, readEdit, type EditDeps, type EditTarget, type RecipeEdit } from "@/lib/edit";
+import { applyEdit, changesThePot, clearsMacros, readEdit, type EditDeps, type EditTarget, type RecipeEdit } from "@/lib/edit";
 import { EMPTY_META } from "@/lib/metadata";
 import { normalizeName, perServing, toServingRows, type Recipe } from "@/lib/recipes";
 import type { Macros } from "@/lib/macros";
-import { ConflictError, InputError, statusOf } from "@/lib/errors";
+import { ConflictError, InputError } from "@/lib/errors";
 
 /**
- * Editing a kept recipe (2026-09-26). What has to hold: an edit that
- * changes the ingredients re-estimates the macros with one call, one that does not calls
- * nothing, and **a failed re-estimate writes nothing and never looks like success.**
+ * Editing a kept recipe (2026-09-26; TEC-223). What has to hold: an edit calls no
+ * model; one that changes the ingredients or the servings clears the macros, and
+ * every other edit leaves them alone.
  */
 
 const stored: EditTarget = {
   id: "r1",
   name: "Weeknight chilli",
+  servings: 6,
   ingredients: ["500g beef mince", "1 tin kidney beans"],
 };
 
@@ -28,13 +29,10 @@ function edit(over: Partial<RecipeEdit> = {}): RecipeEdit {
   };
 }
 
-const newPot = { kcal: 3000, protein_g: 200, carbs_g: 150, fat_g: 120 };
-
 function deps(over: Partial<EditDeps<string>> = {}) {
   const d = {
     getRecipe: vi.fn(async () => stored),
     nameTakenByOther: vi.fn(async () => false),
-    estimate: vi.fn(async () => ({ macros: newPot, note: "assumed 1 tbsp oil" })),
     update: vi.fn(async () => "written"),
     normalizeName,
     ...over,
@@ -42,36 +40,29 @@ function deps(over: Partial<EditDeps<string>> = {}) {
   return d;
 }
 
-describe("what re-estimates the macros", () => {
-  it("a changed ingredient does, with one call, and the new pot is what is written", async () => {
+describe("what clears the macros", () => {
+  it("a changed ingredient does, in the one write", async () => {
     const d = deps();
     const next = edit({ ingredients: ["750g beef mince", "1 tin kidney beans"] });
     const result = await applyEdit(d, "r1", next);
-    expect(d.estimate).toHaveBeenCalledTimes(1);
-    expect(d.update).toHaveBeenCalledWith("r1", next, {
-      macros: newPot,
-      model: "claude-sonnet-5-5",
-      note: "assumed 1 tbsp oil",
-    });
-    expect(result.reestimated).toBe(true);
+    expect(d.update).toHaveBeenCalledTimes(1);
+    expect(d.update).toHaveBeenCalledWith("r1", next, true);
+    expect(result.macrosCleared).toBe(true);
   });
 
-  it("servings alone does not: same pot, a new divisor", async () => {
+  it("a changed serving count does too", async () => {
     const d = deps();
     const result = await applyEdit(d, "r1", edit({ servings: 8 }));
-    expect(d.estimate).not.toHaveBeenCalled();
-    expect(d.update).toHaveBeenCalledWith("r1", edit({ servings: 8 }), null);
-    expect(result.reestimated).toBe(false);
+    expect(d.update).toHaveBeenCalledWith("r1", edit({ servings: 8 }), true);
+    expect(result.macrosCleared).toBe(true);
   });
 
   it("name, method and metadata do not", async () => {
     const d = deps();
-    await applyEdit(
-      d,
-      "r1",
-      edit({ name: "Friday chilli", method: "Just cook it.", meta: { ...EMPTY_META, meal: "main", rating: 5 } })
-    );
-    expect(d.estimate).not.toHaveBeenCalled();
+    const next = edit({ name: "Friday chilli", method: "Just cook it.", meta: { ...EMPTY_META, meal: "main", rating: 5 } });
+    const result = await applyEdit(d, "r1", next);
+    expect(d.update).toHaveBeenCalledWith("r1", next, false);
+    expect(result.macrosCleared).toBe(false);
   });
 
   it("compares lines as written after trimming, and counts a reorder as a change", () => {
@@ -79,33 +70,19 @@ describe("what re-estimates the macros", () => {
     expect(changesThePot(stored, { ingredients: ["1 tin kidney beans", "500g beef mince"] })).toBe(true);
     expect(changesThePot(stored, { ingredients: ["500g beef mince"] })).toBe(true);
   });
-});
 
-describe("a failed re-estimate", () => {
-  it("writes nothing and throws — it never returns as if it saved", async () => {
-    const d = deps({
-      estimate: vi.fn(async () => {
-        throw new Error("Haiku 4.5 ran out of room before it finished. Nothing was kept — try again.");
-      }),
-    });
-    await expect(
-      applyEdit(d, "r1", edit({ ingredients: ["750g beef mince"], name: "Renamed" }))
-    ).rejects.toThrow(/ran out of room/);
-    // The name change rode with it and was not written on its own either.
-    expect(d.update).not.toHaveBeenCalled();
-  });
-
-  it("is a 500, never a status the screen could read as fine", () => {
-    expect(statusOf(new Error("did not return usable macros"))).toBe(500);
+  it("clearsMacros is the ingredients or the servings, nothing else", () => {
+    expect(clearsMacros(stored, { ingredients: stored.ingredients, servings: 6 })).toBe(false);
+    expect(clearsMacros(stored, { ingredients: stored.ingredients, servings: 7 })).toBe(true);
+    expect(clearsMacros(stored, { ingredients: ["x"], servings: 6 })).toBe(true);
   });
 });
 
 describe("refusals before any call", () => {
-  it("a name another recipe holds is a 409, and pays for no estimate", async () => {
+  it("a name another recipe holds is a 409, and writes nothing", async () => {
     const d = deps({ nameTakenByOther: vi.fn(async () => true) });
     const run = applyEdit(d, "r1", edit({ name: "Beef stew", ingredients: ["other"] }));
     await expect(run).rejects.toBeInstanceOf(ConflictError);
-    expect(d.estimate).not.toHaveBeenCalled();
     expect(d.update).not.toHaveBeenCalled();
   });
 
@@ -152,8 +129,7 @@ describe("reading an edit off a request", () => {
 
 describe("what Health reads after an edit", () => {
   it("/api/servings divides the edited pot by the edited servings, in the same shape", () => {
-    // A servings-only edit: the stored pot is unchanged, and the contract's
-    // per-serving figure follows the new count on the next read.
+    // A row that has macros: the contract's per-serving figure is the pot over the count.
     const row = {
       id: "r1",
       name: "Weeknight chilli",
@@ -167,5 +143,10 @@ describe("what Health reads after an edit", () => {
     expect(Object.keys(served).sort()).toEqual(["id", "name", "per_serving", "servings"]);
     expect(served.per_serving).toEqual(perServing(row as Recipe & Macros));
     expect(served.per_serving.kcal).toBe(300);
+  });
+
+  it("leaves out a recipe whose macros an edit cleared, until the nightly job redoes them", () => {
+    const cleared = { id: "r1", name: "Weeknight chilli", servings: 8, kcal: null, protein_g: null, carbs_g: null, fat_g: null } as Recipe;
+    expect(toServingRows([cleared])).toEqual([]);
   });
 });

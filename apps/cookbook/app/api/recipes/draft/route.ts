@@ -1,40 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { estimateRecipeMacros, generateRecipe, importRecipe, readRecipeFile, styleRecipe, type RecipeFields } from "@/lib/anthropic";
+import { generateRecipe, importRecipe, readRecipeFile, styleRecipe, type RecipeFields } from "@/lib/anthropic";
 import { validateRecipeFile } from "@/lib/upload";
 import { MAX_STEER, readTurnedDown } from "@/lib/reroll";
 import { nameTaken, type RecipeDraft } from "@/lib/recipes";
 import { statusOf } from "@/lib/errors";
 import { errorResponse } from "@/lib/respond";
-import { MODEL } from "@/lib/models";
 import { EMPTY_META, readMeta } from "@/lib/metadata";
 import { hasPicks, readPicks, tagWithPicks } from "@/lib/tuning";
 
 export const dynamic = "force-dynamic";
-// Reading a page and then estimating its macros is two model calls, one of them with a
-// server tool that may pause and resume. Both think at medium effort (TEC-133),
-// so the room is Coffee's search route's, not the Vercel default.
+// Reading a page is a model call with a server tool that may pause and resume, and it
+// thinks at medium effort (TEC-133), so the room is Coffee's search route's, not the
+// Vercel default.
 export const maxDuration = 300;
 
 /**
  * Four ways into the book, and **none of them writes anything.**
  *
- * - `manual` — you typed the recipe; the model only estimates its macros.
- * - `generate` — you described what you wanted; the model writes it, then estimates
- *   the macros of what it wrote.
- * - `import` — you pasted a link; the model reads the page, then estimates the
- *   macros of what it read.
- * - `file` — you uploaded a photo or a PDF; the model reads it, then estimates the
- *   macros of what it read. Added 2026-09-22. It lands as `imported` with no `source_url`,
+ * - `manual` — you typed the recipe; the model only puts it in the house style.
+ * - `generate` — you described what you wanted; the model writes it.
+ * - `import` — you pasted a link; the model reads the page.
+ * - `file` — you uploaded a photo or a PDF; the model reads it. Added 2026-09-22. It lands as `imported` with no `source_url`,
  *   because there is nowhere to point back to, and the file itself is not kept.
  *
  * All four end at the same approval, `POST /api/recipes`. **This route is the
  * draft, and the draft is not the book.**
  *
- * **The macros are always ours.** Even an imported recipe whose page publishes a
- * nutrition panel comes back `estimate` — only the recipe is kept, and the macros
- * are calculated from it — and `source_url` records where the method came
- * from rather than where a number did. That is a cost named once, and it buys one
- * rule instead of two and a book whose numbers are comparable with each other.
+ * **No way in estimates macros** (TEC-223, owner: "I don't want to use the API to
+ * re-calculate the macros on a recipe"). A draft carries `macros: null`, `source:
+ * null` and `model: null`, and the nightly Cowork job fills them in
+ * (`NOTES.md`, *The nightly macro job*). Even an imported recipe whose page
+ * publishes a nutrition panel keeps none of it, and `source_url` records where
+ * the method came from rather than where a number did.
  */
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
@@ -66,12 +63,12 @@ export async function POST(request: NextRequest) {
       }
       if (ingredients.length === 0) {
         return NextResponse.json(
-          { error: "List what goes in it — the macros come from that." },
+          { error: "List what goes in it." },
           { status: 400 }
         );
       }
 
-      // Before the macro estimate, not after it: a typed recipe saves straight away,
+      // Before the restyle, not after it: a typed recipe saves straight away,
       // so a name already in the book would pay for a model call and then be
       // refused at the insert.
       if (await nameTaken(name)) {
@@ -176,15 +173,13 @@ export async function POST(request: NextRequest) {
     const assumedServings = fields.servings < 1;
     const servings = assumedServings ? 4 : fields.servings;
 
-    const estimate = await estimateRecipeMacros({ recipe: { ...fields, servings } });
-
     const draft: RecipeDraft = {
       name: fields.name,
       servings,
-      macros: estimate.macros,
+      macros: null,
       origin,
-      source: "estimate",
-      model: MODEL,
+      source: null,
+      model: null,
       source_url: sourceUrl,
       styled,
       ingredients: fields.ingredients,
@@ -197,7 +192,6 @@ export async function POST(request: NextRequest) {
           assumedServings ? `${mode === "file" ? "The file" : "The page"} did not say how many it serves; 4 assumed — change it.` : null,
           styleNote,
           ...pickNotes,
-          estimate.note,
         ]
           .filter(Boolean)
           .join(" ") || null,

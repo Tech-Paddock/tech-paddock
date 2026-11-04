@@ -22,10 +22,10 @@ function draft(over: Partial<RecipeDraft> = {}): RecipeDraft {
   return {
     name: "Weeknight chilli",
     servings: 6,
-    macros: pot,
+    macros: null,
     origin: "manual",
-    source: "estimate",
-    model: "claude-haiku-4-5",
+    source: null,
+    model: null,
     source_url: null,
     ingredients: ["500g beef mince"],
     method: null,
@@ -65,10 +65,9 @@ describe("what a draft has to be before it goes in the book", () => {
     expect(validateDraft(draft())).toBeNull();
   });
 
-  it("refuses a recipe with no calories", () => {
-    // A zero-calorie recipe is one nobody estimated. Stored, it reads for ever
-    // afterwards like a dish that costs nothing.
-    expect(validateDraft(draft({ macros: { ...pot, kcal: 0 } }))).toContain("no calories");
+  it("has no macros: a draft carries none, and the nightly job adds them (TEC-223)", () => {
+    const d = draft();
+    expect([d.macros, d.source, d.model]).toEqual([null, null, null]);
   });
 
   it("refuses fractional or missing servings", () => {
@@ -79,20 +78,6 @@ describe("what a draft has to be before it goes in the book", () => {
 
   it("refuses a nameless recipe", () => {
     expect(validateDraft(draft({ name: "   " }))).toContain("needs a name");
-  });
-
-  it("refuses a model-produced number that does not name its model", () => {
-    // The same pairing `recipe_model_matches_source` enforces in the database.
-    // Catching it here makes it a sentence rather than a constraint violation.
-    expect(validateDraft(draft({ source: "estimate", model: null }))).toContain("which model");
-  });
-
-  it("lets a hand-entered recipe carry no model", () => {
-    expect(validateDraft(draft({ source: "hand", model: null }))).toBeNull();
-  });
-
-  it("refuses a negative macro", () => {
-    expect(validateDraft(draft({ macros: { ...pot, fat_g: -1 } }))).toContain("fat_g");
   });
 });
 

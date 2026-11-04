@@ -2,15 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { listRecipes, saveRecipe, deleteRecipe, setRating, type RecipeDraft, type RecipeOrigin } from "@/lib/recipes";
 import { readMeta } from "@/lib/metadata";
 import { errorResponse } from "@/lib/respond";
-import { parseMacros } from "@/lib/macros";
-import { isRecordedModel } from "@/lib/models";
 
 export const dynamic = "force-dynamic";
 
 const ORIGINS: RecipeOrigin[] = ["manual", "generated", "imported"];
-
-/** Two values, matching `cookbook.macro_source`. There is no `web` — see lib/macros.ts. */
-const SOURCES = ["hand", "estimate"] as const;
 
 /** The book. A failed read is a 503, never an empty shelf. */
 export async function GET() {
@@ -26,9 +21,11 @@ export async function GET() {
  * through `/api/recipes/edit`, and a rating through PATCH).
  *
  * Re-validated here rather than trusted, because the browser has had the draft in
- * its hands and a draft is where every number in the book comes from. The
- * database has the same rules as constraints; this layer exists so a bad draft is
- * a sentence you can read rather than a constraint violation.
+ * its hands. **A kept recipe has no macros** (TEC-223): any `macros`, `source` or
+ * `model` the body carries (a draft made before this change) is ignored, and the
+ * nightly Cowork job fills the macros in. The database has the same rules as
+ * constraints; this layer exists so a bad draft is a sentence you can read rather
+ * than a constraint violation.
  */
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
@@ -37,33 +34,21 @@ export async function POST(request: NextRequest) {
   if (!raw) return NextResponse.json({ error: "That draft has nothing in it." }, { status: 400 });
 
   const name = typeof raw.name === "string" ? raw.name.trim() : "";
-  const macros = parseMacros(raw.macros);
   const servings = Number(raw.servings);
 
   if (!name) return NextResponse.json({ error: "The recipe needs a name." }, { status: 400 });
   if (name.length > 200) return NextResponse.json({ error: "That name is too long." }, { status: 413 });
-  if (!macros) return NextResponse.json({ error: "That recipe has no usable numbers." }, { status: 400 });
   if (!Number.isInteger(servings) || servings < 1) {
     return NextResponse.json({ error: "Say how many servings it makes." }, { status: 400 });
   }
 
-  const source = typeof raw.source === "string" && (SOURCES as readonly string[]).includes(raw.source)
-    ? (raw.source as RecipeDraft["source"])
-    : "estimate";
-  // Today's model, or one used before TEC-133: a draft made before a deploy and
-  // kept after it names the model that really estimated it.
-  const model = isRecordedModel(raw.model) ? raw.model : null;
-
   const draft: RecipeDraft = {
     name,
     servings,
-    macros,
+    macros: null,
     origin: ORIGINS.includes(raw.origin as RecipeOrigin) ? (raw.origin as RecipeOrigin) : "manual",
-    source,
-    // A model-produced number must name a real model, not whatever string the
-    // browser sent. The database enforces the pairing; this keeps it a 400 you
-    // can read.
-    model: source === "hand" ? null : model,
+    source: null,
+    model: null,
     // A URL records where the METHOD came from. It is never where a number came
     // from, which is why nothing here tries to infer a source from it.
     source_url: typeof raw.source_url === "string" && raw.source_url.startsWith("http") ? raw.source_url : null,
@@ -80,13 +65,6 @@ export async function POST(request: NextRequest) {
     // set one on the draft before Keep it; no model path produces one.
     meta: readMeta(raw.meta, { rating: true }),
   };
-
-  if (draft.source !== "hand" && !draft.model) {
-    return NextResponse.json(
-      { error: "That draft says a model produced its numbers but does not name one." },
-      { status: 400 }
-    );
-  }
 
   try {
     return NextResponse.json({ recipe: await saveRecipe(draft) }, { status: 201 });
