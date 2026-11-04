@@ -154,7 +154,7 @@ export default function Book({
     }
   }
 
-  /** A recipe changed by Revert or by "Estimate macros" (TEC-201): the row that came back replaces it. */
+  /** A recipe changed by Revert (TEC-201): the row that came back replaces it. */
   function replaced(updated: Recipe, message: string) {
     setRecipes((all) => (all ? all.map((r) => (r.id === updated.id ? updated : r)) : all));
     if (message) toast.notice(message);
@@ -177,9 +177,9 @@ export default function Book({
   }
 
   /** An edit saved (`EditRecipe`): the row that came back replaces the one on screen. */
-  function edited(updated: Recipe, reestimated: boolean) {
+  function edited(updated: Recipe, macrosCleared: boolean) {
     setRecipes((all) => (all ? all.map((r) => (r.id === updated.id ? updated : r)) : all));
-    toast.notice(reestimated ? `"${updated.name}" is saved and its macros re-estimated.` : `"${updated.name}" is saved.`);
+    toast.notice(macrosCleared ? `"${updated.name}" is saved. Its macros are worked out again overnight.` : `"${updated.name}" is saved.`);
   }
 
   async function remove(recipe: Recipe) {
@@ -307,7 +307,6 @@ export default function Book({
                 onRemove={() => remove(recipe)}
                 onEdited={edited}
                 onRevert={() => revert(recipe)}
-                onEstimated={(updated) => replaced(updated, "")}
               />
             ))}
           </ul>
@@ -329,7 +328,6 @@ export function RecipeCard({
   onRemove,
   onEdited,
   onRevert,
-  onEstimated,
 }: {
   recipe: Recipe;
   open: boolean;
@@ -339,11 +337,9 @@ export function RecipeCard({
   onList: (day: string) => void;
   onRate: (value: number | null) => void;
   onRemove: () => void;
-  onEdited: (recipe: Recipe, reestimated: boolean) => void;
+  onEdited: (recipe: Recipe, macrosCleared: boolean) => void;
   /** Revert to the imported original (TEC-201); offered only for a recipe that has one. */
   onRevert?: () => void;
-  /** Macros estimated from the Macros tab (TEC-201). */
-  onEstimated?: (recipe: Recipe) => void;
 }) {
   // Which tab is showing; the card stays mounted, so it is held while the book is.
   const [tab, setTab] = useState<RecipeTab>(FIRST_RECIPE_TAB);
@@ -381,9 +377,9 @@ export function RecipeCard({
           <EditRecipe
             recipe={recipe}
             onCancel={() => setEditing(false)}
-            onSaved={(updated, reestimated) => {
+            onSaved={(updated, macrosCleared) => {
               setEditing(false);
-              onEdited(updated, reestimated);
+              onEdited(updated, macrosCleared);
             }}
           />
         </div>
@@ -393,7 +389,7 @@ export function RecipeCard({
         // by a date box (TEC-189) with Edit and Remove under it. The helpings estimator and the
         // keywords are gone; Health's `GET /api/servings` is untouched.
         <div className="flex flex-col gap-4 border-t border-line/40 px-3.5 py-3">
-          <RecipeOpen recipe={recipe} tab={tab} onTab={setTab} onRate={onRate} rating={rating} onEstimated={onEstimated} />
+          <RecipeOpen recipe={recipe} tab={tab} onTab={setTab} onRate={onRate} rating={rating} />
           <AddToListCard
             name={recipe.name}
             hasIngredients={recipe.ingredients.length > 0}
@@ -404,7 +400,7 @@ export function RecipeCard({
             onRevert={recipe.has_original ? onRevert : undefined}
           />
           <p className="text-[11px] text-ink-soft">
-            Editing re-estimates the macros only when the ingredients change. Removing takes the recipe out of the book and
+            Changing the ingredients or servings clears the macros; they are worked out again overnight. Removing takes the recipe out of the book and
             leaves your shopping list alone.
           </p>
         </div>

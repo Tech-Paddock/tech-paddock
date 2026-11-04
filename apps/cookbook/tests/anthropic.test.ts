@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { existsSync } from "node:fs";
 import { NextRequest } from "next/server";
 
 /**
  * Every request Cookbook sends (TEC-133): one model, effort medium, nothing
  * Sonnet 5.5 rejects. The SDK is replaced by a recorder that answers from a
  * queue, so the test reads what would have gone on the wire without calling
- * the API. The database is mocked for the edit route.
+ * the API. The database is mocked for the edit route. No macro estimate is
+ * among the calls (TEC-223): the nightly Cowork job writes the macros.
  */
 
 const sent: Array<Record<string, unknown>> = [];
@@ -38,10 +40,10 @@ vi.mock("@/lib/recipes", async (importOriginal) => ({
   nameTaken: async () => false,
   getRecipe: async () => STORED,
   nameTakenByOther: async () => false,
-  updateRecipe: async (_id: string, edit: unknown, reestimate: unknown) => ({ ...STORED, ...(edit as object), reestimate }),
+  updateRecipe: async (_id: string, edit: unknown, clearMacros: unknown) => ({ ...STORED, ...(edit as object), clearMacros }),
 }));
 
-const { estimateRecipeMacros, generateRecipe, importRecipe, readRecipeFile, styleRecipe, tidyList } = await import("@/lib/anthropic");
+const { generateRecipe, importRecipe, readRecipeFile, styleRecipe, tidyList } = await import("@/lib/anthropic");
 
 const reply = (text: string, stop_reason = "end_turn") => ({
   stop_reason,
@@ -52,7 +54,6 @@ const reply = (text: string, stop_reason = "end_turn") => ({
   ],
 });
 
-const MACROS = JSON.stringify({ kcal: 2400, protein_g: 180, carbs_g: 120, fat_g: 100, note: null });
 const RECIPE = JSON.stringify({ name: "Chilli", servings: 4, ingredients: ["500g beef mince"], method: "1. Cook." });
 const READ = JSON.stringify({ read: true, reason: null, name: "Chilli", servings: 4, ingredients: ["500g beef mince"], method: "1. Cook." });
 const TIDY = JSON.stringify({ lines: [{ name: "garlic", note: null, absorbed: [1, 2] }] });
@@ -61,9 +62,6 @@ const STYLED = JSON.stringify({ ingredients: ["500g beef mince"], method: "1. Co
 
 /** Run every model call the app makes, once each. */
 async function everyCall() {
-  replies.push(reply(MACROS));
-  await estimateRecipeMacros({ recipe });
-
   replies.push(reply(RECIPE));
   await generateRecipe({ brief: "chilli" });
 
@@ -108,9 +106,9 @@ beforeEach(() => {
 });
 
 describe("every model request", () => {
-  it("covers the macro estimate, Ask Claude, both turns of a link, a file, Tidy of the list and the house style", async () => {
+  it("covers Ask Claude, both turns of a link, a file, Tidy of the list and the house style", async () => {
     await everyCall();
-    expect(sent).toHaveLength(7);
+    expect(sent).toHaveLength(6);
   });
 
   it("goes out as claude-sonnet-5-5 at effort medium, with nothing Sonnet 5.5 rejects", async () => {
@@ -135,17 +133,45 @@ describe("a turn that did not finish fails visibly", () => {
     ["refusal", /declined/],
     ["max_tokens", /ran out of room/],
   ])("%s throws a sentence and nothing is kept", async (stop, message) => {
-    replies.push(reply(MACROS, stop));
-    await expect(estimateRecipeMacros({ recipe })).rejects.toThrow(message);
+    replies.push(reply(RECIPE, stop));
+    await expect(generateRecipe({ brief: "chilli" })).rejects.toThrow(message);
     // One request: no retry on another model, no second try.
     expect(sent).toHaveLength(1);
   });
 });
 
-describe("a stale `model` from an installed copy of the page", () => {
-  it("is ignored by the draft route, and the draft names the one model", async () => {
+describe("no way in estimates macros", () => {
+  it.each([
+    ["generate", { mode: "generate", brief: "chilli" }, [reply(RECIPE)]],
+    [
+      "import",
+      { mode: "import", url: "https://x" },
+      [{ stop_reason: "pause_turn", content: [{ type: "web_fetch_tool_result", content: { type: "web_fetch_result", url: "https://x" } }] }, reply(READ)],
+    ],
+    ["file", { mode: "file", file: { mediaType: "image/jpeg", data: "AAAA" } }, [reply(READ)]],
+    ["manual", { mode: "manual", name: "Chilli", servings: 4, ingredients: ["500g beef mince"] }, [reply(STYLED)]],
+  ])("%s drafts a recipe with macros, source and model all null", async (_name, body, queued) => {
     const { POST } = await import("@/app/api/recipes/draft/route");
-    replies.push(reply(RECIPE), reply(MACROS));
+    replies.push(...queued);
+    const response = await POST(new NextRequest("http://x/api/recipes/draft", { method: "POST", body: JSON.stringify(body) }));
+    expect(response.status).toBe(200);
+    const { draft } = await response.json();
+    expect(draft.macros).toBeNull();
+    expect(draft.source).toBeNull();
+    expect(draft.model).toBeNull();
+    // Whatever was sent is a write or a read of the recipe, never a macro request.
+    for (const request of sent) expect(JSON.stringify(request)).not.toMatch(/WHOLE dish|macronutrients/);
+  });
+
+  it("has no estimate route", () => {
+    expect(existsSync("app/api/recipes/estimate")).toBe(false);
+  });
+});
+
+describe("a stale `model` from an installed copy of the page", () => {
+  it("is ignored by the draft route: the one model writes the recipe", async () => {
+    const { POST } = await import("@/app/api/recipes/draft/route");
+    replies.push(reply(RECIPE));
     const response = await POST(
       new NextRequest("http://x/api/recipes/draft", {
         method: "POST",
@@ -153,27 +179,35 @@ describe("a stale `model` from an installed copy of the page", () => {
       })
     );
     expect(response.status).toBe(200);
-    expect((await response.json()).draft.model).toBe("claude-sonnet-5-5");
-    expect(sent.map((b) => b.model)).toEqual(["claude-sonnet-5-5", "claude-sonnet-5-5"]);
+    expect(sent.map((b) => b.model)).toEqual(["claude-sonnet-5-5"]);
   });
+});
 
-  it("is ignored by the edit route, and the re-estimate records the one model", async () => {
+describe("the edit route", () => {
+  const post = async (edit: Record<string, unknown>) => {
     const { POST } = await import("@/app/api/recipes/edit/route");
-    replies.push(reply(MACROS));
-    const response = await POST(
-      new NextRequest("http://x/api/recipes/edit", {
-        method: "POST",
-        body: JSON.stringify({
-          id: "r1",
-          model: "claude-haiku-4-5",
-          edit: { name: "Weeknight chilli", servings: 4, ingredients: ["750g beef mince"], method: null, meta: {} },
-        }),
-      })
-    );
+    return POST(new NextRequest("http://x/api/recipes/edit", { method: "POST", body: JSON.stringify({ id: "r1", edit }) }));
+  };
+  const base = { name: "Weeknight chilli", servings: 4, ingredients: ["500g beef mince"], method: null, meta: {} };
+
+  it("calls no model, and an ingredient change clears the macros", async () => {
+    const response = await post({ ...base, ingredients: ["750g beef mince"] });
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.reestimated).toBe(true);
-    expect(body.recipe.reestimate.model).toBe("claude-sonnet-5-5");
-    expectOneModel(sent[0], "edit re-estimate");
+    expect(body.macrosCleared).toBe(true);
+    expect(body.recipe.clearMacros).toBe(true);
+    expect(sent).toHaveLength(0);
+  });
+
+  it("clears them on a servings change", async () => {
+    const body = await (await post({ ...base, servings: 6 })).json();
+    expect(body.recipe.clearMacros).toBe(true);
+  });
+
+  it("leaves them alone on any other edit", async () => {
+    const body = await (await post({ ...base, name: "Friday chilli", method: "Cook it." })).json();
+    expect(body.macrosCleared).toBe(false);
+    expect(body.recipe.clearMacros).toBe(false);
+    expect(sent).toHaveLength(0);
   });
 });

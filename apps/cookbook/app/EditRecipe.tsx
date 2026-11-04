@@ -3,16 +3,16 @@
 import { useState } from "react";
 import { useToast } from "./Toast";
 import { MetaFields, formFromMeta, type MetaForm } from "./Meta";
-import { changesThePot, cleanIngredients } from "@/lib/edit";
+import { clearsMacros, cleanIngredients } from "@/lib/edit";
 import type { Recipe } from "@/lib/recipes";
 
 /**
  * Editing a kept recipe, in place on its card (2026-09-26). The rules —
- * what re-estimates the macros and why a failed re-estimate writes nothing — are in `lib/edit.ts`.
+ * what clears the macros — are in `lib/edit.ts`.
  *
- * **The button says what the save will do.** "Save and re-estimate macros" when the
- * ingredients differ, because that is a model call and a new set of numbers;
- * plain "Save" otherwise. **A failed save leaves the form as you left it**, so
+ * **The note says what the save will do.** When the ingredients or servings differ
+ * it says the macros clear and are worked out again overnight (TEC-223); no model
+ * is called. **A failed save leaves the form as you left it**, so
  * nothing typed is lost, and says "Not saved" — it never closes the editor.
  */
 export default function EditRecipe({
@@ -21,7 +21,7 @@ export default function EditRecipe({
   onCancel,
 }: {
   recipe: Recipe;
-  onSaved: (recipe: Recipe, reestimated: boolean) => void;
+  onSaved: (recipe: Recipe, macrosCleared: boolean) => void;
   onCancel: () => void;
 }) {
   const toast = useToast();
@@ -33,7 +33,7 @@ export default function EditRecipe({
   const [saving, setSaving] = useState(false);
 
   const lines = cleanIngredients(ingredients);
-  const reestimates = changesThePot(recipe, { ingredients: lines });
+  const clears = clearsMacros(recipe, { ingredients: lines, servings: Number(servings) });
   const ready = name.trim() !== "" && lines.length > 0 && Number.isInteger(Number(servings)) && Number(servings) >= 1;
 
   async function save() {
@@ -50,7 +50,7 @@ export default function EditRecipe({
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body.recipe) throw new Error(body.error ?? "Couldn't save that.");
-      onSaved(body.recipe as Recipe, body.reestimated === true);
+      onSaved(body.recipe as Recipe, body.macrosCleared === true);
     } catch (e) {
       toast.error(`Not saved. ${e instanceof Error ? e.message : "Couldn't save that."}`);
     } finally {
@@ -98,9 +98,9 @@ export default function EditRecipe({
       <MetaFields value={meta} onChange={setMeta} open />
 
       <p className="text-xs text-ink-soft">
-        {reestimates
-          ? "The ingredients changed, so saving works the macros out again — one call, and the new numbers replace the old."
-          : "Changing the servings re-divides the same pot; nothing is re-estimated. Grocery lines already on your list keep what they say."}
+        {clears
+          ? "The ingredients or servings changed, so saving clears the macros. They are worked out again overnight. Grocery lines already on your list keep what they say."
+          : "The macros stay as they are. Grocery lines already on your list keep what they say."}
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -111,9 +111,9 @@ export default function EditRecipe({
           type="button"
           onClick={save}
           disabled={!ready || saving}
-          className={`${reestimates ? "" : "ml-auto "}rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50`}
+          className="ml-auto rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
         >
-          {saving ? (reestimates ? "Re-estimating macros…" : "Saving…") : reestimates ? "Save and re-estimate macros" : "Save"}
+          {saving ? "Saving…" : clears ? "Save and clear macros" : "Save"}
         </button>
       </div>
     </div>

@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Provenance from "./Provenance";
-import MacroRow from "./MacroRow";
 import { useToast } from "./Toast";
-import { methodSteps, perServing } from "@/lib/recipeSteps";
+import { methodSteps } from "@/lib/recipeSteps";
 import type { Recipe, RecipeDraft } from "@/lib/recipes";
 import { MAX_FILE_BYTES, isFileMediaType, type RecipeFile } from "@/lib/upload";
 import { MAX_STEER, pileForAsk, turnDown, type TurnedDown } from "@/lib/reroll";
@@ -23,8 +21,9 @@ import { NO_PICKS, hasPicks, type Picks } from "@/lib/tuning";
  *
  * **Typing one saves straight away, and that is the exception, added 2026-09-22.**
  * The draft step exists to show you what a model produced before it lands. On the
- * typed path you wrote the recipe, so the only thing the draft adds is the macros
- * — an approval of your own words back, which is ceremony.
+ * typed path you wrote the recipe, so the draft adds nothing — an approval of your
+ * own words back, which is ceremony. Since TEC-223 no way in works out macros: a
+ * recipe is kept without them and the nightly Cowork job fills them in.
  * `RULES.md` (*Recipes*) says the same: a typed recipe's draft is kept at once.
  *
  * **It is a tab of its own now** (2026-10-05, replacing the two-tab
@@ -289,7 +288,7 @@ export default function AddRecipe({
             value={ingredients}
             onChange={(e) => setIngredients(e.target.value)}
             rows={5}
-            placeholder={"500g beef mince\n1 tin kidney beans\n2 tbsp olive oil\n\nAmounts matter — the macros are estimated from them"}
+            placeholder={"500g beef mince\n1 tin kidney beans\n2 tbsp olive oil\n\nAmounts matter — the nightly macro job works from them"}
             aria-label="Ingredients, one per line"
             className="rounded-lg border border-line bg-surface p-3 text-base"
           />
@@ -328,8 +327,8 @@ export default function AddRecipe({
             className="rounded-lg border border-line bg-surface p-3 text-base"
           />
           <p className="text-xs text-ink-soft">
-            Only the recipe is kept — the story and the ads are dropped, and the macros are worked
-            out here rather than copied off the page.{" "}
+            Only the recipe is kept — the story and the ads are dropped, and any macros on the
+            page are ignored: they are worked out overnight.{" "}
             <b>If the page cannot be read you get an error, not a guess.</b>
           </p>
         </div>
@@ -362,7 +361,7 @@ export default function AddRecipe({
           />
           <p className="text-xs text-ink-soft">
             Only the recipe is kept. The file isn&rsquo;t saved anywhere, and any nutrition panel
-            in it is ignored: the macros are worked out here.{" "}
+            in it is ignored: the macros are worked out overnight.{" "}
             <b>If it can&rsquo;t be read, you get an error, not a guess.</b>
           </p>
         </div>
@@ -374,16 +373,11 @@ export default function AddRecipe({
         disabled={!ready || busy !== null}
         className="rounded-lg bg-accent px-4 py-3 text-base font-semibold text-accent-ink disabled:opacity-50"
       >
-        {/* **The label says what the press actually does, and that now differs
-            by mode.** On the typed path it estimates the macros and saves in one go, so
-            promising only macros would understate a write. On the other two it
-            invents or reads a recipe and then estimates its macros, and nothing is saved
-            until Keep it — so it must not say "save". */}
-        {busy === "drafting"
-          ? "Working it out…"
-          : mode === "manual"
-            ? "Work out the macros and save"
-            : "Work it out"}
+        {/* **The label says what the press actually does, and that differs by
+            mode.** The typed path saves in one go; the other two write or read a
+            recipe and nothing is saved until Keep it, so they must not say "save".
+            No way in works out macros (TEC-223): the nightly job does. */}
+        {busy === "drafting" ? "Working it out…" : mode === "manual" ? "Save" : "Draft it"}
       </button>
 
       {draft ? (
@@ -391,22 +385,8 @@ export default function AddRecipe({
           <header className="flex flex-wrap items-baseline gap-2 border-b border-line px-3 py-2">
             <h3 className="text-sm font-semibold">{draft.name}</h3>
             <span className="text-xs text-ink-soft">makes {draft.servings}</span>
-            <span className="ml-auto">
-              <Provenance source={draft.source} model={draft.model} url={draft.source_url} />
-            </span>
           </header>
           <div className="flex flex-col gap-3 p-3">
-            <div>
-              <h4 className="text-xs font-semibold text-ink-soft">Whole recipe</h4>
-              <MacroRow macros={draft.macros} per="in the pot" />
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold text-ink-soft">One serving</h4>
-              <MacroRow
-                macros={perServing({ ...draft.macros, servings: draft.servings })}
-                per="in one bowl"
-              />
-            </div>
             {draft.note ? <p className="text-xs text-ink-soft">{draft.note}</p> : null}
             {/* The model's keywords are stored with the draft and editable in the typed
                 form and in Edit; none is shown (TEC-183). The rating is yours: the

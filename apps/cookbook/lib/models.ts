@@ -2,8 +2,9 @@
  * The one model every call in Cookbook runs on, and the one effort level
  * (TEC-133, 2026-10-22).
  *
- * Drafting (Ask Claude), reading a link, reading a file, estimating the macros
- * every way in, re-estimating an edit and the grocery list's Tidy all go out as exactly this. There is no picker and
+ * Drafting (Ask Claude), reading a link, reading a file, styling a recipe and the
+ * grocery list's Tidy all go out as exactly this. No macro estimate goes out at
+ * all (TEC-223): the nightly Cowork job writes the macros. There is no picker and
  * no effort dial anywhere, and the draft and edit routes ignore a `model` an
  * older copy of the page still sends. Changing either is the owner's call and
  * needs `tests/models.test.ts` to change with it.

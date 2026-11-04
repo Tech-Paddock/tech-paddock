@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { estimateRecipeMacros } from "@/lib/anthropic";
 import { applyEdit, readEdit } from "@/lib/edit";
 import { getRecipe, nameTakenByOther, normalizeName, updateRecipe, type Recipe } from "@/lib/recipes";
-import { statusOf } from "@/lib/errors";
 import { errorResponse } from "@/lib/respond";
 
 export const dynamic = "force-dynamic";
-// An edit that changes the ingredients makes one estimate call before it writes,
-// thinking at medium effort (TEC-133).
-export const maxDuration = 120;
 
 /**
  * Edit a recipe in the book: every field (2026-09-26). `lib/edit.ts` has
- * the rules — what re-estimates the macros, and why a failed re-estimate writes nothing.
+ * the rules — an edit calls no model (TEC-223), and one that changes the
+ * ingredients or servings clears the macros for the nightly job to redo.
  *
  * Body: `{ id, edit:{ name, servings, ingredients, method, meta } }`.
- * Answers `{ recipe, reestimated }`. **Not contract** — `/api/servings` is the only
+ * Answers `{ recipe, macrosCleared }`. **Not contract** — `/api/servings` is the only
  * route Health reads, and it reads the edited row the next time it asks.
  */
 export async function POST(request: NextRequest) {
@@ -26,16 +22,12 @@ export async function POST(request: NextRequest) {
   const read = readEdit(body.edit);
   if ("error" in read) return NextResponse.json({ error: read.error }, { status: 400 });
 
-  // A `model` in the body (an installed copy of the page from before TEC-133)
-  // is ignored, not refused: a re-estimate runs on lib/models.ts's one model.
-
   try {
     const result = await applyEdit<Recipe>(
       {
         getRecipe,
         nameTakenByOther,
         normalizeName,
-        estimate: (recipe) => estimateRecipeMacros({ recipe }),
         update: updateRecipe,
       },
       id,
@@ -43,13 +35,6 @@ export async function POST(request: NextRequest) {
     );
     return NextResponse.json(result);
   } catch (e) {
-    // A model that failed throws a plain Error whose sentence ("ran out of room",
-    // "did not return usable macros") says more than a fallback. It is still a
-    // 500, never a 200, and nothing was written; the screen says "not saved".
-    if (statusOf(e) !== 500) return errorResponse(e, "");
-    return NextResponse.json(
-      { error: e instanceof Error && e.message ? e.message : "Couldn't re-estimate that. Nothing was changed." },
-      { status: 500 }
-    );
+    return errorResponse(e, "Couldn't save that edit. Nothing was changed.");
   }
 }

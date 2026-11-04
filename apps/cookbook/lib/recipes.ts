@@ -4,7 +4,7 @@ import { round, type Macros, type MacroSource } from "./macros";
 import { addItems } from "./grocery";
 import { quantityRule } from "./lineQuantity";
 import { readMeta, readRating, type RecipeMeta } from "./metadata";
-import type { RecipeEdit, Reestimate } from "./edit";
+import type { RecipeEdit } from "./edit";
 import { isEstimated, perServing, servingOrNull, type PotMacros } from "./recipeSteps";
 
 // The helpers the browser runs live in `lib/recipeSteps.ts`, which imports no `./supabase`.
@@ -15,7 +15,7 @@ export { perServing, methodSteps } from "./recipeSteps";
  *
  * **The book stores the whole pot and derives the serving.** Dividing is the
  * lossless direction, so "I got eight bowls, not six" is a one-field edit rather
- * than a re-estimate. `perServing` is the only divider in the app and
+ * than a redo. `perServing` is the only divider in the app and
  * `tests/recipes.test.ts` asserts it round-trips against `wholeRecipe`, because
  * the two disagreeing would be every number on the screen being quietly wrong.
  *
@@ -66,10 +66,11 @@ export type Recipe = PotMacros & RecipeMeta & {
 export type RecipeDraft = {
   name: string;
   servings: number;
-  macros: Macros;
+  /** Always null (TEC-223): the nightly Cowork job writes the macros, never a draft. */
+  macros: null;
   origin: RecipeOrigin;
-  source: MacroSource;
-  model: string | null;
+  source: null;
+  model: null;
   source_url: string | null;
   ingredients: string[];
   method: string | null;
@@ -218,7 +219,7 @@ export async function getRecipe(id: string): Promise<Recipe | null> {
 /**
  * Is this name already in the book? **A courtesy, not the rule** — the unique
  * index is the rule, and `saveRecipe` still catches the collision from the
- * insert. This exists so a typed recipe is refused before it pays for an estimate
+ * insert. This exists so a typed recipe is refused before it pays for a restyle
  * call it can never keep (TEC-29 item 8). Compared through `normalizeName`, the
  * index's own expression.
  */
@@ -234,24 +235,14 @@ export async function nameTaken(name: string): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 /**
- * Why a draft is refused rather than tidied up.
- *
- * A recipe is a number you will trust for as long as it is in the book, and
- * estimating one again is a deliberate act. A zero, a fraction of a serving or a
- * missing model must not become a row that later reads like something somebody
- * checked. Returns a message, or null when the draft is sound.
+ * Why a draft is refused rather than tidied up. A fraction of a serving or a
+ * nameless recipe must not become a row. Macros are not checked here: a draft
+ * has none (TEC-223). Returns a message, or null when the draft is sound.
  */
 export function validateDraft(draft: RecipeDraft): string | null {
   if (!draft.name.trim()) return "The recipe needs a name.";
   if (!Number.isInteger(draft.servings) || draft.servings < 1) {
     return "Servings has to be a whole number, at least one.";
-  }
-  if (draft.macros.kcal <= 0) return "A recipe with no calories is a recipe nobody estimated.";
-  for (const [key, value] of Object.entries(draft.macros)) {
-    if (!Number.isFinite(value) || value < 0) return `${key} is not a number a recipe can have.`;
-  }
-  if (draft.source !== "hand" && !draft.model) {
-    return "A number a model produced has to say which model.";
   }
   return null;
 }
@@ -279,13 +270,15 @@ export async function saveRecipe(draft: RecipeDraft): Promise<Recipe> {
     .insert({
       name,
       servings: draft.servings,
-      kcal: draft.macros.kcal,
-      protein_g: draft.macros.protein_g,
-      carbs_g: draft.macros.carbs_g,
-      fat_g: draft.macros.fat_g,
+      // A new recipe has no macros (TEC-223): all six columns null, which the
+      // table's checks allow. The nightly Cowork job fills them in.
+      kcal: null,
+      protein_g: null,
+      carbs_g: null,
+      fat_g: null,
       origin: draft.origin,
-      source: draft.source,
-      model: draft.source === "hand" ? null : draft.model,
+      source: null,
+      model: null,
       source_url: draft.source_url,
       ingredients: draft.ingredients.map((i) => i.trim()).filter(Boolean),
       method: draft.method?.trim() || null,
@@ -323,47 +316,19 @@ export async function nameTakenByOther(name: string, exceptId: string): Promise<
 }
 
 /**
- * Write an edit (`lib/edit.ts` decides what it is and whether it re-estimates the macros).
+ * Write an edit (`lib/edit.ts` decides what it is and whether it clears the macros).
  * **One statement**, so an edit lands whole or not at all.
  *
- * With a `reestimate`, the pot's macros, `source: estimate`, the model and the
- * estimate's caveat replace the old ones — a hand-set number whose ingredients
- * changed is no longer the hand's. Without one, none of those four is sent, and
- * a field not sent is not overwritten. `origin` and `source_url` are never sent:
- * where a recipe came from does not change because it was edited.
+ * With `clearMacros`, kcal, protein_g, carbs_g, fat_g, source and model are set
+ * to null together (the only shape the table allows) and the nightly Cowork job
+ * works them out again. Without it, none of the six is sent, and a field not
+ * sent is not overwritten. `origin` and `source_url` are never sent: where a
+ * recipe came from does not change because it was edited.
  */
-export async function updateRecipe(
-  id: string,
-  edit: RecipeEdit,
-  reestimate: Reestimate | null
-): Promise<Recipe> {
-  const macroFields = reestimate
-    ? {
-        kcal: reestimate.macros.kcal,
-        protein_g: reestimate.macros.protein_g,
-        carbs_g: reestimate.macros.carbs_g,
-        fat_g: reestimate.macros.fat_g,
-        source: "estimate" as const,
-        model: reestimate.model,
-        note: reestimate.note,
-      }
+export async function updateRecipe(id: string, edit: RecipeEdit, clearMacros: boolean): Promise<Recipe> {
+  const macroFields = clearMacros
+    ? { kcal: null, protein_g: null, carbs_g: null, fat_g: null, source: null, model: null }
     : {};
-  if (reestimate) {
-    const problem = validateDraft({
-      name: edit.name,
-      servings: edit.servings,
-      macros: reestimate.macros,
-      origin: "manual",
-      source: "estimate",
-      model: reestimate.model,
-      source_url: null,
-      ingredients: edit.ingredients,
-      method: edit.method,
-      note: reestimate.note,
-      meta: edit.meta,
-    });
-    if (problem) throw new InputError(problem);
-  }
 
   const { data, error } = await getServiceClient()
     .from("recipes")

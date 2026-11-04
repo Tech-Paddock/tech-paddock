@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import Provenance from "./Provenance";
-import { useToast } from "./Toast";
 import { MACRO_LABELS, round, type Macros } from "@/lib/macros";
 import { calorieSplit, potAndServing, SPLIT_KEYS } from "@/lib/breakdown";
 import { isEstimated, NOT_ESTIMATED, perServing } from "@/lib/recipeSteps";
@@ -34,49 +32,11 @@ export function MacroTiles({ macros }: { macros: Macros }) {
 }
 
 /**
- * "Macros not estimated yet", and the way to get them (TEC-201): one estimate
- * call on the recipe as it is, the same path as an ingredient edit. For an
- * imported recipe nobody has estimated, after a Revert, or after a failed estimate.
+ * "Macros not estimated yet" (TEC-200). There is no button: the nightly Cowork
+ * job fills the macros in (TEC-223), so the tab says so and leaves it at that.
  */
-function NotEstimated({ recipe, onEstimated }: { recipe: Recipe; onEstimated?: (recipe: Recipe) => void }) {
-  const toast = useToast();
-  const [busy, setBusy] = useState(false);
-
-  async function estimate() {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const response = await fetch("/api/recipes/estimate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: recipe.id }),
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Couldn't estimate that.");
-      toast.notice(`"${recipe.name}" has its macros estimated.`);
-      onEstimated?.(body.recipe as Recipe);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't estimate that.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-col items-start gap-2">
-      <p className="text-sm text-ink-soft">{NOT_ESTIMATED}</p>
-      {onEstimated ? (
-        <button
-          type="button"
-          onClick={estimate}
-          disabled={busy}
-          className="min-h-11 rounded-xl border border-line px-4 text-base disabled:opacity-50"
-        >
-          {busy ? "Estimating…" : "Estimate macros"}
-        </button>
-      ) : null}
-    </div>
-  );
+function NotEstimated() {
+  return <p className="text-sm text-ink-soft">{NOT_ESTIMATED}</p>;
 }
 
 /** The bar's fills, in `SPLIT_KEYS` order; the legend repeats them. Tokens only. */
@@ -88,10 +48,10 @@ const SWATCH = ["bg-accent", "bg-accent/50", "bg-ink-soft/60"] as const;
  * the whole pot on one line, and where the numbers came from. Stored numbers
  * only; nothing is called. Local patterns: the tiles, a thin split bar.
  */
-export default function MacroTab({ recipe, onEstimated }: { recipe: Recipe; onEstimated?: (recipe: Recipe) => void }) {
+export default function MacroTab({ recipe }: { recipe: Recipe }) {
   // TEC-200: saved before its macros were estimated. Say so; show no tiles, no 0.
   if (!isEstimated(recipe) || !recipe.source) {
-    return <NotEstimated recipe={recipe} onEstimated={onEstimated} />;
+    return <NotEstimated />;
   }
   const { pot } = potAndServing(recipe);
   const split = calorieSplit(recipe);

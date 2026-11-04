@@ -20,8 +20,9 @@ export type Macros = {
  * Where a number came from.
  *
  * **Two values, where Health has three.** There is no `web`, because a recipe's
- * macros are always this app's own estimate of its ingredients — even for an
- * imported recipe whose page published a nutrition panel. The enum in the
+ * macros are always an estimate of its ingredients, written overnight by the
+ * Cowork job (TEC-223) — even for an imported recipe whose page published a
+ * nutrition panel. The enum in the
  * database is the same two values, so a lifted number is not storable rather
  * than merely not written.
  */
@@ -55,17 +56,4 @@ export function round(m: Macros): Macros {
     carbs_g: Math.round(m.carbs_g),
     fat_g: Math.round(m.fat_g),
   };
-}
-
-/** Reads a Macros off an untrusted object — a model response, or a row. */
-export function parseMacros(value: unknown): Macros | null {
-  if (!value || typeof value !== "object") return null;
-  const raw = value as Record<string, unknown>;
-  const out = {} as Macros;
-  for (const k of MACRO_KEYS) {
-    const n = typeof raw[k] === "string" ? Number(raw[k]) : raw[k];
-    if (typeof n !== "number" || !Number.isFinite(n) || n < 0) return null;
-    out[k] = n;
-  }
-  return out;
 }
