@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
-import { heldByLine, summarizeClear, summarizeTakeBack, unaskedOutcomes, takeBack, takeBackLines, type SendRow, type TakeBackDeps, type TakeBackLine } from "@/lib/takeBack";
+import { describe, expect, it } from "vitest";
+import { BACK_TO_LIST_WORDS, clearedWords, heldByLine, type SendRow } from "@/lib/takeBack";
 import { sentRows, type Outcome } from "@/lib/cart";
-import { KrogerError } from "@/lib/kroger";
+import * as kroger from "@/lib/kroger";
 
 /**
  * Take back (TEC-127). Pure: Kroger and the ledger are passed in. What these
@@ -44,111 +44,6 @@ describe("what is still held", () => {
     const held = heldByLine([row({}), row({ kind: "taken_back", quantity: -2 }), row({ kind: "refused", quantity: 2 })]);
     expect(held.get("a")).toEqual([{ upc: MILK, quantity: 2, modality: "PICKUP" }]);
   });
-
-  it("acts only on lines still on the list that Cookbook sent; the line's quantity now doesn't matter", () => {
-    const list = [
-      { id: "a", name: "milk", sent_at: "2026-10-21T01:00:00Z" },
-      { id: "b", name: "eggs", sent_at: null },
-      { id: "c", name: "flour", sent_at: "2026-10-01T00:00:00Z" }, // before the ledger
-    ];
-    const lines = takeBackLines(list, [row({}), row({ item_id: "gone", quantity: 9 })]);
-    expect(lines.map((l) => [l.id, l.held])).toEqual([
-      ["a", [{ upc: MILK, quantity: 2, modality: "PICKUP" }]],
-      ["c", []],
-    ]);
-  });
-});
-
-function deps() {
-  return {
-    reserve: vi.fn<TakeBackDeps["reserve"]>(async () => undefined),
-    remove: vi.fn<TakeBackDeps["remove"]>(async () => undefined),
-    refused: vi.fn<TakeBackDeps["refused"]>(async () => undefined),
-  };
-}
-
-const LINE: TakeBackLine = {
-  id: "a",
-  name: "milk",
-  sent_at: "2026-10-21T01:00:00Z",
-  held: [
-    { upc: MILK, quantity: 3, modality: "PICKUP" },
-    { upc: OAT, quantity: 1, modality: null },
-  ],
-};
-
-describe("taking back", () => {
-  it("removes each held product with its own quantity and mode, reserving first, and marks the line unsent", async () => {
-    const d = deps();
-    const order: string[] = [];
-    d.reserve.mockImplementation(async () => void order.push("reserve"));
-    d.remove.mockImplementation(async () => void order.push("remove"));
-    const { outcomes, unsent } = await takeBack([LINE], d);
-    expect(order).toEqual(["reserve", "remove", "remove"]);
-    expect(d.reserve).toHaveBeenCalledWith(LINE, LINE.held);
-    expect(d.remove.mock.calls).toEqual([
-      [MILK, 3, "PICKUP"],
-      [OAT, 1, null],
-    ]);
-    expect(outcomes).toEqual([{ id: "a", name: "milk", result: "taken back", detail: "Took back ×3 + ×1." }]);
-    expect(unsent).toEqual(["a"]);
-    expect(d.refused).not.toHaveBeenCalled();
-  });
-
-  it("a Kroger refusal fails the line, reverses only what was refused, and leaves it sent", async () => {
-    const d = deps();
-    d.remove.mockImplementation(async (upc: string) => {
-      if (upc === OAT) throw new KrogerError("Kroger refused it (400).", 400);
-    });
-    const { outcomes, unsent } = await takeBack([LINE], d);
-    expect(d.refused).toHaveBeenCalledWith(LINE, [LINE.held[1]]);
-    expect(unsent).toEqual([]);
-    expect(outcomes[0].result).toBe("failed");
-    expect(outcomes[0].detail).toMatch(/^Took back ×3, but not ×1: Kroger refused it \(400\)\. Still marked sent/);
-    expect(outcomes[0].detail).toMatch(/cart page/);
-  });
-
-  it("does not retry without the mode", async () => {
-    const d = deps();
-    d.remove.mockRejectedValue(new KrogerError("Kroger refused it (422).", 422));
-    await takeBack([{ ...LINE, held: [LINE.held[0]] }], d);
-    expect(d.remove).toHaveBeenCalledTimes(1);
-  });
-
-  it("a reservation the database refuses asks nothing of Kroger", async () => {
-    const d = deps();
-    d.reserve.mockRejectedValue(new Error("db down"));
-    const { outcomes, unsent } = await takeBack([LINE], d);
-    expect(d.remove).not.toHaveBeenCalled();
-    expect(outcomes[0]).toMatchObject({ result: "failed", detail: expect.stringMatching(/Kroger wasn't asked/) });
-    expect(unsent).toEqual([]);
-  });
-
-  it("an unrecordable refusal says the line now reads as taken back", async () => {
-    const d = deps();
-    d.remove.mockRejectedValue(new KrogerError("Kroger refused it (400).", 400));
-    d.refused.mockRejectedValue(new Error("db down"));
-    const { outcomes } = await takeBack([{ ...LINE, held: [LINE.held[0]] }], d);
-    expect(outcomes[0].detail).toMatch(/reads as taken back — check the cart page/);
-  });
-
-  it("a line sent before the ledger is skipped and said, without Kroger", async () => {
-    const d = deps();
-    const { outcomes } = await takeBack([{ ...LINE, held: [] }], d);
-    expect(outcomes[0]).toMatchObject({ result: "skipped", detail: expect.stringMatching(/before Cookbook recorded/) });
-    expect(d.reserve).not.toHaveBeenCalled();
-    expect(d.remove).not.toHaveBeenCalled();
-  });
-
-  it("the summary counts every line and never says the cart is empty", () => {
-    const s = summarizeTakeBack([
-      { id: "a", name: "milk", result: "taken back", detail: "" },
-      { id: "b", name: "eggs", result: "failed", detail: "" },
-      { id: "c", name: "flour", result: "skipped", detail: "" },
-    ]);
-    expect(s).toBe("1 taken back, 1 skipped, 1 failed. Anything added to the cart elsewhere is still there.");
-    expect(s).not.toMatch(/empty/i);
-  });
 });
 
 describe("what a send records", () => {
@@ -166,26 +61,15 @@ describe("what a send records", () => {
   });
 });
 
-describe("Clear cart words (TEC-210)", () => {
-  const out = (result: "taken back" | "skipped" | "failed") => ({ id: "x", name: "x", result, detail: "" });
-
-  it("says how many cleared, and only adds the refusals when there were some", () => {
-    expect(summarizeClear([out("taken back"), out("taken back")])).toEqual({ cleared: 2, refused: 0, text: "Cleared 2 from the cart." });
-    expect(summarizeClear([out("taken back"), out("failed"), out("skipped")])).toEqual({
-      cleared: 3,
-      refused: 2,
-      text: "Cleared 3 from the cart. King Soopers didn't take back 2; check its cart.",
-    });
+describe("Clear cart and Back to list words (TEC-228)", () => {
+  it("say Cookbook only, and that the King Soopers cart is not affected", () => {
+    expect(clearedWords(3)).toBe("Cleared 3 from Cookbook. Items in your King Soopers cart are not affected.");
+    expect(BACK_TO_LIST_WORDS).toBe("Back on the list. Your King Soopers cart is not affected.");
   });
+});
 
-  it("when Kroger was never asked, held lines read failed and unrecorded ones skipped", () => {
-    const lines = [
-      { id: "a", name: "milk", sent_at: "t", held: [{ upc: "0001111041700", quantity: 2, modality: "PICKUP" as const }] },
-      { id: "b", name: "salt", sent_at: "t", held: [] },
-    ];
-    expect(unaskedOutcomes(lines, "Connect King Soopers first.").map((o) => [o.id, o.result])).toEqual([
-      ["a", "failed"],
-      ["b", "skipped"],
-    ]);
+describe("Cookbook never removes from the King Soopers cart (TEC-228)", () => {
+  it("has no take-back call: Kroger's Cart API only adds", () => {
+    expect("takeBackFromCart" in kroger).toBe(false);
   });
 });

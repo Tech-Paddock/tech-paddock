@@ -17,7 +17,7 @@ import { totalsOf, type LinePrice, type Totals } from "@/lib/listPrices";
 import { shortDay } from "@/lib/dealFilter";
 import { checkLine, clock } from "@/lib/checkLine";
 import { ItemMatches } from "./ItemMatches";
-import { ProductSplash, RefreshLog, StorePicker, TakeBackResults, useCart, when } from "./Cart";
+import { ProductSplash, RefreshLog, StorePicker, useCart, when } from "./Cart";
 import { useToast } from "./Toast";
 
 /**
@@ -117,9 +117,8 @@ export default function List({
   const [readError, setReadError] = useState<string | null>(null);
   const toast = useToast();
   // **One "Are you sure?" with a count, never a list** (TEC-206). Section buttons use
-  // `confirm`; a row's Remove uses `removeConfirm`. **Adds never ask** (TEC-211).
+  // `confirm`. **Adds never ask** (TEC-211), and neither does Back to list (TEC-228).
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
-  const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
   // The line whose matches popup is open (TEC-226).
   const [looking, setLooking] = useState<ShoppingLine | null>(null);
   const [typed, setTyped] = useState("");
@@ -601,24 +600,16 @@ export default function List({
                     item={item}
                     live={live ? { total: live.total } : null}
                     disabled={cart.busy !== null}
-                    removing={cart.removing === item.id}
-                    confirming={removeConfirm === item.id}
+                    returning={cart.returning === item.id}
                     onOpen={() => setLooking(item)}
-                    onAskRemove={() => setRemoveConfirm(item.id)}
-                    onCancel={() => setRemoveConfirm(null)}
-                    onRemove={() => {
-                      setRemoveConfirm(null);
-                      void cart.removeOne(item.id);
-                    }}
+                    onBack={() => void cart.backToList(item.id)}
                   />
                 );
               })}
             </ul>
           )}
 
-          {cart.takeBackResults ? <TakeBackResults results={cart.takeBackResults} onClose={cart.dismissTakeBack} /> : null}
-
-          {/* **Clear cart clears every line in In cart whatever King Soopers answers** (TEC-206, TEC-210): one confirm with the count, no list, shown even when not signed in. */}
+          {/* **Clear cart clears every line in In cart in Cookbook only; King Soopers is not asked** (TEC-206, TEC-210, TEC-228): one confirm with the count, no list, shown even when not signed in. */}
           {cart.ready || inCart.length > 0 ? (
             confirm === "clear-cart" ? (
               sure("clear-cart", inCart.length, () => void cart.clearCart())
@@ -630,7 +621,7 @@ export default function List({
                   disabled={cart.busy !== null || inCart.length === 0}
                   className="min-h-11 flex-1 rounded-[10px] border border-danger bg-transparent text-[15px] font-bold text-danger disabled:opacity-50"
                 >
-                  {cart.busy === "take-back" && !cart.removing ? "Clearing…" : "Clear cart"}
+                  {cart.busy === "take-back" && !cart.returning ? "Clearing…" : "Clear cart"}
                 </button>
                 <a
                   href={CHECKOUT_URL}
@@ -797,25 +788,21 @@ function Price({ price, cue, notSent }: { price: LinePrice | null | undefined; c
 }
 
 /**
- * One In cart line: **item · qty · price** and **Remove** (TEC-211). The price is today's
+ * One In cart line: **item · qty · price** and **Back to list** (TEC-228, was Remove). The price is today's
  * once Refresh cart has read it, else the nightly check's; "no price" when Kroger can't
  * price it, never $0. The ×N box is the quantity that was sent, so it does not edit.
- * **Remove** is Take back for this line, after one "Take 1 out of the cart?".
+ * **Back to list** returns this line to the List unsent, with no confirm; King Soopers is not asked.
  */
 export function InCartRow(props: {
   item: ShoppingLine;
   live: { total: number | null } | null;
   disabled: boolean;
-  removing: boolean;
-  confirming: boolean;
-  onAskRemove: () => void;
+  returning: boolean;
   onOpen: () => void;
-  onCancel: () => void;
-  onRemove: () => void;
+  onBack: () => void;
 }) {
   const { item } = props;
   const name = item.view?.name ?? item.name;
-  const ask = confirmWords("remove", 1);
   return (
     <li title={[name, dealWords(item.deal)].filter(Boolean).join(" · ")} className={`flex items-center gap-2 rounded-[10px] bg-raised py-2 pl-3 pr-2.5 ${SHADE_CLASS[item.deal?.shade ?? "plain"]}`}>
       <button type="button" onClick={props.onOpen} aria-haspopup="dialog" className="block min-w-0 flex-1 truncate text-[15px] font-semibold text-left">
@@ -833,29 +820,15 @@ export function InCartRow(props: {
       ) : (
         <Price price={item.price} cue={dealWords(item.deal)} />
       )}
-      {props.confirming ? (
-        <span role="group" aria-label="Are you sure?" className="flex shrink-0 flex-col items-stretch gap-1">
-          <span className="text-center text-[11px] font-semibold">{ask.ask}</span>
-          <span className="flex gap-1">
-            <button type="button" onClick={props.onCancel} className="h-8 rounded-lg border border-line px-2 text-xs text-ink-soft">
-              No
-            </button>
-            <button type="button" onClick={props.onRemove} className="h-8 rounded-lg border border-danger px-2.5 text-xs font-bold text-danger">
-              {ask.yes}
-            </button>
-          </span>
-        </span>
-      ) : (
-        <button
-          type="button"
-          aria-label={`Remove ${name} from the cart`}
-          onClick={props.onAskRemove}
-          disabled={props.disabled}
-          className="min-h-11 shrink-0 whitespace-nowrap rounded-[10px] border border-line bg-transparent px-3 text-[13px] disabled:opacity-50"
-        >
-          {props.removing ? "Removing…" : "Remove"}
-        </button>
-      )}
+      <button
+        type="button"
+        aria-label={`Put ${name} back on the list`}
+        onClick={props.onBack}
+        disabled={props.disabled}
+        className="min-h-11 shrink-0 whitespace-nowrap rounded-[10px] border border-line bg-transparent px-3 text-[13px] disabled:opacity-50"
+      >
+        {props.returning ? "Moving…" : "Back to list"}
+      </button>
     </li>
   );
 }

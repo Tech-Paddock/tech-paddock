@@ -258,9 +258,10 @@ Reasoning is in the migration headers.
   insert only; see *Import purchases*.
 - `cart_sends` (TEC-127): the cart ledger, insert only (`lib/cartSends.ts`) except `item_id`,
   which a Tidy moves onto the merged line before deleting the old ones. Signed quantity: `sent`
-  and `refused` positive, `taken_back` negative; the sum per line, UPC and modality is what Take
-  back removes. `item_id` is set null when a line is *deleted* (Clear all / Clear ticked), and those
-  rows are never taken back. A line **Clear cart** clears (TEC-210) keeps its `item_id`.
+  and `refused` positive, `taken_back` negative; the sum per line, UPC and modality is what Refresh cart
+  prices. The old `taken_back` and `refused` rows (TEC-127, TEC-210) stay as history; **nothing
+  writes either kind since TEC-228**. `item_id` is set null when a line is *deleted* (Clear all /
+  Clear ticked). A line **Clear cart** clears (TEC-210) keeps its `item_id`.
 - `grocery_items.cleared_at` (TEC-210, migration `cookbook_grocery_cleared_at`): set by Clear cart
   and nothing else, never unset. `readList` filters `cleared_at is null`, so a cleared line is off the
   List, off In cart, out of Tidy and the deal scan, and Refresh cart cannot see it (`reconcile` and
@@ -330,8 +331,8 @@ Reasoning is in the migration headers.
   add.". The send then reports in one toast (`sentWords`, `app/Cart.tsx`).
   `?ids=a,b` limits the lookup (+ Cart on one line); the route looks up only lines still on the List
   (`include=sent` went with Change, TEC-211). **Confirms** are `confirmWords` (`lib/cartGuess.ts`): a
-  count, never names, for Remove, Clear cart, Tidy, Clear ticked and Clear all only; `List.tsx` holds
-  `confirm` for the section buttons and `removeConfirm` for a row's Remove.
+  count, never names, for Clear cart, Tidy, Clear ticked and Clear all only; `List.tsx` holds
+  `confirm` for the section buttons. Back to list (TEC-228) has no confirm.
 - **Nothing sets a default on Send** (TEC-214). `makeDefault` is gone from `CartPick`, `readPicks`,
   `SendDeps`, `sendLines`, `pickOf` and the route, and the splash has no tick; a `makeDefault` in a
   request is dropped. `tests/sendDefaults.test.ts` reads the source for `setDefault|makeDefault`.
@@ -345,32 +346,33 @@ Reasoning is in the migration headers.
   **no deals since TEC-132**, they live on the Deals tab. The store is chosen in the list's header
   (`StorePicker`, ZIP only: Kroger's Locations API has no city filter). `serialKroger` is
   module-level, so the list and Your brands' Refresh share one Kroger queue.
-- **List and In cart** (TEC-190, TEC-206): a line is In cart when `sent_at` is set (Send sets it, a
-  whole Take back clears it), so the sections need no new column. **In cart is the whole King
+- **List and In cart** (TEC-190, TEC-206, TEC-228): a line is In cart when `sent_at` is set (Send sets
+  it, Back to list clears it), so the sections need no new column. **In cart is the whole King
   Soopers cart**: every add comes from this app, and the King Soopers app is only for checkout, so
   no screen says an add elsewhere is hidden. **+ Cart** (`addOne`) goes at once (TEC-211): it sends
-  `guessPick` with `only: [id]` and reports in a toast. **Remove** (`removeOne`) and
-  **Clear cart** (`clearCart`) both go through `takeBackRequest`: `POST
-  /api/kroger/cart/take-back` with `confirm: true`, and `ids` for Remove only. Clear cart sends
-  `clear: true` as well (TEC-210) and calls no GET preview and has no King Soopers step.
-  **Clear cart always clears** (owner, 2026-11-02): it sends a negative for every In cart line with
-  its recorded Pickup/Delivery choice (same reserve-then-ask path, `refused` rows appended when
-  Kroger says no), then `markCleared` on every line it was given, **whatever Kroger answered**: a
-  per-line refusal, no sign-in or an unreachable Kroger (`unaskedOutcomes`; nothing reserved or
-  asked), a line sent before the ledger. Nothing is retried, cleared lines do not go back to the
-  List, and `sent_at` is kept. The reply is `{ cleared, refused, text, checkoutUrl }`; the client shows
-  one toast (`Cleared N from the cart.`, plus `King Soopers didn't take back M; check its cart.` and
-  a link to `CHECKOUT_URL` when M > 0; `Toast` takes an optional link). The button shows even when
-  not signed in. **Remove is unchanged**: a refusal fails the line and it stays In cart; success
-  returns it to the List (`sent_at` cleared). There is no Done shopping button. **Ticked lines sort to the bottom** of the List, faded
+  `guessPick` with `only: [id]` and reports in a toast. **Cookbook never sends a negative quantity
+  (TEC-228; see the Kroger trap at the end).** **Clear cart** (`clearCart`) is `POST
+  /api/kroger/cart/clear` with `confirm: true`: it reads the list, `markCleared` on every line with
+  `sent_at`, and replies `{ cleared, text, checkoutUrl }`. Kroger is never called (no token, so it
+  works signed out) and the ledger is not written. The client shows one toast (`clearedWords`,
+  `lib/takeBack.ts`: "Cleared N from Cookbook. Items in your King Soopers cart are not affected.")
+  with a link to `CHECKOUT_URL`. Cleared lines do not go back to the List and `sent_at` is kept.
+  **Back to list** (`backToList`, replacing Remove) is `POST /api/kroger/cart/back-to-list` with
+  `{ id }`, no confirm: `markUnsent`, nothing else, then the toast `BACK_TO_LIST_WORDS`. The ledger
+  still holds what was sent, so **`reconcile` must never mark a line sent from the ledger** (it did
+  before TEC-228, and would put the line straight back In cart on the next Refresh); a re-send adds
+  to the held quantity, which is true of the real cart. The `take-back` route and `takeBackFromCart`
+  are deleted; `lib/takeBack.ts` keeps only the ledger types, `heldByLine` and the two sets of
+  words. There is no Done shopping button. **Ticked lines sort to the bottom** of the List, faded
   (`tickedLast`, `lib/listOrder.ts`, also applied client-side so a tick moves the line at once); In
   cart has no ticks. **Tidy applies at once** after its confirm (`tidyNow`: POST then PUT; the
   route still runs `validateTidy` on both). **Tidy and Clear all / Clear ticked / Copy read the List
   only**: a line in the cart is never merged into a tidy or deleted without a take back.
 - **Refresh cart** (TEC-206): `POST /api/kroger/cart/refresh`, `lib/cartRefresh.ts` (`reconcile`,
   `priceHeld`, `refreshCart`, deps injected). It compares the list with the `cart_sends` ledger
-  (a line the ledger holds is marked sent; a sent line whose ledger nets to zero goes back on the
-  List; a sent line with no ledger rows at all is left alone and reads "no price"), then prices each
+  (a sent line whose ledger nets to zero goes back on the List; a line the ledger holds but that is
+  not sent stays on the List; a sent line with no ledger rows at all is left alone and reads "no
+  price"), then prices each
   In cart line today at the chosen store with `appToken` and `productsByIds`: **the app token,
   never `withAccessToken`**, so it is not in `serial`. A product Kroger does not return or prices
   at nothing makes its line "no price", never $0. The client keeps the result in `cartCheck` (not
@@ -402,7 +404,7 @@ Reasoning is in the migration headers.
   checked …" is the quiet line under it (`RefreshLog` with no note), and a failed deal scan shows
   there too. Nothing King Soopers renders below In cart. **Rows are item · qty · price**: List rows
   keep the tick, the ×N box and **+ Cart**; In cart rows keep a ×N label (the quantity sent, not
-  editable) and **Remove**. The recipe names, ★ ? + mark, bubble, amount, note and "Used:" line are
+  editable) and **Back to list**. The recipe names, ★ ? + mark, bubble, amount, note and "Used:" line are
   gone; the deal shade stays, with the bubble and "Good price"/"High price" words on the price's
   `title` and accessible name. **A send is one toast** ("Sent 12", "Sent 12 · 2 not sent"); a line it
   did not take reads a red "not sent" in its price spot (`notSent`, in memory, cleared by the next
@@ -411,7 +413,7 @@ Reasoning is in the migration headers.
   `offerChoices(ids)` looks the new lines up and opens it for each `needsSplash` plan (`settle` with
   two or more options). Tapping a product (`chooseProduct`) adds it to the cart now (`pickOf`,
   `lib/cartGuess.ts`); it never sets a default. **Change on an In cart row is gone**
-  (TEC-211): to use another product, Remove the line and add it again.
+  (TEC-211): to use another product, send the line Back to list and add it again.
 - **Searching by the item alone** (TEC-131): `lineTerm` (`lib/cart.ts`) is
   `searchTerm(itemWords(name)) ?? searchTerm(name)`, used by `planLine` and `targetFor`; a
   phrase's search words are searched as written. The list's links use `itemWords` too
@@ -433,17 +435,6 @@ Reasoning is in the migration headers.
 - A send appends a `sent` row per added line (`sentRows` in `lib/cart.ts`): the UPC that went in,
   the quantity sent, and the modality it actually went with (null when Kroger refused the choice).
   A failed append is named in `recordError`; the items are still in the cart.
-- **Take back** (TEC-127): rules in `lib/takeBack.ts`, route `/api/kroger/cart/take-back`. POST
-  needs `confirm: true` (the screen no longer calls the GET preview, which still exists). Only lines still
-  on the list, ticked or not. Per line it appends the `taken_back` rows first, then sends
-  `PUT /cart/add` with the negated quantity and the recorded modality (`takeBackFromCart`), never
-  retried without it; a refusal appends `refused` rows and the line stays sent. Only lines wholly
-  taken back get `sent_at` cleared (`markUnsent`). A line with `sent_at` and no ledger rows was sent
-  before the ledger and is skipped, with a pointer to the cart page. The summary always says
-  anything added elsewhere is still there; any failure shows the `CHECKOUT_URL` link. The button
-  and confirm are local patterns in `app/Cart.tsx`. **Remove** sends `ids` (TEC-190): the same
-  reserve-then-ask path for one line, with its recorded Pickup/Delivery choice, never retried
-  without it; a line sent before the ledger is skipped and says so, and stays In cart.
 - Refresh: `lib/refresh.ts`, `POST /api/kroger/refresh`, triggered by `lib/refreshDue.ts`. No cron of its own (the nightly price scan, below, is separate).
   Every saved code in one `productsByIds` (50 per request); a code absent from the answer is
   flagged (`missing_since` kept from the first time) and Kroger is searched by its `description`
@@ -714,7 +705,7 @@ No model call. Code: `lib/purchases.ts` (pure), `lib/purchaseStore.ts`, `app/api
   Shift+Enter starts a line; "notes after a dash"), **Cooking this week** (the menu as day and
   recipe chips with a two-tap Clear; names come from the book via `Cookbook.tsx`; moving a day
   stays on the book's *On the menu*), then **List · N** (Copy · Tidy · Clear ticked · Clear all, the
-  lines, **Send all to cart**) and **In cart · N** (Remove per line, Clear cart, Go to checkout).
+  lines, **Send all to cart**) and **In cart · N** (Back to list per line, Clear cart, Go to checkout).
   The King Soopers panel moved into the header in TEC-211 (see *The live check and the one-line
   list*). The header says "N still to buy · N in cart · prices from the night of …", then the live
   status. Each List row is **the tick, the name, the ×N box, the price and + Cart** on one line
@@ -796,10 +787,9 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
 
 - **In cart is what Cookbook sent, not the account** (TEC-190). Anything added in the King Soopers
   app, and anything bought since, is invisible; a line cleared from the list while in the cart
-  loses its ledger link (`item_id` null) and is never taken back, so Clear all and Clear ticked
-  leave In cart lines alone. A line the owner removes in the King Soopers app still shows In cart
-  until Remove or Clear cart (which Kroger may refuse or ignore). Clear cart clears the line here
-  either way, so check the King Soopers cart at checkout.
+  loses its ledger link (`item_id` null), so Clear all and Clear ticked leave In cart lines alone.
+  **Clear cart and Back to list never touch the King Soopers cart** (TEC-228): a line removed here
+  is still in the King Soopers cart until removed there, so check it at checkout.
 - **A bag line saved as a product is saved under its phrase** ("onions 3 lb bag"), so a bag picked
   for "5 onions" also catches "7 onions" and "8 yellow onions", and never "2 onions".
 - **Deals colours start at 4 weeks of rolled-up weeks, not 4 weeks of nights**: the Monday run
@@ -831,17 +821,19 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   characters; search pages hold at most 50 and stop at 1,000 results. No rate-limit headers. The
   public API has no coupons, offers, orders or lists (404). An app token gets 403 `AUTH-1007` on
   `PUT /cart/add`, so the cart needs the user's sign-in; its body (`{items:[{upc,quantity}]}`,
-  with or without `modality`) is unconfirmed until the first production Send. **A negative
-  `quantity` on `/cart/add`: the owner tested a one-line Remove on 2026-11-02 and believes it
-  worked** (their belief, not a recorded Kroger response; nothing here reads the cart back, so the
-  code cannot confirm it). A refusal is handled (Remove: the line fails, stays sent, the cart page
-  is offered; Clear cart: the line is cleared anyway and the toast says how many Kroger did not
-  take back). A 2xx that Kroger ignores, or treats as a positive add, would not be noticed here
-  (TEC-162).
+  with or without `modality`) is unconfirmed until the first production Send. ****Kroger's cart
+  API cannot remove: a negative `quantity` on `/cart/add` is refused (TEC-228).** `cookbook.cart_sends`
+  holds the proof: every `taken_back` row Cookbook ever wrote has a matching `refused` row, from
+  2026-11-02 to the owner's test on 2026-11-04. Check it with `select kind, count(*) from
+  cookbook.cart_sends group by kind`; `taken_back` and `refused` counts match and both are history,
+  since nothing writes them now. So Cookbook sends no negative quantity anywhere, and no screen
+  claims to remove from the cart. A Claude in Chrome hand-off to remove by hand was considered and
+  dropped (a page cannot start one). A 2xx that Kroger treats as something other than an add would
+  not be noticed here (TEC-162).
 - The code reads every table and column the `cookbook_*` migrations add, so a database missing one
   fails those reads; without `cart_sends`, a Tidy fails before deleting and leaves the list
   duplicated.
-- Lines sent before `cookbook_cart_sends` have no ledger rows; Take back skips them and says so.
+- Lines sent before `cookbook_cart_sends` have no ledger rows; Refresh cart leaves them In cart and reads "no price".
 - **Changing `KROGER_TOKEN_KEY` orphans the token**; the list asks to connect again. That is the
   rotation path.
 - Two concurrent refreshes can race token rotation; the second fails with `reconnect`.

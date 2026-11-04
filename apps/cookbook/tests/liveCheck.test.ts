@@ -135,7 +135,7 @@ describe("one line per item: item, qty and price", () => {
     renderToStaticMarkup(createElement(ListRow, { item: line(over), onTick: noop, onQuantity: noop, canAdd: true, adding: false, notSent: null, onAdd: noop, onOpen: noop, ...extra }));
   const cartRow = (over: Record<string, unknown> = {}, live: { total: number | null } | null = null) =>
     renderToStaticMarkup(
-      createElement(InCartRow, { item: line({ sent_at: "2026-11-02T00:00:00Z", ...over }), live, disabled: false, removing: false, confirming: false, onAskRemove: noop, onOpen: noop, onCancel: noop, onRemove: noop })
+      createElement(InCartRow, { item: line({ sent_at: "2026-11-02T00:00:00Z", ...over }), live, disabled: false, returning: false, onOpen: noop, onBack: noop })
     );
 
   it("a List row reads the item, the quantity and the price, and offers + Cart", () => {
@@ -159,13 +159,14 @@ describe("one line per item: item, qty and price", () => {
     expect(html).toMatch(/aria-label="\$4\.50, Sale \$1\.50 · Good price/);
   });
 
-  it("an In cart row reads the item, the quantity and the price, and offers Remove: no recipe, no Used line, no Change", () => {
+  it("an In cart row reads the item, the quantity and the price, and offers Back to list, not Remove: no recipe, no Used line, no Change", () => {
     const html = cartRow();
     const shown = text(html);
     expect(shown).toContain("Yellow onions");
     expect(shown).toContain("×3");
     expect(shown).toContain("$4.50");
-    expect(shown).toContain("Remove");
+    expect(shown).toContain("Back to list");
+    expect(shown).not.toContain("Remove");
     for (const gone of ["Zesty Chicken Soup", "Weeknight Chili", "Used:", "Kroger Yellow Onions", "Change", "★", "for the soup"]) expect(shown).not.toContain(gone);
   });
 
@@ -201,10 +202,10 @@ describe("adds go at once; everything else keeps its confirm", () => {
     expect(list).not.toMatch(/setConfirm\("send"\)|setConfirm\("add"\)|onAskAdd/);
   });
 
-  it("Tidy, Clear ticked, Clear all, Clear cart and Remove still ask one question with a count", () => {
+  it("Tidy, Clear ticked, Clear all and Clear cart still ask one question with a count; Back to list asks none", () => {
     for (const kind of ["tidy", "clear-ticked", "clear-all", "clear-cart"]) expect(list).toContain(`setConfirm("${kind}")`);
-    expect(list).toMatch(/setRemoveConfirm\(item\.id\)/);
-    expect(confirmWords("clear-cart", 4).ask).toBe("Clear the cart? 4 items come out.");
+    expect(list).not.toMatch(/setRemoveConfirm|onAskRemove/);
+    expect(confirmWords("clear-cart", 4).ask).toBe("Clear the cart? 4 items leave Cookbook, not King Soopers.");
     expect(confirmWords("tidy", 4).ask).toBe("Tidy 4 lines?");
   });
 });

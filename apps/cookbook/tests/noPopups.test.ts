@@ -5,7 +5,7 @@ import { confirmWords, guessPick, guessPicks, needsSplash, pickOf, pickerOptions
 import { tickedLast } from "@/lib/listOrder";
 import { reconcile, refreshCart, type CartRefreshDeps } from "@/lib/cartRefresh";
 import { sendLines, type Candidate, type CartLine, type Plan, type ReviewLine } from "@/lib/cart";
-import { takeBack, takeBackLines, type SendRow, type TakeBackDeps } from "@/lib/takeBack";
+import type { SendRow } from "@/lib/takeBack";
 import type { Product } from "@/lib/kroger";
 
 /**
@@ -67,8 +67,7 @@ function review(id: string, plan: Plan, over: Partial<ReviewLine> = {}): ReviewL
 
 describe("the confirm says a count and never a list", () => {
   it("asks once per action with how many", () => {
-    expect(confirmWords("remove", 1).ask).toBe("Take 1 out of the cart?");
-    expect(confirmWords("clear-cart", 5).ask).toBe("Clear the cart? 5 items come out.");
+    expect(confirmWords("clear-cart", 5).ask).toBe("Clear the cart? 5 items leave Cookbook, not King Soopers.");
     expect(confirmWords("tidy", 9).ask).toBe("Tidy 9 lines?");
     expect(confirmWords("clear-ticked", 2).ask).toBe("Clear 2 ticked?");
     expect(confirmWords("clear-all", 7).ask).toBe("Clear all 7?");
@@ -84,7 +83,7 @@ describe("the confirm says a count and never a list", () => {
     const cart = read("../app/Cart.tsx");
     // TEC-211: adds (+ Cart, Send all) never ask; taking out, tidying and clearing still do.
     for (const kind of ["tidy", "clear-ticked", "clear-all", "clear-cart"]) expect(list).toContain(`"${kind}"`);
-    expect(list).toMatch(/confirmWords\("remove"/);
+    expect(list).not.toMatch(/confirmWords\("remove"/);
     expect(list).not.toMatch(/confirmWords\("add"|setConfirm\("send"\)|confirm === "send"/);
     expect(list).not.toMatch(/proposal/i);
     expect(list).not.toMatch(/TakeBackConfirm/);
@@ -174,7 +173,6 @@ describe("Refresh cart", () => {
       now: () => new Date(T0),
       readList: async () => list,
       readSends: async () => rows,
-      markSent: vi.fn(async () => undefined),
       markUnsent: vi.fn(async () => undefined),
       store: async () => ({ locationId: "62000001", name: "Test King Soopers" }),
       appToken: vi.fn(async () => "app-token"),
@@ -183,7 +181,7 @@ describe("Refresh cart", () => {
     } satisfies CartRefreshDeps;
   }
 
-  it("fixes In cart from the ledger both ways", () => {
+  it("fixes In cart from the ledger one way: an old take-back returns a line, a held line is never pulled In cart (TEC-228)", () => {
     const list = [
       { id: "held-not-marked", name: "milk", sent_at: null },
       { id: "marked-but-taken-back", name: "eggs", sent_at: "2026-10-30T00:00:00Z" },
@@ -197,14 +195,14 @@ describe("Refresh cart", () => {
       row("marked-but-taken-back", B, -2, "taken_back"),
       row("fine", C, 1),
     ]);
-    expect(fix.markSent).toEqual(["held-not-marked"]);
+    expect(fix).not.toHaveProperty("markSent");
     expect(fix.markUnsent).toEqual(["marked-but-taken-back"]);
   });
 
-  it("writes the fix, then prices each In cart line today with the app token and sums the total", async () => {
+  it("prices each In cart line today with the app token and sums the total", async () => {
     const d = deps({
       list: [
-        { id: "milk", name: "milk", sent_at: null },
+        { id: "milk", name: "milk", sent_at: "2026-10-30T00:00:00Z" },
         { id: "kale", name: "kale", sent_at: "2026-10-30T00:00:00Z" },
         { id: "rice", name: "rice", sent_at: null },
       ],
@@ -212,7 +210,6 @@ describe("Refresh cart", () => {
       found: [product(A, { price: 2.5, regular: 3, promo: 2.5 }), product(C, { price: 4 })],
     });
     const out = await refreshCart(d);
-    expect(d.markSent).toHaveBeenCalledWith(["milk"], T0);
     expect(d.markUnsent).not.toHaveBeenCalled();
     // Product read at the chosen store, with the app's own token.
     expect(d.appToken).toHaveBeenCalledTimes(1);
@@ -224,7 +221,7 @@ describe("Refresh cart", () => {
     expect(out.total).toBe(9);
     expect(out.unpriced).toBe(0);
     expect(out.checkedAt).toBe(T0);
-    expect(out.fixed).toEqual({ added: 1, removed: 0 });
+    expect(out.fixed).toEqual({ removed: 0 });
   });
 
   it("a line Kroger can't price reads no price and is never counted as $0", async () => {
@@ -263,11 +260,21 @@ describe("Refresh cart", () => {
     const cleared = { id: "bought", name: "milk", sent_at: "2026-10-30T00:00:00Z", cleared_at: "2026-11-02T17:00:00Z" };
     // The ledger still holds it (nothing was taken back) — and it must still not come back.
     const fix = reconcile([cleared, { ...cleared, id: "bought2", sent_at: null }], [row("bought", A, 1), row("bought2", B, 1)]);
-    expect(fix.markSent).toEqual([]);
     expect(fix.markUnsent).toEqual([]);
     const d = deps({ list: [cleared, { id: "kale", name: "kale", sent_at: "2026-10-30T00:00:00Z" }], rows: [row("bought", A, 1), row("kale", C, 1)], found: [product(C, { price: 4 })] });
     const out = await refreshCart(d);
-    expect(d.markSent).not.toHaveBeenCalled();
+    expect(d.markUnsent).not.toHaveBeenCalled();
+    expect(d.byIds).toHaveBeenCalledWith("app-token", [C], "62000001");
+    expect(out.lines.map((l) => l.id)).toEqual(["kale"]);
+    expect(out.total).toBe(4);
+  });
+
+  it("a line moved Back to list is not resurrected: the ledger still holds it, Refresh leaves it on the List and out of the cart total (TEC-228)", async () => {
+    const back = { id: "milk", name: "milk", sent_at: null };
+    const fix = reconcile([back], [row("milk", A, 2)]);
+    expect(fix.markUnsent).toEqual([]);
+    const d = deps({ list: [back, { id: "kale", name: "kale", sent_at: "2026-10-30T00:00:00Z" }], rows: [row("milk", A, 2), row("kale", C, 1)], found: [product(C, { price: 4 })] });
+    const out = await refreshCart(d);
     expect(d.markUnsent).not.toHaveBeenCalled();
     expect(d.byIds).toHaveBeenCalledWith("app-token", [C], "62000001");
     expect(out.lines.map((l) => l.id)).toEqual(["kale"]);
@@ -281,34 +288,17 @@ describe("Refresh cart", () => {
   });
 });
 
-describe("Clear cart", () => {
-  it("takes back every line In cart, whatever was ticked, by negative quantities, and marks them all unsent", async () => {
-    const list = [
-      { id: "a", name: "milk", sent_at: "2026-11-01T00:00:00Z" },
-      { id: "b", name: "kale", sent_at: "2026-11-01T00:00:00Z" },
-      { id: "c", name: "rice", sent_at: null },
-    ];
-    const lines = takeBackLines(list, [row("a", A, 2), row("b", C, 1)]);
-    const d: TakeBackDeps = {
-      reserve: vi.fn(async () => undefined),
-      remove: vi.fn(async () => undefined),
-      refused: vi.fn(async () => undefined),
-    };
-    // The route is given no ids: all of them.
-    const { outcomes, unsent } = await takeBack(lines, d);
-    expect(unsent).toEqual(["a", "b"]);
-    expect((d.remove as ReturnType<typeof vi.fn>).mock.calls).toEqual([
-      [A, 2, "PICKUP"],
-      [C, 1, "PICKUP"],
-    ]);
-    expect(outcomes.every((o) => o.result === "taken back")).toBe(true);
-  });
+describe("Clear cart and Back to list (TEC-228)", () => {
+  const cart = readFileSync(resolve(__dirname, "../app/Cart.tsx"), "utf8");
 
-  it("needs no King Soopers step and sends no ids from the button", () => {
-    const cart = readFileSync(resolve(__dirname, "../app/Cart.tsx"), "utf8");
-    expect(cart).toMatch(/async function clearCart\(\)[\s\S]*takeBackRequest\(null, true\)/);
-    expect(cart).not.toMatch(/Open the King Soopers cart/);
-    expect(cart).not.toMatch(/\/api\/kroger\/cart\/take-back"[^)]*\{ cache/);
+  it("the buttons call routes that never reach Kroger, and nothing negative is sent anywhere", () => {
+    expect(cart).toMatch(/async function clearCart\(\)[\s\S]*\/api\/kroger\/cart\/clear/);
+    expect(cart).toMatch(/async function backToList\(id: string\)[\s\S]*\/api\/kroger\/cart\/back-to-list/);
+    expect(cart).not.toMatch(/cart\/take-back|takeBackRequest/);
+    for (const route of ["clear", "back-to-list"]) {
+      const source = readFileSync(resolve(__dirname, `../app/api/kroger/cart/${route}/route.ts`), "utf8");
+      expect(source).not.toMatch(/withAccessToken|kroger"|addToCart|takeBackFromCart/);
+    }
   });
 });
 
