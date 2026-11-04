@@ -16,6 +16,7 @@ import { CHECKOUT_URL } from "@/lib/kingsoopers";
 import { totalsOf, type LinePrice, type Totals } from "@/lib/listPrices";
 import { shortDay } from "@/lib/dealFilter";
 import { checkLine, clock } from "@/lib/checkLine";
+import { ItemMatches } from "./ItemMatches";
 import { ProductSplash, RefreshLog, StorePicker, TakeBackResults, useCart, when } from "./Cart";
 import { useToast } from "./Toast";
 
@@ -119,6 +120,8 @@ export default function List({
   // `confirm`; a row's Remove uses `removeConfirm`. **Adds never ask** (TEC-211).
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null);
+  // The line whose matches popup is open (TEC-226).
+  const [looking, setLooking] = useState<ShoppingLine | null>(null);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState<null | "adding" | "tidying">(null);
   const [copied, setCopied] = useState(false);
@@ -367,6 +370,7 @@ export default function List({
   return (
     <section id="shop" className="flex scroll-mt-4 flex-col gap-3">
       <ProductSplash cart={cart} />
+      {looking ? <ItemMatches key={looking.id} id={looking.id} name={looking.view?.name ?? looking.name} fallback={looking.href} onClose={() => setLooking(null)} /> : null}
 
       {/* The header: the counts, the live cart total, and King Soopers (TEC-211): the live status, Pickup/Delivery, the store. */}
       <div className="flex flex-col gap-2 px-2">
@@ -553,6 +557,7 @@ export default function List({
                 adding={cart.adding === item.id}
                 notSent={cart.notSent.get(item.id) ?? null}
                 onAdd={() => void cart.addOne(item.id)}
+                onOpen={() => setLooking(item)}
               />
             ))}
           </ul>
@@ -598,6 +603,7 @@ export default function List({
                     disabled={cart.busy !== null}
                     removing={cart.removing === item.id}
                     confirming={removeConfirm === item.id}
+                    onOpen={() => setLooking(item)}
                     onAskRemove={() => setRemoveConfirm(item.id)}
                     onCancel={() => setRemoveConfirm(null)}
                     onRemove={() => {
@@ -724,6 +730,7 @@ export function ListRow(props: {
   adding: boolean;
   notSent: string | null;
   onAdd: () => void;
+  onOpen: () => void;
 }) {
   const { item } = props;
   // A ticked line is done: no shade, no bubble.
@@ -737,14 +744,14 @@ export function ListRow(props: {
       <label className="flex shrink-0 cursor-pointer items-center self-stretch">
         <input type="checkbox" checked={item.checked} onChange={props.onTick} aria-label={`Got ${item.name}`} className="size-6 accent-accent" />
       </label>
-      <a
-        href={item.href}
-        target="_blank"
-        rel="noreferrer"
-        className={`block min-w-0 flex-1 truncate text-[15px] font-semibold ${item.checked ? "text-ink-soft line-through" : ""}`}
+      <button
+        type="button"
+        onClick={props.onOpen}
+        aria-haspopup="dialog"
+        className={`block min-w-0 flex-1 truncate text-[15px] font-semibold text-left ${item.checked ? "text-ink-soft line-through" : ""}`}
       >
         {name}
-      </a>
+      </button>
       <Quantity key={`${item.id}:${item.quantity}`} item={item} onCommit={props.onQuantity} />
       <Price price={item.price} cue={dealWords(deal)} notSent={props.notSent} />
       {props.canAdd && !item.checked ? (
@@ -802,6 +809,7 @@ export function InCartRow(props: {
   removing: boolean;
   confirming: boolean;
   onAskRemove: () => void;
+  onOpen: () => void;
   onCancel: () => void;
   onRemove: () => void;
 }) {
@@ -810,9 +818,9 @@ export function InCartRow(props: {
   const ask = confirmWords("remove", 1);
   return (
     <li title={[name, dealWords(item.deal)].filter(Boolean).join(" · ")} className={`flex items-center gap-2 rounded-[10px] bg-raised py-2 pl-3 pr-2.5 ${SHADE_CLASS[item.deal?.shade ?? "plain"]}`}>
-      <a href={item.href} target="_blank" rel="noreferrer" className="block min-w-0 flex-1 truncate text-[15px] font-semibold">
+      <button type="button" onClick={props.onOpen} aria-haspopup="dialog" className="block min-w-0 flex-1 truncate text-[15px] font-semibold text-left">
         {name}
-      </a>
+      </button>
       <span className="flex shrink-0 items-center rounded-lg border border-line bg-surface px-2 py-1 text-sm font-semibold" aria-label={`${item.quantity} in the cart`}>
         ×{item.quantity}
       </span>

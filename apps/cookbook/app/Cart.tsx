@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CHECKOUT_URL } from "@/lib/kingsoopers";
 import { refreshDue, scanDue } from "@/lib/refreshDue";
 import type { CartLine, CartPick, Outcome, ReviewLine } from "@/lib/cart";
 import { guessPick, guessPicks, needsSplash, pickOf, pickerOptions, type PickerOption } from "@/lib/cartGuess";
+import { optionTag } from "@/lib/itemMatches";
 import type { CheckResult } from "@/lib/checkLine";
 import type { CartRefresh } from "@/lib/cartRefresh";
 import type { Modality } from "@/lib/modality";
@@ -826,52 +827,62 @@ export function ProductSplash({ cart }: { cart: CartState }) {
   return <SplashBody key={line.id} cart={cart} line={line} more={splash.queue.length - 1} />;
 }
 
+/**
+ * **The dialog look** the Which-chicken picker and the item popup share (TEC-226): a bottom
+ * sheet on phones, centred from `sm`, `role=dialog`, closed by Escape. A tap on the backdrop
+ * is deliberately not a close, so a stray tap never loses a choice.
+ */
+export function SheetFrame({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 sm:items-center">
+      <div role="dialog" aria-modal="true" aria-label={label} className="flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl bg-paper p-4">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function SplashBody({ cart, line, more }: { cart: CartState; line: ReviewLine; more: number }) {
   const options = pickerOptions(line.plan);
   const working = cart.busy === "add";
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") cart.leaveSplash();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [cart]);
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 sm:items-center">
-      <div role="dialog" aria-modal="true" aria-label={`Which ${line.name}`} className="flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl bg-paper p-4">
-        <div className="flex flex-col gap-0.5">
-          <h2 className="text-lg font-bold">Which {line.name}?</h2>
-          <p className="text-[13px] text-ink-soft">
-            Several match and none stands out. Tap one to add it to the cart.
-            {more > 0 ? ` ${more} more to choose after this.` : ""}
-          </p>
-        </div>
-        <div role="group" aria-label={`Which ${line.name}`} className="flex flex-col gap-1.5">
-          {options.map((o) => (
-            <button
-              key={o.upc}
-              type="button"
-              disabled={working}
-              onClick={() => void cart.chooseProduct(o)}
-              className="flex min-h-11 items-center gap-2.5 rounded-[10px] border border-line bg-raised px-3 py-2.5 text-left text-ink disabled:opacity-50"
-            >
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="text-sm font-semibold">{o.label}</span>
-                <span className="text-xs text-ink-soft">{o.detail || "not priced yet"}</span>
-              </span>
-              <span className="shrink-0 text-xs font-semibold">
-                {o.isDefault ? "★ " : ""}
-                {o.fresh ? "Kroger's pick" : o.count > 0 ? `bought ${o.count}×` : "new"}
-              </span>
-            </button>
-          ))}
-        </div>
-        <button type="button" onClick={cart.leaveSplash} disabled={working} className="min-h-11 self-start rounded-[10px] px-2 text-[15px] text-accent underline-offset-2 hover:underline disabled:opacity-50">
-          Leave it on the list
-        </button>
+    <SheetFrame label={`Which ${line.name}`} onClose={cart.leaveSplash}>
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-lg font-bold">Which {line.name}?</h2>
+        <p className="text-[13px] text-ink-soft">
+          Several match and none stands out. Tap one to add it to the cart.
+          {more > 0 ? ` ${more} more to choose after this.` : ""}
+        </p>
       </div>
-    </div>
+      <div role="group" aria-label={`Which ${line.name}`} className="flex flex-col gap-1.5">
+        {options.map((o) => (
+          <button
+            key={o.upc}
+            type="button"
+            disabled={working}
+            onClick={() => void cart.chooseProduct(o)}
+            className="flex min-h-11 items-center gap-2.5 rounded-[10px] border border-line bg-raised px-3 py-2.5 text-left text-ink disabled:opacity-50"
+          >
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-sm font-semibold">{o.label}</span>
+              <span className="text-xs text-ink-soft">{o.detail || "not priced yet"}</span>
+            </span>
+            <span className="shrink-0 text-xs font-semibold">{optionTag(o)}</span>
+          </button>
+        ))}
+      </div>
+      <button type="button" onClick={cart.leaveSplash} disabled={working} className="min-h-11 self-start rounded-[10px] px-2 text-[15px] text-accent underline-offset-2 hover:underline disabled:opacity-50">
+        Leave it on the list
+      </button>
+    </SheetFrame>
   );
 }

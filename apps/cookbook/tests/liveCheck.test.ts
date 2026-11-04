@@ -132,10 +132,10 @@ function text(html: string): string {
 describe("one line per item: item, qty and price", () => {
   const noop = () => undefined;
   const listRow = (over: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) =>
-    renderToStaticMarkup(createElement(ListRow, { item: line(over), onTick: noop, onQuantity: noop, canAdd: true, adding: false, notSent: null, onAdd: noop, ...extra }));
+    renderToStaticMarkup(createElement(ListRow, { item: line(over), onTick: noop, onQuantity: noop, canAdd: true, adding: false, notSent: null, onAdd: noop, onOpen: noop, ...extra }));
   const cartRow = (over: Record<string, unknown> = {}, live: { total: number | null } | null = null) =>
     renderToStaticMarkup(
-      createElement(InCartRow, { item: line({ sent_at: "2026-11-02T00:00:00Z", ...over }), live, disabled: false, removing: false, confirming: false, onAskRemove: noop, onCancel: noop, onRemove: noop })
+      createElement(InCartRow, { item: line({ sent_at: "2026-11-02T00:00:00Z", ...over }), live, disabled: false, removing: false, confirming: false, onAskRemove: noop, onOpen: noop, onCancel: noop, onRemove: noop })
     );
 
   it("a List row reads the item, the quantity and the price, and offers + Cart", () => {
