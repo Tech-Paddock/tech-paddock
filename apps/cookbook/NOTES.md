@@ -59,6 +59,15 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   plus cook (whichever is set), else the total: the book's "Under N minutes" filter and Ask Claude's
   overrun note use it, and a recipe with nothing set never matches. Health's `GET /api/servings`
   does not carry either column.
+- **Rows grey out while cooking** (TEC-222, `app/RecipeDetail.tsx`, `lib/greyedRows.ts`): tapping
+  an ingredient or a step greys it (line-through, `text-ink-soft`); tapping again restores it. Each
+  row is a `<button aria-pressed>`, 44px tall. The state lives **in this browser's `localStorage`
+  only** (`cookbook:greyed:<recipe id>`: row indexes and the time of the last tap); nothing goes to
+  the database, so it does not follow the owner to another phone. It clears itself 24 hours after
+  the last tap on that recipe (the exact 24h mark counts as expired), checked on read, on open and
+  when the page becomes visible; there is no Clear button. Every storage touch is in try/catch and
+  the page renders normally without storage. Editing a recipe's ingredients or method can shift
+  which row an index points at; the grey is by position and ends within a day.
 - **An open recipe is in tabs** (TEC-183, `app/RecipeDetail.tsx`; replaces TEC-140's layout): the
   name, "origin · makes N · time", the rating as five tappable stars (the PATCH call; tapping the
   set star clears it) with "N of 5" or "Not rated", then a `role="tablist"` of **Ingredients ·
@@ -96,6 +105,13 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   only where the model agrees, else noted. Book filters are the same four, as **one row of
   four compact selects** under the search at 360px (`BookFilters`, `app/Tuning.tsx`; High protein
   was dropped, TEC-189); an unset field never matches.
+- **The book has a sort** (TEC-224, `app/Book.tsx`, `lib/recipeSort.ts`): a "Sort" select under the
+  filters, Book order (the server's order, the default) or A to Z. A to Z ignores case and accents,
+  drops a leading "The" (a bare "The" stays), compares with `localeCompare("en", base)`, and keeps
+  the incoming order on a tie. It sorts first, then search and the filters narrow, so all three
+  work together. The choice is **this browser's `localStorage` only** (`cookbook:book-sort`, read
+  and written in try/catch; no storage means Book order). Not a jump-to-letter row, by the owner's
+  word ("A-z").
 - Metadata sits flat on `recipes`, read by `lib/metadata.ts`. `meal` and `diet` are
   check-constrained to `MEALS` and `DIETS`; `readMeta` drops free-of claims and macro tags. **The
   meal list is Main · Side · Breakfast · Snack · Dessert · Creami** (TEC-205), held by
@@ -663,6 +679,21 @@ No model call. Code: `lib/purchases.ts` (pure), `lib/purchaseStore.ts`, `app/api
   status. Each List row is **the tick, the name, the ×N box, the price and + Cart** on one line
   (32px, 12px bold, accessible name "Add to cart"; `h-8`, not the 44px floor, by the owner's word);
   the recipes, mark, bubble, amount and note no longer show (TEC-211).
+- **A name opens the matches popup** (TEC-226; owner, 2026-11-04: "I want it to pop up a window like
+  the search function for everything"). Tapping a List or In cart line's name no longer follows
+  `item.href` to a browser search. `app/ItemMatches.tsx` opens the same sheet as the Which-chicken
+  picker (`SheetFrame`, shared in `app/Cart.tsx`: bottom sheet on phones, `role=dialog`, Escape, Close).
+  It reads `GET /api/kroger/matches?id=` (signed-in only, read-only: no POST, no cart add, no default,
+  no token), which plans the line with `planLine` as Send does, then `lib/itemMatches.ts` orders the
+  products (default, most bought, plan order) and words them (`optionTag`, shared with the picker).
+  Each product is a `target=_blank` link to its `/p/` page (built with `pageFor` when the saved url is not
+  one); **a phone hands that link to the King Soopers app, which could not be checked from a build
+  session (kingsoopers.com is blocked), so it is a phone check**. Every line works, in cart or not. No
+  match: the reason and a **Search King Soopers** link (the item alone, never the quantity). Not connected,
+  no store or no answer: the saved products only, with the reason, plus the search link. The route and
+  the popup run in `serialKroger` like every call that borrows the token. `item.href` is still sent by
+  `/api/grocery`, now only the popup's loading and error fallback. **Trap:** the rows' name is a
+  `button`, not a link; `tests/itemMatches.test.ts` and `tests/lineDeal.test.ts` read the source for it.
 - **The Add box is its own card** (TEC-212, `app/List.tsx`; owner: "Make the add an item pop more it gets
   lost and is a great feature"): a `section` with a 2px `border-accent` frame on `bg-surface`, a bold
   "Add to the list" heading, a ＋ in accent at the start, and the placeholder "Eggs, 2 lb chicken — notes

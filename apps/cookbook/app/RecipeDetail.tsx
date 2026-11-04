@@ -1,12 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import MacroTab from "./MacroTab";
 import { Stars } from "./Meta";
 import { methodSteps } from "@/lib/recipeSteps";
 import type { Recipe, RecipeOrigin } from "@/lib/recipes";
 import { mealLabel, timeParts } from "@/lib/metadata";
 import { localToday, parseDay } from "@/lib/menuDay";
+import {
+  greyKey,
+  isGreyed,
+  readGreyed,
+  toggleGreyed,
+  writeGreyed,
+  type Greyed,
+  type GreyKind,
+} from "@/lib/greyedRows";
 import { RECIPE_TABS, ratingWords, splitIngredient, type RecipeTab } from "@/lib/recipeView";
 
 /**
@@ -22,6 +31,60 @@ export const ORIGIN_LABELS: Record<RecipeOrigin, string> = {
   generated: "Claude's",
   imported: "Imported",
 };
+
+const GREY_ROW = "text-ink-soft line-through opacity-60";
+
+/**
+ * Tap-to-grey state for one recipe (TEC-222), kept in this browser only. Read
+ * after mount (so the server markup matches), again whenever the page becomes
+ * visible, and dropped by `readGreyed` once 24 hours have passed since the last
+ * tap. Every storage touch is in try/catch; without storage the rows still grey
+ * for as long as the page is open.
+ */
+function useGreyed(recipeId: string) {
+  const [greyed, setGreyed] = useState<Greyed | null>(null);
+
+  const load = useCallback(() => {
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem(greyKey(recipeId));
+    } catch {
+      /* storage is unavailable: render normally */
+    }
+    const state = readGreyed(raw, Date.now());
+    if (raw && !state) {
+      try {
+        window.localStorage.removeItem(greyKey(recipeId));
+      } catch {
+        /* nothing to clean */
+      }
+    }
+    setGreyed(state);
+  }, [recipeId]);
+
+  useEffect(() => {
+    load();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [load]);
+
+  const toggle = (kind: GreyKind, index: number) => {
+    const next = toggleGreyed(greyed, kind, index, Date.now());
+    setGreyed(next);
+    try {
+      const text = writeGreyed(next);
+      if (text) window.localStorage.setItem(greyKey(recipeId), text);
+      else window.localStorage.removeItem(greyKey(recipeId));
+    } catch {
+      /* storage is unavailable or full: the grey lasts while the page is open */
+    }
+  };
+
+  return { greyed, toggle };
+}
 
 export function RecipeOpen({
   recipe,
@@ -41,6 +104,7 @@ export function RecipeOpen({
   onEstimated?: (recipe: Recipe) => void;
 }) {
   const steps = methodSteps(recipe.method);
+  const { greyed, toggle } = useGreyed(recipe.id);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
@@ -87,16 +151,24 @@ export function RecipeOpen({
             <ul className="flex flex-col text-sm">
               {recipe.ingredients.map((line, n) => {
                 const { amount, text } = splitIngredient(line);
+                const off = isGreyed(greyed, "ingredient", n);
                 return (
-                  <li key={n} className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 border-t border-line/40 py-2 first:border-t-0">
-                    {amount ? (
-                      <>
-                        <span className="font-semibold tabular-nums">{amount}</span>
-                        <span>{text}</span>
-                      </>
-                    ) : (
-                      <span className="col-span-2">{line}</span>
-                    )}
+                  <li key={n} className="border-t border-line/40 first:border-t-0">
+                    <button
+                      type="button"
+                      aria-pressed={off}
+                      onClick={() => toggle("ingredient", n)}
+                      className={`grid min-h-11 w-full grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-3 py-2 text-left ${off ? GREY_ROW : ""}`}
+                    >
+                      {amount ? (
+                        <>
+                          <span className="font-semibold tabular-nums">{amount}</span>
+                          <span>{text}</span>
+                        </>
+                      ) : (
+                        <span className="col-span-2">{line}</span>
+                      )}
+                    </button>
                   </li>
                 );
               })}
@@ -107,19 +179,29 @@ export function RecipeOpen({
         ) : tab === "method" ? (
           steps.length > 0 ? (
             <ol className="flex flex-col gap-3 text-sm">
-              {steps.map((step, n) => (
-                <li key={n} className="flex gap-3">
-                  <span
-                    aria-hidden="true"
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-raised text-xs font-bold tabular-nums"
-                  >
-                    {n + 1}
-                  </span>
-                  {/* The marker the author wrote is stripped so the circle's
-                      number does not print beside "1. Chop the onion". */}
-                  <span className="pt-0.5">{step.replace(/^\d{1,2}[.)]\s*/, "")}</span>
-                </li>
-              ))}
+              {steps.map((step, n) => {
+                const off = isGreyed(greyed, "step", n);
+                return (
+                  <li key={n}>
+                    <button
+                      type="button"
+                      aria-pressed={off}
+                      onClick={() => toggle("step", n)}
+                      className="flex min-h-11 w-full gap-3 text-left"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-raised text-xs font-bold tabular-nums"
+                      >
+                        {n + 1}
+                      </span>
+                      {/* The marker the author wrote is stripped so the circle's
+                          number does not print beside "1. Chop the onion". */}
+                      <span className={`pt-0.5 ${off ? GREY_ROW : ""}`}>{step.replace(/^\d{1,2}[.)]\s*/, "")}</span>
+                    </button>
+                  </li>
+                );
+              })}
             </ol>
           ) : (
             <p className="text-sm text-ink-soft">No method.</p>
