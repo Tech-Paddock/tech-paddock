@@ -415,7 +415,7 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [view, setView] = useState<View>("all");
-  const [panel, setPanel] = useState<null | "batch" | "words" | "purchases">(null);
+  const [panel, setPanel] = useState<null | "batch" | "words" | "purchases" | "coupons">(null);
   const [editing, setEditing] = useState<{ kind: "product"; row: SavedProduct | null } | { kind: "words"; row: Preference | null } | null>(null);
   const [replacing, setReplacing] = useState<string | null>(null);
   const [making, setMaking] = useState<string | null>(null);
@@ -429,6 +429,9 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
   const [orders, setOrders] = useState("");
   const [importing, setImporting] = useState(false);
   const [imported, setImported] = useState<{ text: string; failed: boolean } | null>(null);
+  const [couponText, setCouponText] = useState("");
+  const [importingCoupons, setImportingCoupons] = useState(false);
+  const [couponResult, setCouponResult] = useState<{ text: string; failed: boolean } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -562,6 +565,29 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
       setImported({ text: "Couldn't reach the server. Try again.", failed: true });
     } finally {
       setImporting(false);
+    }
+  }
+
+  /** Import coupons (TEC-230): the same shape as Import purchases, to `/api/coupons`. */
+  async function importCouponLines() {
+    setImportingCoupons(true);
+    setCouponResult(null);
+    try {
+      const res = await fetch("/api/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: couponText }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setCouponResult({ text: data.error ?? "Couldn't save those coupons.", failed: true });
+      else {
+        setCouponResult({ text: data.line, failed: false });
+        setCouponText("");
+      }
+    } catch {
+      setCouponResult({ text: "Couldn't reach the server. Try again.", failed: true });
+    } finally {
+      setImportingCoupons(false);
     }
   }
 
@@ -797,6 +823,9 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
         <button type="button" onClick={() => setPanel(panel === "purchases" ? null : "purchases")} className={LINK}>
           Import purchases
         </button>
+        <button type="button" onClick={() => setPanel(panel === "coupons" ? null : "coupons")} className={LINK}>
+          Import coupons
+        </button>
         <button type="button" onClick={() => setPanel(panel === "words" ? null : "words")} className={LINK}>
           Search words{words.length > 0 ? ` · ${words.length}` : ""}
         </button>
@@ -871,6 +900,38 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
           {imported ? (
             <p role={imported.failed ? "alert" : undefined} className={`text-xs ${imported.failed ? "text-danger" : "text-ink-soft"}`}>
               {imported.text}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Import coupons (TEC-230): digital coupons, pasted by the weekly Chrome task or by
+          hand. One JSON object per line; NOTES.md, *Import coupons*. Same card as Import purchases. */}
+      {panel === "coupons" ? (
+        <div className="flex flex-col gap-2 rounded-xl bg-surface p-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-ink-soft">Import coupons</h3>
+          <textarea
+            value={couponText}
+            onChange={(e) => {
+              setCouponText(e.target.value);
+              setCouponResult(null);
+            }}
+            rows={5}
+            placeholder={'{"title":"Test Brand Pasta Sauce","amount":"$1.00 off","expires_on":"2026-11-18","product_ids":["0001111012345"]}'}
+            aria-label="Coupons, one JSON object per line"
+            className="w-full rounded-lg border border-line bg-surface p-2 font-mono text-xs"
+          />
+          <button
+            type="button"
+            onClick={() => void importCouponLines()}
+            disabled={importingCoupons || couponText.trim() === ""}
+            className="self-start rounded-lg border border-line px-3 py-1.5 text-xs text-ink-soft disabled:opacity-50"
+          >
+            {importingCoupons ? "Importing…" : "Import"}
+          </button>
+          {couponResult ? (
+            <p role={couponResult.failed ? "alert" : undefined} className={`text-xs ${couponResult.failed ? "text-danger" : "text-ink-soft"}`}>
+              {couponResult.text}
             </p>
           ) : null}
         </div>

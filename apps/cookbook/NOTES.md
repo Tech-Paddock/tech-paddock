@@ -276,7 +276,8 @@ Reasoning is in the migration headers.
 - `price_weeks` (TEC-132): the Monday roll-up, one row per product, store and Monday, insert only:
   `low`, `high`, `mean` (4 places), `regular_mean`, `nights_on_sale`, `nights_seen`. Nightly rows
   are never deleted.
-- `coupons` (TEC-132): **read path only** (`lib/couponStore.ts`; nothing writes it yet): `title`,
+- `coupons` (TEC-132): read by `readCoupons`, written only by Import coupons (TEC-230, insert only,
+  `on conflict do nothing`; see *Import coupons*), all in `lib/couponStore.ts`: `title`,
   `amount` text as shown, `expires_on`, `week_seen` (a Monday), `product_ids` text[] (codes; may be
   empty). Unique per week seen, title and amount. No expiry counts as active for two weeks
   (`lib/couponRules.ts`).
@@ -498,7 +499,7 @@ Reasoning is in the migration headers.
   night that fresh, no price: plain, no bubble). **Shade**: green is good, red is bad, else plain;
   `new` (under `MIN_WEEKS`) is good when on sale or with a coupon, never bad (`shadeOf`). The bubble
   is "Sale $2.99" (night's sale below regular), "Coupon" (a staged coupon lists the code, matched
-  by code only; none staged today so only sales show), or "Sale + coupon". Colour is never the
+  by code only; only sales show until coupons are imported, TEC-230), or "Sale + coupon". Colour is never the
   only cue: a bubble, or "● Good price" / "● High price" (shortened to Good / High beside a
   bubble, with the full words as `title`/`aria-label`). A failed weeks/coupons read comes back as
   `dealError`, said in the header, and lines stay plain; prices are unaffected. Ticked lines are
@@ -600,7 +601,7 @@ Reasoning is in the migration headers.
   *when the line says "…"* (`namingHint`: up to two words of its Kroger name no other member is
   known by) and **Make default** on the others. Make default posts `POST /api/brands/default`
   with every shared name that product carries. A lone product is its own group and its own
-  default. Footer: Remember a product · Paste a batch · Export · Import purchases · Search words. The cards, rows,
+  default. Footer: Remember a product · Paste a batch · Export · Import purchases · Import coupons · Search words. The cards, rows,
   Fix these panel and the filter are local patterns.
 - Routes: `GET/POST/DELETE /api/brands` (POST a product: `names` as one comma-separated field or a
   list, `product` as a page or code, optional `size_first`, `pack_*`; `id` to edit, whose names are
@@ -697,6 +698,47 @@ No model call. Code: `lib/purchases.ts` (pure), `lib/purchaseStore.ts`, `app/api
   weeks, via `purchasesForPicking`) after the default and the pack that fits; `products.count`
   still counts Sends and decides only when no candidate has a purchase. **Trap:** a pack size that
   does not parse (free text) takes no part in the fit, so such a product is decided by purchases.
+
+## Import coupons (TEC-230)
+
+Digital coupons, as a running record. Kroger's API has no coupons, so the owner's weekly
+Claude-in-Chrome task reads King Soopers digital coupons in the owner's signed-in browser and pastes
+them into **Your brands, Import coupons** (the footer link beside Import purchases; a box and an
+Import button). The box posts `{ text }` to `POST /api/coupons`, signed in like every `/api` route
+(the gate is untouched; the Chrome task uses the owner's session; there is no signed-out path). The
+result is one line: "Imported N coupons · K with product codes · J skipped" (N and K count what was
+new; J the bad lines). No model call. Code: `lib/coupons.ts` (pure), `importCoupons` in
+`lib/couponStore.ts`, `app/api/coupons/route.ts`. Table `cookbook.coupons`: no migration was needed.
+
+**The paste format: one JSON object per line.** This is what the Chrome task's instructions quote.
+
+```
+{"title":"Test Brand Pasta Sauce","amount":"$1.00 off","expires_on":"2026-11-18","product_ids":["0001111012345","0001111012346"]}
+{"title":"Test Brand Rice","amount":"Save $2 when you buy 2","expires_on":"2026-11-18","product_ids":[]}
+{"title":"Test Brand Snack Bars","amount":"$0.75 off"}
+```
+
+- Required: `title` and `amount`, non-empty text exactly as shown (extra spaces are collapsed).
+  Optional: `expires_on` (a real `YYYY-MM-DD`; leave it out when none is shown) and `product_ids`
+  (an array of codes, each a string of 8 to 14 digits).
+- **A bad line is counted and skipped, never guessed**: not JSON, not an object, a missing or empty
+  `title` or `amount`, an `expires_on` that is not a real date, a `product_ids` that is not an array.
+  **An invalid entry inside `product_ids` is dropped** (and tallied as `droppedCodes` in the
+  response, not shown in the result line); the coupon is still kept, with the codes that were valid.
+  Blank lines are not lines. Extra keys are ignored. Paste at most 500,000 characters at once.
+- **`week_seen` is set by the server, never pasted:** this week's Monday in Denver (`weekSeen`, from
+  `denverDate` and `mondayOf`). Sunday night in Denver is still the old week, though UTC says Monday.
+- **A re-paste adds nothing.** The table is unique on (`week_seen`, `title`, `amount`) and written
+  with `ignoreDuplicates` (`on conflict do nothing`); nothing here updates or deletes. The same
+  coupon twice in one paste is one row (the first wins). The next Monday's paste of the same coupon
+  is a new row, which is how the weeks a coupon was on offer can be told. **Trap:** the key is the
+  text, so the task must word `title` and `amount` the same way each time, or the second paste is a
+  new row.
+- **Codes are stored as pasted** (not trimmed of leading zeros) and the Deals board matches them to a
+  saved product by exact string, so a coupon matches only a product saved with the same 13-digit
+  form. A coupon with no codes is kept and matches nothing.
+- Read by `readCoupons` for the Deals Coupon and Stacks filters and the list's "Coupon" bubble; the
+  first imported row turns "no coupons staged yet" off.
 
 ## List lines (TEC-131)
 

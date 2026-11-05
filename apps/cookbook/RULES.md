@@ -213,9 +213,9 @@ section and closing comment before changing anything in this file.
 - **Deals says when the nightly check last ran,** and **every empty filter says why** (TEC-190):
   the colours cannot show before 4 weeks of prices, so Green, Neutral and Red say when they start
   until then.
-- **Coupons come only from the owner's own Chrome task (TEC-126),** reviewed before saving. Until it
-  runs, Coupon and Stacks say "no coupons staged yet". **Stacks** marks a product with both a sale
-  and a coupon.
+- **Coupons come only from the owner's own Chrome task, through Import coupons on Your brands
+  (TEC-230).** Until one is imported, Coupon and Stacks say "no coupons staged yet". **Stacks** marks
+  a product with both a sale and a coupon.
 
 ## Health↔Cookbook contract
 
