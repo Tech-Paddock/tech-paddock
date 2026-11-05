@@ -195,8 +195,9 @@ describe("the list's surface", () => {
       expect(row).toMatch(/<li\s+title=\{/);
       expect(row).not.toMatch(/whitespace-normal|break-words|line-clamp/);
     }
-    expect(list).toMatch(/h-8 shrink-0 whitespace-nowrap rounded-lg bg-accent/); // + Cart
-    expect(list).toMatch(/min-h-11 shrink-0 whitespace-nowrap rounded-\[10px\] border border-line/); // Remove
+    // TEC-227: the pills are smaller (owner: "make the pills smaller").
+    expect(list).toMatch(/h-7 shrink-0 whitespace-nowrap rounded-full bg-accent/); // + Cart
+    expect(list).toMatch(/h-7 shrink-0 whitespace-nowrap rounded-full border border-line/); // Back to list
   });
 
   it("the Best toggle filters the List to the lines the server marked Best", () => {

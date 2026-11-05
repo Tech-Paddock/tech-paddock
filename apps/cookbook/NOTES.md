@@ -404,7 +404,8 @@ Reasoning is in the migration headers.
   checked …" is the quiet line under it (`RefreshLog` with no note), and a failed deal scan shows
   there too. Nothing King Soopers renders below In cart. **Rows are item · qty · price**: List rows
   keep the tick, the ×N box and **+ Cart**; In cart rows keep a ×N label (the quantity sent, not
-  editable) and **Back to list**. The recipe names, ★ ? + mark, bubble, amount, note and "Used:" line are
+  editable) and **Back to list**; since TEC-227 an In cart row's name is the product that was sent (below),
+  and grey mirror rows follow the live ones. The recipe names, ★ ? + mark, bubble, amount, note and "Used:" line are
   gone; the deal shade stays, with the bubble and "Good price"/"High price" words on the price's
   `title` and accessible name. **A send is one toast** ("Sent 12", "Sent 12 · 2 not sent"); a line it
   did not take reads a red "not sent" in its price spot (`notSent`, in memory, cleared by the next
@@ -709,23 +710,63 @@ No model call. Code: `lib/purchases.ts` (pure), `lib/purchaseStore.ts`, `app/api
   The King Soopers panel moved into the header in TEC-211 (see *The live check and the one-line
   list*). The header says "N still to buy · N in cart · prices from the night of …", then the live
   status. Each List row is **the tick, the name, the ×N box, the price and + Cart** on one line
-  (32px, 12px bold, accessible name "Add to cart"; `h-8`, not the 44px floor, by the owner's word);
-  the recipes, mark, bubble, amount and note no longer show (TEC-211).
-- **A name opens the matches popup** (TEC-226; owner, 2026-11-04: "I want it to pop up a window like
-  the search function for everything"). Tapping a List or In cart line's name no longer follows
-  `item.href` to a browser search. `app/ItemMatches.tsx` opens the same sheet as the Which-chicken
-  picker (`SheetFrame`, shared in `app/Cart.tsx`: bottom sheet on phones, `role=dialog`, Escape, Close).
-  It reads `GET /api/kroger/matches?id=` (signed-in only, read-only: no POST, no cart add, no default,
-  no token), which plans the line with `planLine` as Send does, then `lib/itemMatches.ts` orders the
-  products (default, most bought, plan order) and words them (`optionTag`, shared with the picker).
-  Each product is a `target=_blank` link to its `/p/` page (built with `pageFor` when the saved url is not
-  one); **a phone hands that link to the King Soopers app, which could not be checked from a build
-  session (kingsoopers.com is blocked), so it is a phone check**. Every line works, in cart or not. No
-  match: the reason and a **Search King Soopers** link (the item alone, never the quantity). Not connected,
-  no store or no answer: the saved products only, with the reason, plus the search link. The route and
-  the popup run in `serialKroger` like every call that borrows the token. `item.href` is still sent by
-  `/api/grocery`, now only the popup's loading and error fallback. **Trap:** the rows' name is a
-  `button`, not a link; `tests/itemMatches.test.ts` and `tests/lineDeal.test.ts` read the source for it.
+  (accessible name "Add to cart"); the recipes, mark, bubble, amount and note no longer show (TEC-211).
+  **The quantity and the price are one size, 13px, and the pills are small** (TEC-227; owner: "make qty
+  and price the same size, make the pills smaller"): the ×N box is a `rounded-full` `px-1.5 py-0.5`
+  pill, + Cart and Back to list are `h-7 rounded-full` at 11px, not the 44px floor, by the owner's word.
+- **A name opens the matches popup, and a tap on a product picks it for that line** (TEC-226, changed by
+  TEC-227; owner, 2026-11-04: "tapping the item should select confirm it in the list … Search KS is great
+  don't change that. No close button. Add an x at the top and allow clicking out of the window to close.
+  Bring why and price inline and make pill smaller"; on the pick, "This line only"). Only a **List** row's
+  name opens it: an In cart name is plain text ("we can't change items in the cart"). `app/ItemMatches.tsx`
+  (`ItemMatches` fetches, `MatchesBody` is stateless so tests call it) uses `SheetFrame` from `app/Cart.tsx`
+  with `closeOnBackdrop`: an **×** at the top, a tap outside (`backdropTap`: only the backdrop itself) and
+  Escape close it; there is no Close button. The Which-chicken picker keeps the backdrop off. It reads
+  `GET /api/kroger/matches?id=` (signed-in only, read-only), which plans the line **without its pick** (so
+  every candidate shows) and `matchView` marks the picked one `selected` (`aria-pressed`, a ✓ and an accent
+  border; a pick the plan no longer offers is added first, tagged "your pick"). Each product is one button
+  line, **name · size · price**, with the reason ("★ bought 3×", "Kroger's pick", "new") as a 10px pill on
+  the same line. Tapping a product PATCHes `/api/grocery { id, pick }` and closes the popup; tapping the
+  picked one sends `pick: null` and goes back to the automatic pick. **Search King Soopers is unchanged**
+  (the item alone, never the quantity). Not connected, no store or no answer: the saved products only, with
+  the reason. The popup runs in `serialKroger`. **Phone check:** the popup used to hand a product to the
+  King Soopers app; products are buttons now, so nothing opens an app except Search King Soopers.
+- **A pick is per grocery line** (TEC-227, the `cookbook_grocery_picked_product` migration): one nullable
+  `grocery_items.picked_product` jsonb snapshot `{upc, url, label, size, price}` (`lib/linePick.ts`,
+  `readPicked`). A snapshot, not a foreign key, because Kroger's top match is offered in the popup and
+  **a pick must not save it to Your brands**. It is the **named-product step, first**: `planLine` calls
+  `decide(name, note, line.picked)`, and `withPicks` (the two-argument `decider` plus a pick) returns that
+  one product as a `chosen: "named"` decision. It never writes `default_for`, a name or a count; defaults
+  stay manual on Your brands. Send then sends it: a saved product goes as `{id, upc}`; a pick Your brands
+  does not hold also carries its page and size (`guessPick`), so Send remembers it like any tapped match,
+  as before. `GET /api/grocery` decides with the pick, so the line's price is the picked product's.
+  **Traps:** a Tidy builds new rows, so a pick does not follow a line through one; `readList` selects
+  `picked_product`, so the migration must be applied before this code deploys; a line's pick survives
+  Send and Back to list.
+- **In cart mirrors the List** (TEC-227; owner: "With the list conversion shopping list creates a mirror
+  grayed out item in cart. Adding it one off or the entire list switches them to live."). Two kinds of
+  In cart row (`cartSplit`, `lib/mirrorWords.ts`). **Live** (`sent_at` set): shows **the exact product that
+  was sent**, "Coke Zero 12 oz", in place of the list word: `GET /api/grocery` joins the ledger's latest
+  `sent` row (`heldByLine`) to `products` as `used {product, size}` (or to the line's own pick when Your
+  brands lacks the product); with no ledger row it falls back to the list word. **Grey** (`GreyRow`): every
+  unsent, unticked List line, opacity 60, not tappable, showing the product a send would put in the cart now
+  (the same `planLine` as Send: pick, default, fit, most bought, else Kroger's top match), its quantity and its
+  price (the line's nightly total when it has one, else the product's price times the quantity; "no price
+  yet", never $0). **No clear match** (Kroger has none, or several saved products with nothing to separate
+  them) reads "<word> — pick one"; a lookup that could not be made reads the plain word. **The In cart
+  count, the header count and the totals include live rows only**; sending a line sets `sent_at`, which
+  moves its row from grey to live. Ticked lines are not mirrored (Send all skips them).
+- **How the grey rows are resolved** (`GET /api/kroger/mirror`, `lib/mirror.ts`, `app/useMirror.ts`):
+  read-only (no cart add, no default, no product, no token in the body). Pass one needs no Kroger: a line
+  Your brands settles (pick, default, the only saved product, fit) resolves at once. Pass two borrows the
+  account token **once for the whole batch** for the lines only a search can settle, four searches at a
+  time (`mirrorLines`). A failure leaves those lines `unknown` (the plain word) and the request is still a
+  200. The page asks inside `serialKroger` with every other token borrower, in batches of `MIRROR_MAX` (30),
+  only for lines it does not already hold. The cache is keyed by the line's words and its pick; it is
+  dropped when `refreshKey` changes (Your brands or the list changed elsewhere), and an `unknown` is tried
+  again after the next list reload. **Trap:** the cache is by line, so a default changed in Your brands
+  reaches the grey rows only through `refreshKey` (`Cookbook.tsx` bumps it when Your brands changes); a
+  change made anywhere else, such as another phone, shows after a reload of the page.
 - **The Add box is its own card** (TEC-212, `app/List.tsx`; owner: "Make the add an item pop more it gets
   lost and is a great feature"): a `section` with a 2px `border-accent` frame on `bg-surface`, a bold
   "Add to the list" heading, a ＋ in accent at the start, and the placeholder "Eggs, 2 lb chicken — notes

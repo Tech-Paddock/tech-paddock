@@ -6,6 +6,7 @@ import {
   readQuantity,
   removeItems,
   setChecked,
+  setPicked,
   setQuantity,
   splitLine,
 } from "@/lib/grocery";
@@ -14,6 +15,7 @@ import { linkFor, readPreferences } from "@/lib/preferences";
 import { readProducts } from "@/lib/productStore";
 import { purchasesForPicking } from "@/lib/purchaseStore";
 import { decider } from "@/lib/decide";
+import { readPicked, withPicks } from "@/lib/linePick";
 import { lineMark } from "@/lib/brands";
 import { lineView } from "@/lib/lineView";
 import { packOf, quantityRule } from "@/lib/lineQuantity";
@@ -52,8 +54,9 @@ export async function GET() {
   try {
     // The purchases read degrades to an empty map (the count decides), never to an error.
     const [items, words, products, purchases] = await Promise.all([readList(), readPreferences(), readProducts(), purchasesForPicking()]);
-    const decide = decider(products, words, purchases);
-    const decisions = items.map((item) => decide(item.name, item.note));
+    // **A line's pick decides first** (TEC-227), so its price is the picked product's.
+    const decide = withPicks(decider(products, words, purchases), products);
+    const decisions = items.map((item) => decide(item.name, item.note, item.picked));
 
     // **Prices are the nightly check's** (TEC-190): each line's saved product at
     // its latest night, never a live Kroger call. A failed read is said, and the
@@ -99,8 +102,15 @@ export async function GET() {
       if (sent.length > 0) {
         const held = heldByLine(await readSends(sent));
         for (const [id, h] of held) {
-          const saved = products.find((p) => p.product_id === h[0]?.upc);
+          // **The latest product sent** (TEC-227): an In cart row reads it in place of the list word.
+          const sentUpc = h[h.length - 1]?.upc;
+          const saved = products.find((p) => p.product_id === sentUpc);
           if (saved) used.set(id, { product: saved.description ?? saved.names[0] ?? saved.product_id, size: saved.size });
+          else {
+            // Not in Your brands (yet): the line's own pick, when that is what went in.
+            const picked = items.find((i) => i.id === id)?.picked;
+            if (picked && picked.upc === sentUpc) used.set(id, { product: picked.label, size: picked.size });
+          }
         }
       }
     } catch {
@@ -162,6 +172,19 @@ export async function PATCH(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const id = typeof body.id === "string" ? body.id : "";
   if (!id) return NextResponse.json({ error: "Which line?" }, { status: 400 });
+
+  // **Pick a product for this line, or clear the pick with null** (TEC-227; owner: "This line only").
+  // It writes the line's own column and nothing else: never a default, never a name in Your brands.
+  if (body.pick !== undefined) {
+    const picked = body.pick === null ? null : readPicked(body.pick);
+    if (body.pick !== null && !picked) return NextResponse.json({ error: "Which product?" }, { status: 400 });
+    try {
+      await setPicked(id, picked);
+      return NextResponse.json({ ok: true, picked });
+    } catch (e) {
+      return errorResponse(e, "Couldn't save that pick.");
+    }
+  }
 
   // How many to put in the cart (TEC-90). Its own field, so a tick never moves it.
   if (body.quantity !== undefined) {

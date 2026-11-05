@@ -2,6 +2,7 @@ import { getServiceClient } from "./supabase";
 import { ConflictError, InputError, LookupError } from "./errors";
 import { moveSends } from "./cartSends";
 import { MAX_QUANTITY, asText } from "./groceryText";
+import { readPicked, type PickedProduct } from "./linePick";
 
 // The helpers the browser runs live in `lib/groceryText.ts`, which imports no `./supabase`.
 export { MAX_QUANTITY, asText };
@@ -57,9 +58,11 @@ export type GroceryItem = {
   quantity: number;
   /** When this line last went to the Kroger cart, or null. What a second send warns about. */
   sent_at: string | null;
+  /** The product picked for this line in the List popup (TEC-227), or null. This line only; never a default. */
+  picked?: PickedProduct | null;
 };
 
-const COLUMNS = "id, name, note, source, checked, created_at, recipes, quantity, sent_at";
+const COLUMNS = "id, name, note, source, checked, created_at, recipes, quantity, sent_at, picked_product";
 
 /** A quantity this app will store, or null. Whole, 1 to 99 — the same range the table checks. */
 export function readQuantity(value: unknown): number | null {
@@ -74,6 +77,7 @@ function hydrate(row: Record<string, unknown>): GroceryItem {
     recipes: Array.isArray(row.recipes) ? (row.recipes as string[]) : [],
     quantity: readQuantity(row.quantity) ?? 1,
     sent_at: typeof row.sent_at === "string" ? row.sent_at : null,
+    picked: readPicked(row.picked_product),
   };
 }
 
@@ -182,6 +186,15 @@ export async function setChecked(id: string, checked: boolean): Promise<void> {
 export async function setQuantity(id: string, quantity: number): Promise<void> {
   const { error } = await getServiceClient().from("grocery_items").update({ quantity }).eq("id", id);
   if (error) throw new LookupError(`Couldn't change how many: ${error.message}`);
+}
+
+/**
+ * Pick a product for one line, or clear the pick with null (TEC-227). **This line only**: it
+ * writes `grocery_items.picked_product` and nothing else, never `products.default_for`.
+ */
+export async function setPicked(id: string, picked: PickedProduct | null): Promise<void> {
+  const { error } = await getServiceClient().from("grocery_items").update({ picked_product: picked }).eq("id", id);
+  if (error) throw new LookupError(`Couldn't save that pick: ${error.message}`);
 }
 
 /** Record that these lines went to the cart, so the next send can warn. */

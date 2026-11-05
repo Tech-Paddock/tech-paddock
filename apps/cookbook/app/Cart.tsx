@@ -758,12 +758,28 @@ export function ProductSplash({ cart }: { cart: CartState }) {
   return <SplashBody key={line.id} cart={cart} line={line} more={splash.queue.length - 1} />;
 }
 
+/** The backdrop's tap: close, but only for a tap on the backdrop itself (a tap inside the dialog bubbles up with another target). */
+export function backdropTap(closeOnBackdrop: boolean, onClose: () => void): ((e: { target: unknown; currentTarget: unknown }) => void) | undefined {
+  return closeOnBackdrop ? (e) => (e.target === e.currentTarget ? onClose() : undefined) : undefined;
+}
+
 /**
  * **The dialog look** the Which-chicken picker and the item popup share (TEC-226): a bottom
- * sheet on phones, centred from `sm`, `role=dialog`, closed by Escape. A tap on the backdrop
- * is deliberately not a close, so a stray tap never loses a choice.
+ * sheet on phones, centred from `sm`, `role=dialog`, closed by Escape. **A tap on the backdrop
+ * closes it only when `closeOnBackdrop` is set** (the item popup, TEC-227: "allow clicking out of
+ * the window to close"). The Which-chicken picker keeps it off, so a stray tap never loses a choice.
  */
-export function SheetFrame({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
+export function SheetFrame({
+  label,
+  onClose,
+  closeOnBackdrop = false,
+  children,
+}: {
+  label: string;
+  onClose: () => void;
+  closeOnBackdrop?: boolean;
+  children: ReactNode;
+}) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -773,7 +789,10 @@ export function SheetFrame({ label, onClose, children }: { label: string; onClos
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 sm:items-center">
+    <div
+      onClick={backdropTap(closeOnBackdrop, onClose)}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 sm:items-center"
+    >
       <div role="dialog" aria-modal="true" aria-label={label} className="flex max-h-[85vh] w-full max-w-md flex-col gap-3 overflow-y-auto rounded-2xl bg-paper p-4">
         {children}
       </div>

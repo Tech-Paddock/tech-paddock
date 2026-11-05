@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readList, markSent, splitLine, type GroceryItem } from "@/lib/grocery";
 import { readPreferences } from "@/lib/preferences";
 import { decider } from "@/lib/decide";
+import { withPicks } from "@/lib/linePick";
 import { addToCart, searchProducts } from "@/lib/kroger";
 import { withAccessToken } from "@/lib/krogerConnection";
 import { bumpCounts, readProducts, rememberProduct } from "@/lib/productStore";
@@ -39,7 +40,8 @@ export const dynamic = "force-dynamic";
  */
 
 function cartLine(item: GroceryItem): CartLine {
-  return { id: item.id, name: item.name, note: item.note, quantity: item.quantity, sent_at: item.sent_at };
+  // `picked` rides along (TEC-227): the review's plan, and so Send, goes with the line's own pick first.
+  return { id: item.id, name: item.name, note: item.note, quantity: item.quantity, sent_at: item.sent_at, picked: item.picked };
 }
 
 async function openLines(): Promise<CartLine[]> {
@@ -55,7 +57,7 @@ function idsOf(raw: string | null): string[] | null {
 export async function GET(request?: NextRequest) {
   try {
     const [open, words, products, purchases] = await Promise.all([openLines(), readPreferences(), readProducts(), purchasesForPicking()]);
-    const decide = decider(products, words, purchases);
+    const decide = withPicks(decider(products, words, purchases), products);
     // **Only lines still on the List** (TEC-190): a line in the cart is not looked up or offered again.
     // (`include=sent` went with Change, TEC-211.)
     const params = request ? new URL(request.url).searchParams : null;

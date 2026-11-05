@@ -135,7 +135,7 @@ describe("one line per item: item, qty and price", () => {
     renderToStaticMarkup(createElement(ListRow, { item: line(over), onTick: noop, onQuantity: noop, canAdd: true, adding: false, notSent: null, onAdd: noop, onOpen: noop, ...extra }));
   const cartRow = (over: Record<string, unknown> = {}, live: { total: number | null } | null = null) =>
     renderToStaticMarkup(
-      createElement(InCartRow, { item: line({ sent_at: "2026-11-02T00:00:00Z", ...over }), live, disabled: false, returning: false, onOpen: noop, onBack: noop })
+      createElement(InCartRow, { item: line({ sent_at: "2026-11-02T00:00:00Z", ...over }), live, disabled: false, returning: false, onBack: noop })
     );
 
   it("a List row reads the item, the quantity and the price, and offers + Cart", () => {
@@ -159,15 +159,20 @@ describe("one line per item: item, qty and price", () => {
     expect(html).toMatch(/aria-label="\$4\.50, Sale \$1\.50 · Good price/);
   });
 
-  it("an In cart row reads the item, the quantity and the price, and offers Back to list, not Remove: no recipe, no Used line, no Change", () => {
+  it("an In cart row reads the exact product that was sent in place of the list word (TEC-227), the quantity and the price, and offers Back to list, not Remove: no recipe, no Used line, no Change", () => {
     const html = cartRow();
     const shown = text(html);
-    expect(shown).toContain("Yellow onions");
+    expect(shown).toContain("Kroger Yellow Onions 3 lb");
+    expect(shown).not.toContain("Yellow onions");
     expect(shown).toContain("×3");
     expect(shown).toContain("$4.50");
     expect(shown).toContain("Back to list");
     expect(shown).not.toContain("Remove");
-    for (const gone of ["Zesty Chicken Soup", "Weeknight Chili", "Used:", "Kroger Yellow Onions", "Change", "★", "for the soup"]) expect(shown).not.toContain(gone);
+    for (const gone of ["Zesty Chicken Soup", "Weeknight Chili", "Used:", "Change", "★", "for the soup"]) expect(shown).not.toContain(gone);
+  });
+
+  it("an In cart row with no ledger row falls back to the list word", () => {
+    expect(text(cartRow({ used: null }))).toContain("Yellow onions");
   });
 
   it("an In cart row prefers today's price once Refresh cart has read it, and never shows $0", () => {

@@ -16,7 +16,8 @@ export const maxDuration = 30;
 
 /**
  * **The popup behind a grocery item's name** (TEC-226). Read-only: it never adds to the cart,
- * never writes a default or a product, and returns no token. Signed in only like every `/api`
+ * never writes a default or a product, and returns no token. (The pick itself is
+ * `PATCH /api/grocery`, TEC-227; this only says which product is picked.) Signed in only like every `/api`
  * route (`proxy.ts` unchanged). Any line, in cart or not, ticked or not.
  *
  * It plans the line the way Send does (`planLine`), so the products are the ones Send would
@@ -31,6 +32,8 @@ export async function GET(request: NextRequest) {
     const [list, words, products, purchases] = await Promise.all([readList(), readPreferences(), readProducts(), purchasesForPicking()]);
     const item = list.find((i) => i.id === id);
     if (!item) throw new ConflictError("That line isn't on the list any more.");
+    // **Planned without the line's pick** (TEC-227): the popup lists every product the line could go in
+    // as, and marks the picked one in `matchView`. With the pick, the plan would offer only that product.
     const line: CartLine = { id: item.id, name: item.name, note: item.note, quantity: item.quantity, sent_at: item.sent_at };
     const decide = decider(products, words, purchases);
 
@@ -49,7 +52,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(matchView(plan, searchHrefFor(line.name, line.note, decide(line.name, line.note)), reach));
+    return NextResponse.json(matchView(plan, searchHrefFor(line.name, line.note, decide(line.name, line.note)), reach, item.picked));
   } catch (e) {
     return errorResponse(e, "Couldn't look up the matches.");
   }

@@ -16,8 +16,11 @@ import { CHECKOUT_URL } from "@/lib/kingsoopers";
 import { totalsOf, type LinePrice, type Totals } from "@/lib/listPrices";
 import { shortDay } from "@/lib/dealFilter";
 import { checkLine, clock } from "@/lib/checkLine";
+import type { PickedProduct } from "@/lib/linePick";
+import { cartSplit, greyTotal, greyWords, productWords, type MirrorRow } from "@/lib/mirrorWords";
 import { ItemMatches } from "./ItemMatches";
 import { ProductSplash, RefreshLog, StorePicker, useCart, when } from "./Cart";
+import { useMirror } from "./useMirror";
 import { useToast } from "./Toast";
 
 /**
@@ -37,6 +40,8 @@ type ShoppingLine = GroceryItem &
     price?: LinePrice | null;
     /** The sale/coupon bubble, the shade and Best, from the nightly prices (TEC-196; `lib/lineDeal.ts`). */
     deal?: LineDeal | null;
+    /** For an In cart line, the product that was sent, from the ledger and Your brands (TEC-227). */
+    used?: { product: string; size: string | null } | null;
   };
 
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -214,6 +219,29 @@ export default function List({
     }
   }
 
+  /**
+   * **Pick a product for this line** (TEC-227; owner: "This line only"), or clear the pick with null.
+   * The popup closes, the row changes at once, and a refused write reloads the truth. It never sets a
+   * default: the server writes the line's own column and nothing else.
+   */
+  async function pick(item: ShoppingLine, picked: PickedProduct | null) {
+    setLooking(null);
+    setItems((current) => (current ?? []).map((i) => (i.id === item.id ? { ...i, picked } : i)));
+    const word = item.view?.name ?? item.name;
+    try {
+      const response = await fetch("/api/grocery", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, pick: picked }),
+      });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error ?? "Couldn't save that pick.");
+      toast.notice(picked ? `${word}: ${productWords(picked.label, picked.size)}.` : `${word} goes back to the automatic pick.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't save that pick.");
+      await load();
+    }
+  }
+
   async function tick(item: GroceryItem) {
     // Optimistic: the checkbox is the one control you use with a trolley in
     // one hand. A failed write reloads the truth back over it.
@@ -315,7 +343,8 @@ export default function List({
   // comes from this app. A line is in one or the other, never both.
   const all = items ?? [];
   const onList = all.filter((i) => i.sent_at === null);
-  const inCart = all.filter((i) => i.sent_at !== null);
+  // **In cart counts and totals only the live rows** (TEC-227): the grey mirror rows are not in the cart.
+  const inCart = cartSplit(all).live;
   const open = onList.filter((i) => !i.checked);
   const bought = onList.filter((i) => i.checked);
   // **Best** (TEC-196): the List lines at, or within 5% of, their 12-week nightly low.
@@ -331,6 +360,10 @@ export default function List({
   const nightWords =
     everything.from === null ? null : everything.from === everything.to ? shortDay(everything.from) : `${shortDay(everything.from)} to ${shortDay(everything.to as string)}`;
   const canAdd = cart.ready && cart.busy === null;
+  // **The grey rows In cart** (TEC-227): each unsent, unticked List line as the product a send would put in
+  // the cart now. They are not in the cart, so no count or total below includes them.
+  const mirrorOf = useMirror(items, { enabled: cart.ready, refreshKey, reloads });
+  const greyed = cart.ready ? cartSplit(all).grey : [];
   const check = cart.cartCheck;
   const checkById = new Map((check?.lines ?? []).map((l) => [l.id, l]));
   // **The live In cart total** (TEC-206): today's price at the store, read by Refresh cart. Never $0.
@@ -369,7 +402,16 @@ export default function List({
   return (
     <section id="shop" className="flex scroll-mt-4 flex-col gap-3">
       <ProductSplash cart={cart} />
-      {looking ? <ItemMatches key={looking.id} id={looking.id} name={looking.view?.name ?? looking.name} fallback={looking.href} onClose={() => setLooking(null)} /> : null}
+      {looking ? (
+        <ItemMatches
+          key={looking.id}
+          id={looking.id}
+          name={looking.view?.name ?? looking.name}
+          fallback={looking.href}
+          onPick={(picked) => void pick(looking, picked)}
+          onClose={() => setLooking(null)}
+        />
+      ) : null}
 
       {/* The header: the counts, the live cart total, and King Soopers (TEC-211): the live status, Pickup/Delivery, the store. */}
       <div className="flex flex-col gap-2 px-2">
@@ -601,13 +643,20 @@ export default function List({
                     live={live ? { total: live.total } : null}
                     disabled={cart.busy !== null}
                     returning={cart.returning === item.id}
-                    onOpen={() => setLooking(item)}
                     onBack={() => void cart.backToList(item.id)}
                   />
                 );
               })}
             </ul>
           )}
+          {/* **Grey mirror rows** (TEC-227): what each unsent List line would send now. + Cart or Send all turns one live. */}
+          {greyed.length > 0 ? (
+            <ul aria-label="Not sent yet" className="flex flex-col gap-1.5">
+              {greyed.map((item) => (
+                <GreyRow key={item.id} item={item} row={mirrorOf(item)} />
+              ))}
+            </ul>
+          ) : null}
 
           {/* **Clear cart clears every line in In cart in Cookbook only; King Soopers is not asked** (TEC-206, TEC-210, TEC-228): one confirm with the count, no list, shown even when not signed in. */}
           {cart.ready || inCart.length > 0 ? (
@@ -751,7 +800,7 @@ export function ListRow(props: {
           aria-label="Add to cart"
           onClick={props.onAdd}
           disabled={props.adding}
-          className="h-8 shrink-0 whitespace-nowrap rounded-lg bg-accent px-2.5 text-xs font-bold text-accent-ink disabled:opacity-50"
+          className="h-7 shrink-0 whitespace-nowrap rounded-full bg-accent px-2.5 text-[11px] font-bold text-accent-ink disabled:opacity-50"
         >
           {props.adding ? "…" : "+ Cart"}
         </button>
@@ -788,27 +837,28 @@ function Price({ price, cue, notSent }: { price: LinePrice | null | undefined; c
 }
 
 /**
- * One In cart line: **item · qty · price** and **Back to list** (TEC-228, was Remove). The price is today's
- * once Refresh cart has read it, else the nightly check's; "no price" when Kroger can't
- * price it, never $0. The ×N box is the quantity that was sent, so it does not edit.
- * **Back to list** returns this line to the List unsent, with no confirm; King Soopers is not asked.
+ * One In cart line: **item · qty · price** and **Back to list** (TEC-228, was Remove). **The name is the
+ * exact product that was sent**, "Coke Zero 12 oz", in place of the list word (TEC-227), read from the
+ * ledger and Your brands; with no ledger row it falls back to the list word. **It is not tappable**:
+ * an item in the cart can't be changed, so there is no popup here. The price is today's once Refresh
+ * cart has read it, else the nightly check's; "no price" when Kroger can't price it, never $0. The ×N
+ * box is the quantity that was sent, so it does not edit. **Back to list** returns this line to the
+ * List unsent, with no confirm; King Soopers is not asked. The quantity and the price are one size.
  */
 export function InCartRow(props: {
   item: ShoppingLine;
   live: { total: number | null } | null;
   disabled: boolean;
   returning: boolean;
-  onOpen: () => void;
   onBack: () => void;
 }) {
   const { item } = props;
-  const name = item.view?.name ?? item.name;
+  const word = item.view?.name ?? item.name;
+  const name = item.used ? productWords(item.used.product, item.used.size) : word;
   return (
     <li title={[name, dealWords(item.deal)].filter(Boolean).join(" · ")} className={`flex items-center gap-2 rounded-[10px] bg-raised py-2 pl-3 pr-2.5 ${SHADE_CLASS[item.deal?.shade ?? "plain"]}`}>
-      <button type="button" onClick={props.onOpen} aria-haspopup="dialog" className="block min-w-0 flex-1 truncate text-[15px] font-semibold text-left">
-        {name}
-      </button>
-      <span className="flex shrink-0 items-center rounded-lg border border-line bg-surface px-2 py-1 text-sm font-semibold" aria-label={`${item.quantity} in the cart`}>
+      <span className="block min-w-0 flex-1 truncate text-[15px] font-semibold">{name}</span>
+      <span className="flex shrink-0 items-center rounded-full border border-line bg-surface px-1.5 py-0.5 text-[13px] font-semibold" aria-label={`${item.quantity} in the cart`}>
         ×{item.quantity}
       </span>
       {props.live ? (
@@ -825,10 +875,42 @@ export function InCartRow(props: {
         aria-label={`Put ${name} back on the list`}
         onClick={props.onBack}
         disabled={props.disabled}
-        className="min-h-11 shrink-0 whitespace-nowrap rounded-[10px] border border-line bg-transparent px-3 text-[13px] disabled:opacity-50"
+        className="h-7 shrink-0 whitespace-nowrap rounded-full border border-line bg-transparent px-2.5 text-[11px] disabled:opacity-50"
       >
         {props.returning ? "Moving…" : "Back to list"}
       </button>
+    </li>
+  );
+}
+
+/**
+ * **A grey mirror row** (TEC-227; owner: "With the list conversion shopping list creates a mirror
+ * grayed out item in cart. Adding it one off or the entire list switches them to live."). An unsent
+ * List line, shown In cart as the exact product a send would put in the cart now ("Coke Zero 12 oz"),
+ * by the same picking as a send. With no clear match it reads "coke — pick one"; if it could not be
+ * worked out, or is still being, the plain word. Not tappable: tap the List row to pick. It shows its
+ * price, but **it is not in the cart**, so the In cart count and total never include it; + Cart or
+ * Send all makes it a live row. Grey is not the only cue: it says "Not sent yet" to a screen reader
+ * and in its `title`.
+ */
+export function GreyRow({ item, row }: { item: ShoppingLine; row: MirrorRow | null }) {
+  const word = item.view?.name ?? item.name;
+  const words = greyWords(word, row);
+  const total = greyTotal(row, item.quantity, item.price?.total ?? null);
+  return (
+    <li title={`${words} · not sent yet`} data-grey="" className="flex items-center gap-2 rounded-[10px] bg-raised py-2 pl-3 pr-2.5 opacity-60">
+      <span className="block min-w-0 flex-1 truncate text-[15px] font-semibold text-ink-soft">
+        <span className="sr-only">Not sent yet: </span>
+        {words}
+      </span>
+      <span className="flex shrink-0 items-center rounded-full border border-line bg-surface px-1.5 py-0.5 text-[13px] font-semibold" aria-label={`${item.quantity}, not sent yet`}>
+        ×{item.quantity}
+      </span>
+      {total === null ? (
+        <span className="min-w-14 whitespace-nowrap text-right text-[11px] text-ink-soft">no price yet</span>
+      ) : (
+        <span className="min-w-14 whitespace-nowrap text-right text-[13px] tabular-nums">{money(total)}</span>
+      )}
     </li>
   );
 }
@@ -943,7 +1025,7 @@ function Quantity({ item, onCommit }: { item: GroceryItem; onCommit: (q: number)
     else setDraft(String(item.quantity));
   }
   return (
-    <label className="flex shrink-0 items-center gap-0.5 rounded-lg border border-line bg-raised px-2 py-1 text-sm font-semibold">
+    <label className="flex shrink-0 items-center gap-0.5 rounded-full border border-line bg-raised px-1.5 py-0.5 text-[13px] font-semibold">
       ×
       <input
         value={draft}
@@ -954,7 +1036,7 @@ function Quantity({ item, onCommit }: { item: GroceryItem; onCommit: (q: number)
         }}
         inputMode="numeric"
         aria-label={`How many ${item.name}`}
-        className="w-6 bg-transparent text-center"
+        className="w-5 bg-transparent text-center"
       />
     </label>
   );
