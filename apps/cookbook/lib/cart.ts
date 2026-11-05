@@ -5,6 +5,7 @@ import { modalityWord, type Modality } from "./modality";
 import { itemWords } from "./itemWords";
 import { bagOf, readAs } from "./lineView";
 import type { Candidate, Chosen, Decision } from "./brands";
+import type { PickedProduct } from "./linePick";
 
 /**
  * Send to cart — what each line becomes, and what happened to it (TEC-90).
@@ -43,7 +44,15 @@ export type CartLine = {
   note: string | null;
   quantity: number;
   sent_at: string | null;
+  /**
+   * The product picked for this line in the List popup (TEC-227): **the named-product step,
+   * first** in `planLine`. This line only; it never makes a default.
+   */
+  picked?: PickedProduct | null;
 };
+
+/** A decider that also takes a line's pick (`withPicks`, `lib/linePick.ts`); a two-argument decider ignores it. */
+export type LineDecider = (name: string, note?: string | null, picked?: PickedProduct | null) => Decision;
 
 export type { Candidate, Decision } from "./brands";
 
@@ -121,14 +130,15 @@ function goingIn(
  */
 export async function planLine(
   line: CartLine,
-  decide: (name: string, note?: string | null) => Decision,
+  decide: LineDecider,
   search: (term: string) => Promise<Product[]>
 ): Promise<Plan> {
-  const decision = decide(line.name, line.note);
+  // **A pick comes first** (TEC-227): the line's own product, named, before any default or guess.
+  const decision = decide(line.name, line.note, line.picked ?? null);
 
   if (decision?.kind === "products" && decision.via !== "description") {
     const options = decision.candidates;
-    if (options.length === 1) return goingIn(options, decision, "one");
+    if (options.length === 1) return goingIn(options, decision, decision.chosen ?? "one");
     if (options.length > 1 && decision.chosen) return goingIn(options, decision, decision.chosen);
     if (options.length > 1) return { kind: "settle", phrase: decision.name, via: "name", options, matched: decision.matched ?? null };
   }
@@ -162,7 +172,7 @@ export async function planLine(
  */
 export async function reviewLines(
   lines: CartLine[],
-  decide: (name: string, note?: string | null) => Decision,
+  decide: LineDecider,
   search: (term: string) => Promise<Product[]>
 ): Promise<ReviewLine[]> {
   const out: ReviewLine[] = new Array(lines.length);

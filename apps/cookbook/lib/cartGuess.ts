@@ -20,7 +20,14 @@ import type { Candidate, CartLine, CartPick, Plan, ReviewLine } from "./cart";
 /** The pick a line goes in as, or `{ id }` when there is no product to add. */
 export function guessPick(line: Pick<ReviewLine, "id" | "plan">): CartPick {
   const plan = line.plan;
-  if (plan.kind === "exact") return { id: line.id, upc: plan.upc };
+  if (plan.kind === "exact") {
+    // **A pick of a product Your brands does not have yet** (TEC-227) is remembered on Send like any
+    // tapped match: its page and size go along. A saved product is never re-saved.
+    if (plan.chosen === "named" && plan.option.id === null) {
+      return { id: line.id, upc: plan.upc, match: plan.url, ...(plan.option.size ? { size: plan.option.size } : {}) };
+    }
+    return { id: line.id, upc: plan.upc };
+  }
   if (plan.kind === "settle") {
     const [first] = plan.options;
     return first ? { id: line.id, upc: first.upc, match: first.url } : { id: line.id };
@@ -46,6 +53,8 @@ export type PickerOption = {
   detail: string;
   count: number;
   isDefault: boolean;
+  /** The shelf price, or null (TEC-227: the popup picks with it). */
+  price: number | null;
   /** Sent beside a match, so a product new to Your brands is saved with the size first bought. */
   size: string | null;
   /** True for Kroger's own match, not a saved product. */
@@ -64,6 +73,7 @@ function fromCandidate(o: Candidate): PickerOption {
     detail: [o.size, money(o.price)].filter(Boolean).join(" · "),
     count: o.count,
     isDefault: o.isDefault === true,
+    price: o.price,
     size: o.size,
     fresh: false,
   };
@@ -82,6 +92,7 @@ export function pickerOptions(plan: Plan): PickerOption[] {
         detail: [p.size, money(p.price)].filter(Boolean).join(" · "),
         count: 0,
         isDefault: false,
+        price: p.price,
         size: p.size,
         fresh: true,
       },

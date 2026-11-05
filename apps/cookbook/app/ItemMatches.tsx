@@ -1,19 +1,43 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { MatchView } from "@/lib/itemMatches";
+import type { MatchOption, MatchView } from "@/lib/itemMatches";
+import type { PickedProduct } from "@/lib/linePick";
 import { SheetFrame, serialKroger } from "./Cart";
 
 const LINK_BUTTON = "min-h-11 self-start rounded-[10px] px-2 text-[15px] text-accent underline-offset-2 hover:underline";
 
+/** What a tap on an option stores for the line (`PATCH /api/grocery`, `readPicked`). */
+export function pickOfOption(o: MatchOption): PickedProduct {
+  return { upc: o.upc, url: o.url, label: o.label, size: o.size, price: o.price };
+}
+
 /**
- * **The popup behind a grocery item's name** (TEC-226; owner, 2026-11-04). The same sheet as the
- * Which-chicken picker (`SheetFrame`), but it only browses: each product is a link to its King
- * Soopers page, opened in a new tab, which a phone hands to the King Soopers app. **Nothing here
- * adds to the cart or sets a default.** `fallback` is the search link the list already holds,
- * used while loading and when the look-up fails, so a tap always has somewhere to go.
+ * **The popup behind a grocery item's name** (TEC-226, changed by TEC-227; owner, 2026-11-04:
+ * "tapping the item should select confirm it in the list. So if there are multiple options this is
+ * where you select. Search KS is great don't change that. No close button. Add an x at the top and
+ * allow clicking out of the window to close. Bring why and price inline and make pill smaller.").
+ *
+ * A tap on a product **picks it for this line** (`onPick`), so + Cart and Send all send it; it is not
+ * made a default ("This line only"). The picked product shows as selected, and a tap on it clears the
+ * pick. **Search King Soopers is unchanged.** An × at the top closes it, and so do a tap outside it and
+ * Escape; there is no Close button. `fallback` is the search link the list already holds, used while
+ * loading and when the look-up fails, so a tap always has somewhere to go.
  */
-export function ItemMatches({ id, name, fallback, onClose }: { id: string; name: string; fallback: string; onClose: () => void }) {
+export function ItemMatches({
+  id,
+  name,
+  fallback,
+  onPick,
+  onClose,
+}: {
+  id: string;
+  name: string;
+  fallback: string;
+  /** The product to use for this line, or null to go back to the automatic pick. */
+  onPick: (picked: PickedProduct | null) => void;
+  onClose: () => void;
+}) {
   const [view, setView] = useState<MatchView | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,13 +58,40 @@ export function ItemMatches({ id, name, fallback, onClose }: { id: string; name:
     };
   }, [id]);
 
-  const searchHref = view?.searchHref ?? fallback;
-
   return (
-    <SheetFrame label={`${name} at King Soopers`} onClose={onClose}>
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-lg font-bold">{name}</h2>
-        <p className="text-[13px] text-ink-soft">Tap a product to open it in King Soopers. Nothing is added to the cart.</p>
+    <SheetFrame label={`${name} at King Soopers`} onClose={onClose} closeOnBackdrop>
+      <MatchesBody name={name} view={view} error={error} fallback={fallback} onPick={onPick} onClose={onClose} />
+    </SheetFrame>
+  );
+}
+
+/** The popup's content. No state, so it renders (and is tested) on its own. */
+export function MatchesBody({
+  name,
+  view,
+  error,
+  fallback,
+  onPick,
+  onClose,
+}: {
+  name: string;
+  view: MatchView | null;
+  error: string | null;
+  fallback: string;
+  onPick: (picked: PickedProduct | null) => void;
+  onClose: () => void;
+}) {
+  const searchHref = view?.searchHref ?? fallback;
+  return (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2 className="text-lg font-bold">{name}</h2>
+          <p className="text-[13px] text-ink-soft">Tap a product to use it for this line. Tap the picked one again to go back to the automatic pick.</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Close" className="-mr-2 -mt-1 flex size-11 shrink-0 items-center justify-center rounded-[10px] text-2xl leading-none text-ink-soft">
+          ×
+        </button>
       </div>
       {error ? (
         <p role="alert" className="text-[13px] text-danger">
@@ -57,18 +108,24 @@ export function ItemMatches({ id, name, fallback, onClose }: { id: string; name:
             <ul aria-label={`${name} matches`} className="flex flex-col gap-1.5">
               {view.options.map((o) => (
                 <li key={o.upc}>
-                  <a
-                    href={o.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex min-h-11 items-center gap-2.5 rounded-[10px] border border-line bg-raised px-3 py-2.5 text-left text-ink"
+                  {/* **One line**: name · size · price, with why as a small pill on the same line. */}
+                  <button
+                    type="button"
+                    aria-pressed={o.selected}
+                    onClick={() => onPick(o.selected ? null : pickOfOption(o))}
+                    title={[o.label, o.detail, o.tag].filter(Boolean).join(" · ")}
+                    className={`flex min-h-11 w-full items-center gap-2 rounded-[10px] bg-raised px-3 py-2 text-left text-ink ${o.selected ? "border-2 border-accent" : "border border-line"}`}
                   >
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="text-sm font-semibold">{o.label}</span>
-                      <span className="text-xs text-ink-soft">{o.detail || "not priced yet"}</span>
+                    <span aria-hidden="true" className={`w-4 shrink-0 text-sm font-bold ${o.selected ? "text-accent" : "text-transparent"}`}>
+                      ✓
                     </span>
-                    <span className="shrink-0 text-xs font-semibold">{o.tag}</span>
-                  </a>
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+                      {o.label}
+                      <span className="font-normal text-ink-soft"> · {o.detail || "not priced yet"}</span>
+                    </span>
+                    <span className="shrink-0 whitespace-nowrap rounded-full bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-ink-soft">{o.tag}</span>
+                    {o.selected ? <span className="sr-only">Picked for this line</span> : null}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -79,10 +136,7 @@ export function ItemMatches({ id, name, fallback, onClose }: { id: string; name:
         <a href={searchHref} target="_blank" rel="noreferrer" className={`${LINK_BUTTON} inline-flex items-center`}>
           Search King Soopers
         </a>
-        <button type="button" onClick={onClose} className={LINK_BUTTON}>
-          Close
-        </button>
       </div>
-    </SheetFrame>
+    </>
   );
 }

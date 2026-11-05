@@ -79,11 +79,11 @@ describe("matchOptions", () => {
     expect(matchOptions({ kind: "none", reason: "x" })).toEqual([]);
   });
 
-  it("always links a King Soopers product page, building one when the saved url is not", () => {
+  it("always carries a King Soopers product page, building one when the saved url is not (a pick sends it so Send can remember it)", () => {
     const [o] = matchOptions(settle([candidate({ url: "https://example.com/milk", description: "Whole Milk" })]));
-    expect(o.href).toBe("https://www.kingsoopers.com/p/whole-milk/0085631200203");
+    expect(o.url).toBe("https://www.kingsoopers.com/p/whole-milk/0085631200203");
     const [kept] = matchOptions(settle([candidate()]));
-    expect(kept.href).toBe("https://www.kingsoopers.com/p/fairlife-2-milk/0085631200203");
+    expect(kept.url).toBe("https://www.kingsoopers.com/p/fairlife-2-milk/0085631200203");
   });
 });
 
@@ -134,10 +134,13 @@ describe("matchView", () => {
 });
 
 describe("the grocery rows", () => {
-  it("open the popup instead of following a link, and the route never writes", () => {
+  it("a List row opens the popup instead of following a link, an In cart row has none (TEC-227), and the route never writes", () => {
     const list = readFileSync("app/List.tsx", "utf8");
     expect(list).not.toMatch(/href=\{item\.href\}/);
-    expect(list.match(/onClick=\{props\.onOpen\}/g)).toHaveLength(2);
+    // One name opens the popup: the List row's. In cart ("we can't change items in the cart") has no popup.
+    expect(list.match(/onClick=\{props\.onOpen\}/g)).toHaveLength(1);
+    const inCart = list.slice(list.indexOf("function InCartRow"), list.indexOf("function ModeSwitch"));
+    expect(inCart).not.toMatch(/onOpen|aria-haspopup|setLooking/);
     const route = readFileSync("app/api/kroger/matches/route.ts", "utf8");
     expect(route).not.toMatch(/export async function (POST|PUT|PATCH|DELETE)/);
     expect(route).not.toMatch(/addToCart|rememberProduct|markSent|bumpCounts/);

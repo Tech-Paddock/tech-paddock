@@ -1,0 +1,31 @@
+-- Cookbook · a grocery line can carry the product the owner picked for it
+--
+-- TEC-227, owner's go on 2026-11-04 ("From here tapping the item should select
+-- confirm it in the list", "This line only"). Tapping a product in the List
+-- popup picks it for that one line, so + Cart and Send all send exactly that
+-- product. A pick is the "named product" step, ahead of the name's default,
+-- the pack that fits and the most purchased.
+--
+-- Shape: **additive.** One nullable jsonb column, no default, no rewrite.
+-- Nothing existing reads or writes differently until the code ships. The code
+-- selects this column when it reads the list, so this must be applied before
+-- that code deploys (Deployment applies it at merge, before merging).
+--
+-- ## picked_product: this line only, never a default
+--
+-- A snapshot of the product at the time of the pick:
+--   { "upc": "<8-14 digits>", "url": "<King Soopers product page>",
+--     "label": "<name>", "size": "<size or null>", "price": <number or null> }
+-- A snapshot rather than a foreign key because the product may not be in
+-- `cookbook.products` (Kroger's own top match is offered in the popup too), and
+-- a pick must not save it there: "This line only". A pick never writes
+-- `products.default_for`; defaults stay manual on Your brands. A Tidy merges
+-- lines into new rows, so a pick does not follow a line through one.
+--
+-- ## RLS
+--
+-- The table already has RLS enabled with zero policies; a column changes
+-- neither that nor the grants.
+
+alter table cookbook.grocery_items
+  add column picked_product jsonb;
