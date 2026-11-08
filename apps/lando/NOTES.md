@@ -141,6 +141,20 @@
   shows under the form (`role="alert"`). `tests/medication-save.test.ts` renders `Journal` over the real route handlers and an
   in-memory database (jsdom; `jsdom` and Testing Library are dev dependencies for it). **Trap:** its fake database is not
   PostgREST; the table itself was proved by a rolled-back insert as `service_role`.
+  **A medication's reason (TEC-233):** `lando.medications.reason` (migration `lando_medication_reason`, additive, nullable, a
+  plain column check, no function): one of `MED_REASONS` (heartworm, flea-tick, dewormer, allergy, pain, antibiotic, joint,
+  other; ids are history's key, retire by dropping from the form, never rename). It lives on the medication, **not on the dose**
+  (no snapshot: a reason is set once and never changes, so a dose reads its medication's). "Add a medication…" now has a
+  required Reason select (`parseNewMedication` refuses a missing one: "pick a reason"). A medication added before has none and
+  shows "No reason" under the pick with a Reason select and **Set reason** button (`PATCH /api/medications {id, reason}`,
+  `journal.ts:setMedicationReason`): the update runs `where reason is null`, so it is set once whatever races; a second try is a
+  400 "already has a reason" and nothing in SQL or the app changes one (a wrong one is fixed in the SQL Editor). The Log feed's
+  dose line ends with the reason ("Name · 5 mg · by mouth · Heartworm" or "No reason"; `describe`'s fourth argument is the
+  medication list, and a caller without it, like the form's tap list, shows none). Analytics has **Medication by reason**
+  (`analytics.ts:dosesByReason`, last 14 days, reasons in form order, No reason last, a dose of an unknown medication under No
+  reason). `Journal` keeps reasons set this session (`reasonsSet`) and applies them to every read, like `addedMeds`.
+  **Deploy order:** `lando_medication_reason` before the code, because the journal read selects `reason` (an unapplied column
+  makes every journal load a 503).
 - **The Health note is required** (TEC-139), for a new entry and a correction alike: the phone
   blocks Save on a blank or whitespace-only note with "Say what happened — the note is required."
   and the server refuses it too (`parseNewEvent`, so `writeEvent`; a delete is exempt, and no

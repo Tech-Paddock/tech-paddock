@@ -56,7 +56,7 @@ import {
 import { clockTime, localMidnight, shortDate, toDateInput } from "@/lib/localtime";
 import { saveThenClose, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
 import { allUpcoming, donePrefill, formForItem, nextWeek } from "@/lib/future";
-import type { MedUnit, Medication } from "@/lib/medications";
+import type { MedReason, MedUnit, Medication } from "@/lib/medications";
 import { isMealType, type AddedFood, type FoodUnit, type ListType } from "@/lib/foods";
 import { nameBoxWidth } from "@/lib/names";
 import { saveThen } from "@/lib/saveOrder";
@@ -89,9 +89,9 @@ type Stored = LogBody & { then?: LogBody[] };
 type Open = { form: FormKind; event?: JournalEvent; healthType?: HealthType; doneFor?: Upcoming; plan?: Upcoming; quick?: QuickLog } | null;
 type Tab = "log" | "notes" | "analytics" | "new";
 
-async function postJson(url: string, body: unknown): Promise<{ ok: boolean; status: number; data: any }> {
+async function postJson(url: string, body: unknown, method: "POST" | "PATCH" = "POST"): Promise<{ ok: boolean; status: number; data: any }> {
   const res = await fetch(url, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -173,6 +173,8 @@ export default function Journal() {
   const [personError, setPersonError] = useState<string | null>(null);
   const sinceRef = useRef(since);
   const addedMeds = useRef(new Map<string, Medication>());
+  /** Reasons set this session (TEC-233), applied to every read so a read that began before the set cannot undo it. */
+  const reasonsSet = useRef(new Map<string, MedReason>());
   sinceRef.current = since;
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Upcoming (TEC-192, TEC-199): open items, read apart from the journal so one failing never blanks the other.
@@ -206,7 +208,9 @@ export default function Journal() {
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       // A medication added in this session stays in the list even when this read began before it was saved.
       const read: Medication[] = data.medications ?? [];
-      const medications = [...read, ...[...addedMeds.current.values()].filter((m) => !read.some((r) => r.id === m.id))];
+      const medications = [...read, ...[...addedMeds.current.values()].filter((m) => !read.some((r) => r.id === m.id))].map((m) =>
+        !m.reason && reasonsSet.current.has(m.id) ? { ...m, reason: reasonsSet.current.get(m.id) } : m
+      );
       setLoaded({ events: data.events, people: data.people, dogs: data.dogs ?? [], foods: data.foods ?? [], medications });
       setPhotoUrls((prev) => ({ ...prev, ...(data.photos ?? {}) }));
       setLoadError(null);
@@ -409,7 +413,7 @@ export default function Journal() {
   }
 
   /** The Medication tab's "Add a medication…": saved to `lando.medications`, then merged into the loaded list without a reload. */
-  async function addMedication(input: { name: string; unit: MedUnit }): Promise<{ medication: Medication | null; error: string | null }> {
+  async function addMedication(input: { name: string; unit: MedUnit; reason: MedReason }): Promise<{ medication: Medication | null; error: string | null }> {
     try {
       const { ok, data } = await postJson("/api/medications", input);
       if (!ok) return { medication: null, error: data.error ?? "couldn't add" };
@@ -421,6 +425,19 @@ export default function Journal() {
       return { medication, error: null };
     } catch (e) {
       return { medication: null, error: e instanceof TypeError ? "no connection" : (e as Error).message };
+    }
+  }
+
+  /** Give a medication its reason, once (TEC-233): saved, then merged into the loaded list; kept so a stale read cannot undo it. */
+  async function setMedicationReason(id: string, reason: MedReason): Promise<string | null> {
+    try {
+      const { ok, data } = await postJson("/api/medications", { id, reason }, "PATCH");
+      if (!ok) return data.error ?? "couldn't set the reason";
+      reasonsSet.current.set(id, reason);
+      setLoaded((prev) => (prev ? { ...prev, medications: prev.medications.map((m) => (m.id === id ? { ...m, reason } : m)) } : prev));
+      return null;
+    } catch (e) {
+      return e instanceof TypeError ? "no connection" : (e as Error).message;
     }
   }
 
@@ -675,7 +692,7 @@ export default function Journal() {
 
         <div id="panel-analytics" role="tabpanel" aria-labelledby="tab-analytics" hidden={tab !== "analytics"}>
           {tab === "analytics" &&
-            (loaded ? <Analytics events={entries} now={now} /> : <p className="text-sm text-ink-soft">{loadError ? "" : "Loading…"}</p>)}
+            (loaded ? <Analytics events={entries} now={now} medications={medications} /> : <p className="text-sm text-ink-soft">{loadError ? "" : "Loading…"}</p>)}
         </div>
 
         <div id="panel-new" role="tabpanel" aria-labelledby="tab-new" hidden={tab !== "new"}>
@@ -958,7 +975,7 @@ export default function Journal() {
                         );
                       }
                       const e = item.saved;
-                      const { title, detail } = describe(e, dogs, entries);
+                      const { title, detail } = describe(e, dogs, entries, medications);
                       const accident = isAccident(e);
                       return (
                         <li key={e.id}>
@@ -1051,6 +1068,7 @@ export default function Journal() {
             onAddFood={addFood}
             medications={medications}
             onAddMedication={addMedication}
+            onSetMedicationReason={setMedicationReason}
             phonePerson={person?.id ?? null}
             events={entries}
             allEvents={loaded?.events}

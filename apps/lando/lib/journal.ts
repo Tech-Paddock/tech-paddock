@@ -7,6 +7,7 @@ import {
   parseNewEvent,
   parseNewFood,
   parseNewMedication,
+  parseMedicationReason,
   type Dog,
   type ExerciseDetails,
   checkHealthReasons,
@@ -18,7 +19,7 @@ import {
 } from "./events";
 import { missingPhotos } from "./storage";
 import type { AddedFood } from "./foods";
-import type { Medication, MedUnit } from "./medications";
+import { findMedication, type Medication, type MedReason, type MedUnit } from "./medications";
 
 /**
  * The database half. Every failure throws: a failed read must never render as
@@ -263,7 +264,7 @@ export async function addFood(db: SupabaseClient, raw: unknown): Promise<AddedFo
   throw new Error(`couldn't add food: ${error.message}`);
 }
 
-type MedicationRow = { id: string; name: string; unit: MedUnit; retired: boolean };
+type MedicationRow = { id: string; name: string; unit: MedUnit; reason: MedReason | null; retired: boolean };
 
 /**
  * Medications added in the app (TEC-199), retired ones too, so an old dose can still be corrected
@@ -272,11 +273,11 @@ type MedicationRow = { id: string; name: string; unit: MedUnit; retired: boolean
 export async function listMedications(db: SupabaseClient): Promise<Medication[]> {
   const { data, error } = await db
     .from("medications")
-    .select("id, name, unit, retired")
+    .select("id, name, unit, reason, retired")
     .order("created_at", { ascending: true })
     .order("id", { ascending: true });
   if (error) throw new Error(`couldn't read medications: ${error.message}`);
-  return (data as MedicationRow[]).map((r) => ({ id: r.id, name: r.name, unit: r.unit, ...(r.retired ? { retired: true } : {}) }));
+  return (data as MedicationRow[]).map((r) => ({ id: r.id, name: r.name, unit: r.unit, ...(r.reason ? { reason: r.reason } : {}), ...(r.retired ? { retired: true } : {}) }));
 }
 
 /**
@@ -286,8 +287,23 @@ export async function listMedications(db: SupabaseClient): Promise<Medication[]>
  */
 export async function addMedication(db: SupabaseClient, raw: unknown): Promise<Medication> {
   const m = parseNewMedication(raw, await listMedications(db));
-  const { data, error } = await db.from("medications").insert({ name: m.name, unit: m.unit }).select("id").single();
-  if (!error) return { id: (data as { id: string }).id, name: m.name, unit: m.unit };
+  const { data, error } = await db.from("medications").insert({ name: m.name, unit: m.unit, reason: m.reason }).select("id").single();
+  if (!error) return { id: (data as { id: string }).id, name: m.name, unit: m.unit, reason: m.reason };
   if (error.code === "23505") throw new InvalidEvent(`${m.name} is already in the list`);
   throw new Error(`couldn't add medication: ${error.message}`);
+}
+
+/**
+ * Give a medication its reason (TEC-233), once. Only a row whose reason is still null is updated, so a reason
+ * already set is never changed (a second try is a 400, and the database decides a race).
+ */
+export async function setMedicationReason(db: SupabaseClient, raw: unknown): Promise<Medication> {
+  const { id, reason } = parseMedicationReason(raw);
+  const med = findMedication(await listMedications(db), id);
+  if (!med) throw new InvalidEvent("that medication is not in the list — reload");
+  if (med.reason) throw new InvalidEvent(`${med.name} already has a reason`);
+  const { data, error } = await db.from("medications").update({ reason }).eq("id", id).is("reason", null).select("id");
+  if (error) throw new Error(`couldn't set the reason: ${error.message}`);
+  if (!(data as unknown[] | null)?.length) throw new InvalidEvent(`${med.name} already has a reason`);
+  return { ...med, reason };
 }

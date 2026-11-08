@@ -18,7 +18,7 @@
 
 import { FOOD_TYPES, FOOD_UNITS, cleanFoodName, isMealType, listOf, findFood, foodNameTaken, formatAmount, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "./foods";
 import { dateLabel, fromDateInput, localMidnight, shortDate, toDateInput } from "./localtime";
-import { DOSE_MAX, MED_NAME_MAX, MED_ROUTES, MED_ROUTE_LABELS, MED_UNITS, cleanMedName, doseText, findMedication, medNameTaken, type MedRoute, type MedUnit, type Medication } from "./medications";
+import { DOSE_MAX, MED_NAME_MAX, MED_REASON_IDS, medReasonLabel, type MedReason, MED_ROUTES, MED_ROUTE_LABELS, MED_UNITS, cleanMedName, doseText, findMedication, medNameTaken, type MedRoute, type MedUnit, type Medication } from "./medications";
 
 export const LOG_KINDS = ["potty", "food", "exercise", "weight", "health", "note"] as const;
 export type LogKind = (typeof LOG_KINDS)[number];
@@ -1103,7 +1103,8 @@ export const round1 = (n: number) => Math.round(n * 10) / 10;
 export function describe(
   e: Pick<JournalEvent, "kind" | "details"> & { id?: string },
   dogs: readonly Dog[] = [],
-  events: JournalEvent[] = []
+  events: JournalEvent[] = [],
+  meds: readonly Medication[] = []
 ): { title: string; detail: string } {
   switch (e.kind) {
     case "potty": {
@@ -1168,8 +1169,11 @@ export function describe(
               .filter(Boolean)
               .join(" · ")
           : "";
+      // Its medication's reason (TEC-233), "No reason" until one is set; nothing when the list is not at hand.
+      const medFound = h.type === "medication" && h.med_id ? findMedication(meds, h.med_id) : null;
       const parts = [
         dose,
+        medFound ? medReasonLabel(medFound.reason) : "",
         (h.reasons ?? []).map((id) => healthReasonLabel(h.type, id)).join(", "),
         w ? `${round1(weight(w).value)} ${weight(w).unit}` : "",
         h.issue ? issueLinkText(events, h.issue) : "",
@@ -1355,14 +1359,29 @@ function medicationDetails(r: Record<string, unknown>, meds: readonly Medication
  * already in the list (retired too, case-blind); a unit from `MED_UNITS`. Throws `InvalidEvent` with a
  * sentence the form can show (TEC-199).
  */
-export function parseNewMedication(raw: unknown, meds: readonly Medication[] = []): { name: string; unit: MedUnit } {
+export function parseNewMedication(raw: unknown, meds: readonly Medication[] = []): { name: string; unit: MedUnit; reason: MedReason } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new InvalidEvent("expected a JSON object");
   const r = raw as Record<string, unknown>;
   const name = typeof r.name === "string" ? cleanMedName(r.name) : "";
   if (name.length < 1 || name.length > MED_NAME_MAX) throw new InvalidEvent(`a name is 1 to ${MED_NAME_MAX} characters`);
   const unit = oneOf(r.unit, MED_UNITS, "unit");
+  const reason = medReason(r.reason);
   if (medNameTaken(name, meds)) throw new InvalidEvent(`${name} is already in the list`);
-  return { name, unit };
+  return { name, unit, reason };
+}
+
+/** A medication's reason from the short list (TEC-233); a sentence the form can show when it is missing. */
+function medReason(v: unknown): MedReason {
+  if (typeof v !== "string" || !MED_REASON_IDS.includes(v)) throw new InvalidEvent("pick a reason");
+  return v as MedReason;
+}
+
+/** Giving an existing medication its reason ({id, reason}), checked (TEC-233). */
+export function parseMedicationReason(raw: unknown): { id: string; reason: MedReason } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new InvalidEvent("expected a JSON object");
+  const r = raw as Record<string, unknown>;
+  if (typeof r.id !== "string" || !r.id) throw new InvalidEvent("pick a medication");
+  return { id: r.id, reason: medReason(r.reason) };
 }
 
 /** Only the fields a kind owns survive; every required one must be there. */

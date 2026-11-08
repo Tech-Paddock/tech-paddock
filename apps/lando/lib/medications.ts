@@ -22,11 +22,36 @@ export const MED_ROUTES = [
 export type MedRoute = (typeof MED_ROUTES)[number][0];
 export const MED_ROUTE_LABELS = Object.fromEntries(MED_ROUTES) as Record<MedRoute, string>;
 
+/**
+ * Why a medication is given (TEC-233), id then label, in the order the form offers them. The ids are history's
+ * key: retire one by leaving it out of the form, never delete or rename it. Held equal to `lando.medications`'s
+ * check by a test.
+ */
+export const MED_REASONS = [
+  ["heartworm", "Heartworm"],
+  ["flea-tick", "Flea & tick"],
+  ["dewormer", "Dewormer"],
+  ["allergy", "Allergy"],
+  ["pain", "Pain"],
+  ["antibiotic", "Antibiotic"],
+  ["joint", "Joint"],
+  ["other", "Other"],
+] as const;
+export type MedReason = (typeof MED_REASONS)[number][0];
+export const MED_REASON_IDS: readonly string[] = MED_REASONS.map(([id]) => id);
+export const MED_REASON_LABELS = Object.fromEntries(MED_REASONS) as Record<MedReason, string>;
+export const NO_REASON = "No reason";
+
+/** A reason's words, or "No reason" for a medication added before reasons (or an id this build does not know). */
+export function medReasonLabel(reason: string | null | undefined): string {
+  return (reason && MED_REASON_LABELS[reason as MedReason]) || NO_REASON;
+}
+
 export const MED_NAME_MAX = 60;
 export const DOSE_MAX = 10_000;
 
 /** A medication as `lando.medications` holds it. Its `id` is history's key: never deleted, never changed. */
-export type Medication = { id: string; name: string; unit: MedUnit; retired?: boolean };
+export type Medication = { id: string; name: string; unit: MedUnit; reason?: MedReason; retired?: boolean };
 
 /** The pick list: every medication not retired, in the order added. */
 export function medPicklist(meds: readonly Medication[]): Medication[] {

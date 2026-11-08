@@ -11,6 +11,7 @@ import {
   dailyAverage,
   dayTimeline,
   dayStarts,
+  dosesByReason,
   foodAgainstWeight,
   formatSpan,
   mealToPoop,
@@ -19,6 +20,7 @@ import {
   weeklyExercise,
 } from "@/lib/analytics";
 import { displayUnit, type JournalEvent } from "@/lib/events";
+import type { Medication } from "@/lib/medications";
 import DailyChart, { type DailyColumn } from "./DailyChart";
 import DayTimeline from "./DayTimeline";
 import FoodWeightChart from "./FoodWeight";
@@ -45,7 +47,7 @@ function Card({ title, summary, children }: { title: string; summary?: React.Rea
  * Calories are recorded with every food and deliberately not shown. No model
  * is called here (RULES, Never 4).
  */
-export default function Analytics({ events, now }: { events: JournalEvent[]; now: Date }) {
+export default function Analytics({ events, now, medications = [] }: { events: JournalEvent[]; now: Date; medications?: Medication[] }) {
   // Re-bucketed when the day changes, not on every clock tick; meal to poop
   // needs the real clock (a meal an hour ago may still get its poop), so it
   // moves by the minute.
@@ -58,6 +60,7 @@ export default function Analytics({ events, now }: { events: JournalEvent[]; now
   const unit = displayUnit(events);
   const foodWeight = useMemo(() => foodAgainstWeight(events, midnight, unit), [events, midnight, unit]);
   const weeks = useMemo(() => weeklyExercise(events, midnight), [events, midnight]);
+  const reasons = useMemo(() => dosesByReason(events, medications, midnight), [events, medications, midnight]);
   const since = dayStarts(midnight)[0];
 
   const outside = dailyAverage(rows, ["pee", "poop"]);
@@ -208,6 +211,24 @@ export default function Analytics({ events, now }: { events: JournalEvent[]; now
             );
           })}
         </ul>
+      </Card>
+
+      <Card
+        title="Medication by reason"
+        summary={reasons.length ? `Doses in these ${ANALYTICS_DAYS} days, grouped by why the medication is given.` : "No medication dose in these days."}
+      >
+        {reasons.length > 0 && (
+          <ul className="grid gap-1.5">
+            {reasons.map((r) => (
+              <li key={r.reason || "none"} className="flex items-baseline justify-between gap-2 text-[13px]">
+                <span className="font-semibold">{r.label}</span>
+                <span className="text-right tabular-nums">
+                  {r.doses} {r.doses === 1 ? "dose" : "doses"} <span className="text-ink-soft">· {r.meds.map((m) => `${m.name} ${m.doses}`).join(", ")}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       <p className="text-[13px] text-ink-soft">

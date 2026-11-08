@@ -61,7 +61,7 @@ import {
   type Unit,
 } from "@/lib/events";
 import { FOOD_UNITS, MISC_ID, amountOptions, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
-import { MED_ROUTES, MED_UNITS, findMedication, medPicklist, type MedRoute, type MedUnit, type Medication } from "@/lib/medications";
+import { MED_REASONS, MED_REASON_IDS, MED_ROUTES, MED_UNITS, NO_REASON, findMedication, medReasonLabel, type MedReason, medPicklist, type MedRoute, type MedUnit, type Medication } from "@/lib/medications";
 import { FUTURE_NOTICE, donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, type DonePrefill } from "@/lib/future";
 import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
@@ -119,7 +119,9 @@ type Props = {
   /** Medications added in the app (`lando.medications`, TEC-199), retired ones too. */
   medications: Medication[];
   /** The Medication pick's "Add a medication…": saves one to `lando.medications` and hands it back. */
-  onAddMedication: (m: { name: string; unit: MedUnit }) => Promise<{ medication: Medication | null; error: string | null }>;
+  onAddMedication: (m: { name: string; unit: MedUnit; reason: MedReason }) => Promise<{ medication: Medication | null; error: string | null }>;
+  /** Give a medication added before reasons its reason, once (TEC-233). Resolves to an error sentence, or null when set. */
+  onSetMedicationReason: (id: string, reason: MedReason) => Promise<string | null>;
   phonePerson: string | null;
   /** Everything the journal read, voids included: the Related issue select lists its recent medical issues (TEC-142). */
   events: JournalEvent[];
@@ -273,6 +275,7 @@ export default function LogForm({
   onAddFood,
   medications,
   onAddMedication,
+  onSetMedicationReason,
   phonePerson,
   events,
   allEvents = [],
@@ -416,6 +419,12 @@ export default function LogForm({
   const [addingMed, setAddingMed] = useState(false);
   const [medName, setMedName] = useState("");
   const [newMedUnit, setNewMedUnit] = useState<MedUnit>("mg");
+  // The new medication's reason (TEC-233): none until picked, and the add refuses without one.
+  const [newMedReason, setNewMedReason] = useState("");
+  // Giving a medication with no reason one (TEC-233): the pick waiting on its Set button.
+  const [lateReason, setLateReason] = useState("");
+  const [lateBusy, setLateBusy] = useState(false);
+  const [lateError, setLateError] = useState<string | null>(null);
   const [medError, setMedError] = useState<string | null>(null);
   const [medBusy, setMedBusy] = useState(false);
   // Photos (TEC-137, and Fun and Training since TEC-139). A correction opens
@@ -531,7 +540,7 @@ export default function LogForm({
     setMedError(null);
     let checked;
     try {
-      checked = parseNewMedication({ name: medName, unit: newMedUnit }, medications);
+      checked = parseNewMedication({ name: medName, unit: newMedUnit, reason: newMedReason }, medications);
     } catch (err) {
       setMedError(err instanceof InvalidEvent ? err.message : "check the medication");
       return;
@@ -553,6 +562,27 @@ export default function LogForm({
     setMedUnit(medication.unit);
     setAddingMed(false);
     setMedName("");
+    setNewMedReason("");
+  }
+
+  /** Give the picked medication its reason: once, so the Set button is the only way and the sentence says so. */
+  async function setLate() {
+    if (lateBusy || !medId) return;
+    if (!MED_REASON_IDS.includes(lateReason)) {
+      setLateError("Pick a reason.");
+      return;
+    }
+    setLateBusy(true);
+    setLateError(null);
+    let err: string | null;
+    try {
+      err = await onSetMedicationReason(medId, lateReason as MedReason);
+    } catch (e) {
+      err = (e as Error).message || "couldn't set the reason";
+    }
+    setLateBusy(false);
+    if (err) setLateError(err);
+    else setLateReason("");
   }
 
   const item = findFood(foodType, itemId, foods);
@@ -1265,6 +1295,16 @@ export default function LogForm({
                         </select>
                       </Field>
                     </div>
+                    <Field label="Reason" htmlFor="f-med-new-reason">
+                      <select id="f-med-new-reason" value={newMedReason} onChange={(e) => setNewMedReason(e.target.value)} className={inputFull}>
+                        <option value="">Pick one…</option>
+                        {MED_REASONS.map(([id, label]) => (
+                          <option key={id} value={id}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
                     <div className="flex items-center gap-2">
                       <button type="button" onClick={(e) => void addMedication(e)} disabled={medBusy} className="min-h-[44px] rounded-[10px] bg-accent px-3 font-medium text-accent-ink disabled:opacity-60">
                         {medBusy ? "Adding…" : "Add"}
@@ -1300,7 +1340,9 @@ export default function LogForm({
                             return;
                           }
                           setMedId(e.target.value);
-                          const m = findMedication(medications, e.target.value);
+                          setLateReason("");
+                          setLateError(null);
+                          const m =findMedication(medications, e.target.value);
                           if (m) setMedUnit(m.unit);
                         }}
                         className={inputFull}
@@ -1327,6 +1369,38 @@ export default function LogForm({
                         ))}
                       </select>
                     </Field>
+                  </div>
+                )}
+                {!addingMed && pickedMed && (
+                  /* The medication's reason (TEC-233): words once set; "No reason" with a one-time Set before. */
+                  <div className="grid gap-1" data-testid="med-reason">
+                    {pickedMed.reason ? (
+                      <p className="text-[13px] text-ink-soft">Reason: {medReasonLabel(pickedMed.reason)}</p>
+                    ) : (
+                      <>
+                        <div className="flex items-end gap-2">
+                          <Field label={`Reason (${NO_REASON})`} htmlFor="f-med-late-reason" className="flex-1">
+                            <select id="f-med-late-reason" value={lateReason} onChange={(e) => setLateReason(e.target.value)} className={inputFull}>
+                              <option value="">{NO_REASON}</option>
+                              {MED_REASONS.map(([id, label]) => (
+                                <option key={id} value={id}>
+                                  {label}
+                                </option>
+                              ))}
+                            </select>
+                          </Field>
+                          <button type="button" onClick={() => void setLate()} disabled={lateBusy || !lateReason} className="min-h-[44px] rounded-[10px] bg-accent px-3 font-medium text-accent-ink disabled:opacity-60">
+                            {lateBusy ? "Setting…" : "Set reason"}
+                          </button>
+                        </div>
+                        <p className="text-[12px] text-ink-soft">A reason can be set once.</p>
+                        {lateError && (
+                          <p role="alert" className="text-[13px] font-semibold text-danger">
+                            {lateError}
+                          </p>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
                 <Field label="Given">
