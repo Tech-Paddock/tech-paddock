@@ -133,6 +133,14 @@
   `medications`) and, for a dose only, by `writeEvent`. Retire one by SQL (`retired = true`); it leaves the pick list but old
   doses still resolve and can be corrected, a retired one staying selectable on the dose that holds it. Picking a medication sets
   the Unit to its own. A future Medication saves an upcoming item titled "Name · 5 mg".
+  **Adding one (TEC-232):** the server path (`addMedication`, the table, its grants and checks) was sound; two client faults
+  made the add look like it did nothing. (1) Pressing the form's **Save** with "Add a medication" still open said only "Pick the
+  medication."; it now adds the medication first (or shows why it can't, in red under that form) and Save is pressed again for the
+  dose. (2) A journal read that began before the add and ended after it replaced the loaded list and dropped the new medication
+  from the pick; `Journal` now keeps what this session added (`addedMeds`) and merges it into every read. The add's own failure
+  shows under the form (`role="alert"`). `tests/medication-save.test.ts` renders `Journal` over the real route handlers and an
+  in-memory database (jsdom; `jsdom` and Testing Library are dev dependencies for it). **Trap:** its fake database is not
+  PostgREST; the table itself was proved by a rolled-back insert as `service_role`.
 - **The Health note is required** (TEC-139), for a new entry and a correction alike: the phone
   blocks Save on a blank or whitespace-only note with "Say what happened — the note is required."
   and the server refuses it too (`parseNewEvent`, so `writeEvent`; a delete is exempt, and no

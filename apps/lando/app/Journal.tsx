@@ -172,6 +172,7 @@ export default function Journal() {
   const [newName, setNewName] = useState("");
   const [personError, setPersonError] = useState<string | null>(null);
   const sinceRef = useRef(since);
+  const addedMeds = useRef(new Map<string, Medication>());
   sinceRef.current = since;
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Upcoming (TEC-192, TEC-199): open items, read apart from the journal so one failing never blanks the other.
@@ -203,7 +204,10 @@ export default function Journal() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setLoaded({ events: data.events, people: data.people, dogs: data.dogs ?? [], foods: data.foods ?? [], medications: data.medications ?? [] });
+      // A medication added in this session stays in the list even when this read began before it was saved.
+      const read: Medication[] = data.medications ?? [];
+      const medications = [...read, ...[...addedMeds.current.values()].filter((m) => !read.some((r) => r.id === m.id))];
+      setLoaded({ events: data.events, people: data.people, dogs: data.dogs ?? [], foods: data.foods ?? [], medications });
       setPhotoUrls((prev) => ({ ...prev, ...(data.photos ?? {}) }));
       setLoadError(null);
     } catch (e) {
@@ -409,7 +413,10 @@ export default function Journal() {
     try {
       const { ok, data } = await postJson("/api/medications", input);
       if (!ok) return { medication: null, error: data.error ?? "couldn't add" };
-      const medication = data.medication as Medication;
+      const medication = data.medication as Medication | undefined;
+      if (!medication?.id) return { medication: null, error: "couldn't add: the server sent no medication" };
+      // Kept apart too, so a journal read that started before the add and ends after it cannot drop it from the list.
+      addedMeds.current.set(medication.id, medication);
       setLoaded((prev) => (prev && !prev.medications.some((m) => m.id === medication.id) ? { ...prev, medications: [...prev.medications, medication] } : prev));
       return { medication, error: null };
     } catch (e) {
