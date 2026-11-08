@@ -14,9 +14,9 @@
 - `VERCEL_TOKEN` and `INTERNAL_API_SECRET` are not read; The Garage warns while either is set.
 - It knows tools through `TOOLS` in `lib/platform.ts`, whose array order is the sidebar order;
   changing that order is the owner's call. Adding a tool also touches `PRESENTATION` in
-  `app/apps.ts` (typed by `ToolSlug`, so the build fails until the tool has an icon), `ROSTER` in
-  `lib/pitgroups.ts` (the Pit Wall's app order, hand-typed until TEC-163) and the slug list in
-  `scripts/smoke-check.test.mjs`.
+  `app/apps.ts` (typed by `ToolSlug`, so the build fails until the tool has an icon) and the slug
+  list in `scripts/smoke-check.test.mjs`. The Pit Wall's `ROSTER` (`lib/pitgroups.ts`) is derived
+  from `PROJECTS` plus `showcase` (TEC-163), so it needs no edit.
 - `scripts/smoke-check.mjs` reads `lib/platform.ts` with a regex: each entry is one object literal
   holding only `slug`, `name`, `url` and `vercelProject`, in that order, and the live lists sit
   above `PARKED`. It skips an entry in any other shape without saying so.

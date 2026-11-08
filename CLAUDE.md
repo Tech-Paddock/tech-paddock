@@ -28,7 +28,7 @@ has readied, `/build TEC-n` that one, to a plan the TD shows first; `/status-che
 reports branches, unfinished work, blockers and hot topics; `/deploy` deploys what is ready, or
 holds and reports; `/summarize-plan [app]` lists the builds and deploys ahead and the command that
 runs them; `/execute-plan …` runs exactly that plan, step by step; `/closeout` says whether a chat
-is safe to archive; `/skill-check` lists every skill.
+is safe to archive; `/retro` looks back and records one lesson; `/skill-check` lists every skill.
 
 **Propose before branching:** the job, what comes first, what it contradicts. No branch until the
 owner says go. "Backlog" means a Linear issue in Backlog, not a build.

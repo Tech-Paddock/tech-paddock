@@ -79,8 +79,8 @@ would overwrite a hand correction. This is correctness, not cost.
 - No `/api/summary`. Nothing reads one.
 - The livery is the theme's (`apps/home`). `lib/livery.ts` pins `senna`. Do not change it from here.
 - The `health` schema and its tables belong to this app.
-- Deleting a meal is the one rewrite of the log. The owner decided on 2026-10-26 that it becomes a
-  soft delete, hidden and kept; TEC-165 makes it one.
+- Deleting a meal is a soft delete (owner, 2026-10-26; TEC-165): the route sets `deleted_at`,
+  removes nothing, and every read (the day, the list, totals, Left today) skips it.
 - One exception to Never 2, accepted by the owner on 2026-09-26 (TEC-25): during a Cookbook
   outage, a recipe never yet logged here cannot be told from a food, so it resolves as an ordinary
   food and may reach the model (`lib/cookbook.ts`, "The accepted gap"). A recipe stored with a

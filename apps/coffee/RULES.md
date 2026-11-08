@@ -30,9 +30,9 @@ there are none, and keep a library of bags bought and brews made.
   sentence's page.
 - This is enforced in code, in `lib/guide.ts`, never in the prompt; a prompt can only ask.
 - Do not weaken it, move it into the prompt, or add a write path around it.
-- An empty result and an unread result never render the same. One known exception: a product
-  gallery the detector misses, on a page with no `og:image`, comes back as a clean read with no
-  images (`lib/anthropic.ts`). Its warning is filed in TEC-167.
+- An empty result and an unread result never render the same. A product gallery the detector
+  misses, on a page with no `og:image`, is a failed read with a warning, not a clean read with no
+  images (TEC-167).
 
 ## Flow
 
