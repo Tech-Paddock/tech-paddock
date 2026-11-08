@@ -297,7 +297,7 @@ export default function AddRecipe({
             onChange={(e) => setMethod(e.target.value)}
             rows={3}
             placeholder="How you make it (optional)"
-            aria-label="Method"
+            aria-label="Steps"
             className="rounded-lg border border-line bg-surface p-3 text-base"
           />
           <MetaFields value={metaForm} onChange={setMetaForm} />
@@ -400,7 +400,7 @@ export default function AddRecipe({
             </div>
             <details>
               <summary className="cursor-pointer text-xs text-ink-soft">
-                {draft.ingredients.length} ingredients{draft.method ? " and the method" : ""}
+                {draft.ingredients.length} ingredients{draft.method ? " and the steps" : ""}
               </summary>
               <ul className="mt-2 flex flex-col gap-1 text-sm">
                 {draft.ingredients.map((i, n) => (

@@ -49,19 +49,23 @@ function card(r: Recipe, open: boolean) {
     }),
   );
 }
-function openTab(tab: "ingredients" | "method" | "macros") {
-  return renderToStaticMarkup(
-    createElement(RecipeOpen, { recipe, tab, onTab: noop, onRate: noop, rating: false }),
-  );
+function openTab(tab: "ingredients" | "steps" | "macros") {
+  return renderToStaticMarkup(createElement(RecipeOpen, { recipe, tab, onTab: noop }));
 }
 
 describe("the recipe on the list (TEC-189)", () => {
   const html = card(recipe, false);
-  it("is the name, then 5★ · Prep · Cook · makes N, then one serving as text", () => {
+  it("is the name, then 5★ · Prep · Cook · makes N, and no macros line (TEC-235)", () => {
     expect(html).toContain("Green curry");
     expect(html).toContain("5★");
     expect(html).toMatch(/ · Prep 15m · Cook 30m · makes 4/);
-    expect(html).toContain("500 kcal · 30p · 40c · 23f");
+    expect(html).not.toContain("kcal");
+    const none = card({ ...recipe, kcal: null, protein_g: null, carbs_g: null, fat_g: null }, false);
+    expect(none).not.toContain("Macros not estimated");
+  });
+  it("is one toggle button, with no stars to rate while closed", () => {
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain("Rate 1 of 5");
   });
   it("has no macro tiles on the list", () => {
     expect(html).not.toContain("grid-cols-4");
@@ -88,7 +92,8 @@ describe("the open recipe", () => {
   it("opens on Ingredients, with the three tabs in a tablist", () => {
     expect(html).toContain('role="tablist"');
     expect(html).toMatch(/aria-selected="true"[^>]*>Ingredients</);
-    expect(html).toMatch(/aria-selected="false"[^>]*>Method</);
+    expect(html).toMatch(/aria-selected="false"[^>]*>Steps</);
+    expect(html).not.toContain("Method");
     expect(html).toMatch(/aria-selected="false"[^>]*>Macros</);
     expect(html).toContain("curry paste");
     expect(html).not.toContain("Fry the paste");
@@ -98,10 +103,27 @@ describe("the open recipe", () => {
     expect(html).toContain(">curry paste<");
     expect(html).toContain(">Salt, to taste<");
   });
-  it("shows the rating up top as five stars with N of 5", () => {
+  it("names the recipe once, with the rating stars on the same line as the title", () => {
+    expect(html.split(">Green curry<").length - 1).toBe(1);
+    const header = html.slice(0, html.indexOf('role="tablist"'));
+    expect(header).toContain("Clear the rating of 5");
+    expect(header.indexOf(">Green curry<")).toBeLessThan(header.indexOf("Clear the rating of 5"));
     expect(html).toContain("5 of 5");
-    expect(html).toContain("Clear the rating of 5");
     expect(card({ ...recipe, rating: null }, true)).toContain("Not rated");
+  });
+  it("is one toggle: the header button is expanded, and carries the origin and facts", () => {
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain("Claude&#x27;s · Main · Prep 15m · Cook 30m · makes 4");
+  });
+  it("has a servings dial that starts at the recipe's own servings", () => {
+    expect(html).toContain("Fewer servings");
+    expect(html).toContain("More servings");
+    expect(html).toMatch(/<output[^>]*>4<\/output>/);
+    expect(html).toContain(">2 tbsp<");
+  });
+  it("has no warning text under the buttons", () => {
+    expect(html).not.toContain("clears the macros");
+    expect(html).not.toContain("shopping list alone");
   });
   it("renders no keywords and no helpings estimator", () => {
     for (const word of ["chicken", "thai", "one pot", "vegetarian", "workmight", "elpings"]) {
@@ -110,8 +132,8 @@ describe("the open recipe", () => {
     expect(html).not.toContain("Macro breakdown");
   });
   it("switches: each tab shows its own panel and marks itself selected", () => {
-    const method = openTab("method");
-    expect(method).toMatch(/aria-selected="true"[^>]*>Method</);
+    const method = openTab("steps");
+    expect(method).toMatch(/aria-selected="true"[^>]*>Steps</);
     expect(method).toContain("Fry the paste.");
     expect(method).toContain("Add the coconut milk");
     expect(method).not.toContain("curry paste");
@@ -138,9 +160,9 @@ describe("the Add to list card", () => {
         today: "2026-10-28",
       }),
     );
-  it("asks when with one date box that opens on today, not chips", () => {
+  it("has one date box that opens on today, not chips", () => {
     const html = render();
-    expect(html).toContain("When are you cooking it?");
+    expect(html).toContain("Cook on");
     expect(html).toContain('type="date"');
     expect(html).toContain('value="2026-10-28"');
     for (const label of ["Today", "Tomorrow", "Friday", "Pick a date"]) {
@@ -153,6 +175,24 @@ describe("the Add to list card", () => {
     expect(html).toContain(">Add to list<");
     expect(html).toContain(">Edit<");
     expect(html).toContain(">Remove<");
+  });
+  it("offers a small Revert to original link only for a recipe with an original", () => {
+    expect(render()).not.toContain("Revert");
+    const html = renderToStaticMarkup(
+      createElement(AddToListCard, {
+        name: "Green curry",
+        hasIngredients: true,
+        listing: false,
+        onList: noop,
+        onEdit: noop,
+        onRemove: noop,
+        onRevert: noop,
+        today: "2026-10-28",
+      }),
+    );
+    expect(html).toContain(">Revert to original<");
+    expect(html).not.toContain("Revert to imported");
+    expect(html).toContain("underline");
   });
   it("carries no pricing note", () => {
     expect(render().toLowerCase()).not.toContain("pricing");

@@ -21,7 +21,7 @@ export function ratingWords(rating: number | null | undefined): string {
 /** The open recipe's tabs, in order. It opens on the first. */
 export const RECIPE_TABS = [
   { key: "ingredients", label: "Ingredients" },
-  { key: "method", label: "Method" },
+  { key: "steps", label: "Steps" },
   { key: "macros", label: "Macros" },
 ] as const;
 

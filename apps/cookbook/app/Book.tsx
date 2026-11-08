@@ -2,15 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Menu from "./Menu";
-import { AddToListCard, RecipeOpen } from "./RecipeDetail";
+import { AddToListCard, ORIGIN_LABELS, RecipeOpen } from "./RecipeDetail";
+import { Stars } from "./Meta";
 import { useToast } from "./Toast";
-import { servingOrNull } from "@/lib/recipeSteps";
 import type { Recipe } from "@/lib/recipes";
 import { menuDayLabel } from "@/lib/menuDay";
-import { FIRST_RECIPE_TAB, factsLine, macrosLine, type RecipeTab } from "@/lib/recipeView";
+import { mealLabel, timeParts } from "@/lib/metadata";
+import { FIRST_RECIPE_TAB, factsLine, ratingWords, type RecipeTab } from "@/lib/recipeView";
 import EditRecipe from "./EditRecipe";
 import { BookFilters } from "./Tuning";
-import { DEFAULT_SORT, SORT_CHOICES, readSort, sortRecipes, type BookSort } from "@/lib/recipeSort";
+import { sortRecipes } from "@/lib/recipeSort";
 import { NO_FILTER, cuisinesIn, filterActive, matchesFilter, type BookFilter } from "@/lib/tuning";
 
 /**
@@ -21,8 +22,6 @@ import { NO_FILTER, cuisinesIn, filterActive, matchesFilter, type BookFilter } f
  * stay mounted side by side, so a recipe kept there reaches this one through
  * `version` rather than through shared state.
  */
-
-const SORT_KEY = "cookbook:book-sort";
 
 export default function Book({
   onAddedToList,
@@ -41,24 +40,6 @@ export default function Book({
   const [readError, setReadError] = useState<string | null>(null);
   const toast = useToast();
   const [filter, setFilter] = useState<BookFilter>(NO_FILTER);
-  // The sort (TEC-224): kept in this browser's localStorage only; every touch is in try/catch.
-  const [sort, setSort] = useState<BookSort>(DEFAULT_SORT);
-  useEffect(() => {
-    try {
-      setSort(readSort(window.localStorage.getItem(SORT_KEY)));
-    } catch {
-      // No storage: the book order, and the select still works for this visit.
-    }
-  }, []);
-  function chooseSort(next: BookSort) {
-    setSort(next);
-    try {
-      window.localStorage.setItem(SORT_KEY, next);
-    } catch {
-      // Not remembered; nothing else depends on it.
-    }
-  }
-
   const [openId, setOpenId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   // The recipe whose ingredients are on their way to the list, if any.
@@ -170,7 +151,7 @@ export default function Book({
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't put that back.");
-      replaced(body.recipe as Recipe, `"${recipe.name}" is back as imported. Its macros are not estimated yet.`);
+      replaced(body.recipe as Recipe, `"${recipe.name}" is back to the original. Its macros are not estimated yet.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't put that back.");
     }
@@ -206,7 +187,7 @@ export default function Book({
    * Filtered in the browser because the whole book is already here. When it stops
    * being, this moves to the query — the shape of the answer does not change.
    */
-  const shown = sortRecipes(recipes ?? [], sort).filter((recipe) => {
+  const shown = sortRecipes(recipes ?? []).filter((recipe) => {
     // The filters first (`matchesFilter`): every one set must hold.
     if (!matchesFilter(recipe, filter)) return false;
     const q = query.trim().toLowerCase();
@@ -254,23 +235,6 @@ export default function Book({
         ) : null}
         {recipes !== null && recipes.length > 0 ? (
           <BookFilters value={filter} onChange={setFilter} cuisines={cuisinesIn(recipes)} />
-        ) : null}
-        {recipes !== null && recipes.length > 0 ? (
-          <label className="flex items-center gap-2 text-[13px] text-ink-soft">
-            Sort
-            <select
-              value={sort}
-              onChange={(e) => chooseSort(readSort(e.target.value))}
-              aria-label="Sort the book"
-              className="rounded-lg border border-line bg-surface px-1.5 py-1.5 text-[13px] text-ink"
-            >
-              {SORT_CHOICES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </label>
         ) : null}
 
         {recipes === null ? (
@@ -350,27 +314,48 @@ export function RecipeCard({
   return (
     // The id is what "On the menu" scrolls to.
     <li id={`recipe-${recipe.id}`} className="scroll-mt-4 overflow-hidden rounded-xl bg-surface">
-      {/* **Three short text lines** (TEC-189, the owner's pick from the preview):
-          the name; then rating · Prep · Cook · makes N, each part absent when
-          unset (the old total stands in only while neither Prep nor Cook is
-          set); then one serving's numbers as text. The four macro tiles are
-          gone from the list (the Macros tab keeps them). **Origin is no longer
-          on the line**: it did not fit at 360px beside Prep and Cook, and the
-          open recipe still says it. `truncate` on the name, not a character
-          count, so a long name gives way and the facts do not. */}
-      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full flex-col gap-0.5 px-3 py-2 text-left">
-        <span className="min-w-0 truncate text-[15px] font-semibold">{recipe.name}</span>
-        <span className="text-xs text-ink-soft">
-          {facts.stars ? (
-            <>
-              <span aria-label={`Rated ${recipe.rating} of 5`} className="font-semibold text-accent">{facts.stars}</span>
-              {" · "}
-            </>
-          ) : null}
-          {facts.rest}
-        </span>
-        <span className="text-xs tabular-nums text-ink-soft">{macrosLine(servingOrNull(recipe))}</span>
-      </button>
+      {/* **One header, open or closed** (TEC-235; the two text lines of TEC-189
+          lost their macros line). The name shows once, with the facts under it,
+          and tapping them toggles the card, so an open recipe closes the same
+          way it opened. Closed, the facts lead with the rating as "5★". Open,
+          the rating is five tappable stars on the title's line, so the facts
+          drop the "5★" and add the origin (it does not fit beside Prep and Cook
+          at 360px closed). The stars are the button's sibling, never inside it.
+          `truncate` on the closed name so a long name gives way and the facts
+          do not; open, it wraps. */}
+      <div className="flex items-start gap-1 pr-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 flex-col gap-0.5 px-3 py-2 text-left"
+        >
+          <span className={open ? "break-words text-base font-bold leading-snug" : "min-w-0 truncate text-[15px] font-semibold"}>
+            {recipe.name}
+          </span>
+          <span className="text-xs text-ink-soft">
+            {open ? (
+              [ORIGIN_LABELS[recipe.origin], mealLabel(recipe.meal), ...timeParts(recipe), `makes ${recipe.servings}`].join(" · ")
+            ) : (
+              <>
+                {facts.stars ? (
+                  <>
+                    <span aria-label={`Rated ${recipe.rating} of 5`} className="font-semibold text-accent">{facts.stars}</span>
+                    {" · "}
+                  </>
+                ) : null}
+                {facts.rest}
+              </>
+            )}
+          </span>
+        </button>
+        {open && !editing ? (
+          <div className="shrink-0 pt-0.5">
+            <Stars rating={recipe.rating} onRate={onRate} busy={rating} size="text-xl" />
+            <span className="sr-only">{ratingWords(recipe.rating)}</span>
+          </div>
+        ) : null}
+      </div>
 
       {open && editing ? (
         <div className="border-t border-line p-3">
@@ -384,12 +369,13 @@ export function RecipeCard({
           />
         </div>
       ) : open ? (
-        // **The recipe opens in tabs** (TEC-183): name, origin · makes · time and
-        // the rating up top, then Ingredients · Method · Macros, then Add to list
-        // by a date box (TEC-189) with Edit and Remove under it. The helpings estimator and the
-        // keywords are gone; Health's `GET /api/servings` is untouched.
-        <div className="flex flex-col gap-4 border-t border-line/40 px-3.5 py-3">
-          <RecipeOpen recipe={recipe} tab={tab} onTab={setTab} onRate={onRate} rating={rating} />
+        // **The recipe opens in tabs** (TEC-183): the header above, then the
+        // servings dial and Ingredients · Steps · Macros, then one row with the cook
+        // date and Add to list, with Edit and Remove quiet under it (TEC-235). The
+        // helpings estimator and the keywords are gone; Health's
+        // `GET /api/servings` is untouched.
+        <div className="flex flex-col gap-3 px-3.5 pb-3 pt-1">
+          <RecipeOpen recipe={recipe} tab={tab} onTab={setTab} />
           <AddToListCard
             name={recipe.name}
             hasIngredients={recipe.ingredients.length > 0}
@@ -399,10 +385,6 @@ export function RecipeCard({
             onRemove={onRemove}
             onRevert={recipe.has_original ? onRevert : undefined}
           />
-          <p className="text-[11px] text-ink-soft">
-            Changing the ingredients or servings clears the macros; they are worked out again overnight. Removing takes the recipe out of the book and
-            leaves your shopping list alone.
-          </p>
         </div>
       ) : null}
     </li>
