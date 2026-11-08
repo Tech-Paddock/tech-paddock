@@ -44,7 +44,7 @@ section and closing comment before changing anything in this file.
   macros out from the ingredients, and the macro source is `estimate`, never `web`. `source_url`
   records where the method came from, never a number.
 - **There is no recipe Tidy** (owner, 2026-11-02). Every way in applies the house style, so a recipe
-  arrives in it; nothing rewrites the book in a batch. **Revert to imported** puts back
+  arrives in it; nothing rewrites the book in a batch. **Revert to original** puts back
   `imported_original` (ingredients, method, servings), clears the macros and `house_style_at`, and
   runs no model. The grocery list's Tidy is a separate feature and stays.
 - **The recipe side never says price** (owner, 2026-11-02): "estimate macros" is the word. Dollars
@@ -66,10 +66,15 @@ section and closing comment before changing anything in this file.
 - A recipe stores no allergen or free-of claim and no macro tag, and its rating never comes from a
   model.
 - A recipe must not take a name that already means something else in this app's data.
-- An open recipe is **tabs Ingredients · Method · Macros**, the rating at the top, **Add to list**
-  by day, Edit and Remove; no helpings estimator, and no keywords shown anywhere (TEC-183; the
+- An open recipe is **tabs Ingredients · Steps · Macros**, the rating beside its one title, **Add
+  to list** by day, Edit and Remove; no helpings estimator, and no keywords shown anywhere (TEC-183; the
   fields stay stored and editable). **Cookbook does not log what was eaten** (owner, 2026-10-26): Health does, from `GET /api/servings` under the
   contract below. Removing a recipe leaves anything Health logged untouched.
+- **The servings dial scales a view, never the recipe** (TEC-235). It scales the leading number of
+  each ingredient line, shown as kitchen fractions; nothing is stored or sent, and a line with no
+  leading number stays as written.
+- **The Book always sorts A to Z, with no choice** (owner, TEC-235): no Sort control, and nothing
+  stored for one.
 
 ## Storage
 
@@ -110,7 +115,8 @@ section and closing comment before changing anything in this file.
   price's `title` and accessible name. The line is **shaded by the
   Deals stoplight for that product**: green when Deals calls it green, red when red, plain
   otherwise; **before 4 weeks of history, on sale or with a coupon is good, else plain, never red**.
-  A line with no saved product or no recent price stays plain. Colour is never the only cue: the
+  A line with no saved product or no recent price stays plain. Colour is never the only cue: a
+  small **Sale · Low · Coupon · High** tag beside the price, with no left bar (TEC-236), and the
   price's `title` and accessible name ("Good price", "High price", the bubble) say why. A line's shade and the Deals board come
   from one function and never disagree. A **Best** toggle on the List shows only the lines that are
   Best (below). No Kroger call, no model.

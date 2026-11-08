@@ -58,6 +58,10 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **A container restart kills the builder.** Unpushed work survives in `.claude/worktrees/agent-*`
   until the container goes; brief a fresh builder to carry it over.
 - **Parallel builders can pick the same migration timestamp.** Check before merging.
+- **Two merges seconds apart can skip an app's deploy** (seen 2026-11-08, #387 then #388). Vercel
+  builds only the newest `main` commit, and each `ignoreCommand` reads that commit alone, so the
+  earlier merge's app never builds. Brief Deployment to let each app's production deploy start
+  before the next merge, or to confirm every merged app is READY on a commit that contains it.
 - **CI runs on push only** (TEC-158); a pull request shows the push run's checks. If `main`'s
   required checks ever stop showing on a pull request, that change is the first suspect. Read checks
   with `pull_request_read` → `get_check_runs`, not a curl loop.
