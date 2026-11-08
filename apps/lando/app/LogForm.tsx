@@ -85,6 +85,8 @@ export type LogBody = {
   details: Details;
   note: string | null;
   voids?: string;
+  /** The entry this one was made from (TEC-251): a treat, or a Fun form's Pee or Poop, saved under the parent's id. */
+  parent_id?: string;
 };
 
 type Props = {
@@ -498,6 +500,8 @@ export default function LogForm({
       person_id: personId || null,
       details: parseDetails("potty", raw),
       note: null,
+      // Made from this Fun form: the id the Fun entry will be saved under, fixed when the form opened (TEC-251).
+      parent_id: saveId.current,
     };
     setTapped((t) => [...t, { id: body.id, what, at, detail: describe(body).detail }]);
     onPotty(body);
@@ -764,7 +768,7 @@ export default function LogForm({
     let then: LogBody[] = [];
     try {
       if (kind === "potty" || kind === "exercise") {
-        then = inlineTreatEntries({ id: treatId.current, item_id: MISC_ID, qty: treatQty }, at, body.person_id, foods);
+        then = inlineTreatEntries({ id: treatId.current, item_id: MISC_ID, qty: treatQty }, at, body.person_id, foods, body.id);
       }
       // A vet visit's Weight, saved after the visit (TEC-151); a Medical issue has none.
       if (kind === "health" && healthType === "vet") {

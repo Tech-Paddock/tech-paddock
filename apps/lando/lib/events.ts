@@ -466,6 +466,13 @@ export type JournalEvent = {
   details: Details;
   note: string | null;
   voids: string | null;
+  /**
+   * The entry this one was made from, inside that entry's form (TEC-251): a treat counted on Potty, Training or Fun,
+   * a Pee or Poop tapped on a Fun form, a vet visit's weight. Its id as the form opened, so it is the id the parent is
+   * saved under, and a correction of the parent leaves it (the chain through `voids` reaches the live parent). Null on
+   * an entry that was not made from another, and on every entry from before. Never shown.
+   */
+  parent_id?: string | null;
   created_at: string;
 };
 
@@ -589,15 +596,28 @@ export function emptyFeedText(picks: FormKind | readonly FormKind[] | null): str
 }
 
 /**
- * The treats logged from a training's Treats pop-up: live food treats at the
- * training's exact time. Each is saved at the session's `at`, to the
- * millisecond, so nothing else lands on it; there is no link column (the data
- * shape is unchanged). A correction that moves the session's time leaves its
- * treats where they were, and they then no longer show on it.
+ * The treats logged with a training, fun or potty: live food treats made from it, or, for a treat saved before
+ * TEC-251 (no link), live food treats at its exact time. A treat is made from the entry when its `parent_id` is the
+ * entry's id or the id of any entry the live one replaced (a correction of the parent leaves the link on the old id,
+ * so the chain through `voids` is followed). A treat that holds a link belongs to that parent only: it is never
+ * matched by time. An unlinked one is saved at the session's `at`, to the millisecond, so nothing else lands on it;
+ * a correction that moves the session's time leaves such a treat where it was, and it then no longer shows on it
+ * (a linked one stays). `events` is the whole read, voids included; without the entry's `id` only time matches.
  */
-export function treatsWith(events: JournalEvent[], training: Pick<JournalEvent, "at">): JournalEvent[] {
+export function treatsWith(events: JournalEvent[], training: Pick<JournalEvent, "at"> & Partial<Pick<JournalEvent, "id">>): JournalEvent[] {
   const t = Date.parse(training.at);
-  return liveEvents(events).filter((e) => e.kind === "food" && food(e).type === "treat" && Date.parse(e.at) === t);
+  const ids = new Set<string>();
+  if (training.id) {
+    const replaced = new Map<string, string>();
+    for (const e of events) if (e.voids && e.kind !== "void") replaced.set(e.id, e.voids);
+    for (let id: string | undefined = training.id; id && !ids.has(id); id = replaced.get(id)) ids.add(id);
+  }
+  return liveEvents(events).filter(
+    (e) =>
+      e.kind === "food" &&
+      food(e).type === "treat" &&
+      (e.parent_id ? ids.has(e.parent_id) : Date.parse(e.at) === t)
+  );
 }
 
 /**
@@ -614,8 +634,9 @@ export function treatEntry(
   t: QueuedTreat,
   at: string,
   personId: string | null,
-  added: readonly AddedFood[] = []
-): { id: string; kind: "food"; at: string; person_id: string | null; details: Details; note: null } {
+  added: readonly AddedFood[] = [],
+  parentId?: string
+): { id: string; kind: "food"; at: string; person_id: string | null; details: Details; note: null; parent_id?: string } {
   return {
     id: t.id,
     kind: "food",
@@ -623,6 +644,7 @@ export function treatEntry(
     person_id: personId,
     details: parseDetails("food", { type: "treat", item_id: t.item_id, amount: t.amount }, added),
     note: null,
+    ...(parentId ? { parent_id: parentId } : {}),
   };
 }
 
@@ -633,17 +655,19 @@ export type InlineTreat = { id: string; item_id: string; qty: number | null };
  * What the inline treat row saves after its parent: one treat entry at the parent's time and person, or
  * nothing when the quantity is empty or 0. The row opens at 0, so a form saved without touching it logs no
  * treat. Any other quantity must be a whole number, 1 or more. Throws `InvalidEvent` like any form.
+ * `parentId` is the id the parent is saved under (TEC-251), which the treat stores as `parent_id`.
  */
 export function inlineTreatEntries(
   t: InlineTreat,
   at: string,
   personId: string | null,
-  added: readonly AddedFood[] = []
+  added: readonly AddedFood[] = [],
+  parentId?: string
 ): ReturnType<typeof treatEntry>[] {
   if (t.qty === null || t.qty === 0) return [];
   const bad = treatQtyError(t.qty);
   if (bad) throw new InvalidEvent(bad);
-  return [treatEntry({ id: t.id, item_id: t.item_id, amount: t.qty }, at, personId, added)];
+  return [treatEntry({ id: t.id, item_id: t.item_id, amount: t.qty }, at, personId, added, parentId)];
 }
 
 /** How far behind today the journal is read. A clock with nothing in it says so. */
@@ -998,6 +1022,8 @@ export type FollowUp = {
   details: Details;
   note: string | null;
   voids?: string;
+  /** The entry this one was made from (TEC-251): the id the parent is saved under. */
+  parent_id?: string;
 };
 
 /**
@@ -1045,6 +1071,7 @@ export function visitWeightPlan(x: {
       details,
       note: x.linked?.note ?? null,
       ...(x.linked ? { voids: x.linked.id } : {}),
+      parent_id: x.visitId,
     },
   ];
 }
@@ -1201,6 +1228,8 @@ export type NewEvent = {
   details: Details;
   note: string | null;
   voids: string | null;
+  /** The entry this one was made from (TEC-251); only a treat, a potty or a weight carries one. */
+  parent_id: string | null;
 };
 
 export class InvalidEvent extends Error {}
@@ -1523,6 +1552,15 @@ export function parseNewEvent(body: unknown, now: Date, added: readonly AddedFoo
   if (kind === "void" && !voids) throw new InvalidEvent("a delete must name the entry it deletes");
   if (voids === b.id) throw new InvalidEvent("an entry cannot void itself");
 
+  // The entry this one was made from (TEC-251). Not checked against the table: a Fun form's Pee or Poop is saved
+  // before the Fun entry, which may never be. Only what a form makes from another entry carries one.
+  if (b.parent_id !== undefined && b.parent_id !== null && !isUuid(b.parent_id)) throw new InvalidEvent("parent_id must be a UUID");
+  const parent_id = (b.parent_id as string | null | undefined) ?? null;
+  if (parent_id && !(kind === "food" || kind === "potty" || kind === "weight")) {
+    throw new InvalidEvent("only a treat, a potty or a weight is made from another entry");
+  }
+  if (parent_id === b.id) throw new InvalidEvent("an entry cannot be made from itself");
+
   let at: string | null = null;
   if (kind !== "void" && b.at !== undefined && b.at !== null) {
     if (typeof b.at !== "string" || Number.isNaN(Date.parse(b.at))) throw new InvalidEvent("at must be a time");
@@ -1553,6 +1591,7 @@ export function parseNewEvent(body: unknown, now: Date, added: readonly AddedFoo
     details,
     note,
     voids,
+    parent_id,
   };
 }
 
