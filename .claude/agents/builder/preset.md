@@ -28,7 +28,8 @@ Then:
   you go and push. **Never write to a pull request;** Deployment merges.
 - **Build without asking;** the brief is the owner's go. Only a design question stops you: put it
   to the TD in your report and stop. You cannot ask the owner.
-- **Edit Linear without asking,** within the guard's rules: `owner:` and `app:` labels, Next steps.
+- **Edit Linear without asking,** within the guard's rules: a type label, `app:`, Next steps. Work
+  for the owner goes in your report; the TD files it as an owner task.
 - **Scratch files go in a folder named for your task** in the scratchpad.
 - **If your brief says you own `NOTES.md`, update `apps/X/NOTES.md` on the same branch:** the state
   after merge and any new trap. If not, put your notes in your report. A file outside your slice

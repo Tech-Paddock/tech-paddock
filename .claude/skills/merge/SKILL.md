@@ -88,11 +88,11 @@ stays: say so, and what the old code does with the new column. Reopen the issue.
 **Close what shipped, once it is live.** For each issue the branch names:
 
 - Mark the Next step it delivered `Done YYYY-MM-DD`.
-- **Every step done, or only an owner phone check left:** status Done, unassigned. A phone check
-  left gets the `Phone check` label instead of holding it open. When one issue has several
-  branches, only the last one to go live closes it.
-- **Steps left:** reopen it if the merge closed it; status per `CLAUDE.md`; assigned to the owner
-  only while a ⭐ step waits on them.
+- **Every step done:** status Done, unassigned. A check after live the brief asks for is an owner
+  task related to the issue (the `owner-task` skill), never a step that holds it open. When one
+  issue has several branches, only the last one to go live closes it.
+- **Steps left:** reopen it if the merge closed it; status per `CLAUDE.md`. Never assign it: work
+  for the owner is an owner task.
 - Put each issue and what you set it to in your report.
 
 List merged branches still on the remote; agents cannot delete them.

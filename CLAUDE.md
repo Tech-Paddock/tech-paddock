@@ -94,17 +94,21 @@ go, go fully and do not reopen it.
 
 ## Linear, team TEC
 
-- **One issue per request,** labelled `owner:Owner` or `owner:TD`, plus `app:<app>` where one
-  applies. The body ends with numbered **Next steps**, each naming who acts: Owner, TD, Builder or
-  Deployment. The guard refuses an issue without them.
+- **One issue per request,** with one type label (Feature, Enhancement, Bug or Owner task) plus
+  `app:<app>` where one applies. It opens with what, why and done when, and shows at most 300 words;
+  detail for agents goes in a collapsed `+++ Agent notes` section. The body ends with numbered
+  **Next steps**, each naming who acts: Owner, TD, Builder or Deployment. The guard refuses an
+  issue without them.
+- **The owner's work is an owner task** (the `owner-task` skill): its own issue, assigned to the
+  owner, opening `For TEC-n`, with Steps and Done when in 150 words. It blocks its issue when work
+  waits on it, and is only related when it is a check after live. Nothing else is assigned to the
+  owner. A failed check is the owner's comment; the TD files a Bug sub-issue.
+- **Epics are Linear Projects; sub-issues are slices,** one per builder or deployable part.
 - **Status:** Backlog (blocked, or parked with the `Parked` label) · Todo (ready) · In Progress
   (work committed) · In Review (pushed, awaiting merge) · Done (every Next step done; reopen a
   merge-closed issue if steps remain).
-- **Assign an issue only while a step waits on the owner,** and mark that step ⭐.
-- **Live closes an issue.** A phone check is a step only when the owner asks for one or the change
-  cannot be tested signed out. It never holds the issue open: Deployment closes it with the
-  `Phone check` label, `/status-check` lists them, and the TD removes the label when the owner says
-  it passed.
+- **Live closes an issue.** A check after live is a related owner task, filed only when the owner
+  asks for one or the change cannot be tested signed out; it never holds the issue open.
 - **Open every message to the owner with a `---` line.**
 - **Anything the owner should open outside the chat is a clickable link:** an app, a Linear issue,
   a pull request, a dashboard page. Never a bare name, subdomain or path. Linear issues carry the

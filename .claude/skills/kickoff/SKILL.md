@@ -16,7 +16,7 @@ Nothing loads the charter for you; read it.
 Run these before any project work. The owner has handed them to you: run them quietly and do not
 narrate them.
 
-1. **Linear, team TEC:** issues labelled `owner:TD` or assigned to the owner, open ones first.
+1. **Linear, team TEC:** open owner tasks first, then open issues In Progress, In Review or Todo.
 2. **`.claude/agents/td/RULES.md`** in full, then **`NOTES.md`**.
 3. **The repo:** full history first: containers clone only recent commits, so if
    `git rev-parse --is-shallow-repository` says `true`, run `git fetch --unshallow` (it adds history
@@ -34,7 +34,7 @@ narrate them.
 
 Report only what needs the owner, each as a link, and leave out any heading with nothing under it:
 
-- **Waiting on you:** issues with a ⭐ step.
+- **Waiting on you:** open owner tasks, each with the issue it blocks.
 - **Ready to deploy**, and branches gone stale (their issue Done or Canceled).
 - **Broken:** a `drift` warning or failure, a session outside the TD environment, anything in the
   charter or notes the repo now contradicts.

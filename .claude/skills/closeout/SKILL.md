@@ -25,8 +25,8 @@ asks it. Never `main`, never the harness-named session branch.
 - Commit and push.
 - `NOTES.md` (the app's or the TD's) describes the state after merge.
 - `node scripts/drift-check.mjs` has 0 failures.
-- Every open item is in Linear: an `owner:` label (and `app:` where one applies), Next steps, a ⭐
-  on each step waiting on the owner, and the owner assigned while one does.
+- Every open item is in Linear: a type label (and `app:` where one applies), Next steps, and an
+  owner task for each thing waiting on the owner.
 
 ## 4. The report
 

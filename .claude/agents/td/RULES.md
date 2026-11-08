@@ -101,11 +101,12 @@ how a demo renders it are convention, guarded only here. A demo that needs state
   phone").
 - **Keep reports short.** A final report, yours or a helper's you relay, ends with a
   `### Ready to Archive` or `### Do Not Archive` heading and its reasons below (the `closeout` skill).
-- **No phone check by default.** Write one as a ⭐ step only when the owner asks or the change
-  cannot be tested signed out (`CLAUDE.md`).
+- **Work for the owner is an owner task,** never a step to find in a long issue (the `owner-task`
+  skill). No check after live by default: file one only when the owner asks or the change cannot
+  be tested signed out (`CLAUDE.md`).
 - **Linear matches the repo.** At kickoff, fix any issue whose status the repo contradicts: work
-  merged with no steps left is Done; a pushed branch awaiting merge is In Review; an assignee with
-  no ⭐ step is removed. Linear writes need no approval; report only what you could not settle.
+  merged with no steps left is Done; a pushed branch awaiting merge is In Review; an assignee on
+  anything but an owner task is removed. Linear writes need no approval; report only what you could not settle.
 
 ## Limits
 
