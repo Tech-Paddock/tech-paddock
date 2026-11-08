@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * The UserPromptSubmit hook behind `/execute-plan` (TEC-179).
+ * The UserPromptSubmit hook behind `/build`, `/deploy` (TEC-237) and
+ * `/execute-plan` (TEC-179).
  *
  *   node .claude/hooks/plan-gate.mjs < hook-input.json
  *
@@ -14,6 +15,10 @@
  *   mismatch   blocks the prompt and returns the summarized command
  *   no plan    blocks the prompt and says `/summarize-plan` comes first
  *
+ * For `/build …` it writes `build-approved.json` (the issues the prompt names,
+ * none for a bare `/build`), and for `/deploy` `deploy-approved.json`. The
+ * guard then starts those builders, or Deployment, without a click.
+ *
  * Any other prompt passes untouched. It fails safe rather than closed: if it
  * crashes, the prompt goes through with no approval written, and every start
  * asks the owner as before. planGate in decide.mjs holds the logic;
@@ -22,7 +27,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { planGate, stateDir } from "./decide.mjs";
+import { promptGate, stateDir } from "./decide.mjs";
 
 let raw = "";
 process.stdin.setEncoding("utf8");
@@ -32,15 +37,15 @@ process.stdin.on("data", (chunk) => {
 process.stdin.on("end", () => {
   try {
     const input = JSON.parse(raw);
-    const r = planGate(input);
+    const r = promptGate(input);
     if (r?.block) {
       process.stdout.write(`${JSON.stringify({ decision: "block", reason: r.block })}\n`);
-    } else if (r?.approve) {
+    } else if (r?.file) {
       const dir = stateDir(input);
       mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, "plan-approved.json"), `${JSON.stringify(r.approve, null, 2)}\n`);
+      writeFileSync(join(dir, r.file), `${JSON.stringify(r.record, null, 2)}\n`);
     }
   } catch (e) {
-    process.stderr.write(`The /execute-plan hook failed (${e?.message ?? e}); no plan approval was recorded, so each start will ask.\n`);
+    process.stderr.write(`The /execute-plan hook failed (${e?.message ?? e}); no approval was recorded, so each start will ask.\n`);
   }
 });

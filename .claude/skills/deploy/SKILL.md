@@ -6,7 +6,9 @@ disable-model-invocation: true
 
 # Deploy
 
-The owner's only. The TD does not merge; it briefs Deployment.
+The owner's only. The TD does not merge; it briefs Deployment. **Typing `/deploy` is the one
+approval** (TEC-237): the prompt hook records it and Deployment starts without a click. The lock in
+step 0 is the only check; CLAUDE.md's owner-approval list still holds per branch.
 
 ## 0. The lock
 
@@ -24,9 +26,8 @@ and changes nothing else). Then `git fetch`, and every remote branch not on `mai
 (`git branch -r --no-merged origin/main`), whichever session cut it. For each: its Linear issue (from its commits), the session that cut it
 (the `Claude-Session` trailer, read with `get_session`), and `gate` on its head.
 
-A branch is **this session's** when its commits beyond `main` carry this session's
-`Claude-Session` trailer, as the TD's and its builders' do; a merge of `main` into it decides
-nothing. Every branch is still sorted; only this session's deploy without asking (TEC-173).
+Every ready branch deploys, whichever session cut it (TEC-237, superseding TEC-173). Name the
+session that cut each in the brief, so the report says whose work shipped.
 
 ## 2. What is in flight
 
@@ -52,36 +53,31 @@ Look before sorting; in-flight work holds only the branches it touches.
 
 If you cannot tell whether a branch is finished, it is not ready; say what you would need.
 
-**Another session's ready branch waits for the owner** (TEC-173). Before step 4, ask once, listing
-each as a link with the session that cut it and its issue. Only the ones the owner picks join the
-brief; the rest are listed as held, "not this session's".
+## 4. Deploy, or hand off to the deploy running
 
-## 4. Start Deployment now
+**No lock:** start Deployment (`subagent_type: deployment`) now, with the ready branches as its
+brief: for each, its name, the request line (`Requested on YYYY-MM-DD — "…"`, the owner's words),
+the Linear issue, the blast radius, the Deployment section and the merge order (migrations first,
+slices of one issue together). Add the other three lists so its report carries them. Nothing ready:
+still start it, so the check runs.
 
-**The owner's `/deploy` is the green light, and its approval click lands here, now,** while they
-are in this chat. So start Deployment (`subagent_type: deployment`) straight away, lock or not,
-with the ready branches as its brief: for each, its name, the request line
-(`Requested on YYYY-MM-DD — "…"`, the owner's words), the Linear issue, the blast radius, the
-Deployment section and the merge order (migrations first, slices of one issue together). Add the
-other three lists so its report carries them. Nothing ready: still start it, so the check runs.
+**Lock held:** do not start Deployment. Ask the holder, TD to TD with `send_message` (a Deployment
+helper cannot be messaged across sessions, so its TD speaks for it), to include your ready branches
+in its run, with their briefs. Open the message with plain words, never a slash command.
 
-**Lock held:** tell Deployment so in its brief; it runs its pre-deploy check, reports held, and
-stops without opening anything. Then, TD to TD with `send_message` (a Deployment helper cannot be
-messaged across sessions, so its TD speaks for it):
-
-1. **Offer the holder your ready branches** with their briefs, and ask it to fold them into its run
-   or to message you when its Deployment stops.
-2. **The holder folds them in** if they are ready and touch nothing its own branches touch: it
-   `SendMessage`s them to its running Deployment, which merges them last. No new approval: the
-   owner's `/deploy` in your chat already covers them (each is that chat's own or one the owner
-   picked there), and order changes are not the owner's.
-   Otherwise it replies with why. Either way it reports each of your branches back to you, and
-   messages every session waiting on it when its Deployment stops.
-3. **Not folded in:** when the holder says it has stopped, or a `send_later` check-in at 20 minutes
-   finds no pull request open, **resume your own Deployment with `SendMessage`.** Resuming a
-   helper starts nothing new, so the owner is not asked again.
-4. **No holder:** a pull request no session claims (a crashed Deployment) is the owner's to close;
+1. **Yes:** the holder hands them to its running Deployment (`SendMessage`), which merges them
+   last, and reports each back to you. Nothing starts here, so nothing asks.
+2. **Anything but yes** (a no, a condition, a clash, or no answer by a `send_later` check-in at 20
+   minutes): ask the holder to explain, then put its reason to the owner as one multiple-choice
+   question (such as: deploy here once its Deployment stops, or hold these branches). Act on the
+   answer; starting Deployment later still needs no click while the `/deploy` is under 12 hours old.
+3. **No holder:** a pull request no session claims (a crashed Deployment) is the owner's to close;
    name it as a link and stop.
+
+**When you hold the lock and another TD asks,** answer yes and fold its branches in if they are
+ready and touch nothing your own branches touch; otherwise answer with why. Report each of its
+branches back, and message every session waiting on you when your Deployment stops. Order changes
+are not the owner's.
 
 ## 5. What reaches the owner
 

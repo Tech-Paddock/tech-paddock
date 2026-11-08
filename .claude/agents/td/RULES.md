@@ -44,8 +44,7 @@ reason to deploy. If you cannot tell execution from structure, treat it as struc
 
 **One Deployment at a time, across every session** (the skill's lock). Recommend a fresh TD session
 for the deploy when your context is large or builders are still running; it picks the work up from
-branches and Linear. A fresh session has cut no branch, so its `/deploy` asks the owner about each
-one (TEC-173).
+branches and Linear, and deploys every ready branch whichever session cut it (TEC-237).
 
 **A plan run** (`/execute-plan`, the owner's only) runs the builds and deploys `/summarize-plan`
 showed, in order, on one approval; its skill says where it stops.

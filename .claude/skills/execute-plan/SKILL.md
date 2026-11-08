@@ -17,8 +17,9 @@ mismatch, or no summary in this chat, never reaches here.
    - **Build:** the `build` skill from its step 3 (free check, slices, builders, report). The brief
      names only this step's issue. The guard lets a start through without a click only when every
      issue a brief names is in the plan.
-   - **Deploy:** once the branch is pushed and `gate` is green, the `deploy` skill (lock, sort,
-     Deployment) for this step's branches only, with a brief that names only plan issues.
+   - **Deploy:** once the branch is pushed and `gate` is green, the `deploy` skill (lock and
+     handoff, sort, Deployment) for this step's branches only, with a brief that names only plan
+     issues. The lock is the only deploy check; a "no" from the holder comes to the owner.
    - Wait for each report before the step after it. Steps run side by side only where the summary
      said nothing waits.
 4. **Stop and report, never improvise,** on:
@@ -26,7 +27,6 @@ mismatch, or no summary in this chat, never reaches here.
    - a red CI a builder cannot fix in its own round;
    - a merge conflict, or a migration that fails or reads back wrong;
    - anything on CLAUDE.md's owner-approval list;
-   - another session's branch (TEC-173);
    - a step the plan does not name;
    - a start the guard asks about: it means the brief left the plan.
 5. **After each deploy,** one line to the owner: shipped, live. At the end, the `/status-check`

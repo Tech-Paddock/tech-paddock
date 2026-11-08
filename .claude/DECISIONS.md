@@ -8,13 +8,19 @@ would get something wrong without it: the rule, one line of why. App rules live 
 
 - **Three roles: the TD architects, the builder builds, Deployment deploys** (2026-10-20, superseding
   TEC-115's "the TD merges"). Only Deployment writes to a pull request, and only on `/deploy`.
-- **Only the owner starts the builder,** with `/build TEC-n` (2026-10-26, TEC-145), and the guard
-  asks the owner on every builder start, as for Deployment (TEC-156). The TD writes the brief; a go
-  on a proposal is not a start.
+- **Only the owner starts the builder,** with `/build TEC-n` (2026-10-26, TEC-145). The typed
+  command is the one approval: the prompt hook records it and the guard starts its builders without
+  a click (2026-11-08, TEC-237, superseding TEC-156's click on every start). `/build` stops before
+  deploy. The TD writes the brief; a go on a proposal is not a start.
+- **Each owner command is its own gate, and the only one** (2026-11-08, TEC-237): `/build`
+  builds, `/deploy` deploys (its one check is the lock), `/summarize-plan` proposes,
+  `/execute-plan` runs the summary. A click on top only re-asked what the owner had just typed.
+  CLAUDE.md's owner-approval list still holds inside each.
 - **One Deployment at a time, across sessions** (2026-10-26, TEC-156). An open pull request is the
-  lock. The owner's `/deploy` in the original chat is the only approval: Deployment starts there at
-  once, and in a jam the TD folds its branches into the holder's run or resumes its own helper later,
-  never asking again (TEC-157). A standing deploy session was rejected: its approval click would
+  lock. The owner's `/deploy` is the only approval. Lock held: the TD asks the holder's TD to fold
+  its branches in; a yes hands them off, anything else comes back with the holder's reason for the
+  owner to decide (TEC-237, superseding TEC-157's start-anyway). Another session's ready branch
+  needs no second ask (superseding TEC-173). A standing deploy session was rejected: its approval click would
   land in a chat the owner is not in. Parallel Deployments would only
   make each other's branches out of date under "branches up
   to date"; the throughput fix is GitHub's merge queue, the owner's setting.

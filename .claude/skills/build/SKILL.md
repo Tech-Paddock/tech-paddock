@@ -6,8 +6,10 @@ disable-model-invocation: true
 
 # Build
 
-The owner's only. This is the owner's go on the work; nothing else starts a builder. The guard still
-asks the owner as each builder starts, so the plan in step 2 is what those approvals rest on.
+The owner's only. Typing `/build` is the one approval the build needs (TEC-237): the prompt hook
+records it, and the guard starts each builder whose brief names only the issues typed (any issue,
+for a bare `/build`) without a click. Nothing else starts a builder. **It stops before deploy:**
+never start Deployment from here; the report ends with `/deploy`.
 
 1. **What to build.**
    - **`/build TEC-n`:** that issue. No such issue, or one with no `app:` label: ask the owner
