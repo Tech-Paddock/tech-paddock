@@ -115,7 +115,8 @@ section and closing comment before changing anything in this file.
   price's `title` and accessible name. The line is **shaded by the
   Deals stoplight for that product**: green when Deals calls it green, red when red, plain
   otherwise; **before 4 weeks of history, on sale or with a coupon is good, else plain, never red**.
-  A line with no saved product or no recent price stays plain. Colour is never the only cue: the
+  A line with no saved product or no recent price stays plain. Colour is never the only cue: a
+  small **Sale · Low · Coupon · High** tag beside the price, with no left bar (TEC-236), and the
   price's `title` and accessible name ("Good price", "High price", the bubble) say why. A line's shade and the Deals board come
   from one function and never disagree. A **Best** toggle on the List shows only the lines that are
   Best (below). No Kroger call, no model.
