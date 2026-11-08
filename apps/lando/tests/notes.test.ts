@@ -293,7 +293,9 @@ describe("the Note form", () => {
     expect(sections).toEqual(["when", "entry", "photos", "save"]);
     expect(html).toContain("Logging as");
     expect(html).toContain("Attachments");
-    expect(html).toContain("Take photo");
+    // TEC-250: one small Attach link; the camera is offered once it is tapped.
+    expect(html).toContain("Attach");
+    expect(html).not.toContain("Take photo");
     expect(html).toContain("Save note");
   });
 

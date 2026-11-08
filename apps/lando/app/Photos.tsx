@@ -166,129 +166,134 @@ export function usePhotos(
 
 type Photos = ReturnType<typeof usePhotos>;
 
-const pick =
-  "min-h-[44px] flex-1 rounded-[10px] border border-line bg-surface px-3 py-2 font-medium active:translate-y-px";
+/**
+ * The small attachments row (TEC-250, a local pattern; the Log feed's thumbnails are unchanged): one small **Attach**
+ * link with a paperclip. Once tapped it offers Take photo (the camera) or Choose files (anything), inline. Then small
+ * thumbnails in a row (a file as a small chip with its type). Tapping one opens a small Open / Remove panel under
+ * the row (not a second sheet over the form's own). Each control keeps a 44px hit area; only what is drawn is small.
+ * A failed upload stays on screen in red with Retry and ✕, and Save still waits for every one.
+ */
+const link = "inline-flex min-h-[44px] items-center gap-1.5 px-1 text-[13px] font-semibold text-ink-soft disabled:opacity-60";
 
 export default function PhotoPicker({ photos }: { photos: Photos }) {
   const camera = useRef<HTMLInputElement>(null);
   const library = useRef<HTMLInputElement>(null);
+  const [offer, setOffer] = useState(false);
+  const [open, setOpen] = useState<string | null>(null);
   const full = photos.shots.length >= MAX_PHOTOS;
   const onFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     photos.add(e.target.files);
     e.target.value = ""; // the same file can be picked again
+    setOffer(false);
   };
-  const pictures = photos.shots.filter((s) => s.picture);
-  const files = photos.shots.filter((s) => !s.picture);
-  const item = (s: Shot, i: number) => {
-            const label = s.name ?? (s.path ? attachmentLabel(s.path) : s.source?.name ?? "File");
-            const ext = (s.path ? pathExt(s.path) : /\.([A-Za-z0-9]{1,10})$/.exec(s.source?.name ?? "")?.[1]?.toLowerCase()) || "file";
-            const retryBar = (
-              <>
-                <p role="alert" className="break-words text-[12px] font-semibold text-danger">
-                  Not uploaded{s.error ? `: ${s.error}` : ""}
-                </p>
-                <div className="flex items-center justify-between">
-                  <button type="button" onClick={() => photos.retry(s.key)} className="min-h-[44px] font-medium underline">
-                    Retry
-                  </button>
-                  <button type="button" onClick={() => photos.remove(s.key)} aria-label={s.picture ? `Remove photo ${i + 1}` : `Remove ${label}`} className="min-h-[44px] px-2 text-ink-soft">
-                    ✕
-                  </button>
-                </div>
-              </>
-            );
-            if (!s.picture) {
-              // A file that is not a picture: a chip with its name and type, opening through its signed URL.
-              return (
-                <li key={s.key} data-attachment="file" className="min-w-0 space-y-1">
-                  <div className={`flex min-h-[44px] items-center gap-2 rounded-[10px] border bg-surface px-2.5 ${s.status === "failed" ? "border-danger" : "border-line"}`}>
-                    <span className="shrink-0 rounded border border-line bg-paper px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-soft">{ext}</span>
-                    {s.status === "done" && s.preview ? (
-                      <a href={s.preview} target="_blank" rel="noopener noreferrer" title={label} className="min-w-0 flex-1 truncate font-medium underline">
-                        {label}
-                      </a>
-                    ) : (
-                      <span title={label} className="min-w-0 flex-1 truncate">
-                        {label}
-                      </span>
-                    )}
-                    {s.status === "working" && <span className="shrink-0 text-[12px] text-ink-soft">Uploading…</span>}
-                    {s.status !== "failed" && (
-                      <button type="button" onClick={() => photos.remove(s.key)} aria-label={`Remove ${label}`} className="min-h-[44px] shrink-0 px-2 text-[13px] text-ink-soft">
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                  {s.status === "failed" && retryBar}
-                </li>
-              );
-            }
-            return (
-              <li key={s.key} data-attachment="photo" className="grid min-w-0 content-start gap-1">
-                <div
-                  className={`relative aspect-square overflow-hidden rounded-[10px] border bg-paper ${
-                    s.status === "failed" ? "border-danger" : "border-line"
-                  }`}
-                >
-                  {s.preview ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.preview} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="grid h-full place-items-center px-1 text-center text-[12px] text-ink-soft">Photo unavailable</span>
-                  )}
-                  {s.status === "working" && (
-                    <span className="absolute inset-x-0 bottom-0 bg-bar/70 px-1 py-0.5 text-center text-[12px] text-paper">Uploading…</span>
-                  )}
-                </div>
-                {s.status === "failed" ? (
-                  retryBar
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => photos.remove(s.key)}
-                    aria-label={`Remove photo ${i + 1}`}
-                    className="min-h-[44px] self-start px-2 text-[13px] text-ink-soft"
-                  >
-                    Remove
-                  </button>
-                )}
-              </li>
-            );
-  };
+  const labelOf = (s: Shot) => s.name ?? (s.path ? attachmentLabel(s.path) : s.source?.name ?? "File");
+  const extOf = (s: Shot) => (s.path ? pathExt(s.path) : /\.([A-Za-z0-9]{1,10})$/.exec(s.source?.name ?? "")?.[1]?.toLowerCase()) || "file";
+  const chosen = photos.shots.find((s) => s.key === open && s.status === "done") ?? null;
+  const failedShots = photos.shots.filter((s) => s.status === "failed");
   return (
-    <div className="grid gap-2">
-      <span className="text-xs uppercase tracking-[0.06em] text-ink-soft">Attachments</span>
-      <div className="flex gap-2">
-        <button type="button" disabled={full} onClick={() => camera.current?.click()} className={`${pick} disabled:opacity-60`}>
-          Take photo
-        </button>
-        <button type="button" disabled={full} onClick={() => library.current?.click()} className={`${pick} disabled:opacity-60`}>
-          Attach
-        </button>
-        {/* Not inside the buttons: the camera one opens the rear camera on a phone. Attach takes any file. */}
+    <div role="group" aria-label="Attachments" className="grid gap-1">
+      <div className="flex flex-wrap items-center gap-x-2">
+        {offer ? (
+          <>
+            <button type="button" disabled={full} onClick={() => camera.current?.click()} className={`${link} text-ink`}>
+              Take photo
+            </button>
+            <button type="button" disabled={full} onClick={() => library.current?.click()} className={`${link} text-ink`}>
+              Choose files
+            </button>
+            <button type="button" onClick={() => setOffer(false)} aria-label="Cancel attach" className={link}>
+              ✕
+            </button>
+          </>
+        ) : (
+          <button type="button" disabled={full} onClick={() => setOffer(true)} className={link}>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 11.5l-8.6 8.6a5 5 0 01-7.1-7.1l8.6-8.6a3.4 3.4 0 014.8 4.8l-8.6 8.6a1.7 1.7 0 01-2.4-2.4l7.9-7.9" />
+            </svg>
+            Attach
+          </button>
+        )}
+        {/* Not inside the buttons: the camera one opens the rear camera on a phone. Choose files takes any file. */}
         <input ref={camera} type="file" accept="image/*" capture="environment" onChange={onFiles} className="hidden" tabIndex={-1} />
         <input ref={library} type="file" multiple onChange={onFiles} className="hidden" tabIndex={-1} />
+        {photos.shots.map((s, i) => {
+          const label = labelOf(s);
+          const failed = s.status === "failed";
+          const tile = s.picture ? (
+            <span className={`relative block h-9 w-9 overflow-hidden rounded-[7px] border bg-paper ${failed ? "border-danger" : "border-line"}`}>
+              {s.preview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={s.preview} alt={`Photo ${i + 1}`} className="h-full w-full object-cover" />
+              ) : (
+                <span className="grid h-full place-items-center text-[10px] text-ink-soft">?</span>
+              )}
+              {s.status === "working" && <span className="absolute inset-0 grid place-items-center bg-bar/60 text-[10px] text-paper">…</span>}
+            </span>
+          ) : (
+            <span className={`flex h-9 max-w-[9rem] items-center gap-1 rounded-lg border bg-surface px-2 text-[13px] text-ink-soft ${failed ? "border-danger" : "border-line"}`}>
+              <span className="shrink-0 rounded border border-line px-1 text-[10px] font-bold uppercase tracking-[0.06em]">{extOf(s)}</span>
+              <span className="truncate">{label}</span>
+              {s.status === "working" && <span className="shrink-0 text-[11px]">…</span>}
+            </span>
+          );
+          return (
+            <button
+              key={s.key}
+              type="button"
+              data-attachment={s.picture ? "photo" : "file"}
+              onClick={() => (failed ? undefined : setOpen(open === s.key ? null : s.key))}
+              disabled={s.status === "working"}
+              aria-label={s.picture ? `Photo ${i + 1}: options` : `${label}: options`}
+              aria-expanded={open === s.key}
+              className="grid min-h-[44px] min-w-[44px] place-items-center disabled:opacity-80"
+            >
+              {tile}
+            </button>
+          );
+        })}
       </div>
+      {chosen && (
+        <div role="group" aria-label={`Options for ${labelOf(chosen)}`} className="flex flex-wrap items-center gap-x-1 rounded-[10px] border border-line bg-surface px-2 text-[13px]">
+          <span className="mr-auto min-w-0 truncate text-ink-soft">{chosen.picture ? `Photo ${photos.shots.indexOf(chosen) + 1}` : labelOf(chosen)}</span>
+          {chosen.preview && (
+            <a href={chosen.preview} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(null)} className="grid min-h-[44px] place-items-center px-2 font-semibold underline">
+              Open
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              photos.remove(chosen.key);
+              setOpen(null);
+            }}
+            aria-label={chosen.picture ? `Remove photo ${photos.shots.indexOf(chosen) + 1}` : `Remove ${labelOf(chosen)}`}
+            className="min-h-[44px] px-2 font-semibold text-danger"
+          >
+            Remove
+          </button>
+          <button type="button" onClick={() => setOpen(null)} aria-label="Close options" className="min-h-[44px] px-2 text-ink-soft">
+            ✕
+          </button>
+        </div>
+      )}
       {photos.notice && (
         <p role="alert" className="text-[13px] font-semibold text-danger">
           {photos.notice}
         </p>
       )}
-      {photos.shots.length > 0 && (
-        <>
-          {/* Pictures as thumbnails, then files as chips, so a file never leaves a gap in the thumbnail rows. */}
-          {pictures.length > 0 && (
-            <ul aria-label="Photos on this entry" className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-2">
-              {pictures.map(item)}
-            </ul>
-          )}
-          {files.length > 0 && (
-            <ul aria-label="Files on this entry" className="grid gap-2">
-              {files.map(item)}
-            </ul>
-          )}
-        </>
-      )}
+      {failedShots.map((s) => (
+        <div key={s.key} className="flex flex-wrap items-center gap-x-2 text-[13px]">
+          <p role="alert" className="min-w-0 flex-1 break-words font-semibold text-danger">
+            {labelOf(s)}: not uploaded{s.error ? `: ${s.error}` : ""}
+          </p>
+          <button type="button" onClick={() => photos.retry(s.key)} className="min-h-[44px] font-medium underline">
+            Retry
+          </button>
+          <button type="button" onClick={() => photos.remove(s.key)} aria-label={`Remove ${labelOf(s)}`} className="min-h-[44px] px-2 text-ink-soft">
+            ✕
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
