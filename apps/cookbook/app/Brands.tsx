@@ -21,7 +21,7 @@ import { serialKroger } from "./Cart";
  * names they share, the default starred, **Make default** on the others and
  * *when the line says "…"* under each; **Fix these** above them (a size that
  * shrank, a product Kroger no longer returns with **Replace**, and rows whose
- * note starts `check:`); the filters **All · Pick a default · Fix these**.
+ * note starts `check:`); the filters **All · Fix these**.
  * The grouping is `lib/brandGroups.ts`.
  *
  * **Why remembering cannot read the product you picked.** A line's link opens
@@ -310,7 +310,7 @@ function MemberRow(props: {
   );
 }
 
-type View = "all" | "pick" | "fix";
+type View = "all" | "fix";
 
 const STATUS_WORDS: Record<PreviewEntry["status"], string> = {
   new: "new",
@@ -460,8 +460,8 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
       !q ||
       g.title.toLowerCase().includes(q) ||
       g.members.some(({ product: p }) => [...p.names, p.description ?? "", p.product_id].some((t) => t.toLowerCase().includes(q)));
-    return groups.filter((g) => (view === "pick" ? g.needsDefault : true) && matches(g));
-  }, [groups, filter, view]);
+    return groups.filter(matches);
+  }, [groups, filter]);
   const shownFixes = useMemo(() => {
     const q = filter.trim().toLowerCase();
     return fixes.filter((f) => !q || f.title.toLowerCase().includes(q) || f.product.names.some((n) => n.toLowerCase().includes(q)));
@@ -680,7 +680,6 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
 
   const views: [View, string][] = [
     ["all", "All"],
-    ["pick", "Pick a default"],
     ["fix", `Fix these · ${fixes.length}`],
   ];
 
@@ -718,7 +717,7 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
           aria-label="Search Your brands"
           className="min-h-11 rounded-xl border border-line bg-surface px-3.5 text-base"
         />
-        <div role="group" aria-label="Show" className="grid grid-cols-3 gap-1 rounded-xl bg-raised p-1">
+        <div role="group" aria-label="Show" className="grid grid-cols-2 gap-1 rounded-xl bg-raised p-1">
           {views.map(([id, label]) => (
             <button
               key={id}
@@ -742,7 +741,7 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
       ) : null}
 
       {/* **Fix these** (TEC-135): shrank, discontinued, or seeded wrong (a note starting "check:"). */}
-      {view !== "pick" && shownFixes.length > 0 ? (
+      {shownFixes.length > 0 ? (
         <div className="overflow-hidden rounded-xl border-2 border-warn bg-surface">
           <h3 className="px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider text-warn">
             Fix these · {fixes.length} · shrank, discontinued or seeded wrong
@@ -806,7 +805,7 @@ export default function Brands({ onChanged, refreshKey = 0 }: { onChanged: () =>
           ))
         : null}
       {view !== "fix" && products && products.length > 0 && shown.length === 0 ? (
-        <p className="px-2 text-xs text-ink-soft">{view === "pick" ? "Every name with several products has a default." : "Nothing matches that search."}</p>
+        <p className="px-2 text-xs text-ink-soft">Nothing matches that search.</p>
       ) : null}
 
       <div className="flex flex-wrap gap-4 px-2">

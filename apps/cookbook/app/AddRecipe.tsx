@@ -371,7 +371,7 @@ export default function AddRecipe({
         type="button"
         onClick={() => makeDraft()}
         disabled={!ready || busy !== null}
-        className="rounded-lg bg-accent px-4 py-3 text-base font-semibold text-accent-ink disabled:opacity-50"
+        className="lift rounded-lg bg-accent px-4 py-3 text-base font-semibold text-accent-ink disabled:opacity-50"
       >
         {/* **The label says what the press actually does, and that differs by
             mode.** The typed path saves in one go; the other two write or read a
@@ -459,7 +459,7 @@ export default function AddRecipe({
               disabled={busy !== null}
               className={`${
                 draft.origin === "generated" ? "" : "ml-auto "
-              }rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50`}
+              }lift rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50`}
             >
               {busy === "keeping" ? "Saving…" : "Keep it"}
             </button>

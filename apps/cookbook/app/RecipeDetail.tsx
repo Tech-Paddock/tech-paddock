@@ -284,7 +284,7 @@ export function AddToListCard({
             if (picked) onList(picked);
           }}
           disabled={!hasIngredients || listing || !picked}
-          className="min-h-11 shrink-0 whitespace-nowrap rounded-xl bg-accent px-4 text-[15px] font-bold text-accent-ink disabled:opacity-50"
+          className="lift min-h-11 shrink-0 whitespace-nowrap rounded-xl bg-accent px-4 text-[15px] font-bold text-accent-ink disabled:opacity-50"
         >
           {listing ? "Adding…" : "Add to list"}
         </button>

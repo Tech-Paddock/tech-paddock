@@ -34,8 +34,6 @@ export type BrandGroup = {
   /** Every name two or more of its products share, as matched. What Make default sets. */
   shared: string[];
   members: GroupMember[];
-  /** Two or more products and no default for the title name. */
-  needsDefault: boolean;
 };
 
 export type FixKind = "shrank" | "grew" | "resized" | "gone" | "check";
@@ -92,7 +90,6 @@ export function brandGroups(products: SavedProduct[]): BrandGroup[] {
       key: ranked[0].id,
       title,
       shared,
-      needsDefault: members.length > 1 && !def,
       members: ordered.map((p) => ({
         product: p,
         isDefault: members.length === 1 || p === def,

@@ -51,17 +51,17 @@ describe("Your brands' groups (TEC-135)", () => {
       [plain.id, true],
       [zero.id, false],
     ]);
-    expect(fizz.needsDefault).toBe(false);
     expect(defaultNames(fizz, zero).sort()).toEqual(["test fizz", "test fizz zero"]);
-    // A lone product is its own default, and needs no pick.
-    expect(garlic).toMatchObject({ needsDefault: false, members: [{ isDefault: true, hint: null }] });
+    // A lone product is its own default.
+    expect(garlic).toMatchObject({ members: [{ isDefault: true, hint: null }] });
   });
 
   it("hints what to put on the line for each product that is not the default", () => {
     const a = product({ names: ["test muffins"], description: "Test Bakery Original Test Muffins", count: 8 });
     const b = product({ names: ["test muffins"], description: "Test Bakery Cinnamon Raisin Test Muffins", count: 4 });
     const [g] = brandGroups([a, b]);
-    expect(g.needsDefault).toBe(true);
+    // No default flag on the group (TEC-236): defaults are set by hand and nothing nudges.
+    expect(g).not.toHaveProperty("needsDefault");
     expect(g.members.map((m) => m.hint)).toEqual(["original", "cinnamon raisin"]);
   });
 });
