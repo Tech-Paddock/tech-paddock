@@ -13,6 +13,9 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
   widened 2026-10-27 TEC-182, narrowed 2026-11-01 TEC-199, pills restored 2026-11-02 TEC-202, Notes added 2026-11-02 TEC-204, Calendar added 2026-11-08 TEC-234) of the app surface's one screen and no
   tabs. One-handed, thumb-first. Pills open a quick log: Pee and Poop open Potty on that pick, Meals opens Food, Fun opens Fun (TEC-181, TEC-186, restored TEC-202). The Log buttons are Treats, Training, Weight and Health.
 - An app bar over the tabs: theme, logout and the livery badge (Meals today left, TEC-193).
+- Quiet secondary controls (owner, TEC-250): the Log's Next 7 days is one short line per plan with a
+  Calendar link; Treats is a plain counter, and Medical issue is its own checkbox, on Potty only;
+  attachments are one small Attach link with thumbnails in a row.
 - Every form opens as a bottom sheet.
 - Installable through `/app.webmanifest`.
 
