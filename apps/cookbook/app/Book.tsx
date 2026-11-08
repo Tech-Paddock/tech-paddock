@@ -11,6 +11,7 @@ import { mealLabel, timeParts } from "@/lib/metadata";
 import { FIRST_RECIPE_TAB, factsLine, ratingWords, type RecipeTab } from "@/lib/recipeView";
 import EditRecipe from "./EditRecipe";
 import { BookFilters } from "./Tuning";
+import { FIELD_CONTROL, SearchField } from "./SearchField";
 import { sortRecipes } from "@/lib/recipeSort";
 import { NO_FILTER, cuisinesIn, filterActive, matchesFilter, type BookFilter } from "@/lib/tuning";
 
@@ -224,14 +225,17 @@ export default function Book({
           ) : null}
         </div>
         {recipes !== null && recipes.length > 0 ? (
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            type="search"
-            placeholder="Search the book"
-            aria-label="Search recipes"
-            className="min-h-10 rounded-xl border border-line bg-surface px-3.5 text-base"
-          />
+          // One rounded field with the magnifier inside (TEC-236).
+          <SearchField icon="search">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              type="search"
+              placeholder={`Search ${recipes.length} recipe${recipes.length === 1 ? "" : "s"}`}
+              aria-label="Search recipes"
+              className={`${FIELD_CONTROL} pr-3`}
+            />
+          </SearchField>
         ) : null}
         {recipes !== null && recipes.length > 0 ? (
           <BookFilters value={filter} onChange={setFilter} cuisines={cuisinesIn(recipes)} />

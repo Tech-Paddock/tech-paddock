@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { latestNights, nightPrice, priceLines, productFor, totalsOf } from "@/lib/listPrices";
+import { latestNights, nightPrice, priceLines, productFor, repriced, totalsOf } from "@/lib/listPrices";
 import { refreshSummary } from "@/lib/refreshNote";
 import type { Decision } from "@/lib/brands";
 import type { NightRow } from "@/lib/priceWeeks";
@@ -76,6 +78,37 @@ describe("a line's price and the section's total", () => {
     expect(totalsOf(prices)).toEqual({ total: 9.3, priced: 2, unpriced: 1, from: "2026-10-26", to: "2026-10-28" });
     expect(totalsOf([null, null])).toEqual({ total: null, priced: 0, unpriced: 2, from: null, to: null });
     expect(totalsOf([])).toMatchObject({ total: null });
+  });
+});
+
+describe("a line's price follows its quantity (TEC-236)", () => {
+  const latest = latestNights([night("A", "2026-10-28", 4, 3), night("B", "2026-10-26", 1.1, null)], STORE);
+
+  it("rescales the total from the unit price in whole cents, and keeps the night and sale flag", () => {
+    const a = priceLines([{ id: "a", quantity: 1, productId: "A" }], latest).get("a");
+    expect(a?.total).toBe(3);
+    expect(repriced(a, 4)).toEqual({ unit: 3, total: 12, onSale: true, night: "2026-10-28" });
+    // 1.10 x 3 is 3.3000000000000003 in floats; the cents do not drift.
+    const b = priceLines([{ id: "b", quantity: 1, productId: "B" }], latest).get("b");
+    expect(repriced(b, 3)?.total).toBe(3.3);
+  });
+
+  it("agrees with pricing the line at that quantity to begin with", () => {
+    const at = (q: number) => priceLines([{ id: "a", quantity: q, productId: "A" }], latest).get("a");
+    for (const q of [1, 2, 7, 99]) expect(repriced(at(1), q)).toEqual(at(q));
+  });
+
+  it("leaves a line with no price at no price, never $0, and moves the section total", () => {
+    expect(repriced(null, 5)).toBeNull();
+    expect(repriced(undefined, 5)).toBeNull();
+    const a = priceLines([{ id: "a", quantity: 1, productId: "A" }], latest).get("a");
+    expect(totalsOf([repriced(a, 1), null]).total).toBe(3);
+    expect(totalsOf([repriced(a, 5), null]).total).toBe(15);
+  });
+
+  it("the List applies it in the same update that changes the quantity, so no reload or send is needed", () => {
+    const source = readFileSync(resolve(__dirname, "../app/List.tsx"), "utf8");
+    expect(source).toMatch(/\{ \.\.\.i, quantity, price: repriced\(i\.price, quantity\) \}/);
   });
 });
 

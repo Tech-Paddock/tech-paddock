@@ -19,3 +19,27 @@ body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
+
+/* TEC-236: primary buttons pop. A faint top highlight and a soft accent-coloured
+   drop, so a filled button reads as raised, most of all in light mode where the
+   old flat fill sat quietly on a pale page. Tokens only: the accent comes from
+   the livery, so it is the gold glow in dark mode and the green in light. */
+@layer components {
+  .lift {
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.25) inset, 0 2px 6px rgb(var(--accent-rgb) / 0.35);
+  }
+  .lift:active {
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.15) inset, 0 1px 2px rgb(var(--accent-rgb) / 0.3);
+    transform: translateY(1px);
+  }
+  .lift:disabled {
+    box-shadow: none;
+  }
+  /* The search / add field's soft shadow, and its green ring while you are in it. */
+  .field-shadow {
+    box-shadow: 0 1px 2px rgb(var(--ink-rgb) / 0.08), 0 4px 14px rgb(var(--ink-rgb) / 0.06);
+  }
+  .field-shadow:focus-within {
+    box-shadow: 0 0 0 4px rgb(var(--accent-rgb) / 0.18);
+  }
+}

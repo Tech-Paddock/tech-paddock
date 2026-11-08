@@ -10,10 +10,10 @@ import type { ResolvedLink } from "@/lib/preferences";
 import type { MenuEntry } from "@/lib/menu";
 import { menuDayLabel } from "@/lib/menuDay";
 import { MODALITIES, modalityWord, type Modality } from "@/lib/modality";
-import { bestEmptyWords, bubbleText, shadeWord, type LineDeal } from "@/lib/lineDeal";
+import { bestEmptyWords, bubbleText, priceTag, shadeWord, type LineDeal } from "@/lib/lineDeal";
 import type { Shade } from "@/lib/dealSignal";
 import { CHECKOUT_URL } from "@/lib/kingsoopers";
-import { totalsOf, type LinePrice, type Totals } from "@/lib/listPrices";
+import { repriced, totalsOf, type LinePrice, type Totals } from "@/lib/listPrices";
 import { shortDay } from "@/lib/dealFilter";
 import { checkLine, clock } from "@/lib/checkLine";
 import type { PickedProduct } from "@/lib/linePick";
@@ -21,6 +21,7 @@ import { cartSplit, greyTotal, greyWords, productWords, type MirrorRow } from "@
 import { ItemMatches } from "./ItemMatches";
 import { ProductSplash, RefreshLog, StorePicker, useCart, when } from "./Cart";
 import { useMirror } from "./useMirror";
+import { FIELD_CONTROL, SearchField } from "./SearchField";
 import { useToast } from "./Toast";
 
 /**
@@ -55,16 +56,16 @@ function totalWords(t: Totals, lines: number): string {
 
 /**
  * **A line is shaded by its deal** (TEC-196), in the Deals board's own tints: the
- * accent for good and the danger colour for bad, as a 4px left edge (the board's
- * edge) and a faint wash over the row's own ground. Plain rows keep a clear edge
- * so the ticks line up. Colour is never the only cue: the bubble or "Good price" /
- * "High price" says why. The wash is 8%, where `tests/dealShade.test.ts` holds
- * every text colour on it at 4.5:1 in light and dark.
+ * accent for good and the danger colour for bad, as a faint wash over the row's own
+ * ground. **The 4px left bar is gone** (TEC-236: the owner could not tell what it meant);
+ * a small tag beside the price says it in a word (`PriceTagPill`). Colour is never the only
+ * cue: the tag, the bubble or "Good price" / "High price" says why. The wash is 8%, where
+ * `tests/dealShade.test.ts` holds every text colour on it at 4.5:1 in light and dark.
  */
 const SHADE_CLASS: Record<Shade, string> = {
-  plain: "border-l-4 border-l-transparent",
-  good: "border-l-4 border-l-accent bg-gradient-to-r from-accent/[0.08] to-accent/[0.08]",
-  bad: "border-l-4 border-l-danger bg-gradient-to-r from-danger/[0.08] to-danger/[0.08]",
+  plain: "",
+  good: "bg-gradient-to-r from-accent/[0.08] to-accent/[0.08]",
+  bad: "bg-gradient-to-r from-danger/[0.08] to-danger/[0.08]",
 };
 
 /**
@@ -205,7 +206,9 @@ export default function List({
   /** How many to put in the cart. Saved on blur or Enter; a refused write reloads the truth. */
   async function setQuantity(item: GroceryItem, quantity: number) {
     if (quantity === item.quantity) return;
-    setItems((current) => (current ?? []).map((i) => (i.id === item.id ? { ...i, quantity } : i)));
+    // **The price follows the quantity at once** (TEC-236): the unit price is the night's, so the total
+    // is worked out here, and the row and the section totals move with no reload.
+    setItems((current) => (current ?? []).map((i) => (i.id === item.id ? { ...i, quantity, price: repriced(i.price, quantity) } : i)));
     try {
       const response = await fetch("/api/grocery", {
         method: "PATCH",
@@ -375,6 +378,8 @@ export default function List({
         ? "In cart: no price"
         : `In cart ${money(check.total)}${check.unpriced > 0 ? ` · ${check.unpriced} no price` : ""}`;
   const storeLine = status?.connected && status.store;
+  // The checkout bar's total: the live In cart total once Refresh cart has read it, else summed from the nightly check.
+  const checkoutTotal = inCart.length === 0 ? null : (check?.total ?? totalsOf(inCart.map((i) => i.price)).total);
 
   /** A section's "Are you sure?": the count, Cancel and the button. No list. */
   const sure = (kind: ConfirmKind, count: number, run: () => void, tone: "danger" | "accent" = "danger") => {
@@ -391,7 +396,7 @@ export default function List({
             setConfirm(null);
             run();
           }}
-          className={`min-h-9 rounded-lg px-3 font-bold ${tone === "danger" ? "border border-danger text-danger" : "bg-accent text-accent-ink"}`}
+          className={`min-h-9 rounded-lg px-3 font-bold ${tone === "danger" ? "border border-danger text-danger" : "lift bg-accent text-accent-ink"}`}
         >
           {words.yes}
         </button>
@@ -525,43 +530,37 @@ export default function List({
           </div>
         )}
 
-        {/* **Adding sits below the filters** (TEC-206; it was at the top from 2026-09-22).
-            TEC-212: its own card, a 2px accent frame, so it does not get lost. A local
-            pattern, tokens only. The Add button is full accent whether or not there is
-            text: with none it does nothing (`add` returns), and is never faded. */}
-        <section aria-label="Add to the list" className="rounded-2xl border-2 border-accent bg-surface p-3">
-          <h2 className="mb-1 text-sm font-bold text-ink">Add to the list</h2>
-          <div className="flex items-start gap-2">
-            <span aria-hidden="true" className="flex h-11 shrink-0 items-center text-2xl font-bold leading-none text-accent">
-              ＋
-            </span>
-            {/* One line to look at; a paste of several lines shows them all, one
-                item each. Enter adds; Shift+Enter starts another line. */}
-            <textarea
-              ref={box}
-              rows={1}
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  void add();
-                }
-              }}
-              placeholder="Eggs, 2 lb chicken — notes after a dash"
-              aria-label="Add items, one per line"
-              className="min-h-11 min-w-0 flex-1 resize-none overflow-hidden rounded-xl bg-transparent px-1 py-2.5 text-base font-medium leading-snug text-ink placeholder:font-medium placeholder:text-ink"
-            />
-            <button
-              type="button"
-              onClick={() => void add()}
-              aria-disabled={typed.trim() === "" || busy !== null}
-              className="min-h-11 shrink-0 self-start whitespace-nowrap rounded-xl bg-accent px-4 text-sm font-semibold text-accent-ink"
-            >
-              {busy === "adding" ? "Adding…" : typedLines(typed).length > 1 ? `Add ${typedLines(typed).length}` : "Add"}
-            </button>
-          </div>
-        </section>
+        {/* **Adding sits below the filters** (TEC-206; it was at the top from 2026-09-22). TEC-236 (the
+            owner's demo): one rounded field with a plus inside and a green ring on focus, in place
+            of TEC-212's bordered card. Add stays a solid accent button at its end, whether or not
+            there is text: with none it does nothing (`add` returns), and is never faded. */}
+        <SearchField icon="add" label="Add to the list">
+          {/* One line to look at; a paste of several lines shows them all, one
+              item each. Enter adds; Shift+Enter starts another line. */}
+          <textarea
+            ref={box}
+            rows={1}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void add();
+              }
+            }}
+            placeholder="Eggs, 2 lb chicken — notes after a dash"
+            aria-label="Add items, one per line"
+            className={`${FIELD_CONTROL} resize-none overflow-hidden py-2.5`}
+          />
+          <button
+            type="button"
+            onClick={() => void add()}
+            aria-disabled={typed.trim() === "" || busy !== null}
+            className="lift min-h-10 shrink-0 self-start whitespace-nowrap rounded-full bg-accent px-4 text-sm font-semibold text-accent-ink"
+          >
+            {busy === "adding" ? "Adding…" : typedLines(typed).length > 1 ? `Add ${typedLines(typed).length}` : "Add"}
+          </button>
+        </SearchField>
 
         {items === null ? (
           readError ? (
@@ -609,7 +608,7 @@ export default function List({
             type="button"
             onClick={() => void cart.sendAll()}
             disabled={cart.busy !== null || open.length === 0}
-            className="min-h-11 rounded-[10px] border border-accent bg-transparent text-[15px] font-bold text-accent disabled:opacity-50"
+            className="min-h-11 rounded-[10px] border-2 border-accent bg-surface text-[15px] font-bold text-accent shadow-sm disabled:opacity-50"
           >
             {cart.busy === "send" ? "Sending…" : "Send all to cart"}
           </button>
@@ -630,9 +629,8 @@ export default function List({
               ) : null}
             </span>
           </div>
-          {inCart.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-line p-4 text-sm text-ink-soft">Nothing in the cart.</p>
-          ) : (
+          {/* No "Nothing in the cart" box (TEC-236): an empty cart shows no live rows. */}
+          {inCart.length > 0 ? (
             <ul className="flex flex-col gap-1.5">
               {inCart.map((item) => {
                 const live = checkById.get(item.id);
@@ -648,40 +646,52 @@ export default function List({
                 );
               })}
             </ul>
-          )}
+          ) : null}
           {/* **Grey mirror rows** (TEC-227): what each unsent List line would send now. + Cart or Send all turns one live. */}
           {greyed.length > 0 ? (
-            <ul aria-label="Not sent yet" className="flex flex-col gap-1.5">
-              {greyed.map((item) => (
-                <GreyRow key={item.id} item={item} row={mirrorOf(item)} />
-              ))}
-            </ul>
+            <>
+              {/* **Says what the faded rows are** (TEC-236; replaces the "Nothing in the cart" box). */}
+              <p role="note" className="flex items-start gap-2 rounded-[10px] bg-accent/10 px-2.5 py-2 text-xs leading-snug text-ink-soft">
+                <span aria-hidden="true">ⓘ</span>
+                <span>
+                  <b className="text-ink">Faded rows are your List, matched to King Soopers products.</b> They become live when you add them to the cart.
+                </span>
+              </p>
+              <ul aria-label="Not sent yet" className="flex flex-col gap-1.5">
+                {greyed.map((item) => (
+                  <GreyRow key={item.id} item={item} row={mirrorOf(item)} />
+                ))}
+              </ul>
+            </>
           ) : null}
 
           {/* **Clear cart clears every line in In cart in Cookbook only; King Soopers is not asked** (TEC-206, TEC-210, TEC-228): one confirm with the count, no list, shown even when not signed in. */}
           {cart.ready || inCart.length > 0 ? (
-            confirm === "clear-cart" ? (
-              sure("clear-cart", inCart.length, () => void cart.clearCart())
-            ) : (
-              <div className="flex gap-2">
+            <>
+              {/* **Go to checkout is the full-width green bar, with the cart total** (TEC-236). The total is the
+                  live In cart total once Refresh cart has read it, else the nightly sum; never $0. */}
+              <a
+                href={CHECKOUT_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="lift flex min-h-12 items-center justify-between gap-3 rounded-[14px] bg-accent px-4 py-3 text-[15px] font-bold text-accent-ink"
+              >
+                <span>Go to checkout →</span>
+                {checkoutTotal !== null ? <span className="tabular-nums">{money(checkoutTotal)}</span> : null}
+              </a>
+              {confirm === "clear-cart" ? (
+                sure("clear-cart", inCart.length, () => void cart.clearCart())
+              ) : (
                 <button
                   type="button"
                   onClick={() => setConfirm("clear-cart")}
                   disabled={cart.busy !== null || inCart.length === 0}
-                  className="min-h-11 flex-1 rounded-[10px] border border-danger bg-transparent text-[15px] font-bold text-danger disabled:opacity-50"
+                  className="min-h-11 rounded-[10px] border-2 border-danger bg-surface text-[15px] font-bold text-danger shadow-sm disabled:opacity-50"
                 >
                   {cart.busy === "take-back" && !cart.returning ? "Clearing…" : "Clear cart"}
                 </button>
-                <a
-                  href={CHECKOUT_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex min-h-11 flex-1 items-center justify-center rounded-[10px] bg-raised text-[15px]"
-                >
-                  Go to checkout
-                </a>
-              </div>
-            )
+              )}
+            </>
           ) : null}
         </section>
       ) : null}
@@ -793,6 +803,7 @@ export function ListRow(props: {
         {name}
       </button>
       <Quantity key={`${item.id}:${item.quantity}`} item={item} onCommit={props.onQuantity} />
+      <PriceTagPill deal={deal} hide={!!props.notSent} />
       <Price price={item.price} cue={dealWords(deal)} notSent={props.notSent} />
       {props.canAdd && !item.checked ? (
         <button
@@ -800,12 +811,33 @@ export function ListRow(props: {
           aria-label="Add to cart"
           onClick={props.onAdd}
           disabled={props.adding}
-          className="h-7 shrink-0 whitespace-nowrap rounded-full bg-accent px-2.5 text-[11px] font-bold text-accent-ink disabled:opacity-50"
+          className="lift h-7 shrink-0 whitespace-nowrap rounded-full bg-accent px-2.5 text-[11px] font-bold text-accent-ink disabled:opacity-50"
         >
           {props.adding ? "…" : "+ Cart"}
         </button>
       ) : null}
     </li>
+  );
+}
+
+/**
+ * **The Sale / Low / Coupon / High tag beside a price** (TEC-236, in place of the green left bar). A
+ * small outlined word in the accent (good) or the danger colour (bad), the same pair the wash is
+ * measured with. The long reason is on the price's `title` and accessible name, so the tag is
+ * `aria-hidden` rather than read twice. A local pattern; tokens only.
+ */
+function PriceTagPill({ deal, hide }: { deal: LineDeal | null | undefined; hide?: boolean }) {
+  const tag = hide ? null : priceTag(deal);
+  if (!tag) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className={`shrink-0 rounded-full border px-1.5 py-px text-[10px] font-bold uppercase leading-4 tracking-wide ${
+        tag.tone === "bad" ? "border-danger text-danger" : "border-accent text-accent"
+      }`}
+    >
+      {tag.word}
+    </span>
   );
 }
 
@@ -868,7 +900,10 @@ export function InCartRow(props: {
           <span className="min-w-14 whitespace-nowrap text-right text-[13px] tabular-nums">{money(props.live.total)}</span>
         )
       ) : (
-        <Price price={item.price} cue={dealWords(item.deal)} />
+        <>
+          <PriceTagPill deal={item.deal} />
+          <Price price={item.price} cue={dealWords(item.deal)} />
+        </>
       )}
       <button
         type="button"

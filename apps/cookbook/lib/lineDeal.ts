@@ -68,6 +68,24 @@ export function shadeWord(d: LineDeal | null | undefined): string | null {
   return d.shade === "good" ? "Good price" : "High price";
 }
 
+export type PriceTag = { word: "Sale" | "Low" | "Coupon" | "High"; tone: "good" | "bad" };
+
+/**
+ * **The tag beside a line's price** (TEC-236; it replaces the green left bar, which the owner could
+ * not read). Only a shaded line has one, and one word says why: red is **High** (even when Kroger
+ * calls it a sale, as the Deals board does); green is **Sale** when the product is on sale, else
+ * **Coupon** when a staged coupon lists it, else **Low**, because its price is under its usual or at
+ * its low. A plain line, and a line with no deal, has none. The long reason stays on the price's
+ * `title` and accessible name. Pure, so the same function reads the same everywhere.
+ */
+export function priceTag(d: LineDeal | null | undefined): PriceTag | null {
+  if (!d || d.shade === "plain") return null;
+  if (d.shade === "bad") return { word: "High", tone: "bad" };
+  if (d.salePrice !== null) return { word: "Sale", tone: "good" };
+  if (d.coupon) return { word: "Coupon", tone: "good" };
+  return { word: "Low", tone: "good" };
+}
+
 /** Why the Best toggle shows nothing: from the lines it would have filtered. */
 export function bestEmptyWords(lines: (LineDeal | null | undefined)[]): { title: string; body: string } {
   if (lines.every((d) => !d || d.bestNights < BEST_MIN_NIGHTS)) {

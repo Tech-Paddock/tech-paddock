@@ -80,6 +80,17 @@ export function priceLines(
   return out;
 }
 
+/**
+ * **A line's price at a new quantity** (TEC-236). The unit price is the night's and does not change;
+ * only the total follows the quantity, in whole cents as `priceLines` does. The List calls this the
+ * moment a quantity is committed, so the row and the section total move at once, with no reload,
+ * send or Back to list. A line with no price stays null, never $0.
+ */
+export function repriced(price: LinePrice | null | undefined, quantity: number): LinePrice | null {
+  if (!price) return null;
+  return { ...price, total: Math.round(price.unit * 100) * quantity / 100 };
+}
+
 export type Totals = {
   /** Null when no line could be priced: "no price yet", never $0. */
   total: number | null;

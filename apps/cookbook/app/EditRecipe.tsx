@@ -111,7 +111,7 @@ export default function EditRecipe({
           type="button"
           onClick={save}
           disabled={!ready || saving}
-          className="ml-auto rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
+          className="lift ml-auto rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink disabled:opacity-50"
         >
           {saving ? "Saving…" : clears ? "Save and clear macros" : "Save"}
         </button>

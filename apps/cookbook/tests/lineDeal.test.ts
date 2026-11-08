@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { bubbleText, lineDeals, shadeWord, bestEmptyWords, type LineDeal } from "@/lib/lineDeal";
+import { bubbleText, lineDeals, priceTag, shadeWord, bestEmptyWords, type LineDeal } from "@/lib/lineDeal";
 import { shadeOf } from "@/lib/dealSignal";
 import { FRESH_NIGHTS, buildDealBoard } from "@/lib/dealRows";
 import { percentOff } from "@/lib/pricing";
@@ -178,8 +178,32 @@ describe("an empty Best on the list says why", () => {
   });
 });
 
+describe("the tag beside a line's price (TEC-236)", () => {
+  const deal = (over: Partial<LineDeal>): LineDeal => ({ shade: "good", reason: "", salePrice: null, coupon: false, best: false, bestNights: 0, ...over });
+
+  it("says Sale, Coupon, Low or High, and nothing for a plain line", () => {
+    expect(priceTag(deal({ salePrice: 2.99 }))).toEqual({ word: "Sale", tone: "good" });
+    expect(priceTag(deal({ coupon: true }))).toEqual({ word: "Coupon", tone: "good" });
+    expect(priceTag(deal({}))).toEqual({ word: "Low", tone: "good" });
+    expect(priceTag(deal({ shade: "bad" }))).toEqual({ word: "High", tone: "bad" });
+    // Red stays red even when Kroger calls it a sale, as the Deals board does.
+    expect(priceTag(deal({ shade: "bad", salePrice: 5 }))).toEqual({ word: "High", tone: "bad" });
+    expect(priceTag(deal({ shade: "plain", salePrice: 2.99 }))).toBeNull();
+    expect(priceTag(null)).toBeNull();
+    expect(priceTag(undefined)).toBeNull();
+  });
+
+  it("the row draws the tag in the accent or the danger colour, and no left bar", () => {
+    const list = readFileSync(resolve(__dirname, "../app/List.tsx"), "utf8");
+    expect(list).not.toMatch(/border-l-4/);
+    const pill = list.slice(list.indexOf("function PriceTagPill"), list.indexOf("function Price("));
+    expect(pill).toMatch(/border-danger text-danger/);
+    expect(pill).toMatch(/border-accent text-accent/);
+  });
+});
+
 describe("the list's surface", () => {
-  const read = (file: string) => readFileSync(resolve(__dirname, file), "utf8");
+  const read =(file: string) => readFileSync(resolve(__dirname, file), "utf8");
   const list = read("../app/List.tsx");
 
   it("is browser-safe: lib/lineDeal.ts imports nothing with a database behind it", () => {

@@ -155,7 +155,10 @@ describe("one line per item: item, qty and price", () => {
 
   it("the deal still shades the row and says why on the price, so colour is not the only cue", () => {
     const html = listRow();
-    expect(html).toContain("border-l-accent");
+    // TEC-236: the green left bar is gone; a Sale / Low tag beside the price says it in a word.
+    expect(html).not.toMatch(/border-l-(accent|danger|4)/);
+    expect(html).toContain("from-accent/[0.08]");
+    expect(text(html)).toContain("Sale");
     expect(html).toMatch(/aria-label="\$4\.50, Sale \$1\.50 · Good price/);
   });
 

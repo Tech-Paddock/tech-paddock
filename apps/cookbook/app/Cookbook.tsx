@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import AddRecipe from "./AddRecipe";
 import Book from "./Book";
 import List from "./List";
@@ -39,6 +39,24 @@ import type { Recipe } from "@/lib/recipes";
 
 export type { Tab };
 
+/**
+ * Publishes the sticky bar's height as `--bar-h` on <html>, so the tab bar can freeze right under
+ * it whatever the bar's content makes it (TEC-236). The 3.5rem in the class is the fallback before
+ * this runs. Nothing is stored; it follows the bar if it resizes.
+ */
+function useBarHeight() {
+  useLayoutEffect(() => {
+    const bar = document.querySelector("main > header");
+    if (!bar) return;
+    const set = () => document.documentElement.style.setProperty("--bar-h", `${bar.getBoundingClientRect().height}px`);
+    set();
+    if (typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(set);
+    watch.observe(bar);
+    return () => watch.disconnect();
+  }, []);
+}
+
 export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [listVersion, setListVersion] = useState(0);
@@ -57,6 +75,8 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
     setRecipes(read);
   }, []);
 
+  useBarHeight();
+
   function choose(next: Tab) {
     setTab(next);
     const path = pathFor(next);
@@ -70,7 +90,12 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
     <ToastProvider>
       <div className="flex flex-col gap-6">
         {/* Pills in one scrolling row (TEC-135, the owner's mockup): the chosen tab filled with the accent. */}
-        <div role="tablist" aria-label="Cookbook" className="-mx-1 flex gap-1 overflow-x-auto px-1">
+        {/* **Frozen under the bar** (TEC-236): `--bar-h` is the header's measured height (see `useBarHeight`). */}
+        <div
+          role="tablist"
+          aria-label="Cookbook"
+          className="sticky top-[var(--bar-h,3.5rem)] z-20 -mx-4 -mt-6 flex gap-1 overflow-x-auto border-b border-line/30 bg-paper px-5 py-2"
+        >
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -81,7 +106,7 @@ export default function Cookbook({ initialTab = "recipes" }: { initialTab?: Tab 
               aria-controls={`panel-${t.id}`}
               onClick={() => choose(t.id)}
               className={`whitespace-nowrap rounded-full px-3 py-2.5 text-[13px] ${
-                tab === t.id ? "bg-accent font-semibold text-accent-ink" : "text-ink"
+                tab === t.id ? "lift bg-accent font-semibold text-accent-ink" : "text-ink"
               }`}
             >
               {t.label}

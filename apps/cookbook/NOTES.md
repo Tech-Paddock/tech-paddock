@@ -525,9 +525,13 @@ Reasoning is in the migration headers.
   `dealError`, said in the header, and lines stay plain; prices are unaffected. Ticked lines are
   not shaded. The row is one line: name `truncate`, small line `truncate` with `overflow-hidden`,
   the mark, bubble, word, price, ×N and buttons `shrink-0`; the row's `title` is the whole text.
-  Shading is a 4px left edge plus an 8% wash (`SHADE_CLASS` in `app/List.tsx`; local pattern, the
-  Deals row's edge and tints); `tests/dealShade.test.ts` holds ink, soft ink and the tint at 4.5:1
-  on it, Clark light and dark, over paper, surface and raised.
+  Shading is an 8% wash (`SHADE_CLASS` in `app/List.tsx`; local pattern, the Deals row's tints);
+  `tests/dealShade.test.ts` holds ink, soft ink and the tint at 4.5:1 on it, Clark light and dark,
+  over paper, surface and raised. **The 4px green left bar is gone** (TEC-236; the owner could not
+  tell what it meant). A small outlined **tag beside the price** says it in a word (`priceTag`,
+  `lib/lineDeal.ts`; `PriceTagPill`, `app/List.tsx`): red is **High** (even on a sale), green is
+  **Sale** when on sale, else **Coupon** when a staged coupon lists it, else **Low**; a plain line has
+  none. The tag is `aria-hidden`: the price's `title` and accessible name still carry the reason.
 - **Best** (`lib/bestPrice.ts`, pure, `BEST_WITHIN` 0.05, `BEST_MIN_NIGHTS` 2): tonight's effective
   price at or within 5% of the lowest night in the 12 weeks to today (day 84 back counts), needing
   at least 2 priced nights. Deals' Best button (fifth in the Show group; `DealRow.best`, board
@@ -613,7 +617,7 @@ Reasoning is in the migration headers.
 
 - The tab (`app/Brands.tsx`, TEC-135 look): the count and when last checked, **Refresh now** (the
   list's refresh, through `serialKroger`), a search over names, Kroger's name and code, and the
-  filters **All · Pick a default · Fix these · N**. **Fix these · shrank, discontinued or seeded
+  filters **All · Fix these · N** (TEC-236 dropped "Pick a default"). **Fix these · shrank, discontinued or seeded
   wrong** (`fixThese`, `lib/brandGroups.ts`): size drift (shrank / grew / changed size), a product
   Kroger no longer returns (**Replace** when a successor was found, else edit), and rows whose note
   starts `check:`. Then **groups** (`brandGroups`): products joined through any shared name
@@ -763,12 +767,13 @@ new; J the bad lines). No model call. Code: `lib/coupons.ts` (pure), `importCoup
 ## List lines (TEC-131)
 
 - **The tab** (TEC-135): the header (**N still to buy** · about $N · the store, and Pickup/Delivery),
-  **the Add box** (TEC-212, below), which looks one line high and grows to show a paste: **one item per line**
+  **the Add field** (TEC-236, below), which looks one line high and grows to show a paste: **one item per line**
   (`typedLines`, `lib/typedLines.ts`; owner, 2026-10-23, "Keep multi-line paste"; Enter adds,
   Shift+Enter starts a line; "notes after a dash"), **Cooking this week** (the menu as day and
   recipe chips with a two-tap Clear; names come from the book via `Cookbook.tsx`; moving a day
   stays on the book's *On the menu*), then **List · N** (Copy · Tidy · Clear ticked · Clear all, the
-  lines, **Send all to cart**) and **In cart · N** (Back to list per line, Clear cart, Go to checkout).
+  lines, **Send all to cart**) and **In cart · N** (Back to list per line, then a full-width **Go to
+  checkout** bar showing the cart total, then Clear cart; TEC-236).
   The King Soopers panel moved into the header in TEC-211 (see *The live check and the one-line
   list*). The header says "N still to buy · N in cart · prices from the night of …", then the live
   status. Each List row is **the tick, the name, the ×N box, the price and + Cart** on one line
@@ -829,15 +834,36 @@ new; J the bad lines). No model call. Code: `lib/coupons.ts` (pure), `importCoup
   again after the next list reload. **Trap:** the cache is by line, so a default changed in Your brands
   reaches the grey rows only through `refreshKey` (`Cookbook.tsx` bumps it when Your brands changes); a
   change made anywhere else, such as another phone, shows after a reload of the page.
-- **The Add box is its own card** (TEC-212, `app/List.tsx`; owner: "Make the add an item pop more it gets
-  lost and is a great feature"): a `section` with a 2px `border-accent` frame on `bg-surface`, a bold
-  "Add to the list" heading, a ＋ in accent at the start, and the placeholder "Eggs, 2 lb chicken — notes
-  after a dash" in full `text-ink` (`placeholder:text-ink`, never faded). Same place, below the filters.
-  **The Add button is full accent always and has no `disabled` attribute or opacity**: with nothing typed
-  (or while adding) `add()` returns before any request and the button carries `aria-disabled`. Enter
-  adds, Shift+Enter starts a line, a paste adds one per line, as before. The card is a local pattern
-  (existing tokens only). `tests/addBox.test.ts` reads the source, as there is no DOM harness. **Trap:**
-  do not put `disabled` back on the button for the empty state; the owner wants it unfaded.
+- **One search / add field** (TEC-236, `app/SearchField.tsx`; the owner's demo of 2026-11-08, replacing
+  TEC-212's bordered Add card): a `rounded-[26px]` field on `bg-surface` with the icon inside (＋ for the
+  List's Add, a magnifier for the book's search) and an accent border plus a soft 4px accent ring while
+  you are in it (`.field-shadow` in `globals.css`). No heading and no frame. The placeholder is
+  `text-ink-soft` now (a token that holds 4.5:1), no longer full ink: TEC-212's "never faded" went with
+  the card. **The Add button is still full accent always and has no `disabled` attribute or opacity**: with
+  nothing typed (or while adding) `add()` returns before any request and the button carries
+  `aria-disabled`. Enter adds, Shift+Enter starts a line, a paste adds one per line. The book's search
+  keeps `aria-label="Search recipes"` and now reads "Search N recipes". `tests/addBox.test.ts` reads the
+  source, as there is no DOM harness. **Trap:** do not put `disabled` back on the Add button.
+- **Buttons pop** (TEC-236): `.lift` in `globals.css` is a faint top highlight and an accent-coloured
+  drop shadow (`rgb(var(--accent-rgb) / …)`, so green in light and the gold glow in dark), pressed 1px
+  on `:active`, none when disabled. It is on the filled accent buttons: Add, + Cart, Add to list, the
+  selected tab, Keep it, Save, the accent "Are you sure?" button and Go to checkout. Outlined buttons
+  (Send all to cart, Clear cart) are a 2px border on `bg-surface` with `shadow-sm`. A local pattern.
+- **Frozen headers** (TEC-236): the bar in `Shell.tsx` is `sticky top-0` and the tab bar in
+  `Cookbook.tsx` is `sticky` under it at `top-[var(--bar-h)]`, an opaque `bg-paper` strip. `--bar-h` is
+  the bar's measured height, set on `<html>` by `useBarHeight` (a `ResizeObserver`; 3.5rem before it
+  runs). Cookbook's own markup: no shared file. `layout.tsx` has no `viewportFit: "cover"`, so no
+  safe-area offset is needed. **Trap:** a parent with `overflow` other than visible between the page and
+  these breaks `sticky`; none is there now.
+- **In cart explains its faded rows** (TEC-236): the "Nothing in the cart" box is gone, so an empty cart
+  shows no live rows. An info note ("Faded rows are your List, matched to King Soopers products. They
+  become live when you add them to the cart.") sits above the faded rows whenever there are any.
+  **Go to checkout** is a full-width accent bar with the total at its right: the live In cart total once
+  Refresh cart has read it, else the nightly sum; no total shown when none can be priced, never $0.
+- **A quantity change reprices the line at once** (TEC-236): `setQuantity` in `app/List.tsx` rescales
+  `price.total` from the unit price (`repriced`, `lib/listPrices.ts`) in the same update as the
+  quantity, so the row, the List total and a faded row's price move with no send or Back to list. It was
+  only the quantity that moved before; the total came back right on the next read.
 - **Each line's mark** (`lineMark`, `lib/brands.ts`; `GET /api/grocery` adds `mark`): ★ goes in
   as a saved product (code, only product, default, named, fit or bought), ? needs a pick (a true tie) at Send, + anything
   else, including a product found only by its Kroger name and a typed code that is not saved.
@@ -954,12 +980,12 @@ when the stored sign-in failed), `SetupError` 501 (missing variable), anything e
   time that exact line has one match and goes straight in, whatever the default.
 - The list's link and price for a line decided by default, fit or purchases follow that pick; a
   new default in Your brands, or a new import of purchases, changes them on the next read.
-- With every preset cleared, Your brands' **Pick a default** filter and each multi-product card's
-  "needs a default" read list every group until a default is made by hand. That is expected; the
-  line itself already goes in by fit and purchases.
+- **No default nudges** (TEC-236; owner, 2026-11-08): Your brands has no "Pick a default" filter and no
+  "needs a default" flag (`BrandGroup.needsDefault` is gone). Defaults themselves stay, set by hand with
+  Make default; the line goes in by fit and purchases until one is.
 - Your brands' groups chain through shared names, so one broad name ("milk") can pull unrelated
   products into one card. Make default sets only the shared names that product carries; when it
-  does not carry the card's title name, the card still reads as needing a default.
+  does not carry the card's title name, the card still shows no default star.
 - A bare code becomes `/p/<first-name-slug>/<code>`, unconfirmed as a page King Soopers serves
   (kingsoopers.com is unreachable from here). Send reads only the digits; the refresh replaces it
   with Kroger's own page. Run **Refresh now** after pasting a seed.

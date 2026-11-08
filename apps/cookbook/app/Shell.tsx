@@ -24,7 +24,9 @@ import { LIVERY } from "@/lib/livery";
 export default function Shell({ tab }: { tab: Tab }) {
   return (
     <main className="min-h-screen">
-      <header className="flex items-center gap-2 border-b-4 border-accent bg-bar px-4 py-3 text-bar-ink">
+      {/* **Frozen** (TEC-236): the bar stays at the top while the page scrolls, and the tab bar
+          (`Cookbook.tsx`) freezes right under it. Cookbook's own markup only; no shared file. */}
+      <header className="sticky top-0 z-30 flex items-center gap-2 border-b-4 border-accent bg-bar px-4 py-3 text-bar-ink">
         <h1 className="text-lg font-semibold tracking-tight">Cookbook</h1>
         <ThemeControl onBar />
         <LogoutControl onBar />
