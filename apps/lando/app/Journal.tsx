@@ -788,12 +788,18 @@ export default function Journal() {
             })}
           </section>
 
-          {/* Next 7 days (TEC-199): open items due in the coming week, overdue too, soonest first, each with
-              Done. Absent when nothing is due; the feed's Upcoming filter has the rest. */}
+          {/* Next 7 days (TEC-199, compact since TEC-250): open items due in the coming week, overdue too, soonest
+              first, one short line each with a small Done, and a Calendar link in the heading. Absent when nothing
+              is due; the feed's Upcoming filter has the rest. */}
           {week.length > 0 && (
-            <section aria-label="Next 7 days" className="-mt-2 grid gap-1 rounded-xl border border-line bg-paper p-2">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Next 7 days</h2>
-              <UpcomingList items={week} today={today} onDone={doneUpcoming} onEdit={editUpcoming} />
+            <section aria-label="Next 7 days" className="-mt-2 grid gap-0.5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Next 7 days</h2>
+                <button type="button" onClick={() => showTab("calendar")} className="min-h-[44px] px-1 text-[13px] font-semibold text-accent underline underline-offset-2">
+                  Calendar
+                </button>
+              </div>
+              <UpcomingList compact items={week} today={today} onDone={doneUpcoming} onEdit={editUpcoming} />
             </section>
           )}
 

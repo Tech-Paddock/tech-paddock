@@ -813,9 +813,9 @@ export default function LogForm({
   // and pick. Potty puts it behind a checkbox (TEC-161); a vet visit and a medication dose show it all the time
   // (TEC-208), opening on None.
   const issueCheck = (label: string) => (
-    <label className="flex min-h-[44px] items-center gap-2">
+    <label className="flex min-h-[44px] items-center gap-2 text-[15px] text-ink-soft">
       <input type="checkbox" checked={hasIssue} onChange={(e) => setHasIssue(e.target.checked)} className="h-5 w-5 accent-accent" />
-      <span>{label}</span>
+      <span className={hasIssue ? "font-semibold text-ink" : ""}>{label}</span>
     </label>
   );
   const issueField = (
@@ -1423,16 +1423,22 @@ export default function LogForm({
         )}
       </Box>
 
-      {/* Box 3: the secondary things (TEC-199). Potty: the treats count then the medical issue checkbox, on one line.
+      {/* The secondary things (Box 3 in TEC-199, no box since TEC-250: a plain row under Box 2). Potty: the treats
+          count, a thin divider, then the medical issue checkbox, on one line.
           Training and Fun: the treats count. Health (TEC-208): a vet visit's Related issue, then the Related note
           on every Health type; Training has the Related note too. Not on a future entry, which keeps no
           treats or links. */}
       {!planning && (kind === "potty" || kind === "exercise" || kind === "health") && (
-        <Box section="secondary" label="Treats and links">
+        <div data-section="secondary" className="grid gap-2">
           {(kind === "potty" || kind === "exercise") && (
-            <div className="flex flex-wrap items-center gap-x-4">
+            <div className="flex flex-wrap items-center gap-x-3">
               {treatCount}
-              {kind === "potty" && issueCheck("Medical issue")}
+              {kind === "potty" && (
+                <>
+                  <span aria-hidden="true" className="h-[22px] w-px bg-line/60" />
+                  {issueCheck("Medical issue")}
+                </>
+              )}
             </div>
           )}
           {kind === "potty" && issueSelect}
@@ -1487,7 +1493,7 @@ export default function LogForm({
               )}
             </div>
           )}
-        </Box>
+        </div>
       )}
 
       {/* The note: a full-width two-line text box that scrolls past two lines (TEC-199). */}

@@ -58,6 +58,23 @@
     weights only. (2) `/api/upcoming` returns open plans only, so a plan marked done leaves the Calendar (its entry shows on the day it was
     logged) and a repeating plan shows only its next date. (3) A new reader of `loaded.events` must still read `entries`, not events, or a
     note leaks in. (4) The tab row is five columns at 13px; a sixth tab will not fit.
+- **The quieter Log and forms** (TEC-250, the owner: less prominent upcoming, treats and medical issue apart, small attachments; "we've
+  slightly overcorrected" kept a list rather than one line). Three **local patterns**, no data change and no migration. **Later bullets
+  that say Box 3, "Treats and links", Take photo/Attach buttons or the Next 7 days card describe what this replaced.**
+  * **The compact Upcoming row** (`UpcomingList` with `compact`, used by the Log's Next 7 days only): a dot in the plan's form colour
+    (`planTone`, the Calendar's `lando-cal-dot`; a plan with no form wears the soft ink), the title, when (`dueText`), a small Done; no card,
+    no detail line, no note (the note stays in the tap's `title`), no repeat text. Overdue time is red (`text-danger`, bold) and in words
+    for screen readers. Tap edits as before. The heading row has a **Calendar** link (`showTab("calendar")`). **The feed's Upcoming
+    filter and the Calendar's day list keep the full rows** (the owner left the filter alone; Calendar was not in the brief).
+  * **The plain counter** (`TreatCount`): − 0 + with no border or fill, accent ink, buttons 40x44 hit areas. **Box 3 is no longer a box:**
+    `data-section="secondary"` is a plain `div` under Box 2 (the section order the tests read is unchanged). Potty: counter, a thin
+    vertical divider, then the Medical issue checkbox (text soft until ticked), Related issue under it when ticked; Training and Fun: the
+    counter alone; Health: Related issue (vet visit) and Related note, no box. What and Where (Box 2) are untouched.
+  * **The small attachments row** (`PhotoPicker`, every form, upcoming plan and the Note form): one **Attach** link with a paperclip;
+    tapped, it shows **Take photo** and **Choose files** inline (the camera input is still its own hidden input), then ✕. Attached items
+    are 36px thumbnails (a file: a small chip with its type and name) in one wrapping row, each a 44px button; a tap opens a small
+    **Open / Remove** panel under the row (an inline panel, not a second bottom sheet over the form's). A failed upload stays visible in
+    red with Retry and ✕, and Save still waits. The feed's thumbnails are unchanged. `tests/quieter.test.ts` holds all three.
 - **Upcoming items** (TEC-192, no tab since TEC-199): plans in `lando.upcoming` (kind vet, vaccine, medication or other; title,
   due day, optional time and note, optional repeat of N weeks, months or years, status open, done or cancelled). **A future
   When on any form creates one** (`lib/future.ts`; below). **An open item is edited in place** (TEC-203): tapping its words
