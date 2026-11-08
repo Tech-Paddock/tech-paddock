@@ -9,8 +9,8 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 ## Surface: app
 
-- Four tabs, Log, Notes, Analytics and Patch notes, opening on Log: the owner's override (2026-10-20,
-  widened 2026-10-27 TEC-182, narrowed 2026-11-01 TEC-199, pills restored 2026-11-02 TEC-202, Notes added 2026-11-02 TEC-204) of the app surface's one screen and no
+- Five tabs, Log, Calendar, Notes, Analytics and Patch notes, opening on Log: the owner's override (2026-10-20,
+  widened 2026-10-27 TEC-182, narrowed 2026-11-01 TEC-199, pills restored 2026-11-02 TEC-202, Notes added 2026-11-02 TEC-204, Calendar added 2026-11-08 TEC-234) of the app surface's one screen and no
   tabs. One-handed, thumb-first. Pills open a quick log: Pee and Poop open Potty on that pick, Meals opens Food, Fun opens Fun (TEC-181, TEC-186, restored TEC-202). The Log buttons are Treats, Training, Weight and Health.
 - An app bar over the tabs: theme, logout and the livery badge (Meals today left, TEC-193).
 - Every form opens as a bottom sheet.
@@ -35,6 +35,8 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 - Login is the shared password until per-person logins ship (TEC-118).
 - Notes are a journal kind (`note`) on their own tab, never in the Log feed, the pills or Analytics;
   a note is never dated in the future (TEC-204).
+- The Calendar reads the journal and `lando.upcoming` as they are, with no table of its own; it
+  never shows notes, and offers Add a plan only from today onward (TEC-234).
 - Related issue (TEC-142, TEC-161, TEC-208): Potty keeps its Medical issue checkbox, the select behind it. A vet
   visit and a medication dose show the select always, opening on None, which saves no `issue`. A medical issue
   links to no other issue.
