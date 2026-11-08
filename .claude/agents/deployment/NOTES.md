@@ -7,8 +7,9 @@
 
 ## Traps
 
-- **Starting Deployment asks the owner,** on top of typing `/deploy`. That approval is the hook's
-  only way to know the owner asked.
+- **A typed `/deploy` or `/execute-plan` starts Deployment without a click** (TEC-237); the prompt
+  hook records the command. A start without one asks. Folded-in branches arrive by `SendMessage`
+  from the lock holder's TD and need nothing more.
 - **Branch protection requires `gate`, `drift` and `request-line`.** A renamed job needs the ruleset
   changed first, or merges are refused.
 - **CI runs on push only** (TEC-158): a pull request shows its head's push run, so `gate` runs once.

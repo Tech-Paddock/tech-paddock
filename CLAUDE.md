@@ -24,10 +24,10 @@ Only Deployment writes to a pull request. The TD does not build app features, ex
 `apps/showcase` and touch-ups (a wrong doc, a missing config line).
 
 **Owner commands:** `/kickoff [brief]` starts a TD session; `/build` builds every issue this chat
-has readied, `/build TEC-n` that one, to a plan the TD shows first; `/status-check [app | session]`
-reports branches, unfinished work, blockers and hot topics; `/deploy` deploys what is ready, or
-holds and reports; `/summarize-plan [app]` lists the builds and deploys ahead and the command that
-runs them; `/execute-plan …` runs exactly that plan, step by step; `/closeout` says whether a chat
+has readied, `/build TEC-n` that one, to a plan the TD shows first, and stops before deploy;
+`/status-check [app | session]` reports branches, unfinished work, blockers and hot topics;
+`/deploy` deploys what is ready, or hands it to the deploy already running;
+`/summarize-plan [app]` lists the builds and deploys ahead and the command that runs them; `/execute-plan …` runs exactly that plan, step by step; `/closeout` says whether a chat
 is safe to archive; `/retro` looks back and records one lesson; `/skill-check` lists every skill.
 
 **Propose before branching:** the job, what comes first, what it contradicts. No branch until the
@@ -163,8 +163,8 @@ are the owner's.
 2. **The guard** (`.claude/hooks/guard.mjs`, fails closed) refuses a push to `main`, a non-squash
    merge, migration-history rewrites, pull-request writes from anyone but Deployment, and app-code
    edits from any helper but a builder; holds starting Deployment or a builder, the TD's own
-   app-code edits, Vercel writes, and Supabase writes other than `apply_migration`, for the owner (a
-   step of the plan the owner ran with `/execute-plan` starts without a click);
+   app-code edits, Vercel writes, and Supabase writes other than `apply_migration`, for the owner (the
+   owner's typed `/build`, `/deploy` or `/execute-plan` is that approval: its starts need no click);
    refuses a Linear issue without labels or Next steps.
    `guard.test.mjs` proves each in CI.
 3. **CI `gate`:** every app typechecks, tests and builds, and `drift` passes

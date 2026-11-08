@@ -80,11 +80,14 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **A helper worktree refuses git inside a loop, a variable or `git -C`.** Run each git plainly.
 - **Finished work hides in other sessions.** At kickoff, `list_sessions` and `git branch -r`.
 - **Cost is context × turns.** Brief tightly; end the session once branches are merged.
-- **Deployment and the builder start with an approval click** on top of `/deploy` and `/build`; the
-  hook cannot tell otherwise that the owner asked. Auto mode shows the owner the click (seen on a
-  Deployment start, 2026-10-26).
+- **A typed `/build`, `/deploy` or `/execute-plan` is the approval** (TEC-237). The prompt hook
+  writes its record to `.claude/state/` (`build-`, `deploy-`, `plan-approved.json`); for 12 hours,
+  in that session, the guard starts that command's helpers without a click. Any other start asks.
+  No tool writes those files, and a shell command that names one is refused.
+- **Only the owner's prompt writes a record.** If a `send_message` from another session that began
+  `/deploy` ever reached the prompt hook, it would count; so TD-to-TD messages open with plain words.
 - **Smoke** (`.github/workflows/smoke.yml`) probes each app signed out after every production
   deploy and on demand (Actions → Smoke → Run workflow). All apps passed on 2026-10-26. A red run
   is post-merge news, not a blocked merge.
 - **Resuming a helper with `SendMessage` does not ask again;** the guard's matcher is `Agent|Task`.
-  `/deploy` relies on it to resume a Deployment held by the lock.
+  A lock holder relies on it to fold another session's branches into its running Deployment.

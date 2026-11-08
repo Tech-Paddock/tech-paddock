@@ -53,7 +53,7 @@ export function decide(input) {
   const deploy = isDeployment(input);
   if (tool === "Agent" || tool === "Task") return startAgent(args, input);
   if (EDIT_TOOLS.has(tool)) return editApp(args, input);
-  if (tool === "Bash" && /plan-approved/.test(String(args.command ?? ""))) return deny(PLAN_RECORD_ONLY);
+  if (tool === "Bash" && RECORD.test(String(args.command ?? ""))) return deny(PLAN_RECORD_ONLY);
   if (tool === "Bash") return bash(String(args.command ?? ""), input?.cwd || process.cwd(), 0, deploy);
   if (!tool.startsWith("mcp__")) return null;
   const cut = tool.lastIndexOf("__");
@@ -83,21 +83,22 @@ const MAIN_ONLY =
   "Every write to a pull request is Deployment's. Push your branch, report, and stop; the owner runs `/deploy`.";
 
 /* Starting Deployment or a builder: never from a helper; from a main session,
-   only with the owner's approval. A hook cannot tell the TD's session from
-   another, so the approval is what makes it the owner's `/deploy` or `/build`
-   (TEC-156). */
+   only on the owner's typed command. A hook cannot tell the TD's session from
+   another, so the prompt hook records the owner's `/build`, `/deploy` or
+   `/execute-plan` as it is typed, and a start that record covers needs no
+   click (TEC-237). Anything else asks, as before (TEC-156). */
 const BUILDER = "builder";
 function startAgent(a, input) {
   const type = String(a.subagent_type ?? "").toLowerCase();
   if (type === DEPLOYMENT) {
     if (input?.agent_id) return deny("Only the TD starts Deployment, on the owner's `/deploy` or `/execute-plan`. Report what is ready and stop.");
-    if (onPlan(a, input)) return null;
-    return ask("Starting Deployment waits for the owner's approval. Approve it only if you ran `/deploy`, or it is a step of the plan you ran with `/execute-plan`.");
+    if (onPlan(a, input) || onDeploy(input)) return null;
+    return ask("Starting Deployment waits for the owner's approval: no `/deploy` or `/execute-plan` was typed in this session in the last 12 hours. Approve it only if you asked for this deploy.");
   }
   if (type === BUILDER) {
     if (input?.agent_id) return deny("Only the TD starts a builder, on the owner's `/build` or `/execute-plan`. Put the work in your report and stop.");
-    if (onPlan(a, input)) return null;
-    return ask("Starting a builder waits for the owner's approval. Approve it only if you ran `/build`, or it is a step of the plan you ran with `/execute-plan`.");
+    if (onPlan(a, input) || onBuild(a, input)) return null;
+    return ask("Starting a builder waits for the owner's approval: no `/build` or `/execute-plan` typed in this session covers the issues this brief names. Approve it only if you asked for this build.");
   }
   return null;
 }
@@ -120,7 +121,8 @@ function startAgent(a, input) {
    the exception fails closed. */
 const PLAN_HOURS = 12;
 const PLAN_RECORD_ONLY =
-  "`.claude/state/plan-approved.json` is written only by the hook that sees the owner type `/execute-plan`. No tool writes it.";
+  "The approval records in `.claude/state/` (`plan-`, `build-` and `deploy-approved.json`) are written only by the hook that sees the owner type `/execute-plan`, `/build` or `/deploy`. No tool writes them.";
+const RECORD = /(plan|build|deploy)-approved/;
 export const stateDir = (input) => join(process.env.CLAUDE_PROJECT_DIR || input?.cwd || process.cwd(), ".claude", "state");
 const readJson = (path) => {
   try {
@@ -148,14 +150,53 @@ export function planGate(input, now = Date.now()) {
   return { approve: { command: plan.command, issues, session_id: input.session_id, at: new Date(now).toISOString() } };
 }
 
-export function onPlan(a, input, now = Date.now()) {
-  if (input?.agent_id || !input?.session_id) return false;
-  const r = readJson(join(stateDir(input), "plan-approved.json"));
-  if (!r || r.session_id !== input.session_id || !Array.isArray(r.issues)) return false;
+/** The record `file` if it is this session's and under PLAN_HOURS old; else null. */
+function freshRecord(file, input, now = Date.now()) {
+  if (input?.agent_id || !input?.session_id) return null;
+  const r = readJson(join(stateDir(input), file));
+  if (!r || r.session_id !== input.session_id) return null;
   const age = now - Date.parse(r.at);
-  if (!(age >= 0 && age < PLAN_HOURS * 3600 * 1000)) return false;
+  return age >= 0 && age < PLAN_HOURS * 3600 * 1000 ? r : null;
+}
+
+export function onPlan(a, input, now = Date.now()) {
+  const r = freshRecord("plan-approved.json", input, now);
+  if (!r || !Array.isArray(r.issues)) return false;
   const named = issuesIn(a?.prompt);
   return named.length > 0 && named.every((n) => r.issues.includes(n));
+}
+
+/* `/build TEC-n …` covers a brief that names only those issues; a bare
+   `/build` (every issue the chat readied) covers a brief that names any. A
+   brief that names no issue is not a build of anything, and asks. */
+export function onBuild(a, input, now = Date.now()) {
+  const r = freshRecord("build-approved.json", input, now);
+  if (!r || !Array.isArray(r.issues)) return false;
+  const named = issuesIn(a?.prompt);
+  return named.length > 0 && (r.issues.length === 0 || named.every((n) => r.issues.includes(n)));
+}
+
+/* `/deploy` is the go for Deployment in this session; the lock and the handoff
+   to a running deploy are the deploy skill's, not a click (TEC-237). */
+export const onDeploy = (input, now = Date.now()) => Boolean(freshRecord("deploy-approved.json", input, now));
+
+/* The UserPromptSubmit hook's whole job: the owner's typed command in, the
+   record to write (or a block) out. Only a prompt the owner submits reaches
+   it, never a tool call. */
+export function promptGate(input, now = Date.now()) {
+  const prompt = String(input?.prompt ?? "");
+  const at = new Date(now).toISOString();
+  const session_id = input?.session_id;
+  const build = /^\s*\/build(\s|$)/i.test(prompt);
+  const deploy = /^\s*\/deploy(\s|$)/i.test(prompt);
+  if (build || deploy) {
+    if (!session_id) return null; // nothing to tie it to: every start asks
+    if (build) return { file: "build-approved.json", record: { command: "/build", issues: issuesIn(prompt), session_id, at } };
+    return { file: "deploy-approved.json", record: { command: "/deploy", session_id, at } };
+  }
+  const r = planGate(input, now);
+  if (r?.approve) return { file: "plan-approved.json", record: r.approve };
+  return r;
 }
 
 /* App code is the builder's: the TD does not build app features (CLAUDE.md).
@@ -168,7 +209,7 @@ const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const APP_CODE = /(^|\/)apps\/(?!showcase\/)[^/]+\/.+/;
 function editApp(a, input) {
   const path = String(a.file_path ?? a.notebook_path ?? "").replace(/\\/g, "/");
-  if (/(^|\/)\.claude\/state\/plan-approved\.json$/.test(path)) return deny(PLAN_RECORD_ONLY);
+  if (/(^|\/)\.claude\/state\/(plan|build|deploy)-approved\.json$/.test(path)) return deny(PLAN_RECORD_ONLY);
   if (!APP_CODE.test(path) || /\.md$/i.test(path)) return null;
   if (!input?.agent_id) {
     return ask("App code is the builder's. Approve this edit only if it is a touch-up (a wrong doc or a missing config line); a feature waits for `/build`.");

@@ -14,7 +14,7 @@ import { copyFileSync, mkdtempSync, readFileSync, symlinkSync, mkdirSync, writeF
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { decide, lex, nextSteps, planGate, stripSql, targetsMain } from "./decide.mjs";
+import { decide, lex, nextSteps, planGate, promptGate, stripSql, targetsMain } from "./decide.mjs";
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HOOKS, "..", "..");
@@ -563,12 +563,65 @@ test("a plan run starts its own builders and Deployment without a click, and not
   withState({}, () => assert.equal(start("deployment", "TEC-176"), "ask"));
 });
 
-test("no tool writes the plan approval; only the prompt hook does", () => {
+test("no tool writes an approval record; only the prompt hook does", () => {
   for (const tool_name of ["Edit", "Write"]) {
-    assert.equal(verdict(decide({ tool_name, tool_input: { file_path: "/home/user/tech-paddock/.claude/state/plan-approved.json" } })), "deny", tool_name);
+    for (const f of ["plan", "build", "deploy"]) {
+      assert.equal(verdict(decide({ tool_name, tool_input: { file_path: `/home/user/tech-paddock/.claude/state/${f}-approved.json` } })), "deny", `${tool_name} ${f}`);
+    }
   }
   assert.equal(verdict(decide({ tool_name: "Write", tool_input: { file_path: "/home/user/tech-paddock/.claude/state/plan.json" } })), "allow");
-  assert.equal(verdict(decide({ tool_name: "Bash", tool_input: { command: "echo '{}' > .claude/state/plan-approved.json" } })), "deny");
+  for (const f of ["plan", "build", "deploy"]) {
+    assert.equal(verdict(decide({ tool_name: "Bash", tool_input: { command: `echo '{}' > .claude/state/${f}-approved.json` } })), "deny", f);
+  }
+});
+
+/* TEC-237: the owner's typed `/build` and `/deploy` are each the one approval */
+test("/build and /deploy: the prompt hook records the owner's command, and nothing else", () => {
+  const at = Date.parse("2026-11-08T15:00:00Z");
+  assert.deepEqual(promptGate({ prompt: "/build TEC-5 tec-6", session_id: "s1" }, at), {
+    file: "build-approved.json",
+    record: { command: "/build", issues: ["TEC-5", "TEC-6"], session_id: "s1", at: "2026-11-08T15:00:00.000Z" },
+  });
+  assert.deepEqual(promptGate({ prompt: "/build", session_id: "s1" }, at).record.issues, []);
+  assert.deepEqual(promptGate({ prompt: " /Deploy ", session_id: "s1" }, at), {
+    file: "deploy-approved.json",
+    record: { command: "/deploy", session_id: "s1", at: "2026-11-08T15:00:00.000Z" },
+  });
+  for (const prompt of ["/builder", "/deployment now", "please /build TEC-5", "build TEC-5", "/status-check"]) {
+    assert.equal(promptGate({ prompt, session_id: "s1" }, at), null, prompt);
+  }
+  assert.equal(promptGate({ prompt: "/build TEC-5" }, at), null); // no session: every start asks
+  withState({}, () => assert.match(promptGate({ prompt: "/execute-plan lando", session_id: "s1" }).block, /summarize-plan/));
+});
+
+test("a /build starts its builders without a click, a /deploy its Deployment, and neither the other", () => {
+  const fresh = new Date(Date.now() - 60 * 1000).toISOString();
+  const stale = new Date(Date.now() - 13 * 3600 * 1000).toISOString();
+  const start = (subagent_type, prompt, who = {}) => verdict(decide({ tool_name: "Agent", tool_input: { subagent_type, prompt }, session_id: "s1", ...who }));
+  const build = (issues, at = fresh, session_id = "s1") => ({ "build-approved.json": { command: "/build", issues, session_id, at } });
+  const deploy = (at = fresh, session_id = "s1") => ({ "deploy-approved.json": { command: "/deploy", session_id, at } });
+  withState(build(["TEC-5"]), () => {
+    assert.equal(start("builder", "app: lando. Issue TEC-5."), "allow");
+    assert.equal(start("builder", "app: lando. TEC-5 and TEC-6."), "ask"); // not what was typed
+    assert.equal(start("builder", "app: lando. No issue named."), "ask");
+    assert.equal(start("deployment", "Ready: claude/lando-x (TEC-5)."), "ask"); // /build stops at deploy
+    assert.equal(start("builder", "Issue TEC-5.", { session_id: "s2" }), "ask");
+    assert.equal(start("builder", "Issue TEC-5.", HELPER), "deny");
+  });
+  withState(build([]), () => {
+    assert.equal(start("builder", "app: cookbook. Issue TEC-6."), "allow"); // a bare /build
+    assert.equal(start("builder", "app: cookbook. No issue named."), "ask");
+  });
+  withState(build(["TEC-5"], stale), () => assert.equal(start("builder", "Issue TEC-5."), "ask"));
+  withState(build(["TEC-5"], fresh, "s2"), () => assert.equal(start("builder", "Issue TEC-5."), "ask"));
+  withState(deploy(), () => {
+    assert.equal(start("deployment", "Ready: claude/lando-x (TEC-5), claude/coffee-y."), "allow");
+    assert.equal(start("builder", "Issue TEC-5."), "ask"); // /deploy builds nothing
+    assert.equal(start("deployment", "x", { session_id: "s2" }), "ask");
+    assert.equal(start("deployment", "x", HELPER), "deny");
+  });
+  withState(deploy(stale), () => assert.equal(start("deployment", "x"), "ask"));
+  withState({ "deploy-approved.json": "not json at all" }, () => assert.equal(start("deployment", "x"), "ask"));
 });
 
 /* ------------------------------------------------------------------------- */
@@ -651,7 +704,7 @@ test("end to end: the real commands deny, ask and allow", () => {
   }
 });
 
-test("end to end: the prompt hook blocks a mismatch and records a match", () => {
+test("end to end: the prompt hook blocks a mismatch and records a match, a /build and a /deploy", () => {
   const command = settings.hooks.UserPromptSubmit[0].hooks[0].command;
   const dir = mkdtempSync(join(tmpdir(), "plan-e2e-"));
   mkdirSync(join(dir, ".claude", "hooks"), { recursive: true });
@@ -670,6 +723,13 @@ test("end to end: the prompt hook blocks a mismatch and records a match", () => 
   assert.deepEqual(runPrompt("/execute-plan lando"), { status: 0, out: null });
   const rec = JSON.parse(readFileSync(join(dir, ".claude", "state", "plan-approved.json"), "utf8"));
   assert.deepEqual([rec.command, rec.issues, rec.session_id], ["/execute-plan lando", ["TEC-176"], "s1"]);
+  // TEC-237: /build and /deploy reach the hook through settings.json's filter and are recorded.
+  assert.deepEqual(runPrompt("/build TEC-5"), { status: 0, out: null });
+  const built = JSON.parse(readFileSync(join(dir, ".claude", "state", "build-approved.json"), "utf8"));
+  assert.deepEqual([built.command, built.issues, built.session_id], ["/build", ["TEC-5"], "s1"]);
+  assert.deepEqual(runPrompt("/deploy"), { status: 0, out: null });
+  const deployed = JSON.parse(readFileSync(join(dir, ".claude", "state", "deploy-approved.json"), "utf8"));
+  assert.deepEqual([deployed.command, deployed.session_id], ["/deploy", "s1"]);
 });
 
 test("end to end: it fails closed", () => {
