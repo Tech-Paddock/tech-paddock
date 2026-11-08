@@ -8,11 +8,13 @@
  */
 
 import { isMealType } from "./foods";
+import { findMedication, medReasonLabel, MED_REASONS, type Medication } from "./medications";
 import {
   exercise,
   food,
   fromKg,
   growthPoints,
+  health,
   liveEvents,
   potty,
   round1,
@@ -508,4 +510,43 @@ export function weeklyExercise(events: JournalEvent[], now: Date, weeks = EXERCI
   const began = live.filter((e) => e.kind !== "weight").reduce((m, e) => Math.min(m, Date.parse(e.at)), Infinity);
   const keep = rows.findIndex((r) => new Date(r.end.getFullYear(), r.end.getMonth(), r.end.getDate() + 1).getTime() > began);
   return keep < 0 ? rows.slice(-1) : rows.slice(keep);
+}
+
+export type ReasonRow = {
+  /** A `MED_REASONS` id, or "" for doses whose medication has no reason. */
+  reason: string;
+  label: string;
+  doses: number;
+  /** The medications given for it, with their dose counts, most doses first. */
+  meds: { name: string; doses: number }[];
+};
+
+/**
+ * Medication doses in the last fourteen days grouped by their medication's reason (TEC-233): the reasons in
+ * the form's order, then "No reason". A reason with no dose is left out; voided doses and the old copy of a
+ * corrected one do not count. A dose whose medication is not in `meds` counts under No reason, by its name then.
+ */
+export function dosesByReason(events: JournalEvent[], meds: readonly Medication[], now: Date, days = ANALYTICS_DAYS): ReasonRow[] {
+  const first = dayStarts(now, days)[0].getTime();
+  const end = endOfToday(now);
+  const byReason = new Map<string, Map<string, number>>();
+  for (const e of liveEvents(events)) {
+    if (e.kind !== "health") continue;
+    const h = health(e);
+    if (h.type !== "medication") continue;
+    const t = Date.parse(e.at);
+    if (t < first || t >= end) continue;
+    const med = h.med_id ? findMedication(meds, h.med_id) : null;
+    const reason = med?.reason ?? "";
+    const names = byReason.get(reason) ?? new Map<string, number>();
+    const name = med?.name ?? h.med_name ?? "A medication";
+    names.set(name, (names.get(name) ?? 0) + 1);
+    byReason.set(reason, names);
+  }
+  return [...MED_REASONS.map(([id]) => id as string), ""]
+    .filter((id) => byReason.has(id))
+    .map((id) => {
+      const list = [...byReason.get(id)!].map(([name, doses]) => ({ name, doses })).sort((a, b) => b.doses - a.doses || a.name.localeCompare(b.name));
+      return { reason: id, label: medReasonLabel(id), doses: list.reduce((n, m) => n + m.doses, 0), meds: list };
+    });
 }

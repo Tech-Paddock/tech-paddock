@@ -14,6 +14,8 @@ function fakeDb() {
     from(name: string) {
       const rows = (tables[name] ??= []);
       let pending: Row | null = null;
+      let patch: Row | null = null;
+      let matchId = "";
       const q: Record<string, unknown> = {};
       const self = () => q;
       Object.assign(q, {
@@ -21,7 +23,9 @@ function fakeDb() {
         order: self,
         or: self,
         range: self,
-        eq: self,
+        eq: (_c: string, v: string) => ((matchId = v), q),
+        is: self,
+        update: (p: Row) => ((patch = p), q),
         in: self,
         insert: (r: Row) => ((pending = r), q),
         single: async () => {
@@ -30,7 +34,14 @@ function fakeDb() {
           rows.push(row);
           return { data: row, error: null };
         },
-        then: (ok: (v: unknown) => unknown, fail: (e: unknown) => unknown) => Promise.resolve({ data: rows, error: null }).then(ok, fail),
+        then: (ok: (v: unknown) => unknown, fail: (e: unknown) => unknown) => {
+          if (patch) {
+            const hit = rows.filter((r) => r.id === matchId && r.reason == null);
+            hit.forEach((r) => Object.assign(r, patch));
+            return Promise.resolve({ data: hit.map((r) => ({ id: r.id })), error: null }).then(ok, fail);
+          }
+          return Promise.resolve({ data: rows, error: null }).then(ok, fail);
+        },
       });
       return q;
     },
@@ -62,7 +73,7 @@ async function wireFetch() {
     const req = new NextRequest(u, init as never);
     if (u.pathname === "/api/journal") return journal.GET(req);
     if (u.pathname === "/api/upcoming") return init?.method === "POST" ? upcoming.POST(req) : upcoming.GET();
-    if (u.pathname === "/api/medications") return meds.POST(req);
+    if (u.pathname === "/api/medications") return init?.method === "PATCH" ? meds.PATCH(req) : meds.POST(req);
     return new Response("{}", { status: 404 });
   });
 }
@@ -90,6 +101,7 @@ describe("Add a medication… (TEC-232)", () => {
     const pick = pickList();
     fireEvent.change(pick, { target: { value: "__add_med" } });
     fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "Test Drops" } });
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "heartworm" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(tables.medications).toHaveLength(1));
     expect(tables.medications[0]).toMatchObject({ name: "Test Drops", unit: "mg" });
@@ -103,6 +115,7 @@ describe("Add a medication… (TEC-232)", () => {
     await openMedicationForm();
     fireEvent.change(pickList(), { target: { value: "__add_med" } });
     fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "Test Drops" } });
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "heartworm" } });
     fireEvent.click(screen.getByRole("button", { name: /^Save / }));
     await waitFor(() => expect(tables.medications).toHaveLength(1));
     await waitFor(() => expect(pickList().selectedOptions[0].text).toBe("Test Drops"));
@@ -127,6 +140,7 @@ describe("Add a medication… (TEC-232)", () => {
     window.dispatchEvent(new Event("focus"));
     fireEvent.change(pickList(), { target: { value: "__add_med" } });
     fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "Test Drops" } });
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "heartworm" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(pickList().selectedOptions[0].text).toBe("Test Drops"));
     release();
@@ -140,8 +154,68 @@ describe("Add a medication… (TEC-232)", () => {
     await openMedicationForm();
     fireEvent.change(pickList(), { target: { value: "__add_med" } });
     fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "Test Drops" } });
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "heartworm" } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
     const msg = await screen.findByText(/couldn't add medication: boom/);
     expect(msg.className).toContain("text-danger");
+  });
+});
+
+describe("a medication's reason (TEC-233)", () => {
+  const OLD_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const seed = () => {
+    tables.medications = [{ id: OLD_ID, name: "Old Drops", unit: "ml", retired: false, created_at: "2026-11-01T00:00:00Z" }];
+  };
+
+  it("the add form asks for a reason and refuses to add without one", async () => {
+    await wireFetch();
+    await openMedicationForm();
+    fireEvent.change(pickList(), { target: { value: "__add_med" } });
+    fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "Test Drops" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/pick a reason/);
+    expect(tables.medications ?? []).toHaveLength(0);
+    const options = [...(screen.getByLabelText("Reason") as HTMLSelectElement).options].map((o) => o.text);
+    expect(options).toEqual(["Pick one…", "Heartworm", "Flea & tick", "Dewormer", "Allergy", "Pain", "Antibiotic", "Joint", "Other"]);
+  });
+
+  it("an added medication keeps the reason picked for it and shows it", async () => {
+    await wireFetch();
+    await openMedicationForm();
+    fireEvent.change(pickList(), { target: { value: "__add_med" } });
+    fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "Test Drops" } });
+    fireEvent.change(screen.getByLabelText("Reason"), { target: { value: "flea-tick" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(tables.medications[0]).toMatchObject({ reason: "flea-tick" }));
+    expect((await screen.findByTestId("med-reason")).textContent).toBe("Reason: Flea & tick");
+  });
+
+  it("a medication from before shows No reason, can be given one, and then cannot be changed", async () => {
+    seed();
+    await wireFetch();
+    await openMedicationForm();
+    fireEvent.change(pickList(), { target: { value: OLD_ID } });
+    const box = await screen.findByTestId("med-reason");
+    expect(box.textContent).toContain("No reason");
+    fireEvent.change(screen.getByLabelText(/^Reason/), { target: { value: "heartworm" } });
+    fireEvent.click(screen.getByRole("button", { name: "Set reason" }));
+    await waitFor(() => expect(tables.medications[0]).toMatchObject({ reason: "heartworm" }));
+    await waitFor(() => expect(screen.getByTestId("med-reason").textContent).toBe("Reason: Heartworm"));
+    // Set: there is no select or button left to change it with.
+    expect(screen.queryByRole("button", { name: "Set reason" })).toBeNull();
+  });
+
+  it("a refused set shows why under the form and the medication stays as the database has it", async () => {
+    seed();
+    await wireFetch();
+    await openMedicationForm();
+    fireEvent.change(pickList(), { target: { value: OLD_ID } });
+    await screen.findByTestId("med-reason");
+    // Someone else set it first.
+    tables.medications[0].reason = "pain";
+    fireEvent.change(screen.getByLabelText(/^Reason/), { target: { value: "heartworm" } });
+    fireEvent.click(screen.getByRole("button", { name: "Set reason" }));
+    expect((await screen.findByRole("alert")).textContent).toMatch(/already has a reason/);
+    expect(tables.medications[0].reason).toBe("pain");
   });
 });

@@ -294,12 +294,12 @@ describe("Medication", () => {
   });
 
   it("adds a medication: trimmed, a unit from the list, never a duplicate in any case (retired too)", () => {
-    expect(parseNewMedication({ name: "  New   Drops ", unit: "ml" }, MEDS)).toEqual({ name: "New Drops", unit: "ml" });
-    expect(() => parseNewMedication({ name: "test tablet", unit: "mg" }, MEDS)).toThrow(/already in the list/);
-    expect(() => parseNewMedication({ name: "OLD SYRUP", unit: "mg" }, MEDS)).toThrow(/already in the list/);
-    expect(() => parseNewMedication({ name: "", unit: "mg" })).toThrow(InvalidEvent);
-    expect(() => parseNewMedication({ name: "x".repeat(61), unit: "mg" })).toThrow(InvalidEvent);
-    expect(() => parseNewMedication({ name: "Fine", unit: "gallon" })).toThrow(InvalidEvent);
+    expect(parseNewMedication({ name: "  New   Drops ", unit: "ml", reason: "pain" }, MEDS)).toEqual({ name: "New Drops", unit: "ml", reason: "pain" });
+    expect(() => parseNewMedication({ name: "test tablet", unit: "mg", reason: "pain" }, MEDS)).toThrow(/already in the list/);
+    expect(() => parseNewMedication({ name: "OLD SYRUP", unit: "mg", reason: "pain" }, MEDS)).toThrow(/already in the list/);
+    expect(() => parseNewMedication({ name: "", unit: "mg", reason: "pain" })).toThrow(InvalidEvent);
+    expect(() => parseNewMedication({ name: "x".repeat(61), unit: "mg", reason: "pain" })).toThrow(InvalidEvent);
+    expect(() => parseNewMedication({ name: "Fine", unit: "gallon", reason: "pain" })).toThrow(InvalidEvent);
     expect(medNameTaken("Test Tablet", MEDS)).toBe(true);
   });
 
@@ -320,10 +320,10 @@ describe("Medication", () => {
   it("reads the table and adds to it through the server routes' functions", async () => {
     const { db, inserted } = fakeDb([{ id: MED.id, name: MED.name, unit: MED.unit, retired: false }, { ...OLD }]);
     expect(await listMedications(db)).toEqual([MED, OLD]);
-    const added = await addMedication(db, { name: "Another", unit: "mg" });
+    const added = await addMedication(db, { name: "Another", unit: "mg", reason: "joint" });
     expect(added).toMatchObject({ name: "Another", unit: "mg" });
-    expect(inserted).toEqual([{ name: "Another", unit: "mg" }]);
-    await expect(addMedication(db, { name: "Test Tablet", unit: "mg" })).rejects.toThrow(/already in the list/);
+    expect(inserted).toEqual([{ name: "Another", unit: "mg", reason: "joint" }]);
+    await expect(addMedication(db, { name: "Test Tablet", unit: "mg", reason: "joint" })).rejects.toThrow(/already in the list/);
   });
   it("a dose is checked against the table on write; an unknown medication saves nothing", async () => {
     const { db } = fakeDb([]);
