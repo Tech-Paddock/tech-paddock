@@ -62,6 +62,7 @@ import {
 } from "@/lib/events";
 import { FOOD_UNITS, MISC_ID, amountOptions, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
 import { MED_REASONS, MED_REASON_IDS, MED_ROUTES, MED_UNITS, NO_REASON, findMedication, medReasonLabel, type MedReason, medPicklist, type MedRoute, type MedUnit, type Medication } from "@/lib/medications";
+import { plannedWhen } from "@/lib/calendar";
 import { FUTURE_NOTICE, donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, type DonePrefill } from "@/lib/future";
 import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
@@ -105,6 +106,8 @@ type Props = {
    * the item in place. A done or cancelled item is never opened.
    */
   plan?: Upcoming;
+  /** The Calendar's "Add a plan" (TEC-234): a new entry opens on this day (`YYYY-MM-DD`), a later hour, so it saves as a plan. */
+  planDay?: string;
   /** A training, fun or potty being corrected: the treats already logged with it (`treatsWith`), shown, not changed. */
   sessionTreats?: JournalEvent[];
   people: Person[];
@@ -267,6 +270,7 @@ export default function LogForm({
   event,
   done,
   plan,
+  planDay,
   sessionTreats = [],
   people,
   dogs,
@@ -300,7 +304,13 @@ export default function LogForm({
   // Common. A Done opens on the item's day and time once they have come; before that it is "now". An edit of an
   // upcoming item opens on its own day and time, past or not: it is a plan, and overdue is a state, not an error.
   const prefill = !event ? (done ?? (plan ? donePrefill(plan, medications) : undefined)) : undefined;
-  const prefillWhen = prefill ? (plan ? `${prefill.day}T${prefill.time}` : doneWhen(prefill, new Date())) : null;
+  const prefillWhen = prefill
+    ? plan
+      ? `${prefill.day}T${prefill.time}`
+      : doneWhen(prefill, new Date())
+    : !event && planDay
+      ? plannedWhen(planDay, new Date())
+      : null;
   const [when, setWhen] = useState(prefillWhen ?? toLocalInput(event?.at ?? openedAt.current));
   const [day, setDay] = useState(prefillWhen ? prefillWhen.slice(0, 10) : toDateInput(event?.at ?? openedAt.current));
   const [whenTouched, setWhenTouched] = useState(!!prefillWhen);
