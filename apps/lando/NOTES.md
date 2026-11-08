@@ -2,9 +2,9 @@
 
 ## State
 
-- v2 on Next.js 16: four tabs under the app bar, **Log**, **Notes**, **Analytics** and **Patch notes** (TEC-199, Notes TEC-204; "What's new"
+- v2 on Next.js 16: five tabs under the app bar, **Log**, **Calendar**, **Notes**, **Analytics** and **Patch notes** (TEC-199, Notes TEC-204, Calendar TEC-234; "What's new"
   renamed in the UI only, the file is still `app/WhatsNew.tsx` and the data `lib/releases.ts`; the Upcoming tab is gone),
-  sticky, four equal columns in 15px bold with `whitespace-nowrap` (at 390px "Patch notes" wrapped to two lines at 16px),
+  sticky, five equal columns in 13px bold with `whitespace-nowrap` (at four columns 15px fit; at 390px "Patch notes" wrapped to two lines at 16px; **the five-column fit at 390px was not seen on a phone**),
   opening on Log (RULES.md holds the owner's override of the one-screen rule).
 - **Notes** (TEC-204, the owner: "a notes after log section to capture misc notes and docs"): a journal entry of a new kind,
   `note`, in `lando.events`; `details` is `{text, photos?, names?}`, `text` 1 to `NOTE_MAX` (2000) characters with its line
@@ -37,6 +37,27 @@
   * **The database**: migration `lando_notes` (a `note` branch in `lando.details_ok`, nothing else). `events_kind_check` was dropped
   in `lando_health_events`, so the function is the only gate on a kind: a kind with no branch is refused. Without the migration a
   note save fails with a 503 and nothing else changes. `tests/details-ok-superset.test.ts` reads `note` as a kind now.
+- **Calendar** (TEC-234, the owner: "Need to see upcoming. Maybe a calendar page", shows "Upcoming + past"): the second tab,
+  `app/Calendar.tsx` over the pure `lib/calendar.ts` (`tests/calendar.test.ts`). **No table and no migration**: it reads what `Journal`
+  already holds, `entries` (live journal entries with notes already out, so a note can never show; `calendarDays` also drops a note and a
+  void if handed one) and `upcoming` (open plans).
+  * **The month**: whole weeks, Sunday first (`monthGrid`), stepped with the arrows or a sideways swipe (`swipeStep`: 50px and mostly
+    horizontal; the grid is `touch-pan-y` so the page still scrolls); a Today button returns from another month. Today is the accent circle
+    on its number (`aria-current="date"`); the chosen day has an ink border and opens on today. Each day button reads aloud as "Nov 8: 1 plan,
+    2 entries" (`dayWords`).
+  * **The dots** (a **local pattern**, `.lando-cal-dot` and `.lando-cal-plan` in `globals.css`, beside the feed colours): a filled dot per
+    kind of entry logged that day, a ring per kind of plan due, both in `--kind` (an inside potty is the accident red); at most `MAX_DOTS`
+    of each style; a plan with no form of its own (an old Other item) wears the soft ink. A legend sits under the grid.
+  * **A chosen day** lists its plans (the Log's `UpcomingList`, unchanged: tap to edit in place, Done opens the form it came from, no
+    Cancel) above its entries (a row like the feed's; a tap opens the entry exactly as the Log does, `setOpen({event})`). Both open the
+    usual sheet, which `Journal` renders for every tab.
+  * **Add a plan** shows on today and later days only (`canPlanOn`). It asks which form (Vet visit, Medication, Medical issue, Training,
+    Food, Fun, Potty, Weight), then opens it with `planDay` on `LogForm`: the When opens on that day at 09:00, or for today on the next whole
+    hour (`plannedWhen`), already touched, so the form reads "Future: saves as upcoming" and Save posts an upcoming item as any future When does.
+  * **Traps**: (1) the past is only what `Journal` loaded: the feed's `HORIZON_DAYS` window, plus every weight; a month before that shows
+    weights only. (2) `/api/upcoming` returns open plans only, so a plan marked done leaves the Calendar (its entry shows on the day it was
+    logged) and a repeating plan shows only its next date. (3) A new reader of `loaded.events` must still read `entries`, not events, or a
+    note leaks in. (4) The tab row is five columns at 13px; a sixth tab will not fit.
 - **Upcoming items** (TEC-192, no tab since TEC-199): plans in `lando.upcoming` (kind vet, vaccine, medication or other; title,
   due day, optional time and note, optional repeat of N weeks, months or years, status open, done or cancelled). **A future
   When on any form creates one** (`lib/future.ts`; below). **An open item is edited in place** (TEC-203): tapping its words

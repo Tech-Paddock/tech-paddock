@@ -166,6 +166,24 @@ body::before {
   box-shadow: 0 0 0 1px var(--paper);
 }
 
+/* Calendar dots (app/Calendar.tsx, TEC-234), a local pattern beside the feed colours: a filled dot is an entry
+   logged that day and a ring is a plan due that day, both in the form's colour (--kind); a plan with no form of its
+   own wears the soft ink. The legend and each day's list name the two, so colour is never the only cue. */
+.lando-cal-dot,
+.lando-cal-plan {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+}
+.lando-cal-dot {
+  background-color: var(--kind, currentColor);
+}
+.lando-cal-plan {
+  border: 2px solid var(--kind, currentColor);
+}
+
 /* The bottom sheet rises rather than appears, unless motion is reduced. */
 @media (prefers-reduced-motion: no-preference) {
   .lando-sheet {

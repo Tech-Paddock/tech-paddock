@@ -65,6 +65,7 @@ import Analytics from "./Analytics";
 import Notes from "./Notes";
 import NoteForm from "./NoteForm";
 import WhatsNew from "./WhatsNew";
+import Calendar from "./Calendar";
 import UpcomingList from "./UpcomingList";
 import LogForm, { type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
@@ -86,8 +87,8 @@ type Stored = LogBody & { then?: LogBody[] };
  * (TEC-203); `healthType` is Health's tab on a new entry;
  * `quick` is the pill or Treats button that opened the form (TEC-181, TEC-186).
  */
-type Open = { form: FormKind; event?: JournalEvent; healthType?: HealthType; doneFor?: Upcoming; plan?: Upcoming; quick?: QuickLog } | null;
-type Tab = "log" | "notes" | "analytics" | "new";
+type Open = { form: FormKind; event?: JournalEvent; healthType?: HealthType; doneFor?: Upcoming; plan?: Upcoming; planDay?: string; quick?: QuickLog } | null;
+type Tab = "log" | "calendar" | "notes" | "analytics" | "new";
 
 async function postJson(url: string, body: unknown, method: "POST" | "PATCH" = "POST"): Promise<{ ok: boolean; status: number; data: any }> {
   const res = await fetch(url, {
@@ -136,7 +137,7 @@ function Pill({
 }
 
 /**
- * Three tabs, Log, Analytics and Patch notes, opening on Log (RULES.md, Surface: app, the owner's
+ * Five tabs, Log, Calendar, Notes, Analytics and Patch notes, opening on Log (RULES.md, Surface: app, the owner's
  * override, 2026-10-20). Log: four since-last pills that each open a quick log (Pee, Poop, Meal, Fun; TEC-181,
  * TEC-186, back in TEC-202), the Next 7 days box, four buttons that open a short form (Treats, Training,
  * Weight, Health), who is logging, and a feed of every loaded day, by when each entry happened, with a filter
@@ -634,7 +635,7 @@ export default function Journal() {
   const allOpen = upcoming ? allUpcoming(upcoming) : [];
 
   const tabClass = (t: Tab) =>
-    `whitespace-nowrap border-b-[3px] pb-2 pt-2.5 text-[15px] font-bold ${t === tab ? "border-pinstripe text-ink" : "border-transparent text-ink-soft"}`;
+    `whitespace-nowrap border-b-[3px] pb-2 pt-2.5 text-[13px] font-bold ${t === tab ? "border-pinstripe text-ink" : "border-transparent text-ink-soft"}`;
 
   return (
     <>
@@ -644,9 +645,12 @@ export default function Journal() {
         className="sticky z-10 border-b border-line bg-paper"
         style={{ top: "env(safe-area-inset-top, 0px)" }}
       >
-        <div className="mx-auto grid max-w-md grid-cols-4 gap-1 px-3">
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-0.5 px-1.5">
           <button role="tab" type="button" id="tab-log" aria-selected={tab === "log"} aria-controls="panel-log" onClick={() => showTab("log")} className={tabClass("log")}>
             Log
+          </button>
+          <button role="tab" type="button" id="tab-calendar" aria-selected={tab === "calendar"} aria-controls="panel-calendar" onClick={() => showTab("calendar")} className={tabClass("calendar")}>
+            Calendar
           </button>
           <button role="tab" type="button" id="tab-notes" aria-selected={tab === "notes"} aria-controls="panel-notes" onClick={() => showTab("notes")} className={tabClass("notes")}>
             Notes
@@ -671,6 +675,24 @@ export default function Journal() {
             </button>
           </div>
         )}
+
+        <div id="panel-calendar" role="tabpanel" aria-labelledby="tab-calendar" hidden={tab !== "calendar"}>
+          {tab === "calendar" && (
+            <Calendar
+              entries={entries}
+              upcoming={upcoming}
+              upcomingError={upcomingError}
+              loaded={!!loaded}
+              today={today}
+              describeEntry={(e) => describe(e, dogs, entries, medications)}
+              nameOf={nameOf}
+              onDone={doneUpcoming}
+              onEditPlan={editUpcoming}
+              onOpenEntry={(e) => setOpen({ form: formOf(e) ?? "potty", event: e })}
+              onAddPlan={(day, form, healthType) => setOpen({ form, healthType, planDay: day })}
+            />
+          )}
+        </div>
 
         <div id="panel-notes" role="tabpanel" aria-labelledby="tab-notes" hidden={tab !== "notes"}>
           {tab === "notes" && (
@@ -1053,13 +1075,14 @@ export default function Journal() {
           onClose={() => setOpen(null)}
         >
           <LogForm
-            key={open.event?.id ?? (open.plan ? `plan-${open.plan.id}` : open.doneFor ? `done-${open.doneFor.id}` : open.form)}
+            key={open.event?.id ?? (open.planDay ? `day-${open.planDay}-${open.form}-${open.healthType ?? ""}` : open.plan ? `plan-${open.plan.id}` : open.doneFor ? `done-${open.doneFor.id}` : open.form)}
             form={open.form}
             healthType={open.healthType}
             quick={open.quick}
             event={open.event}
             done={open.doneFor ? donePrefill(open.doneFor, medications) : undefined}
             plan={open.plan}
+            planDay={open.planDay}
             sessionTreats={(open.form === "training" || open.form === "potty" || open.form === "fun") && open.event && loaded ? treatsWith(entries, open.event) : undefined}
             people={people}
             dogs={dogs}
