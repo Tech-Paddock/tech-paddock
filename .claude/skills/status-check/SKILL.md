@@ -27,9 +27,8 @@ Anything else: name the app folders and stop.
 2. **Uncommitted or unpushed:** `git status` in the main checkout and each
    `.claude/worktrees/agent-*`; running agents (`ListAgents`); sessions (`list_sessions`, mine)
    with work in flight or an unanswered question.
-3. **Blocking:** open TEC issues with a ⭐ step or assigned to the owner, and issues Backlog for
-   being blocked. **Phone checks:** issues labelled `Phone check`, each with what to look at and a
-   link to the app.
+3. **Waiting on you:** open owner tasks (type `Owner task`), each with the issue it blocks or is
+   for. **Blocking:** issues Backlog for being blocked by anything else.
 4. **Hot topics:** CI and `drift` on `main`; issues In Progress or In Review; anything updated in
    the last 24 hours; any production deployment not `READY`.
 5. **This chat:** what archiving it would lose. Blockers: a running subagent; uncommitted or
@@ -59,11 +58,11 @@ and **Waiting**.
 ---
 Status · YYYY-MM-DD HH:MM
 
-Blocking
-- TEC-n ⭐ Owner: what is needed
+Waiting on you
+- TEC-m: the task's title → blocks TEC-n  |  for TEC-n (after live)
 
-Phone checks
-- TEC-n: what to look at, on the app's link
+Blocking
+- TEC-n: what it waits on
 
 Uncommitted / unpushed
 - who (app), where: what
@@ -106,7 +105,7 @@ Done here
 - merged #n (TEC-n) · pushed branch · filed TEC-n · ran SQL: what, confirmed
 
 Waiting
-- TEC-n ⭐ Owner: what  ·  subagent: what, still running
+- TEC-m owner task: title  ·  subagent: what, still running
 
 ### Ready to Archive  |  ### Do Not Archive
 - …

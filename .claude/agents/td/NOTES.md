@@ -5,7 +5,8 @@ What is true now, and the traps. Branch and pull request state is never written 
 ## State
 
 - **Shape:** one TD at a time + builders (started by the owner's `/build`) + Deployment (on `/deploy`) + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Linear
-  labels: `owner:Owner`, `owner:TD`, `app:<folder>`; the parking lot is the `Parked` label.
+  labels: one of the `type` group (Feature, Enhancement, Bug, Owner task), `app:<folder>`; the
+  parking lot is the `Parked` label. The `owner:` labels and `Phone check` retired (TEC-238).
 - **Every app is on Next 16 with `proxy.ts`,** one gate copy.
 - **Without a session, the gate lets through** the login page, its endpoint, its icons and Next's
   `/_next/` assets, and `/api/cron/prices` with `Authorization: Bearer <CRON_SECRET>` (TEC-132,

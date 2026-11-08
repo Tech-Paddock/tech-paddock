@@ -451,17 +451,19 @@ test("Vercel: reads go ahead; changes and credentials wait for the owner", () =>
   assert.equal(mcp("mcp__Vercel__filter_project_envs", { decrypt: "true" }), "ask");
 });
 
-test("Linear: an issue has an owner, at most one app, and ends with Next steps that name who acts", () => {
+test("Linear: an issue has one type, at most one app, and ends with Next steps that name who acts", () => {
   const good = "What and why.\n\n## Next steps\n\n1. **Owner:** decide.\n2. **TD:** build it.\n   * a detail\n3. **Done:** checked.\n";
   const save = (input) => mcp("mcp__Linear__save_issue", input);
-  const create = (extra) => save({ team: "TEC", title: "t", labels: ["owner:TD", "app:coffee"], description: good, ...extra });
+  const create = (extra) => save({ team: "TEC", title: "t", labels: ["Feature", "app:coffee"], description: good, ...extra });
   assert.equal(create({}), "allow");
-  assert.equal(create({ labels: ["owner:Owner", "app:health", "Parked"] }), "allow");
-  assert.equal(create({ labels: ["owner:TD"] }), "allow"); // a platform issue has no app
-  assert.equal(create({ labels: ["app:coffee"] }), "deny");
-  assert.equal(create({ labels: ["owner:TD", "owner:Owner", "app:coffee"] }), "deny");
-  assert.equal(create({ labels: ["owner:TD", "app:coffee", "app:health"] }), "deny");
-  assert.equal(create({ labels: ["1f4adc9b-38dc-4f83-9c67-6cdfaae4d47a", "owner:TD"] }), "deny");
+  assert.equal(create({ labels: ["Bug", "app:health", "Parked"] }), "allow");
+  assert.equal(create({ labels: ["enhancement"] }), "allow"); // a platform issue has no app; case does not matter
+  assert.equal(create({ labels: ["app:coffee"] }), "deny"); // no type
+  assert.equal(create({ labels: ["Feature", "Bug", "app:coffee"] }), "deny");
+  assert.equal(create({ labels: ["Feature", "app:coffee", "app:health"] }), "deny");
+  assert.equal(create({ labels: ["Feature", "owner:TD"] }), "deny"); // TEC-238: owner labels are retired
+  assert.equal(create({ labels: ["Improvement"] }), "deny"); // renamed Enhancement
+  assert.equal(create({ labels: ["1f4adc9b-38dc-4f83-9c67-6cdfaae4d47a", "Feature"] }), "deny");
   assert.equal(create({ description: undefined }), "deny");
   assert.equal(create({ description: "No section at all." }), "deny");
   assert.equal(create({ description: "## Next steps\n\n1. **TD:** x\n\n## Notes\n\nlater" }), "deny");
@@ -476,11 +478,15 @@ test("Linear: an issue has an owner, at most one app, and ends with Next steps t
 
   assert.equal(save({ id: "TEC-1", state: "Done" }), "allow");
   assert.equal(save({ id: "TEC-1", addLabels: ["Parked"] }), "allow");
-  assert.equal(save({ id: "TEC-1", removeLabels: ["owner:TD"], addLabels: ["owner:Owner"] }), "allow");
-  assert.equal(save({ id: "TEC-1", removeLabels: ["owner:TD"] }), "deny");
+  assert.equal(save({ id: "TEC-1", removeLabels: ["owner:TD"] }), "allow"); // the migration off owner labels
+  assert.equal(save({ id: "TEC-1", removeLabels: ["owner:TD"], addLabels: ["Feature"] }), "allow");
+  assert.equal(save({ id: "TEC-1", addLabels: ["owner:Owner"] }), "deny");
+  assert.equal(save({ id: "TEC-1", removeLabels: ["Feature"], addLabels: ["Bug"] }), "allow");
+  assert.equal(save({ id: "TEC-1", removeLabels: ["Feature"] }), "deny");
+  assert.equal(save({ id: "TEC-1", addLabels: ["Feature", "Bug"] }), "deny");
   assert.equal(save({ id: "TEC-1", removeLabels: ["agent:TD"], addLabels: ["app:coffee"] }), "allow"); // the relabel
   assert.equal(save({ id: "TEC-1", addLabels: ["app:coffee", "app:health"] }), "deny");
-  assert.equal(save({ id: "TEC-1", labels: ["owner:TD"] }), "allow");
+  assert.equal(save({ id: "TEC-1", labels: ["Bug"] }), "allow");
   assert.equal(save({ id: "TEC-1", labels: ["app:coffee"] }), "deny");
   assert.equal(save({ id: "TEC-1", description: good }), "allow");
   assert.equal(save({ id: "TEC-1", description: "Rewritten, and the steps are gone." }), "deny");
@@ -491,6 +497,37 @@ test("Linear: an issue has an owner, at most one app, and ends with Next steps t
   assert.equal(save({ id: "TEC-1", patch: [{ op: "insert_before", anchor: "## Next steps", text: "## Notes\n\nx\n\n" }] }), "allow");
   assert.equal(mcp("mcp__Linear__list_issues", {}), "allow");
   assert.equal(mcp("mcp__Linear__save_comment", { body: "x" }), "allow");
+});
+
+/* TEC-238: what the owner reads is short. "It's too much to sort through a 2k word ticket." */
+test("Linear: an issue shows at most 300 words; the Agent notes fold away the rest", () => {
+  const save = (input) => mcp("mcp__Linear__save_issue", input);
+  const steps = "\n\n## Next steps\n\n1. **TD:** build it.\n";
+  const long = Array(320).fill("word").join(" ");
+  const create = (description) => save({ team: "TEC", title: "t", labels: ["Feature"], description });
+  assert.equal(create(`Short summary.${steps}`), "allow");
+  assert.equal(create(`${long}${steps}`), "deny");
+  assert.equal(create(`Short summary.\n\n+++ Agent notes\n\n${long}\n\n+++${steps}`), "allow");
+  assert.equal(create(`Short summary.\n\n>>> Agent notes\n\n${long}\n\n>>>${steps}`), "allow"); // as Linear stores it
+  assert.equal(create(`Short summary.\n\n+++ Agent notes\n\n${long}${steps}`), "deny"); // never closed, so it shows
+  assert.equal(save({ id: "TEC-1", description: `${long}${steps}` }), "deny");
+});
+
+test("Linear: an owner task is short, opens with the issue it is for, and has Steps and Done when", () => {
+  const save = (input) => mcp("mcp__Linear__save_issue", input);
+  const task = "For TEC-240 — Cookbook grocery rows show the exact product.\nNeeded: confirm the List popup on your phone.\n\n## Steps\n1. Open https://cookbook.techpaddock.io/list\n2. Tap a row, then Pick product\n\n## Test\n- [ ] The popup lists that item's products\n\nDone when: the box passes. If not, comment what you saw.";
+  const create = (extra) => save({ team: "TEC", title: "Test: grocery picklist", labels: ["Owner task", "app:cookbook"], description: task, blocks: ["TEC-240"], ...extra });
+  assert.equal(create({}), "allow"); // no Next steps: the task is the step
+  assert.equal(create({ description: task.replace("For TEC-240", "For [TEC-240](https://linear.app/x/issue/TEC-240)") }), "allow");
+  assert.equal(create({ description: task.replace("For TEC-240 — ", "") }), "deny");
+  assert.equal(create({ description: task.replace("## Steps", "## How") }), "deny");
+  assert.equal(create({ description: task.replace("Done when: the box passes. ", "") }), "deny");
+  assert.equal(create({ description: `${task}\n\n${Array(150).fill("detail").join(" ")}` }), "deny");
+  assert.equal(create({ labels: ["Owner task", "Bug"] }), "deny");
+  // An update is read as an owner task by its labels, or by its shape when they are not in the call.
+  assert.equal(save({ id: "TEC-241", description: task }), "allow");
+  assert.equal(save({ id: "TEC-241", labels: ["Owner task"], description: task.replace("## Steps", "## How") }), "deny");
+  assert.equal(save({ id: "TEC-241", removeLabels: ["Feature"], addLabels: ["Owner task"], description: task }), "allow");
 });
 
 test("helpers", () => {

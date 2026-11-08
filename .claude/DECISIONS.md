@@ -24,8 +24,13 @@ would get something wrong without it: the rule, one line of why. App rules live 
   land in a chat the owner is not in. Parallel Deployments would only
   make each other's branches out of date under "branches up
   to date"; the throughput fix is GitHub's merge queue, the owner's setting.
-- **Phone checks never hold an issue open** (2026-10-26, TEC-154): live closes it, the `Phone check`
-  label tracks the look. Ten merged issues sat In Progress for checks alone.
+- **Checks after live never hold an issue open** (2026-10-26, TEC-154): live closes it. Ten merged
+  issues sat In Progress for checks alone. The check is a related owner task (TEC-238), not a label.
+- **The owner's work is an owner task, and owner tickets are short** (2026-11-08, TEC-238): a
+  150-word issue assigned to the owner that blocks the one it is for. A ⭐ step inside a 2,000-word
+  issue was hard to find and track; the `owner:` label repeated it and went stale. Issues show 300
+  words, the rest folded into Agent notes. The owner's Linear account is read at run time, never
+  committed.
 - **The TD's own docs changes share one branch per chat** (2026-10-26, TEC-154): seven doc branches
   cost seven merge-main-and-wait cycles under "branches up to date".
 - **One issue splits across at most three builders,** each on its own files and its own branch

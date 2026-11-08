@@ -945,19 +945,66 @@ function vercel(name, a) {
 /* ------------------------------------------------------------------------- */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/* One `owner:` label, always; at most one `app:` label (TEC-115). */
-const KINDS = ["owner:"];
+/* Exactly one type label, passed by name: what the issue is (TEC-238).
+   `Owner task` is the owner's own work: short, assigned to the owner, and
+   linked to the issue it is for. The rest are the agents'. At most one `app:`
+   label (TEC-115). The `owner:` labels retired with TEC-238: an owner task
+   says who acts, so a label saying it again only went stale. */
+export const TYPES = ["Feature", "Enhancement", "Bug", "Owner task"];
+const OWNER_TASK = "owner task";
+const isType = (l) => TYPES.some((t) => t.toLowerCase() === l.trim().toLowerCase());
+const isTask = (l) => l.trim().toLowerCase() === OWNER_TASK;
 const OPTIONAL_KINDS = ["app:"];
+const RETIRED = /^owner:/i;
 /* Who can act on a step: the roster by name, and the words for everyone or
    no one. Names are case-sensitive so a path does not count as an actor. */
 const ACTOR = /\b(Owner|TD|Builder|Deployment)\b/;
 const ACTOR_WORDS = /\b(technical director|every ?one|every ?body|no ?one|nobody|each agent|every agent|each owner|whoever)\b/i;
 // A finished step has nobody left to act.
 const DONE = /^(~~|\*\*Done\b|Done\b)/;
+/* What the owner reads. An owner task is the whole of it; an issue is what
+   shows before its collapsed Agent notes are opened. The owner's words: "It's
+   too much to sort through a 2k word ticket." */
+export const TASK_WORDS = 150;
+export const ISSUE_WORDS = 300;
 const RULE =
-  "Every issue carries one `owner:` label and at most one `app:` label, passed by name, and its body ends with a `## Next steps` section of numbered steps, each naming who acts, such as `1. **Owner:** …` (CLAUDE.md).";
+  "Every issue carries one type label (Feature, Enhancement, Bug or Owner task) and at most one `app:` label, passed by name. An owner task opens with `For TEC-n — what it is`, has a `## Steps` section and a `Done when:` line, in 150 words or fewer. Any other issue shows at most 300 words outside its collapsed `+++ Agent notes` section and ends with a `## Next steps` section of numbered steps, each naming who acts, such as `1. **TD:** …` (CLAUDE.md).";
 
 const listOf = (v) => (Array.isArray(v) ? v.map(String) : typeof v === "string" ? [v] : []);
+const wordCount = (s) => (String(s).match(/\S+/g) ?? []).length;
+
+/** A body less its collapsed sections: `+++ Title` to a bare `+++`, which Linear stores as `>>>`. */
+export function visible(body) {
+  return String(body ?? "")
+    .replace(/\r\n/g, "\n")
+    .replace(/^(\+\+\+|>>>)[^\n]*\n[\s\S]*?^(\+\+\+|>>>)[ \t]*$/gm, "");
+}
+
+const firstLine = (body) => String(body ?? "").replace(/\r\n/g, "\n").split("\n").find((l) => l.trim()) ?? "";
+const OPENS_FOR = /^\W*For\W+\[?TEC-\d+/i;
+/** Read as an owner task when the labels are not in the call: it opens with `For TEC-n` and has no Next steps. */
+const readsAsTask = (body) => OPENS_FOR.test(firstLine(body)) && !/^ {0,3}#{1,6}\s+\**next steps/im.test(String(body));
+
+/** What is wrong with an owner task's body: an empty list when nothing. */
+export function ownerTask(body) {
+  const b = String(body ?? "").replace(/\r\n/g, "\n");
+  const problems = [];
+  if (!OPENS_FOR.test(firstLine(b))) problems.push("an owner task opens with `For TEC-n — what it is`, the issue it is for");
+  if (!/^ {0,3}#{1,6}\s+\**Steps\b/im.test(b) || !/^ {0,2}\d+[.)]\s+\S/m.test(b)) {
+    problems.push("an owner task has a `## Steps` section of numbered steps");
+  }
+  if (!/done when/i.test(b)) problems.push("an owner task has a `Done when:` line");
+  const n = wordCount(b);
+  if (n > TASK_WORDS) problems.push(`the owner task is ${n} words, over ${TASK_WORDS}: keep only what the owner needs to do it, and link the issue for the rest`);
+  return problems;
+}
+
+/** What is wrong with any other issue's body: its length, then its Next steps. */
+export function issueBody(body) {
+  const n = wordCount(visible(body));
+  const problems = n > ISSUE_WORDS ? [`${n} words show outside the collapsed Agent notes, over ${ISSUE_WORDS}: move the detail into \`+++ Agent notes\``] : [];
+  return [...problems, ...nextSteps(body)];
+}
 
 /* Linear's diff tools act on the GitHub pull request behind a diff: merging one
    merges the pull request. They are Deployment's like every other pull request
@@ -970,46 +1017,52 @@ function linear(name, a, deploy = false) {
   const creating = name === "create_issue" || (name === "save_issue" && !a.id);
   const problems = [];
 
-  const countKinds = (labels, where) => {
-    for (const k of KINDS) {
-      const n = labels.filter((l) => l.toLowerCase().startsWith(k)).length;
-      if (n !== 1) problems.push(`${where} ${n ? `${n} \`${k}\` labels` : `no \`${k}\` label`}`);
-    }
+  const labelSet = (labels, where) => {
+    const types = labels.filter(isType);
+    if (types.length !== 1) problems.push(`${where} ${types.length ? `${types.length} type labels` : "no type label"}`);
     for (const k of OPTIONAL_KINDS) {
       const n = labels.filter((l) => l.toLowerCase().startsWith(k)).length;
       if (n > 1) problems.push(`${where} ${n} \`${k}\` labels`);
     }
   };
+  const noRetired = (labels) => {
+    if (labels.some((l) => RETIRED.test(l))) problems.push("`owner:` labels are retired (TEC-238): an owner task, assigned to the owner, says who acts");
+  };
   const byName = (labels) => {
     if (labels.some((l) => UUID.test(l))) problems.push("a label is passed by ID, which this check cannot read");
   };
+  const checkBody = (body, task) => problems.push(...(task ? ownerTask(body) : issueBody(body)));
 
   if (creating) {
     const labels = [...listOf(a.labels), ...listOf(a.addLabels), ...listOf(a.labelIds)];
     byName(labels);
-    countKinds(labels, "it has");
+    noRetired(labels);
+    labelSet(labels, "it has");
     if (typeof a.description !== "string" || !a.description.trim()) problems.push("it has no description");
-    else problems.push(...nextSteps(a.description));
+    else checkBody(a.description, labels.some(isTask));
   } else {
+    let task = null; // not known from the call
     if (a.labels !== undefined || a.labelIds !== undefined) {
       const labels = [...listOf(a.labels), ...listOf(a.labelIds)];
       byName(labels);
-      countKinds(labels, "the new label set has");
+      noRetired(labels);
+      labelSet(labels, "the new label set has");
+      task = labels.some(isTask);
     }
     const added = listOf(a.addLabels);
     const removed = listOf(a.removeLabels);
     byName([...added, ...removed]);
+    noRetired(added);
     for (const k of OPTIONAL_KINDS) {
       if (added.filter((l) => l.toLowerCase().startsWith(k)).length > 1) problems.push(`it adds more than one \`${k}\` label`);
     }
-    for (const k of KINDS) {
-      const out = removed.filter((l) => l.toLowerCase().startsWith(k));
-      const inn = added.filter((l) => l.toLowerCase().startsWith(k));
-      if (out.length && !inn.length) problems.push(`it removes \`${out[0]}\` without adding another \`${k}\` label`);
-      if (inn.length > 1) problems.push(`it adds ${inn.length} \`${k}\` labels`);
-    }
-    if (typeof a.description === "string") problems.push(...nextSteps(a.description));
-    if (Array.isArray(a.patch)) problems.push(...patchProblems(a.patch));
+    const typesIn = added.filter(isType);
+    const typesOut = removed.filter(isType);
+    if (typesIn.length > 1) problems.push(`it adds ${typesIn.length} type labels`);
+    if (typesOut.length && !typesIn.length) problems.push(`it removes \`${typesOut[0]}\` without adding another type label`);
+    if (typesIn.length === 1) task = isTask(typesIn[0]);
+    if (typeof a.description === "string") checkBody(a.description, task ?? readsAsTask(a.description));
+    if (Array.isArray(a.patch) && !task) problems.push(...patchProblems(a.patch));
   }
 
   if (!problems.length) return null;

@@ -15,8 +15,7 @@ owner approves the one change; then that change is the only write.
    or the last 7 days if there is none or it is older.
 2. **Shipped:** TEC issues completed in the window (Linear, `completedAt`), each with its pull
    request. Group them by app.
-3. **Still waiting:** issues with the `Phone check` label, ⭐ steps assigned to the owner, and
-   merged branches still on the remote.
+3. **Still waiting:** open owner tasks, and merged branches still on the remote.
 4. **What happened:** this chat, plus the issues' comments and Deployment reports in the window.
    Look for holds, reverts, red CI, rework, and owner corrections ("a little more than I wanted",
    "my bad").
