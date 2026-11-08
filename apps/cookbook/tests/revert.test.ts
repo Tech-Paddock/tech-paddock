@@ -128,10 +128,10 @@ describe("where Revert shows", () => {
     );
 
   it("shows on a recipe that has an import to go back to", () => {
-    expect(card({ ...unestimated, has_original: true }, noop)).toContain("Revert to imported");
+    expect(card({ ...unestimated, has_original: true }, noop)).toContain("Revert to original");
   });
 
   it("does not show on a recipe that was never imported", () => {
-    expect(card({ ...unestimated, has_original: false }, noop)).not.toContain("Revert to imported");
+    expect(card({ ...unestimated, has_original: false }, noop)).not.toContain("Revert to original");
   });
 });

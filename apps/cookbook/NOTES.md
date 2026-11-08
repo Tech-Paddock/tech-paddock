@@ -39,13 +39,29 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
 
 - **Add's order is Ask Claude · Link · File · Type it, and it opens on Ask Claude** (TEC-135,
   `MODES` in `AddRecipe.tsx`). The modes' behaviour is unchanged.
-- **A recipe on the list is three short text lines** (TEC-189, `RecipeCard` in `Book.tsx`; replaces
-  TEC-183's pill with tiles): the name; "5★ · Prep 15m · Cook 30m · makes 4" (`factsLine`,
+- **A closed recipe is two short text lines** (TEC-235, `RecipeCard` in `Book.tsx`; TEC-189 had a
+  third, the macros, which is gone): the name; "5★ · Prep 15m · Cook 30m · makes 4" (`factsLine`,
   `lib/recipeView.ts`; each part absent when unset, and the old `total_minutes` ("35 min") stands in
-  only while neither prep nor cook is set); one serving as text, "520 kcal · 38p · 42c · 18f"
-  (`macrosLine`). The four macro tiles are gone from the list (`MacroTiles` still draws the Macros
-  tab). **Origin is not on the facts line** (it did not fit beside Prep and Cook at 360px); the open
-  recipe still says it. **The meal is the one keyword shown** (TEC-205): after the rating on the list
+  only while neither prep nor cook is set). `macrosLine` stays in `lib/recipeView.ts` for other
+  readers; the card no longer calls it. The four macro tiles are gone from the list (`MacroTiles`
+  still draws the Macros tab). **Origin is not on the closed facts line** (it did not fit beside
+  Prep and Cook at 360px); the open header says it.
+- **One header, open or closed** (TEC-235). The name and facts are one `<button aria-expanded>`, so
+  tapping an open recipe's title closes it; the whole card is not a tap target (grey-out rows,
+  dial and tabs live inside it). Open, the header's facts read "origin · meal · times · makes N" and
+  the rating is five tappable stars beside the title, a sibling of that button (a button inside a
+  button is invalid); a screen-reader-only "N of 5" / "Not rated" rides with them. Editing hides
+  the stars. The book is **always A to Z** (below).
+- **The servings dial** (TEC-235, `RecipeOpen`, `lib/scaleServings.ts`): − / + under the header,
+  from the recipe's own servings, 1 to 99 in steps of one. It is **per view**: component state in
+  `RecipeOpen`, so closing the card, or an edit, puts it back; nothing is stored or sent and the
+  macros do not move (they are per serving already; the Macros tab's whole-pot line is the stored
+  pot). It scales only the **leading number** of each ingredient line (a range scales both ends;
+  "1 1/2", "1½", "1 ½", "2.5" and "200g" are read) and writes kitchen fractions: nearest eighth or
+  third under 20, whole numbers from 20 up, never below ⅛. A line with no leading number, a size
+  like "2-inch piece", and any line at the recipe's own servings come back exactly as stored.
+  Numbers later in a line ("1 (14 oz) can") are not scaled, so a pack size stays. Row indexes do
+  not change, so the TEC-222 grey-out is unaffected. **The meal is the one keyword shown** (TEC-205): after the rating on the list
   line and after the origin on the open recipe, by its capitalised name, and "Other" for a recipe with
   none. Main, cuisine, equipment, diet and tags are stored and editable in Edit and the typed form,
   and **render nowhere**: not on the list, the open recipe or Add's draft.
@@ -61,7 +77,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   does not carry either column.
 - **Rows grey out while cooking** (TEC-222, `app/RecipeDetail.tsx`, `lib/greyedRows.ts`): tapping
   an ingredient or a step greys it (line-through, `text-ink-soft`); tapping again restores it. Each
-  row is a `<button aria-pressed>`, 44px tall. The state lives **in this browser's `localStorage`
+  row is a `<button aria-pressed>` (36px tall since TEC-235, was 44). The state lives **in this browser's `localStorage`
   only** (`cookbook:greyed:<recipe id>`: row indexes and the time of the last tap); nothing goes to
   the database, so it does not follow the owner to another phone. It clears itself 24 hours after
   the last tap on that recipe (the exact 24h mark counts as expired), checked on read, on open and
@@ -69,20 +85,25 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   the page renders normally without storage. Editing a recipe's ingredients or method can shift
   which row an index points at; the grey is by position and ends within a day.
 - **An open recipe is in tabs** (TEC-183, `app/RecipeDetail.tsx`; replaces TEC-140's layout): the
-  name, "origin · makes N · time", the rating as five tappable stars (the PATCH call; tapping the
-  set star clears it) with "N of 5" or "Not rated", then a `role="tablist"` of **Ingredients ·
-  Method · Macros**. It opens on Ingredients; the tab is `RecipeCard` state, so it is held while
-  the card is mounted (not across a reload). Ingredients put a leading amount in its own column
-  (`splitIngredient`; a line that does not lead with one is shown whole). Method is numbered steps
-  in circles. Macros (`app/MacroTab.tsx`) is one serving's tiles, the calorie split bar
+  header above, the servings dial, then a `role="tablist"` of **Ingredients · Steps · Macros**
+  ("Method" until TEC-235; the key is `steps`, and Edit and Add's field label say Steps; the stored
+  column and the API are still `method`). The stars are the PATCH call; tapping the set star clears
+  it. It opens on Ingredients; the tab is `RecipeCard` state, so it is held while the card is
+  mounted (not across a reload). Ingredients put a leading amount in its own column
+  (`splitIngredient`, run on the scaled line; a line that does not lead with one is shown whole).
+  Steps are numbered in circles. Tabs and rows are tight (TEC-235): rows are 36px, under the 44px
+  floor, by the owner's word. Macros (`app/MacroTab.tsx`) is one serving's tiles, the calorie split bar
   (`calorieSplit`, `lib/breakdown.ts`), the whole-pot line (`potAndServing`) and the provenance.
   Stored numbers only; nothing is called. The segmented tabs, circles, chips and bar are local
   patterns.
-- **Add to list** is a card under the tabs (`AddToListCard`, TEC-189): "When are you cooking it?" is
-  **one date box opening on today** with an Add to list button beside it (the day chips and "Pick a
-  date…" are gone, with `dayChips` and `addButtonLabel`), then Edit and Remove as outlined buttons
-  (Remove keeps its confirm). The helpings estimator and its note are gone. The day sent is
-  still `YYYY-MM-DD` from `parseDay`; a cleared date disables the button.
+- **The bottom of an open recipe** (`AddToListCard`, TEC-189, reworked in TEC-235): **one row**, a
+  "Cook on" date box opening on today with Add to list beside it. Under it Edit and Remove are quiet
+  text buttons; Remove asks once, inline ("Remove this recipe?" with Remove and Keep it). Under
+  those, a small underlined **Revert to original** link, only on a recipe with `has_original`
+  (was "Revert to imported"; same route, same ask-once, same result; the toast says "back to the
+  original"). The warning text about macros and the shopping list is gone; the Remove toast still
+  says the list is kept. The helpings estimator and its note are gone. The day sent is still
+  `YYYY-MM-DD` from `parseDay`; a cleared date disables the button.
 - **Tests render with `react-dom/server`** (`tests/recipeOpen.test.ts`): there is no DOM or click
   harness here, so a tab "switch" is asserted by rendering `RecipeOpen` with each `tab`, not by a
   click.
@@ -105,13 +126,12 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in Linear
   only where the model agrees, else noted. Book filters are the same four, as **one row of
   four compact selects** under the search at 360px (`BookFilters`, `app/Tuning.tsx`; High protein
   was dropped, TEC-189); an unset field never matches.
-- **The book has a sort** (TEC-224, `app/Book.tsx`, `lib/recipeSort.ts`): a "Sort" select under the
-  filters, Book order (the server's order, the default) or A to Z. A to Z ignores case and accents,
-  drops a leading "The" (a bare "The" stays), compares with `localeCompare("en", base)`, and keeps
-  the incoming order on a tie. It sorts first, then search and the filters narrow, so all three
-  work together. The choice is **this browser's `localStorage` only** (`cookbook:book-sort`, read
-  and written in try/catch; no storage means Book order). Not a jump-to-letter row, by the owner's
-  word ("A-z").
+- **The book is always A to Z, with no choice** (TEC-235, replacing TEC-224's Sort select;
+  `app/Book.tsx`, `lib/recipeSort.ts`). A to Z ignores case and accents, drops a leading "The" (a
+  bare "The" stays), compares with `localeCompare("en", base)`, and keeps the incoming order on a
+  tie. It sorts first, then search and the filters narrow. **Trap:** TEC-224 stored the choice in
+  `localStorage` as `cookbook:book-sort`; nothing reads or clears it now, so an old browser keeps
+  the dead key. Harmless. Not a jump-to-letter row, by the owner's word ("A-z").
 - Metadata sits flat on `recipes`, read by `lib/metadata.ts`. `meal` and `diet` are
   check-constrained to `MEALS` and `DIETS`; `readMeta` drops free-of claims and macro tags. **The
   meal list is Main · Side · Breakfast · Snack · Dessert · Creami** (TEC-205), held by

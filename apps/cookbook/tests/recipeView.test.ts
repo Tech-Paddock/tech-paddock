@@ -19,8 +19,8 @@ describe("the pill's rating", () => {
 });
 
 describe("the tabs", () => {
-  it("are Ingredients, Method, Macros, and it opens on Ingredients", () => {
-    expect(RECIPE_TABS.map((t) => t.label)).toEqual(["Ingredients", "Method", "Macros"]);
+  it("are Ingredients, Steps, Macros, and it opens on Ingredients", () => {
+    expect(RECIPE_TABS.map((t) => t.label)).toEqual(["Ingredients", "Steps", "Macros"]);
     expect(FIRST_RECIPE_TAB).toBe("ingredients");
   });
 });

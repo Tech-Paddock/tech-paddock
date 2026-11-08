@@ -92,7 +92,7 @@ export default function EditRecipe({
         onChange={(e) => setMethod(e.target.value)}
         rows={5}
         placeholder="How you make it (optional)"
-        aria-label="Method"
+        aria-label="Steps"
         className={field}
       />
       <MetaFields value={meta} onChange={setMeta} open />

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import MacroTab from "./MacroTab";
-import { Stars } from "./Meta";
 import { methodSteps } from "@/lib/recipeSteps";
 import type { Recipe, RecipeOrigin } from "@/lib/recipes";
 import { mealLabel, timeParts } from "@/lib/metadata";
@@ -16,14 +15,18 @@ import {
   type Greyed,
   type GreyKind,
 } from "@/lib/greyedRows";
-import { RECIPE_TABS, ratingWords, splitIngredient, type RecipeTab } from "@/lib/recipeView";
+import { RECIPE_TABS, splitIngredient, type RecipeTab } from "@/lib/recipeView";
+import { MAX_SERVINGS, MIN_SERVINGS, scaleFactor, scaleIngredient, stepServings } from "@/lib/scaleServings";
 
 /**
- * The open recipe (TEC-183, the owner's canvas): name, origin · makes · time,
- * the rating up top, then Ingredients · Method · Macros as tabs. The keywords
- * (main, cuisine, equipment, diet, tags) are stored and editable in Edit
- * and no longer shown here; the meal is, by its name (TEC-205). Local patterns: the segmented tabs, the numbered
- * circles. Add to list is a date box (TEC-189).
+ * The open recipe's body (TEC-183, reworked in TEC-235). **The title, the facts
+ * line and the rating are the card's header** (`RecipeCard` in `Book.tsx`), so
+ * the name shows once and tapping it closes the card. This file draws what is
+ * under it: the servings dial, then Ingredients · Steps · Macros as tabs. The
+ * keywords (main, cuisine, equipment, diet, tags) are stored and editable in Edit
+ * and not shown here; the meal is, by its name (TEC-205). Local patterns: the
+ * segmented tabs, the numbered circles, the servings dial. Add to list is a date
+ * box (TEC-189).
  */
 
 export const ORIGIN_LABELS: Record<RecipeOrigin, string> = {
@@ -90,32 +93,47 @@ export function RecipeOpen({
   recipe,
   tab,
   onTab,
-  onRate,
-  rating,
 }: {
   recipe: Recipe;
   tab: RecipeTab;
   onTab: (tab: RecipeTab) => void;
-  onRate: (value: number | null) => void;
-  /** True while a rating is being saved. */
-  rating: boolean;
 }) {
   const steps = methodSteps(recipe.method);
   const { greyed, toggle } = useGreyed(recipe.id);
+  // The servings dial (TEC-235): this view only. It scales the lines shown and
+  // changes nothing stored, so closing the card puts it back to the recipe's own.
+  const [viewServings, setViewServings] = useState(recipe.servings);
+  const factor = scaleFactor(viewServings, recipe.servings);
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <h3 className="text-lg font-bold">{recipe.name}</h3>
-        <p className="text-xs text-ink-soft">
-          {[ORIGIN_LABELS[recipe.origin], mealLabel(recipe.meal), ...timeParts(recipe), `makes ${recipe.servings}`].join(" · ")}
-        </p>
-        <div className="flex items-center gap-2">
-          <Stars rating={recipe.rating} onRate={onRate} busy={rating} size="text-2xl" />
-          <span className="text-xs text-ink-soft">{ratingWords(recipe.rating)}</span>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center justify-between rounded-xl bg-accent/10 py-1 pl-3 pr-1">
+        <span className="text-sm font-semibold">Servings</span>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setViewServings((n) => stepServings(n, -1))}
+            disabled={viewServings <= MIN_SERVINGS}
+            aria-label="Fewer servings"
+            className="h-10 w-10 rounded-full bg-surface text-lg font-bold text-accent disabled:opacity-40"
+          >
+            −
+          </button>
+          <output aria-live="polite" className="min-w-8 text-center font-bold tabular-nums">
+            {viewServings}
+          </output>
+          <button
+            type="button"
+            onClick={() => setViewServings((n) => stepServings(n, 1))}
+            disabled={viewServings >= MAX_SERVINGS}
+            aria-label="More servings"
+            className="h-10 w-10 rounded-full bg-surface text-lg font-bold text-accent disabled:opacity-40"
+          >
+            +
+          </button>
         </div>
       </div>
 
-      <div role="tablist" aria-label="Recipe sections" className="flex gap-1 rounded-xl bg-raised p-1">
+      <div role="tablist" aria-label="Recipe sections" className="flex gap-0.5 rounded-xl bg-raised p-0.5">
         {RECIPE_TABS.map((t) => (
           <button
             key={t.key}
@@ -125,7 +143,7 @@ export function RecipeOpen({
             aria-selected={tab === t.key}
             aria-controls={`panel-${recipe.id}-${t.key}`}
             onClick={() => onTab(t.key)}
-            className={`min-h-10 flex-1 rounded-lg px-2 text-sm font-semibold ${
+            className={`min-h-9 flex-1 rounded-[10px] px-2 text-[13px] font-semibold ${
               tab === t.key ? "bg-accent text-accent-ink" : "text-ink-soft"
             }`}
           >
@@ -147,15 +165,15 @@ export function RecipeOpen({
           recipe.ingredients.length > 0 ? (
             <ul className="flex flex-col text-sm">
               {recipe.ingredients.map((line, n) => {
-                const { amount, text } = splitIngredient(line);
+                const { amount, text } = splitIngredient(scaleIngredient(line, factor));
                 const off = isGreyed(greyed, "ingredient", n);
                 return (
-                  <li key={n} className="border-t border-line/40 first:border-t-0">
+                  <li key={n} className="border-t border-line/30 first:border-t-0">
                     <button
                       type="button"
                       aria-pressed={off}
                       onClick={() => toggle("ingredient", n)}
-                      className={`grid min-h-11 w-full grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-x-3 py-2 text-left ${off ? GREY_ROW : ""}`}
+                      className={`grid min-h-9 w-full grid-cols-[5rem_minmax(0,1fr)] items-center gap-x-2.5 py-1.5 text-left leading-snug ${off ? GREY_ROW : ""}`}
                     >
                       {amount ? (
                         <>
@@ -163,7 +181,7 @@ export function RecipeOpen({
                           <span>{text}</span>
                         </>
                       ) : (
-                        <span className="col-span-2">{line}</span>
+                        <span className="col-span-2">{text}</span>
                       )}
                     </button>
                   </li>
@@ -173,9 +191,9 @@ export function RecipeOpen({
           ) : (
             <p className="text-sm text-ink-soft">No ingredients.</p>
           )
-        ) : tab === "method" ? (
+        ) : tab === "steps" ? (
           steps.length > 0 ? (
-            <ol className="flex flex-col gap-3 text-sm">
+            <ol className="flex flex-col gap-1.5 text-sm">
               {steps.map((step, n) => {
                 const off = isGreyed(greyed, "step", n);
                 return (
@@ -184,7 +202,7 @@ export function RecipeOpen({
                       type="button"
                       aria-pressed={off}
                       onClick={() => toggle("step", n)}
-                      className="flex min-h-11 w-full gap-3 text-left"
+                      className="flex min-h-9 w-full gap-3 py-0.5 text-left"
                     >
                       <span
                         aria-hidden="true"
@@ -201,7 +219,7 @@ export function RecipeOpen({
               })}
             </ol>
           ) : (
-            <p className="text-sm text-ink-soft">No method.</p>
+            <p className="text-sm text-ink-soft">No steps.</p>
           )
         ) : (
           <MacroTab recipe={recipe} />
@@ -211,13 +229,13 @@ export function RecipeOpen({
   );
 }
 
-
 /**
- * **Add to list** (TEC-183; the day became one date box in TEC-189): "When are
- * you cooking it?" is a single date input that opens on today, with Add to list
- * beside it; the day picked is the day it sits on the menu. Edit and Remove sit
- * under it as outlined buttons, and Remove keeps its confirm. A cleared date
- * disables the button instead of quietly meaning "today".
+ * The bottom of an open recipe (TEC-235; Add to list became one date box in
+ * TEC-189). **One row** holds the cook date and Add to list. Under it, Edit and
+ * Remove are quiet text buttons and Remove asks once, inline. Under those, a small
+ * underlined "Revert to original" link (the old "Revert to imported", same
+ * behaviour: it still asks once). No warning text. A cleared date disables Add to
+ * list instead of quietly meaning "today".
  */
 export function AddToListCard({
   name,
@@ -235,7 +253,7 @@ export function AddToListCard({
   onList: (day: string) => void;
   onEdit: () => void;
   onRemove: () => void;
-  /** Only for a recipe with an imported original (TEC-201): put the import back. */
+  /** Only for a recipe with an imported original (TEC-201): put the original back. */
   onRevert?: () => void;
   /** Injected by the tests; the browser's own today otherwise. */
   today?: string;
@@ -244,38 +262,65 @@ export function AddToListCard({
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [confirmingRevert, setConfirmingRevert] = useState(false);
   const picked = parseDay(day);
-  const outline = "min-h-11 rounded-xl border border-line px-4 text-base";
+  const quiet = "min-h-9 px-3 text-[13px] font-semibold";
+  const pill = "min-h-9 rounded-full border px-3.5 text-[13px] font-semibold";
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-2.5 rounded-xl bg-raised p-3">
-        <h4 className="text-sm font-bold">When are you cooking it?</h4>
-        <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-2">
+      <div className="flex items-stretch gap-2">
+        <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-line bg-surface px-3">
+          <span className="shrink-0 text-xs text-ink-soft">Cook on</span>
           <input
             type="date"
             value={day}
             onChange={(e) => setDay(e.target.value)}
             aria-label={`Day to cook ${name}`}
-            className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-base"
+            className="min-w-0 flex-1 bg-transparent text-sm"
           />
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            if (picked) onList(picked);
+          }}
+          disabled={!hasIngredients || listing || !picked}
+          className="min-h-11 shrink-0 whitespace-nowrap rounded-xl bg-accent px-4 text-[15px] font-bold text-accent-ink disabled:opacity-50"
+        >
+          {listing ? "Adding…" : "Add to list"}
+        </button>
+      </div>
+
+      {confirmingRemove ? (
+        <div role="group" aria-label="Remove this recipe?" className="flex flex-wrap items-center justify-center gap-2 text-[13px]">
+          <span>Remove this recipe?</span>
           <button
             type="button"
             onClick={() => {
-              if (picked) onList(picked);
+              setConfirmingRemove(false);
+              onRemove();
             }}
-            disabled={!hasIngredients || listing || !picked}
-            className="min-h-11 shrink-0 rounded-xl bg-accent px-4 text-base font-semibold text-accent-ink disabled:opacity-50"
+            className={`${pill} border-danger bg-danger text-accent-ink`}
           >
-            {listing ? "Adding…" : "Add to list"}
+            Remove
+          </button>
+          <button type="button" onClick={() => setConfirmingRemove(false)} className={`${pill} border-line bg-surface`}>
+            Keep it
           </button>
         </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={onEdit} className={outline}>
-          Edit
-        </button>
-        {onRevert ? (
-          confirmingRevert ? (
+      ) : (
+        <div className="flex items-center justify-center gap-3">
+          <button type="button" onClick={onEdit} className={`${quiet} text-ink-soft`}>
+            Edit
+          </button>
+          <button type="button" onClick={() => setConfirmingRemove(true)} className={`${quiet} text-danger`}>
+            Remove
+          </button>
+        </div>
+      )}
+
+      {onRevert ? (
+        <div className="flex items-center justify-center gap-2 text-[11px]">
+          {confirmingRevert ? (
             <>
               <button
                 type="button"
@@ -283,42 +328,27 @@ export function AddToListCard({
                   setConfirmingRevert(false);
                   onRevert();
                 }}
-                className={`${outline} font-semibold`}
+                className="min-h-9 px-2 font-semibold underline underline-offset-2"
               >
                 Revert — sure?
               </button>
-              <button type="button" onClick={() => setConfirmingRevert(false)} className={`${outline} text-ink-soft`}>
+              <button type="button" onClick={() => setConfirmingRevert(false)} className="min-h-9 px-2 text-ink-soft underline underline-offset-2">
                 Not now
               </button>
             </>
           ) : (
-            <button type="button" onClick={() => setConfirmingRevert(true)} className={outline}>
-              Revert to imported
-            </button>
-          )
-        ) : null}
-        {confirmingRemove ? (
-          <>
             <button
               type="button"
-              onClick={() => {
-                setConfirmingRemove(false);
-                onRemove();
-              }}
-              className={`${outline} font-semibold text-danger`}
+              onClick={() => setConfirmingRevert(true)}
+              title="Puts back the recipe exactly as it was first imported"
+              className="min-h-9 px-2 text-ink-soft underline underline-offset-2"
             >
-              Remove — sure?
+              Revert to original
             </button>
-            <button type="button" onClick={() => setConfirmingRemove(false)} className={`${outline} text-ink-soft`}>
-              Keep it
-            </button>
-          </>
-        ) : (
-          <button type="button" onClick={() => setConfirmingRemove(true)} className={`${outline} text-danger`}>
-            Remove
-          </button>
-        )}
-      </div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
+
