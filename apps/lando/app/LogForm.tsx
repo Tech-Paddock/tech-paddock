@@ -527,6 +527,7 @@ export default function LogForm({
   /** Add a medication: checked here as the server will, saved, then picked. A dose is logged only when the form is saved. */
   async function addMedication(e: { preventDefault(): void }) {
     e.preventDefault();
+    if (medBusy) return;
     setMedError(null);
     let checked;
     try {
@@ -536,8 +537,14 @@ export default function LogForm({
       return;
     }
     setMedBusy(true);
-    const { medication, error } = await onAddMedication(checked);
+    let result: { medication: Medication | null; error: string | null };
+    try {
+      result = await onAddMedication(checked);
+    } catch (err) {
+      result = { medication: null, error: (err as Error).message || "couldn't add" };
+    }
     setMedBusy(false);
+    const { medication, error } = result;
     if (!medication) {
       setMedError(error ?? "couldn't add");
       return;
@@ -659,6 +666,12 @@ export default function LogForm({
       return;
     }
     if (kind === "health" && healthType === "medication") {
+      // Save with "Add a medication" still open must not read as a save of the dose: the new medication is
+      // added first (or its problem is shown under that form), and Save is then pressed again for the dose.
+      if (addingMed) {
+        await addMedication(e);
+        return;
+      }
       if (!medId) {
         setError("Pick the medication.");
         return;
@@ -1267,7 +1280,11 @@ export default function LogForm({
                         Cancel
                       </button>
                     </div>
-                    {medError && <p className="text-[13px] font-semibold text-danger">{medError}</p>}
+                    {medError && (
+                      <p role="alert" className="text-[13px] font-semibold text-danger">
+                        {medError}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-start gap-2">

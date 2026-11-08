@@ -25,6 +25,7 @@ export const DAYS_SHOWN = 7;
  * once written, is not rewritten.
  */
 export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
+  "2026-11-08": "Adding a medication works.",
   "2026-11-02": "The top boxes open a quick entry again, the form boxes line up, and a Health or Training entry can point to a note.",
   "2026-11-01": "Tidier forms, one Potty button, a Medication tab, and plans for the days ahead.",
   "2026-10-30": "A snuffle mat counts as half a meal.",
@@ -37,6 +38,7 @@ export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
 };
 
 export const RELEASES: readonly Release[] = [
+  { date: "2026-11-08", text: "Adding a medication now works." },
   { date: "2026-11-02", text: "A vet visit, medical issue, medication or training entry can now point to one of your notes: pick it under Related note, or leave it on None. On a vet visit or a medication, the Related issue list is always there, with no tick box to open it first. Potty keeps its Medical issue tick box. Notes still never show in the Log feed, the top boxes or Analytics." },
   { date: "2026-11-02", text: "There is a new Notes tab after Log for anything that is not a potty or a meal: a reminder, something the vet said, or a document. Tap Add note, write it, and attach up to 6 photos or files such as a PDF. Notes are listed newest first with who wrote them, long ones show two lines until you tap them, and a file opens when you tap its name. Tap Edit on a note to change or delete it. Notes never show in the Log feed, the top boxes or Analytics." },
   { date: "2026-11-02", text: "Every form, Food and Weight included, and every upcoming item can now carry up to 6 photos or files, such as a PDF from the vet. Take photo is still there, and Attach opens the phone's file picker for anything. Photos are still shrunk first; other files can be up to 4 MB, and a bigger one says so on the form. Photos show as thumbnails and other files as a tag with their name, which opens the file when tapped. Tapping an item in Next 7 days or the Upcoming list now opens it to change anything, and its row reads the title and note together on one line. When you mark an item done, its photos and files come along to the entry." },
