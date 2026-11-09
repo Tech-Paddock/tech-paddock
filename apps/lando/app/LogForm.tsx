@@ -60,13 +60,12 @@ import {
   type PottyWhat,
   type Unit,
 } from "@/lib/events";
-import { FOOD_UNITS, MISC_ID, amountOptions, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
+import { FOOD_UNITS, MISC_ID, servingAmount, servingOptions, servingText, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
 import { MED_REASONS, MED_REASON_IDS, MED_ROUTES, MED_UNITS, NO_REASON, findMedication, medReasonLabel, type MedReason, medPicklist, type MedRoute, type MedUnit, type Medication } from "@/lib/medications";
 import { plannedWhen } from "@/lib/calendar";
 import { FUTURE_NOTICE, donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, type DonePrefill } from "@/lib/future";
 import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
-import AmountScroller from "./AmountScroller";
 import TreatQty from "./TreatQty";
 import TreatCount from "./TreatCount";
 import PhotoPicker, { usePhotos } from "./Photos";
@@ -357,12 +356,13 @@ export default function LogForm({
   const firstFoodType: FoodType = f?.type ?? (quickFood?.type === "treat" ? "treat" : "meal");
   const [foodType, setFoodType] = useState<FoodType>(firstFoodType);
   const [itemId, setItemId] = useState(f?.item_id ?? quickFood?.itemId ?? defaultFood(firstFoodType, remembered, foods));
-  // An amount from the ⅛ scroller (TEC-136). The amount it opened on stays on
-  // the list even when it is not an eighth (an older 1/3), so an untouched
-  // correction keeps it.
-  const [amount, setAmount] = useState<number | null>(
-    f ? f.amount : quickFood?.itemId ? quickFood.amount : defaultAmount(firstFoodType, remembered)
-  );
+  // A treat's count, or a meal's or snuffle mat's servings (TEC-257, a picklist in halves). The amount a correction
+  // opened on stays on the list even when it is not a half (an older entry in cups), so an untouched correction
+  // keeps it. A new meal opens on a remembered amount that is on the list, else one serving.
+  const [amount, setAmount] = useState<number | null>(() => {
+    const a = f ? f.amount : quickFood?.itemId ? quickFood.amount : defaultAmount(firstFoodType, remembered);
+    return !f && firstFoodType !== "treat" ? servingAmount(a) : a;
+  });
   const [openedAmount] = useState(amount);
   // "Add a food…" (TEC-191): the inline form under What. It never becomes the pick; the new food does.
   const [addingFood, setAddingFood] = useState(false);
@@ -509,7 +509,7 @@ export default function LogForm({
     setAddingFood(false);
     setFoodError(null);
     setFoodUnit(t === "treat" ? "piece" : "cup");
-    setAmount(defaultAmount(t, remembered));
+    setAmount(t === "treat" ? defaultAmount(t, remembered) : servingAmount(defaultAmount(t, remembered)));
   }
 
   /** Fun's Pee or Poop: one tap saves a potty entry now, no confirm. Where comes from `funPotty`. */
@@ -624,7 +624,8 @@ export default function LogForm({
   }
 
   const item = findFood(foodType, itemId, foods);
-  const amountUnit = item?.unit ? unitLabel(item.unit, amount ?? 2) : null;
+  // A treat counts its own unit; a meal's amount is picked from Servings, so it needs no unit word beside it.
+  const amountUnit = foodType === "treat" && item?.unit ? unitLabel(item.unit, amount ?? 2) : null;
   const pickedMed = findMedication(medications, medId);
 
   function rawDetails(): Record<string, unknown> {
@@ -1100,23 +1101,31 @@ export default function LogForm({
                   <option value={FOOD_ADD}>Add a food…</option>
                 </select>
               </Field>
-              <Field label="Amount" htmlFor="f-amount" className="shrink-0">
-                {/* Just the box, and the unit as a small word beside it (TEC-202), so the column is no wider than the box. */}
-                <div className="flex items-start gap-1">
-                {foodType === "treat" ? (
-                  <TreatQty id="f-amount" label={amountUnit ? `Amount in ${amountUnit}` : "Amount"} value={amount} onChange={setAmount} />
-                ) : (
-                  <AmountScroller
+              {foodType === "treat" ? (
+                <Field label="Amount" htmlFor="f-amount" className="shrink-0">
+                  {/* Just the box, and the unit as a small word beside it (TEC-202), so the column is no wider than the box. */}
+                  <div className="flex items-start gap-1">
+                    <TreatQty id="f-amount" label={amountUnit ? `Amount in ${amountUnit}` : "Amount"} value={amount} onChange={setAmount} />
+                    {amountUnit && <span className="pt-2.5 text-[13px] text-ink-soft">{amountUnit}</span>}
+                  </div>
+                </Field>
+              ) : (
+                <Field label="Servings" htmlFor="f-amount" className="shrink-0">
+                  {/* A fixed width, never one sized to its options (TEC-255). It stores `SERVING_UNIT`. */}
+                  <select
                     id="f-amount"
-                    label={amountUnit ? `Amount in ${amountUnit}` : "Amount"}
-                    options={amountOptions(openedAmount, defaultAmount("meal", remembered))}
-                    value={amount}
-                    onChange={setAmount}
-                  />
-                )}
-                  {amountUnit && <span className="pt-2.5 text-[13px] text-ink-soft">{amountUnit}</span>}
-                </div>
-              </Field>
+                    value={amount ?? servingAmount(null)}
+                    onChange={(e) => setAmount(Number(e.target.value))}
+                    className={`${input} w-[96px]`}
+                  >
+                    {servingOptions(openedAmount).map((n) => (
+                      <option key={n} value={n}>
+                        {servingText(n)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
             </div>
             {addingFood && (
               /* Not a nested <form> (HTML has none): Enter in the name box adds the food rather than saving the entry. */

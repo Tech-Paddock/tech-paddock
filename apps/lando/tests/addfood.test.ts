@@ -45,7 +45,7 @@ describe("findFood for an added food", () => {
       item_id: MEAL.id,
       item_name: "Test Kibble",
       kcal_per: 300,
-      unit: "scoop",
+      unit: "serving",
       amount: 1.5,
     });
     expect(() => foodSnapshot("meal", MEAL.id, 1)).toThrow(InvalidEvent);

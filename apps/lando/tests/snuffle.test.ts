@@ -76,7 +76,7 @@ describe("parseDetails and the feed row", () => {
       item_id: "royal-canin-dachshund-puppy",
       item_name: "Royal Canin Dachshund Puppy",
       kcal_per: 369,
-      unit: "cup",
+      unit: "serving",
       amount: 0.25,
     });
   });

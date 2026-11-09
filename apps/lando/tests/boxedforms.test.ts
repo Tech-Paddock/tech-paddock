@@ -156,8 +156,11 @@ describe("Food", () => {
     const entry = html.slice(at(html, 'data-section="entry"'), at(html, 'data-section="note"'));
     for (const t of ["Meal", "Snuffle mat", "Treat"]) expect(entry).toContain(t);
     expect(entry.indexOf("Type")).toBeLessThan(entry.indexOf("What"));
-    expect(entry.indexOf("What")).toBeLessThan(entry.indexOf("Amount"));
-    expect(entry).toContain("max-width:44px"); // narrowed again by TEC-202
+    expect(entry.indexOf("What")).toBeLessThan(entry.indexOf("Servings"));
+    // Servings: a select at a fixed width (TEC-257); a treat keeps its own small count box.
+    expect(entry).toContain("Servings");
+    expect(entry).toContain("<select");
+    expect(entry).not.toContain("max-width:44px");
   });
 });
 
