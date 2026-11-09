@@ -64,6 +64,9 @@ afterEach(() => {
   delete (HTMLInputElement.prototype as unknown as { showPicker?: unknown }).showPicker;
 });
 
+const repeatStep = () => screen.queryByRole("dialog", { name: "Repeat?" });
+/** Confirms the small Repeat step a future pick opens. */
+const confirmPlan = () => fireEvent.click(within(repeatStep()!).getByRole("button", { name: "Save as upcoming" }));
 const nowLocal = () => toLocalInput(new Date().toISOString());
 const hoursFromNow = (h: number) => toLocalInput(new Date(Date.now() + h * 3600_000).toISOString());
 const stored = (at: string) =>
@@ -133,15 +136,57 @@ describe("Save opens the phone's own picker (TEC-255)", () => {
     expect(props.onUpcoming).not.toHaveBeenCalled();
   });
 
-  it("a future time makes a plan, never an entry", async () => {
+  it("a future time asks its Repeat first and saves nothing until it is confirmed", async () => {
     const props = open("potty");
     pickPee();
     fireEvent.click(saveButton());
     const later = hoursFromNow(26);
     pick(later);
+    expect(repeatStep()).not.toBeNull();
+    expect(within(repeatStep()!).getByText("Future: saves as upcoming")).toBeTruthy();
+    expect(within(repeatStep()!).getByText("Repeat")).toBeTruthy();
+    expect(props.onUpcoming).not.toHaveBeenCalled();
+    expect(props.onLog).not.toHaveBeenCalled();
+    confirmPlan();
+    expect(repeatStep()).toBeNull();
     await waitFor(() => expect(props.onUpcoming).toHaveBeenCalledTimes(1));
     expect(props.onLog).not.toHaveBeenCalled();
     expect(props.onUpcoming.mock.calls[0][0]).toMatchObject({ due_on: later.slice(0, 10), due_time: later.slice(11, 16) });
+  });
+
+  it("a future time with Repeat ticked saves a plan with the chosen repeat", async () => {
+    const props = open("potty");
+    pickPee();
+    fireEvent.click(saveButton());
+    pick(hoursFromNow(26));
+    fireEvent.click(within(repeatStep()!).getByLabelText("Repeat"));
+    fireEvent.change(within(repeatStep()!).getByLabelText("Repeat every"), { target: { value: "2" } });
+    fireEvent.change(within(repeatStep()!).getByLabelText("Repeat unit"), { target: { value: "month" } });
+    confirmPlan();
+    await waitFor(() => expect(props.onUpcoming).toHaveBeenCalledTimes(1));
+    expect(props.onUpcoming.mock.calls[0][0]).toMatchObject({ repeat_every: 2, repeat_unit: "month" });
+    expect(props.onLog).not.toHaveBeenCalled();
+  });
+
+  it("Back to the form on the Repeat step saves nothing, and Save asks the time again", () => {
+    const props = open("potty");
+    pickPee();
+    fireEvent.click(saveButton());
+    pick(hoursFromNow(26));
+    fireEvent.click(within(repeatStep()!).getByRole("button", { name: "Back to the form" }));
+    expect(repeatStep()).toBeNull();
+    expect(props.onUpcoming).not.toHaveBeenCalled();
+    fireEvent.click(saveButton());
+    expect(showPicker).toHaveBeenCalledTimes(2);
+  });
+
+  it("a past time or now saves at once, with no Repeat step", () => {
+    const props = open("potty");
+    pickPee();
+    fireEvent.click(saveButton());
+    pick(hoursFromNow(-2));
+    expect(repeatStep()).toBeNull();
+    expect(props.onLog).toHaveBeenCalledTimes(1);
   });
 
   it("a failed save keeps the picked time: Save reads Retry and does not open the picker again", async () => {
@@ -151,6 +196,7 @@ describe("Save opens the phone's own picker (TEC-255)", () => {
     fireEvent.click(saveButton());
     const later = hoursFromNow(26);
     pick(later);
+    confirmPlan();
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Could not save"));
     expect(showPicker).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
@@ -165,6 +211,7 @@ describe("Save opens the phone's own picker (TEC-255)", () => {
     pickPee();
     fireEvent.click(saveButton());
     pick(hoursFromNow(26));
+    confirmPlan();
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Pick another time" }));
     fireEvent.click(saveButton());

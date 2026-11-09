@@ -77,9 +77,11 @@
   * **A failed save keeps the pick** (`held`): a plan or a correction that the server refuses shows the reason on the form, **Save reads Retry** and
     does not reopen the picker, and "Pick another time" lets go of it. A mistake in the form itself (Potty's What, a vet visit's note) drops the pick,
     so Save asks again. A new entry saves through `onLog` and the sheet closes, with Retry on its pending row as ever.
-  * **Repeat** now shows on the form while it is a plan (`data-section="plan"`: an open plan being edited, or a form opened on a future time), with the
-    "Future: saves as upcoming" line. **A future time picked from Save on a new entry makes a plan with no repeat** (there is nowhere to ask for it);
-    make the plan from the Calendar's Add a plan, or edit it after, to repeat.
+  * **Repeat** (owner: "Add Repeat to forms") shows on the form while it is a plan (`data-section="plan"`: an open plan being edited, or a form opened
+    on a future time), with the "Future: saves as upcoming" line. **A future time picked from Save on a new entry does not save at once:** a small
+    nested "Repeat?" sheet (`repeatStep`, the same `Sheet` as the stored-time one) shows the form's own `repeatBlock`, and **Save as upcoming** there
+    saves the plan; Back to the form saves nothing and Save asks the time again. A past time or now saves at once, with no step. The form's own plan
+    block hides while the step is open, so there is one Repeat control at a time.
   * **One field class** (`input` in `LogForm.tsx`): every text box, number box and select is `min-h-[44px] px-2.5 py-1.5`; the Log tab's Logging as and
     its add-a-person box use it too. It carries no width (TEC-202's trap holds). **Widths are fixed, never from content:** `inputHalf` (half the
     section, the default), `inputFull` (fills a column that is already sized: a half column or a grid cell), `w-[64px]`, `w-[76px]`, `w-[88px]`,

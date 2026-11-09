@@ -70,6 +70,7 @@ import AmountScroller from "./AmountScroller";
 import TreatQty from "./TreatQty";
 import TreatCount from "./TreatCount";
 import PhotoPicker, { usePhotos } from "./Photos";
+import Sheet from "./Sheet";
 import WhenAsk, { classifyPick, isFuturePick, type WhenAskHandle, type WhenChoice } from "./WhenPicker";
 import { clockTime, fromDateInput, fromLocalInput, toDateInput, toLocalInput } from "@/lib/localtime";
 import { noteChoices, noteLink } from "@/lib/notes";
@@ -477,6 +478,8 @@ export default function LogForm({
   // The time Save asked for (TEC-255). A save that failed after it was picked keeps it, so Retry does not ask again.
   const whenAsk = useRef<WhenAskHandle>(null);
   const [held, setHeld] = useState<WhenChoice | null>(null);
+  // A future time picked on a new entry waits here for its Repeat (TEC-255): nothing is saved until it is confirmed.
+  const [repeatStep, setRepeatStep] = useState<WhenChoice | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Fixed when the form opens, so pressing Save again after a lost response
   // is the same row, never a second one.
@@ -743,7 +746,7 @@ export default function LogForm({
   }
 
   /** The time is known: the rest of Save runs as it always did (checks, then log or plan). */
-  async function commit(choice: WhenChoice) {
+  async function commit(choice: WhenChoice, repeatAsked = false) {
     setError(null);
     setHeld(choice);
     // The time chosen. Keep leaves what the form opened on (a correction's own time to the millisecond, a Done's);
@@ -761,11 +764,17 @@ export default function LogForm({
       else whenV = choice.value;
       touched = true;
     }
+    const futureNow =
+      touched && (dateOnly ? isFutureDay(dayV, toDateInput(new Date().toISOString())) : isFuturePick(whenV, false, new Date()));
+    // A future time on a new entry (not an open plan, and not a form already opened as one, which shows its Repeat)
+    // is a plan: its Repeat is asked in a small step first, and nothing is saved until it is confirmed.
+    if (futureNow && !editing && !plan && !planning && !repeatAsked) {
+      setRepeatStep(choice);
+      return;
+    }
     setWhen(whenV);
     setDay(dayV);
     setWhenTouched(touched);
-    const futureNow =
-      touched && (dateOnly ? isFutureDay(dayV, toDateInput(new Date().toISOString())) : isFuturePick(whenV, false, new Date()));
     if (futureNow && editing) {
       failOnForm("A saved entry can't move to the future — delete it and log a new one for then.");
       return;
@@ -1532,8 +1541,8 @@ export default function LogForm({
 
       {/* A plan's Repeat (TEC-199, moved here by TEC-255 when the When step went): an open plan being edited, or a
           form opened on a future time (the Calendar's Add a plan), says so and offers it. A future time picked from
-          Save on a new entry makes a plan with no repeat. */}
-      {planning && (
+          Save on a new entry asks its Repeat in a small step first (repeatStep). */}
+      {planning && !repeatStep && (
         <div data-section="plan" className="grid gap-0.5">
           {future && <p className="text-[13px] font-semibold text-ink">{FUTURE_NOTICE}</p>}
           {repeatBlock}
@@ -1561,6 +1570,32 @@ export default function LogForm({
       <div data-section="photos">
         <PhotoPicker photos={photos} />
       </div>
+
+      {repeatStep && (
+        /* The same small sheet as the stored-time one: the form's own Repeat, then the plan is saved (TEC-255). */
+        <Sheet nested title="Repeat?" onClose={() => { setRepeatStep(null); setHeld(null); }}>
+          <div className="flex flex-col gap-2" data-section="repeat-step">
+            <p className="text-[13px] font-semibold text-ink">{FUTURE_NOTICE}</p>
+            {repeatBlock}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const c = repeatStep;
+                  setRepeatStep(null);
+                  void commit(c, true);
+                }}
+                className="h-[44px] rounded-[10px] bg-accent px-4 font-bold text-accent-ink"
+              >
+                Save as upcoming
+              </button>
+              <button type="button" onClick={() => { setRepeatStep(null); setHeld(null); }} className="h-[44px] px-2 text-ink-soft underline">
+                Back to the form
+              </button>
+            </div>
+          </div>
+        </Sheet>
+      )}
 
       {error && (
         <div role="alert" className="flex flex-wrap items-center gap-x-2 text-sm font-semibold text-danger">

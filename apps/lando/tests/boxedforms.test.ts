@@ -378,7 +378,7 @@ describe("a future When", () => {
     expect(submit.slice(0, submit.indexOf("await submitFuture(whenV, dayV)"))).not.toContain("onLog");
     expect(form).toContain("await onUpcoming(item, plan?.id)");
     // The Repeat control is inside the planning branch only (a future When, or an open item being edited).
-    expect(form).toMatch(/\{planning && \(\s*<div data-section="plan"/);
+    expect(form).toMatch(/\{planning && !repeatStep && \(\s*<div data-section="plan"/);
     expect(form).toContain("{repeatBlock}");
   });
   it("a saved entry cannot move to the future, and the server refuses a time past a day ahead", () => {
