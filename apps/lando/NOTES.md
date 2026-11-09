@@ -58,6 +58,34 @@
     weights only. (2) `/api/upcoming` returns open plans only, so a plan marked done leaves the Calendar (its entry shows on the day it was
     logged) and a repeating plan shows only its next date. (3) A new reader of `loaded.events` must still read `entries`, not events, or a
     note leaks in. (4) The tab row is five columns at 13px; a sixth tab will not fit.
+- **When is a step after Save** (TEC-252, the owner: "drop the when option. Saving prompts the date screen. Move logged as to bottom next to log
+  button. All screens."). Two **local patterns**, no data change and no migration. **Every older bullet that says "Box 1", a When field, "When and
+  Logging as" on a form, the "Future: saves as upcoming" line under the When, or the When's "Now" label describes what this replaced.**
+  * **The When step** (`app/WhenStep.tsx`, `tests/whenstep.test.ts`): Save on `LogForm` and `NoteForm` runs only the checks that do not depend on the
+    time (an attachment still uploading; for a medication, an open "Add a medication…" is added first) and opens the step, a `Sheet` with `nested`
+    (the Treats pop-up's pattern) titled "When?". A big focused **Now** (Weight: **Today**) logs it at once; "or another time" is a date and time
+    field (Weight: a date) with its own Save; **Back to the form** closes it (so does Escape and the ✕). A future time shows "Future: saves as
+    upcoming" and the form's **Repeat** under it (`repeatBlock`, passed as a prop) and saves an upcoming item as before; a plan being edited shows
+    Repeat whatever the time. The form's other checks (Potty's What, a vet visit's note, a medication's pick and dose, a treat's amount) now run
+    **after** the time is chosen, because a future plan skips them; one that fails closes the step and shows on the form (`failOnForm`).
+    A failure of the awaited save (an upcoming item, or a correction) leaves the step open on the same choice with the reason in it, so a retry is
+    one tap and never asks again; a new entry saves through `onLog` and the sheet closes as ever, with Retry on its pending row.
+  * **A form that opens on a time of its own** (a correction, a Done, a plan being edited, the Calendar's Add a plan with `planDay`) opens the step with
+    its field on that time and the big button reading **Keep Oct 19 9:05 PM** (a correction, a plan being edited) or **Use Tue 9:00 AM** (a Done, an
+    Add a plan), with a small "Now instead" under it. **Keep** leaves `event.at` exactly, to the millisecond, as an untouched When did (so `treatsWith`
+    still matches); Now on a new entry is "untouched": the moment of that tap. A correction cannot be moved to the future (the step says so and
+    disables its Save). A note's step has no future (`allowFuture={false}`: the field's `max`, and `noteWhenError`) and no Repeat.
+  * **The bottom row** (`data-section="save"`): "as [name ▾] [Save potty]" on one line on every form and the Note form, replacing Box 1's Logging as
+    (same select, `nameBoxWidth`, `f-who`; labelled "Logging as" for screen readers). The button no longer says "Save as upcoming" after a pick
+    (the form cannot know), only when the form opened on a future time (the Calendar's Add a plan). The section order the tests read is now
+    `entry, secondary, note, photos, save` (`tests/boxedforms.test.ts`).
+  * **Related fields inline**: Training's Related note sits beside Treats after a thin divider (`flex items-end`, no wrap); a vet visit and a medication
+    dose show Related issue and Related note in two equal columns (`grid-cols-2`, long names cut by the select), **the dose's Related issue moved out of
+    Box 2 into this row** and, like the vet visit's, is not shown on a plan; a medical issue keeps the note alone.
+  * **The Meal pill reads "Meals: 2"** (`mealPillLabel`; the cups are gone from the face, `mealsSummary` still sums them and its test holds that).
+  * **Traps**: (1) the form's `when`, `day` and `whenTouched` state are only set by `commit`, from the step; they stand for what the form opened on
+    until then. (2) The step is a portal, so a button in it that was `type="submit"` would do nothing and Enter in its field does not save; its buttons are
+    `type="button"`. (3) A new form that wants a When must go through `WhenStep` and `commit`, or its Save will skip the step.
 - **The quieter Log and forms** (TEC-250, the owner: less prominent upcoming, treats and medical issue apart, small attachments; "we've
   slightly overcorrected" kept a list rather than one line). Three **local patterns**, no data change and no migration. **Later bullets
   that say Box 3, "Treats and links", Take photo/Attach buttons or the Next 7 days card describe what this replaced.**
@@ -282,7 +310,8 @@
 - **The app bar** (TEC-193, `app/AppBar.tsx`): the name, theme, logout and the livery badge. **"Meals today: N" is
   gone** (TEC-142's `Meals.tsx` context, `useReportMeals` and `mealsToday` with its tests were removed); the Meal
   pill already counts meals. The bar wraps rather than clips on a very narrow phone.
-- **The Meal pill's label** (TEC-194, `mealsSummary` / `mealPillLabel` in `lib/events.ts`, `tests/mealpill.test.ts`):
+- **The Meal pill's label** (TEC-194, `mealsSummary` / `mealPillLabel` in `lib/events.ts`, `tests/mealpill.test.ts`;
+  **the cups were taken off the face by TEC-252: it reads "Meals: N" and everything about X cups below is `mealsSummary`'s, no longer shown**):
   "Meals: N · X cups" for the phone's day (`localMidnight(now)` to the next midnight, so it rolls at midnight with
   `now`). N is live meals (1 each) plus snuffle mats (0.5 each, TEC-197), written in halves with a ½ glyph, never a decimal
   ("Meals: 2½", "Meals: ½", `formatMealCount`); voids out, treats never, any unit, Misc included. Only this N halves:
@@ -851,7 +880,7 @@
   before west of Greenwich. `fromDateInput` builds local noon from the parts.
 - The training command list is in two places: `COMMANDS` in `lib/events.ts` and `lando.details_ok`. Add a command to both.
 - Tailwind's `flex` beats the `hidden` attribute, so the tab panels also switch their class.
-- **The When field is a label over a transparent `datetime-local`** (`app/LogForm.tsx`). The native
+- **(Gone since TEC-252: the form has no When field; this was its trap.) The When field is a label over a transparent `datetime-local`** (`app/LogForm.tsx`). The native
   control is wider than half a phone and pushed into Human, so the form shows `whenLabel`
   (`lib/localtime.ts`: "Now" for an untouched new entry, else "Today 9:05 PM", "Yesterday …",
   "Oct 19 …") and keeps the real input, `opacity-0`, over it; a tap calls `showPicker()`. Do not

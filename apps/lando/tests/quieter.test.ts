@@ -49,7 +49,8 @@ const formProps = {
   unsaved: {},
   onRetry: () => {},
 };
-const render = (form: FormKind) => renderToStaticMarkup(createElement(LogForm, { ...formProps, form } as never));
+const render = (form: FormKind, extra: Record<string, unknown> = {}) =>
+  renderToStaticMarkup(createElement(LogForm, { ...formProps, form, ...extra } as never));
 const secondary = (html: string) => html.slice(html.indexOf('data-section="secondary"'), html.indexOf('data-section="note"'));
 
 describe("the compact Next 7 days row", () => {
@@ -112,6 +113,26 @@ describe("Treats and Medical issue", () => {
     const html = render("health");
     expect(html).toContain("Related note");
     expect(secondary(html)).not.toContain("border-line bg-paper");
+  });
+  it("Training: Treats, a thin divider, then Related note, on one line (TEC-252)", () => {
+    const second = secondary(render("training"));
+    expect(second.indexOf("Treats")).toBeLessThan(second.indexOf("w-px"));
+    expect(second.indexOf("w-px")).toBeLessThan(second.indexOf("Related note"));
+    // One flex row that does not wrap, so the note stays beside the counter; the select fills the rest.
+    expect(second).toContain('class="flex items-end gap-x-3 "');
+    expect(second).toContain("min-w-0 flex-1");
+  });
+  it("a vet visit and a medication dose put Related issue and Related note side by side; a medical issue has the note alone (TEC-252)", () => {
+    for (const healthType of ["vet", "medication"]) {
+      const second = secondary(render("health", { healthType }));
+      const pair = second.slice(second.indexOf("grid grid-cols-2"));
+      expect(pair.indexOf("Related issue")).toBeGreaterThan(-1);
+      expect(pair.indexOf("Related issue")).toBeLessThan(pair.indexOf("Related note"));
+    }
+    const issue = secondary(render("health", { healthType: "issue" }));
+    expect(issue).not.toContain("grid-cols-2");
+    expect(issue).not.toContain("Related issue");
+    expect(issue).toContain("Related note");
   });
   it("What and Where stay in their box", () => {
     const html = render("potty");

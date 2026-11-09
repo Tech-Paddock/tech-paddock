@@ -738,7 +738,7 @@ export default function Journal() {
               const status = last ? pillStatus(c, now.getTime() - Date.parse(last.at)) : null;
               // Pee, Poop, Meal and Fun open a quick log, once the journal has loaded.
               const tap = clocks ? quickLog(c, clocks.food, foods) : null;
-              // The Meal pill reads today's meals and cups (TEC-194); the others keep their name.
+              // The Meal pill reads today's meals (TEC-194, cups dropped by TEC-252); the others keep their name.
               const isMeal = c === "food";
               const face = isMeal && loaded ? mealPillLabel(entries, now) : isMeal ? "Meals" : CLOCK_LABELS[c];
               return (
@@ -761,17 +761,7 @@ export default function Journal() {
                   status={status}
                   onTap={tap ? () => setOpen({ form: tap.form, quick: tap }) : undefined}
                 >
-                  {/* The Meal label is longer ("Meals: 2 · 1⅛ cups"): it may wrap at the dot instead of clipping. */}
-                  <div
-                    className={`${isMeal ? "" : "truncate "}text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] text-ink-soft`}
-                  >
-                    {isMeal ? face.split(" · ").map((part, i) => (
-                      <span key={i}>
-                        {i ? " " : ""}
-                        <span className="whitespace-nowrap">{i ? "· " : ""}{part}</span>
-                      </span>
-                    )) : face}
-                  </div>
+                  <div className="truncate text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] text-ink-soft">{face}</div>
                   <div className="whitespace-nowrap text-[15px] font-bold leading-tight tabular-nums">
                     {!clocks ? "—" : last ? formatAgo(last.at, now) : "none"}
                   </div>

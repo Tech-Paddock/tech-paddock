@@ -79,7 +79,7 @@ const sections = (html: string) => [...html.matchAll(/data-section="([a-z]+)"/g)
 /* ── One form layout everywhere ─────────────────────────────────────────── */
 
 describe("section order per form", () => {
-  const ORDER = ["when", "entry", "secondary", "note", "photos", "save"];
+  const ORDER = ["entry", "secondary", "note", "photos", "save"];
   const cases: [string, FormKind, Record<string, unknown>, string[]][] = [
     ["Potty", "potty", {}, ORDER],
     ["Training", "training", {}, ORDER],
@@ -89,20 +89,23 @@ describe("section order per form", () => {
     ["Medical issue", "health", { healthType: "issue" }, ORDER],
     ["Medication", "health", { healthType: "medication" }, ORDER],
     // Photos and files are on every form (TEC-203).
-    ["Food", "food", {}, ["when", "entry", "note", "photos", "save"]],
-    ["Weight", "weight", {}, ["when", "entry", "note", "photos", "save"]],
+    ["Food", "food", {}, ["entry", "note", "photos", "save"]],
+    ["Weight", "weight", {}, ["entry", "note", "photos", "save"]],
   ];
   for (const [name, form, extra, expected] of cases) {
-    it(`${name}: When and Logging as, the entry, the secondary box, the note, photos, then Save last`, () => {
+    it(`${name}: the entry, the secondary row, the note, photos, then the bottom row last`, () => {
       expect(sections(render(form, extra))).toEqual(expected);
     });
   }
 
-  it("puts When and Logging as on one line, in the first box", () => {
+  it("has no When on the form: it is a step after Save, and Logging as sits in the bottom row beside Save (TEC-252)", () => {
     const html = render("potty");
-    const first = html.slice(at(html, 'data-section="when"'), at(html, 'data-section="entry"'));
-    expect(first).toContain("When");
-    expect(first).toContain("Logging as");
+    expect(html).not.toContain('data-section="when"');
+    expect(html).not.toContain('id="f-when"');
+    const bottom = html.slice(at(html, 'data-section="save"'));
+    expect(bottom).toContain("Logging as");
+    expect(bottom).toContain('id="f-who"');
+    expect(bottom.indexOf('id="f-who"')).toBeLessThan(bottom.indexOf('type="submit"'));
     expect(html).not.toContain(">Human<");
   });
 
@@ -131,7 +134,7 @@ describe("Potty", () => {
   });
   it("won't save without a What: the server and the form both refuse it", () => {
     expect(() => parseDetails("potty", { what: "", where: "outside" })).toThrow(InvalidEvent);
-    expect(readFileSync(resolve(__dirname, "../app/LogForm.tsx"), "utf8")).toMatch(/kind === "potty" && !what\) \{\s+setError\("Pick what happened/);
+    expect(readFileSync(resolve(__dirname, "../app/LogForm.tsx"), "utf8")).toMatch(/kind === "potty" && !what\) \{\s+failOnForm\("Pick what happened/);
   });
   it("puts Where and Leash on one line, then Time outside, and the treats count beside Medical issue", () => {
     const html = render("potty");
@@ -239,7 +242,7 @@ describe("Medication", () => {
     expect(type.indexOf("Medical issue")).toBeLessThan(type.indexOf("Medication"));
   });
 
-  it("lays out Medication, Dose and Unit on one line, then Given, then Related issue", () => {
+  it("lays out Medication, Dose and Unit on one line, then Given, then Related issue and Related note side by side (TEC-252)", () => {
     const html = render("health", { healthType: "medication" });
     const entry = html.slice(at(html, 'data-section="entry"'), at(html, 'data-section="note"'));
     expect(entry.indexOf("Medication")).toBeLessThan(entry.indexOf("Dose"));
@@ -247,6 +250,7 @@ describe("Medication", () => {
     expect(entry.indexOf("Unit")).toBeLessThan(entry.indexOf("Given"));
     for (const [, label] of MED_ROUTES) expect(entry).toContain(label);
     expect(entry.indexOf("Given")).toBeLessThan(entry.indexOf("Related issue"));
+    expect(entry.indexOf("Related issue")).toBeLessThan(entry.indexOf("Related note"));
     expect(entry).not.toContain("For a medical issue");
     expect(entry).toContain("Add a medication…");
     expect(entry).toContain("Test Tablet");
@@ -365,14 +369,16 @@ describe("a future When", () => {
   });
   it("is an upcoming item, not a journal event: the form says so, shows Repeat, and never reaches onLog (source check)", () => {
     const form = readFileSync(resolve(__dirname, "../app/LogForm.tsx"), "utf8");
-    expect(form).toContain("FUTURE_NOTICE");
-    const submit = form.slice(form.indexOf("async function submit("), form.indexOf("async function remove("));
-    expect(submit.indexOf("await submitFuture()")).toBeGreaterThan(0);
-    expect(submit.indexOf("await submitFuture()")).toBeLessThan(submit.indexOf("onLog(body, then)"));
-    expect(submit.slice(0, submit.indexOf("await submitFuture()"))).not.toContain("onLog");
+    // The notice and the Repeat are in the When step now (TEC-252), over the form.
+    expect(readFileSync(resolve(__dirname, "../app/WhenStep.tsx"), "utf8")).toContain("FUTURE_NOTICE");
+    const submit = form.slice(form.indexOf("async function commit("), form.indexOf("async function remove("));
+    expect(submit.indexOf("await submitFuture(whenV, dayV)")).toBeGreaterThan(0);
+    expect(submit.indexOf("await submitFuture(whenV, dayV)")).toBeLessThan(submit.indexOf("onLog(body, then)"));
+    expect(submit.slice(0, submit.indexOf("await submitFuture(whenV, dayV)"))).not.toContain("onLog");
     expect(form).toContain("await onUpcoming(item, plan?.id)");
     // The Repeat control is inside the planning branch only (a future When, or an open item being edited).
-    expect(form).toMatch(/\{planning && \(\s+<div className="flex flex-wrap items-center gap-x-2">/);
+    expect(readFileSync(resolve(__dirname, "../app/WhenStep.tsx"), "utf8")).toMatch(/\(future \|\| planning\) && repeat/);
+    expect(form).toContain("repeat={repeatBlock}");
   });
   it("a saved entry cannot move to the future, and the server refuses a time past a day ahead", () => {
     const body = { id: "99999999-9999-4999-8999-999999999999", kind: "potty", at: "2026-11-09T12:00:00.000Z", details: { what: "pee", where: "outside" } };

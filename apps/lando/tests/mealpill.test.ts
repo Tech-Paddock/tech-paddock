@@ -1,4 +1,4 @@
-// TEC-194: the Meal pill reads today's meals and the cups eaten, in 1/8-cup steps.
+// TEC-194: the Meal pill reads today's meals; TEC-252 took the cups off its face (mealsSummary still sums them, in 1/8-cup steps).
 import { describe, expect, it } from "vitest";
 import { cupsWord, formatCups, mealPillLabel, mealsSummary, type JournalEvent } from "@/lib/events";
 
@@ -54,33 +54,33 @@ describe("formatCups", () => {
 });
 
 describe("mealsSummary and mealPillLabel", () => {
-  it("counts today's meals and sums their cups", () => {
+  it("counts today's meals and sums their cups, and the pill shows the count only", () => {
     const events = [meal(7, 0.5), meal(12, 0.625)];
     expect(mealsSummary(events, NOW)).toEqual({ count: 2, cups: 1.125 });
-    expect(mealPillLabel(events, NOW)).toBe("Meals: 2 · 1⅛ cups");
+    expect(mealPillLabel(events, NOW)).toBe("Meals: 2");
   });
 
   it("reads singular at one cup or less", () => {
-    expect(mealPillLabel([meal(7, 0.875)], NOW)).toBe("Meals: 1 · ⅞ cup");
-    expect(mealPillLabel([meal(7, 0.5), meal(12, 0.5)], NOW)).toBe("Meals: 2 · 1 cup");
-    expect(mealPillLabel([meal(7, 1), meal(12, 1)], NOW)).toBe("Meals: 2 · 2 cups");
+    expect(mealPillLabel([meal(7, 0.875)], NOW)).toBe("Meals: 1");
+    expect(mealPillLabel([meal(7, 0.5), meal(12, 0.5)], NOW)).toBe("Meals: 2");
+    expect(mealPillLabel([meal(7, 1), meal(12, 1)], NOW)).toBe("Meals: 2");
   });
 
   it("leaves voided meals out of both numbers", () => {
     const a = meal(7, 0.5);
     const b = meal(12, 0.25);
-    expect(mealPillLabel([a, b, voidOf(b)], NOW)).toBe("Meals: 1 · ½ cup");
+    expect(mealPillLabel([a, b, voidOf(b)], NOW)).toBe("Meals: 1");
   });
 
   it("never counts treats", () => {
     const events = [meal(7, 0.5), food(at(9), "treat", "treat", 2), food(at(10), "treat", "cup", 0.5)];
-    expect(mealPillLabel(events, NOW)).toBe("Meals: 1 · ½ cup");
+    expect(mealPillLabel(events, NOW)).toBe("Meals: 1");
   });
 
   it("counts a meal in another unit, or Misc with no amount, toward N but not X", () => {
     const events = [meal(7, 0.5), meal(12, 20, "gram"), meal(15, 1, "scoop"), meal(16, null, null)];
     expect(mealsSummary(events, NOW)).toEqual({ count: 4, cups: 0.5 });
-    expect(mealPillLabel(events, NOW)).toBe("Meals: 4 · ½ cup");
+    expect(mealPillLabel(events, NOW)).toBe("Meals: 4");
   });
 
   it("reads just the count when no meal has a cup amount", () => {
@@ -88,7 +88,7 @@ describe("mealsSummary and mealPillLabel", () => {
   });
 
   it("counts a Snuffle mat (a cup meal) toward both", () => {
-    expect(mealPillLabel([meal(7, 0.5), meal(9, 0.25, "cup")], NOW)).toBe("Meals: 2 · ¾ cup");
+    expect(mealPillLabel([meal(7, 0.5), meal(9, 0.25, "cup")], NOW)).toBe("Meals: 2");
   });
 
   it("reads Meals: 0 on a day with no meals", () => {
@@ -98,7 +98,7 @@ describe("mealsSummary and mealPillLabel", () => {
 
   it("looks at the phone's day only", () => {
     const events = [meal(7, 0.5, "cup", 28), meal(23, 0.5, "cup", 28), meal(7, 0.25), meal(7, 0.5, "cup", 30)];
-    expect(mealPillLabel(events, NOW)).toBe("Meals: 1 · ¼ cup");
+    expect(mealPillLabel(events, NOW)).toBe("Meals: 1");
     // The first moment of the day counts; the last moment of yesterday does not.
     const midnight = ev({ kind: "food", at: new Date(2026, 9, 29, 0, 0, 0).toISOString(), details: { type: "meal", unit: "cup", amount: 1 } });
     const before = ev({ kind: "food", at: new Date(2026, 9, 28, 23, 59, 59).toISOString(), details: { type: "meal", unit: "cup", amount: 1 } });
