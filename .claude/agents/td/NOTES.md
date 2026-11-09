@@ -39,6 +39,9 @@ What is true now, and the traps. Branch and pull request state is never written 
 
 ## Traps
 
+- **What only a phone can prove is not proven by jsdom** (TEC-255 broke every Save, fixed in
+  TEC-258): native pickers, `showPicker()`, keyboards, gestures. File an owner task for a
+  phone check before such a change is called done, or choose a design that needs no phone-only behaviour.
 - **A demo must look like the app it changes** (owner, 2026-11-09: "Sometimes it's hard to tell if a
   feature is correct because the [rest] of the app looks off"). Build it from the app's own
   `lib/theme.css`, `globals.css` and the component's real markup and Tailwind classes, read from
