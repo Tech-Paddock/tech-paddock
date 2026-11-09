@@ -57,6 +57,9 @@ would get something wrong without it: the rule, one line of why. App rules live 
 - **The owner runs every `DROP` or `DELETE` in the SQL Editor** (2026-11-02, superseding
   2026-10-24's "agents apply migrations"). Through the connector they time out every time; only
   what has failed is on the list (`supabase/README.md`).
+- **The project allowlist is Linear plus a short read-only list** (owner, 2026-11-09, TEC-253,
+  superseding TEC-43's Linear-only list). `guard.test.mjs` pins the exact list, so any addition is
+  a deliberate change to that test. No interpreter, package runner or write ever goes on it.
 
 ## Mistakes
 

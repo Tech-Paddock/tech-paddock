@@ -692,12 +692,26 @@ test("settings.json sends each tool to the guard it needs, and no other", () => 
 });
 
 /* Linear edits need no click: an issue write is cheap to undo and the guard
-   checks its shape. The allow rule is Linear's alone, and it never outranks the ask list: deleting, retiring a
-   label, and the diff tools (merge_diff merges a GitHub pull request, outside
-   the guard's merge hold) still wait for his click. TEC-43. */
+   checks its shape. The allow list is exactly Linear plus a few read-only reads and checks the owner chose
+   (TEC-253, superseding TEC-43's Linear-only list); anything else added here fails this test. It never
+   outranks the ask list: deleting, retiring a label, and the diff tools (merge_diff merges a GitHub pull
+   request, outside the guard's merge hold) still wait for his click. TEC-43. */
 test("settings.json lets Linear through without a click, except what cannot be undone", () => {
   const { allow = [], ask = [], deny = [] } = settings.permissions ?? {};
-  assert.deepEqual(allow, ["mcp__Linear"], "allow is Linear's alone");
+  assert.deepEqual(
+    allow,
+    [
+      "mcp__Linear",
+      "mcp__claude_ai_Linear__get_issue",
+      "mcp__claude_ai_Linear__list_issues",
+      "mcp__claude_ai_Vercel__list_deployments",
+      "Bash(git fetch)",
+      "Bash(git fetch *)",
+      "Bash(node scripts/drift-check.mjs)",
+      "Bash(npx tsc --noEmit)",
+    ],
+    "allow is Linear plus the owner's read-only list (TEC-253), nothing more"
+  );
   assert.deepEqual(deny, []);
   for (const t of ["delete_attachment", "delete_comment", "delete_diff_comment", "delete_status_update", "retire_issue_label", "retire_project_label", "merge_diff", "update_diff", "submit_diff_review"]) {
     assert.ok(ask.includes(`mcp__Linear__${t}`), `mcp__Linear__${t} must still ask`);
