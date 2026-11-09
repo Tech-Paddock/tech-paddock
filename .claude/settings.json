@@ -4,7 +4,14 @@
   "effortLevel": "medium",
   "permissions": {
     "allow": [
-      "mcp__Linear"
+      "mcp__Linear",
+      "mcp__claude_ai_Linear__get_issue",
+      "mcp__claude_ai_Linear__list_issues",
+      "mcp__claude_ai_Vercel__list_deployments",
+      "Bash(git fetch)",
+      "Bash(git fetch *)",
+      "Bash(node scripts/drift-check.mjs)",
+      "Bash(npx tsc --noEmit)"
     ],
     "ask": [
       "mcp__Linear__delete_attachment",
