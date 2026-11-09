@@ -20,11 +20,14 @@ export default function Sheet({
   onClose,
   children,
   nested = false,
+  moveFocus = true,
 }: {
   title: string;
   onClose?: () => void;
   children: React.ReactNode;
   nested?: boolean;
+  /** False leaves the focus where it is (TEC-255: a sheet opened beside the phone's own picker must not close it). */
+  moveFocus?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -32,7 +35,7 @@ export default function Sheet({
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     const first = panel.current?.querySelector<HTMLElement>("[data-autofocus]") ?? panel.current;
-    first?.focus({ preventScroll: true });
+    if (moveFocus) first?.focus({ preventScroll: true });
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       // A nested sheet listens first (capture) and keeps the key from the one below.
@@ -45,7 +48,7 @@ export default function Sheet({
     return () => {
       document.removeEventListener("keydown", key, nested);
       document.body.style.overflow = overflow;
-      opener?.focus?.({ preventScroll: true });
+      if (moveFocus) opener?.focus?.({ preventScroll: true });
     };
     // Once per mount: onClose changing identity must not move focus again.
   }, []); // react-hooks/exhaustive-deps: deliberate
@@ -68,7 +71,7 @@ export default function Sheet({
           paddingRight: "max(12px, env(safe-area-inset-right, 0px))",
         }}
       >
-        <div className="mx-auto flex max-w-md flex-col gap-3">
+        <div className="mx-auto flex max-w-md flex-col gap-2">
           <header className="flex items-center justify-between gap-3">
             <h3 id={titleId} className="text-xl font-bold leading-tight">
               {title}

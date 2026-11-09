@@ -53,6 +53,17 @@ const render = (form: FormKind, extra: Record<string, unknown> = {}) =>
   renderToStaticMarkup(createElement(LogForm, { ...formProps, form, ...extra } as never));
 const secondary = (html: string) => html.slice(html.indexOf('data-section="secondary"'), html.indexOf('data-section="note"'));
 
+describe("where Next 7 days sits on the Log (TEC-255)", () => {
+  it("is under Logging as and above the Feed, and no longer above the Log buttons", () => {
+    const src = read("app/Journal.tsx");
+    const week = src.indexOf('aria-label="Next 7 days"');
+    expect(week).toBeGreaterThan(src.indexOf('htmlFor="who"'));
+    expect(week).toBeLessThan(src.indexOf('aria-label="Feed"'));
+    expect(week).toBeGreaterThan(src.indexOf('aria-label="Log"'));
+    expect(src.match(/aria-label="Next 7 days"/g)).toHaveLength(1);
+  });
+});
+
 describe("the compact Next 7 days row", () => {
   const html = renderToStaticMarkup(
     createElement(UpcomingList, { compact: true, items: [plan({}), plan({ id: "a0000000-0000-4000-8000-000000000002", title: "Heartworm pill", kind: "medication", due_on: "2026-11-05", due_time: null })], today: TODAY, onDone: async () => {}, onEdit: () => {} })
@@ -120,7 +131,7 @@ describe("Treats and Medical issue", () => {
     expect(second.indexOf("w-px")).toBeLessThan(second.indexOf("Related note"));
     // One flex row that does not wrap, so the note stays beside the counter; the select fills the rest.
     expect(second).toContain('class="flex items-end gap-x-3 "');
-    expect(second).toContain("min-w-0 flex-1");
+    expect(second).toContain('<div class="w-1/2 min-w-0">');
   });
   it("a vet visit and a medication dose put Related issue and Related note side by side; a medical issue has the note alone (TEC-252)", () => {
     for (const healthType of ["vet", "medication"]) {

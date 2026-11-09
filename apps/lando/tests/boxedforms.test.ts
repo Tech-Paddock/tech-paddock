@@ -190,7 +190,7 @@ describe("compact controls", () => {
     expect(html).not.toContain("px-3.5 py-2");
   });
   it("field boxes are narrow-padded and 44px tall", () => {
-    expect(render("weight")).toMatch(/min-h-\[44px\][^"]*px-2 py-1\.5/);
+    expect(render("weight")).toMatch(/min-h-\[44px\][^"]*px-2\.5 py-1\.5/);
   });
 });
 
@@ -369,16 +369,17 @@ describe("a future When", () => {
   });
   it("is an upcoming item, not a journal event: the form says so, shows Repeat, and never reaches onLog (source check)", () => {
     const form = readFileSync(resolve(__dirname, "../app/LogForm.tsx"), "utf8");
-    // The notice and the Repeat are in the When step now (TEC-252), over the form.
-    expect(readFileSync(resolve(__dirname, "../app/WhenStep.tsx"), "utf8")).toContain("FUTURE_NOTICE");
+    // The notice and the Repeat sit on the form while it is a plan (TEC-255; they were in the When step before).
+    expect(form).toContain("{future && <p");
+    expect(form).toContain("FUTURE_NOTICE");
     const submit = form.slice(form.indexOf("async function commit("), form.indexOf("async function remove("));
     expect(submit.indexOf("await submitFuture(whenV, dayV)")).toBeGreaterThan(0);
     expect(submit.indexOf("await submitFuture(whenV, dayV)")).toBeLessThan(submit.indexOf("onLog(body, then)"));
     expect(submit.slice(0, submit.indexOf("await submitFuture(whenV, dayV)"))).not.toContain("onLog");
     expect(form).toContain("await onUpcoming(item, plan?.id)");
     // The Repeat control is inside the planning branch only (a future When, or an open item being edited).
-    expect(readFileSync(resolve(__dirname, "../app/WhenStep.tsx"), "utf8")).toMatch(/\(future \|\| planning\) && repeat/);
-    expect(form).toContain("repeat={repeatBlock}");
+    expect(form).toMatch(/\{planning && \(\s*<div data-section="plan"/);
+    expect(form).toContain("{repeatBlock}");
   });
   it("a saved entry cannot move to the future, and the server refuses a time past a day ahead", () => {
     const body = { id: "99999999-9999-4999-8999-999999999999", kind: "potty", at: "2026-11-09T12:00:00.000Z", details: { what: "pee", where: "outside" } };

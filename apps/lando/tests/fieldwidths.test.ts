@@ -1,4 +1,5 @@
-// TEC-202: the shared field class carries no width. Tailwind writes `.w-full` after `.w-[64px]`, `.w-[76px]` and
+// TEC-255: one field class (the same padding and 44px height everywhere) and fixed widths, never a size taken from a
+// field's content; half the section is the default and a wider field says why. Below that, TEC-202: the shared field class carries no width. Tailwind writes `.w-full` after `.w-[64px]`, `.w-[76px]` and
 // `.w-auto`, so a `w-full` inside the shared class beat every narrow field (Health's Dose spread over the
 // Medication pick). Each field names its own width instead; these tests hold that.
 import { createElement } from "react";
@@ -58,7 +59,7 @@ describe("field widths (TEC-202)", () => {
     const med = render("health", { healthType: "medication" });
     expect(classes(med, "f-dose")).toContain("w-[64px]");
     expect(classes(med, "f-dose")).not.toContain("w-full");
-    expect(classes(med, "f-med-unit")).toContain("w-auto");
+    expect(classes(med, "f-med-unit")).toContain("w-[88px]");
     expect(classes(med, "f-med-unit")).not.toContain("w-full");
     const training = render("training");
     expect(classes(training, "f-mins")).toContain("w-[76px]");
@@ -68,15 +69,16 @@ describe("field widths (TEC-202)", () => {
     expect(classes(weight, "f-value")).not.toContain("w-full");
   });
 
-  it("the Medication pick fills what is left of its row, beside Dose and Unit", () => {
+  it("the Medication pick is half its row, beside Dose and Unit, and fills that half", () => {
     const med = render("health", { healthType: "medication" });
     expect(classes(med, "f-med")).toContain("w-full");
+    expect(med).toContain('<div class="grid min-w-0 content-start gap-0.5 w-1/2"><label for="f-med"');
   });
 
   it("Repeat's number and unit boxes are narrow in the source", () => {
     expect(SRC).toContain("className={`${input} w-[64px]`}");
     expect(SRC).toContain('aria-label="Repeat unit"');
-    expect(SRC).toMatch(/aria-label="Repeat unit"[^\n]*className=\{`\$\{input\} w-auto`\}/);
+    expect(SRC).toMatch(/aria-label="Repeat unit"[^\n]*className=\{`\$\{input\} w-\[96px\]`\}/);
   });
 
   it("no narrow field is built on the full-width class", () => {
@@ -86,8 +88,67 @@ describe("field widths (TEC-202)", () => {
   it("Logging as is 44px tall in the bottom row beside Save, in one flex row (TEC-252)", () => {
     const html = render("potty");
     const row = html.slice(html.indexOf('data-section="save"'));
-    expect(row).toContain('class="flex items-center gap-2"');
+    expect(row).toContain('class="relative flex items-center gap-2"');
     expect(classes(html, "f-who")).toContain("h-[44px]");
     expect(html).not.toContain('id="f-when"');
+  });
+
+  it("Who is a fixed width, and Save is 44px tall and only as wide as its words, never stretched (TEC-255)", () => {
+    const html = render("potty");
+    expect(classes(html, "f-who")).toContain("w-[140px]");
+    const save = html.match(/<button type="submit"[^>]*>/)![0];
+    expect(save).toContain("h-[44px]");
+    expect(save).toContain("shrink-0");
+    expect(save).not.toMatch(/\bflex-1\b|\bw-full\b/);
+  });
+});
+
+describe("one field class, fixed widths (TEC-255)", () => {
+  const forms: [FormKind, Record<string, unknown>][] = [
+    ["potty", {}],
+    ["food", {}],
+    ["fun", {}],
+    ["training", {}],
+    ["weight", {}],
+    ["health", {}],
+    ["health", { healthType: "medication" }],
+  ];
+  /** Every text box, number box and select a form draws, by its opening tag. */
+  const fields = (html: string) => [...html.matchAll(/<(?:input|select|textarea)\b[^>]*>/g)].map((m) => m[0]).filter((t) => /border-line bg-surface/.test(t));
+
+  it("every field has the same padding and a 44px minimum height", () => {
+    for (const [form, extra] of forms) {
+      const found = fields(render(form, extra));
+      expect(found.length, form).toBeGreaterThan(0);
+      for (const tag of found) {
+        expect(tag, `${form}: ${tag}`).toContain("px-2.5 py-1.5");
+        expect(tag, `${form}: ${tag}`).toMatch(/min-h-\[44px\]/);
+      }
+    }
+  });
+
+  it("no field takes its width from its content, and none but the Note is wider than a column", () => {
+    for (const [form, extra] of forms) {
+      for (const tag of fields(render(form, extra))) {
+        expect(tag, `${form}: ${tag}`).not.toMatch(/\bw-auto\b|\bflex-1\b/);
+      }
+    }
+    expect(SRC).not.toMatch(/className=\{?"?[^\n]*\bw-auto\b/);
+    expect(SRC).not.toContain("nameBoxWidth");
+  });
+
+  it("the half-width default is one class, and the Note says why it is full width", () => {
+    expect(classOf("inputHalf").split(/\s+/)).toContain("w-1/2");
+    expect(SRC).toContain("Full width on purpose");
+  });
+
+  it("What and Where share one line on Potty, a half each", () => {
+    const html = render("potty");
+    expect(html).toContain('<div class="flex items-start gap-x-2"><div class="grid min-w-0 content-start gap-0.5 w-1/2"><span class="text-[11px] uppercase tracking-[0.06em] text-ink-soft">What</span>');
+    expect(html).toContain('w-1/2"><span class="text-[11px] uppercase tracking-[0.06em] text-ink-soft">Where</span>');
+  });
+
+  it("no form says that defaults are filled in", () => {
+    for (const [form, extra] of forms) expect(render(form, extra)).not.toContain("Defaults are filled in");
   });
 });

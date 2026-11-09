@@ -4,10 +4,9 @@ import { useRef, useState } from "react";
 import { InvalidEvent, NOTE_MAX, eventNames, eventPhotos, parseDetails, type Details, type JournalEvent } from "@/lib/events";
 import { noteText, noteWhenError } from "@/lib/notes";
 import { fromLocalInput, toLocalInput } from "@/lib/localtime";
-import { nameBoxWidth } from "@/lib/names";
 import PhotoPicker, { usePhotos } from "./Photos";
-import { Box, Field, input, inputFull, type LogBody, type Person } from "./LogForm";
-import WhenStep, { type WhenChoice } from "./WhenStep";
+import { Box, Field, WHO_WIDTH, input, inputFull, type LogBody, type Person } from "./LogForm";
+import WhenAsk, { classifyPick, type WhenAskHandle, type WhenChoice } from "./WhenPicker";
 
 type Props = {
   /** Set when correcting a note; the form opens on its values. */
@@ -34,7 +33,9 @@ type Props = {
 export default function NoteForm({ event, people, phonePerson, photoUrls, onPhotoUrl, onLog, onChange }: Props) {
   const editing = !!event;
   const openedAt = useRef(new Date().toISOString());
-  const [stepOpen, setStepOpen] = useState(false);
+  // Save asks the time with the phone's own picker (TEC-255); a save that failed after it was picked keeps it.
+  const whenAsk = useRef<WhenAskHandle>(null);
+  const [held, setHeld] = useState<WhenChoice | null>(null);
   const [personId, setPersonId] = useState(event ? event.person_id ?? "" : phonePerson ?? "");
   const [text, setText] = useState(event ? noteText(event) : "");
   const photos = usePhotos(event ? eventPhotos(event) : [], event ? eventNames(event) : {}, photoUrls, onPhotoUrl);
@@ -47,7 +48,7 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
   const photoBlock = photos.working || photos.failed;
   const left = NOTE_MAX - text.length;
 
-  /** Save: the note's own checks, then the When step (TEC-252). Nothing is saved here. */
+  /** Save: the note's own checks, then the phone's date-and-time picker (TEC-255). Nothing is saved here. */
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -59,20 +60,32 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
       setError("Write the note — it can't be empty.");
       return;
     }
-    setStepOpen(true);
+    if (held) {
+      void commit(held);
+      return;
+    }
+    whenAsk.current?.ask(editing ? toLocalInput(event?.at ?? "") : null);
   }
 
-  /** The step's choice. Now on a new note is the moment of this save; keep is a correction's own time, to the millisecond. */
+  /** What the picker returned. The same time handed back on a correction is kept to the millisecond. */
+  function picked(value: string) {
+    void commit(classifyPick(value, { dateOnly: false, stored: editing, initial: toLocalInput(event?.at ?? openedAt.current), now: new Date() }));
+  }
+
+  /** The time is known. Now on a new note is the moment of this save; keep is a correction's own time, to the millisecond. */
   async function commit(choice: WhenChoice) {
     setError(null);
+    setHeld(choice);
     const at =
       choice.kind === "at" ? fromLocalInput(choice.value) : choice.kind === "keep" && event ? event.at : new Date().toISOString();
     if (!at) {
+      setHeld(null);
       setError("pick a time");
       return;
     }
     const future = noteWhenError(new Date(at), new Date());
     if (future) {
+      setHeld(null);
       setError(future);
       return;
     }
@@ -84,7 +97,7 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
         ...(photos.paths.length ? { photos: photos.paths, ...(Object.keys(photos.names).length ? { names: photos.names } : {}) } : {}),
       });
     } catch (err) {
-      setStepOpen(false);
+      setHeld(null);
       setError(err instanceof InvalidEvent ? err.message : "check the form");
       return;
     }
@@ -112,7 +125,7 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2" noValidate>
+    <form onSubmit={submit} className="flex flex-col gap-1.5" noValidate>
       {/* The note, required, and its attachments. */}
       <Box section="entry" label="The note">
         <Field label="Note" htmlFor="n-text">
@@ -126,7 +139,7 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
             aria-required="true"
             placeholder="Write the note"
             data-autofocus={editing ? undefined : true}
-            className={`${inputFull} block resize-y leading-snug`}
+            className={`${inputFull} block resize-y leading-snug`} /* full width on purpose: it is the note itself (TEC-255) */
           />
         </Field>
         <p className={`text-right text-[12px] tabular-nums ${left <= 100 ? "font-semibold text-ink" : "text-ink-soft"}`} aria-live="polite">
@@ -137,14 +150,26 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
         </div>
       </Box>
 
-      {error && !stepOpen && (
-        <p role="alert" className="text-sm font-semibold text-danger">
-          {error}
-        </p>
+      {error && (
+        <div role="alert" className="flex flex-wrap items-center gap-x-2 text-sm font-semibold text-danger">
+          <span>{error}</span>
+          {held && (
+            <button
+              type="button"
+              onClick={() => {
+                setHeld(null);
+                setError(null);
+              }}
+              className="min-h-[44px] underline"
+            >
+              Pick another time
+            </button>
+          )}
+        </div>
       )}
 
       {/* The bottom row (TEC-252): Logging as, on one line beside Save, as on every form. */}
-      <div data-section="save" className="flex items-center gap-2">
+      <div data-section="save" className="relative flex items-center gap-2">
         <label htmlFor="n-who" className="shrink-0 text-[13px] text-ink-soft">
           as
         </label>
@@ -153,8 +178,7 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
           aria-label="Logging as"
           value={personId}
           onChange={(e) => setPersonId(e.target.value)}
-          className={`${input} h-[44px] shrink-0`}
-          style={{ width: nameBoxWidth(people.map((p) => p.display_name)) }}
+          className={`${input} h-[44px] shrink-0 ${WHO_WIDTH}`}
         >
           <option value="">Nobody</option>
           {people.map((p) => (
@@ -166,35 +190,25 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
         <button
           type="submit"
           disabled={busy || photoBlock}
-          className="min-h-[44px] min-w-0 flex-1 rounded-[14px] bg-[var(--tone-2-bg)] px-4 py-2.5 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)] disabled:opacity-60"
+          className="h-[44px] min-w-0 shrink-0 whitespace-nowrap rounded-[12px] bg-[var(--tone-2-bg)] px-4 text-[15px] font-bold text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)] disabled:opacity-60"
         >
-          {busy ? "Saving…" : photos.working ? "Uploading attachment…" : photos.failed ? "Fix the attachment to save" : editing ? "Save changes" : "Save note"}
+          {busy ? "Saving…" : photos.working ? "Uploading…" : photos.failed ? "Fix attachment" : held && error ? "Retry" : editing ? "Save changes" : "Save note"}
         </button>
-      </div>
-      {editing && (
-        <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] self-start font-semibold text-danger disabled:opacity-60">
-          {confirmDelete ? "Tap again to delete" : "Delete this note"}
-        </button>
-      )}
-      {stepOpen && (
-        <WhenStep
+        <WhenAsk
+          ref={whenAsk}
           dateOnly={false}
-          initial={toLocalInput(event?.at ?? openedAt.current)}
-          stored={editing}
-          editing={editing}
           allowFuture={false}
           check={(v) => {
             const at = fromLocalInput(v);
             return at ? noteWhenError(new Date(at), new Date()) : null;
           }}
-          busy={busy}
-          error={error}
-          onChoose={(c) => void commit(c)}
-          onBack={() => {
-            setStepOpen(false);
-            setError(null);
-          }}
+          onPick={picked}
         />
+      </div>
+      {editing && (
+        <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] self-start font-semibold text-danger disabled:opacity-60">
+          {confirmDelete ? "Tap again to delete" : "Delete this note"}
+        </button>
       )}
     </form>
   );
