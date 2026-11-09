@@ -30,6 +30,9 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 - On a form, Training's Related note shares a line with Treats; a vet visit's and a medication dose's
   Related issue and Related note sit side by side. The Meals pill shows the count only, never cups
   (TEC-252).
+- A Meal's and a Snuffle mat's amount is a Servings select in halves, ½ to 4, at a fixed width, and
+  is stored with unit `serving`; a treat keeps its own count, and older meals keep their cups (owner,
+  TEC-257).
 - Every form opens as a bottom sheet.
 - Installable through `/app.webmanifest`.
 
