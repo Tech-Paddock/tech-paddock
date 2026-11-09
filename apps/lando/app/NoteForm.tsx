@@ -3,10 +3,11 @@
 import { useRef, useState } from "react";
 import { InvalidEvent, NOTE_MAX, eventNames, eventPhotos, parseDetails, type Details, type JournalEvent } from "@/lib/events";
 import { noteText, noteWhenError } from "@/lib/notes";
-import { fromLocalInput, toLocalInput, whenLabel } from "@/lib/localtime";
+import { fromLocalInput, toLocalInput } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
 import PhotoPicker, { usePhotos } from "./Photos";
 import { Box, Field, input, inputFull, type LogBody, type Person } from "./LogForm";
+import WhenStep, { type WhenChoice } from "./WhenStep";
 
 type Props = {
   /** Set when correcting a note; the form opens on its values. */
@@ -33,8 +34,7 @@ type Props = {
 export default function NoteForm({ event, people, phonePerson, photoUrls, onPhotoUrl, onLog, onChange }: Props) {
   const editing = !!event;
   const openedAt = useRef(new Date().toISOString());
-  const [when, setWhen] = useState(toLocalInput(event?.at ?? openedAt.current));
-  const [whenTouched, setWhenTouched] = useState(false);
+  const [stepOpen, setStepOpen] = useState(false);
   const [personId, setPersonId] = useState(event ? event.person_id ?? "" : phonePerson ?? "");
   const [text, setText] = useState(event ? noteText(event) : "");
   const photos = usePhotos(event ? eventPhotos(event) : [], event ? eventNames(event) : {}, photoUrls, onPhotoUrl);
@@ -45,10 +45,10 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
   const saveId = useRef(crypto.randomUUID());
   const deleteId = useRef(crypto.randomUUID());
   const photoBlock = photos.working || photos.failed;
-  const nowDate = new Date();
   const left = NOTE_MAX - text.length;
 
-  async function submit(e: React.FormEvent) {
+  /** Save: the note's own checks, then the When step (TEC-252). Nothing is saved here. */
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (photoBlock) {
@@ -59,8 +59,14 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
       setError("Write the note — it can't be empty.");
       return;
     }
-    // An untouched When on a new note is the moment Save is pressed; an untouched correction keeps the note's own time.
-    const at = !whenTouched ? (event?.at ?? new Date().toISOString()) : fromLocalInput(when);
+    setStepOpen(true);
+  }
+
+  /** The step's choice. Now on a new note is the moment of this save; keep is a correction's own time, to the millisecond. */
+  async function commit(choice: WhenChoice) {
+    setError(null);
+    const at =
+      choice.kind === "at" ? fromLocalInput(choice.value) : choice.kind === "keep" && event ? event.at : new Date().toISOString();
     if (!at) {
       setError("pick a time");
       return;
@@ -78,6 +84,7 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
         ...(photos.paths.length ? { photos: photos.paths, ...(Object.keys(photos.names).length ? { names: photos.names } : {}) } : {}),
       });
     } catch (err) {
+      setStepOpen(false);
       setError(err instanceof InvalidEvent ? err.message : "check the form");
       return;
     }
@@ -106,54 +113,7 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-2" noValidate>
-      {/* Box 1: When and Logging as, as on every form; the When stops at now and there is no Repeat. */}
-      <Box section="when" label="When and who">
-        <div className="flex items-start gap-2">
-          <Field label="When" htmlFor="n-when">
-            <div className="relative h-[44px] min-w-0 rounded-[10px] border border-line bg-surface focus-within:border-accent">
-              <span aria-hidden="true" className="block truncate px-2 text-[15px] leading-[42px] tabular-nums">
-                {!editing && !whenTouched ? "Now" : whenLabel(when, new Date()) || "Pick a time"}
-              </span>
-              <input
-                id="n-when"
-                type="datetime-local"
-                value={when}
-                max={toLocalInput(nowDate.toISOString())}
-                onClick={(e) => {
-                  try {
-                    e.currentTarget.showPicker();
-                  } catch {
-                    // Not supported, or not from a tap: the native control still edits.
-                  }
-                }}
-                onChange={(e) => {
-                  setWhen(e.target.value);
-                  setWhenTouched(true);
-                }}
-                className="absolute inset-0 h-full w-full min-w-0 cursor-pointer opacity-0"
-              />
-            </div>
-          </Field>
-          <Field label="Logging as" htmlFor="n-who">
-            <select
-              id="n-who"
-              value={personId}
-              onChange={(e) => setPersonId(e.target.value)}
-              className={`${input} h-[44px]`}
-              style={{ width: nameBoxWidth(people.map((p) => p.display_name)) }}
-            >
-              <option value="">Nobody</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.display_name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-      </Box>
-
-      {/* Box 2: the note, required, and its attachments. */}
+      {/* The note, required, and its attachments. */}
       <Box section="entry" label="The note">
         <Field label="Note" htmlFor="n-text">
           <textarea
@@ -177,24 +137,64 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
         </div>
       </Box>
 
-      {error && (
+      {error && !stepOpen && (
         <p role="alert" className="text-sm font-semibold text-danger">
           {error}
         </p>
       )}
 
-      <button
-        type="submit"
-        data-section="save"
-        disabled={busy || photoBlock}
-        className="min-h-[44px] rounded-[14px] bg-[var(--tone-2-bg)] px-4 py-2.5 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)] disabled:opacity-60"
-      >
-        {busy ? "Saving…" : photos.working ? "Uploading attachment…" : photos.failed ? "Fix the attachment to save" : editing ? "Save changes" : "Save note"}
-      </button>
+      {/* The bottom row (TEC-252): Logging as, on one line beside Save, as on every form. */}
+      <div data-section="save" className="flex items-center gap-2">
+        <label htmlFor="n-who" className="shrink-0 text-[13px] text-ink-soft">
+          as
+        </label>
+        <select
+          id="n-who"
+          aria-label="Logging as"
+          value={personId}
+          onChange={(e) => setPersonId(e.target.value)}
+          className={`${input} h-[44px] shrink-0`}
+          style={{ width: nameBoxWidth(people.map((p) => p.display_name)) }}
+        >
+          <option value="">Nobody</option>
+          {people.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.display_name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          disabled={busy || photoBlock}
+          className="min-h-[44px] min-w-0 flex-1 rounded-[14px] bg-[var(--tone-2-bg)] px-4 py-2.5 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)] disabled:opacity-60"
+        >
+          {busy ? "Saving…" : photos.working ? "Uploading attachment…" : photos.failed ? "Fix the attachment to save" : editing ? "Save changes" : "Save note"}
+        </button>
+      </div>
       {editing && (
         <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] self-start font-semibold text-danger disabled:opacity-60">
           {confirmDelete ? "Tap again to delete" : "Delete this note"}
         </button>
+      )}
+      {stepOpen && (
+        <WhenStep
+          dateOnly={false}
+          initial={toLocalInput(event?.at ?? openedAt.current)}
+          stored={editing}
+          editing={editing}
+          allowFuture={false}
+          check={(v) => {
+            const at = fromLocalInput(v);
+            return at ? noteWhenError(new Date(at), new Date()) : null;
+          }}
+          busy={busy}
+          error={error}
+          onChoose={(c) => void commit(c)}
+          onBack={() => {
+            setStepOpen(false);
+            setError(null);
+          }}
+        />
       )}
     </form>
   );

@@ -63,14 +63,15 @@ import {
 import { FOOD_UNITS, MISC_ID, amountOptions, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
 import { MED_REASONS, MED_REASON_IDS, MED_ROUTES, MED_UNITS, NO_REASON, findMedication, medReasonLabel, type MedReason, medPicklist, type MedRoute, type MedUnit, type Medication } from "@/lib/medications";
 import { plannedWhen } from "@/lib/calendar";
-import { FUTURE_NOTICE, donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, type DonePrefill } from "@/lib/future";
+import { donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, type DonePrefill } from "@/lib/future";
 import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import AmountScroller from "./AmountScroller";
 import TreatQty from "./TreatQty";
 import TreatCount from "./TreatCount";
 import PhotoPicker, { usePhotos } from "./Photos";
-import { clockTime, dateLabel, fromDateInput, fromLocalInput, toDateInput, toLocalInput, whenLabel } from "@/lib/localtime";
+import WhenStep, { isFuturePick, type WhenChoice } from "./WhenStep";
+import { clockTime, fromDateInput, fromLocalInput, toDateInput, toLocalInput } from "@/lib/localtime";
 import { nameBoxWidth } from "@/lib/names";
 import { noteChoices, noteLink } from "@/lib/notes";
 
@@ -459,6 +460,8 @@ export default function LogForm({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The When step (TEC-252) is open over the form.
+  const [stepOpen, setStepOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Fixed when the form opens, so pressing Save again after a lost response
   // is the same row, never a second one.
@@ -656,15 +659,15 @@ export default function LogForm({
   }
 
   /** A future When: the form's words become an upcoming item, saved and awaited (its error stays here). */
-  async function submitFuture() {
+  async function submitFuture(whenV: string, dayV: string) {
     let item: UpcomingInput;
     try {
       const every = repeatOn ? Number(repeatEvery) : null;
       item = futureItem({
         form,
         healthType,
-        day: dateOnly ? day : when.slice(0, 10),
-        time: dateOnly ? null : when.slice(11, 16),
+        day: dateOnly ? dayV : whenV.slice(0, 10),
+        time: dateOnly ? null : whenV.slice(11, 16),
         note,
         repeatEvery: every,
         repeatUnit: repeatOn ? repeatUnit : null,
@@ -674,54 +677,88 @@ export default function LogForm({
         names: Object.keys(photos.names).length ? photos.names : undefined,
       });
     } catch (err) {
-      setError(err instanceof InvalidEvent ? err.message : "check the form");
+      failOnForm(err instanceof InvalidEvent ? err.message : "check the form");
       return;
     }
     setBusy(true);
     const { error } = await onUpcoming(item, plan?.id);
     setBusy(false);
+    // The step stays open on the same choice with the reason, so a retry does not ask again.
     if (error) setError(error);
   }
 
-  async function submit(e: React.FormEvent) {
+  /** A problem with the form itself: the When step closes and the form shows it. */
+  function failOnForm(message: string) {
+    setStepOpen(false);
+    setError(message);
+  }
+
+  /** Save: the form's own checks that don't depend on the time, then the When step (TEC-252). Nothing is saved here. */
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (futureWhen && editing) {
-      setError("A saved entry can't move to the future — delete it and log a new one for then.");
-      return;
-    }
     // Never saved around an attachment: it is uploaded, or the person removes it.
     if (photos.working || photos.failed) {
       setError(photos.failed ? "An attachment didn't upload — retry it, or remove it." : "An attachment is still uploading.");
       return;
     }
-    if (planning) {
-      await submitFuture();
+    // Save with "Add a medication" still open must not read as a save of the dose: the new medication is
+    // added first (or its problem is shown under that form), and Save is then pressed again for the dose.
+    if (kind === "health" && healthType === "medication" && addingMed) {
+      void addMedication(e);
+      return;
+    }
+    setStepOpen(true);
+  }
+
+  /** The When step's choice: the time is known, so the rest of Save runs as it always did (checks, then log or plan). */
+  async function commit(choice: WhenChoice) {
+    setError(null);
+    // The time chosen. Keep leaves what the form opened on (a correction's own time to the millisecond, a Done's);
+    // Now on a new entry is "untouched": the moment of this save; a picked time is touched.
+    let whenV = when;
+    let dayV = day;
+    let touched = whenTouched;
+    if (choice.kind === "now") {
+      const nowIso = new Date().toISOString();
+      whenV = toLocalInput(nowIso);
+      dayV = toDateInput(nowIso);
+      touched = editing || !!plan || !!prefillWhen;
+    } else if (choice.kind === "at") {
+      if (dateOnly) dayV = choice.value;
+      else whenV = choice.value;
+      touched = true;
+    }
+    setWhen(whenV);
+    setDay(dayV);
+    setWhenTouched(touched);
+    const futureNow =
+      touched && (dateOnly ? isFutureDay(dayV, toDateInput(new Date().toISOString())) : isFuturePick(whenV, false, new Date()));
+    if (futureNow && editing) {
+      setError("A saved entry can't move to the future — delete it and log a new one for then.");
+      return;
+    }
+    if (!!plan || (futureNow && !editing)) {
+      await submitFuture(whenV, dayV);
       return;
     }
     // Potty opens with nothing picked and will not save without a What (TEC-199).
     if (kind === "potty" && !what) {
-      setError("Pick what happened — pee, poop, both or no potty.");
+      failOnForm("Pick what happened — pee, poop, both or no potty.");
       return;
     }
     // The pick is the headline; the note is the story, and it is required for a vet visit or an issue (TEC-139).
     if (kind === "health" && healthType !== "medication" && !note.trim()) {
-      setError("Say what happened — the note is required.");
+      failOnForm("Say what happened — the note is required.");
       return;
     }
     if (kind === "health" && healthType === "medication") {
-      // Save with "Add a medication" still open must not read as a save of the dose: the new medication is
-      // added first (or its problem is shown under that form), and Save is then pressed again for the dose.
-      if (addingMed) {
-        await addMedication(e);
-        return;
-      }
       if (!medId) {
-        setError("Pick the medication.");
+        failOnForm("Pick the medication.");
         return;
       }
       if (!dose.trim()) {
-        setError("Say how much was given.");
+        failOnForm("Say how much was given.");
         return;
       }
     }
@@ -730,7 +767,7 @@ export default function LogForm({
     if (kind === "food" && foodType === "treat") {
       const bad = treatQtyError(amount, f ? f.amount : undefined);
       if (bad) {
-        setError(bad);
+        failOnForm(bad);
         return;
       }
     }
@@ -739,7 +776,7 @@ export default function LogForm({
       // The same check the server makes, so a mistake is caught before the sheet closes.
       details = parseDetails(kind, rawDetails(), foods, medications);
     } catch (err) {
-      setError(err instanceof InvalidEvent ? err.message : "check the form");
+      failOnForm(err instanceof InvalidEvent ? err.message : "check the form");
       return;
     }
     // An untouched "when" on a new entry means the moment Save was pressed.
@@ -747,12 +784,12 @@ export default function LogForm({
     // correction keeps the entry's own time to the millisecond (the input
     // holds minutes only), so the treats logged with a training still match it.
     const at = dateOnly
-      ? fromDateInput(!editing && !whenTouched ? toDateInput(new Date().toISOString()) : day)
-      : !whenTouched
+      ? fromDateInput(!editing && !touched ? toDateInput(new Date().toISOString()) : dayV)
+      : !touched
         ? (event?.at ?? new Date().toISOString())
-        : fromLocalInput(when);
+        : fromLocalInput(whenV);
     if (!at) {
-      setError("pick a time");
+      failOnForm("pick a time");
       return;
     }
     const body: LogBody = {
@@ -783,7 +820,7 @@ export default function LogForm({
         });
       }
     } catch (err) {
-      setError(err instanceof InvalidEvent ? err.message : "check the form");
+      failOnForm(err instanceof InvalidEvent ? err.message : "check the form");
       return;
     }
     if (!editing) {
@@ -823,7 +860,7 @@ export default function LogForm({
     </label>
   );
   const issueField = (
-    <Field label="Related issue" htmlFor="f-issue">
+    <Field label="Related issue" htmlFor="f-issue" className="min-w-0">
       <select id="f-issue" value={issue} onChange={(e) => setIssue(e.target.value)} className={inputFull}>
         <option value="">None</option>
         {issueOptions.map((o) => (
@@ -838,7 +875,7 @@ export default function LogForm({
   // The note link (TEC-208), on every Health type and on Training: None and the newest live notes, newest first,
   // by date and first words. The same plain select as Related issue.
   const noteField = (
-    <Field label="Related note" htmlFor="f-note-id">
+    <Field label="Related note" htmlFor="f-note-id" className="min-w-0 flex-1">
       <select id="f-note-id" value={noteId} onChange={(e) => setNoteId(e.target.value)} className={inputFull}>
         <option value="">None</option>
         {noteOptions.map((o) => (
@@ -910,104 +947,43 @@ export default function LogForm({
     </div>
   );
 
+  // The Repeat of a plan (TEC-199), shown in the When step whenever the time is in the future or an open plan is edited.
+  const repeatBlock = (
+    <div className="flex flex-wrap items-center gap-x-2">
+      <label className="flex min-h-[44px] items-center gap-2">
+        <input type="checkbox" checked={repeatOn} onChange={(e) => setRepeatOn(e.target.checked)} className="h-5 w-5 accent-accent" />
+        <span>Repeat</span>
+      </label>
+      {repeatOn && (
+        <>
+          <span className="text-ink-soft">every</span>
+          <input
+            aria-label="Repeat every"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={REPEAT_MAX}
+            value={repeatEvery}
+            onChange={(e) => setRepeatEvery(e.target.value)}
+            className={`${input} w-[64px]`}
+          />
+          <select aria-label="Repeat unit" value={repeatUnit} onChange={(e) => setRepeatUnit(e.target.value as RepeatUnit)} className={`${input} w-auto`}>
+            {REPEAT_UNITS.map((u) => (
+              <option key={u} value={u}>
+                {Number(repeatEvery) === 1 ? u : `${u}s`}
+              </option>
+            ))}
+          </select>
+        </>
+      )}
+    </div>
+  );
+
   const treatCount = <TreatCount value={treatQty} onChange={setTreatQty} />;
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-2" noValidate>
-      {/* Box 1: When and Logging as, on one line (TEC-199). When is as wide as its label ("Now", "Tue 8:00 AM"),
-          not half the row, and both boxes are the same 44px tall (TEC-202). */}
-      <Box section="when" label="When and who">
-        <div className="flex items-start gap-2">
-          <Field label="When" htmlFor="f-when">
-            {/* The native control is wider than half a phone and pushed into
-                Logging as, so a short label shows instead. The real input sits over
-                it, transparent: a tap opens the phone's own picker, and focus,
-                screen readers and keyboard editing still reach the input. */}
-            <div className="relative h-[44px] min-w-0 rounded-[10px] border border-line bg-surface focus-within:border-accent">
-              <span aria-hidden="true" className="block truncate px-2 text-[15px] leading-[42px] tabular-nums">
-                {dateOnly
-                  ? dateLabel(day, new Date()) || "Pick a date"
-                  : !editing && !whenTouched
-                    ? "Now"
-                    : whenLabel(when, new Date()) || "Pick a time"}
-              </span>
-              <input
-                id="f-when"
-                type={dateOnly ? "date" : "datetime-local"}
-                value={dateOnly ? day : when}
-                onClick={(e) => {
-                  try {
-                    e.currentTarget.showPicker();
-                  } catch {
-                    // Not supported, or not from a tap: the native control still edits.
-                  }
-                }}
-                onChange={(e) => {
-                  if (dateOnly) setDay(e.target.value);
-                  else setWhen(e.target.value);
-                  setWhenTouched(true);
-                }}
-                className="absolute inset-0 h-full w-full min-w-0 cursor-pointer opacity-0"
-              />
-            </div>
-          </Field>
-          <Field label="Logging as" htmlFor="f-who">
-            <select
-              id="f-who"
-              value={personId}
-              onChange={(e) => setPersonId(e.target.value)}
-              className={`${input} h-[44px]`}
-              style={{ width: nameBoxWidth(people.map((p) => p.display_name)) }}
-            >
-              <option value="">Nobody</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.display_name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-        {(futureWhen || plan) && (
-          <div className="grid gap-1">
-            <p role="status" className="text-[13px] font-semibold text-ink">
-              {editing ? "A saved entry can't move to the future." : plan && !futureWhen ? "Upcoming: Save updates it" : FUTURE_NOTICE}
-            </p>
-            {planning && (
-              <div className="flex flex-wrap items-center gap-x-2">
-                <label className="flex min-h-[44px] items-center gap-2">
-                  <input type="checkbox" checked={repeatOn} onChange={(e) => setRepeatOn(e.target.checked)} className="h-5 w-5 accent-accent" />
-                  <span>Repeat</span>
-                </label>
-                {repeatOn && (
-                  <>
-                    <span className="text-ink-soft">every</span>
-                    <input
-                      aria-label="Repeat every"
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={REPEAT_MAX}
-                      value={repeatEvery}
-                      onChange={(e) => setRepeatEvery(e.target.value)}
-                      className={`${input} w-[64px]`}
-                    />
-                    <select aria-label="Repeat unit" value={repeatUnit} onChange={(e) => setRepeatUnit(e.target.value as RepeatUnit)} className={`${input} w-auto`}>
-                      {REPEAT_UNITS.map((u) => (
-                        <option key={u} value={u}>
-                          {Number(repeatEvery) === 1 ? u : `${u}s`}
-                        </option>
-                      ))}
-                    </select>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </Box>
-
-      {/* Box 2: the entry. */}
+      {/* The entry: the first box now that the When is a step after Save (TEC-252). */}
       <Box section="entry" label="The entry">
         {kind === "potty" && (
           <>
@@ -1420,34 +1396,45 @@ export default function LogForm({
                 <Field label="Given">
                   <Seg name="route" label="Given" value={route} onChange={setRoute} options={MED_ROUTES} />
                 </Field>
-                {issueField}
               </>
             )}
           </>
         )}
       </Box>
 
-      {/* The secondary things (Box 3 in TEC-199, no box since TEC-250: a plain row under Box 2). Potty: the treats
+      {/* The secondary things (Box 3 in TEC-199, no box since TEC-250: a plain row under the entry). Potty: the treats
           count, a thin divider, then the medical issue checkbox, on one line.
-          Training and Fun: the treats count. Health (TEC-208): a vet visit's Related issue, then the Related note
-          on every Health type; Training has the Related note too. Not on a future entry, which keeps no
-          treats or links. */}
+          Training: the treats count, a thin divider, then Related note, on one line (TEC-252). Fun: the treats count.
+          Health (TEC-208, TEC-252): a vet visit and a medication dose show Related issue and Related note side by
+          side on one line, long names cut short; a medical issue shows Related note alone. Not on a future entry,
+          which keeps no treats or links. */}
       {!planning && (kind === "potty" || kind === "exercise" || kind === "health") && (
         <div data-section="secondary" className="grid gap-2">
           {(kind === "potty" || kind === "exercise") && (
-            <div className="flex flex-wrap items-center gap-x-3">
+            <div className={`flex items-end gap-x-3 ${kind === "potty" ? "flex-wrap" : ""}`}>
               {treatCount}
               {kind === "potty" && (
                 <>
-                  <span aria-hidden="true" className="h-[22px] w-px bg-line/60" />
+                  <span aria-hidden="true" className="mb-[11px] h-[22px] w-px self-end bg-line/60" />
                   {issueCheck("Medical issue")}
+                </>
+              )}
+              {kind === "exercise" && exType === "training" && (
+                <>
+                  <span aria-hidden="true" className="mb-[11px] h-[22px] w-px self-end bg-line/60" />
+                  {noteField}
                 </>
               )}
             </div>
           )}
           {kind === "potty" && issueSelect}
-          {kind === "health" && healthType === "vet" && issueField}
-          {(kind === "health" || (kind === "exercise" && exType === "training")) && noteField}
+          {kind === "health" && healthType !== "issue" && (
+            <div className="grid grid-cols-2 gap-2">
+              {issueField}
+              {noteField}
+            </div>
+          )}
+          {kind === "health" && healthType === "issue" && noteField}
           {sessionTreats.length > 0 && <LoggedTreats treats={sessionTreats} />}
           {/* Pee and Poop (TEC-186): a Fun form only, on a new entry. Each tap is its own potty entry,
               saved at once and independent of whether this Fun entry is. */}
@@ -1521,33 +1508,53 @@ export default function LogForm({
         <PhotoPicker photos={photos} />
       </div>
 
-      {error && (
+      {error && !stepOpen && (
         <p role="alert" className="text-sm font-semibold text-danger">
           {error}
         </p>
       )}
 
-      <button
-        type="submit"
-        data-section="save"
-        disabled={busy || photoBlock}
-        data-autofocus={kind === "weight" && !editing ? undefined : true}
-        className="min-h-[44px] rounded-[14px] bg-[var(--tone-2-bg)] px-4 py-2.5 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)] disabled:opacity-60"
-      >
-        {busy
-          ? "Saving…"
-          : photos.working
-            ? "Uploading attachment…"
-            : photos.failed
-              ? "Fix the attachment to save"
-              : plan
-                ? "Save changes"
-                : future
-                  ? "Save as upcoming"
-                  : editing
-                    ? "Save changes"
-                    : `Save ${title.toLowerCase()}`}
-      </button>
+      {/* The bottom row (TEC-252): Logging as, on one line beside Save, on every form. The When is the step Save opens. */}
+      <div data-section="save" className="flex items-center gap-2">
+        <label htmlFor="f-who" className="shrink-0 text-[13px] text-ink-soft">
+          as
+        </label>
+        <select
+          id="f-who"
+          aria-label="Logging as"
+          value={personId}
+          onChange={(e) => setPersonId(e.target.value)}
+          className={`${input} h-[44px] shrink-0`}
+          style={{ width: nameBoxWidth(people.map((p) => p.display_name)) }}
+        >
+          <option value="">Nobody</option>
+          {people.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.display_name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          disabled={busy || photoBlock}
+          data-autofocus={kind === "weight" && !editing ? undefined : true}
+          className="min-h-[44px] min-w-0 flex-1 rounded-[14px] bg-[var(--tone-2-bg)] px-4 py-2.5 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)] disabled:opacity-60"
+        >
+          {busy
+            ? "Saving…"
+            : photos.working
+              ? "Uploading attachment…"
+              : photos.failed
+                ? "Fix the attachment to save"
+                : plan
+                  ? "Save changes"
+                  : future
+                    ? "Save as upcoming"
+                    : editing
+                      ? "Save changes"
+                      : `Save ${title.toLowerCase()}`}
+        </button>
+      </div>
       {editing ? (
         <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] self-start font-semibold text-danger disabled:opacity-60">
           {confirmDelete ? "Tap again to delete" : "Delete this entry"}
@@ -1555,6 +1562,28 @@ export default function LogForm({
       ) : (
         /* Potty has no defaults to explain (nothing is preselected) and drops the helper text (TEC-199). */
         kind !== "potty" && <p className="text-[13px] text-ink-soft">Defaults are filled in. Change only what&apos;s different.</p>
+      )}
+      {stepOpen && (
+        <WhenStep
+          dateOnly={dateOnly}
+          initial={dateOnly ? day : when}
+          stored={editing || whenTouched}
+          editing={editing}
+          planning={!!plan}
+          check={(v) =>
+            editing && (dateOnly ? isFutureDay(v, toDateInput(new Date().toISOString())) : isFuturePick(v, false, new Date()))
+              ? "A saved entry can't move to the future."
+              : null
+          }
+          repeat={repeatBlock}
+          busy={busy}
+          error={error}
+          onChoose={(c) => void commit(c)}
+          onBack={() => {
+            setStepOpen(false);
+            setError(null);
+          }}
+        />
       )}
     </form>
   );

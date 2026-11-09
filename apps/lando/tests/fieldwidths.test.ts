@@ -83,11 +83,11 @@ describe("field widths (TEC-202)", () => {
     expect(SRC).not.toMatch(/\$\{inputFull\} w-/);
   });
 
-  it("When is as wide as its label and as tall as Logging as, in one flex row (Box 1)", () => {
+  it("Logging as is 44px tall in the bottom row beside Save, in one flex row (TEC-252)", () => {
     const html = render("potty");
-    const row = html.slice(html.indexOf('data-section="when"'));
-    expect(row).toContain('class="flex items-start gap-2"');
+    const row = html.slice(html.indexOf('data-section="save"'));
+    expect(row).toContain('class="flex items-center gap-2"');
     expect(classes(html, "f-who")).toContain("h-[44px]");
-    expect(html).toMatch(/class="relative h-\[44px\][^"]*"/);
+    expect(html).not.toContain('id="f-when"');
   });
 });

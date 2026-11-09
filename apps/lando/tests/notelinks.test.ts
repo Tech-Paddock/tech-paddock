@@ -162,7 +162,7 @@ describe("the Related note select", () => {
     const box = html.slice(html.indexOf('data-section="secondary"'), html.indexOf('data-section="note"'));
     expect(box.indexOf("Related issue")).toBeGreaterThan(-1);
     expect(box.indexOf("Related issue")).toBeLessThan(box.indexOf("Related note"));
-    expect([...html.matchAll(/data-section="([a-z]+)"/g)].map((m) => m[1])).toEqual(["when", "entry", "secondary", "note", "photos", "save"]);
+    expect([...html.matchAll(/data-section="([a-z]+)"/g)].map((m) => m[1])).toEqual(["entry", "secondary", "note", "photos", "save"]);
   });
 
   it("opens a correction on the stored pick, and a voided note stays picked in words", () => {

@@ -25,7 +25,7 @@ export const DAYS_SHOWN = 7;
  * once written, is not rewritten.
  */
 export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
-  "2026-11-08": "Adding a medication works, a medication now carries a reason, and there is a Calendar.",
+  "2026-11-08": "Adding a medication works, a medication now carries a reason, there is a Calendar, and saving now asks when.",
   "2026-11-02": "The top boxes open a quick entry again, the form boxes line up, and a Health or Training entry can point to a note.",
   "2026-11-01": "Tidier forms, one Potty button, a Medication tab, and plans for the days ahead.",
   "2026-10-30": "A snuffle mat counts as half a meal.",
@@ -38,6 +38,7 @@ export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
 };
 
 export const RELEASES: readonly Release[] = [
+  { date: "2026-11-08", text: "Saving now asks when. The When box is gone from the top of every form: press Save and a short step opens with a big Now button, or pick another date and time and Save it there. A time in the future still saves as an upcoming plan, and the step says so. A correction opens the step on the entry's own time, and Back to the form closes it. Logging as moves to the bottom, beside Save, on every form. The Meals box now reads just Meals: 2, with no cups. On Training, Related note sits beside Treats on one line, and on a vet visit or a medication dose, Related issue and Related note sit side by side." },
   { date: "2026-11-08", text: "The Log is quieter. Next 7 days is now one short line per plan, with its name, when it is due (red if it is late) and a small Done, and a Calendar link beside the heading; tap a plan to change it. On Potty, Training and Fun, Treats is a plain minus, number and plus with no boxes, and on Potty Medical issue is its own tick box beside it, with Related issue opening under it as before. Attaching is smaller everywhere, on every form, plan and note: tap the small Attach link to take a photo or choose files, see them as small thumbnails, and tap one to open or remove it." },
   { date: "2026-11-08", text: "There is a new Calendar tab after Log. It shows a month that you can swipe or step with the arrows, with today marked. Under each day, a filled dot is something you logged and a ring is something planned, in the same colours as the feed. Tap a day to see its plans and what was logged: a plan can be marked Done or changed, and a logged entry opens to correct or delete. On today or any later day, Add a plan asks what kind and opens that form on the day you picked. Notes never show in the Calendar." },
   { date: "2026-11-08", text: "A medication now has a reason: Heartworm, Flea & tick, Dewormer, Allergy, Pain, Antibiotic, Joint or Other. Pick one when you add a medication. Medications you added before show No reason until you set one on the Medication tab, and a reason can be set once. Every dose in the Log shows its medication's reason, and Analytics has a new Medication by reason card." },

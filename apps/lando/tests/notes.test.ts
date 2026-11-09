@@ -288,9 +288,9 @@ describe("the Note form", () => {
   const props = { people, phonePerson: ID, photoUrls: {}, onPhotoUrl: noop, onLog: noop, onChange: async () => ({ error: null }) };
   const html = renderToStaticMarkup(createElement(NoteForm, props));
 
-  it("has Box 1 When and Logging as, then Box 2 the note and the attachments, then Save", () => {
+  it("has the note and the attachments, then the bottom row with Logging as and Save (the When is a step)", () => {
     const sections = [...html.matchAll(/data-section="([a-z]+)"/g)].map((m) => m[1]);
-    expect(sections).toEqual(["when", "entry", "photos", "save"]);
+    expect(sections).toEqual(["entry", "photos", "save"]);
     expect(html).toContain("Logging as");
     expect(html).toContain("Attachments");
     // TEC-250: one small Attach link; the camera is offered once it is tapped.
@@ -308,7 +308,9 @@ describe("the Note form", () => {
   it("has no Repeat and no future When", () => {
     expect(html).not.toContain("Repeat");
     expect(html).not.toContain("Future");
-    expect(html).toMatch(/<input[^>]*type="datetime-local"[^>]*max="\d{4}-\d{2}-\d{2}T\d{2}:\d{2}"/);
+    // The When step stops at now (`allowFuture={false}`): the field's max, and the form refuses a future time.
+    expect(readFileSync(resolve(__dirname, "../app/NoteForm.tsx"), "utf8")).toContain("allowFuture={false}");
+    expect(readFileSync(resolve(__dirname, "../app/WhenStep.tsx"), "utf8")).toContain("max={allowFuture ? undefined");
   });
 
   it("opens a correction on the note's own words, with a way to delete it", () => {

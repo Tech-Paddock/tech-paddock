@@ -800,11 +800,9 @@ export function mealsSummary(events: JournalEvent[], now: Date): { count: number
   return { count, cups };
 }
 
-/** The Meal pill's face: "Meals: 2 · 1⅛ cups", or "Meals: 2" when no cup amount was logged. */
+/** The Meal pill's face: "Meals: 2". The cups eaten are not on it any more (TEC-252); `mealsSummary` still sums them. */
 export function mealPillLabel(events: JournalEvent[], now: Date): string {
-  const { count, cups } = mealsSummary(events, now);
-  const n = formatMealCount(count);
-  return cups === null ? `Meals: ${n}` : `Meals: ${n} · ${formatCups(cups)} ${cupsWord(cups)}`;
+  return `Meals: ${formatMealCount(mealsSummary(events, now).count)}`;
 }
 
 /**
