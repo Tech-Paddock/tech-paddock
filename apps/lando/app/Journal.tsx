@@ -416,8 +416,8 @@ export default function Journal() {
   /** The Medication tab's "Add a medication…": saved to `lando.medications`, then merged into the loaded list without a reload. */
   async function addMedication(input: { name: string; unit: MedUnit; reason: MedReason }): Promise<{ medication: Medication | null; error: string | null }> {
     try {
-      const { ok, data } = await postJson("/api/medications", input);
-      if (!ok) return { medication: null, error: data.error ?? "couldn't add" };
+      const { ok, status, data } = await postJson("/api/medications", input);
+      if (!ok) return { medication: null, error: data.error ?? `couldn't add (the server answered ${status})` };
       const medication = data.medication as Medication | undefined;
       if (!medication?.id) return { medication: null, error: "couldn't add: the server sent no medication" };
       // Kept apart too, so a journal read that started before the add and ends after it cannot drop it from the list.
