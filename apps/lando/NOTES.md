@@ -58,8 +58,44 @@
     weights only. (2) `/api/upcoming` returns open plans only, so a plan marked done leaves the Calendar (its entry shows on the day it was
     logged) and a repeating plan shows only its next date. (3) A new reader of `loaded.events` must still read `entries`, not events, or a
     note leaks in. (4) The tab row is five columns at 13px; a sixth tab will not fit.
+- **Save opens the phone's own picker; compact forms with one field class** (TEC-255, the owner: "Clicking save … should popup the same calander
+  date time window as before. NOW goes away.", "all field boxes should be fixed size not dynamic", "Never make fields full with unless there is a
+  specific reason. Default max is 1/2 width of section."). Local patterns, no data change and no migration. **It replaces the When step below:
+  `WhenStep.tsx`, its Now, its "Keep" and "Use" buttons and "Back to the form" are gone; the TEC-252 bullet's bottom row and Related fields still
+  hold.**
+  * **The picker** (`app/WhenPicker.tsx`, `tests/whenstep.test.ts`): Save on `LogForm` and `NoteForm` runs the checks that do not depend on the time (an
+    attachment still uploading; an open "Add a medication…" is added first) and calls `WhenAsk`'s `ask()`, which sets a hidden `datetime-local` (Weight:
+    `date`) and calls `showPicker()` from the tap. **Confirming it (its `change`) saves.** A new entry opens it on an empty field, which a phone fills
+    with now, because a field already holding now reports no change when confirmed as it is and the tap would be lost. A picked minute equal to this
+    minute is "now" (the moment of the save, `classifyPick`), a stored time handed back is "keep" (to the millisecond), anything else is "at". A future
+    time still makes a plan; a correction cannot move to the future (the error shows on the form); a note cannot (`max`, `noteWhenError`).
+  * **A stored time** (a correction, a Done, an open plan, the Calendar's Add a plan with `planDay`) is preset, and a phone reports no `change` when it
+    is confirmed unchanged, so the same small "When?" sheet opens **beside** the picker for those (`Sheet` with `moveFocus={false}`, or the picker closes)
+    with the same field and **Use this time**. A new pick closes it and saves. If `showPicker` is missing or throws, the sheet opens alone (**Save**).
+    **Not seen on a phone:** whether `change` fires on Done on iOS for an empty field, and whether the sheet beside the picker stays quiet on both
+    phones, were not tried; jsdom has no picker (tests stub `showPicker`).
+  * **A failed save keeps the pick** (`held`): a plan or a correction that the server refuses shows the reason on the form, **Save reads Retry** and
+    does not reopen the picker, and "Pick another time" lets go of it. A mistake in the form itself (Potty's What, a vet visit's note) drops the pick,
+    so Save asks again. A new entry saves through `onLog` and the sheet closes, with Retry on its pending row as ever.
+  * **Repeat** (owner: "Add Repeat to forms") shows on the form while it is a plan (`data-section="plan"`: an open plan being edited, or a form opened
+    on a future time), with the "Future: saves as upcoming" line. **A future time picked from Save on a new entry does not save at once:** a small
+    nested "Repeat?" sheet (`repeatStep`, the same `Sheet` as the stored-time one) shows the form's own `repeatBlock`, and **Save as upcoming** there
+    saves the plan; Back to the form saves nothing and Save asks the time again. A past time or now saves at once, with no step. The form's own plan
+    block hides while the step is open, so there is one Repeat control at a time.
+  * **One field class** (`input` in `LogForm.tsx`): every text box, number box and select is `min-h-[44px] px-2.5 py-1.5`; the Log tab's Logging as and
+    its add-a-person box use it too. It carries no width (TEC-202's trap holds). **Widths are fixed, never from content:** `inputHalf` (half the
+    section, the default), `inputFull` (fills a column that is already sized: a half column or a grid cell), `w-[64px]`, `w-[76px]`, `w-[88px]`,
+    `w-[96px]` for small values, `WHO_WIDTH` (`w-[140px]`) for a person. `nameBoxWidth` and `lib/names.ts` are deleted; there is no `w-auto` or
+    `flex-1` on a field (`tests/fieldwidths.test.ts` holds both). **The Note is the one full-width field, on purpose (free text);** a new full-width
+    field says why where it is used.
+  * **The bottom row**: Who is `WHO_WIDTH`, Save is 44px tall, `shrink-0` and only as wide as its label, so it never stretches. Its busy labels are short
+    ("Uploading…", "Fix attachment"). **Potty's What and Where sit side by side**, a half each (What's chips wrap at half width), Leash or Spot on the
+    line under; the Food What, the Health Why and Medication picks, the Add-a-food and Add-a-medication names and Training's and a vet visit's Related
+    note are half. "Defaults are filled in…" is gone from every form.
+  * **Tighter**: the sheet, form and box gaps are a step smaller (`Sheet` `gap-2`, form `gap-1.5`, `Box` `gap-1 p-1.5`, the secondary row `gap-1`).
+  * **Next 7 days moved**: under the Logging as row (and its error), above the Feed, no longer above the Log buttons; its markup is unchanged.
 - **When is a step after Save** (TEC-252, the owner: "drop the when option. Saving prompts the date screen. Move logged as to bottom next to log
-  button. All screens."). Two **local patterns**, no data change and no migration. **Every older bullet that says "Box 1", a When field, "When and
+  button. All screens."). Two **local patterns**, no data change and no migration. **Superseded by TEC-255 above: the step itself. Every older bullet that says "Box 1", a When field, "When and
   Logging as" on a form, the "Future: saves as upcoming" line under the When, or the When's "Now" label describes what this replaced.**
   * **The When step** (`app/WhenStep.tsx`, `tests/whenstep.test.ts`): Save on `LogForm` and `NoteForm` runs only the checks that do not depend on the
     time (an attachment still uploading; for a medication, an open "Add a medication…" is added first) and opens the step, a `Sheet` with `nested`

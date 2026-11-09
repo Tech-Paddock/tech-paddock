@@ -58,7 +58,6 @@ import { saveThenClose, type Upcoming, type UpcomingInput } from "@/lib/upcoming
 import { allUpcoming, donePrefill, formForItem, nextWeek } from "@/lib/future";
 import type { MedReason, MedUnit, Medication } from "@/lib/medications";
 import { isMealType, type AddedFood, type FoodUnit, type ListType } from "@/lib/foods";
-import { nameBoxWidth } from "@/lib/names";
 import { saveThen } from "@/lib/saveOrder";
 import { liveNotes, withoutNotes } from "@/lib/notes";
 import Analytics from "./Analytics";
@@ -67,7 +66,7 @@ import NoteForm from "./NoteForm";
 import WhatsNew from "./WhatsNew";
 import Calendar from "./Calendar";
 import UpcomingList from "./UpcomingList";
-import LogForm, { type LogBody, type Person } from "./LogForm";
+import LogForm, { WHO_WIDTH, input, type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
 
 type Loaded = { events: JournalEvent[]; people: Person[]; dogs: Dog[]; foods: AddedFood[]; medications: Medication[] };
@@ -778,21 +777,6 @@ export default function Journal() {
             })}
           </section>
 
-          {/* Next 7 days (TEC-199, compact since TEC-250): open items due in the coming week, overdue too, soonest
-              first, one short line each with a small Done, and a Calendar link in the heading. Absent when nothing
-              is due; the feed's Upcoming filter has the rest. */}
-          {week.length > 0 && (
-            <section aria-label="Next 7 days" className="-mt-2 grid gap-0.5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Next 7 days</h2>
-                <button type="button" onClick={() => showTab("calendar")} className="min-h-[44px] px-1 text-[13px] font-semibold text-accent underline underline-offset-2">
-                  Calendar
-                </button>
-              </div>
-              <UpcomingList compact items={week} today={today} onDone={doneUpcoming} onEdit={editUpcoming} />
-            </section>
-          )}
-
           {/* Four buttons in one row, the pills' size and grid, directly under them (TEC-188, back in TEC-202):
               Treats, Training, Weight, Health. Potty, Food and Fun are reached through the pills (and Fun's own
               Pee and Poop). Treats opens Food on a treat; the meal/treat choice stays in the form. The Weight
@@ -849,7 +833,7 @@ export default function Journal() {
                   onChange={(e) => setNewName(e.target.value)}
                   maxLength={40}
                   placeholder="Name"
-                  className="min-w-0 flex-1 rounded-[10px] border border-line bg-surface px-2.5 py-2 outline-none focus:border-accent"
+                  className={`${input} w-1/2`}
                 />
                 <button type="submit" className="rounded-[10px] bg-accent px-3 py-2 font-medium text-accent-ink">
                   Add
@@ -863,8 +847,7 @@ export default function Journal() {
                 id="who"
                 value={person?.id ?? ""}
                 onChange={(e) => (e.target.value === "__add" ? setAdding(true) : choosePerson(e.target.value || null))}
-                className="min-w-0 rounded-[10px] border border-line bg-surface px-2.5 py-2"
-                style={{ width: nameBoxWidth(people.map((p) => p.display_name)) }}
+                className={`${input} ${WHO_WIDTH}`}
               >
                 <option value="">{loaded ? "Who?" : "…"}</option>
                 {people.map((p) => (
@@ -877,6 +860,21 @@ export default function Journal() {
             )}
           </section>
           {personError && !askWho && <p className="-mt-3 text-sm text-urgent">{personError}</p>}
+
+          {/* Next 7 days (TEC-199, compact since TEC-250, below Logging as and above the Feed since TEC-255): open items due in the coming week, overdue too, soonest
+              first, one short line each with a small Done, and a Calendar link in the heading. Absent when nothing
+              is due; the feed's Upcoming filter has the rest. */}
+          {week.length > 0 && (
+            <section aria-label="Next 7 days" className="-mt-2 grid gap-0.5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Next 7 days</h2>
+                <button type="button" onClick={() => showTab("calendar")} className="min-h-[44px] px-1 text-[13px] font-semibold text-accent underline underline-offset-2">
+                  Calendar
+                </button>
+              </div>
+              <UpcomingList compact items={week} today={today} onDone={doneUpcoming} onEdit={editUpcoming} />
+            </section>
+          )}
 
           {/* The feed: every loaded day, newest first, by when it happened (TEC-136) */}
           <section aria-label="Feed">

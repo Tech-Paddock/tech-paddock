@@ -308,9 +308,9 @@ describe("the Note form", () => {
   it("has no Repeat and no future When", () => {
     expect(html).not.toContain("Repeat");
     expect(html).not.toContain("Future");
-    // The When step stops at now (`allowFuture={false}`): the field's max, and the form refuses a future time.
+    // The picker stops at now (`allowFuture={false}`): the field's max, and the form refuses a future time.
     expect(readFileSync(resolve(__dirname, "../app/NoteForm.tsx"), "utf8")).toContain("allowFuture={false}");
-    expect(readFileSync(resolve(__dirname, "../app/WhenStep.tsx"), "utf8")).toContain("max={allowFuture ? undefined");
+    expect(readFileSync(resolve(__dirname, "../app/WhenPicker.tsx"), "utf8")).toContain("max={allowFuture ? undefined");
   });
 
   it("opens a correction on the note's own words, with a way to delete it", () => {

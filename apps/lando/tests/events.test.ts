@@ -20,7 +20,6 @@ import {
   dogsPickFor,
   type JournalEvent,
 } from "@/lib/events";
-import { nameBoxWidth } from "@/lib/names";
 
 // Invented ids. Nothing here is a real person or a real dog's record.
 let n = 0;
@@ -475,14 +474,5 @@ describe("Other dogs — one pick (TEC-129)", () => {
     const { pick, kept } = dogsPickFor({ with_dogs: true, dogs: [GONE] }, [A, B]);
     expect(pick).toBe(DOGS_KEPT);
     expect(kept).toEqual([GONE]);
-  });
-});
-
-describe("nameBoxWidth — a person box fits a name", () => {
-  it("is the longest name plus one, between the floor and the cap, plus padding and arrow", () => {
-    expect(nameBoxWidth(["Al", "Bea"])).toBe("calc(7ch + 2.75rem)");
-    expect(nameBoxWidth(["Alexandra"])).toBe("calc(10ch + 2.75rem)");
-    expect(nameBoxWidth(["x".repeat(40)])).toBe("calc(15ch + 2.75rem)");
-    expect(nameBoxWidth([])).toBe("calc(7ch + 2.75rem)");
   });
 });

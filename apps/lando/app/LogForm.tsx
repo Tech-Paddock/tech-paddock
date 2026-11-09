@@ -63,16 +63,16 @@ import {
 import { FOOD_UNITS, MISC_ID, amountOptions, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
 import { MED_REASONS, MED_REASON_IDS, MED_ROUTES, MED_UNITS, NO_REASON, findMedication, medReasonLabel, type MedReason, medPicklist, type MedRoute, type MedUnit, type Medication } from "@/lib/medications";
 import { plannedWhen } from "@/lib/calendar";
-import { donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, type DonePrefill } from "@/lib/future";
+import { FUTURE_NOTICE, donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, type DonePrefill } from "@/lib/future";
 import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import AmountScroller from "./AmountScroller";
 import TreatQty from "./TreatQty";
 import TreatCount from "./TreatCount";
 import PhotoPicker, { usePhotos } from "./Photos";
-import WhenStep, { isFuturePick, type WhenChoice } from "./WhenStep";
+import Sheet from "./Sheet";
+import WhenAsk, { classifyPick, isFuturePick, type WhenAskHandle, type WhenChoice } from "./WhenPicker";
 import { clockTime, fromDateInput, fromLocalInput, toDateInput, toLocalInput } from "@/lib/localtime";
-import { nameBoxWidth } from "@/lib/names";
 import { noteChoices, noteLink } from "@/lib/notes";
 
 export type Person = { id: string; display_name: string };
@@ -225,7 +225,7 @@ function Seg<T extends string>({
  */
 export function Box({ section, label, children }: { section: string; label: string; children: React.ReactNode }) {
   return (
-    <section data-section={section} aria-label={label} className="grid gap-1.5 rounded-xl border border-line bg-paper p-2">
+    <section data-section={section} aria-label={label} className="grid gap-1 rounded-xl border border-line bg-paper p-1.5">
       {children}
     </section>
   );
@@ -237,14 +237,24 @@ const FOOD_ADD = "__add";
 const MED_ADD = "__add_med";
 
 /**
- * A field box: narrow padding, 44px tall. It carries no width (TEC-202): Tailwind writes `w-full` after
- * `w-[64px]` and `w-auto`, so a width here would beat every narrow field. Each field names its own width:
- * `inputFull` where it fills its column, `w-[..]` or the content's own width elsewhere.
+ * The one field class (TEC-255): every text box, number box and select in the app has this padding and this
+ * height (`px-2.5`, 44px), so no two fields differ by a few pixels. It carries no width (TEC-202): Tailwind writes
+ * `w-full` after `w-[64px]` and `w-auto`, so a width here would beat every narrow field. A field never sizes
+ * itself from its content or its options: it names a width, and the default is half its section (`inputHalf`).
+ * `inputFull` is for a field that fills a column which is already sized (a half column, a grid cell), and for the
+ * rare field with a reason to be wide, which says why where it is used (the Note: free text).
  */
 export const input =
-  "min-w-0 min-h-[44px] rounded-[10px] border border-line bg-surface px-2 py-1.5 text-[15px] outline-none focus:border-accent";
+  "min-w-0 min-h-[44px] rounded-[10px] border border-line bg-surface px-2.5 py-1.5 text-[15px] outline-none focus:border-accent";
 
+/** Fills its column (a half column, a grid cell). */
 export const inputFull = `${input} w-full`;
+
+/** The default: half the section's width. */
+export const inputHalf = `${input} w-1/2`;
+
+/** Who in the bottom row, and Logging as on the Log tab: one fixed width, wide enough for a name. */
+export const WHO_WIDTH = "w-[140px]";
 
 const WHERE_OPTS = [
   ["outside", "Outside"],
@@ -465,8 +475,11 @@ export default function LogForm({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The When step (TEC-252) is open over the form.
-  const [stepOpen, setStepOpen] = useState(false);
+  // The time Save asked for (TEC-255). A save that failed after it was picked keeps it, so Retry does not ask again.
+  const whenAsk = useRef<WhenAskHandle>(null);
+  const [held, setHeld] = useState<WhenChoice | null>(null);
+  // A future time picked on a new entry waits here for its Repeat (TEC-255): nothing is saved until it is confirmed.
+  const [repeatStep, setRepeatStep] = useState<WhenChoice | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Fixed when the form opens, so pressing Save again after a lost response
   // is the same row, never a second one.
@@ -486,6 +499,9 @@ export default function LogForm({
   const future = futureWhen && !editing;
   // Saves an upcoming item: a future When on a new entry, or an open item being edited.
   const planning = !!plan || future;
+  // The form opened on a time of its own (a correction, a Done, an open plan, the Calendar's Add a plan): the picker
+  // opens on it, and handing it back keeps it exactly.
+  const openedOnTime = editing || whenTouched;
 
   function pickFoodType(t: FoodType) {
     setFoodType(t);
@@ -692,13 +708,17 @@ export default function LogForm({
     if (error) setError(error);
   }
 
-  /** A problem with the form itself: the When step closes and the form shows it. */
+  /** A problem with the form itself: shown on the form, and the time picked for it is dropped (Save asks again). */
   function failOnForm(message: string) {
-    setStepOpen(false);
+    setHeld(null);
     setError(message);
   }
 
-  /** Save: the form's own checks that don't depend on the time, then the When step (TEC-252). Nothing is saved here. */
+  /**
+   * Save: the form's own checks that don't depend on the time, then the phone's date-and-time picker (TEC-255),
+   * which opens on now (a date on Weight), or on the time the form opened on. Confirming it saves. Nothing is
+   * saved here. After a failed save the picked time is kept and Save is Retry: it does not ask again.
+   */
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -713,12 +733,22 @@ export default function LogForm({
       void addMedication(e);
       return;
     }
-    setStepOpen(true);
+    if (held) {
+      void commit(held);
+      return;
+    }
+    whenAsk.current?.ask(openedOnTime ? (dateOnly ? day : when) : null);
   }
 
-  /** The When step's choice: the time is known, so the rest of Save runs as it always did (checks, then log or plan). */
-  async function commit(choice: WhenChoice) {
+  /** What the picker returned: the time is known, so the rest of Save runs as it always did (checks, then log or plan). */
+  function picked(value: string) {
+    void commit(classifyPick(value, { dateOnly, stored: openedOnTime, initial: dateOnly ? day : when, now: new Date() }));
+  }
+
+  /** The time is known: the rest of Save runs as it always did (checks, then log or plan). */
+  async function commit(choice: WhenChoice, repeatAsked = false) {
     setError(null);
+    setHeld(choice);
     // The time chosen. Keep leaves what the form opened on (a correction's own time to the millisecond, a Done's);
     // Now on a new entry is "untouched": the moment of this save; a picked time is touched.
     let whenV = when;
@@ -734,13 +764,19 @@ export default function LogForm({
       else whenV = choice.value;
       touched = true;
     }
+    const futureNow =
+      touched && (dateOnly ? isFutureDay(dayV, toDateInput(new Date().toISOString())) : isFuturePick(whenV, false, new Date()));
+    // A future time on a new entry (not an open plan, and not a form already opened as one, which shows its Repeat)
+    // is a plan: its Repeat is asked in a small step first, and nothing is saved until it is confirmed.
+    if (futureNow && !editing && !plan && !planning && !repeatAsked) {
+      setRepeatStep(choice);
+      return;
+    }
     setWhen(whenV);
     setDay(dayV);
     setWhenTouched(touched);
-    const futureNow =
-      touched && (dateOnly ? isFutureDay(dayV, toDateInput(new Date().toISOString())) : isFuturePick(whenV, false, new Date()));
     if (futureNow && editing) {
-      setError("A saved entry can't move to the future — delete it and log a new one for then.");
+      failOnForm("A saved entry can't move to the future — delete it and log a new one for then.");
       return;
     }
     if (!!plan || (futureNow && !editing)) {
@@ -880,7 +916,7 @@ export default function LogForm({
   // The note link (TEC-208), on every Health type and on Training: None and the newest live notes, newest first,
   // by date and first words. The same plain select as Related issue.
   const noteField = (
-    <Field label="Related note" htmlFor="f-note-id" className="min-w-0 flex-1">
+    <Field label="Related note" htmlFor="f-note-id" className="min-w-0">
       <select id="f-note-id" value={noteId} onChange={(e) => setNoteId(e.target.value)} className={inputFull}>
         <option value="">None</option>
         {noteOptions.map((o) => (
@@ -934,7 +970,7 @@ export default function LogForm({
         }}
         maxLength={40}
         placeholder="Dog's name"
-        className={`${input} flex-1`}
+        className={`${input} w-1/2`}
       />
       <button type="button" onClick={(e) => void addDog(e)} disabled={dogBusy} className="min-h-[44px] rounded-[10px] bg-accent px-3 font-medium text-accent-ink disabled:opacity-60">
         {dogBusy ? "Adding…" : "Add"}
@@ -952,7 +988,7 @@ export default function LogForm({
     </div>
   );
 
-  // The Repeat of a plan (TEC-199), shown in the When step whenever the time is in the future or an open plan is edited.
+  // The Repeat of a plan (TEC-199), shown on the form while it is a plan: an open plan being edited, or a form opened on a future time.
   const repeatBlock = (
     <div className="flex flex-wrap items-center gap-x-2">
       <label className="flex min-h-[44px] items-center gap-2">
@@ -972,7 +1008,7 @@ export default function LogForm({
             onChange={(e) => setRepeatEvery(e.target.value)}
             className={`${input} w-[64px]`}
           />
-          <select aria-label="Repeat unit" value={repeatUnit} onChange={(e) => setRepeatUnit(e.target.value as RepeatUnit)} className={`${input} w-auto`}>
+          <select aria-label="Repeat unit" value={repeatUnit} onChange={(e) => setRepeatUnit(e.target.value as RepeatUnit)} className={`${input} w-[96px]`}>
             {REPEAT_UNITS.map((u) => (
               <option key={u} value={u}>
                 {Number(repeatEvery) === 1 ? u : `${u}s`}
@@ -987,30 +1023,30 @@ export default function LogForm({
   const treatCount = <TreatCount value={treatQty} onChange={setTreatQty} />;
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2" noValidate>
+    <form onSubmit={submit} className="flex flex-col gap-1.5" noValidate>
       {/* The entry: the first box now that the When is a step after Save (TEC-252). */}
       <Box section="entry" label="The entry">
         {kind === "potty" && (
           <>
-            <Field label="What">
-              <Seg name="what" label="What" value={what} onChange={setWhat} options={POTTY_WHAT.map((v) => [v, POTTY_WHAT_LABELS[v]] as const)} />
-            </Field>
-            {/* Where and Leash (or Spot) on one line. */}
-            <div className="flex flex-wrap items-start gap-x-4">
-              <Field label="Where">
+            {/* What and Where side by side, a half each (TEC-255): What's chips wrap at half width. Leash (or Spot) is the line under. */}
+            <div className="flex items-start gap-x-2">
+              <Field label="What" className="w-1/2">
+                <Seg name="what" label="What" value={what} onChange={setWhat} options={POTTY_WHAT.map((v) => [v, POTTY_WHAT_LABELS[v]] as const)} />
+              </Field>
+              <Field label="Where" className="w-1/2">
                 <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
               </Field>
-              {where === "outside" && (
-                <Field label="Leash">
-                  <Seg name="leash" label="Leash" value={leash} onChange={setLeash} options={leashOptions(leash)} />
-                </Field>
-              )}
-              {where === "inside" && (
-                <Field label="Spot">
-                  <Seg name="spot" label="Spot" value={spot} onChange={setSpot} options={spotOptions(spot)} />
-                </Field>
-              )}
             </div>
+            {where === "outside" && (
+              <Field label="Leash">
+                <Seg name="leash" label="Leash" value={leash} onChange={setLeash} options={leashOptions(leash)} />
+              </Field>
+            )}
+            {where === "inside" && (
+              <Field label="Spot">
+                <Seg name="spot" label="Spot" value={spot} onChange={setSpot} options={spotOptions(spot)} />
+              </Field>
+            )}
             {where === "outside" && (
               <Field label="Time outside">
                 {/* Range chips only (TEC-186, TEC-193): each saves its upper bound ("≤5" saves 5, "5–15" saves 15). */}
@@ -1042,7 +1078,7 @@ export default function LogForm({
             </Field>
             {/* What and a half-size Amount scroller on one line. */}
             <div className="flex items-start gap-2">
-              <Field label="What" htmlFor="f-item" className="flex-1">
+              <Field label="What" htmlFor="f-item" className="w-1/2">
                 <select
                   id="f-item"
                   value={itemId}
@@ -1086,7 +1122,7 @@ export default function LogForm({
               /* Not a nested <form> (HTML has none): Enter in the name box adds the food rather than saving the entry. */
               <div className="grid gap-1.5 rounded-xl border border-line bg-surface p-2">
                 <span className="text-[11px] uppercase tracking-[0.06em] text-ink-soft">Add a {foodType === "treat" ? "treat" : "meal"} food</span>
-                <Field label="Name" htmlFor="f-food-name">
+                <Field label="Name" htmlFor="f-food-name" className="w-1/2">
                   <input
                     id="f-food-name"
                     autoFocus
@@ -1102,7 +1138,7 @@ export default function LogForm({
                 </Field>
                 <div className="flex items-start gap-2">
                   <Field label="Unit" htmlFor="f-food-unit">
-                    <select id="f-food-unit" value={foodUnit} onChange={(e) => setFoodUnit(e.target.value as FoodUnit)} className={inputFull}>
+                    <select id="f-food-unit" value={foodUnit} onChange={(e) => setFoodUnit(e.target.value as FoodUnit)} className={`${input} w-[96px]`}>
                       {FOOD_UNITS.map((u) => (
                         <option key={u} value={u}>
                           {u}
@@ -1110,7 +1146,7 @@ export default function LogForm({
                       ))}
                     </select>
                   </Field>
-                  <Field label="Calories per unit (optional)" htmlFor="f-food-kcal" className="flex-1">
+                  <Field label="Calories per unit (optional)" htmlFor="f-food-kcal" className="w-1/2">
                     <input
                       id="f-food-kcal"
                       inputMode="decimal"
@@ -1165,7 +1201,7 @@ export default function LogForm({
             </div>
             {/* Commands and Other dogs on one line; Fun has Other dogs alone. */}
             {addDogRow || (
-              <div className={`grid items-start gap-2 ${exType === "training" ? "grid-cols-2" : "grid-cols-1"}`}>
+              <div className="grid grid-cols-2 items-start gap-2">
                 {exType === "training" && (
                   <Field label="Commands practised" htmlFor="f-commands">
                     {/* A picklist, not chips (TEC-193): a native multi-select over the fixed list, which a phone
@@ -1226,7 +1262,7 @@ export default function LogForm({
             {healthType !== "medication" && (
               /* One plain select, like Other dogs (TEC-139); the detail goes in the note. */
               <Field label={healthType === "vet" ? "Why" : "What"} htmlFor="f-reason">
-                <select id="f-reason" value={reason} onChange={(e) => setReason(e.target.value)} className={inputFull}>
+                <select id="f-reason" value={reason} onChange={(e) => setReason(e.target.value)} className={inputHalf}>
                   <option value="">Pick one…</option>
                   {keptReasons && h?.type === healthType && (
                     <option value={HEALTH_KEPT}>{keptReasons.map((id) => healthReasonLabel(healthType, id)).join(", ")}</option>
@@ -1266,7 +1302,7 @@ export default function LogForm({
                   <div className="grid gap-1.5 rounded-xl border border-line bg-surface p-2">
                     <span className="text-[11px] uppercase tracking-[0.06em] text-ink-soft">Add a medication</span>
                     <div className="flex items-start gap-2">
-                      <Field label="Name" htmlFor="f-med-name" className="flex-1">
+                      <Field label="Name" htmlFor="f-med-name" className="w-1/2">
                         <input
                           id="f-med-name"
                           autoFocus
@@ -1281,7 +1317,7 @@ export default function LogForm({
                         />
                       </Field>
                       <Field label="Unit" htmlFor="f-med-new-unit">
-                        <select id="f-med-new-unit" value={newMedUnit} onChange={(e) => setNewMedUnit(e.target.value as MedUnit)} className={inputFull}>
+                        <select id="f-med-new-unit" value={newMedUnit} onChange={(e) => setNewMedUnit(e.target.value as MedUnit)} className={`${input} w-[96px]`}>
                           {MED_UNITS.map((u) => (
                             <option key={u} value={u}>
                               {u}
@@ -1300,7 +1336,7 @@ export default function LogForm({
                         }}
                         aria-required="true"
                         aria-invalid={medError === "pick a reason" ? true : undefined}
-                        className={`${inputFull} ${medError === "pick a reason" ? "border-danger" : ""}`}
+                        className={`${inputHalf} ${medError === "pick a reason" ? "border-danger" : ""}`}
                       >
                         <option value="">Pick one…</option>
                         {MED_REASONS.map(([id, label]) => (
@@ -1334,7 +1370,7 @@ export default function LogForm({
                   </div>
                 ) : (
                   <div className="flex items-start gap-2">
-                    <Field label="Medication" htmlFor="f-med" className="flex-1">
+                    <Field label="Medication" htmlFor="f-med" className="w-1/2">
                       <select
                         id="f-med"
                         value={medId}
@@ -1367,7 +1403,7 @@ export default function LogForm({
                       <input id="f-dose" type="text" inputMode="decimal" autoComplete="off" value={dose} onChange={(e) => setDose(e.target.value)} placeholder="5" className={`${input} w-[64px]`} />
                     </Field>
                     <Field label="Unit" htmlFor="f-med-unit" className="shrink-0">
-                      <select id="f-med-unit" value={medUnit} onChange={(e) => setMedUnit(e.target.value as MedUnit)} className={`${input} w-auto`}>
+                      <select id="f-med-unit" value={medUnit} onChange={(e) => setMedUnit(e.target.value as MedUnit)} className={`${input} w-[88px]`}>
                         {MED_UNITS.map((u) => (
                           <option key={u} value={u}>
                             {u}
@@ -1385,7 +1421,7 @@ export default function LogForm({
                     ) : (
                       <>
                         <div className="flex items-end gap-2">
-                          <Field label={`Reason (${NO_REASON})`} htmlFor="f-med-late-reason" className="flex-1">
+                          <Field label={`Reason (${NO_REASON})`} htmlFor="f-med-late-reason" className="w-1/2">
                             <select id="f-med-late-reason" value={lateReason} onChange={(e) => setLateReason(e.target.value)} className={inputFull}>
                               <option value="">{NO_REASON}</option>
                               {MED_REASONS.map(([id, label]) => (
@@ -1425,7 +1461,7 @@ export default function LogForm({
           side on one line, long names cut short; a medical issue shows Related note alone. Not on a future entry,
           which keeps no treats or links. */}
       {!planning && (kind === "potty" || kind === "exercise" || kind === "health") && (
-        <div data-section="secondary" className="grid gap-2">
+        <div data-section="secondary" className="grid gap-1">
           {(kind === "potty" || kind === "exercise") && (
             <div className={`flex items-end gap-x-3 ${kind === "potty" ? "flex-wrap" : ""}`}>
               {treatCount}
@@ -1438,19 +1474,19 @@ export default function LogForm({
               {kind === "exercise" && exType === "training" && (
                 <>
                   <span aria-hidden="true" className="mb-[11px] h-[22px] w-px self-end bg-line/60" />
-                  {noteField}
+                  <div className="w-1/2 min-w-0">{noteField}</div>
                 </>
               )}
             </div>
           )}
-          {kind === "potty" && issueSelect}
+          {kind === "potty" && issueSelect && <div className="w-1/2 min-w-0">{issueSelect}</div>}
           {kind === "health" && healthType !== "issue" && (
             <div className="grid grid-cols-2 gap-2">
               {issueField}
               {noteField}
             </div>
           )}
-          {kind === "health" && healthType === "issue" && noteField}
+          {kind === "health" && healthType === "issue" && <div className="w-1/2 min-w-0">{noteField}</div>}
           {sessionTreats.length > 0 && <LoggedTreats treats={sessionTreats} />}
           {/* Pee and Poop (TEC-186): a Fun form only, on a new entry. Each tap is its own potty entry,
               saved at once and independent of whether this Fun entry is. */}
@@ -1503,7 +1539,18 @@ export default function LogForm({
         </div>
       )}
 
-      {/* The note: a full-width two-line text box that scrolls past two lines (TEC-199). */}
+      {/* A plan's Repeat (TEC-199, moved here by TEC-255 when the When step went): an open plan being edited, or a
+          form opened on a future time (the Calendar's Add a plan), says so and offers it. A future time picked from
+          Save on a new entry asks its Repeat in a small step first (repeatStep). */}
+      {planning && !repeatStep && (
+        <div data-section="plan" className="grid gap-0.5">
+          {future && <p className="text-[13px] font-semibold text-ink">{FUTURE_NOTICE}</p>}
+          {repeatBlock}
+        </div>
+      )}
+
+      {/* The note: a full-width two-line text box that scrolls past two lines (TEC-199). Full width on purpose
+          (TEC-255): it is free text, the one field with a reason to be wide. */}
       <div data-section="note">
         <Field label="Note" htmlFor="f-note">
           <textarea
@@ -1524,14 +1571,53 @@ export default function LogForm({
         <PhotoPicker photos={photos} />
       </div>
 
-      {error && !stepOpen && (
-        <p role="alert" className="text-sm font-semibold text-danger">
-          {error}
-        </p>
+      {repeatStep && (
+        /* The same small sheet as the stored-time one: the form's own Repeat, then the plan is saved (TEC-255). */
+        <Sheet nested title="Repeat?" onClose={() => { setRepeatStep(null); setHeld(null); }}>
+          <div className="flex flex-col gap-2" data-section="repeat-step">
+            <p className="text-[13px] font-semibold text-ink">{FUTURE_NOTICE}</p>
+            {repeatBlock}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const c = repeatStep;
+                  setRepeatStep(null);
+                  void commit(c, true);
+                }}
+                className="h-[44px] rounded-[10px] bg-accent px-4 font-bold text-accent-ink"
+              >
+                Save as upcoming
+              </button>
+              <button type="button" onClick={() => { setRepeatStep(null); setHeld(null); }} className="h-[44px] px-2 text-ink-soft underline">
+                Back to the form
+              </button>
+            </div>
+          </div>
+        </Sheet>
       )}
 
-      {/* The bottom row (TEC-252): Logging as, on one line beside Save, on every form. The When is the step Save opens. */}
-      <div data-section="save" className="flex items-center gap-2">
+      {error && (
+        <div role="alert" className="flex flex-wrap items-center gap-x-2 text-sm font-semibold text-danger">
+          <span>{error}</span>
+          {held && (
+            <button
+              type="button"
+              onClick={() => {
+                setHeld(null);
+                setError(null);
+              }}
+              className="min-h-[44px] underline"
+            >
+              Pick another time
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* The bottom row (TEC-252, TEC-255): Logging as, a fixed-width field, beside Save, which is as tall as Who
+          and only as wide as its words, on every form. Save asks the time with the phone's own picker (WhenAsk). */}
+      <div data-section="save" className="relative flex items-center gap-2">
         <label htmlFor="f-who" className="shrink-0 text-[13px] text-ink-soft">
           as
         </label>
@@ -1540,8 +1626,7 @@ export default function LogForm({
           aria-label="Logging as"
           value={personId}
           onChange={(e) => setPersonId(e.target.value)}
-          className={`${input} h-[44px] shrink-0`}
-          style={{ width: nameBoxWidth(people.map((p) => p.display_name)) }}
+          className={`${input} h-[44px] shrink-0 ${WHO_WIDTH}`}
         >
           <option value="">Nobody</option>
           {people.map((p) => (
@@ -1554,52 +1639,39 @@ export default function LogForm({
           type="submit"
           disabled={busy || photoBlock}
           data-autofocus={kind === "weight" && !editing ? undefined : true}
-          className="min-h-[44px] min-w-0 flex-1 rounded-[14px] bg-[var(--tone-2-bg)] px-4 py-2.5 text-lg font-bold text-[var(--tone-2-ink)] shadow-[0_4px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_2px_0_var(--tone-2-lip)] disabled:opacity-60"
+          className="h-[44px] min-w-0 shrink-0 whitespace-nowrap rounded-[12px] bg-[var(--tone-2-bg)] px-4 text-[15px] font-bold text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)] disabled:opacity-60"
         >
           {busy
             ? "Saving…"
             : photos.working
-              ? "Uploading attachment…"
+              ? "Uploading…"
               : photos.failed
-                ? "Fix the attachment to save"
-                : plan
-                  ? "Save changes"
-                  : future
-                    ? "Save as upcoming"
-                    : editing
-                      ? "Save changes"
-                      : `Save ${title.toLowerCase()}`}
+                ? "Fix attachment"
+                : held && error
+                  ? "Retry"
+                  : plan
+                    ? "Save changes"
+                    : future
+                      ? "Save as upcoming"
+                      : editing
+                        ? "Save changes"
+                        : `Save ${title.toLowerCase()}`}
         </button>
-      </div>
-      {editing ? (
-        <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] self-start font-semibold text-danger disabled:opacity-60">
-          {confirmDelete ? "Tap again to delete" : "Delete this entry"}
-        </button>
-      ) : (
-        /* Potty has no defaults to explain (nothing is preselected) and drops the helper text (TEC-199). */
-        kind !== "potty" && <p className="text-[13px] text-ink-soft">Defaults are filled in. Change only what&apos;s different.</p>
-      )}
-      {stepOpen && (
-        <WhenStep
+        <WhenAsk
+          ref={whenAsk}
           dateOnly={dateOnly}
-          initial={dateOnly ? day : when}
-          stored={editing || whenTouched}
-          editing={editing}
-          planning={!!plan}
           check={(v) =>
             editing && (dateOnly ? isFutureDay(v, toDateInput(new Date().toISOString())) : isFuturePick(v, false, new Date()))
               ? "A saved entry can't move to the future."
               : null
           }
-          repeat={repeatBlock}
-          busy={busy}
-          error={error}
-          onChoose={(c) => void commit(c)}
-          onBack={() => {
-            setStepOpen(false);
-            setError(null);
-          }}
+          onPick={picked}
         />
+      </div>
+      {editing && (
+        <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] self-start font-semibold text-danger disabled:opacity-60">
+          {confirmDelete ? "Tap again to delete" : "Delete this entry"}
+        </button>
       )}
     </form>
   );
