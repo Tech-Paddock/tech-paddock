@@ -16,6 +16,13 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 - Quiet secondary controls (owner, TEC-250): the Log's Next 7 days is one short line per plan with a
   Calendar link; Treats is a plain counter, and Medical issue is its own checkbox, on Potty only;
   attachments are one small Attach link with thumbnails in a row.
+- A form has no When field (owner, TEC-252). Save opens a nested When step: a big Now (Weight:
+  Today), or another time with its own Save; a future time still saves as a plan. A form that opened
+  on its own time (a correction, a Done, an Add a plan) offers that time on the big button. Logging
+  as sits at the bottom, on one line beside Save, on every form.
+- On a form, Training's Related note shares a line with Treats; a vet visit's and a medication dose's
+  Related issue and Related note sit side by side. The Meals pill shows the count only, never cups
+  (TEC-252).
 - Every form opens as a bottom sheet.
 - Installable through `/app.webmanifest`.
 
