@@ -63,17 +63,14 @@
   specific reason. Default max is 1/2 width of section."). Local patterns, no data change and no migration. **It replaces the When step below:
   `WhenStep.tsx`, its Now, its "Keep" and "Use" buttons and "Back to the form" are gone; the TEC-252 bullet's bottom row and Related fields still
   hold.**
-  * **The picker** (`app/WhenPicker.tsx`, `tests/whenstep.test.ts`): Save on `LogForm` and `NoteForm` runs the checks that do not depend on the time (an
-    attachment still uploading; an open "Add a medication…" is added first) and calls `WhenAsk`'s `ask()`, which sets a hidden `datetime-local` (Weight:
-    `date`) and calls `showPicker()` from the tap. **Confirming it (its `change`) saves.** A new entry opens it on an empty field, which a phone fills
-    with now, because a field already holding now reports no change when confirmed as it is and the tap would be lost. A picked minute equal to this
-    minute is "now" (the moment of the save, `classifyPick`), a stored time handed back is "keep" (to the millisecond), anything else is "at". A future
-    time still makes a plan; a correction cannot move to the future (the error shows on the form); a note cannot (`max`, `noteWhenError`).
-  * **A stored time** (a correction, a Done, an open plan, the Calendar's Add a plan with `planDay`) is preset, and a phone reports no `change` when it
-    is confirmed unchanged, so the same small "When?" sheet opens **beside** the picker for those (`Sheet` with `moveFocus={false}`, or the picker closes)
-    with the same field and **Use this time**. A new pick closes it and saves. If `showPicker` is missing or throws, the sheet opens alone (**Save**).
-    **Not seen on a phone:** whether `change` fires on Done on iOS for an empty field, and whether the sheet beside the picker stays quiet on both
-    phones, were not tried; jsdom has no picker (tests stub `showPicker`).
+  * **The When sheet** (TEC-258 replaced TEC-255's `showPicker()` path; `app/WhenPicker.tsx`, `tests/whenstep.test.ts`): Save on `LogForm` and `NoteForm`
+    runs the checks that do not depend on the time (an attachment still uploading; an open "Add a medication…" is added first) and calls `WhenAsk`'s
+    `ask()`, which **always** opens a small "When?" sheet: the native `datetime-local` (Weight: `date`) and a **Save**. Tapping the field opens the
+    phone's own wheel; the sheet's Save saves. A new entry opens on now; a stored time (a correction, a Done, an open plan, the Calendar's Add a plan
+    with `planDay`) opens on that time. A picked minute equal to this minute is "now" (the moment of the save, `classifyPick`), a stored time handed
+    back is "keep" (to the millisecond), anything else is "at". A future time still makes a plan (the Repeat step); a correction or a note cannot move
+    to the future: the sheet says so and its Save is off (`check`, `noteWhenError`).
+  * **The sheet is the only path** (TEC-258): there is no hidden field and no `showPicker()`. The sheet's field and Save were not tried on both phones.
   * **A failed save keeps the pick** (`held`): a plan or a correction that the server refuses shows the reason on the form, **Save reads Retry** and
     does not reopen the picker, and "Pick another time" lets go of it. A mistake in the form itself (Potty's What, a vet visit's note) drops the pick,
     so Save asks again. A new entry saves through `onLog` and the sheet closes, with Retry on its pending row as ever.
@@ -778,6 +775,8 @@
 
 ## Traps
 
+- **A hidden `showPicker()` field reports nothing on a phone** (TEC-258: after TEC-255 every Save did nothing). It neither throws nor fires `change`,
+  so no fallback runs and nothing saves. Never rely on it: Save opens the When sheet and the sheet's own Save saves.
 - **Upcoming's Done is client-linked.** The link from the entry saved by a Done to its item lives in `Journal`'s
   `visitLinks` ref, not in storage. If the entry saves but the phone loses the page before the `done` call
   lands (or the call fails twice), the entry is in the journal and the item stays open; a toast says so. Tapping

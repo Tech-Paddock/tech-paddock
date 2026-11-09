@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
-// TEC-255 (after TEC-252): Save opens the phone's own date-and-time picker; the form has no When and no When step. Rendered in a DOM so the taps are real.
-// jsdom has no picker, so `showPicker` is stubbed where a test needs the real path; without it the fallback sheet shows.
+// TEC-258 (after TEC-255, TEC-252): Save always opens a small When sheet (native date-and-time field and a Save); the form has no When. Rendered in a DOM so the taps are real.
 import { createElement } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import LogForm from "@/app/LogForm";
 import NoteForm from "@/app/NoteForm";
@@ -44,25 +43,17 @@ function open(form: FormKind, extra: Record<string, unknown> = {}) {
 const saveButton = () => screen.getByRole("button", { name: /^Save (?!changes$)|^Save changes$|^Save as upcoming$|^Retry$/ });
 const sheet = () => screen.queryByRole("dialog", { name: "When?" });
 const pickPee = () => fireEvent.click(screen.getByLabelText("Pee"));
-/** The hidden field the picker opens on. */
-const field = () => document.querySelector<HTMLInputElement>("input[data-when-picker]")!;
-/** Confirms the picker with a value, as the phone does. */
-const pick = (value: string) => fireEvent.change(field(), { target: { value } });
+/** The sheet's native field, and what it holds. */
+const sheetField = () => within(sheet()!).getByLabelText(/^Date/) as HTMLInputElement;
+/** Sets the sheet's field to a value and taps its Save, as a person does. */
+const pick = (value: string) => {
+  fireEvent.change(sheetField(), { target: { value } });
+  fireEvent.click(within(sheet()!).getByRole("button", { name: "Save" }));
+};
+/** Taps the sheet's Save on whatever it opened on. */
+const saveSheet = () => fireEvent.click(within(sheet()!).getByRole("button", { name: "Save" }));
 
-let showPicker: ReturnType<typeof vi.fn>;
-/** What the picker was opened on (`field().value` at the call), one entry per opening. */
-let openedOn: string[];
-beforeEach(() => {
-  openedOn = [];
-  showPicker = vi.fn(function (this: HTMLInputElement) {
-    openedOn.push(this.value);
-  });
-  (HTMLInputElement.prototype as unknown as { showPicker: unknown }).showPicker = showPicker;
-});
-afterEach(() => {
-  cleanup();
-  delete (HTMLInputElement.prototype as unknown as { showPicker?: unknown }).showPicker;
-});
+afterEach(() => cleanup());
 
 const repeatStep = () => screen.queryByRole("dialog", { name: "Repeat?" });
 /** Confirms the small Repeat step a future pick opens. */
@@ -81,7 +72,7 @@ const stored = (at: string) =>
     created_at: at,
   }) as unknown as JournalEvent;
 
-describe("Save opens the phone's own picker (TEC-255)", () => {
+describe("Save always opens the When sheet (TEC-258)", () => {
   it("has no When on the form, no Now, and Logging as is beside Save", () => {
     open("potty");
     expect(screen.queryByLabelText("When")).toBeNull();
@@ -90,7 +81,7 @@ describe("Save opens the phone's own picker (TEC-255)", () => {
     expect(who.parentElement).toBe(saveButton().parentElement);
   });
 
-  it("opens the picker on every form, from Save, and saves nothing until it is confirmed", () => {
+  it("opens the sheet on every form, from Save, and saves nothing until its Save is tapped", () => {
     const forms: [FormKind, Record<string, unknown>][] = [
       ["potty", {}],
       ["food", {}],
@@ -100,23 +91,21 @@ describe("Save opens the phone's own picker (TEC-255)", () => {
     ];
     for (const [form] of forms) {
       cleanup();
-      showPicker.mockClear();
       const props = open(form);
       if (form === "potty") pickPee();
       if (form === "weight") fireEvent.change(screen.getByLabelText(/Weight/, { selector: "input" }), { target: { value: "7.3" } });
       fireEvent.click(saveButton());
-      expect(showPicker, form).toHaveBeenCalledTimes(1);
-      expect(sheet(), form).toBeNull();
+      expect(sheet(), form).not.toBeNull();
       expect(props.onLog, form).not.toHaveBeenCalled();
     }
   });
 
-  it("a new entry opens it empty (the phone fills in now), and confirming now logs the moment of the save", () => {
+  it("a new entry opens it on now, and its Save logs the moment of the save", () => {
     const props = open("potty");
     pickPee();
     fireEvent.click(saveButton());
-    expect(openedOn).toEqual([""]);
-    pick(nowLocal());
+    expect(sheetField().value).toBe(nowLocal());
+    saveSheet();
     expect(props.onLog).toHaveBeenCalledTimes(1);
     const [body] = props.onLog.mock.calls[0] as unknown as [{ at: string; kind: string; person_id: string }];
     expect(body.kind).toBe("potty");
@@ -177,7 +166,7 @@ describe("Save opens the phone's own picker (TEC-255)", () => {
     expect(repeatStep()).toBeNull();
     expect(props.onUpcoming).not.toHaveBeenCalled();
     fireEvent.click(saveButton());
-    expect(showPicker).toHaveBeenCalledTimes(2);
+    expect(sheet()).not.toBeNull();
   });
 
   it("a past time or now saves at once, with no Repeat step", () => {
@@ -198,10 +187,11 @@ describe("Save opens the phone's own picker (TEC-255)", () => {
     pick(later);
     confirmPlan();
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Could not save"));
-    expect(showPicker).toHaveBeenCalledTimes(1);
+    expect(sheet()).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(onUpcoming).toHaveBeenCalledTimes(2));
-    expect(showPicker).toHaveBeenCalledTimes(1);
+    expect(sheet()).toBeNull();
+    expect(repeatStep()).toBeNull();
     expect(onUpcoming.mock.calls[1][0]).toMatchObject({ due_on: later.slice(0, 10), due_time: later.slice(11, 16) });
   });
 
@@ -215,24 +205,25 @@ describe("Save opens the phone's own picker (TEC-255)", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "Pick another time" }));
     fireEvent.click(saveButton());
-    expect(showPicker).toHaveBeenCalledTimes(2);
+    expect(sheet()).not.toBeNull();
   });
 
   it("a form's own mistake is shown on the form, and Save asks the time again", () => {
     open("potty");
     fireEvent.click(saveButton());
-    pick(nowLocal());
+    saveSheet();
     expect(screen.getByRole("alert").textContent).toMatch(/Pick what happened/);
     pickPee();
     fireEvent.click(saveButton());
-    expect(showPicker).toHaveBeenCalledTimes(2);
+    expect(sheet()).not.toBeNull();
   });
 
-  it("Weight opens a date picker, on today", () => {
+  it("Weight opens a date field in the sheet, on today", () => {
     const props = open("weight");
     fireEvent.change(screen.getByLabelText(/Weight/, { selector: "input" }), { target: { value: "7.3" } });
     fireEvent.click(saveButton());
-    expect(field().type).toBe("date");
+    expect(sheetField().type).toBe("date");
+    expect(sheetField().value).toBe(toLocalInput(new Date().toISOString()).slice(0, 10));
     expect(props.onLog).not.toHaveBeenCalled();
     pick(toLocalInput(new Date().toISOString()).slice(0, 10));
     expect(props.onLog).toHaveBeenCalledTimes(1);
@@ -243,10 +234,9 @@ describe("Save opens the phone's own picker (TEC-255)", () => {
     const event = stored(at);
     const props = open("potty", { event });
     fireEvent.click(saveButton());
-    expect(openedOn).toEqual([toLocalInput(at)]);
-    // The phone reports no change when a time is confirmed as it was, so the sheet beside the picker has the button.
+    expect(sheetField().value).toBe(toLocalInput(at));
     expect(props.onChange).not.toHaveBeenCalled();
-    fireEvent.click(within(sheet()!).getByRole("button", { name: "Use this time" }));
+    saveSheet();
     await waitFor(() => expect(props.onChange).toHaveBeenCalledTimes(1));
     expect(props.onChange.mock.calls[0][0]).toMatchObject({ at, voids: event.id });
   });
@@ -264,42 +254,30 @@ describe("Save opens the phone's own picker (TEC-255)", () => {
   it("a correction cannot be moved to the future", async () => {
     const props = open("potty", { event: stored("2026-10-19T21:05:07.123Z") });
     fireEvent.click(saveButton());
-    pick(hoursFromNow(26));
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toMatch(/can't move to the future/));
+    fireEvent.change(sheetField(), { target: { value: hoursFromNow(26) } });
+    // The sheet says why and its Save is off, so nothing is sent.
+    expect(within(sheet()!).getByRole("status").textContent).toMatch(/can't move to the future/);
+    expect((within(sheet()!).getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
     expect(props.onChange).not.toHaveBeenCalled();
     expect(props.onUpcoming).not.toHaveBeenCalled();
   });
 
-  it("the Calendar's Add a plan opens the picker on that day, as a plan", async () => {
+  it("the Calendar's Add a plan opens the sheet on that day, as a plan", async () => {
     const day = toLocalInput(new Date(Date.now() + 3 * 86400_000).toISOString()).slice(0, 10);
     const props = open("training", { planDay: day });
     expect(screen.getByText("Future: saves as upcoming")).toBeTruthy();
     expect(screen.getByText("Repeat")).toBeTruthy();
     fireEvent.click(saveButton());
-    expect(openedOn).toHaveLength(1);
-    expect(openedOn[0].slice(0, 10)).toBe(day);
-    fireEvent.click(within(sheet()!).getByRole("button", { name: "Use this time" }));
+    expect(sheetField().value.slice(0, 10)).toBe(day);
+    saveSheet();
     await waitFor(() => expect(props.onUpcoming).toHaveBeenCalledTimes(1));
     expect(props.onUpcoming.mock.calls[0][0]).toMatchObject({ due_on: day });
     expect(props.onLog).not.toHaveBeenCalled();
   });
-
-  it("a form of its own has no When step: no sheet, even where the browser refuses showPicker's field", () => {
-    open("potty");
-    pickPee();
-    fireEvent.click(saveButton());
-    expect(sheet()).toBeNull();
-  });
 });
 
-describe("when the browser refuses showPicker (TEC-255)", () => {
-  beforeEach(() => {
-    showPicker.mockImplementation(() => {
-      throw new DOMException("not allowed", "NotAllowedError");
-    });
-  });
-
-  it("a small sheet holds the native field, and its Save logs the time", () => {
+describe("the When sheet (TEC-258)", () => {
+  it("holds the native field, and its Save logs the time", () => {
     const props = open("potty");
     pickPee();
     fireEvent.click(saveButton());
@@ -315,8 +293,7 @@ describe("when the browser refuses showPicker (TEC-255)", () => {
     expect(toLocalInput(body.at)).toBe(earlier);
   });
 
-  it("is the same without showPicker at all, and Back to the form saves nothing", () => {
-    delete (HTMLInputElement.prototype as unknown as { showPicker?: unknown }).showPicker;
+  it("Back to the form saves nothing", () => {
     const props = open("potty");
     pickPee();
     fireEvent.click(saveButton());
@@ -334,7 +311,7 @@ describe("when the browser refuses showPicker (TEC-255)", () => {
   });
 });
 
-describe("the Note form's picker (TEC-255)", () => {
+describe("the Note form's sheet (TEC-258)", () => {
   const noteProps = () => ({
     people: [{ id: PERSON, display_name: "Tester" }],
     phonePerson: PERSON,
@@ -345,15 +322,15 @@ describe("the Note form's picker (TEC-255)", () => {
   });
   const write = () => fireEvent.change(screen.getByPlaceholderText("Write the note"), { target: { value: "Invented words" } });
 
-  it("has no When on the form; Save opens the picker and confirming logs the note", () => {
+  it("has no When on the form; Save opens the sheet and its Save logs the note", () => {
     const props = noteProps();
     render(createElement(NoteForm, props));
     expect(screen.queryByLabelText("When")).toBeNull();
     write();
     fireEvent.click(screen.getByRole("button", { name: "Save note" }));
-    expect(showPicker).toHaveBeenCalledTimes(1);
+    expect(sheet()).not.toBeNull();
     expect(props.onLog).not.toHaveBeenCalled();
-    pick(nowLocal());
+    saveSheet();
     expect(props.onLog).toHaveBeenCalledTimes(1);
   });
 
@@ -362,8 +339,9 @@ describe("the Note form's picker (TEC-255)", () => {
     render(createElement(NoteForm, props));
     write();
     fireEvent.click(screen.getByRole("button", { name: "Save note" }));
-    pick(hoursFromNow(26));
-    expect(screen.getByRole("alert").textContent).toMatch(/future/i);
+    fireEvent.change(sheetField(), { target: { value: hoursFromNow(26) } });
+    expect(within(sheet()!).getByRole("status").textContent).toMatch(/future/i);
+    expect((within(sheet()!).getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
     expect(props.onLog).not.toHaveBeenCalled();
     expect(screen.queryByText("Repeat")).toBeNull();
   });
