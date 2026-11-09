@@ -39,6 +39,12 @@ What is true now, and the traps. Branch and pull request state is never written 
 
 ## Traps
 
+- **A demo must look like the app it changes** (owner, 2026-11-09: "Sometimes it's hard to tell if a
+  feature is correct because the [rest] of the app looks off"). Build it from the app's own
+  `lib/theme.css`, `globals.css` and the component's real markup and Tailwind classes, read from
+  the source, not redrawn. Keep everything around the change exactly as it ships. Change only the
+  part under review, and say on the page which part that is.
+
 - **The guard runs from this session's checkout.** Edit `.claude/hooks/` in a separate worktree.
 - **A container's local `main` can sit far behind `origin/main`.** Sessions start detached at the
   remote head; `git checkout main` in the main checkout swaps the guard and the skills for old
