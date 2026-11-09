@@ -207,6 +207,14 @@
   shows under the form (`role="alert"`). `tests/medication-save.test.ts` renders `Journal` over the real route handlers and an
   in-memory database (jsdom; `jsdom` and Testing Library are dev dependencies for it). **Trap:** its fake database is not
   PostgREST; the table itself was proved by a rolled-back insert as `service_role`.
+  **Adding one, again (TEC-256):** production's database logs showed journal reads of `lando.medications` and not one write,
+  and no read from `addMedication` itself, so no add ever reached the server, not even as a refused one. The route, the parse and the
+  table were sound (the test posts the form's exact body through the real `parseNewMedication` and route). The break was in the
+  browser: the add was stopped by its own required reason, whose message sat under the buttons, and an Add pressed while the phone's
+  keyboard closed could lose its tap. Now the message sits above Add, the Reason select is marked invalid and required, Add keeps
+  the focus (`onMouseDown` default prevented), the message scrolls into view, and a non-JSON server answer reads "couldn't add (the
+  server answered 502)". **Not reproduced in a real browser** (none could run here): if an add still does nothing, look for a POST
+  in the browser's network tab first. `tests/medication-add-request.test.ts`.
   **A medication's reason (TEC-233):** `lando.medications.reason` (migration `lando_medication_reason`, additive, nullable, a
   plain column check, no function): one of `MED_REASONS` (heartworm, flea-tick, dewormer, allergy, pain, antibiotic, joint,
   other; ids are history's key, retire by dropping from the form, never rename). It lives on the medication, **not on the dose**

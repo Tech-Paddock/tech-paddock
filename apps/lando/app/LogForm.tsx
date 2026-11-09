@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   COMMANDS,
   DOGS_ADD,
@@ -440,6 +440,11 @@ export default function LogForm({
   const [lateError, setLateError] = useState<string | null>(null);
   const [medError, setMedError] = useState<string | null>(null);
   const [medBusy, setMedBusy] = useState(false);
+  const medErrorRef = useRef<HTMLParagraphElement>(null);
+  // A refusal is brought into view: below the fold, or under the keyboard, it read as "nothing happened" (TEC-256).
+  useEffect(() => {
+    if (medError) medErrorRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [medError]);
   // Photos (TEC-137, and Fun and Training since TEC-139). A correction opens
   // with the photos the entry has and keeps whatever is not removed.
   // A Done or an edit of an upcoming item opens with the item's own (TEC-203), so a Done's entry carries them.
@@ -1286,7 +1291,17 @@ export default function LogForm({
                       </Field>
                     </div>
                     <Field label="Reason" htmlFor="f-med-new-reason">
-                      <select id="f-med-new-reason" value={newMedReason} onChange={(e) => setNewMedReason(e.target.value)} className={inputFull}>
+                      <select
+                        id="f-med-new-reason"
+                        value={newMedReason}
+                        onChange={(e) => {
+                          setNewMedReason(e.target.value);
+                          setMedError(null);
+                        }}
+                        aria-required="true"
+                        aria-invalid={medError === "pick a reason" ? true : undefined}
+                        className={`${inputFull} ${medError === "pick a reason" ? "border-danger" : ""}`}
+                      >
                         <option value="">Pick one…</option>
                         {MED_REASONS.map(([id, label]) => (
                           <option key={id} value={id}>
@@ -1295,8 +1310,14 @@ export default function LogForm({
                         ))}
                       </select>
                     </Field>
+                    {medError && (
+                      <p ref={medErrorRef} role="alert" className="text-[13px] font-semibold text-danger">
+                        {medError}
+                      </p>
+                    )}
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={(e) => void addMedication(e)} disabled={medBusy} className="min-h-[44px] rounded-[10px] bg-accent px-3 font-medium text-accent-ink disabled:opacity-60">
+                      {/* onMouseDown keeps the focus where it is: on a phone, the keyboard closing as the button is pressed moved the form and the tap was lost. */}
+                      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={(e) => void addMedication(e)} disabled={medBusy} className="min-h-[44px] rounded-[10px] bg-accent px-3 font-medium text-accent-ink disabled:opacity-60">
                         {medBusy ? "Adding…" : "Add"}
                       </button>
                       <button
@@ -1310,11 +1331,6 @@ export default function LogForm({
                         Cancel
                       </button>
                     </div>
-                    {medError && (
-                      <p role="alert" className="text-[13px] font-semibold text-danger">
-                        {medError}
-                      </p>
-                    )}
                   </div>
                 ) : (
                   <div className="flex items-start gap-2">
