@@ -114,7 +114,7 @@ describe("writeEvent", () => {
       kind: "food",
       details: { type: "meal", item_id: "purina-pro-plan-toy-puppy-chicken-rice", amount: 0.5, kcal_per: 1 },
     });
-    expect(inserts[0].details).toMatchObject({ kcal_per: 447, unit: "cup", amount: 0.5 });
+    expect(inserts[0].details).toMatchObject({ kcal_per: 447, unit: "serving", amount: 0.5 });
   });
 
   it("a database failure throws rather than looking saved", async () => {

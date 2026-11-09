@@ -480,18 +480,20 @@
   part of a piece (or none) is not forced to change. Stored shape and `parseDetails` are unchanged (the server
   still accepts any amount above 0). The What select and the amount sit in a grid with `items-start`, so What
   keeps a normal input height beside the scroller.
-- **Food amount, for meals, is a scroll picker in ⅛ steps** (TEC-136, `app/AmountScroller.tsx`, a local
-  pattern): **a small window, two rows tall (TEC-193)**: the pick in full with half of the amount above and half
-  of the amount below peeking in, 88px wide at most (`lib/scroller.ts`: `SCROLLER_ROW` 32, `SCROLLER_WIDTH`,
-  `scrollerWindow()` holds the height, the half-row padding and the band, and `tests/inlinetreat.test.ts` holds
-  the window); it snaps a step at a time; one
-  `spinbutton` for screen readers (arrows step, Page keys a whole unit, Home and End). It offers
-  "—" (no amount, as before) and 1/8 up to `AMOUNT_PICKER_MAX` (20) (`amountOptions`). The stored
-  bound is unchanged (above 0, at most 1000). An amount the form opened on that is not an eighth
-  (an older 1/3) or is past 20, and a phone's remembered meal amount, are slotted into the list,
-  so an untouched correction keeps them. Eighths read as fractions, reduced (`formatAmount`:
-  "1/8", "3/8", "1 1/4"). Defaults unchanged: a treat opens on 1, a meal on this phone's last
-  meal amount, or "—" on its first. **Snuffle mat is a food type**
+- **Food amount, for meals and snuffle mats, is a Servings picklist in halves** (TEC-257; it was a ⅛ cup scroller, TEC-136):
+  a plain `<select id="f-amount">` labelled Servings, `input` at a fixed `w-[96px]`, offering ½, 1, 1½, 2, 2½, 3, 3½, 4
+  (`SERVING_OPTIONS` in `lib/foods.ts`), no "—". A new meal opens on this phone's last meal amount when it is on
+  the list, else 1 (`servingAmount`). An amount a correction opened on that is not a half (an old ⅜ cup) is slotted into
+  the list (`servingOptions`), so an untouched correction keeps it. **A new meal or snuffle mat stores `unit: "serving"`**
+  (`foodSnapshot`, whatever the food's own unit; `SERVING_UNIT`), so the feed, Calendar and Analytics read "1 1/2 servings"
+  through `unitLabel`; **old meals keep `cup` and read cups, never converted**. A treat keeps its own whole-number count
+  box and its item's unit. No migration: `details_ok` takes any positive amount up to 1000 and any string unit. The
+  stored bound is unchanged. A treat opens on 1. Traps: `kcal_per` on a new meal is still the food's per-cup figure
+  (calories are recorded, never shown); `mealsSummary`'s cups add only `cup` entries, so new servings no longer add
+  to it (nothing shows it since TEC-252); the food-against-weight chart picks the most common unit, so a window
+  mixing cups and servings charts one and says how many were left out; correcting an old cup meal re-snapshots it as
+  servings with its amount unchanged. `AmountScroller.tsx`, `amountOptions` and `lib/scroller.ts` are now unused by
+  the app (their tests remain). Where one is shown, "serving" is at 1 or less and "servings" above. **Snuffle mat is a food type**
   (TEC-195, `FOOD_TYPES` = meal, snuffle, treat; the Food form's Type choice reads Meal, Snuffle mat, Treat): it picks from the
   **meal list** (`listOf("snuffle")` is `meal`, so `picklist`, `findFood`, `defaultFood` and "Add a food…" all use the meal
   list, and an added food is a meal food: `lando.foods.type` stays meal|treat) and takes the meal amount default. It counts

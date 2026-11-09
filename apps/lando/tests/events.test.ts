@@ -322,7 +322,7 @@ describe("parseNewEvent — what the server accepts", () => {
 
   it("allows Misc with no calories and no amount; refuses an unknown food or a bad amount", () => {
     expect(parseNewEvent({ id, kind: "food", details: { type: "meal", item_id: "misc" } }, NOW).details).toEqual({
-      type: "meal", item_id: "misc", item_name: "Misc", kcal_per: null, unit: null, amount: null,
+      type: "meal", item_id: "misc", item_name: "Misc", kcal_per: null, unit: "serving", amount: null,
     });
     expect(() => parseNewEvent({ id, kind: "food", details: { type: "meal", item_id: "steak" } }, NOW)).toThrow(/not in the list/);
     // A treat id is not a meal.

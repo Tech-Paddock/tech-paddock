@@ -202,6 +202,40 @@ export function amountOptions(...keep: (number | null)[]): (number | null)[] {
   return [null, ...steps];
 }
 
+/* ── A meal's and a snuffle mat's servings (TEC-257) ──────────────────────── */
+
+/** The unit a new meal or snuffle mat is stored in: what the Servings picklist counts. */
+export const SERVING_UNIT = "serving";
+
+/** The Servings picklist: halves from ½ to 4. */
+export const SERVING_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4] as const;
+
+/** The amount a new meal or snuffle mat opens on when nothing usable was remembered. */
+export const SERVING_DEFAULT = 1;
+
+/**
+ * What the Servings picklist offers: the halves, plus each `keep` that is not one of them (a correction's older
+ * amount in cups, say), slotted in at its place so an untouched correction keeps its amount.
+ */
+export function servingOptions(...keep: (number | null)[]): number[] {
+  const out: number[] = [...SERVING_OPTIONS];
+  for (const k of keep) if (k !== null && k > 0 && !out.some((v) => Math.abs(v - k) < 1e-9)) out.push(k);
+  return out.sort((a, b) => a - b);
+}
+
+/** A new meal's amount in servings: the one given when it is on the list, else one serving. */
+export function servingAmount(n: number | null): number {
+  return n !== null && SERVING_OPTIONS.some((v) => Math.abs(v - n) < 1e-9) ? n : SERVING_DEFAULT;
+}
+
+/** A serving amount for the picklist: halves as "½", "1½", "2"; anything else as `formatAmount` does. */
+export function servingText(n: number): string {
+  const whole = Math.floor(n + 1e-9);
+  if (Math.abs(n - whole) < 1e-9) return String(whole);
+  if (Math.abs(n - whole - 0.5) < 1e-9) return `${whole || ""}½`;
+  return formatAmount(n);
+}
+
 /* ── A treat's quantity (TEC-188) ─────────────────────────────────────────── */
 
 /**

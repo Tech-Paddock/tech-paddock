@@ -16,7 +16,7 @@
  * `lando_box_leash_spot`, `lando_notes`); change both together.
  */
 
-import { FOOD_TYPES, FOOD_UNITS, cleanFoodName, isMealType, listOf, findFood, foodNameTaken, formatAmount, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "./foods";
+import { FOOD_TYPES, FOOD_UNITS, SERVING_UNIT, cleanFoodName, isMealType, listOf, findFood, foodNameTaken, formatAmount, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "./foods";
 import { dateLabel, fromDateInput, localMidnight, shortDate, toDateInput } from "./localtime";
 import { DOSE_MAX, MED_NAME_MAX, MED_REASON_IDS, medReasonLabel, type MedReason, MED_ROUTES, MED_ROUTE_LABELS, MED_UNITS, cleanMedName, doseText, findMedication, medNameTaken, type MedRoute, type MedUnit, type Medication } from "./medications";
 
@@ -1322,7 +1322,9 @@ function wholeNumber(v: unknown, field: string, min: number, max: number): numbe
 export function foodSnapshot(type: FoodType, itemId: string, amount: number | null, added: readonly AddedFood[] = []): FoodDetails {
   const item = findFood(type, itemId, added);
   if (!item) throw new InvalidEvent("that food is not in the list");
-  return { type, item_id: item.id, item_name: item.name, kcal_per: item.kcalPer, unit: item.unit, amount };
+  // A meal or a snuffle mat counts servings (TEC-257), whatever the food's own unit; a treat keeps the item's. kcal_per is
+  // still the food's, per its own unit (a cup): calories are recorded and never shown.
+  return { type, item_id: item.id, item_name: item.name, kcal_per: item.kcalPer, unit: isMealType(type) ? SERVING_UNIT : item.unit, amount };
 }
 
 /**

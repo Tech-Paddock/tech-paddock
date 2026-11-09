@@ -27,13 +27,13 @@ describe("the catalogue", () => {
 });
 
 describe("the retired snuffle mat item (TEC-193, retired by TEC-195)", () => {
-  it("still reads as a meal item in cups with no calories, and opens on the same amount as every other meal", () => {
+  it("still reads as a meal item in servings (TEC-257) with no calories, and opens on the same amount as every other meal", () => {
     expect(parseDetails("food", { type: "meal", item_id: "snuffle-mat", amount: 0.125 })).toMatchObject({
       type: "meal",
       item_id: "snuffle-mat",
       item_name: "Snuffle mat",
       kcal_per: null,
-      unit: "cup",
+      unit: "serving",
       amount: 0.125,
     });
     // No per-item default: the form's amount depends on the remembered meal amount only.
