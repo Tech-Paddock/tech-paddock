@@ -260,6 +260,7 @@ describe("visitWeightPlan — a new visit", () => {
       person_id: person,
       details: { value: 7.6, unit: "lb", visit: visitId },
       note: null,
+      parent_id: visitId, // TEC-251: made from the visit, under the id the visit is saved with
     });
     expect(w.voids).toBeUndefined();
   });

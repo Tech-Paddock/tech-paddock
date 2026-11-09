@@ -26,9 +26,10 @@ describe("the reason list", () => {
     // Additive only: a nullable column, nothing dropped or rewritten.
     expect(sql).toMatch(/ADD COLUMN reason text/);
     expect(sql).not.toMatch(/NOT NULL|\bDROP\b|\bDELETE\b|\bUPDATE\b/i);
-    // Later than every other migration.
-    const newest = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort().pop();
-    expect(newest).toBe(file);
+    // Later than the migration that made the table it alters (it was once asserted newest of all, which any
+    // later migration, TEC-251's among them, broke without the reason migration changing).
+    const table = readdirSync(dir).find((f) => f.endsWith("_lando_medications.sql"))!;
+    expect(file > table).toBe(true);
   });
   it("reads No reason for a medication without one", () => {
     expect(medReasonLabel(undefined)).toBe("No reason");

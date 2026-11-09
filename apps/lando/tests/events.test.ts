@@ -288,7 +288,7 @@ describe("parseNewEvent — what the server accepts", () => {
 
   it("accepts a potty with no time, leaving now to the database", () => {
     expect(parseNewEvent({ id, kind: "potty", details: potty }, NOW)).toEqual({
-      id, kind: "potty", at: null, person_id: null, details: potty, note: null, voids: null,
+      id, kind: "potty", at: null, person_id: null, details: potty, note: null, voids: null, parent_id: null,
     });
   });
 
@@ -403,7 +403,7 @@ describe("parseNewEvent — what the server accepts", () => {
   it("makes a delete name its target and carry nothing else", () => {
     expect(() => parseNewEvent({ id, kind: "void" }, NOW)).toThrow(/name the entry/);
     expect(parseNewEvent({ id, kind: "void", voids: other, note: "x", details: { what: "y" }, at: "2026-10-01T00:00:00Z" }, NOW)).toEqual({
-      id, kind: "void", at: null, person_id: null, details: {}, note: null, voids: other,
+      id, kind: "void", at: null, person_id: null, details: {}, note: null, voids: other, parent_id: null,
     });
     expect(() => parseNewEvent({ id, kind: "void", voids: id }, NOW)).toThrow(/itself/);
   });

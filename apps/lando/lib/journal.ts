@@ -35,7 +35,7 @@ export type Person = { id: string; display_name: string };
 const PAGE = 1000;
 const MAX_PAGES = 20;
 
-const COLUMNS = "id, kind, at, person_id, details, note, voids, created_at";
+const COLUMNS = "id, kind, at, person_id, details, note, voids, parent_id, created_at";
 
 /**
  * Everything the screen needs in one read: the last `HORIZON_DAYS` before
@@ -120,6 +120,9 @@ export async function writeEvent(db: SupabaseClient, body: unknown, now = new Da
   if (next.kind === "health" && !next.voids) checkHealthReasons(next, null);
 
   let at: string | undefined = next.at ?? undefined;
+  // The link of an entry made from another (TEC-251) is kept by its correction: a corrected treat is still that
+  // entry's treat, so a correction that names none inherits the one it replaces.
+  let parentId = next.parent_id;
   if (next.voids) {
     const target = await findEvent(db, next.voids);
     const { data: voiders, error } = await db.from("events").select("id").eq("voids", next.voids).limit(1);
@@ -130,7 +133,10 @@ export async function writeEvent(db: SupabaseClient, body: unknown, now = new Da
       if (e instanceof InvalidEvent && /already changed/.test(e.message)) throw new Conflict(e.message);
       throw e;
     }
-    if (next.kind !== "void") at = correctionAt(next, target as JournalEvent);
+    if (next.kind !== "void") {
+      at = correctionAt(next, target as JournalEvent);
+      parentId = parentId ?? (target as JournalEvent).parent_id ?? null;
+    }
     if (next.kind === "health") checkHealthReasons(next, target);
   }
   if (next.kind === "void") at = undefined; // the database's now()
@@ -143,6 +149,7 @@ export async function writeEvent(db: SupabaseClient, body: unknown, now = new Da
     details: next.details,
     note: next.note,
     voids: next.voids,
+    ...(parentId ? { parent_id: parentId } : {}),
   };
   const { data, error } = await db.from("events").insert(row).select(COLUMNS).single();
   if (!error) return data as JournalEvent;

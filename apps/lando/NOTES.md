@@ -443,9 +443,31 @@
     it now has the count too, with this meaning (it was never read by Analytics; the feed still says "N treats"), so an old Fun
     entry's number and a new one's differ in meaning. Fun's Length box stays.
   - Deleting a training, fun or potty leaves its treats: they were eaten. Delete one from the feed if it was not.
-  - A correction shows the treats already logged with it ("Logged: …", `treatsWith`): live food treats at the entry's exact `at`,
-    to the millisecond. There is no link column. Moving the entry's When in a correction leaves its treats at the old time. The
-    count opens on 0 on a correction too, so nothing already logged is saved twice.
+  - A correction shows the treats already logged with it ("Logged: …", `treatsWith`): live food treats **made from the entry**
+    (`parent_id`, below), and, for a treat saved before TEC-251 (no link), live food treats at the entry's exact `at`, to the
+    millisecond. A treat that holds a link is never matched by time. Moving the entry's When in a correction leaves an old
+    treat at the old time (it drops off), and a linked one stays. The count opens on 0 on a correction too, so nothing already
+    logged is saved twice.
+- **Entries made from another entry store its id** (TEC-251, `lando.events.parent_id`, migration `lando_event_parent`, additive):
+  a treat counted on Potty, Training or Fun, a Pee or Poop tapped on a Fun form, a vet visit's weight. Nothing shows it: no feed,
+  Calendar or Analytics change; it is read only by `treatsWith`. Entries saved from Done on a plan keep `done_event` on the plan,
+  unchanged.
+  - **A plain nullable uuid, no foreign key, on purpose:** Fun's Pee and Poop save the moment they are tapped, before the Fun
+    entry, which may be saved later or never, so the link is the id the Fun entry *will* have; a foreign key would refuse that
+    save. Nothing is deleted, so a saved parent's id never dangles. A check (`events_parent_not_self`) refuses a link to itself. It
+    is a column, not a key in `details`, because `details_ok` is a closed list per kind and the link is the same for all three.
+    **A Fun form closed without saving leaves its Pee or Poop pointing at an entry that never existed;** the link is then inert.
+  - **The id is `saveId.current`, fixed when the form opens** (`LogForm.tsx`): the parent saves under it, and every child
+    (`inlineTreatEntries(..., parentId)`, `tapPotty`, `visitWeightPlan`'s `parent_id`) carries it, so a retry of either is the same
+    row with the same link. The child saves after the parent (`saveThen`) except Fun's taps, which save at once.
+  - **A correction of the parent leaves the old children's link as it is:** a correction is a new row under a new id, so
+    `treatsWith` walks the `voids` chain from the live entry to every id it replaced and matches a link to any of them. A treat
+    counted while correcting links to the correction's own id. A correction of a child keeps its link (`writeEvent` inherits
+    `parent_id` from the entry it replaces unless the body names one); a delete carries none.
+  - `parseNewEvent` takes `parent_id` only on food, potty and weight, a uuid, never the entry's own id; it does not check that the
+    parent exists. A weight keeps its `details.visit` too (the feed and the growth chart read that; `parent_id` is the same id).
+  - **Deploy order:** `lando_event_parent` before the code, because the journal read selects `parent_id` (an unapplied column
+    makes every journal load a 503). Old entries keep null.
 - **Training's commands** (TEC-193, laid out by TEC-199): a native multi-select over `COMMANDS` (a phone shows a checklist) in a half-width
   box beside Other dogs, with "Picked: Sit, Down" under the row once something is picked. The picks are stored exactly as before,
   filtered to the list's order (`parseDetails`).
@@ -702,8 +724,8 @@
   `retryingFetch` in `lib/supabase.ts` sends such a request once more after 300ms and returns
   the second answer as it is; any other 401 or status passes through, so a real key failure still
   shows. Do not widen it to other 401s, and do not swap it out of `getServiceClient`.
-- **A training's treats are found by its exact `at`** (`treatsWith`). Anything that rounds a
-  correction's time (the `datetime-local` input holds minutes only) unlinks them: an untouched
+- **A treat saved before TEC-251 is found by its parent's exact `at`** (`treatsWith`; a newer one by `parent_id`). Anything that
+  rounds a correction's time (the `datetime-local` input holds minutes only) unlinks an old one: an untouched
   When must keep sending `event.at` as it is. Compare with `Date.parse`, never as strings: the
   database spells the instant `+00:00`, the phone `Z`.
 - **A sheet inside a sheet must be portalled.** The bottom sheet rises with a `transform`, which
