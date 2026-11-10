@@ -544,6 +544,7 @@ export default function Logger() {
                           itemId={item.item_id}
                           name={item.name}
                           current={item.macros}
+                          entryItemId={day.date === localDate(new Date()) ? item.id : undefined}
                           onClose={() => setFixing(null)}
                           onSaved={() => {
                             setFixing(null);

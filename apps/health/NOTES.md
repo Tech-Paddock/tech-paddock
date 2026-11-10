@@ -17,6 +17,12 @@
 - **Snapshots**: `entry_items` carries the four macros and a NOT NULL `item_version_id`. `readDay`
   is a plain sum; a line without a snapshot is a `LookupError`, never zero. A version's `kind`
   (`correction` or `change`) is for a future backfill; none exists.
+- **A correction from today's log updates that line** (owner, 2026-11-09, TEC-69). The sheet sends
+  `entry_item_id` only when the day shown is the phone's today; `POST /api/items/version` re-reads
+  the line and `mayRewriteLine` (`lib/lineRewrite.ts`; `lib/entries.ts` must not touch `entry_items`) allows it only for a `correction` on that food,
+  eaten today, meal not deleted. `rewriteLine` repoints the line to the new version and copies its
+  numbers; no other line and no older day moves, and the old version stays in `item_versions`. The
+  version is written first, so a failed rewrite leaves a recorded correction and a 500 naming it.
 - **Dates** are the phone's, always sent. The page re-reads "today" on return to view and at every
   parse.
 - **After a save** (`lib/saved.ts`) the page re-reads today and looks for the saved entry; missing,

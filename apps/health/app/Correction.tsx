@@ -28,7 +28,8 @@ type Version = Macros & {
  *   the only thing a change means.
  *
  * **Neither moves a day already logged** (TEC-21): every logged line keeps the
- * numbers it was logged with, this line included. What the kind decides is
+ * numbers it was logged with. The one exception (TEC-69): a correction opened
+ * from a line logged today also updates that line. What the kind decides is
  * which figure a later log of an earlier date picks up, and what a backfill
  * would read to tell a day that was wrong from one that was right at the time.
  *
@@ -39,12 +40,15 @@ export default function Correction({
   itemId,
   name,
   current,
+  entryItemId,
   onClose,
   onSaved,
 }: {
   itemId: string;
   name: string;
   current: Macros;
+  /** The logged line this was opened from, only when that line is today's. */
+  entryItemId?: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -78,7 +82,10 @@ export default function Correction({
       const response = await fetch("/api/items/version", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ item_id: itemId, macros, kind, date }),
+        body: JSON.stringify({
+          item_id: itemId, macros, kind, date,
+          ...(entryItemId && kind === "correction" ? { entry_item_id: entryItemId } : {}),
+        }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Couldn't record that.");
@@ -137,7 +144,9 @@ export default function Correction({
           <span>
             The number was wrong.
             <span className="block text-[11px] text-ink-soft">
-              Used from your next log on. Days already logged keep their numbers.
+              {entryItemId
+                ? "Fixes this line from today and applies from your next log on. Other lines and earlier days keep their numbers."
+                : "Used from your next log on. Days already logged keep their numbers."}
             </span>
           </span>
         </label>
