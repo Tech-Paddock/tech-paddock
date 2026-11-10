@@ -705,20 +705,51 @@ test("settings.json lets Linear through without a click, except what cannot be u
       "mcp__claude_ai_Linear__get_issue",
       "mcp__claude_ai_Linear__list_issues",
       "mcp__claude_ai_Vercel__list_deployments",
+      "mcp__claude_ai_Linear",
+      "mcp__claude_ai_Vercel__get_deployment",
+      "mcp__claude_ai_Vercel__list_projects",
+      "mcp__claude_ai_Vercel__get_project",
+      "mcp__claude_ai_Vercel__get_runtime_logs",
+      "mcp__claude_ai_Vercel__get_runtime_errors",
+      "mcp__claude_ai_Vercel__list_deployment_events",
+      "mcp__claude_ai_Supabase__list_migrations",
+      "mcp__claude_ai_Supabase__list_tables",
+      "mcp__claude_ai_Supabase__get_advisors",
       "Bash(git fetch)",
       "Bash(git fetch *)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git rev-parse *)",
+      "Bash(git rev-list *)",
+      "Bash(git merge-base *)",
+      "Bash(git worktree list)",
+      "Bash(git branch -r)",
+      "Bash(node --test *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh run list *)",
       "Bash(node scripts/drift-check.mjs)",
       "Bash(npx tsc --noEmit)",
     ],
-    "allow is Linear plus the owner's read-only list (TEC-253), nothing more"
+    "allow is Linear plus the owner's read-only list (TEC-253, widened for the PC), nothing more"
   );
-  assert.deepEqual(deny, []);
-  for (const t of ["delete_attachment", "delete_comment", "delete_diff_comment", "delete_status_update", "retire_issue_label", "retire_project_label", "merge_diff", "update_diff", "submit_diff_review"]) {
-    assert.ok(ask.includes(`mcp__Linear__${t}`), `mcp__Linear__${t} must still ask`);
+  // On the PC the gh token, ssh keys and git credentials sit on disk; the guard
+  // stops a shell from printing them, and these stop the file-read tool.
+  assert.deepEqual(deny, ["Read(~/.config/gh/**)", "Read(~/.ssh/**)", "Read(~/.git-credentials)"]);
+  // The cloud named the Linear server `Linear`; the PC names it `claude_ai_Linear`.
+  for (const server of ["Linear", "claude_ai_Linear"]) {
+    for (const t of ["delete_attachment", "delete_comment", "delete_diff_comment", "delete_status_update", "retire_issue_label", "retire_project_label", "merge_diff", "update_diff", "submit_diff_review"]) {
+      assert.ok(ask.includes(`mcp__${server}__${t}`), `mcp__${server}__${t} must still ask`);
+    }
   }
-  for (const rule of ask) assert.match(rule, /^mcp__Linear__\w+$/, `${rule} names one Linear tool`);
+  for (const rule of ask) assert.match(rule, /^mcp__(claude_ai_)?Linear__\w+$/, `${rule} names one Linear tool`);
   // The guard still sees Linear issue writes, whatever the allow rule says.
   assert.ok(hookFor("mcp__Linear__save_issue"));
+  assert.ok(hookFor("mcp__claude_ai_Linear__save_issue"));
 });
 
 test("end to end: the real commands deny, ask and allow", () => {
