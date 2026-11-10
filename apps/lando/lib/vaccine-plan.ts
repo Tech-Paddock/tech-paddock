@@ -78,6 +78,8 @@ export function visitVaccineEntries(x: {
   at: string;
   personId: string | null;
   events: JournalEvent[];
+  /** Lando's birth date from the Profile (TEC-260), when known; the age then decides the puppy series. */
+  birthOn?: string | null;
   idFor: (vaccine: string) => string;
   planNext: boolean;
 }): { entries: FollowUp[]; plans: Record<string, UpcomingInput> } {
@@ -97,7 +99,7 @@ export function visitVaccineEntries(x: {
       parent_id: x.visitId,
     });
     if (x.planNext) {
-      const next = nextDose({ vaccine, givenOn: toDateInput(x.at), dose, earlier });
+      const next = nextDose({ vaccine, givenOn: toDateInput(x.at), dose, earlier, birthOn: x.birthOn });
       plans[id] = nextDosePlan({ vaccine, dose, series: next.series, on: next.on });
     }
   }

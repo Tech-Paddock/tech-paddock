@@ -68,6 +68,8 @@ import Calendar from "./Calendar";
 import UpcomingList from "./UpcomingList";
 import LogForm, { Box, WHO_WIDTH, input, type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
+import Profile from "./Profile";
+import { EMPTY_PROFILE, OPEN_PROFILE, mergeEvents, type ProfileDetails } from "@/lib/profile";
 
 type Loaded = { events: JournalEvent[]; people: Person[]; dogs: Dog[]; foods: AddedFood[]; medications: Medication[] };
 
@@ -168,6 +170,11 @@ export default function Journal() {
   // Signed URLs of health photos by storage path: the read's, plus every upload this session made.
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
+  // Profile (TEC-260): opened from the app bar's icon, in place of the tabs. The stored details and the all-time
+  // vaccine and vet history are read apart from the journal, so one failing never blanks the other.
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileData, setProfileData] = useState<{ details: ProfileDetails; history: JournalEvent[] } | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [personError, setPersonError] = useState<string | null>(null);
@@ -202,6 +209,18 @@ export default function Journal() {
     }
   }, []);
 
+  const loadProfile = useCallback(async () => {
+    try {
+      const res = await fetch("/api/profile", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setProfileData({ details: data.profile ?? EMPTY_PROFILE, history: data.history ?? [] });
+      setProfileError(null);
+    } catch (e) {
+      setProfileError((e as Error).message || "couldn't reach the server");
+    }
+  }, []);
+
   const load = useCallback(async () => {
     try {
       const res = await fetch(`/api/journal?since=${encodeURIComponent(sinceRef.current.toISOString())}`, {
@@ -222,7 +241,8 @@ export default function Journal() {
       setLoadError((e as Error).message || "couldn't reach the server");
     }
     void loadUpcoming();
-  }, [loadUpcoming]);
+    void loadProfile();
+  }, [loadUpcoming, loadProfile]);
 
   const updatePending = useCallback((fn: (list: Pending[]) => Pending[]) => {
     setPending((prev) => {
@@ -297,6 +317,32 @@ export default function Journal() {
     []
   );
 
+  // Profile's Edit: saved and awaited, so a refused detail stays on the form with the reason (nothing typed is logged).
+  async function saveProfile(details: ProfileDetails): Promise<{ error: string | null }> {
+    try {
+      const { ok, data } = await postJson("/api/profile", details);
+      if (!ok) return { error: data.error ?? "couldn't save" };
+      setProfileData((prev) => ({ details: data.profile, history: prev?.history ?? [] }));
+      say("Profile saved");
+      return { error: null };
+    } catch (e) {
+      return { error: e instanceof TypeError ? "no connection — try again" : (e as Error).message };
+    }
+  }
+
+  // Profile's Plan next: the vaccine's next dose added as an upcoming plan, awaited so the row can say so or show why not.
+  async function planFromProfile(item: UpcomingInput): Promise<{ error: string | null }> {
+    try {
+      const { ok, data } = await postJson("/api/upcoming", { action: "add", item });
+      if (!ok) return { error: data.error ?? "couldn't add" };
+      setUpcoming((prev) => [...(prev ?? []).filter((i) => i.id !== data.item.id), data.item]);
+      say(`${item.title} planned`);
+      return { error: null };
+    } catch (e) {
+      return { error: e instanceof TypeError ? "no connection — try again" : (e as Error).message };
+    }
+  }
+
   const save = useCallback(
     async function save(body: LogBody, announce: boolean, then?: LogBody[]): Promise<void> {
       const after = then?.length ? then : undefined;
@@ -367,6 +413,16 @@ export default function Journal() {
       window.removeEventListener("focus", back);
     };
   }, [load]);
+
+  // The app bar's icon asks for Profile (TEC-260).
+  useEffect(() => {
+    const open = () => {
+      setProfileOpen(true);
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener(OPEN_PROFILE, open);
+    return () => window.removeEventListener(OPEN_PROFILE, open);
+  }, []);
 
   // A new day at midnight with the app open.
   useEffect(() => {
@@ -666,6 +722,7 @@ export default function Journal() {
       <nav
         role="tablist"
         aria-label="Lando"
+        hidden={profileOpen}
         className="sticky z-10 border-b border-line bg-paper"
         style={{ top: "env(safe-area-inset-top, 0px)" }}
       >
@@ -688,7 +745,24 @@ export default function Journal() {
         </div>
       </nav>
 
-      <div className="mx-auto max-w-md px-3 pb-10 pt-3">
+      {profileOpen && (
+        <Profile
+          details={profileData?.details ?? null}
+          loadError={profileError}
+          events={mergeEvents(profileData?.history ?? [], loaded?.events ?? [])}
+          upcoming={upcoming}
+          medications={medications}
+          today={today}
+          onBack={() => setProfileOpen(false)}
+          onRetry={() => void loadProfile()}
+          onSave={saveProfile}
+          onPlanNext={planFromProfile}
+          onDone={doneUpcoming}
+          onEditPlan={editUpcoming}
+        />
+      )}
+
+      <div hidden={profileOpen} className="mx-auto max-w-md px-3 pb-10 pt-3">
         {loadError && (
           <div className="mb-3 flex items-center gap-3 rounded-xl border border-urgent/40 bg-urgent/10 px-3 py-2 text-sm">
             <span className="flex-1">
@@ -1115,6 +1189,7 @@ export default function Journal() {
             onSetMedicationReason={setMedicationReason}
             phonePerson={person?.id ?? null}
             events={entries}
+            birthOn={profileData?.details.birth_on ?? null}
             allEvents={loaded?.events}
             photoUrls={photoUrls}
             onPhotoUrl={rememberPhotoUrl}
