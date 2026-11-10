@@ -180,7 +180,7 @@ describe("the Related note select", () => {
   it("the form saves the pick through noteLink on every Health type and on Training only", () => {
     const src = readFileSync(resolve(__dirname, "../app/LogForm.tsx"), "utf8");
     const raw = rawDetailsOf(src);
-    expect(raw.match(/\.\.\.noteLink\(noteId\)/g)).toHaveLength(3); // training, medication, vet and issue
+    expect(raw.match(/\.\.\.noteLink\(noteId\)/g)).toHaveLength(4); // training, vaccine (TEC-259), medication, vet and issue
     expect(raw).toMatch(/exType === "training" \? \{ commands, \.\.\.noteLink\(noteId\) \}/);
   });
 });

@@ -24,6 +24,7 @@ import UpcomingList from "./UpcomingList";
 const PLAN_CHOICES: { label: string; form: FormKind; healthType?: HealthType }[] = [
   { label: HEALTH_LABELS.vet, form: "health", healthType: "vet" },
   { label: HEALTH_LABELS.medication, form: "health", healthType: "medication" },
+  { label: HEALTH_LABELS.vaccine, form: "health", healthType: "vaccine" },
   { label: HEALTH_LABELS.issue, form: "health", healthType: "issue" },
   { label: FORM_LABELS.training, form: "training" },
   { label: FORM_LABELS.food, form: "food" },

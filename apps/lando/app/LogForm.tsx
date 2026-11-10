@@ -45,6 +45,7 @@ import {
   outMinutesAria,
   outMinutesChip,
   visitWeightPlan,
+  earlierDoses,
   weight as asWeight,
   type CommandId,
   type Details,
@@ -66,6 +67,9 @@ import { plannedWhen } from "@/lib/calendar";
 import { FUTURE_NOTICE, donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, isFuturePick, type DonePrefill } from "@/lib/future";
 import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
+import { VACCINES, hasDoses, suggestedDose } from "@/lib/vaccines";
+import { nextDose, nextDosePlan, visitVaccineEntries } from "@/lib/vaccine-plan";
+import { NextDoseOffer, VaccinePick, VaccinesGiven } from "./VaccineFields";
 import TreatQty from "./TreatQty";
 import TreatCount from "./TreatCount";
 import PhotoPicker, { usePhotos } from "./Photos";
@@ -142,9 +146,10 @@ type Props = {
   weightUnit: Unit;
   /**
    * A new entry: handed off at once, never awaited (RULES.md, Never 5). `then`
-   * are the follow-ups (a treat count's entry, a vet visit's weight), saved once the entry itself is.
+   * are the follow-ups (a treat count's entry, a vet visit's weight, the vaccines given), saved once the entry itself is.
+   * `plans` (TEC-259) are next doses to plan, each keyed by the id of the entry it follows and added once that is saved.
    */
-  onLog: (body: LogBody, then?: LogBody[]) => void;
+  onLog: (body: LogBody, then?: LogBody[], plans?: Record<string, UpcomingInput>) => void;
   /** A correction or a delete: awaited, and its error shown here. `then` are saved once it succeeds. */
   onChange: (body: Record<string, unknown>, then?: LogBody[]) => Promise<{ error: string | null }>;
   /** A future When (TEC-199): saves an upcoming item instead of an entry. Awaited, and its error shown here. */
@@ -438,6 +443,17 @@ export default function LogForm({
     h?.unit ?? ((MED_UNITS as readonly string[]).includes(prefill?.unit ?? "") ? (prefill!.unit as MedUnit) : findMedication(medications, h?.med_id ?? prefill?.medId ?? "")?.unit ?? "mg")
   );
   const [route, setRoute] = useState<MedRoute>(h?.route ?? "mouth");
+  // A vaccine (TEC-259): which one and its dose number. The dose opens on one more than those already logged until it
+  // is touched. A Done on a planned dose opens on its vaccine and dose.
+  const [vaccine, setVaccine] = useState(h?.type === "vaccine" ? h.vaccine ?? "" : prefill?.vaccine ?? "");
+  const [vDose, setVDose] = useState(h?.type === "vaccine" ? (h.dose ? String(h.dose) : "") : prefill?.vaccineDose ? String(prefill.vaccineDose) : "");
+  const [vDoseTouched, setVDoseTouched] = useState(h?.type === "vaccine" || !!prefill?.vaccineDose);
+  // A vet visit's Vaccines given: each is its own Vaccine entry linked to the visit. A new visit only.
+  const [given, setGiven] = useState<string[]>([]);
+  const givenIds = useRef(new Map<string, string>());
+  // The offer to plan the next dose, ticked unless the person unticks it; and the day, once they change it.
+  const [planNext, setPlanNext] = useState(true);
+  const [nextOn, setNextOn] = useState<string | null>(null);
   // "Add a medication…": the inline form under the pick. It never becomes the pick; the new medication does.
   const [addingMed, setAddingMed] = useState(false);
   const [medName, setMedName] = useState("");
@@ -499,6 +515,21 @@ export default function LogForm({
   // The form opened on a time of its own (a correction, a Done, an open plan, the Calendar's Add a plan): the picker
   // opens on it, and handing it back keeps it exactly.
   const openedOnTime = editing || whenTouched;
+
+  // The vaccine's numbers (TEC-259), read each render: the day it is given (the When row's), how many of it are already
+  // logged, the dose that opens (one more) until it is touched, and the next dose the rules suggest.
+  const givenOn = /^\d{4}-\d{2}-\d{2}$/.test(when.slice(0, 10)) ? when.slice(0, 10) : toDateInput(openedAt.current);
+  const givenAt = fromLocalInput(when) ?? openedAt.current;
+  const vEarlier = vaccine ? earlierDoses(events, vaccine, givenAt, event?.id) : 0;
+  const vDoseShown = vDoseTouched ? vDose : (suggestedDose(vaccine, vEarlier)?.toString() ?? "");
+  const vDoseNum = hasDoses(vaccine) && vDoseShown ? Number(vDoseShown) : null;
+  const suggest = vaccine ? nextDose({ vaccine, givenOn, dose: vDoseNum, earlier: vEarlier }) : null;
+  const nextDay = nextOn ?? suggest?.on ?? givenOn;
+  // A vet visit's picks, each with the day its next dose would be planned for.
+  const givenItems = VACCINES.filter((v) => given.includes(v.id)).map((v) => {
+    const earlier = earlierDoses(events, v.id, givenAt);
+    return { label: v.label, day: nextDose({ vaccine: v.id, givenOn, dose: suggestedDose(v.id, earlier), earlier }).on };
+  });
 
   /** The When row changed (TEC-261): from now on the time is the person's, not the moment of Save. */
   function pickWhen(v: string) {
@@ -677,6 +708,9 @@ export default function LogForm({
             ...attachments,
           };
         }
+        if (healthType === "vaccine") {
+          return { type: "vaccine", vaccine, ...(vDoseNum ? { dose: vDoseNum } : {}), ...noteLink(noteId), ...attachments };
+        }
         return {
           type: healthType,
           reasons: healthReasonsFromPick(reason === HEALTH_KEPT && h?.type !== healthType ? "" : reason, keptReasons),
@@ -701,6 +735,7 @@ export default function LogForm({
         repeatEvery: every,
         repeatUnit: repeatOn ? repeatUnit : null,
         reason: reason === HEALTH_KEPT ? "" : reason,
+        vaccine: healthType === "vaccine" && vaccine ? { id: vaccine, dose: vDoseNum } : null,
         med: healthType === "medication" ? { name: pickedMed?.name ?? "", dose: Number(dose.replace(",", ".")) || null, unit: medUnit } : null,
         photos: photos.paths,
         names: Object.keys(photos.names).length ? photos.names : undefined,
@@ -771,8 +806,12 @@ export default function LogForm({
       return;
     }
     // The pick is the headline; the note is the story, and it is required for a vet visit or an issue (TEC-139).
-    if (kind === "health" && healthType !== "medication" && !note.trim()) {
+    if (kind === "health" && healthType !== "medication" && healthType !== "vaccine" && !note.trim()) {
       failOnForm("Say what happened — the note is required.");
+      return;
+    }
+    if (kind === "health" && healthType === "vaccine" && !vaccine) {
+      failOnForm("Pick the vaccine.");
       return;
     }
     if (kind === "health" && healthType === "medication") {
@@ -826,6 +865,7 @@ export default function LogForm({
     // The treat count on Potty, Training and Fun: one Misc treat entry at this entry's time and person, amount
     // the count, saved after it, and none at 0 (TEC-199).
     let then: LogBody[] = [];
+    let plans: Record<string, UpcomingInput> | undefined;
     try {
       if (kind === "potty" || kind === "exercise") {
         then = inlineTreatEntries({ id: treatId.current, item_id: MISC_ID, qty: treatQty }, at, body.person_id, foods, body.id);
@@ -842,12 +882,37 @@ export default function LogForm({
           personId: body.person_id,
         });
       }
+      // A vet visit's Vaccines given: each its own Vaccine entry, linked to the visit (TEC-259).
+      if (kind === "health" && healthType === "vet" && !editing && given.length) {
+        const v = visitVaccineEntries({
+          given,
+          visitId: body.id,
+          at,
+          personId: body.person_id,
+          events,
+          idFor: (id) => {
+            const old = givenIds.current.get(id);
+            if (old) return old;
+            const fresh = crypto.randomUUID();
+            givenIds.current.set(id, fresh);
+            return fresh;
+          },
+          planNext,
+        });
+        then = [...then, ...v.entries];
+        if (Object.keys(v.plans).length) plans = v.plans;
+      }
+      // A Vaccine entry's offer to plan the next dose, on the day in the box.
+      if (kind === "health" && healthType === "vaccine" && !editing && planNext && suggest) {
+        plans = { [body.id]: nextDosePlan({ vaccine, dose: vDoseNum, series: suggest.series, on: nextDay }) };
+      }
     } catch (err) {
       failOnForm(err instanceof InvalidEvent ? err.message : "check the form");
       return;
     }
     if (!editing) {
-      onLog(body, then);
+      if (plans) onLog(body, then, plans);
+      else onLog(body, then);
       return;
     }
     setBusy(true);
@@ -875,6 +940,8 @@ export default function LogForm({
   const title =
     form === "fun" ? EXERCISE_LABELS[exType] : form === "health" ? HEALTH_LABELS[healthType] : FORM_LABELS[form];
   const photoBlock = photos.working || photos.failed;
+  // A vet visit and a medical issue need the story; a dose and a vaccine do not (TEC-139, TEC-199, TEC-259).
+  const noteRequired = kind === "health" && healthType !== "medication" && healthType !== "vaccine";
 
   // The medical issue link (TEC-142, TEC-199): None and the recent live medical issues, newest first, by date
   // and pick. Potty puts it behind a checkbox (TEC-161); a vet visit and a medication dose show it all the time
@@ -1252,7 +1319,7 @@ export default function LogForm({
             <Field label="Type">
               <Seg name="health-type" label="Type" value={healthType} onChange={pickHealthType} options={HEALTH_TYPES.map((t) => [t, HEALTH_LABELS[t]] as const)} />
             </Field>
-            {healthType !== "medication" && (
+            {(healthType === "vet" || healthType === "issue") && (
               /* One plain select, like Other dogs (TEC-139); the detail goes in the note. */
               <Field label={healthType === "vet" ? "Why" : "What"} htmlFor="f-reason">
                 <select id="f-reason" value={reason} onChange={(e) => setReason(e.target.value)} className={inputHalf}>
@@ -1286,6 +1353,28 @@ export default function LogForm({
                   <Seg name="visit-unit" label="Unit" value={visitUnit} onChange={setVisitUnit} options={UNITS.map((u) => [u, u] as const)} />
                 </Field>
               </div>
+            )}
+            {healthType === "vaccine" && (
+              <>
+                <VaccinePick
+                  vaccine={vaccine}
+                  onVaccine={setVaccine}
+                  dose={vDoseShown}
+                  onDose={(d) => {
+                    setVDose(d);
+                    setVDoseTouched(true);
+                  }}
+                />
+                {!editing && !planning && (
+                  <NextDoseOffer on={planNext} onOn={setPlanNext} day={nextDay} onDay={setNextOn} text={suggest?.text} />
+                )}
+              </>
+            )}
+            {healthType === "vet" && !editing && !planning && (
+              <>
+                <VaccinesGiven given={given} onToggle={(id) => setGiven((g) => (g.includes(id) ? g.filter((x) => x !== id) : [...g, id]))} />
+                {given.length > 0 && <NextDoseOffer on={planNext} onOn={setPlanNext} items={givenItems} />}
+              </>
             )}
             {healthType === "medication" && (
               <>
@@ -1473,13 +1562,13 @@ export default function LogForm({
             </div>
           )}
           {kind === "potty" && issueSelect && <div className="w-1/2 min-w-0">{issueSelect}</div>}
-          {kind === "health" && healthType !== "issue" && (
+          {kind === "health" && healthType !== "issue" && healthType !== "vaccine" && (
             <div className="grid grid-cols-2 gap-2">
               {issueField}
               {noteField}
             </div>
           )}
-          {kind === "health" && healthType === "issue" && <div className="w-1/2 min-w-0">{noteField}</div>}
+          {kind === "health" && (healthType === "issue" || healthType === "vaccine") && <div className="w-1/2 min-w-0">{noteField}</div>}
           {sessionTreats.length > 0 && <LoggedTreats treats={sessionTreats} />}
           {/* Pee and Poop (TEC-186): a Fun form only, on a new entry. Each tap is its own potty entry,
               saved at once and independent of whether this Fun entry is. */}
@@ -1542,9 +1631,9 @@ export default function LogForm({
             onChange={(e) => setNote(e.target.value)}
             rows={2}
             maxLength={500}
-            required={kind === "health" && healthType !== "medication"}
-            aria-required={kind === "health" && healthType !== "medication" ? "true" : undefined}
-            placeholder={kind === "health" && healthType !== "medication" ? "What happened?" : "Optional"}
+            required={noteRequired}
+            aria-required={noteRequired ? "true" : undefined}
+            placeholder={noteRequired ? "What happened?" : "Optional"}
             className={`${inputFull} block resize-none overflow-y-auto leading-snug`}
           />
         </Field>

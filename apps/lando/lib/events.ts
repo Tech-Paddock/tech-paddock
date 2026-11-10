@@ -19,6 +19,7 @@
 import { FOOD_TYPES, FOOD_UNITS, SERVING_UNIT, cleanFoodName, isMealType, listOf, findFood, foodNameTaken, formatAmount, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "./foods";
 import { dateLabel, fromDateInput, localMidnight, shortDate, toDateInput } from "./localtime";
 import { DOSE_MAX, MED_NAME_MAX, MED_REASON_IDS, medReasonLabel, type MedReason, MED_ROUTES, MED_ROUTE_LABELS, MED_UNITS, cleanMedName, doseText, findMedication, medNameTaken, type MedRoute, type MedUnit, type Medication } from "./medications";
+import { DOSE_MAX as VACCINE_DOSE_MAX, VACCINE_IDS, hasDoses, vaccineText } from "./vaccines";
 
 export const LOG_KINDS = ["potty", "food", "exercise", "weight", "health", "note"] as const;
 export type LogKind = (typeof LOG_KINDS)[number];
@@ -264,9 +265,9 @@ export type WeightDetails = {
  * A vet visit, a medical issue noticed at home, or a medication dose (TEC-199). Photos can go on any. A vet
  * visit and an issue pick a reason; a medication names a medication, a dose, a unit and how it was given.
  */
-export const HEALTH_TYPES = ["vet", "issue", "medication"] as const;
+export const HEALTH_TYPES = ["vet", "issue", "medication", "vaccine"] as const;
 export type HealthType = (typeof HEALTH_TYPES)[number];
-export const HEALTH_LABELS: Record<HealthType, string> = { vet: "Vet visit", issue: "Medical issue", medication: "Medication" };
+export const HEALTH_LABELS: Record<HealthType, string> = { vet: "Vet visit", issue: "Medical issue", medication: "Medication", vaccine: "Vaccine" };
 
 /**
  * Why we went to the vet: one high-level pick (TEC-139), the detail goes in
@@ -353,7 +354,7 @@ export const HEALTH_KEPT = "__kept";
  * a retired one) opens on `HEALTH_KEPT` carrying those reasons as they were.
  */
 export function healthPickFor(h: Pick<HealthDetails, "type" | "reasons"> | null): { pick: string; kept: string[] | null } {
-  if (!h || h.type === "medication") return { pick: "", kept: null };
+  if (!h || h.type === "medication" || h.type === "vaccine") return { pick: "", kept: null };
   const [only] = h.reasons;
   if (h.reasons.length === 1 && healthOptions(h.type).some(([id]) => id === only)) return { pick: only, kept: null };
   return { pick: HEALTH_KEPT, kept: [...h.reasons] };
@@ -372,7 +373,7 @@ export function healthReasonsFromPick(pick: string, kept: readonly string[] | nu
  */
 export function checkHealthReasons(next: { details: Details }, target: { kind: string; details: Details } | null): void {
   const d = next.details as HealthDetails;
-  if (d.type === "medication") return; // a dose has no reason; `parseDetails` holds its own checks
+  if (d.type === "medication" || d.type === "vaccine") return; // a dose or a vaccine has no reason; `parseDetails` holds its own checks
   if (d.reasons.length === 1 && healthOptions(d.type).some(([id]) => id === d.reasons[0])) return;
   if (target?.kind === "health") {
     const t = target.details as HealthDetails;
@@ -437,6 +438,8 @@ export type HealthDetails = {
   dose?: number;
   unit?: MedUnit;
   route?: MedRoute;
+  /** A vaccine only (TEC-259): the `VACCINES` id, and its dose number when it has one (`dose` is also a medication's amount). */
+  vaccine?: string;
   /** Storage paths, 1 to MAX_PHOTOS; no key when there are none. */
   photos?: string[];
   names?: Record<string, string>;
@@ -618,6 +621,29 @@ export function treatsWith(events: JournalEvent[], training: Pick<JournalEvent, 
       food(e).type === "treat" &&
       (e.parent_id ? ids.has(e.parent_id) : Date.parse(e.at) === t)
   );
+}
+
+/**
+ * The vaccines given at a vet visit (TEC-259): live Vaccine entries whose `parent_id` is the visit's id or the id of any
+ * entry the live visit replaced (a correction of the visit leaves the link on the old id, so the chain through
+ * `voids` is followed, as `treatsWith` does). Oldest first. A vaccine logged by itself has no parent and is never here.
+ */
+export function vaccinesWith(events: JournalEvent[], visitId: string): JournalEvent[] {
+  const ids = new Set<string>();
+  const replaced = new Map<string, string>();
+  for (const e of events) if (e.voids && e.kind !== "void") replaced.set(e.id, e.voids);
+  for (let id: string | undefined = visitId; id && !ids.has(id); id = replaced.get(id)) ids.add(id);
+  return liveEvents(events)
+    .filter((e) => e.kind === "health" && health(e).type === "vaccine" && !!e.parent_id && ids.has(e.parent_id))
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || a.id.localeCompare(b.id));
+}
+
+/** How many live Vaccine entries of this vaccine were logged at or before `at`: what a new entry's dose number counts from. */
+export function earlierDoses(events: JournalEvent[], vaccine: string, at: string, exceptId?: string): number {
+  const t = Date.parse(at);
+  return liveEvents(events).filter(
+    (e) => e.kind === "health" && health(e).type === "vaccine" && health(e).vaccine === vaccine && e.id !== exceptId && Date.parse(e.at) <= t
+  ).length;
 }
 
 /**
@@ -1196,11 +1222,16 @@ export function describe(
           : "";
       // Its medication's reason (TEC-233), "No reason" until one is set; nothing when the list is not at hand.
       const medFound = h.type === "medication" && h.med_id ? findMedication(meds, h.med_id) : null;
+      // A vaccine reads "Vaccine  DHPP · dose 2" (TEC-259); a vet visit lists the vaccines given at it.
+      const shot = h.type === "vaccine" && h.vaccine ? vaccineText(h.vaccine, h.dose) : "";
+      const given = h.type === "vet" && e.id ? vaccinesWith(events, e.id).map((v) => vaccineText(health(v).vaccine ?? "", health(v).dose)) : [];
       const parts = [
         dose,
+        shot,
         medFound ? medReasonLabel(medFound.reason) : "",
         (h.reasons ?? []).map((id) => healthReasonLabel(h.type, id)).join(", "),
         w ? `${round1(weight(w).value)} ${weight(w).unit}` : "",
+        given.length ? `gave ${given.join(", ")}` : "",
         h.issue ? issueLinkText(events, h.issue) : "",
         attachmentsText(h.photos ?? []),
       ];
@@ -1352,6 +1383,24 @@ export function parseNewFood(
   }
   if (foodNameTaken(type, name, added)) throw new InvalidEvent(`${name} is already in the list`);
   return { type, name, unit, kcalPer };
+}
+
+/**
+ * A vaccine from what the form sends ({vaccine, dose?, note_id?, photos?}) (TEC-259). The vaccine must be in the list
+ * (a retired one too, so an old entry can be corrected); a dose number is a whole 1 to `DOSE_MAX`, and only for a
+ * vaccine that has one. It stores no `reasons` key, as a medication stores none.
+ */
+function vaccineDetails(r: Record<string, unknown>): HealthDetails {
+  if (typeof r.vaccine !== "string" || !VACCINE_IDS.includes(r.vaccine)) throw new InvalidEvent("pick a vaccine from the list");
+  const out = { type: "vaccine", vaccine: r.vaccine } as HealthDetails;
+  if (r.dose !== undefined && r.dose !== null) {
+    if (!hasDoses(r.vaccine)) throw new InvalidEvent(`${vaccineText(r.vaccine)} has no dose number`);
+    out.dose = wholeNumber(r.dose, "dose", 1, VACCINE_DOSE_MAX);
+  }
+  const noteId = parseNoteId(r.note_id);
+  if (noteId) out.note_id = noteId;
+  Object.assign(out, parseAttachments(r));
+  return out;
 }
 
 /**
@@ -1510,6 +1559,7 @@ export function parseDetails(kind: Kind, raw: unknown, added: readonly AddedFood
     case "health": {
       const type = oneOf(r.type, HEALTH_TYPES, "type");
       if (type === "medication") return medicationDetails(r, meds);
+      if (type === "vaccine") return vaccineDetails(r);
       const accepted = healthAccepted(type);
       const picked = r.reasons;
       if (!Array.isArray(picked) || picked.some((c) => typeof c !== "string" || !accepted.some(([id]) => id === c))) {
@@ -1556,9 +1606,6 @@ export function parseNewEvent(body: unknown, now: Date, added: readonly AddedFoo
   // before the Fun entry, which may never be. Only what a form makes from another entry carries one.
   if (b.parent_id !== undefined && b.parent_id !== null && !isUuid(b.parent_id)) throw new InvalidEvent("parent_id must be a UUID");
   const parent_id = (b.parent_id as string | null | undefined) ?? null;
-  if (parent_id && !(kind === "food" || kind === "potty" || kind === "weight")) {
-    throw new InvalidEvent("only a treat, a potty or a weight is made from another entry");
-  }
   if (parent_id === b.id) throw new InvalidEvent("an entry cannot be made from itself");
 
   let at: string | null = null;
@@ -1578,8 +1625,12 @@ export function parseNewEvent(body: unknown, now: Date, added: readonly AddedFoo
   // A note's words are its details.text (up to 2000); the event's own 500-character note stays empty for it.
   const note = kind === "void" || kind === "note" ? null : (text(b.note, "note", 500) ?? null);
   const details = parseDetails(kind as Kind, b.details, added, meds);
-  // A vet visit or an issue needs the story: the pick is only the headline (TEC-139). A dose does not (TEC-199).
-  if (kind === "health" && !note && (details as HealthDetails).type !== "medication") {
+  // Only what a form makes from another entry carries a link: a treat, a potty, a weight, or a vaccine given at a vet visit.
+  if (parent_id && !(kind === "food" || kind === "potty" || kind === "weight" || (kind === "health" && (details as HealthDetails).type === "vaccine"))) {
+    throw new InvalidEvent("only a treat, a potty, a weight or a vaccine is made from another entry");
+  }
+  // A vet visit or an issue needs the story: the pick is only the headline (TEC-139). A dose or a vaccine does not (TEC-199, TEC-259).
+  if (kind === "health" && !note && (details as HealthDetails).type !== "medication" && (details as HealthDetails).type !== "vaccine") {
     throw new InvalidEvent("say what happened — the note is required");
   }
 
