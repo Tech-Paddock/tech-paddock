@@ -16,23 +16,25 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 - Quiet secondary controls (owner, TEC-250): Next 7 days is one short line per plan with a
   Calendar link; Treats is a plain counter, and Medical issue is its own checkbox, on Potty only;
   attachments are one small Attach link with thumbnails in a row.
-- A form has no When field (owner, TEC-252, TEC-255). Save opens the phone's own date and time
-  picker, set to now (Weight: a date); confirming it saves, with no Now and no When step. A future
-  time still saves as a plan, and on a new entry asks its Repeat in a small step first. A form that
-  opened on a time of its own (a correction, a Done, an Add a plan) opens the picker on that time. A
-  failed save keeps the picked time, and Retry does not reopen the picker. Logging as sits at the
-  bottom beside Save, on every form.
+- Every form's bottom row is When and Logging as, each half the row (owner, TEC-261): a date box
+  that opens the calendar from a tap anywhere on it, and one time box whose hour, minute and AM/PM
+  scroll in place. Weight is a date only, and a note is never in the future. The row opens on now,
+  or on the entry's own time (a correction, a Done, an Add a plan). Save is on its own line below:
+  one tap saves at that time and nothing opens after it. A future time shows the form's Repeat and
+  "Future: saves as upcoming", and Save reads Save plan. A failed save keeps the chosen time.
 - One field class (owner, TEC-255): every text box, number box and select has the same padding, a
   44px height and a fixed width, never one taken from its content. The default is half its section;
-  a full-width field has a stated reason (the Note). Save is 44px tall and only as wide as its label;
-  Who is a fixed width. On Potty, What and Where sit side by side.
-- Next 7 days sits under the Log tab's Logging as row, above the Feed (TEC-255).
+  a full-width field has a stated reason (the Note). Save is 44px tall and only as wide as its label.
+  On Potty, Where is on its own line under What (TEC-263). On Food, Servings is the left box at about
+  its label's width and What takes the rest of the row, wider than half because it holds a food's name.
+- Next 7 days sits in a box under the Log tab's Logging as row, above the Feed (TEC-255, TEC-263).
 - On a form, Training's Related note shares a line with Treats; a vet visit's and a medication dose's
   Related issue and Related note sit side by side. The Meals pill shows the count only, never cups
   (TEC-252).
 - A Meal's and a Snuffle mat's amount is a Servings select in halves, ½ to 4, at a fixed width, and
   is stored with unit `serving`; a treat keeps its own count, and older meals keep their cups (owner,
-  TEC-257).
+  TEC-257). A new Meal opens on 1 serving and a new Snuffle mat on ½; the last amount is not
+  remembered (TEC-263).
 - Every form opens as a bottom sheet.
 - Installable through `/app.webmanifest`.
 
