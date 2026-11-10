@@ -13,6 +13,13 @@
   failure is a sentence plus its raw code (`lib/diagnostics.ts`). Rules drift is baked at build by
   `scripts/collect-drift.mjs` into `lib/drift.generated.ts`; `lib/drift-explain.ts` supplies only
   the wording.
+- `GET /api/version` (TEC-57) is public in every app: the gate lets through that exact path and
+  method signed out, and the stamped route (`packages/shared/app/api/version/route.ts`) returns
+  only `{ commit: VERCEL_GIT_COMMIT_SHA | null }`, `no-store`. The Garage's *Serving* section
+  (`lib/versions.ts`) reads each app's route and compares it with the latest production
+  deployment's commit: green on a match, red when the deploy succeeded but another commit is
+  serving (a rollback or dashboard redeploy), amber when it cannot compare. Home reads its own
+  env var instead of fetching itself. The deployments are read once, shared with Deploy errors.
 - Bar controls, all stamped: `LiveryBadge` on every bar, framed or not; `ThemeControl` and
   `LogoutControl` hidden in a frame.
 - `PARKED` is empty. A parked app would be probed and shown grey.
@@ -35,8 +42,10 @@
   owner is the only assignee, so "assigned" is enough.
 - `nextStep` treats "done", "skipped", ✅ or a strikethrough as finished; any other format shows as
   open.
-- GitHub sees only git-triggered deploys, so a dashboard rollback is invisible to Deploy errors.
-  `GITHUB_TOKEN` needs *Deployments: read*.
+- GitHub sees only git-triggered deploys, so a dashboard rollback is invisible to Deploy errors;
+  the Serving rows are what catch it. `GITHUB_TOKEN` needs *Deployments: read*.
+- `VERCEL_GIT_COMMIT_SHA` is unset on a deploy not made from git, so that app's Serving row is
+  amber ("reports no commit"), not red.
 - A function exported from a `"use client"` file cannot run on the server; hence `app/apps.ts` and
   `lib/pitgroups.ts`.
 - A long tab scrolls only because `.content` sets `overflow-y` and `min-height: 0`.

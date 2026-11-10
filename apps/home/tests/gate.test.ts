@@ -81,3 +81,45 @@ describe("the cron exception on /api/cron/prices", () => {
     expect(page.headers.get("location")).toContain("/login");
   });
 });
+
+/**
+ * The gate's other signed-out exception (TEC-57): `GET /api/version`, the exact
+ * path and method, nothing near it.
+ */
+describe("the version exception on GET /api/version", () => {
+  const send = (path: string, method = "GET") =>
+    proxy(new NextRequest(`https://example.test${path}`, { method }));
+
+  it("passes a signed-out GET", async () => {
+    expect(passed(await send("/api/version"))).toBe(true);
+  });
+
+  it("keeps its neighbours shut", async () => {
+    for (const path of ["/api/version2", "/api/versions", "/api/version/x", "/api/version/", "/api/Version", "/api"]) {
+      const res = await send(path);
+      expect(res.status, path).toBe(401);
+      expect(passed(res), path).toBe(false);
+    }
+  });
+
+  it("opens no other method on the path", async () => {
+    for (const method of ["POST", "PUT", "PATCH", "DELETE", "HEAD"]) {
+      const res = await send("/api/version", method);
+      expect(res.status, method).toBe(401);
+      expect(passed(res), method).toBe(false);
+    }
+  });
+
+  it("the route answers the commit and nothing else, uncached, on GET only", async () => {
+    const route = await import("../app/api/version/route");
+    const saved = process.env.VERCEL_GIT_COMMIT_SHA;
+    process.env.VERCEL_GIT_COMMIT_SHA = "abc1234def5678";
+    const res = route.GET();
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await res.json()).toEqual({ commit: "abc1234def5678" });
+    delete process.env.VERCEL_GIT_COMMIT_SHA;
+    expect(await route.GET().json()).toEqual({ commit: null });
+    if (saved !== undefined) process.env.VERCEL_GIT_COMMIT_SHA = saved;
+    expect(Object.keys(route).filter((k) => /^(POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(k))).toEqual([]);
+  });
+});

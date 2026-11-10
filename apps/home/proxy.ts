@@ -30,6 +30,13 @@ const PUBLIC_ICONS = new Set([
 // secret, so elsewhere the path is refused here and would 404 beyond it. The
 // route checks the secret again itself.
 const CRON_PATH = "/api/cron/prices";
+
+// The one path anyone may GET without a session (TEC-57, owner: "public"): the
+// commit this deployment is serving, so The Garage and any monitor can tell
+// what is live. Exact path and exact method, never a prefix: /api/version2,
+// /api/versions and /api/version/x stay behind the gate, as does any other
+// method on this path. The route returns the commit and nothing else.
+const VERSION_PATH = "/api/version";
 const CRON_SECRET_MIN_LENGTH = 32;
 
 // Constant time: both sides are hashed to the same length first, so neither the
@@ -59,6 +66,10 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (pathname === VERSION_PATH && request.method === "GET") {
+    return NextResponse.next();
   }
 
   if (

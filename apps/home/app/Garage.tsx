@@ -147,6 +147,20 @@ export default async function Garage() {
         ))}
       </ul>
 
+      <h2 className="admin-section">
+        Serving <span className="admin-qualifier">each app&apos;s public /api/version, against its latest production deploy</span>
+      </h2>
+      <p className="admin-note">
+        The commit each app says it is running, next to the commit GitHub has for its latest production
+        deployment. They differ after a rollback or a redeploy of an older build from the Vercel
+        dashboard, which posts nothing to GitHub.
+      </p>
+      <ul className="garage-rows">
+        {diag.versions.map((p) => (
+          <ProbeRow key={p.target} probe={p} />
+        ))}
+      </ul>
+
       {diag.deploys.length > 0 && (
         <>
           <h2 className="admin-section">
@@ -220,11 +234,6 @@ export default async function Garage() {
               401. Opening it up is a gate-file change — shared auth plumbing, not this app&apos;s.
             </>
           )}
-        </li>
-        <li>
-          <strong>Which commit each project is serving.</strong> Deploy errors read each project&apos;s
-          latest production deployment from GitHub, but a rollback or redeploy started in the Vercel
-          dashboard posts nothing there, so what is serving can differ.
         </li>
         <li>
           <strong>Whether SESSION_SECRET matches across every project.</strong> Nothing may echo it,
