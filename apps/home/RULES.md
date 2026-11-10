@@ -42,8 +42,9 @@ What home's own code enforces. The shared auth plumbing and its rules are in `CL
 - **Framing:** `?app=` is a slug lookup, so a frame's `src` is only ever a `TOOLS` URL. The iframe
   grants only `clipboard-write` (`app/apps.ts`, `app/(shell)/page.tsx`, `app/Landing.tsx`).
 - **Signed-out paths:** the gate (`proxy.ts`, shared plumbing) lets through only `/login`,
-  `/api/login`, `/_next/`, the icons in `PUBLIC_ICONS` and the cron path, which needs the
-  `CRON_SECRET` bearer. `from` is followed only through `safeRedirectTarget`: a path on this
+  `/api/login`, `/_next/`, the icons in `PUBLIC_ICONS`, the cron path, which needs the
+  `CRON_SECRET` bearer, and `GET /api/version`, the commit only (TEC-57). The Garage's Serving rows
+  read each app's `/api/version`. `from` is followed only through `safeRedirectTarget`: a path on this
   origin, else `/`.
 - **Headers:** the shared set (`packages/shared/next.config.mjs`) is CSP `frame-ancestors`,
   `nosniff` and `Referrer-Policy`.
