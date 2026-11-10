@@ -71,6 +71,9 @@ export const MANIFEST = [
   // since the handlers were stamped; now written and checked like the handlers.
   { from: "app/api/login/route.ts", to: "app/api/login/route.ts" },
   { from: "app/api/logout/route.ts", to: "app/api/logout/route.ts" },
+  // The commit each deployment is serving (TEC-57): GET /api/version, opened
+  // signed-out by the gate for that exact path and method only.
+  { from: "app/api/version/route.ts", to: "app/api/version/route.ts" },
 ];
 
 export const SHARED_DIR = "packages/shared";

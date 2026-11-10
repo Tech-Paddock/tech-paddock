@@ -18,7 +18,8 @@ import type { Probe } from "./diagnostics";
  * Garage's live connections already show it grey.
  *
  * **Blind spot:** a rollback or redeploy started from the Vercel dashboard
- * posts no GitHub deployment, so it does not show here.
+ * posts no GitHub deployment, so it does not show here. The Garage's Serving
+ * rows (`lib/versions.ts`) catch it by asking each app which commit it serves.
  */
 
 const TIMEOUT_MS = 4000;
@@ -105,10 +106,21 @@ export function whyGitHub(message: string): string {
   return "could not check — GitHub did not answer";
 }
 
-/** Every probed project's deploy problem, if it has one. Empty is the healthy state. */
-export async function deployErrors(token: string | undefined = process.env.GITHUB_TOKEN): Promise<Probe[]> {
+/**
+ * Every live project's latest production deployment, read once so the deploy
+ * errors and the serving-commit rows share one set of GitHub calls. `unchecked`
+ * carries the single row that says why nothing could be read.
+ */
+export type Deploys =
+  | { kind: "unchecked"; probe: Probe }
+  | { kind: "checked"; live: (Project & { parked?: true })[]; settled: PromiseSettledResult<LatestDeploy>[] };
+
+export async function latestDeploys(token: string | undefined = process.env.GITHUB_TOKEN): Promise<Deploys> {
   if (!token) {
-    return [{ target: "Deploys", status: "unknown", detail: "could not check — GITHUB_TOKEN is not set on home", raw: null, ms: null }];
+    return {
+      kind: "unchecked",
+      probe: { target: "Deploys", status: "unknown", detail: "could not check — GITHUB_TOKEN is not set on home", raw: null, ms: null },
+    };
   }
   const live = PROBED.filter((p) => !p.parked);
   const settled = await Promise.allSettled(live.map((p) => latestDeploy(p, token)));
@@ -116,15 +128,24 @@ export async function deployErrors(token: string | undefined = process.env.GITHU
   const failed = settled.filter((r): r is PromiseRejectedResult => r.status === "rejected");
   if (failed.length === live.length) {
     const msg = (failed[0]?.reason as Error)?.message ?? "failed";
-    return [{ target: "Deploys", status: "unknown", detail: whyGitHub(msg), raw: msg, ms: null }];
+    return { kind: "unchecked", probe: { target: "Deploys", status: "unknown", detail: whyGitHub(msg), raw: msg, ms: null } };
   }
+  return { kind: "checked", live, settled };
+}
 
-  return settled.flatMap((r, i) => {
+/** Every probed project's deploy problem, if it has one. Empty is the healthy state. */
+export function deployErrorsFrom(d: Deploys): Probe[] {
+  if (d.kind === "unchecked") return [d.probe];
+  return d.settled.flatMap((r, i) => {
     if (r.status === "rejected") {
       const msg = (r.reason as Error)?.message ?? "failed";
-      return [{ target: live[i].name, status: "unknown" as const, detail: whyGitHub(msg), raw: msg, ms: null }];
+      return [{ target: d.live[i].name, status: "unknown" as const, detail: whyGitHub(msg), raw: msg, ms: null }];
     }
     const row = deployError(r.value);
     return row ? [row] : [];
   });
+}
+
+export async function deployErrors(token: string | undefined = process.env.GITHUB_TOKEN): Promise<Probe[]> {
+  return deployErrorsFrom(await latestDeploys(token));
 }

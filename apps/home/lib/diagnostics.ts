@@ -18,7 +18,8 @@
  *    code rides along after the sentence, so nothing is lost in translation.
  */
 import { HOME, HOME_ENV, HOME_ENV_RETIRED, PROBED, type Project } from "./platform";
-import { deployErrors } from "./deploys";
+import { deployErrorsFrom, latestDeploys } from "./deploys";
+import { servingCommit, versionRows, type Serving } from "./versions";
 
 /** `parked` is a probe that did not come back up for an app paused on purpose. */
 export type Status = "up" | "down" | "unknown" | "parked";
@@ -42,6 +43,8 @@ export type Diagnostics = {
   liveness: Probe[];
   /** Empty is the healthy state, and The Garage then shows nothing at all. */
   deploys: Probe[];
+  /** One row per live app: the commit it serves against its latest production deployment. */
+  versions: Probe[];
   /** Empty is the healthy state, and The Garage then shows nothing at all. */
   envErrors: EnvError[];
 };
@@ -194,12 +197,21 @@ const homeProbe: Probe = {
 
 export async function runDiagnostics(): Promise<Diagnostics> {
   const others = PROBED.filter((p) => p.slug !== HOME.slug);
-  const [liveness, deploys] = await Promise.all([Promise.all(others.map(livenessProbe)), deployErrors()]);
+  const [liveness, latest, servings] = await Promise.all([
+    Promise.all(others.map(livenessProbe)),
+    latestDeploys(),
+    Promise.all(others.map((p) => servingCommit(p, explainError, explainResponse))),
+  ]);
+
+  // Home reads its own commit rather than fetching itself, as with liveness.
+  const served = new Map<string, Serving>(others.map((p, i) => [p.slug, servings[i]]));
+  served.set(HOME.slug, { ok: true, commit: process.env.VERCEL_GIT_COMMIT_SHA?.toLowerCase() ?? null });
 
   return {
     checkedAt: new Date().toISOString(),
     liveness: [homeProbe, ...liveness],
-    deploys,
+    deploys: deployErrorsFrom(latest),
+    versions: versionRows(PROBED, served, latest),
     envErrors: envErrors(),
   };
 }
