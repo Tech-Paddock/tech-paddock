@@ -60,7 +60,7 @@ direct merge is refused with "Changes must be made through the merge queue"), qu
 with `enable_pr_auto_merge`, `mergeMethod: "SQUASH"`. That adds it to the queue, and GitHub merges
 it once its merge group is green. Queue every ready pull request in merge order, then wait for each
 to show merged (`pull_request_read`); a merge group that fails is a red CI, handled like any other.
-`gh pr merge` needs GraphQL, which a cloud session cannot reach. Then read the production deployment of every project the change
+Then read the production deployment of every project the change
 rebuilds, read the Smoke run for the merge commit (`.github/workflows/smoke.yml`, one run per
 production deployment; red means the live gate is broken, so see *If it breaks production*), and
 follow the pull request's Verify line.

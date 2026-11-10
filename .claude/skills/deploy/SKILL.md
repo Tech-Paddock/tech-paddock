@@ -20,8 +20,7 @@ changes.
 
 ## 1. Every branch, not just this chat's
 
-Full history first: containers clone only recent commits, so if
-`git rev-parse --is-shallow-repository` says `true`, run `git fetch --unshallow` (it adds history
+Full history first: if `git rev-parse --is-shallow-repository` says `true` (a cloud clone), run `git fetch --unshallow` (it adds history
 and changes nothing else). Then `git fetch`, and every remote branch not on `main`
 (`git branch -r --no-merged origin/main`), whichever session cut it. For each: its Linear issue (from its commits), the session that cut it
 (the `Claude-Session` trailer, read with `get_session`), and `gate` on its head.

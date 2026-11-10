@@ -11,8 +11,12 @@ The reasons name what was checked, or what archiving would lose: an unpushed com
 ## 1. Find what is not saved
 
 `git status`, `git stash list`, unpushed commits (`git log --branches --not --remotes`), and any
-`.claude/worktrees/agent-*` with changes. On the TD, close out a running builder first; a container
-restart kills it and its unpushed work.
+`.claude/worktrees/agent-*` with changes. On the TD, close out a running builder first; the PC
+sleeping or the desktop app closing kills it and its unpushed work.
+
+On the PC nothing else clears helper worktrees. Remove each clean `.claude/worktrees/agent-*` whose
+issue is on `origin/main` (`git worktree remove`, then `git branch -D` its local branch); keep and
+report any other.
 
 ## 2. Never assume where work lands
 

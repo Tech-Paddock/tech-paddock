@@ -15,8 +15,8 @@
  * copy of them. Nothing is retyped here, so a new app is probed the day it is
  * listed and a header change is followed rather than flagged as a failure.
  *
- * This container cannot reach *.techpaddock.io, so this runs in GitHub Actions
- * (.github/workflows/smoke.yml). Its logic is tested with a mocked fetch.
+ * It runs in GitHub Actions (.github/workflows/smoke.yml) after every production
+ * deploy, whoever merged. Its logic is tested with a mocked fetch.
  */
 
 import { readFileSync } from "node:fs";
