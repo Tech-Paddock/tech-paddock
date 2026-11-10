@@ -52,6 +52,10 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **A container's local `main` can sit far behind `origin/main`.** Sessions start detached at the
   remote head; `git checkout main` in the main checkout swaps the guard and the skills for old
   copies. Cut branches from `origin/main` (`git switch -c <branch> origin/main`).
+- **On the owner's PC, new sessions start from `~/paddock/td`'s local `main`,** and nothing pulls
+  it, so a new session can carry old skills and an old guard (2026-11-10: 5 commits behind). At
+  kickoff, compare it with `origin/main` and fast-forward it (`git merge --ff-only origin/main`)
+  when its working tree is clean.
 - **A project env read cannot see team-shared variables.** `list_user_events` (the audit log) shows
   every change, shared ones included.
 - **The firewall cannot be read or written through the API** (`Seawall Config not found`).
