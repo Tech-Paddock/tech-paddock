@@ -6,13 +6,21 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 - Potty, food, fun, training (both stored as exercise), weight and health (vet visits, medical issues, medications and vaccines, TEC-259), with photos and files on every form and upcoming item (TEC-203), each logged through a short form with defaults; analytics over the same events; and notes (misc notes and documents, TEC-204), which a Health or Training entry can link to (TEC-208).
 - Who logged it is a person picked from names stored in the database, never in the repo.
+- Profile details (breed, birth date, microchip, insurance, clinic and phone) in one row of
+  `lando.profile` (`id boolean check (id)`), RLS on and no policies, read and written only by the
+  server through `/api/profile` (TEC-260). The microchip and insurance policy numbers live only there:
+  no test, note, migration or log holds a real one, and the app never logs them.
 
 ## Surface: app
 
 - Five tabs, Log, Calendar, Notes, Analytics and Patch notes, opening on Log: the owner's override (2026-10-20,
   widened 2026-10-27 TEC-182, narrowed 2026-11-01 TEC-199, pills restored 2026-11-02 TEC-202, Notes added 2026-11-02 TEC-204, Calendar added 2026-11-08 TEC-234) of the app surface's one screen and no
   tabs. One-handed, thumb-first. Pills open a quick log: Pee and Poop open Potty on that pick, Meals opens Food, Fun opens Fun (TEC-181, TEC-186, restored TEC-202). The Log buttons are Treats, Training, Weight and Health.
-- An app bar over the tabs: theme, logout and the livery badge (Meals today left, TEC-193).
+- An app bar over the tabs: theme, logout and the livery badge (Meals today left, TEC-193). Its title
+  is the app's own icon, not the word "Lando": a 44px button named Profile that opens Profile in
+  place of the tabs, with a Back (owner, TEC-260). Profile shows Basics and Vet from the stored
+  details, edited through an Edit form, and Vaccines and Regular medications read from the journal
+  and plans. The tabs stay five.
 - Quiet secondary controls (owner, TEC-250): Next 7 days is one short line per plan with a
   Calendar link; Treats is a plain counter, and Medical issue is its own checkbox, on Potty only;
   attachments are one small Attach link with thumbnails in a row.
