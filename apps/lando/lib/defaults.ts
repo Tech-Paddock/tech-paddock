@@ -19,6 +19,7 @@ export type Remembered = {
   /** No longer written or read: a treat opens on Misc. Older phones may still hold one. */
   treat?: string;
   unit?: Unit;
+  /** No longer written or read (TEC-263): a meal opens on 1 serving, a Snuffle mat on a half. Older phones may still hold one. */
   mealAmount?: number;
 };
 
@@ -50,8 +51,11 @@ export function defaultFood(type: FoodType, remembered: Remembered, added: reado
   return id && picklist(type, added).some((f) => f.id === id) ? id : MISC_ID;
 }
 
-/** The amount a food form opens on: the last meal's, one treat. */
-export function defaultAmount(type: FoodType, remembered: Remembered): number | null {
-  if (type === "treat") return 1;
-  return typeof remembered.mealAmount === "number" && remembered.mealAmount > 0 ? remembered.mealAmount : null;
+/**
+ * The amount a new food form opens on (TEC-263): one serving for a Meal, a half serving for a Snuffle mat, one
+ * treat. Never the last amount: a meal's amount is not remembered.
+ */
+export function defaultAmount(type: FoodType): number {
+  if (type === "snuffle") return 0.5;
+  return 1;
 }

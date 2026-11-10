@@ -52,7 +52,7 @@ describe("the Servings picklist", () => {
   });
   it("is a plain select on the Food form for a meal, a fixed width, with the shared field class", () => {
     const sel = selectOf(render("food"), "f-amount");
-    expect(sel).toContain("w-[96px]");
+    expect(sel).toContain("w-[64px]");
     expect(sel).not.toMatch(/w-auto|w-full|w-1\/2/);
     expect(sel).toContain("min-h-[44px]");
     for (const t of ["½", "1½", "4"]) expect(sel).toContain(`>${t}</option>`);

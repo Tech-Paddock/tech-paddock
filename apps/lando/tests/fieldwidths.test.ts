@@ -85,17 +85,16 @@ describe("field widths (TEC-202)", () => {
     expect(SRC).not.toMatch(/\$\{inputFull\} w-/);
   });
 
-  it("Logging as is 44px tall in the bottom row beside Save, in one flex row (TEC-252)", () => {
+  it("Logging as is a half of the When row, 44px tall, filling its half (TEC-261)", () => {
     const html = render("potty");
-    const row = html.slice(html.indexOf('data-section="save"'));
-    expect(row).toContain('class="relative flex items-center gap-2"');
-    expect(classes(html, "f-who")).toContain("h-[44px]");
+    expect(html).toContain('<div data-section="when-who" class="grid grid-cols-2 items-end gap-2">');
+    expect(classes(html, "f-who")).toContain("min-h-[44px]");
+    expect(classes(html, "f-who")).toContain("w-full");
     expect(html).not.toContain('id="f-when"');
   });
 
-  it("Who is a fixed width, and Save is 44px tall and only as wide as its words, never stretched (TEC-255)", () => {
+  it("Save is on its own line, 44px tall and only as wide as its words, never stretched (TEC-261)", () => {
     const html = render("potty");
-    expect(classes(html, "f-who")).toContain("w-[140px]");
     const save = html.match(/<button type="submit"[^>]*>/)![0];
     expect(save).toContain("h-[44px]");
     expect(save).toContain("shrink-0");
@@ -142,10 +141,15 @@ describe("one field class, fixed widths (TEC-255)", () => {
     expect(SRC).toContain("Full width on purpose");
   });
 
-  it("What and Where share one line on Potty, a half each", () => {
+  it("Where is back on its own line under What on Potty (TEC-263)", () => {
     const html = render("potty");
-    expect(html).toContain('<div class="flex items-start gap-x-2"><div class="grid min-w-0 content-start gap-0.5 w-1/2"><span class="text-[11px] uppercase tracking-[0.06em] text-ink-soft">What</span>');
-    expect(html).toContain('w-1/2"><span class="text-[11px] uppercase tracking-[0.06em] text-ink-soft">Where</span>');
+    const label = (w: string) => `<span class="text-[11px] uppercase tracking-[0.06em] text-ink-soft">${w}</span>`;
+    expect(html).toContain(label("What"));
+    expect(html).toContain(label("Where"));
+    expect(html.indexOf(label("What"))).toBeLessThan(html.indexOf(label("Where")));
+    // Neither is a half-width column beside the other.
+    expect(html).not.toContain('w-1/2"><span class="text-[11px] uppercase tracking-[0.06em] text-ink-soft">Where</span>');
+    expect(html).not.toContain('w-1/2"><span class="text-[11px] uppercase tracking-[0.06em] text-ink-soft">What</span>');
   });
 
   it("no form says that defaults are filled in", () => {

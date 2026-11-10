@@ -66,7 +66,7 @@ import NoteForm from "./NoteForm";
 import WhatsNew from "./WhatsNew";
 import Calendar from "./Calendar";
 import UpcomingList from "./UpcomingList";
-import LogForm, { WHO_WIDTH, input, type LogBody, type Person } from "./LogForm";
+import LogForm, { Box, WHO_WIDTH, input, type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
 
 type Loaded = { events: JournalEvent[]; people: Person[]; dogs: Dog[]; foods: AddedFood[]; medications: Medication[] };
@@ -519,13 +519,10 @@ export default function Journal() {
   function remember(bodies: LogBody[]) {
     const next = { ...remembered };
     for (const body of bodies) {
-      // A meal's item and amount are remembered; a treat always opens on Misc.
+      // A meal's item is remembered, never its amount (TEC-263); a treat always opens on Misc.
       if (body.kind === "food") {
         const f = asFood(body);
-        if (isMealType(f.type)) {
-          next.meal = f.item_id;
-          if (f.amount !== null) next.mealAmount = f.amount;
-        }
+        if (isMealType(f.type)) next.meal = f.item_id;
       }
       // A weight's unit, also when it was typed on a vet visit (TEC-151).
       if (body.kind === "weight") next.unit = asWeight(body).unit;
@@ -865,15 +862,17 @@ export default function Journal() {
               first, one short line each with a small Done, and a Calendar link in the heading. Absent when nothing
               is due; the feed's Upcoming filter has the rest. */}
           {week.length > 0 && (
-            <section aria-label="Next 7 days" className="-mt-2 grid gap-0.5">
-              <div className="flex items-center justify-between">
+            <Box section="next-7-days" label="Next 7 days" className="-mt-2 !gap-0 !px-2 !py-0.5">
+              {/* Tighter than before (TEC-263): the box's own padding is thin, the heading row is short (the Calendar link keeps
+                  its 44px hit area through a negative margin), and the rows beneath are packed. */}
+              <div className="flex min-h-[28px] items-center justify-between">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Next 7 days</h2>
-                <button type="button" onClick={() => showTab("calendar")} className="min-h-[44px] px-1 text-[13px] font-semibold text-accent underline underline-offset-2">
+                <button type="button" onClick={() => showTab("calendar")} className="-my-2 min-h-[44px] px-1 text-[13px] font-semibold text-accent underline underline-offset-2">
                   Calendar
                 </button>
               </div>
               <UpcomingList compact items={week} today={today} onDone={doneUpcoming} onEdit={editUpcoming} />
-            </section>
+            </Box>
           )}
 
           {/* The feed: every loaded day, newest first, by when it happened (TEC-136) */}

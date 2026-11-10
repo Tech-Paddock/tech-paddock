@@ -58,6 +58,32 @@
     weights only. (2) `/api/upcoming` returns open plans only, so a plan marked done leaves the Calendar (its entry shows on the day it was
     logged) and a repeating plan shows only its next date. (3) A new reader of `loaded.events` must still read `entries`, not events, or a
     note leaks in. (4) The tab row is five columns at 13px; a sixth tab will not fit.
+- **The When row is back at the bottom; Where is back under What** (TEC-261 and TEC-263, the owner: "I like the original mechanisim. I'd like to move it to the
+  bottom, next to the logging user. Each takes up 50% of the row. Save below.", "clicking anywhere in the chip opens the calendar. change the time back to the
+  small box that you scoll to select hh:mm,am/pm."). Local patterns, no data change and no migration. **It replaces the TEC-255/258 When sheet below:
+  `WhenPicker.tsx`, `WhenAsk`, `classifyPick`, `held`, the "Repeat?" step (`repeatStep`) and "Pick another time" are gone; every bullet below that describes
+  them is history.**
+  * **The row** (`data-section="when-who"`, `grid grid-cols-2`, on every form and the Note form): **When** and **Logging as**, each half. `app/WhenField.tsx`
+    draws When: a **date box** (the shared `input` border and height, reading `dateLabel`: "Today", "Yesterday", "Nov 12") with a transparent `type=date` input
+    over all of it, so a tap anywhere opens the calendar (`showPicker()` is also called in its `onClick`, inside a try), and **one time box** drawn like the
+    original 44px field, in which the hour, the minute and AM/PM are three `TimeColumn`s, each a `spinbutton` that scrolls in place with `snap-y` (AmountScroller's
+    settle-on-a-row pattern, a 42px row, one row showing; arrows, Page keys, Home and End step). **Weight is date only, no time box.** The helpers are
+    `clock12`, `withClock` and `withDay` in `lib/localtime.ts` (12 AM is 00:00, 12 PM is 12:00) and `isFuturePick` in `lib/future.ts`.
+  * **Save is its own line below** (`data-section="save"`): one tap saves at the chosen time and nothing opens after it. The row opens on now (a new entry) or on
+    the stored time. `whenTouched` stays false until the row is changed: untouched, a new entry saves at the moment of Save and **a correction keeps its stored
+    time to the millisecond** (`treatsWith` matches on it, and `parent_id`, TEC-251, is unchanged); a Done, a plan edit and the Calendar's Add a plan are
+    touched from the start, as before. A correction cannot move to the future (the error shows on Save); the Note form's calendar stops at today (`maxDay`) and
+    Save refuses a time later today (`noteWhenError`).
+  * **A future time** shows the form's `repeatBlock` under the row (`data-section="plan"`) with "Future: saves as upcoming", and Save reads **Save plan**; there is
+    no Repeat step, nothing is asked before the save. **A failed save keeps the chosen time** (it is in the row): `retry` makes Save read Retry, which saves the
+    same plan or correction. A mistake in the form itself shows on the form and does not set `retry`.
+  * **Phone only, not proven**: jsdom proves the wiring (the taps, the columns' values, `showPicker` being called, the saved time), not scroll-snap, the finger
+    swipe, or the calendar opening from a tap on the transparent date input. Those were not tried on a phone.
+  * **Where is back on its own line under What on Potty.** A new Meal always opens on **1 serving** and a new Snuffle mat on **½** (`defaultAmount(type)` takes no
+    remembered amount; `Journal` no longer writes `mealAmount`, an older phone may still hold one, unread). The Meals pill's repeat of the last meal (`quick.amount`)
+    still brings that meal's amount. **Food: Servings is the left box, `w-[64px]` (about its label), and What takes the rest of the row** (`flex-1`; wider than
+    half on purpose, a food's name); a treat keeps its Amount box on the right. **Next 7 days is a `Box`** (`Box` takes a `className`) with thinner padding, a short
+    heading row and the Calendar link's 44px hit area kept by a negative margin; the rows are the same.
 - **Save opens the phone's own picker; compact forms with one field class** (TEC-255, the owner: "Clicking save … should popup the same calander
   date time window as before. NOW goes away.", "all field boxes should be fixed size not dynamic", "Never make fields full with unless there is a
   specific reason. Default max is 1/2 width of section."). Local patterns, no data change and no migration. **It replaces the When step below:
@@ -86,7 +112,7 @@
     `flex-1` on a field (`tests/fieldwidths.test.ts` holds both). **The Note is the one full-width field, on purpose (free text);** a new full-width
     field says why where it is used.
   * **The bottom row**: Who is `WHO_WIDTH`, Save is 44px tall, `shrink-0` and only as wide as its label, so it never stretches. Its busy labels are short
-    ("Uploading…", "Fix attachment"). **Potty's What and Where sit side by side**, a half each (What's chips wrap at half width), Leash or Spot on the
+    ("Uploading…", "Fix attachment"). **Potty's What and Where** (side by side here; on their own lines again since TEC-263), Leash or Spot on the
     line under; the Food What, the Health Why and Medication picks, the Add-a-food and Add-a-medication names and Training's and a vet visit's Related
     note are half. "Defaults are filled in…" is gone from every form.
   * **Tighter**: the sheet, form and box gaps are a step smaller (`Sheet` `gap-2`, form `gap-1.5`, `Box` `gap-1 p-1.5`, the secondary row `gap-1`).
@@ -776,7 +802,10 @@
 ## Traps
 
 - **A hidden `showPicker()` field reports nothing on a phone** (TEC-258: after TEC-255 every Save did nothing). It neither throws nor fires `change`,
-  so no fallback runs and nothing saves. Never rely on it: Save opens the When sheet and the sheet's own Save saves.
+  so no fallback runs and nothing saves. Never save from a `showPicker()` that nothing visible asked for. The When row's `showPicker()` (TEC-261) is only a
+  help on a tap: the date input itself is visible state in the row and Save never waits on it.
+- **The When row's time is state, not a pick.** A new entry's row shows the minute the form opened on, but untouched it saves at the moment of Save; touch any
+  of the day or the three columns and the time is the row's. A correction's seconds survive only while it is untouched.
 - **Upcoming's Done is client-linked.** The link from the entry saved by a Done to its item lives in `Journal`'s
   `visitLinks` ref, not in storage. If the entry saves but the phone loses the page before the `done` call
   lands (or the call fails twice), the entry is in the journal and the item stays open; a toast says so. Tapping

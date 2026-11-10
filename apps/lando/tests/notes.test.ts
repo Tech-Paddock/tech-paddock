@@ -308,9 +308,10 @@ describe("the Note form", () => {
   it("has no Repeat and no future When", () => {
     expect(html).not.toContain("Repeat");
     expect(html).not.toContain("Future");
-    // The picker stops at now (`allowFuture={false}`): the field's max, and the form refuses a future time.
-    expect(readFileSync(resolve(__dirname, "../app/NoteForm.tsx"), "utf8")).toContain("allowFuture={false}");
-    expect(readFileSync(resolve(__dirname, "../app/WhenPicker.tsx"), "utf8")).toContain("max={allowFuture ? undefined");
+    // The calendar stops at today (`maxDay`, the day input's max), and Save refuses a time later today.
+    expect(readFileSync(resolve(__dirname, "../app/NoteForm.tsx"), "utf8")).toContain("maxDay={toDateInput(");
+    expect(readFileSync(resolve(__dirname, "../app/WhenField.tsx"), "utf8")).toContain("max={maxDay}");
+    expect(readFileSync(resolve(__dirname, "../app/NoteForm.tsx"), "utf8")).toContain("noteWhenError(new Date(at)");
   });
 
   it("opens a correction on the note's own words, with a way to delete it", () => {
