@@ -26,7 +26,9 @@ narrate them.
 4. **Other sessions:** `list_sessions` for unmerged finished work and unanswered questions. Read the
    last assistant message of any idle session with work in flight.
 5. **The environment:** `get_session` (no id) gives this session's `environment_id`, and
-   `list_environments` names it. TD sessions run in the one named `PADDOCK_ROLE=td`.
+   `list_environments` names it. TD sessions run on the owner's PC: a `bridge` environment whose
+   name carries `:td:` (the `~/paddock/td` folder). The cloud `PADDOCK_ROLE=td` serves scheduled
+   tasks only.
 6. **Title the session** with `set_session_title`: `TD · YYYY-MM-DD · <brief>`, the brief being the
    owner's kickoff argument or first request in a few words, omitted if there is none.
 

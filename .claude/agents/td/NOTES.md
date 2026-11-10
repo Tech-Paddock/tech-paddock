@@ -32,8 +32,9 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **Migration history is clean:** repo and `list_migrations` differ by exactly `20260908235234`,
   withheld because it seeds personal data.
 - **This container cannot reach `*.techpaddock.io`.** Use Vercel runtime logs, or ask the owner.
-- **TD sessions run in the environment named `PADDOCK_ROLE=td`.** The name sets no variable;
-  kickoff reads the environment with `get_session`.
+- **TD sessions run on the owner's PC,** in a `bridge` environment whose name carries `:td:`
+  (the `~/paddock/td` folder). The cloud environment named `PADDOCK_ROLE=td` remains for scheduled
+  tasks; its name sets no variable. Kickoff reads the environment with `get_session`.
 - **A scheduled task carries its own repositories and connectors,** set in its edit dialog at
   claude.ai/code/routines. A run with neither still reports Succeeded and does nothing. The Weekly
   rules-drift audit says "Audit did not run" when it cannot audit (TEC-162).
