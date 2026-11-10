@@ -63,6 +63,8 @@ would overwrite a hand correction. This is correctness, not cost.
 - A correction fixes the item, never a past day. Item numbers are append-only versions.
 - An entry snapshots the item's numbers, item id and version when logged, so a past day's total
   never moves.
+- A correction opened from a line logged today also updates that one line's snapshot and version
+  (owner, 2026-11-09, TEC-69). No other line and no earlier day moves.
 
 ## Models
 
