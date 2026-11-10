@@ -250,9 +250,12 @@ describe("the migration lando_vaccines", () => {
   const sql = readFileSync(resolve(dir, name), "utf8");
   const code = sql.replace(/--.*$/gm, "");
 
-  it("is the newest file in the folder, so it is applied last", () => {
+  // Newest among the files that replace the function, since each replacement copies the newest body (supabase/README.md).
+  // It was once the newest of all, which a later migration that does not touch the function (TEC-260's table) broke.
+  it("is the newest file that replaces lando.details_ok, so it is applied last", () => {
     expect(name).toBeDefined();
-    expect(files.at(-1)).toBe(name);
+    const replacers = files.filter((f) => /create or replace function lando\.details_ok/i.test(readFileSync(resolve(dir, f), "utf8")));
+    expect(replacers.at(-1)).toBe(name);
   });
 
   it("is only the lock timeout and the function, a replace and never a constraint swap", () => {

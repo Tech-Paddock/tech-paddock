@@ -6,6 +6,28 @@
   renamed in the UI only, the file is still `app/WhatsNew.tsx` and the data `lib/releases.ts`; the Upcoming tab is gone),
   sticky, five equal columns in 13px bold with `whitespace-nowrap` (at four columns 15px fit; at 390px "Patch notes" wrapped to two lines at 16px; **the five-column fit at 390px was not seen on a phone**),
   opening on Log (RULES.md holds the owner's override of the one-screen rule).
+- **Profile** (TEC-260; the owner: "Rather than Lando put the icon for the app. clicking that brings up his profile", microchip and insurance "yes", the vaccine list
+  "leave them for now"). **No sixth tab:** the app bar's "Lando" is the app's own `icon.svg` in `app/ProfileButton.tsx` (a 44px button named "Profile"; the
+  word stays in an `sr-only` h1), and a tap sends the window event `OPEN_PROFILE` (`lib/profile.ts`) which `Journal` listens for. While Profile is open `Journal`
+  `hidden`s the tab bar and the panels and shows `app/Profile.tsx` in their place with a **Back**; a Done or an Edit-plan from it opens the usual sheet over it.
+  * **Stored details**: `lando.profile`, a one-row table (migration `lando_profile`; `id boolean primary key check (id)`, so a second row cannot exist; RLS on, no
+    policies; saved by an upsert on `id`). Breed, `birth_on`, microchip, insurance provider and policy, clinic name and phone, all nullable. `GET /api/profile`
+    returns `{profile, history}` and `POST` saves (checked by `parseProfile`, 400 with a message that never carries what was typed). **The microchip and policy
+    numbers exist only in the database:** the app shows them on Profile and in the Edit form, and nothing logs a request, a body or a row (a test greps the files for
+    `console.`). No row is seeded; until the owner types the details every box reads "Not set".
+  * **Derived, read-only** (`lib/profile.ts`, pure): age (`ageText`), the latest weight (`latestWeight`), the last vet visit and next vet plan, each vaccine's last
+    date and status, and the regular medications. **Vaccine status** is the pills' cut-offs on the next-dose day: red before today, amber through 7 days, green after,
+    always also in words ("good", "due soon", "overdue", "not logged"). The next-dose day is an open `Vaccine · <name>` plan's date, else `nextDose` from the newest
+    entry and `birth_on`. **Plan next** shows when a vaccine is logged and no plan names it; it posts the plan `nextDosePlan` makes, and the row then reads "planned".
+    A vaccine never logged has no button (no dose to follow). Medications listed are every one not retired, each with its reason and the soonest open `medication`
+    plan whose title starts with its name.
+  * **The history read**: `readJournal` keeps only 30 days of health entries, so Profile would lose an older shot. `GET /api/profile` therefore also reads every
+    `health` entry whose `details->>type` is `vaccine` or `vet`, plus every voiding event (one page of 1000 each, an error if full), and `Journal` merges it with its
+    own events (`mergeEvents`) for Profile only. The Log, the feed and Analytics still read the 30-day window.
+  * **The birth date** reaches `nextDose` through `LogForm`'s new `birthOn` prop (from `Journal`'s profile read) at its **two** calls (the Vaccine form's suggestion and a
+    vet visit's `givenItems`) and through `visitVaccineEntries`, so the age beats the dose number once a birthday is saved.
+  * **The Edit form** is a `Sheet` of two `Box`es (Basics, Vet) on the shared field class; empty boxes clear a detail. **Phone-only, not proven by jsdom:** the icon tap
+    on a phone, the 44px targets, the tab bar returning where it was, and the layout.
 - **Vaccines** (TEC-259, the owner: "I want a vaccines section I think in heath. I don't want it to live solely in vet visit"; the list
   is "fine for now"): Health's fifth type, `vaccine`, stored as a `health` event with `details` `{type: 'vaccine', vaccine, dose?, note_id?, photos?, names?}`
   and **no `reasons` key** (as a medication has none). `lib/vaccines.ts` holds the list (`VACCINES`: DHPP, Bordetella, Leptospirosis, Rabies; ids
@@ -16,9 +38,8 @@
     only; a note is optional (like a medication's); Related note only (no Related issue). The dose opens on one more than the live entries of that
     vaccine already logged (`earlierDoses`) until it is touched. A future When on it is a plan (title `Vaccine · DHPP · dose 2`), with no further offer.
   * **Next dose** (suggestions only; the plan's date is editable in the form and later in the Calendar): DHPP and Leptospirosis 3 weeks on while under
-    16 weeks old, then 1 year; Rabies 1 year after the first, then 3 years; Bordetella 6 months. **There is no birth date in the app yet**
-    (`nextDose` takes `birthOn` and nothing passes it), so the dose number stands in: doses 1 and 2 are the puppy series, 3 and later yearly. TEC-260 (Profile)
-    should pass the birth date to `nextDose` in `LogForm`; the age beats the dose number when both are known.
+    16 weeks old, then 1 year; Rabies 1 year after the first, then 3 years; Bordetella 6 months. Until a birthday is saved in the Profile (TEC-260) the dose number
+    stands in: doses 1 and 2 are the puppy series, 3 and later yearly. Once it is saved, `LogForm` passes it to `nextDose` and the age beats the dose number.
   * **The plan** is an ordinary `lando.upcoming` item of kind `vaccine` titled `Vaccine · DHPP · dose 3` (the dose only while the puppy series
     goes on). It is added **after the vaccine is saved** (`planAfter` in `Journal.tsx`, keyed by the vaccine entry's id), so a vaccine that fails
     leaves no plan; the map is in memory, so a reload between a failed save and its Retry drops the offer (the vaccine still saves). If the plan can't be
@@ -400,7 +421,7 @@
   Tests: `tests/pillsway.test.ts`.
 - **The meal gaps under the pills are gone** (TEC-172's second lines, removed by TEC-186, with `mealGaps`,
   `mealGapText`, `formatGap` and `tests/mealgaps.test.ts`). Meal-to-poop timing lives in Analytics only.
-- **The app bar** (TEC-193, `app/AppBar.tsx`): the name, theme, logout and the livery badge. **"Meals today: N" is
+- **The app bar** (TEC-193, `app/AppBar.tsx`): the app's icon (TEC-260: it opens Profile; the name is kept for screen readers), theme, logout and the livery badge. **"Meals today: N" is
   gone** (TEC-142's `Meals.tsx` context, `useReportMeals` and `mealsToday` with its tests were removed); the Meal
   pill already counts meals. The bar wraps rather than clips on a very narrow phone.
 - **The Meal pill's label** (TEC-194, `mealsSummary` / `mealPillLabel` in `lib/events.ts`, `tests/mealpill.test.ts`;
@@ -827,6 +848,11 @@
 
 ## Traps
 
+- **Profile reads two journals.** The Log's read is the last 30 days of health entries; Profile's vaccines and last visit need all of them, so they come from
+  `GET /api/profile` (`readProfileHistory`) and are merged in the browser. Anything new on Profile that reads old health entries must read them there, not from
+  `loaded.events`. A voiding event must come with them or a deleted shot would still show as given.
+- **`lando.profile` holds personal data and the table is not seeded.** Never put a real chip number, policy number or phone in a test, a note or a migration;
+  the tests use invented values. A test asserts the profile's files contain no `console.`.
 - **A hidden `showPicker()` field reports nothing on a phone** (TEC-258: after TEC-255 every Save did nothing). It neither throws nor fires `change`,
   so no fallback runs and nothing saves. Never save from a `showPicker()` that nothing visible asked for. The When row's `showPicker()` (TEC-261) is only a
   help on a tap: the date input itself is visible state in the row and Save never waits on it.

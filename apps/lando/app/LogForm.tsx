@@ -131,6 +131,8 @@ type Props = {
   /** Give a medication added before reasons its reason, once (TEC-233). Resolves to an error sentence, or null when set. */
   onSetMedicationReason: (id: string, reason: MedReason) => Promise<string | null>;
   phonePerson: string | null;
+  /** Lando's birth date from the Profile (TEC-260), or null: the vaccine suggestions then fall back to the dose number. */
+  birthOn?: string | null;
   /** Everything the journal read, voids included: the Related issue select lists its recent medical issues (TEC-142). */
   events: JournalEvent[];
   /**
@@ -297,6 +299,7 @@ export default function LogForm({
   onAddMedication,
   onSetMedicationReason,
   phonePerson,
+  birthOn = null,
   events,
   allEvents = [],
   photoUrls,
@@ -523,12 +526,12 @@ export default function LogForm({
   const vEarlier = vaccine ? earlierDoses(events, vaccine, givenAt, event?.id) : 0;
   const vDoseShown = vDoseTouched ? vDose : (suggestedDose(vaccine, vEarlier)?.toString() ?? "");
   const vDoseNum = hasDoses(vaccine) && vDoseShown ? Number(vDoseShown) : null;
-  const suggest = vaccine ? nextDose({ vaccine, givenOn, dose: vDoseNum, earlier: vEarlier }) : null;
+  const suggest = vaccine ? nextDose({ vaccine, givenOn, dose: vDoseNum, earlier: vEarlier, birthOn }) : null;
   const nextDay = nextOn ?? suggest?.on ?? givenOn;
   // A vet visit's picks, each with the day its next dose would be planned for.
   const givenItems = VACCINES.filter((v) => given.includes(v.id)).map((v) => {
     const earlier = earlierDoses(events, v.id, givenAt);
-    return { label: v.label, day: nextDose({ vaccine: v.id, givenOn, dose: suggestedDose(v.id, earlier), earlier }).on };
+    return { label: v.label, day: nextDose({ vaccine: v.id, givenOn, dose: suggestedDose(v.id, earlier), earlier, birthOn }).on };
   });
 
   /** The When row changed (TEC-261): from now on the time is the person's, not the moment of Save. */
@@ -890,6 +893,7 @@ export default function LogForm({
           at,
           personId: body.person_id,
           events,
+          birthOn,
           idFor: (id) => {
             const old = givenIds.current.get(id);
             if (old) return old;
