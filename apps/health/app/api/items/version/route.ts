@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { addVersion, versionsOf, eraFor, itemById, LookupError } from "@/lib/items";
 import { recipeBookFor, isRecipe, fromCookbook, fixItInTheCookbook } from "@/lib/cookbook";
 import { parseMacros } from "@/lib/macros";
+import { mayRewriteLine, readLineForRewrite, rewriteLine } from "@/lib/lineRewrite";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,9 @@ export const dynamic = "force-dynamic";
  * - `change` — the food itself changed. It takes its own date and starts a new
  *   era, so a log dated before it still picks up the older numbers.
  *
- * Neither moves a day already logged: those carry a snapshot (TEC-21).
+ * Neither moves a day already logged: those carry a snapshot (TEC-21). One
+ * exception (owner, 2026-11-09, TEC-69): a correction sent with `entry_item_id`
+ * for a line logged today also rewrites that one line's snapshot.
  *
  * **A change must carry the date the food changed, not the date you noticed.**
  * Defaulting that would silently misdate the boundary, and the boundary is the
@@ -67,6 +70,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const lineId = typeof body.entry_item_id === "string" && body.entry_item_id ? body.entry_item_id : null;
+
   try {
     // A Cookbook recipe's numbers are the Cookbook's (TEC-25). A correction
     // here would be bypassed by the next log, which asks the Cookbook first, so
@@ -89,7 +94,18 @@ export async function POST(request: NextRequest) {
       model: null,
       note: typeof body.note === "string" && body.note.trim() ? body.note.trim() : null,
     });
-    return NextResponse.json({ version }, { status: 201 });
+
+    // Today's line only: checked against the stored line, not trusted from the
+    // client. Any other line, and every older day, keeps its numbers.
+    let lineUpdated = false;
+    if (lineId) {
+      const line = await readLineForRewrite(lineId);
+      if (mayRewriteLine({ kind, today: date, line, itemId })) {
+        await rewriteLine(lineId, version.id, macros);
+        lineUpdated = true;
+      }
+    }
+    return NextResponse.json({ version, lineUpdated }, { status: 201 });
   } catch (e) {
     if (e instanceof LookupError) return NextResponse.json({ error: e.message }, { status: 503 });
     return NextResponse.json(
