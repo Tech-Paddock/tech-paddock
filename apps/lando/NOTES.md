@@ -105,6 +105,23 @@
     weights only. (2) `/api/upcoming` returns open plans only, so a plan marked done leaves the Calendar (its entry shows on the day it was
     logged) and a repeating plan shows only its next date. (3) A new reader of `loaded.events` must still read `entries`, not events, or a
     note leaks in. (4) The tab row is five columns at 13px; a sixth tab will not fit.
+- **The When row shows that it scrolls** (TEC-266, the owner: "It's not quite apparent that they scroll", "That's perfect [peek] and nudge. Do the same thing with the day
+  field"). A local pattern in `app/WhenField.tsx`, no data change and no migration; **it changes the TEC-261 bullet below where it describes the date box and a 42px row.**
+  * **Peek**: every column (`ScrollColumn`) is 42px high (the 44px box inside its border) with **20px rows** and an 11px spacer above and below, so the chosen row sits
+    in the middle at 15px and the rows either side show about 11px of themselves at 11px in `text-ink-soft`, under a top-and-bottom fade (`mask-image`). Row height is
+    20, so a scroll position is `index * 20` (`tests/whenstep.test.ts` scrolls that way).
+  * **The day is a column**, not a covered box: `Day` is a `spinbutton` listing 14 days back to 30 ahead (Yesterday, Today, Tomorrow, then "Nov 12"; a note stops at
+    `maxDay`), plus the chosen day when the calendar picked one outside that range. Scrolling sets the day and keeps the clock (`withDay`). The `type=date` input
+    (label "Date") is still there for the calendar's value but is **`pointer-events-none` and under the column**, so it cannot eat a swipe; a plain tap on the column
+    (its `onClick`, which a scroll does not fire; Enter and Space too) calls its `showPicker()` in a try, or `click()` where there is no `showPicker`.
+  * **Nudge**: once per mount (the form mounts when its sheet opens), after 280ms and then 140ms apart (Day, Hour, Minute, AM or PM; Weight has only the day), each
+    column scrolls 16px smoothly (the other way at its last row) and back, with `scroll-snap-type: none` set on it meanwhile and its scroll events ignored, then
+    lands exactly on `index * 20`. A touch, wheel or key on a column cancels its nudge. Skipped under `prefers-reduced-motion: reduce`, and where `scrollTo` is missing.
+  * **Traps**: (1) The nudge and the Page-key jumps assume the 20px row; change `ROW` and the test helper together. (2) The list is rebuilt each render from the phone's
+    clock, so after midnight it re-labels on the next render. (3) The Day column's `aria-valuenow` is an index into a list that can grow by one (a far-off picked day).
+  * **Phone only, not proven**: jsdom proves the wiring (the list, the taps, the scroll-to-pick, the nudge's calls and order, reduced motion, `showPicker`), not that
+    scroll-snap settles, that the fade looks right, that the roll is smooth, that a tap after a swipe never opens the calendar, or that the calendar opens from a tap on the
+    column. Those were not tried on a phone (TEC-265 is the owner's check).
 - **The When row is back at the bottom; Where is back under What** (TEC-261 and TEC-263, the owner: "I like the original mechanisim. I'd like to move it to the
   bottom, next to the logging user. Each takes up 50% of the row. Save below.", "clicking anywhere in the chip opens the calendar. change the time back to the
   small box that you scoll to select hh:mm,am/pm."). Local patterns, no data change and no migration. **It replaces the TEC-255/258 When sheet below:

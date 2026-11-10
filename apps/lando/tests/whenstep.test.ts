@@ -47,14 +47,14 @@ afterEach(() => cleanup());
 const saveButton = () => screen.getByRole("button", { name: /^(Save|Retry)/ });
 const pickPee = () => fireEvent.click(screen.getByLabelText("Pee"));
 const dateInput = () => screen.getByLabelText("Date") as HTMLInputElement;
-const column = (name: "Hour" | "Minute" | "AM or PM") => screen.getByRole("spinbutton", { name });
+const column = (name: "Day" | "Hour" | "Minute" | "AM or PM") => screen.getByRole("spinbutton", { name });
 const noDialog = () => expect(screen.queryByRole("dialog")).toBeNull();
 
 const HOUR_ORDER = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 /** Scrolls a time column to a row, as a swipe does, and waits for it to settle. */
-async function scrollTo(name: "Hour" | "Minute" | "AM or PM", index: number) {
+async function scrollTo(name: "Day" | "Hour" | "Minute" | "AM or PM", index: number) {
   const el = column(name);
-  el.scrollTop = index * 42;
+  el.scrollTop = index * 20;
   fireEvent.scroll(el);
   await waitFor(() => expect(Number(el.getAttribute("aria-valuenow"))).toBe(index));
 }
@@ -107,7 +107,7 @@ describe("the When row (TEC-261)", () => {
     expect(document.querySelector('[data-section="when-who"]')).not.toBeNull();
   });
 
-  it("has a date box reading Today, with a transparent date input over all of it, and showPicker on a tap", () => {
+  it("has a day column reading Today, a transparent date input under it, and showPicker on a plain tap", () => {
     const showPicker = vi.fn();
     (HTMLInputElement.prototype as unknown as { showPicker: () => void }).showPicker = showPicker;
     try {
@@ -115,9 +115,11 @@ describe("the When row (TEC-261)", () => {
       const input = dateInput();
       expect(input.type).toBe("date");
       expect(input.className).toContain("opacity-0");
-      expect(input.className).toContain("absolute inset-0");
-      expect(input.parentElement!.textContent).toBe("Today");
-      fireEvent.click(input);
+      // The input is not touchable, so it never blocks a swipe on the column.
+      expect(input.className).toContain("pointer-events-none");
+      const day = screen.getByRole("spinbutton", { name: "Day" });
+      expect(day.getAttribute("aria-valuetext")).toBe("Today");
+      fireEvent.click(day);
       expect(showPicker).toHaveBeenCalledTimes(1);
     } finally {
       delete (HTMLInputElement.prototype as unknown as { showPicker?: () => void }).showPicker;
@@ -130,7 +132,7 @@ describe("the When row (TEC-261)", () => {
     };
     try {
       open("potty");
-      expect(() => fireEvent.click(dateInput())).not.toThrow();
+      expect(() => fireEvent.click(screen.getByRole("spinbutton", { name: "Day" }))).not.toThrow();
     } finally {
       delete (HTMLInputElement.prototype as unknown as { showPicker?: () => void }).showPicker;
     }
@@ -416,5 +418,107 @@ describe("the Note form's When row (TEC-261)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save note" }));
     const [body] = props.onLog.mock.calls[0] as unknown as [{ at: string }];
     expect(toLocalInput(body.at)).toBe(earlier);
+  });
+});
+
+describe("the When row shows that it scrolls (TEC-266)", () => {
+  // jsdom cannot prove scroll-snap, the fade or the roll on a phone; these prove the wiring.
+  const matchMedia = (reduce: boolean) => (q: string) => ({ matches: reduce && q.includes("reduce") }) as MediaQueryList;
+  afterEach(() => {
+    vi.useRealTimers();
+    delete (window as unknown as { matchMedia?: unknown }).matchMedia;
+    delete (HTMLElement.prototype as unknown as { scrollTo?: unknown }).scrollTo;
+  });
+
+  it("each column is a short row with a fade, so the rows either side peek", () => {
+    open("potty");
+    for (const name of ["Day", "Hour", "Minute", "AM or PM"] as const) {
+      const el = column(name);
+      expect(el.style.height).toBe("42px");
+      expect(el.style.maskImage || el.style.webkitMaskImage || el.getAttribute("style")).toContain("linear-gradient");
+      const rows = Array.from(el.children).filter((r) => r.textContent);
+      expect(rows.every((r) => (r as HTMLElement).style.height === "20px"), name).toBe(true);
+    }
+    expect(document.querySelector('[data-section="when-who"]')!.querySelectorAll(".text-ink-soft").length).toBeGreaterThan(0);
+  });
+
+  it("the day column lists Yesterday, Today, Tomorrow and dates, about 2 weeks back to 30 days ahead", () => {
+    open("potty");
+    const texts = Array.from(column("Day").children)
+      .map((r) => r.textContent)
+      .filter(Boolean);
+    expect(texts.length).toBe(45);
+    const i = texts.indexOf("Today");
+    expect(texts.slice(i - 1, i + 2)).toEqual(["Yesterday", "Today", "Tomorrow"]);
+    expect(i).toBe(14);
+  });
+
+  it("scrolling the day sets the day and keeps the clock", async () => {
+    const n = new Date();
+    const dayAt = (k: number) => toDateInput(new Date(n.getFullYear(), n.getMonth(), n.getDate() + k, 12).toISOString());
+    open("potty", { event: stored(new Date(n.getFullYear(), n.getMonth(), n.getDate() - 3, 8, 30).toISOString()) });
+    expect(dateInput().value).toBe(dayAt(-3));
+    expect(column("Minute").getAttribute("aria-valuetext")).toBe("30");
+    const el = column("Day");
+    const before = Number(el.getAttribute("aria-valuenow"));
+    el.scrollTop = (before + 1) * 20;
+    fireEvent.scroll(el);
+    await waitFor(() => expect(Number(el.getAttribute("aria-valuenow"))).toBe(before + 1));
+    expect(dateInput().value).toBe(dayAt(-2));
+    expect(column("Minute").getAttribute("aria-valuetext")).toBe("30");
+    expect(column("Hour").getAttribute("aria-valuetext")).toBe("8");
+  });
+
+  it("a day beyond the list (picked in the calendar) is kept and shown", () => {
+    open("potty");
+    fireEvent.change(dateInput(), { target: { value: "2031-05-04" } });
+    expect(dateInput().value).toBe("2031-05-04");
+    expect(column("Day").getAttribute("aria-valuetext")).not.toBe("Today");
+    expect(column("Day").children.length).toBeGreaterThan(45);
+  });
+
+  it("Weight's day is a scroll column too, with no time box", () => {
+    open("weight");
+    expect(column("Day")).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "Time" })).toBeNull();
+  });
+
+  it("the nudge rolls each column once, staggered, with snap off, and puts it back without changing the pick", () => {
+    vi.useFakeTimers();
+    (window as unknown as { matchMedia: unknown }).matchMedia = matchMedia(false);
+    const calls: [string, number][] = [];
+    (HTMLElement.prototype as unknown as { scrollTo: (o: ScrollToOptions) => void }).scrollTo = function (this: HTMLElement, o: ScrollToOptions) {
+      calls.push([this.getAttribute("aria-label") ?? "", o.top ?? 0]);
+      this.scrollTop = o.top ?? 0;
+      fireEvent.scroll(this);
+    };
+    open("potty");
+    const day = column("Day");
+    const minuteBefore = column("Minute").getAttribute("aria-valuetext");
+    vi.advanceTimersByTime(300);
+    expect(calls.map((c) => c[0])).toEqual(["Day"]);
+    expect(day.style.scrollSnapType).toBe("none");
+    vi.advanceTimersByTime(2000);
+    const labels = calls.map((c) => c[0]);
+    expect(labels.filter((l) => l === "Day").length).toBe(2); // out, then back
+    expect(["Day", "Hour", "Minute", "AM or PM"].every((l) => labels.includes(l))).toBe(true);
+    expect(labels.indexOf("Hour")).toBeGreaterThan(labels.indexOf("Day"));
+    expect(Math.abs(calls[0][1] - Number(day.getAttribute("aria-valuenow")) * 20)).toBe(16);
+    expect(day.style.scrollSnapType).toBe("");
+    expect(day.getAttribute("aria-valuetext")).toBe("Today");
+    expect(column("Minute").getAttribute("aria-valuetext")).toBe(minuteBefore);
+    const total = calls.length;
+    vi.advanceTimersByTime(5000);
+    expect(calls.length).toBe(total); // once only
+  });
+
+  it("nothing moves when reduced motion is on", () => {
+    vi.useFakeTimers();
+    (window as unknown as { matchMedia: unknown }).matchMedia = matchMedia(true);
+    const scrollTo = vi.fn();
+    (HTMLElement.prototype as unknown as { scrollTo: unknown }).scrollTo = scrollTo;
+    open("potty");
+    vi.advanceTimersByTime(5000);
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 });
