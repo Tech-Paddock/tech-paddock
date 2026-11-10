@@ -47,15 +47,14 @@ What is true now, and the traps. Branch and pull request state is never written 
   `lib/theme.css`, `globals.css` and the component's real markup and Tailwind classes, read from
   the source, not redrawn. Keep everything around the change exactly as it ships. Change only the
   part under review, and say on the page which part that is.
-
 - **The guard runs from this session's checkout.** Edit `.claude/hooks/` in a separate worktree.
 - **A container's local `main` can sit far behind `origin/main`.** Sessions start detached at the
   remote head; `git checkout main` in the main checkout swaps the guard and the skills for old
   copies. Cut branches from `origin/main` (`git switch -c <branch> origin/main`).
-- **On the owner's PC, new sessions start from `~/paddock/td`'s local `main`,** and nothing pulls
-  it, so a new session can carry old skills and an old guard (2026-11-10: 5 commits behind). At
-  kickoff, compare it with `origin/main` and fast-forward it (`git merge --ff-only origin/main`)
-  when its working tree is clean.
+- **On the owner's PC, new sessions start from `~/paddock/td`'s local `main`.** A SessionStart hook
+  (TEC-262) fast-forwards it when it is clean and on `main`, but only after the new session's
+  worktree is made, so a session can still start one merge behind. If it is dirty or off `main`,
+  the hook skips it: compare it with `origin/main` at kickoff and say so.
 - **A project env read cannot see team-shared variables.** `list_user_events` (the audit log) shows
   every change, shared ones included.
 - **The firewall cannot be read or written through the API** (`Seawall Config not found`).
