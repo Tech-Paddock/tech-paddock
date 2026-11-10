@@ -7,6 +7,7 @@
 import { FORM_LABELS, HEALTH_LABELS, VET_REASONS, type FormKind, type HealthType } from "./events";
 import { fromLocalInput, toDateInput } from "./localtime";
 import { MED_UNITS, type Medication } from "./medications";
+import { parseVaccinePlanTitle, vaccinePlanTitle } from "./vaccines";
 import {
   SOON_DAYS,
   TITLE_MAX,
@@ -63,6 +64,8 @@ export type FutureForm = {
   reason?: string;
   /** A medication's name, dose and unit, when picked. */
   med?: { name: string; dose: number | null; unit: string } | null;
+  /** A vaccine's id and dose number (TEC-259), when picked: the plan's title names them. */
+  vaccine?: { id: string; dose: number | null } | null;
   /** The photos and files on the form (TEC-203): paths, and the original name of each file that is not a picture. */
   photos?: readonly string[];
   names?: Record<string, string>;
@@ -70,7 +73,7 @@ export type FutureForm = {
 
 /** The item's kind for a form: a vet visit and a medication have their own, everything else is Other. */
 export function futureKind(form: FormKind, healthType: HealthType): UpcomingKind {
-  if (form === "health") return healthType === "vet" ? "vet" : healthType === "medication" ? "medication" : "other";
+  if (form === "health") return healthType === "vet" ? "vet" : healthType === "medication" ? "medication" : healthType === "vaccine" ? "vaccine" : "other";
   return "other";
 }
 
@@ -87,9 +90,11 @@ export const FORM_TITLES: readonly string[] = [
 const SEP = " · ";
 
 /** The item's title: "Training", "Medical issue", "Vet visit · Check-up", "Name · 5 mg" (the medication, then its dose). */
-export function futureTitle(x: Pick<FutureForm, "form" | "healthType" | "reason" | "med">): string {
+export function futureTitle(x: Pick<FutureForm, "form" | "healthType" | "reason" | "med" | "vaccine">): string {
   if (x.form !== "health") return FORM_LABELS[x.form];
   if (x.healthType === "issue") return HEALTH_LABELS.issue;
+  // "Vaccine · DHPP · dose 3" (TEC-259), so Done opens the Vaccine form on that vaccine and dose.
+  if (x.healthType === "vaccine") return x.vaccine ? vaccinePlanTitle(x.vaccine.id, x.vaccine.dose) : HEALTH_LABELS.vaccine;
   if (x.healthType === "vet") {
     const label = VET_REASONS.find(([id]) => id === x.reason)?.[1];
     return label ? `${HEALTH_LABELS.vet}${SEP}${label}` : HEALTH_LABELS.vet;
@@ -129,6 +134,8 @@ export function allUpcoming(items: readonly Upcoming[]): Upcoming[] {
 
 /** Which form a Done opens for an item, or null when Done just marks it done (an old Other item with its own words). */
 export function formForItem(item: Pick<Upcoming, "kind" | "title">): { form: FormKind; healthType: HealthType } | null {
+  // A plan the Vaccine form made names its vaccine; an older "Rabies booster" still closes through a vet visit.
+  if (item.kind === "vaccine" && (item.title === HEALTH_LABELS.vaccine || parseVaccinePlanTitle(item.title))) return { form: "health", healthType: "vaccine" };
   if (item.kind === "vet" || item.kind === "vaccine") return { form: "health", healthType: "vet" };
   if (item.kind === "medication") return { form: "health", healthType: "medication" };
   if (item.title === HEALTH_LABELS.issue) return { form: "health", healthType: "issue" };
@@ -142,6 +149,9 @@ export type DonePrefill = {
   time: string;
   reason: string;
   note: string;
+  /** A Vaccine plan's vaccine and dose number (TEC-259), from its title; empty for any other item. */
+  vaccine: string;
+  vaccineDose: number | null;
   /** A medication's id (when the title names one in the list, a retired one too), and the dose and unit its title carries. */
   medId: string;
   dose: string;
@@ -174,12 +184,15 @@ export function donePrefill(
     if (m && (MED_UNITS as readonly string[]).includes(m[2])) [dose, unit] = [m[1], m[2]];
     medId = meds.find((x) => x.name.toLowerCase() === head.trim().toLowerCase())?.id ?? "";
   }
-  const own = formMade || item.kind === "medication" ? "" : item.title;
+  const planned = item.kind === "vaccine" ? parseVaccinePlanTitle(item.title) : null;
+  const own = formMade || item.kind === "medication" || planned || item.title === HEALTH_LABELS.vaccine ? "" : item.title;
   return {
     day: base.day,
     time: base.time,
     reason,
     note: [own, item.note].filter(Boolean).join(" — "),
+    vaccine: planned?.vaccine ?? "",
+    vaccineDose: planned?.dose ?? null,
     medId,
     dose,
     unit,

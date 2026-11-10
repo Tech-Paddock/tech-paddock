@@ -6,6 +6,32 @@
   renamed in the UI only, the file is still `app/WhatsNew.tsx` and the data `lib/releases.ts`; the Upcoming tab is gone),
   sticky, five equal columns in 13px bold with `whitespace-nowrap` (at four columns 15px fit; at 390px "Patch notes" wrapped to two lines at 16px; **the five-column fit at 390px was not seen on a phone**),
   opening on Log (RULES.md holds the owner's override of the one-screen rule).
+- **Vaccines** (TEC-259, the owner: "I want a vaccines section I think in heath. I don't want it to live solely in vet visit"; the list
+  is "fine for now"): Health's fifth type, `vaccine`, stored as a `health` event with `details` `{type: 'vaccine', vaccine, dose?, note_id?, photos?, names?}`
+  and **no `reasons` key** (as a medication has none). `lib/vaccines.ts` holds the list (`VACCINES`: DHPP, Bordetella, Leptospirosis, Rabies; ids
+  `dhpp`, `bordetella`, `leptospirosis`, `rabies`; `VACCINE_RETIRED` is empty) and the dose number (`doses: true` for DHPP and Leptospirosis only, 1 to 6);
+  `lib/vaccine-plan.ts` holds the pure next-dose rule (`nextDose`) and the plan it makes (`nextDosePlan`, `visitVaccineEntries`).
+  * **The Vaccine form**: a Vaccine select and a Dose select side by side, each half the row (the Dose box is empty for a vaccine with no number),
+    then the offer **Plan the next dose** (ticked, a day in the shared date box and "Usually 3–4 weeks on. You can change the date.") on a new entry
+    only; a note is optional (like a medication's); Related note only (no Related issue). The dose opens on one more than the live entries of that
+    vaccine already logged (`earlierDoses`) until it is touched. A future When on it is a plan (title `Vaccine · DHPP · dose 2`), with no further offer.
+  * **Next dose** (suggestions only; the plan's date is editable in the form and later in the Calendar): DHPP and Leptospirosis 3 weeks on while under
+    16 weeks old, then 1 year; Rabies 1 year after the first, then 3 years; Bordetella 6 months. **There is no birth date in the app yet**
+    (`nextDose` takes `birthOn` and nothing passes it), so the dose number stands in: doses 1 and 2 are the puppy series, 3 and later yearly. TEC-260 (Profile)
+    should pass the birth date to `nextDose` in `LogForm`; the age beats the dose number when both are known.
+  * **The plan** is an ordinary `lando.upcoming` item of kind `vaccine` titled `Vaccine · DHPP · dose 3` (the dose only while the puppy series
+    goes on). It is added **after the vaccine is saved** (`planAfter` in `Journal.tsx`, keyed by the vaccine entry's id), so a vaccine that fails
+    leaves no plan; the map is in memory, so a reload between a failed save and its Retry drops the offer (the vaccine still saves). If the plan can't be
+    added the toast says the vaccine is saved and to add the dose from the Calendar. Its **Done** opens the Vaccine form on that vaccine and dose
+    (`formForItem`, `donePrefill`); an older vaccine plan with its own words ("Rabies booster") still opens Vet visit with the reason Vaccines.
+  * **Vaccines given on a vet visit**: a toggle chip for each vaccine under the visit's Weight, on a **new** visit only (a correction shows none: correct
+    the vaccine entries from the feed). Each pick is its own Vaccine entry at the visit's time and person, saved after the visit (and its weight) through the
+    usual follow-up rows, **`parent_id` the visit's id** (TEC-251's column; `parseNewEvent` now accepts it on a vaccine, and still refuses it on a vet
+    visit or an issue). Its dose is the one the log implies, and **Plan the next doses** (ticked) plans each, listing the suggested days. The visit's feed
+    line reads "Vaccines · gave DHPP · dose 1, Rabies" (`vaccinesWith` follows the visit's `voids` chain like `treatsWith`); a vaccine logged on its own is never listed there.
+  * **The Log** shows a Vaccine entry as "Vaccine  DHPP · dose 2" in Health's colour; it is Health, so it is in the Health pill's filter and nowhere else new.
+  * **Database**: migration `lando_vaccines` (a `vaccine` WHEN placed before `medication` in the health branch of `lando.details_ok`, nothing else).
+    The database allows a `dose` on any vaccine; the app asks for one only where `doses` is true. **Deploy order:** the migration first, then the code.
 - **Notes** (TEC-204, the owner: "a notes after log section to capture misc notes and docs"): a journal entry of a new kind,
   `note`, in `lando.events`; `details` is `{text, photos?, names?}`, `text` 1 to `NOTE_MAX` (2000) characters with its line
   breaks kept (only its ends are trimmed) and the attachments exactly as every other kind has them (TEC-203; `PhotoPicker`,
@@ -562,7 +588,7 @@
     `treatsWith` walks the `voids` chain from the live entry to every id it replaced and matches a link to any of them. A treat
     counted while correcting links to the correction's own id. A correction of a child keeps its link (`writeEvent` inherits
     `parent_id` from the entry it replaces unless the body names one); a delete carries none.
-  - `parseNewEvent` takes `parent_id` only on food, potty and weight, a uuid, never the entry's own id; it does not check that the
+  - `parseNewEvent` takes `parent_id` only on food, potty, weight and a health vaccine (TEC-259), a uuid, never the entry's own id; it does not check that the
     parent exists. A weight keeps its `details.visit` too (the feed and the growth chart read that; `parent_id` is the same id).
   - **Deploy order:** `lando_event_parent` before the code, because the journal read selects `parent_id` (an unapplied column
     makes every journal load a 503). Old entries keep null.
@@ -878,7 +904,8 @@
   constraint `events_details_shape` just calls it, so a widening is a new migration holding the
   function's whole current body with the one list or shape grown: copy the whole body from the
   newest migration file that defines `lando.details_ok`, sorting `supabase/migrations` by version
-  (today `lando_medication_entries`, which is `lando_snuffle_type`'s body with health wrapped in a CASE: a new `medication` branch, and the
+  (today `lando_vaccines`, which is `lando_note_links`'s body with a `vaccine` WHEN placed before the `medication` one in the health CASE;
+  `lando_note_links` added the optional `note_id`; `lando_medication_entries` is `lando_snuffle_type`'s body with health wrapped in a CASE: a new `medication` branch, and the
   old vet and issue shape as its ELSE, unchanged; `lando_snuffle_type` is `lando_box_leash_spot`'s body plus `'snuffle'` in the food type list;
   that one is `lando_potty_minutes`'s body plus `'box'` in the leash and spot lists;
   that one is `lando_details_ok_search_path`'s plus potty's optional
@@ -899,6 +926,15 @@
 - **The food type list is in two places:** `FOOD_TYPES` in `lib/foods.ts` and the food branch of `lando.details_ok`
   (`IN ('meal', 'snuffle', 'treat')`, migration `lando_snuffle_type`). A type in the app alone fails every save of it with a
   503. `tests/snuffle.test.ts` reads the migration. Deploy order: the migration first, then the code.
+- **The vaccine list is in two places:** `VACCINES` (+ `VACCINE_RETIRED`) in `lib/vaccines.ts` and the vaccine branch of `lando.details_ok`
+  (`IN ('dhpp', 'bordetella', 'leptospirosis', 'rabies')`, migration `lando_vaccines`). A vaccine in the app alone fails every save of it with a 503;
+  `tests/vaccines.test.ts` reads the migration and holds the lists equal. An id is history's key: retire one (move it to `VACCINE_RETIRED`), never delete
+  or re-id it. A new vaccine is a newer migration widening the list. **A vaccine's `dose` is the event's `details.dose`, the same key a medication's
+  amount uses** (they are different branches of the function): never read `dose` without checking `type`.
+- **A vaccine entry has no `reasons`.** Code that reads `h.reasons` on a health event must guard for `type` (`describe` does, `healthPickFor` and
+  `checkHealthReasons` return early for it, like a medication); a vaccine saved with a `reasons` key is refused by the database.
+- **Only `lando.upcoming`'s kind `vaccine` is shared with the old plans.** Titles that parse as `Vaccine · <name>[ · dose n]` open the Vaccine form on Done;
+  any other vaccine title keeps opening Vet visit. Do not change the title format without a migration of the open plans' titles.
 - **The health lists are in two places:** `VET_REASONS` + `VET_RETIRED` and `ISSUE_PICKS` +
   `ISSUE_RETIRED` in `lib/events.ts` and `lando.details_ok`. The database holds the union.
   `tests/health.test.ts` reads the newest migration defining the function (by version; it must be

@@ -184,6 +184,9 @@ export default function Journal() {
   // A vet visit opened from an Upcoming item's Done, by the visit's id: the item closes only once that
   // visit is saved (`saveThenClose`), and a Retry of the visit keeps its link.
   const visitLinks = useRef(new Map<string, string>());
+  // The next doses to plan (TEC-259), by the id of the Vaccine entry each follows: added once that entry is saved, so a
+  // vaccine that failed never leaves a plan behind. Held in memory; a reload before the save lands drops the offer.
+  const planAfter = useRef(new Map<string, UpcomingInput>());
 
   const loadUpcoming = useCallback(async () => {
     try {
@@ -275,6 +278,25 @@ export default function Journal() {
     [loadUpcoming]
   );
 
+  // A vaccine's next dose, planned once the vaccine is saved (TEC-259). It joins Next 7 days and the Calendar; if it can't
+  // be added the vaccine is safe in the journal and the toast says so.
+  const planNextDose = useCallback(
+    async (item: UpcomingInput) => {
+      try {
+        const { ok, data } = await postJson("/api/upcoming", { action: "add", item });
+        if (!ok) throw new Error(data.error ?? "couldn't add");
+        setUpcoming((prev) => [...(prev ?? []).filter((i) => i.id !== data.item.id), data.item]);
+        return;
+      } catch {
+        // falls through to the toast
+      }
+      setToast("Vaccine saved, but its next dose wasn't planned — add it from the Calendar");
+      clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setToast(null), 4000);
+    },
+    []
+  );
+
   const save = useCallback(
     async function save(body: LogBody, announce: boolean, then?: LogBody[]): Promise<void> {
       const after = then?.length ? then : undefined;
@@ -287,6 +309,11 @@ export default function Journal() {
           mergeEvent(data.event);
           updatePending((list) => list.filter((p) => p.body.id !== b.id));
           if (announce) say(`${describe(b).title || KIND_LABELS[b.kind]} logged`);
+          const plan = planAfter.current.get(b.id);
+          if (plan) {
+            planAfter.current.delete(b.id);
+            void planNextDose(plan);
+          }
           return true;
         } catch (e) {
           const error = e instanceof TypeError ? "no connection" : (e as Error).message;
@@ -304,7 +331,7 @@ export default function Journal() {
         after
       );
     },
-    [mergeEvent, updatePending, say, closeUpcoming]
+    [mergeEvent, updatePending, say, closeUpcoming, planNextDose]
   );
 
   // Mount: who this phone is, its defaults, anything left unsaved, the journal.
@@ -531,9 +558,10 @@ export default function Journal() {
     writeStore(DEFAULTS_KEY, next);
   }
 
-  function logNew(body: LogBody, then?: LogBody[]) {
+  function logNew(body: LogBody, then?: LogBody[], plans?: Record<string, UpcomingInput>) {
     // An entry opened from an upcoming item's Done: that item closes when this entry is saved.
     if (open?.doneFor) visitLinks.current.set(body.id, open.doneFor.id);
+    for (const [id, item] of Object.entries(plans ?? {})) planAfter.current.set(id, item);
     remember([body, ...(then ?? [])]);
     setOpen(null);
     void save(body, true, then);

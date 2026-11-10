@@ -77,8 +77,8 @@ describe("lando.details_ok only widens", () => {
     const newest = fnBody(all.at(-1)![1]);
     const branch = (kind: string, next: string) => newest.slice(newest.indexOf(`WHEN '${kind}' THEN`), newest.indexOf(`WHEN '${next}' THEN`));
     const listing = (b: string) => [...b.matchAll(/ARRAY\[([^\]]*)\]/g)].filter((m) => quoted(m[1]).includes("note_id"));
-    // Health: the medication branch and the vet / issue branch both list it; so does exercise, which gates it on training.
-    expect(listing(branch("health", "note"))).toHaveLength(2);
+    // Health: the vaccine (TEC-259), medication and vet / issue branches each list it; so does exercise, which gates it on training.
+    expect(listing(branch("health", "note"))).toHaveLength(3);
     const exercise = branch("exercise", "weight");
     expect(listing(exercise)).toHaveLength(1);
     expect(exercise).toMatch(/details \? 'note_id' THEN\s+details ->> 'type' = 'training'/);
@@ -86,8 +86,8 @@ describe("lando.details_ok only widens", () => {
     for (const [kind, next] of [["potty", "food"], ["food", "exercise"], ["weight", "health"], ["note", "void"]]) {
       expect(branch(kind, next), kind).not.toContain("note_id");
     }
-    // It is a uuid string, checked like `issue`: one check for each of the three places.
-    expect(newest.match(/details ->> 'note_id' ~\* '\^\[0-9a-f\]\{8\}/g)).toHaveLength(3);
+    // It is a uuid string, checked like `issue`: one check for each of the four places.
+    expect(newest.match(/details ->> 'note_id' ~\* '\^\[0-9a-f\]\{8\}/g)).toHaveLength(4);
     // The body before it had no such key: this migration is what adds it.
     expect(all.find(([f]) => f.endsWith("_lando_notes.sql"))![1]).not.toContain("note_id");
   });
