@@ -25,8 +25,11 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **The guard also refuses, for every role (TEC-221):** deleting a remote branch, pushing to any
   branch but `claude/…` (tags only as `refs/tags/…`), `gh repo` / `secret` / `variable` / `release`
   writes, any `gh api` write (a field without `-X GET` is a POST), and printing the GitHub token
-  (`gh auth token`, `gh/hosts.yml`). On the owner's PC `gh` is the owner's own login, so this is
-  the only stop.
+  (`gh auth token`, `gh/hosts.yml`). On the owner's PC `gh` and `git push` use a fine-grained token
+  for this repo only (contents and pull requests read-write; TEC-271, 2026-11-10), so the guard is
+  the stop inside the repo and the token outside it. It expires after 90 days: a push failing with
+  401 is that, and renewing it is an owner task. `gh api` still reports the owner's own repo role
+  (`admin: true`), not the token's.
 - **A builder or Deployment start is not held in auto mode (TEC-220, parked).** The guard asks;
   auto mode approves it without the owner. Only the rule "start one on the owner's command" holds.
 - **Migration history is clean:** repo and `list_migrations` differ by exactly `20260908235234`,
