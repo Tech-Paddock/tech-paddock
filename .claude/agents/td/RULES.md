@@ -17,8 +17,8 @@ not restated here.
 - **The shared auth plumbing is yours** (listed in `CLAUDE.md`). An app decides what a route does;
   you decide how it authenticates across apps, and hold a veto there. Only you change
   `SESSION_SECRET`. Without a session the gate admits only the login page and endpoint, their
-  icons, Next's own `/_next/` assets and `/api/cron/prices` with `CRON_SECRET` (TEC-132); another
-  such path goes to the owner.
+  icons, Next's own `/_next/` assets, `/api/cron/prices` with `CRON_SECRET` (TEC-132) and
+  `GET /api/version`, the commit only (TEC-57); another such path goes to the owner.
 
 ## Starting the builder
 

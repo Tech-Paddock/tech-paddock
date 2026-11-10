@@ -11,7 +11,8 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **Without a session, the gate lets through** the login page, its endpoint, its icons and Next's
   `/_next/` assets, and `/api/cron/prices` with `Authorization: Bearer <CRON_SECRET>` (TEC-132,
   owner-approved). The cron path is in every app's gate and fails closed; only `tp-cookbook` has
-  the secret and the route.
+  the secret and the route. `GET /api/version` (exact path and method) is open too, in every app
+  (TEC-57, owner-approved); the route is stamped from `packages/shared` and returns only the commit.
 - **`apps/showcase` is yours to scaffold when the owner wants it** (TEC-99). The owner cleared reading
   `Tech-Paddock/teamusauploader` on 2026-10-18; the demo uses fake data and a neutral name.
 - **Linear writes don't prompt.** Deletes, label retirement and diff tools still ask.
@@ -39,6 +40,9 @@ What is true now, and the traps. Branch and pull request state is never written 
 
 ## Traps
 
+- **A brief that names an issue outside the plan makes the guard ask the owner** to start that
+  helper (2026-11-10: two builder prompts). In a plan run, name only the plan's issues in a brief;
+  describe older work in words, without its TEC number.
 - **What only a phone can prove is not proven by jsdom** (TEC-255 broke every Save, fixed in
   TEC-258): native pickers, `showPicker()`, keyboards, gestures. File an owner task for a
   phone check before such a change is called done, or choose a design that needs no phone-only behaviour.
