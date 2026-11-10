@@ -24,9 +24,10 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 - Quiet secondary controls (owner, TEC-250): Next 7 days is one short line per plan with a
   Calendar link; Treats is a plain counter, and Medical issue is its own checkbox, on Potty only;
   attachments are one small Attach link with thumbnails in a row.
-- Every form's bottom row is When and Logging as, each half the row (owner, TEC-261): a date box
-  that opens the calendar from a tap anywhere on it, and one time box whose hour, minute and AM/PM
-  scroll in place. Weight is a date only, and a note is never in the future. The row opens on now,
+- Every form's bottom row is When and Logging as, each half the row (owner, TEC-261): a day box and
+  one time box, each a scroll column (day; hour, minute and AM/PM) that shows the values either side
+  faintly and rolls once when the form opens, never under reduced motion; a plain tap on the day,
+  without scrolling, opens the calendar for a day further away (owner, TEC-266). Weight is a date only, and a note is never in the future. The row opens on now,
   or on the entry's own time (a correction, a Done, an Add a plan). Save is on its own line below:
   one tap saves at that time and nothing opens after it. A future time shows the form's Repeat and
   "Future: saves as upcoming", and Save reads Save plan. A failed save keeps the chosen time.
