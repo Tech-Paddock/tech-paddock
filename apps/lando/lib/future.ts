@@ -5,6 +5,7 @@
  * the form the item came from. Everything here is pure.
  */
 import { FORM_LABELS, HEALTH_LABELS, VET_REASONS, type FormKind, type HealthType } from "./events";
+import { fromLocalInput, toDateInput } from "./localtime";
 import { MED_UNITS, type Medication } from "./medications";
 import {
   SOON_DAYS,
@@ -32,6 +33,17 @@ export function isFutureWhen(at: Date | null, now: Date): boolean {
 /** A weight's When is a day: the future only when the day is after today (`YYYY-MM-DD`, the phone's). */
 export function isFutureDay(day: string, today: string): boolean {
   return isDay(day) && isDay(today) && daysBetween(today, day) > 0;
+}
+
+/**
+ * Whether a When the form holds is after now: a day for a date-only form (Weight), else a local date and time
+ * (`datetime-local` text). Empty or unreadable is never the future.
+ */
+export function isFuturePick(value: string, dateOnly: boolean, now: Date): boolean {
+  if (!value) return false;
+  if (dateOnly) return isFutureDay(value, toDateInput(now.toISOString()));
+  const at = fromLocalInput(value);
+  return isFutureWhen(at ? new Date(at) : null, now);
 }
 
 /** What the form says under When while the When is in the future. */

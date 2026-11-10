@@ -3,10 +3,10 @@
 import { useRef, useState } from "react";
 import { InvalidEvent, NOTE_MAX, eventNames, eventPhotos, parseDetails, type Details, type JournalEvent } from "@/lib/events";
 import { noteText, noteWhenError } from "@/lib/notes";
-import { fromLocalInput, toLocalInput } from "@/lib/localtime";
+import { fromLocalInput, toDateInput, toLocalInput } from "@/lib/localtime";
 import PhotoPicker, { usePhotos } from "./Photos";
-import { Box, Field, WHO_WIDTH, input, inputFull, type LogBody, type Person } from "./LogForm";
-import WhenAsk, { classifyPick, type WhenAskHandle, type WhenChoice } from "./WhenPicker";
+import { Box, Field, inputFull, type LogBody, type Person } from "./LogForm";
+import WhenField from "./WhenField";
 
 type Props = {
   /** Set when correcting a note; the form opens on its values. */
@@ -33,9 +33,11 @@ type Props = {
 export default function NoteForm({ event, people, phonePerson, photoUrls, onPhotoUrl, onLog, onChange }: Props) {
   const editing = !!event;
   const openedAt = useRef(new Date().toISOString());
-  // Save asks the time with the phone's own picker (TEC-255); a save that failed after it was picked keeps it.
-  const whenAsk = useRef<WhenAskHandle>(null);
-  const [held, setHeld] = useState<WhenChoice | null>(null);
+  // The When row (TEC-261) opens on now, or on the note's own time. Untouched, a new note is saved at the moment of Save and
+  // a correction keeps its time to the millisecond; a failed save keeps whatever the row holds.
+  const [when, setWhen] = useState(toLocalInput(event?.at ?? openedAt.current));
+  const [whenTouched, setWhenTouched] = useState(false);
+  const [retry, setRetry] = useState(false);
   const [personId, setPersonId] = useState(event ? event.person_id ?? "" : phonePerson ?? "");
   const [text, setText] = useState(event ? noteText(event) : "");
   const photos = usePhotos(event ? eventPhotos(event) : [], event ? eventNames(event) : {}, photoUrls, onPhotoUrl);
@@ -48,10 +50,11 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
   const photoBlock = photos.working || photos.failed;
   const left = NOTE_MAX - text.length;
 
-  /** Save: the note's own checks, then the phone's date-and-time picker (TEC-255). Nothing is saved here. */
-  function submit(e: React.FormEvent) {
+  /** Save: the note's own checks, then one save at the time the When row holds. Nothing opens after it. */
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setRetry(false);
     if (photoBlock) {
       setError(photos.failed ? "An attachment didn't upload — retry it, or remove it." : "An attachment is still uploading.");
       return;
@@ -60,32 +63,14 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
       setError("Write the note — it can't be empty.");
       return;
     }
-    if (held) {
-      void commit(held);
-      return;
-    }
-    whenAsk.current?.ask(editing ? toLocalInput(event?.at ?? "") : null);
-  }
-
-  /** What the picker returned. The same time handed back on a correction is kept to the millisecond. */
-  function picked(value: string) {
-    void commit(classifyPick(value, { dateOnly: false, stored: editing, initial: toLocalInput(event?.at ?? openedAt.current), now: new Date() }));
-  }
-
-  /** The time is known. Now on a new note is the moment of this save; keep is a correction's own time, to the millisecond. */
-  async function commit(choice: WhenChoice) {
-    setError(null);
-    setHeld(choice);
-    const at =
-      choice.kind === "at" ? fromLocalInput(choice.value) : choice.kind === "keep" && event ? event.at : new Date().toISOString();
+    const at = whenTouched ? fromLocalInput(when) : editing && event ? event.at : new Date().toISOString();
     if (!at) {
-      setHeld(null);
       setError("pick a time");
       return;
     }
+    // A note is never in the future: the calendar stops at today, and a time later today is refused here.
     const future = noteWhenError(new Date(at), new Date());
     if (future) {
-      setHeld(null);
       setError(future);
       return;
     }
@@ -97,7 +82,6 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
         ...(photos.paths.length ? { photos: photos.paths, ...(Object.keys(photos.names).length ? { names: photos.names } : {}) } : {}),
       });
     } catch (err) {
-      setHeld(null);
       setError(err instanceof InvalidEvent ? err.message : "check the form");
       return;
     }
@@ -109,7 +93,10 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
     setBusy(true);
     const { error } = await onChange({ ...body, voids: event.id });
     setBusy(false);
-    if (error) setError(error);
+    if (error) {
+      setError(error);
+      setRetry(true);
+    }
   }
 
   async function remove() {
@@ -151,59 +138,44 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
       </Box>
 
       {error && (
-        <div role="alert" className="flex flex-wrap items-center gap-x-2 text-sm font-semibold text-danger">
-          <span>{error}</span>
-          {held && (
-            <button
-              type="button"
-              onClick={() => {
-                setHeld(null);
-                setError(null);
-              }}
-              className="min-h-[44px] underline"
-            >
-              Pick another time
-            </button>
-          )}
+        <div role="alert" className="text-sm font-semibold text-danger">
+          {error}
         </div>
       )}
 
-      {/* The bottom row (TEC-252): Logging as, on one line beside Save, as on every form. */}
-      <div data-section="save" className="relative flex items-center gap-2">
-        <label htmlFor="n-who" className="shrink-0 text-[13px] text-ink-soft">
-          as
-        </label>
-        <select
-          id="n-who"
-          aria-label="Logging as"
-          value={personId}
-          onChange={(e) => setPersonId(e.target.value)}
-          className={`${input} h-[44px] shrink-0 ${WHO_WIDTH}`}
-        >
-          <option value="">Nobody</option>
-          {people.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.display_name}
-            </option>
-          ))}
-        </select>
+      {/* The bottom row (TEC-261): When and Logging as, each half the row, as on every form. A note is never in the
+          future, so the calendar stops at today. Save is on its own line below. */}
+      <div data-section="when-who" className="grid grid-cols-2 items-end gap-2">
+        <Field label="When">
+          <WhenField
+            value={when}
+            dateOnly={false}
+            maxDay={toDateInput(new Date().toISOString())}
+            onChange={(v) => {
+              setWhen(v);
+              setWhenTouched(true);
+            }}
+          />
+        </Field>
+        <Field label="Logging as" htmlFor="n-who">
+          <select id="n-who" value={personId} onChange={(e) => setPersonId(e.target.value)} className={inputFull}>
+            <option value="">Nobody</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.display_name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <div data-section="save" className="flex items-center gap-2">
         <button
           type="submit"
           disabled={busy || photoBlock}
           className="h-[44px] min-w-0 shrink-0 whitespace-nowrap rounded-[12px] bg-[var(--tone-2-bg)] px-4 text-[15px] font-bold text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)] disabled:opacity-60"
         >
-          {busy ? "Saving…" : photos.working ? "Uploading…" : photos.failed ? "Fix attachment" : held && error ? "Retry" : editing ? "Save changes" : "Save note"}
+          {busy ? "Saving…" : photos.working ? "Uploading…" : photos.failed ? "Fix attachment" : retry && error ? "Retry" : editing ? "Save changes" : "Save note"}
         </button>
-        <WhenAsk
-          ref={whenAsk}
-          dateOnly={false}
-          allowFuture={false}
-          check={(v) => {
-            const at = fromLocalInput(v);
-            return at ? noteWhenError(new Date(at), new Date()) : null;
-          }}
-          onPick={picked}
-        />
       </div>
       {editing && (
         <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] self-start font-semibold text-danger disabled:opacity-60">

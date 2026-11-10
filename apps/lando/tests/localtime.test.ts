@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DATE_ONLY_HOUR, dateLabel, fromDateInput, rowTime, toDateInput, toLocalInput, whenLabel } from "@/lib/localtime";
+import { DATE_ONLY_HOUR, clock12, dateLabel, fromDateInput, rowTime, toDateInput, toLocalInput, whenLabel, withClock, withDay } from "@/lib/localtime";
 
 describe("weight dates — a day, stored at local noon", () => {
   it("turns a picked date into local noon that day", () => {
@@ -67,5 +67,31 @@ describe("whenLabel", () => {
   it("is empty for an empty or unreadable value", () => {
     expect(whenLabel("", now)).toBe("");
     expect(whenLabel("nonsense", now)).toBe("");
+  });
+});
+
+describe("the When row's clock (TEC-261)", () => {
+  it("reads a local time as a 12-hour face", () => {
+    expect(clock12("2026-11-09T00:05")).toEqual({ hour: 12, minute: 5, pm: false });
+    expect(clock12("2026-11-09T09:30")).toEqual({ hour: 9, minute: 30, pm: false });
+    expect(clock12("2026-11-09T12:00")).toEqual({ hour: 12, minute: 0, pm: true });
+    expect(clock12("2026-11-09T23:59")).toEqual({ hour: 11, minute: 59, pm: true });
+  });
+
+  it("builds the time back, with 12 AM as midnight and 12 PM as noon", () => {
+    expect(withClock("2026-11-09T09:30", { hour: 12, minute: 0, pm: false })).toBe("2026-11-09T00:00");
+    expect(withClock("2026-11-09T09:30", { hour: 12, minute: 0, pm: true })).toBe("2026-11-09T12:00");
+    expect(withClock("2026-11-09T09:30", { hour: 4, minute: 7, pm: true })).toBe("2026-11-09T16:07");
+  });
+
+  it("round-trips every minute of a day", () => {
+    for (let h = 0; h < 24; h++) for (const m of [0, 1, 30, 59]) {
+      const v = `2026-11-09T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      expect(withClock(v, clock12(v))).toBe(v);
+    }
+  });
+
+  it("moves the day and keeps the clock", () => {
+    expect(withDay("2026-11-09T16:07", "2026-12-01")).toBe("2026-12-01T16:07");
   });
 });

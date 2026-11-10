@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
-// TEC-258 (after TEC-255, TEC-252): Save always opens a small When sheet (native date-and-time field and a Save); the form has no When. Rendered in a DOM so the taps are real.
+// TEC-261 (after TEC-258, TEC-255, TEC-252): the When row is back at the bottom, beside Logging as, each half the row. A
+// day box (a transparent date input over all of it) and one time box (hour, minute and AM/PM scroll in place), with Save
+// on its own line below. One tap on Save saves at the chosen time and nothing opens after it. Rendered in a DOM so the
+// taps are real. jsdom cannot prove scroll-snap or the phone's calendar opening: those are phone checks.
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import LogForm from "@/app/LogForm";
 import NoteForm from "@/app/NoteForm";
 import type { FormKind, JournalEvent } from "@/lib/events";
-import { toLocalInput } from "@/lib/localtime";
+import { clock12, toDateInput, toLocalInput, withClock, withDay } from "@/lib/localtime";
 
 // Invented ids. Nothing here is a real record (RULES.md, Never 2).
 const PERSON = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -39,25 +42,31 @@ function open(form: FormKind, extra: Record<string, unknown> = {}) {
   return props;
 }
 
-
-const saveButton = () => screen.getByRole("button", { name: /^Save (?!changes$)|^Save changes$|^Save as upcoming$|^Retry$/ });
-const sheet = () => screen.queryByRole("dialog", { name: "When?" });
-const pickPee = () => fireEvent.click(screen.getByLabelText("Pee"));
-/** The sheet's native field, and what it holds. */
-const sheetField = () => within(sheet()!).getByLabelText(/^Date/) as HTMLInputElement;
-/** Sets the sheet's field to a value and taps its Save, as a person does. */
-const pick = (value: string) => {
-  fireEvent.change(sheetField(), { target: { value } });
-  fireEvent.click(within(sheet()!).getByRole("button", { name: "Save" }));
-};
-/** Taps the sheet's Save on whatever it opened on. */
-const saveSheet = () => fireEvent.click(within(sheet()!).getByRole("button", { name: "Save" }));
-
 afterEach(() => cleanup());
 
-const repeatStep = () => screen.queryByRole("dialog", { name: "Repeat?" });
-/** Confirms the small Repeat step a future pick opens. */
-const confirmPlan = () => fireEvent.click(within(repeatStep()!).getByRole("button", { name: "Save as upcoming" }));
+const saveButton = () => screen.getByRole("button", { name: /^(Save|Retry)/ });
+const pickPee = () => fireEvent.click(screen.getByLabelText("Pee"));
+const dateInput = () => screen.getByLabelText("Date") as HTMLInputElement;
+const column = (name: "Hour" | "Minute" | "AM or PM") => screen.getByRole("spinbutton", { name });
+const noDialog = () => expect(screen.queryByRole("dialog")).toBeNull();
+
+const HOUR_ORDER = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+/** Scrolls a time column to a row, as a swipe does, and waits for it to settle. */
+async function scrollTo(name: "Hour" | "Minute" | "AM or PM", index: number) {
+  const el = column(name);
+  el.scrollTop = index * 42;
+  fireEvent.scroll(el);
+  await waitFor(() => expect(Number(el.getAttribute("aria-valuenow"))).toBe(index));
+}
+/** Sets the whole When row to a local date-and-time: the calendar, then the three scroll columns. */
+async function setWhen(value: string) {
+  fireEvent.change(dateInput(), { target: { value: value.slice(0, 10) } });
+  const c = clock12(value);
+  await scrollTo("Hour", HOUR_ORDER.indexOf(c.hour));
+  await scrollTo("Minute", c.minute);
+  await scrollTo("AM or PM", c.pm ? 1 : 0);
+}
+
 const nowLocal = () => toLocalInput(new Date().toISOString());
 const hoursFromNow = (h: number) => toLocalInput(new Date(Date.now() + h * 3600_000).toISOString());
 const stored = (at: string) =>
@@ -72,22 +81,117 @@ const stored = (at: string) =>
     created_at: at,
   }) as unknown as JournalEvent;
 
-describe("Save always opens the When sheet (TEC-258)", () => {
-  it("has no When on the form, no Now, and Logging as is beside Save", () => {
+describe("the When row (TEC-261)", () => {
+  it("is the bottom row: When and Logging as, each half, with Save on its own line below and no When sheet", () => {
     open("potty");
-    expect(screen.queryByLabelText("When")).toBeNull();
+    const row = document.querySelector('[data-section="when-who"]') as HTMLElement;
+    expect(row.className).toContain("grid-cols-2");
+    expect(within(row).getByText("When")).toBeTruthy();
+    expect(within(row).getByLabelText("Logging as")).toBeTruthy();
+    // Save is its own line after the row, and nothing opens when the form is shown.
+    expect(row.contains(saveButton())).toBe(false);
+    expect(row.compareDocumentPosition(saveButton()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Now" })).toBeNull();
-    const who = screen.getByLabelText("Logging as");
-    expect(who.parentElement).toBe(saveButton().parentElement);
+    noDialog();
   });
 
-  it("opens the sheet on every form, from Save, and saves nothing until its Save is tapped", () => {
+  it("is on every form, the Note form included", () => {
+    for (const form of ["potty", "food", "fun", "training", "weight", "health"] as FormKind[]) {
+      cleanup();
+      open(form);
+      expect(document.querySelector('[data-section="when-who"]'), form).not.toBeNull();
+      expect(dateInput(), form).toBeTruthy();
+    }
+    cleanup();
+    render(createElement(NoteForm, noteProps()));
+    expect(document.querySelector('[data-section="when-who"]')).not.toBeNull();
+  });
+
+  it("has a date box reading Today, with a transparent date input over all of it, and showPicker on a tap", () => {
+    const showPicker = vi.fn();
+    (HTMLInputElement.prototype as unknown as { showPicker: () => void }).showPicker = showPicker;
+    try {
+      open("potty");
+      const input = dateInput();
+      expect(input.type).toBe("date");
+      expect(input.className).toContain("opacity-0");
+      expect(input.className).toContain("absolute inset-0");
+      expect(input.parentElement!.textContent).toBe("Today");
+      fireEvent.click(input);
+      expect(showPicker).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (HTMLInputElement.prototype as unknown as { showPicker?: () => void }).showPicker;
+    }
+  });
+
+  it("survives a browser that refuses showPicker", () => {
+    (HTMLInputElement.prototype as unknown as { showPicker: () => void }).showPicker = () => {
+      throw new Error("NotAllowedError");
+    };
+    try {
+      open("potty");
+      expect(() => fireEvent.click(dateInput())).not.toThrow();
+    } finally {
+      delete (HTMLInputElement.prototype as unknown as { showPicker?: () => void }).showPicker;
+    }
+  });
+
+  it("has one time box with the hour, minute and AM/PM as spinbuttons, opening on now", () => {
+    open("potty");
+    const group = screen.getByRole("group", { name: "Time" });
+    const c = clock12(nowLocal());
+    expect(within(group).getByRole("spinbutton", { name: "Hour" }).getAttribute("aria-valuetext")).toBe(String(c.hour));
+    expect(within(group).getByRole("spinbutton", { name: "Minute" }).getAttribute("aria-valuetext")).toBe(String(c.minute).padStart(2, "0"));
+    expect(within(group).getByRole("spinbutton", { name: "AM or PM" }).getAttribute("aria-valuetext")).toBe(c.pm ? "PM" : "AM");
+    // The box is drawn like the original 44px field.
+    expect(group.className).toContain("h-[44px]");
+    expect(column("Hour").className).toContain("snap-y");
+  });
+
+  it("steps from the keyboard: arrows, Page keys, Home and End", () => {
+    open("potty");
+    const min = column("Minute");
+    fireEvent.keyDown(min, { key: "Home" });
+    expect(min.getAttribute("aria-valuetext")).toBe("00");
+    fireEvent.keyDown(min, { key: "ArrowDown" });
+    expect(min.getAttribute("aria-valuetext")).toBe("01");
+    fireEvent.keyDown(min, { key: "PageDown" });
+    expect(min.getAttribute("aria-valuetext")).toBe("06");
+    fireEvent.keyDown(min, { key: "ArrowUp" });
+    expect(min.getAttribute("aria-valuetext")).toBe("05");
+    fireEvent.keyDown(min, { key: "End" });
+    expect(min.getAttribute("aria-valuetext")).toBe("59");
+    const ap = column("AM or PM");
+    fireEvent.keyDown(ap, { key: "Home" });
+    expect(ap.getAttribute("aria-valuetext")).toBe("AM");
+    fireEvent.keyDown(ap, { key: "ArrowDown" });
+    expect(ap.getAttribute("aria-valuetext")).toBe("PM");
+  });
+
+  it("a swipe on a column picks that row", async () => {
+    open("potty");
+    await scrollTo("Minute", 17);
+    expect(column("Minute").getAttribute("aria-valuetext")).toBe("17");
+    await scrollTo("Hour", 0);
+    expect(column("Hour").getAttribute("aria-valuetext")).toBe("12");
+  });
+
+  it("is a day only on Weight: no time box", () => {
+    open("weight");
+    expect(dateInput()).toBeTruthy();
+    expect(screen.queryByRole("spinbutton", { name: "Hour" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Time" })).toBeNull();
+  });
+});
+
+describe("Save (TEC-261)", () => {
+  it("one tap logs at now on every form, and nothing opens after Save", () => {
     const forms: [FormKind, Record<string, unknown>][] = [
       ["potty", {}],
       ["food", {}],
       ["fun", {}],
       ["training", {}],
-      ["weight", { weightUnit: "lb" }],
+      ["weight", {}],
     ];
     for (const [form] of forms) {
       cleanup();
@@ -95,254 +199,222 @@ describe("Save always opens the When sheet (TEC-258)", () => {
       if (form === "potty") pickPee();
       if (form === "weight") fireEvent.change(screen.getByLabelText(/Weight/, { selector: "input" }), { target: { value: "7.3" } });
       fireEvent.click(saveButton());
-      expect(sheet(), form).not.toBeNull();
-      expect(props.onLog, form).not.toHaveBeenCalled();
+      expect(props.onLog, form).toHaveBeenCalledTimes(1);
+      expect(props.onUpcoming, form).not.toHaveBeenCalled();
+      noDialog();
     }
   });
 
-  it("a new entry opens it on now, and its Save logs the moment of the save", () => {
+  it("logs the moment of the save when the row was never touched", () => {
     const props = open("potty");
     pickPee();
     fireEvent.click(saveButton());
-    expect(sheetField().value).toBe(nowLocal());
-    saveSheet();
-    expect(props.onLog).toHaveBeenCalledTimes(1);
     const [body] = props.onLog.mock.calls[0] as unknown as [{ at: string; kind: string; person_id: string }];
     expect(body.kind).toBe("potty");
     expect(body.person_id).toBe(PERSON);
     expect(Math.abs(Date.now() - Date.parse(body.at))).toBeLessThan(5000);
-    expect(props.onUpcoming).not.toHaveBeenCalled();
   });
 
-  it("an earlier time is logged at that time", () => {
+  it("an earlier time and day is logged at that time", async () => {
     const props = open("potty");
     pickPee();
+    const earlier = withDay(hoursFromNow(-3), toDateInput(new Date(Date.now() - 26 * 3600_000).toISOString()));
+    await setWhen(earlier);
+    expect(screen.getByLabelText("Date").parentElement!.textContent).toMatch(/Yesterday|[A-Z][a-z]{2} \d/);
     fireEvent.click(saveButton());
-    const earlier = hoursFromNow(-3);
-    pick(earlier);
     const [body] = props.onLog.mock.calls[0] as unknown as [{ at: string }];
     expect(toLocalInput(body.at)).toBe(earlier);
     expect(props.onUpcoming).not.toHaveBeenCalled();
   });
 
-  it("a future time asks its Repeat first and saves nothing until it is confirmed", async () => {
-    const props = open("potty");
-    pickPee();
+  it("a Weight saves on the day picked", async () => {
+    const props = open("weight");
+    fireEvent.change(screen.getByLabelText(/Weight/, { selector: "input" }), { target: { value: "7.3" } });
+    const day = toDateInput(new Date(Date.now() - 3 * 86400_000).toISOString());
+    fireEvent.change(dateInput(), { target: { value: day } });
     fireEvent.click(saveButton());
-    const later = hoursFromNow(26);
-    pick(later);
-    expect(repeatStep()).not.toBeNull();
-    expect(within(repeatStep()!).getByText("Future: saves as upcoming")).toBeTruthy();
-    expect(within(repeatStep()!).getByText("Repeat")).toBeTruthy();
-    expect(props.onUpcoming).not.toHaveBeenCalled();
-    expect(props.onLog).not.toHaveBeenCalled();
-    confirmPlan();
-    expect(repeatStep()).toBeNull();
-    await waitFor(() => expect(props.onUpcoming).toHaveBeenCalledTimes(1));
-    expect(props.onLog).not.toHaveBeenCalled();
-    expect(props.onUpcoming.mock.calls[0][0]).toMatchObject({ due_on: later.slice(0, 10), due_time: later.slice(11, 16) });
+    const [body] = props.onLog.mock.calls[0] as unknown as [{ at: string }];
+    expect(toDateInput(body.at)).toBe(day);
   });
 
-  it("a future time with Repeat ticked saves a plan with the chosen repeat", async () => {
+  it("a form's own mistake is shown on the form and the time stays", async () => {
+    open("potty");
+    const earlier = hoursFromNow(-2);
+    await setWhen(earlier);
+    fireEvent.click(saveButton());
+    expect(screen.getByRole("alert").textContent).toMatch(/Pick what happened/);
+    expect(dateInput().value).toBe(earlier.slice(0, 10));
+    expect(column("Minute").getAttribute("aria-valuetext")).toBe(String(clock12(earlier).minute).padStart(2, "0"));
+    noDialog();
+  });
+});
+
+describe("a future time (TEC-261)", () => {
+  const tomorrow = () => withClock(withDay(nowLocal(), toDateInput(new Date(Date.now() + 2 * 86400_000).toISOString())), { hour: 9, minute: 30, pm: false });
+
+  it("shows the form's Repeat under the row and the notice, and Save reads Save plan", async () => {
+    open("potty");
+    expect(screen.queryByText("Future: saves as upcoming")).toBeNull();
+    expect(screen.queryByText("Repeat")).toBeNull();
+    pickPee();
+    await setWhen(tomorrow());
+    expect(screen.getByText("Future: saves as upcoming")).toBeTruthy();
+    expect(screen.getByText("Repeat")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save plan" })).toBeTruthy();
+    const row = document.querySelector('[data-section="when-who"]') as HTMLElement;
+    const plan = document.querySelector('[data-section="plan"]') as HTMLElement;
+    expect(row.compareDocumentPosition(plan) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(plan.compareDocumentPosition(saveButton()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("one tap on Save plan saves an upcoming item, not an entry", async () => {
     const props = open("potty");
     pickPee();
-    fireEvent.click(saveButton());
-    pick(hoursFromNow(26));
-    fireEvent.click(within(repeatStep()!).getByLabelText("Repeat"));
-    fireEvent.change(within(repeatStep()!).getByLabelText("Repeat every"), { target: { value: "2" } });
-    fireEvent.change(within(repeatStep()!).getByLabelText("Repeat unit"), { target: { value: "month" } });
-    confirmPlan();
+    const later = tomorrow();
+    await setWhen(later);
+    fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
+    await waitFor(() => expect(props.onUpcoming).toHaveBeenCalledTimes(1));
+    expect(props.onLog).not.toHaveBeenCalled();
+    expect(props.onUpcoming.mock.calls[0][0]).toMatchObject({ due_on: later.slice(0, 10), due_time: "09:30" });
+    noDialog();
+  });
+
+  it("with Repeat ticked saves the chosen repeat", async () => {
+    const props = open("potty");
+    pickPee();
+    await setWhen(tomorrow());
+    fireEvent.click(screen.getByLabelText("Repeat"));
+    fireEvent.change(screen.getByLabelText("Repeat every"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Repeat unit"), { target: { value: "month" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
     await waitFor(() => expect(props.onUpcoming).toHaveBeenCalledTimes(1));
     expect(props.onUpcoming.mock.calls[0][0]).toMatchObject({ repeat_every: 2, repeat_unit: "month" });
     expect(props.onLog).not.toHaveBeenCalled();
   });
 
-  it("Back to the form on the Repeat step saves nothing, and Save asks the time again", () => {
-    const props = open("potty");
-    pickPee();
-    fireEvent.click(saveButton());
-    pick(hoursFromNow(26));
-    fireEvent.click(within(repeatStep()!).getByRole("button", { name: "Back to the form" }));
-    expect(repeatStep()).toBeNull();
-    expect(props.onUpcoming).not.toHaveBeenCalled();
-    fireEvent.click(saveButton());
-    expect(sheet()).not.toBeNull();
-  });
-
-  it("a past time or now saves at once, with no Repeat step", () => {
-    const props = open("potty");
-    pickPee();
-    fireEvent.click(saveButton());
-    pick(hoursFromNow(-2));
-    expect(repeatStep()).toBeNull();
-    expect(props.onLog).toHaveBeenCalledTimes(1);
-  });
-
-  it("a failed save keeps the picked time: Save reads Retry and does not open the picker again", async () => {
+  it("a failed save keeps the chosen time: Save reads Retry, and Retry saves the same plan", async () => {
     const onUpcoming = vi.fn().mockResolvedValueOnce({ error: "Could not save" }).mockResolvedValueOnce({ error: null });
     open("potty", { onUpcoming });
     pickPee();
-    fireEvent.click(saveButton());
-    const later = hoursFromNow(26);
-    pick(later);
-    confirmPlan();
+    const later = tomorrow();
+    await setWhen(later);
+    fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Could not save"));
-    expect(sheet()).toBeNull();
+    expect(dateInput().value).toBe(later.slice(0, 10));
+    expect(column("Hour").getAttribute("aria-valuetext")).toBe("9");
+    expect(column("Minute").getAttribute("aria-valuetext")).toBe("30");
+    noDialog();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(onUpcoming).toHaveBeenCalledTimes(2));
-    expect(sheet()).toBeNull();
-    expect(repeatStep()).toBeNull();
-    expect(onUpcoming.mock.calls[1][0]).toMatchObject({ due_on: later.slice(0, 10), due_time: later.slice(11, 16) });
+    noDialog();
+    expect(onUpcoming.mock.calls[1][0]).toMatchObject({ due_on: later.slice(0, 10), due_time: "09:30" });
   });
 
-  it("after a failure a person can pick another time", async () => {
-    const onUpcoming = vi.fn().mockResolvedValue({ error: "Could not save" });
-    open("potty", { onUpcoming });
-    pickPee();
-    fireEvent.click(saveButton());
-    pick(hoursFromNow(26));
-    confirmPlan();
-    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "Pick another time" }));
-    fireEvent.click(saveButton());
-    expect(sheet()).not.toBeNull();
-  });
-
-  it("a form's own mistake is shown on the form, and Save asks the time again", () => {
-    open("potty");
-    fireEvent.click(saveButton());
-    saveSheet();
-    expect(screen.getByRole("alert").textContent).toMatch(/Pick what happened/);
-    pickPee();
-    fireEvent.click(saveButton());
-    expect(sheet()).not.toBeNull();
-  });
-
-  it("Weight opens a date field in the sheet, on today", () => {
+  it("Weight in the future is a plan on that day", async () => {
     const props = open("weight");
     fireEvent.change(screen.getByLabelText(/Weight/, { selector: "input" }), { target: { value: "7.3" } });
-    fireEvent.click(saveButton());
-    expect(sheetField().type).toBe("date");
-    expect(sheetField().value).toBe(toLocalInput(new Date().toISOString()).slice(0, 10));
-    expect(props.onLog).not.toHaveBeenCalled();
-    pick(toLocalInput(new Date().toISOString()).slice(0, 10));
-    expect(props.onLog).toHaveBeenCalledTimes(1);
-  });
-
-  it("a correction opens on the entry's stored time, and handing it back leaves the time to the millisecond", async () => {
-    const at = "2026-10-19T21:05:07.123Z";
-    const event = stored(at);
-    const props = open("potty", { event });
-    fireEvent.click(saveButton());
-    expect(sheetField().value).toBe(toLocalInput(at));
-    expect(props.onChange).not.toHaveBeenCalled();
-    saveSheet();
-    await waitFor(() => expect(props.onChange).toHaveBeenCalledTimes(1));
-    expect(props.onChange.mock.calls[0][0]).toMatchObject({ at, voids: event.id });
-  });
-
-  it("a correction moved to another time saves that time", async () => {
-    const props = open("potty", { event: stored("2026-10-19T21:05:07.123Z") });
-    fireEvent.click(saveButton());
-    const other = hoursFromNow(-30);
-    pick(other);
-    expect(sheet()).toBeNull();
-    await waitFor(() => expect(props.onChange).toHaveBeenCalledTimes(1));
-    expect(toLocalInput((props.onChange.mock.calls[0][0] as { at: string }).at)).toBe(other);
-  });
-
-  it("a correction cannot be moved to the future", async () => {
-    const props = open("potty", { event: stored("2026-10-19T21:05:07.123Z") });
-    fireEvent.click(saveButton());
-    fireEvent.change(sheetField(), { target: { value: hoursFromNow(26) } });
-    // The sheet says why and its Save is off, so nothing is sent.
-    expect(within(sheet()!).getByRole("status").textContent).toMatch(/can't move to the future/);
-    expect((within(sheet()!).getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(props.onChange).not.toHaveBeenCalled();
-    expect(props.onUpcoming).not.toHaveBeenCalled();
-  });
-
-  it("the Calendar's Add a plan opens the sheet on that day, as a plan", async () => {
-    const day = toLocalInput(new Date(Date.now() + 3 * 86400_000).toISOString()).slice(0, 10);
-    const props = open("training", { planDay: day });
+    const day = toDateInput(new Date(Date.now() + 3 * 86400_000).toISOString());
+    fireEvent.change(dateInput(), { target: { value: day } });
     expect(screen.getByText("Future: saves as upcoming")).toBeTruthy();
-    expect(screen.getByText("Repeat")).toBeTruthy();
-    fireEvent.click(saveButton());
-    expect(sheetField().value.slice(0, 10)).toBe(day);
-    saveSheet();
+    fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
     await waitFor(() => expect(props.onUpcoming).toHaveBeenCalledTimes(1));
     expect(props.onUpcoming.mock.calls[0][0]).toMatchObject({ due_on: day });
     expect(props.onLog).not.toHaveBeenCalled();
   });
 });
 
-describe("the When sheet (TEC-258)", () => {
-  it("holds the native field, and its Save logs the time", () => {
-    const props = open("potty");
-    pickPee();
+describe("a form that opens on a time of its own (TEC-261)", () => {
+  it("a correction opens on the entry's stored time, and untouched leaves the time to the millisecond", async () => {
+    const at = "2026-10-19T21:05:07.123Z";
+    const event = stored(at);
+    const props = open("potty", { event });
+    const local = toLocalInput(at);
+    expect(dateInput().value).toBe(local.slice(0, 10));
+    const c = clock12(local);
+    expect(column("Hour").getAttribute("aria-valuetext")).toBe(String(c.hour));
+    expect(column("Minute").getAttribute("aria-valuetext")).toBe(String(c.minute).padStart(2, "0"));
+    expect(column("AM or PM").getAttribute("aria-valuetext")).toBe(c.pm ? "PM" : "AM");
     fireEvent.click(saveButton());
-    const s = sheet()!;
-    expect(s).not.toBeNull();
-    expect(within(s).queryByRole("button", { name: "Now" })).toBeNull();
-    const earlier = hoursFromNow(-2);
-    fireEvent.change(within(s).getByLabelText("Date and time"), { target: { value: earlier } });
-    expect(props.onLog).not.toHaveBeenCalled();
-    fireEvent.click(within(s).getByRole("button", { name: "Save" }));
-    expect(sheet()).toBeNull();
-    const [body] = props.onLog.mock.calls[0] as unknown as [{ at: string }];
-    expect(toLocalInput(body.at)).toBe(earlier);
+    await waitFor(() => expect(props.onChange).toHaveBeenCalledTimes(1));
+    expect(props.onChange.mock.calls[0][0]).toMatchObject({ at, voids: event.id });
+    noDialog();
   });
 
-  it("Back to the form saves nothing", () => {
-    const props = open("potty");
-    pickPee();
+  it("a correction moved to another time saves that time", async () => {
+    const props = open("potty", { event: stored("2026-10-19T21:05:07.123Z") });
+    const other = hoursFromNow(-30);
+    await setWhen(other);
     fireEvent.click(saveButton());
-    fireEvent.click(within(sheet()!).getByRole("button", { name: "Back to the form" }));
-    expect(sheet()).toBeNull();
-    expect(props.onLog).not.toHaveBeenCalled();
+    await waitFor(() => expect(props.onChange).toHaveBeenCalledTimes(1));
+    expect(toLocalInput((props.onChange.mock.calls[0][0] as { at: string }).at)).toBe(other);
   });
 
-  it("a future time in the sheet says so", () => {
-    open("potty");
-    pickPee();
+  it("a correction cannot be moved to the future", async () => {
+    const props = open("potty", { event: stored("2026-10-19T21:05:07.123Z") });
+    fireEvent.change(dateInput(), { target: { value: toDateInput(new Date(Date.now() + 3 * 86400_000).toISOString()) } });
     fireEvent.click(saveButton());
-    fireEvent.change(within(sheet()!).getByLabelText("Date and time"), { target: { value: hoursFromNow(26) } });
-    expect(within(sheet()!).getByText("Future: saves as upcoming")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toMatch(/can't move to the future/);
+    expect(props.onChange).not.toHaveBeenCalled();
+    expect(props.onUpcoming).not.toHaveBeenCalled();
+  });
+
+  it("the Calendar's Add a plan opens on that day, as a plan", async () => {
+    const day = toDateInput(new Date(Date.now() + 3 * 86400_000).toISOString());
+    const props = open("training", { planDay: day });
+    expect(dateInput().value).toBe(day);
+    expect(screen.getByText("Future: saves as upcoming")).toBeTruthy();
+    expect(screen.getByText("Repeat")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
+    await waitFor(() => expect(props.onUpcoming).toHaveBeenCalledTimes(1));
+    expect(props.onUpcoming.mock.calls[0][0]).toMatchObject({ due_on: day });
+    expect(props.onLog).not.toHaveBeenCalled();
   });
 });
 
-describe("the Note form's sheet (TEC-258)", () => {
-  const noteProps = () => ({
+function noteProps() {
+  return {
     people: [{ id: PERSON, display_name: "Tester" }],
     phonePerson: PERSON,
     photoUrls: {},
     onPhotoUrl: () => {},
     onLog: vi.fn<(...a: unknown[]) => void>(),
     onChange: vi.fn<(...a: unknown[]) => Promise<{ error: string | null }>>(async () => ({ error: null })),
-  });
+  };
+}
+
+describe("the Note form's When row (TEC-261)", () => {
   const write = () => fireEvent.change(screen.getByPlaceholderText("Write the note"), { target: { value: "Invented words" } });
 
-  it("has no When on the form; Save opens the sheet and its Save logs the note", () => {
+  it("has the row, and one tap on Save logs the note with nothing opening", () => {
     const props = noteProps();
     render(createElement(NoteForm, props));
-    expect(screen.queryByLabelText("When")).toBeNull();
+    expect(screen.getByLabelText("Logging as")).toBeTruthy();
     write();
     fireEvent.click(screen.getByRole("button", { name: "Save note" }));
-    expect(sheet()).not.toBeNull();
-    expect(props.onLog).not.toHaveBeenCalled();
-    saveSheet();
     expect(props.onLog).toHaveBeenCalledTimes(1);
+    noDialog();
   });
 
-  it("refuses a future time", () => {
+  it("stops the calendar at today and refuses a future day, with no Repeat", () => {
+    const props = noteProps();
+    render(createElement(NoteForm, props));
+    expect(dateInput().max).toBe(toDateInput(new Date().toISOString()));
+    write();
+    fireEvent.change(dateInput(), { target: { value: toDateInput(new Date(Date.now() + 3 * 86400_000).toISOString()) } });
+    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+    expect(screen.getByRole("alert").textContent).toMatch(/future/i);
+    expect(props.onLog).not.toHaveBeenCalled();
+    expect(screen.queryByText("Repeat")).toBeNull();
+  });
+
+  it("logs a past time picked in the row", async () => {
     const props = noteProps();
     render(createElement(NoteForm, props));
     write();
+    const earlier = hoursFromNow(-5);
+    await setWhen(earlier);
     fireEvent.click(screen.getByRole("button", { name: "Save note" }));
-    fireEvent.change(sheetField(), { target: { value: hoursFromNow(26) } });
-    expect(within(sheet()!).getByRole("status").textContent).toMatch(/future/i);
-    expect((within(sheet()!).getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(props.onLog).not.toHaveBeenCalled();
-    expect(screen.queryByText("Repeat")).toBeNull();
+    const [body] = props.onLog.mock.calls[0] as unknown as [{ at: string }];
+    expect(toLocalInput(body.at)).toBe(earlier);
   });
 });

@@ -22,6 +22,27 @@ export function fromLocalInput(value: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+/* ── The When row's parts (TEC-261): a day box, and an hour, minute and AM/PM that each scroll ────────── */
+
+/** A local date-and-time value's clock as a 12-hour face: hour 1 to 12, minute 0 to 59, and AM or PM. */
+export function clock12(value: string): { hour: number; minute: number; pm: boolean } {
+  const h = Number(value.slice(11, 13));
+  const m = Number(value.slice(14, 16));
+  const hh = Number.isFinite(h) ? h : 0;
+  return { hour: hh % 12 === 0 ? 12 : hh % 12, minute: Number.isFinite(m) ? m : 0, pm: hh >= 12 };
+}
+
+/** The same day with a new clock, from the 12-hour face (12 AM is 00:00, 12 PM is 12:00). */
+export function withClock(value: string, c: { hour: number; minute: number; pm: boolean }): string {
+  const h24 = (c.hour % 12) + (c.pm ? 12 : 0);
+  return `${value.slice(0, 10)}T${pad(h24)}:${pad(c.minute)}`;
+}
+
+/** The same clock on another day (`YYYY-MM-DD`). */
+export function withDay(value: string, day: string): string {
+  return `${day}${value.slice(10)}`;
+}
+
 /* ── Dates only: a weight is a day, not a moment ─────────────────────────── */
 
 /** The hour a weight is stored at on its day: local noon never slips a day across a time zone or DST. */

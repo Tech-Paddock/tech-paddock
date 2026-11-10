@@ -63,14 +63,13 @@ import {
 import { FOOD_UNITS, MISC_ID, servingAmount, servingOptions, servingText, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
 import { MED_REASONS, MED_REASON_IDS, MED_ROUTES, MED_UNITS, NO_REASON, findMedication, medReasonLabel, type MedReason, medPicklist, type MedRoute, type MedUnit, type Medication } from "@/lib/medications";
 import { plannedWhen } from "@/lib/calendar";
-import { FUTURE_NOTICE, donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, type DonePrefill } from "@/lib/future";
+import { FUTURE_NOTICE, donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, isFuturePick, type DonePrefill } from "@/lib/future";
 import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import TreatQty from "./TreatQty";
 import TreatCount from "./TreatCount";
 import PhotoPicker, { usePhotos } from "./Photos";
-import Sheet from "./Sheet";
-import WhenAsk, { classifyPick, isFuturePick, type WhenAskHandle, type WhenChoice } from "./WhenPicker";
+import WhenField from "./WhenField";
 import { clockTime, fromDateInput, fromLocalInput, toDateInput, toLocalInput } from "@/lib/localtime";
 import { noteChoices, noteLink } from "@/lib/notes";
 
@@ -222,9 +221,9 @@ function Seg<T extends string>({
  * A box of a form (TEC-199): Box 1 is When and Logging as, Box 2 the entry, Box 3 the secondary things. The
  * `data-section` marks them in order for the tests and for anyone reading the form.
  */
-export function Box({ section, label, children }: { section: string; label: string; children: React.ReactNode }) {
+export function Box({ section, label, children, className = "" }: { section: string; label: string; children: React.ReactNode; className?: string }) {
   return (
-    <section data-section={section} aria-label={label} className="grid gap-1 rounded-xl border border-line bg-paper p-1.5">
+    <section data-section={section} aria-label={label} className={`grid gap-1 rounded-xl border border-line bg-paper p-1.5 ${className}`}>
       {children}
     </section>
   );
@@ -358,9 +357,10 @@ export default function LogForm({
   const [itemId, setItemId] = useState(f?.item_id ?? quickFood?.itemId ?? defaultFood(firstFoodType, remembered, foods));
   // A treat's count, or a meal's or snuffle mat's servings (TEC-257, a picklist in halves). The amount a correction
   // opened on stays on the list even when it is not a half (an older entry in cups), so an untouched correction
-  // keeps it. A new meal opens on a remembered amount that is on the list, else one serving.
+  // keeps it. A new Meal always opens on 1 serving and a new Snuffle mat on ½, never a remembered amount (TEC-263);
+  // the Meals pill's repeat of the last meal brings that meal's amount.
   const [amount, setAmount] = useState<number | null>(() => {
-    const a = f ? f.amount : quickFood?.itemId ? quickFood.amount : defaultAmount(firstFoodType, remembered);
+    const a = f ? f.amount : quickFood?.itemId ? quickFood.amount : defaultAmount(firstFoodType);
     return !f && firstFoodType !== "treat" ? servingAmount(a) : a;
   });
   const [openedAmount] = useState(amount);
@@ -475,11 +475,8 @@ export default function LogForm({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The time Save asked for (TEC-255). A save that failed after it was picked keeps it, so Retry does not ask again.
-  const whenAsk = useRef<WhenAskHandle>(null);
-  const [held, setHeld] = useState<WhenChoice | null>(null);
-  // A future time picked on a new entry waits here for its Repeat (TEC-255): nothing is saved until it is confirmed.
-  const [repeatStep, setRepeatStep] = useState<WhenChoice | null>(null);
+  // True after the server refused a save (TEC-261): the chosen time is still in the When row, so Save reads Retry.
+  const [retry, setRetry] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Fixed when the form opens, so pressing Save again after a lost response
   // is the same row, never a second one.
@@ -503,13 +500,23 @@ export default function LogForm({
   // opens on it, and handing it back keeps it exactly.
   const openedOnTime = editing || whenTouched;
 
+  /** The When row changed (TEC-261): from now on the time is the person's, not the moment of Save. */
+  function pickWhen(v: string) {
+    if (dateOnly) setDay(v);
+    else {
+      setWhen(v);
+      setDay(v.slice(0, 10));
+    }
+    setWhenTouched(true);
+  }
+
   function pickFoodType(t: FoodType) {
     setFoodType(t);
     setItemId(defaultFood(t, remembered, foods));
     setAddingFood(false);
     setFoodError(null);
     setFoodUnit(t === "treat" ? "piece" : "cup");
-    setAmount(t === "treat" ? defaultAmount(t, remembered) : servingAmount(defaultAmount(t, remembered)));
+    setAmount(defaultAmount(t));
   }
 
   /** Fun's Pee or Poop: one tap saves a potty entry now, no confirm. Where comes from `funPotty`. */
@@ -705,24 +712,29 @@ export default function LogForm({
     setBusy(true);
     const { error } = await onUpcoming(item, plan?.id);
     setBusy(false);
-    // The step stays open on the same choice with the reason, so a retry does not ask again.
-    if (error) setError(error);
+    // The When row still holds the time, so Retry saves the same plan.
+    if (error) {
+      setError(error);
+      setRetry(true);
+    }
   }
 
-  /** A problem with the form itself: shown on the form, and the time picked for it is dropped (Save asks again). */
+  /** A problem with the form itself: shown on the form. The chosen time stays in the When row. */
   function failOnForm(message: string) {
-    setHeld(null);
+    setRetry(false);
     setError(message);
   }
 
   /**
-   * Save: the form's own checks that don't depend on the time, then the phone's date-and-time picker (TEC-255),
-   * which opens on now (a date on Weight), or on the time the form opened on. Confirming it saves. Nothing is
-   * saved here. After a failed save the picked time is kept and Save is Retry: it does not ask again.
+   * Save (TEC-261): one tap saves at the time the When row holds, and nothing opens after it. The row opens on now, so
+   * an untouched new entry is logged at the moment of Save; a correction, a Done or a plan opens on its own time.
+   * A future time on a new entry is a plan (the form shows its Repeat and Save reads Save plan). A failed save
+   * keeps the chosen time, and Save reads Retry.
    */
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setRetry(false);
     // Never saved around an attachment: it is uploaded, or the person removes it.
     if (photos.working || photos.failed) {
       setError(photos.failed ? "An attachment didn't upload — retry it, or remove it." : "An attachment is still uploading.");
@@ -734,48 +746,17 @@ export default function LogForm({
       void addMedication(e);
       return;
     }
-    if (held) {
-      void commit(held);
-      return;
-    }
-    whenAsk.current?.ask(openedOnTime ? (dateOnly ? day : when) : null);
+    void commit();
   }
 
-  /** What the picker returned: the time is known, so the rest of Save runs as it always did (checks, then log or plan). */
-  function picked(value: string) {
-    void commit(classifyPick(value, { dateOnly, stored: openedOnTime, initial: dateOnly ? day : when, now: new Date() }));
-  }
-
-  /** The time is known: the rest of Save runs as it always did (checks, then log or plan). */
-  async function commit(choice: WhenChoice, repeatAsked = false) {
-    setError(null);
-    setHeld(choice);
-    // The time chosen. Keep leaves what the form opened on (a correction's own time to the millisecond, a Done's);
-    // Now on a new entry is "untouched": the moment of this save; a picked time is touched.
-    let whenV = when;
-    let dayV = day;
-    let touched = whenTouched;
-    if (choice.kind === "now") {
-      const nowIso = new Date().toISOString();
-      whenV = toLocalInput(nowIso);
-      dayV = toDateInput(nowIso);
-      touched = editing || !!plan || !!prefillWhen;
-    } else if (choice.kind === "at") {
-      if (dateOnly) dayV = choice.value;
-      else whenV = choice.value;
-      touched = true;
-    }
+  /** The checks, then a log or a plan, at the time the When row holds. */
+  async function commit() {
+    const whenV = when;
+    const dayV = day;
+    // Untouched: a new entry means the moment of this save, a correction keeps its own time to the millisecond.
+    const touched = whenTouched;
     const futureNow =
       touched && (dateOnly ? isFutureDay(dayV, toDateInput(new Date().toISOString())) : isFuturePick(whenV, false, new Date()));
-    // A future time on a new entry (not an open plan, and not a form already opened as one, which shows its Repeat)
-    // is a plan: its Repeat is asked in a small step first, and nothing is saved until it is confirmed.
-    if (futureNow && !editing && !plan && !planning && !repeatAsked) {
-      setRepeatStep(choice);
-      return;
-    }
-    setWhen(whenV);
-    setDay(dayV);
-    setWhenTouched(touched);
     if (futureNow && editing) {
       failOnForm("A saved entry can't move to the future — delete it and log a new one for then.");
       return;
@@ -872,7 +853,10 @@ export default function LogForm({
     setBusy(true);
     const { error } = await onChange({ ...body, voids: event.id }, then);
     setBusy(false);
-    if (error) setError(error);
+    if (error) {
+      setError(error);
+      setRetry(true);
+    }
   }
 
   async function remove() {
@@ -1029,15 +1013,13 @@ export default function LogForm({
       <Box section="entry" label="The entry">
         {kind === "potty" && (
           <>
-            {/* What and Where side by side, a half each (TEC-255): What's chips wrap at half width. Leash (or Spot) is the line under. */}
-            <div className="flex items-start gap-x-2">
-              <Field label="What" className="w-1/2">
-                <Seg name="what" label="What" value={what} onChange={setWhat} options={POTTY_WHAT.map((v) => [v, POTTY_WHAT_LABELS[v]] as const)} />
-              </Field>
-              <Field label="Where" className="w-1/2">
-                <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
-              </Field>
-            </div>
+            {/* What, then Where on its own line under it (TEC-263, undoing the side-by-side of TEC-255). Leash (or Spot) is the line under. */}
+            <Field label="What">
+              <Seg name="what" label="What" value={what} onChange={setWhat} options={POTTY_WHAT.map((v) => [v, POTTY_WHAT_LABELS[v]] as const)} />
+            </Field>
+            <Field label="Where">
+              <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
+            </Field>
             {where === "outside" && (
               <Field label="Leash">
                 <Seg name="leash" label="Leash" value={leash} onChange={setLeash} options={leashOptions(leash)} />
@@ -1077,9 +1059,27 @@ export default function LogForm({
             <Field label="Type">
               <Seg name="type" label="Type" value={foodType} onChange={pickFoodType} options={[["meal", "Meal"], ["snuffle", "Snuffle mat"], ["treat", "Treat"]] as const} />
             </Field>
-            {/* What and a half-size Amount scroller on one line. */}
+            {/* Servings, then What, on one line (TEC-263): the Servings select is only as wide as its label and What takes
+                the rest of the row. What is wider than half on purpose: it holds a food's name, which half a row clips. */}
             <div className="flex items-start gap-2">
-              <Field label="What" htmlFor="f-item" className="w-1/2">
+              {foodType !== "treat" && (
+                <Field label="Servings" htmlFor="f-amount" className="shrink-0">
+                  {/* A fixed width, never one sized to its options (TEC-255): about its "Servings" label. It stores `SERVING_UNIT`. */}
+                  <select
+                    id="f-amount"
+                    value={amount ?? servingAmount(null)}
+                    onChange={(e) => setAmount(Number(e.target.value))}
+                    className={`${input} w-[64px]`}
+                  >
+                    {servingOptions(openedAmount).map((n) => (
+                      <option key={n} value={n}>
+                        {servingText(n)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+              <Field label="What" htmlFor="f-item" className="flex-1">
                 <select
                   id="f-item"
                   value={itemId}
@@ -1101,29 +1101,13 @@ export default function LogForm({
                   <option value={FOOD_ADD}>Add a food…</option>
                 </select>
               </Field>
-              {foodType === "treat" ? (
+              {foodType === "treat" && (
                 <Field label="Amount" htmlFor="f-amount" className="shrink-0">
                   {/* Just the box, and the unit as a small word beside it (TEC-202), so the column is no wider than the box. */}
                   <div className="flex items-start gap-1">
                     <TreatQty id="f-amount" label={amountUnit ? `Amount in ${amountUnit}` : "Amount"} value={amount} onChange={setAmount} />
                     {amountUnit && <span className="pt-2.5 text-[13px] text-ink-soft">{amountUnit}</span>}
                   </div>
-                </Field>
-              ) : (
-                <Field label="Servings" htmlFor="f-amount" className="shrink-0">
-                  {/* A fixed width, never one sized to its options (TEC-255). It stores `SERVING_UNIT`. */}
-                  <select
-                    id="f-amount"
-                    value={amount ?? servingAmount(null)}
-                    onChange={(e) => setAmount(Number(e.target.value))}
-                    className={`${input} w-[96px]`}
-                  >
-                    {servingOptions(openedAmount).map((n) => (
-                      <option key={n} value={n}>
-                        {servingText(n)}
-                      </option>
-                    ))}
-                  </select>
                 </Field>
               )}
             </div>
@@ -1548,16 +1532,6 @@ export default function LogForm({
         </div>
       )}
 
-      {/* A plan's Repeat (TEC-199, moved here by TEC-255 when the When step went): an open plan being edited, or a
-          form opened on a future time (the Calendar's Add a plan), says so and offers it. A future time picked from
-          Save on a new entry asks its Repeat in a small step first (repeatStep). */}
-      {planning && !repeatStep && (
-        <div data-section="plan" className="grid gap-0.5">
-          {future && <p className="text-[13px] font-semibold text-ink">{FUTURE_NOTICE}</p>}
-          {repeatBlock}
-        </div>
-      )}
-
       {/* The note: a full-width two-line text box that scrolls past two lines (TEC-199). Full width on purpose
           (TEC-255): it is free text, the one field with a reason to be wide. */}
       <div data-section="note">
@@ -1580,70 +1554,42 @@ export default function LogForm({
         <PhotoPicker photos={photos} />
       </div>
 
-      {repeatStep && (
-        /* The same small sheet as the stored-time one: the form's own Repeat, then the plan is saved (TEC-255). */
-        <Sheet nested title="Repeat?" onClose={() => { setRepeatStep(null); setHeld(null); }}>
-          <div className="flex flex-col gap-2" data-section="repeat-step">
-            <p className="text-[13px] font-semibold text-ink">{FUTURE_NOTICE}</p>
-            {repeatBlock}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const c = repeatStep;
-                  setRepeatStep(null);
-                  void commit(c, true);
-                }}
-                className="h-[44px] rounded-[10px] bg-accent px-4 font-bold text-accent-ink"
-              >
-                Save as upcoming
-              </button>
-              <button type="button" onClick={() => { setRepeatStep(null); setHeld(null); }} className="h-[44px] px-2 text-ink-soft underline">
-                Back to the form
-              </button>
-            </div>
-          </div>
-        </Sheet>
-      )}
-
       {error && (
-        <div role="alert" className="flex flex-wrap items-center gap-x-2 text-sm font-semibold text-danger">
-          <span>{error}</span>
-          {held && (
-            <button
-              type="button"
-              onClick={() => {
-                setHeld(null);
-                setError(null);
-              }}
-              className="min-h-[44px] underline"
-            >
-              Pick another time
-            </button>
-          )}
+        <div role="alert" className="text-sm font-semibold text-danger">
+          {error}
         </div>
       )}
 
-      {/* The bottom row (TEC-252, TEC-255): Logging as, a fixed-width field, beside Save, which is as tall as Who
-          and only as wide as its words, on every form. Save asks the time with the phone's own picker (WhenAsk). */}
-      <div data-section="save" className="relative flex items-center gap-2">
-        <label htmlFor="f-who" className="shrink-0 text-[13px] text-ink-soft">
-          as
-        </label>
-        <select
-          id="f-who"
-          aria-label="Logging as"
-          value={personId}
-          onChange={(e) => setPersonId(e.target.value)}
-          className={`${input} h-[44px] shrink-0 ${WHO_WIDTH}`}
-        >
-          <option value="">Nobody</option>
-          {people.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.display_name}
-            </option>
-          ))}
-        </select>
+      {/* The bottom row (TEC-261, the owner's option A): When and Logging as, each half the row, on every form. A day box
+          that opens the calendar anywhere on it, and one time box whose hour, minute and AM/PM scroll in place; a
+          Weight is a day only. The row opens on now, or on the entry's own time. */}
+      <div data-section="when-who" className="grid grid-cols-2 items-end gap-2">
+        <Field label="When">
+          <WhenField value={dateOnly ? day : when} dateOnly={dateOnly} onChange={pickWhen} />
+        </Field>
+        <Field label="Logging as" htmlFor="f-who">
+          <select id="f-who" value={personId} onChange={(e) => setPersonId(e.target.value)} className={inputFull}>
+            <option value="">Nobody</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.display_name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      {/* A plan's Repeat (TEC-199, back under the When row by TEC-261): an open plan being edited, or any form whose When is
+          in the future (a new entry, or the Calendar's Add a plan), says so and offers it. Save then reads Save plan. */}
+      {planning && (
+        <div data-section="plan" className="grid gap-0.5">
+          {future && <p className="text-[13px] font-semibold text-ink">{FUTURE_NOTICE}</p>}
+          {repeatBlock}
+        </div>
+      )}
+
+      {/* Save is on its own line, as tall as the fields and only as wide as its words (TEC-261). One tap saves. */}
+      <div data-section="save" className="flex items-center gap-2">
         <button
           type="submit"
           disabled={busy || photoBlock}
@@ -1656,26 +1602,16 @@ export default function LogForm({
               ? "Uploading…"
               : photos.failed
                 ? "Fix attachment"
-                : held && error
+                : retry && error
                   ? "Retry"
                   : plan
                     ? "Save changes"
                     : future
-                      ? "Save as upcoming"
+                      ? "Save plan"
                       : editing
                         ? "Save changes"
                         : `Save ${title.toLowerCase()}`}
         </button>
-        <WhenAsk
-          ref={whenAsk}
-          dateOnly={dateOnly}
-          check={(v) =>
-            editing && (dateOnly ? isFutureDay(v, toDateInput(new Date().toISOString())) : isFuturePick(v, false, new Date()))
-              ? "A saved entry can't move to the future."
-              : null
-          }
-          onPick={picked}
-        />
       </div>
       {editing && (
         <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] self-start font-semibold text-danger disabled:opacity-60">

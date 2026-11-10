@@ -98,14 +98,15 @@ describe("section order per form", () => {
     });
   }
 
-  it("has no When on the form: it is a step after Save, and Logging as sits in the bottom row beside Save (TEC-252)", () => {
+  it("ends in a When and Logging as row, each half the row, with Save on its own line below (TEC-261)", () => {
     const html = render("potty");
-    expect(html).not.toContain('data-section="when"');
-    expect(html).not.toContain('id="f-when"');
-    const bottom = html.slice(at(html, 'data-section="save"'));
-    expect(bottom).toContain("Logging as");
-    expect(bottom).toContain('id="f-who"');
-    expect(bottom.indexOf('id="f-who"')).toBeLessThan(bottom.indexOf('type="submit"'));
+    const row = html.slice(at(html, 'data-section="when-who"'), at(html, 'data-section="save"'));
+    expect(html).toContain('data-section="when-who" class="grid grid-cols-2');
+    expect(row.indexOf("When")).toBeLessThan(row.indexOf("Logging as"));
+    expect(row).toContain('id="f-who"');
+    // Save is not in the row; it is the only submit button and follows it.
+    expect(row).not.toContain('type="submit"');
+    expect(html.slice(at(html, 'data-section="save"'))).toContain('type="submit"');
     expect(html).not.toContain(">Human<");
   });
 
@@ -151,12 +152,12 @@ describe("Potty", () => {
 });
 
 describe("Food", () => {
-  it("has Type (Meal, Snuffle mat, Treat) then What and a half-size Amount on one line", () => {
+  it("has Type (Meal, Snuffle mat, Treat) then Servings and What on one line, Servings first (TEC-263)", () => {
     const html = render("food");
     const entry = html.slice(at(html, 'data-section="entry"'), at(html, 'data-section="note"'));
     for (const t of ["Meal", "Snuffle mat", "Treat"]) expect(entry).toContain(t);
     expect(entry.indexOf("Type")).toBeLessThan(entry.indexOf("What"));
-    expect(entry.indexOf("What")).toBeLessThan(entry.indexOf("Servings"));
+    expect(entry.indexOf("Servings")).toBeLessThan(entry.indexOf("What"));
     // Servings: a select at a fixed width (TEC-257); a treat keeps its own small count box.
     expect(entry).toContain("Servings");
     expect(entry).toContain("<select");
@@ -381,7 +382,7 @@ describe("a future When", () => {
     expect(submit.slice(0, submit.indexOf("await submitFuture(whenV, dayV)"))).not.toContain("onLog");
     expect(form).toContain("await onUpcoming(item, plan?.id)");
     // The Repeat control is inside the planning branch only (a future When, or an open item being edited).
-    expect(form).toMatch(/\{planning && !repeatStep && \(\s*<div data-section="plan"/);
+    expect(form).toMatch(/\{planning && \(\s*<div data-section="plan"/);
     expect(form).toContain("{repeatBlock}");
   });
   it("a saved entry cannot move to the future, and the server refuses a time past a day ahead", () => {

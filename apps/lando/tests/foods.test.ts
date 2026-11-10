@@ -36,9 +36,8 @@ describe("the retired snuffle mat item (TEC-193, retired by TEC-195)", () => {
       unit: "serving",
       amount: 0.125,
     });
-    // No per-item default: the form's amount depends on the remembered meal amount only.
-    expect(defaultAmount("meal", {})).toBeNull();
-    expect(defaultAmount("meal", { mealAmount: 0.75 })).toBe(0.75);
+    // A meal item opens on one serving whatever it is (TEC-263); only a Snuffle mat opens on a half.
+    expect(defaultAmount("meal")).toBe(1);
   });
 });
 
@@ -73,19 +72,23 @@ describe("form defaults", () => {
   it("opens on Misc on a phone's first log", () => {
     expect(defaultFood("meal", {})).toBe(MISC_ID);
     expect(defaultFood("treat", {})).toBe(MISC_ID);
-    expect(defaultAmount("meal", {})).toBeNull();
+    expect(defaultAmount("meal")).toBe(1);
   });
 
-  it("opens a meal on the last meal item and amount this phone used", () => {
+  it("opens a meal on the last meal item this phone used, and always on 1 serving, never the last amount (TEC-263)", () => {
     const r = { meal: "purina-pro-plan-toy-puppy-chicken-rice", mealAmount: 0.333 };
     expect(defaultFood("meal", r)).toBe(r.meal);
-    expect(defaultAmount("meal", r)).toBe(0.333);
+    expect(defaultAmount("meal")).toBe(1);
+  });
+
+  it("opens a Snuffle mat on a half serving (TEC-263)", () => {
+    expect(defaultAmount("snuffle")).toBe(0.5);
   });
 
   it("always opens a treat on Misc and one, even with a treat remembered from before (TEC-129)", () => {
     const r = { meal: "purina-pro-plan-toy-puppy-chicken-rice", treat: "bixbi-pocket-trainers-bacon" };
     expect(defaultFood("treat", r)).toBe(MISC_ID);
-    expect(defaultAmount("treat", r)).toBe(1);
+    expect(defaultAmount("treat")).toBe(1);
   });
 
   it("falls back to Misc when the remembered meal has left the list", () => {

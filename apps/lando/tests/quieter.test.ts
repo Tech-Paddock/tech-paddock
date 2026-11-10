@@ -56,11 +56,22 @@ const secondary = (html: string) => html.slice(html.indexOf('data-section="secon
 describe("where Next 7 days sits on the Log (TEC-255)", () => {
   it("is under Logging as and above the Feed, and no longer above the Log buttons", () => {
     const src = read("app/Journal.tsx");
-    const week = src.indexOf('aria-label="Next 7 days"');
+    const week = src.indexOf('label="Next 7 days"');
     expect(week).toBeGreaterThan(src.indexOf('htmlFor="who"'));
     expect(week).toBeLessThan(src.indexOf('aria-label="Feed"'));
     expect(week).toBeGreaterThan(src.indexOf('aria-label="Log"'));
-    expect(src.match(/aria-label="Next 7 days"/g)).toHaveLength(1);
+    expect(src.match(/label="Next 7 days"/g)).toHaveLength(1);
+  });
+
+  it("sits in a Box, the form's own box style, and is tighter inside it (TEC-263)", () => {
+    const src = read("app/Journal.tsx");
+    expect(src).toMatch(/<Box section="next-7-days" label="Next 7 days" className="[^"]*!py-0\.5/);
+    expect(src).toContain("!gap-0");
+    // The heading row is short, and the Calendar link keeps its 44px hit area through a negative margin.
+    expect(src).toContain("min-h-[28px]");
+    expect(src).toMatch(/-my-2 min-h-\[44px\][^"]*">\s*Calendar/);
+    // Same rows, same place: still the compact list.
+    expect(src).toContain("<UpcomingList compact items={week}");
   });
 });
 
