@@ -18,11 +18,10 @@ narrate them.
 
 1. **Linear, team TEC:** open owner tasks first, then open issues In Progress, In Review or Todo.
 2. **`.claude/agents/td/RULES.md`** in full, then **`NOTES.md`**.
-3. **The repo:** full history first: containers clone only recent commits, so if
-   `git rev-parse --is-shallow-repository` says `true`, run `git fetch --unshallow` (it adds history
-   and changes nothing else). Then `git fetch`; every remote branch not on `main`, how far behind
+3. **The repo:** full history first: if `git rev-parse --is-shallow-repository` says `true` (a
+   cloud clone), run `git fetch --unshallow` (it adds history and changes nothing else). Then `git fetch`; every remote branch not on `main`, how far behind
    it is, and whether a pull request is open; `node scripts/drift-check.mjs`. Compare against
-   `origin/main`: a container's local `main` can be far behind, and checking it out swaps the guard.
+   `origin/main`: the local `main` can be behind, and checking it out swaps the guard.
 4. **Other sessions:** `list_sessions` for unmerged finished work and unanswered questions. Read the
    last assistant message of any idle session with work in flight.
 5. **The environment:** `get_session` (no id) gives this session's `environment_id`, and

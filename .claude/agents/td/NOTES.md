@@ -31,7 +31,9 @@ What is true now, and the traps. Branch and pull request state is never written 
   auto mode approves it without the owner. Only the rule "start one on the owner's command" holds.
 - **Migration history is clean:** repo and `list_migrations` differ by exactly `20260908235234`,
   withheld because it seeds personal data.
-- **This container cannot reach `*.techpaddock.io`.** Use Vercel runtime logs, or ask the owner.
+- **The owner's PC reaches `*.techpaddock.io`.** Signed out, a TD can read `/login` and
+  `GET /api/version` directly to see what is live; anything behind the gate still needs the owner or
+  Vercel's logs. Smoke still runs in GitHub Actions.
 - **TD sessions run on the owner's PC,** in a `bridge` environment whose name carries `:td:`
   (the `~/paddock/td` folder). The cloud environment named `PADDOCK_ROLE=td` remains for scheduled
   tasks; its name sets no variable. Kickoff reads the environment with `get_session`.
@@ -53,9 +55,8 @@ What is true now, and the traps. Branch and pull request state is never written 
   the source, not redrawn. Keep everything around the change exactly as it ships. Change only the
   part under review, and say on the page which part that is.
 - **The guard runs from this session's checkout.** Edit `.claude/hooks/` in a separate worktree.
-- **A container's local `main` can sit far behind `origin/main`.** Sessions start detached at the
-  remote head; `git checkout main` in the main checkout swaps the guard and the skills for old
-  copies. Cut branches from `origin/main` (`git switch -c <branch> origin/main`).
+- **Never `git checkout main` in `~/paddock/td`'s session worktrees.** It swaps the guard and the
+  skills for the local copies. Cut branches from `origin/main` (`git switch -c <branch> origin/main`).
 - **On the owner's PC, new sessions start from `~/paddock/td`'s local `main`.** A SessionStart hook
   (TEC-262) fast-forwards it when it is clean and on `main`, but only after the new session's
   worktree is made, so a session can still start one merge behind. If it is dirty or off `main`,
@@ -70,11 +71,15 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **The auto-mode classifier can refuse work under `.claude/`.** It clears once the owner's own
   words name the change. Never route around it or probe the guard by editing it live.
 - **A Linear patch matches stored text.** Copy the anchor from `get_issue`, tags and all.
-- **Remote branches cannot be deleted or renamed from here.** The guard refuses a delete; in a cloud
-  session the proxy refuses a rename too, and that refusal looks like a network blip: stop after one
-  try. Merged branches auto-delete; the owner deletes stale ones.
-- **A container restart kills the builder.** Unpushed work survives in `.claude/worktrees/agent-*`
-  until the container goes; brief a fresh builder to carry it over.
+- **Remote branches are not deleted or renamed from here.** On the PC only the guard stops it
+  (TEC-221); `gh` would otherwise succeed with the owner's login. Merged branches auto-delete; the
+  owner deletes stale ones.
+- **The PC sleeping, WSL stopping or the desktop app closing kills a running builder.** Its
+  unpushed work stays in `.claude/worktrees/agent-*`; brief a fresh builder to carry it over.
+  Scheduled tasks run in the cloud and do not need the PC.
+- **Nothing clears helper worktrees on the PC.** Each holds a full checkout with its own
+  `node_modules`; 33 of them reached 17 GB by 2026-11-10. `closeout` removes the ones whose work is
+  on `main`.
 - **Parallel builders can pick the same migration timestamp.** Check before merging.
 - **Two merges seconds apart can skip an app's deploy** (seen 2026-11-08, #387 then #388). Vercel
   builds only the newest `main` commit, and each `ignoreCommand` reads that commit alone, so the
