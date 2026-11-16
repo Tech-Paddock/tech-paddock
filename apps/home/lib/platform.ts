@@ -142,8 +142,7 @@ export type HomeEnv = { name: string; affects: string; unsetMeans: string | null
 export const HOME_ENV: HomeEnv[] = [
   { name: "SESSION_SECRET", affects: "Login", unsetMeans: "home cannot sign anyone in" },
   { name: "APP_PASSWORD_HASH", affects: "Login", unsetMeans: "the password gate has nothing to check against" },
-  { name: "LINEAR_API_KEY", affects: "Pit Wall", unsetMeans: "the Pit Wall cannot ask Linear for open issues" },
-  { name: "GITHUB_TOKEN", affects: "The Garage", unsetMeans: "a failed production deploy cannot be seen" },
+  { name: "GITHUB_TOKEN", affects: "The Garage and Pit Wall", unsetMeans: "a failed production deploy cannot be seen, and the Pit Wall cannot read open issues" },
 ];
 
 /**

@@ -1,4 +1,4 @@
-import type { Column, PitIssue } from "./linear";
+import type { Column, PitIssue } from "./issues";
 import { PROJECTS } from "./platform";
 
 /**
@@ -6,7 +6,7 @@ import { PROJECTS } from "./platform";
  *
  * Its own module, and free of anything that fetches, because the toggle runs in
  * the browser over issues already on the page: switching it must never mean
- * another round trip to Linear.
+ * another round trip to GitHub.
  */
 
 export type Grouping = "status" | "app";
@@ -33,11 +33,9 @@ const NONE = "Platform";
 
 const STAGE: Record<Column, number> = { progress: 1, review: 2, todo: 3, later: 4 };
 
-/** Urgent first, no priority last, then most recently touched. */
+/** `priority:high` first, then most recently touched. */
 function byPriority(a: PitIssue, b: PitIssue) {
-  const pa = a.priority === 0 ? 5 : a.priority;
-  const pb = b.priority === 0 ? 5 : b.priority;
-  if (pa !== pb) return pa - pb;
+  if (a.high !== b.high) return a.high ? -1 : 1;
   return b.updatedAt.localeCompare(a.updatedAt);
 }
 

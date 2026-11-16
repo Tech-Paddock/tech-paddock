@@ -1,19 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import type { PitIssue, PitWallData } from "@/lib/linear";
+import type { PitIssue, PitWallData } from "@/lib/issues";
 import { byApp, byStatus, needsOwner, type Grouping } from "@/lib/pitgroups";
 
 /**
- * The Pit Wall: every open issue in Linear, team TEC, and who acts next.
+ * The Pit Wall: every open issue in paddock-issues, and who acts next.
  *
  * Two arrangements behind one toggle — by status, with what waits on the owner in a
  * band above the board, or by app. The toggle regroups what is already on the
- * page, so it never asks Linear again; the choice rides in `?group=` so a
+ * page, so it never asks GitHub again; the choice rides in `?group=` so a
  * reload or a shared link keeps it.
  *
  * Each card leads with the issue's first Next step not yet done, because that
- * is the line that says who is holding it. Everything links to Linear, where the
+ * is the line that says who is holding it. Everything links to GitHub, where the
  * work is edited — this page only reads.
  */
 
@@ -37,7 +37,7 @@ function Card({ issue, show }: { issue: PitIssue; show: "app" | "status" }) {
         </a>
         <span className="pw-meta">
           {where}
-          {issue.priority > 0 ? ` · ${issue.priorityLabel}` : ""}
+          {issue.high ? " · High priority" : ""}
           {issue.parked ? " · Parked" : ""}
         </span>
       </div>
@@ -75,7 +75,7 @@ function ByStatus({ issues }: { issues: PitIssue[] }) {
           </h3>
           <div className="pw-grid">
             {board.waiting.map((i) => (
-              <Card key={i.id} issue={i} show="app" />
+              <Card key={i.number} issue={i} show="app" />
             ))}
           </div>
         </section>
@@ -90,7 +90,7 @@ function ByStatus({ issues }: { issues: PitIssue[] }) {
             {c.issues.length === 0 ? (
               <p className="pw-empty">Nothing here.</p>
             ) : (
-              c.issues.map((i) => <Card key={i.id} issue={i} show="app" />)
+              c.issues.map((i) => <Card key={i.number} issue={i} show="app" />)
             )}
           </section>
         ))}
@@ -103,7 +103,7 @@ function ByStatus({ issues }: { issues: PitIssue[] }) {
           </summary>
           <div className="pw-grid">
             {board.later.map((i) => (
-              <Card key={i.id} issue={i} show="app" />
+              <Card key={i.number} issue={i} show="app" />
             ))}
           </div>
         </details>
@@ -122,7 +122,7 @@ function ByApp({ issues }: { issues: PitIssue[] }) {
           </h3>
           <div className="pw-grid">
             {g.issues.map((i) => (
-              <Card key={i.id} issue={i} show="status" />
+              <Card key={i.number} issue={i} show="status" />
             ))}
           </div>
         </section>
@@ -136,7 +136,7 @@ export default function PitWall({ data, group }: { data: PitWallData; group: Gro
 
   function choose(next: Grouping) {
     setGrouping(next);
-    // The URL follows without a navigation, so Linear is not asked again.
+    // The URL follows without a navigation, so GitHub is not asked again.
     const url = new URL(window.location.href);
     if (next === "app") url.searchParams.set("group", "app");
     else url.searchParams.delete("group");
@@ -147,7 +147,7 @@ export default function PitWall({ data, group }: { data: PitWallData; group: Gro
     <section className="pitwall">
       <div className="pw-head">
         <p className="pw-asof" suppressHydrationWarning>
-          Open issues in Linear, team TEC · read {ago(data.readAt)}
+          Open issues in paddock-issues · read {ago(data.readAt)}
         </p>
         <div className="pw-toggle" role="group" aria-label="Group by">
           {(["status", "app"] as const).map((g) => (
@@ -163,7 +163,7 @@ export default function PitWall({ data, group }: { data: PitWallData; group: Gro
           <span className="light light-caution" aria-hidden="true" /> <b>No issues to show.</b> {data.why}.
         </p>
       ) : data.issues.length === 0 ? (
-        <p className="pw-empty">No open issues in team TEC.</p>
+        <p className="pw-empty">No open issues in paddock-issues.</p>
       ) : grouping === "status" ? (
         <ByStatus issues={data.issues} />
       ) : (
