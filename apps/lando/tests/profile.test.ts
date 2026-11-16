@@ -69,10 +69,16 @@ describe("the migration", () => {
     expect(code).toMatch(/id boolean PRIMARY KEY DEFAULT true CONSTRAINT profile_one_row CHECK \(id\)/);
   });
 
-  it("is later than every other migration", () => {
+  it("is later than every other migration that touches lando", () => {
+    // It builds on lando's own tables and functions, so it must run after each of them. A later
+    // migration from another app is no concern of it: the check once demanded it be the newest file
+    // of all, which any new app's migration broke.
     const { file } = sql();
-    const all = readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort();
-    expect(all[all.length - 1]).toBe(file);
+    const touchesLando = readdirSync(MIGRATIONS)
+      .filter((f) => f.endsWith(".sql") && f !== file)
+      .filter((f) => /lando/i.test(f) || /\blando\b/i.test(readFileSync(resolve(MIGRATIONS, f), "utf8")));
+    expect(touchesLando.length).toBeGreaterThan(0);
+    for (const f of touchesLando) expect(f < file, `${f} must come before ${file}`).toBe(true);
   });
 
   it("holds the same longest lengths as the app", () => {
