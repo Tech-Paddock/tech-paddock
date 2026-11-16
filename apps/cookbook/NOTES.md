@@ -844,6 +844,20 @@ new; J the bad lines). No model call. Code: `lib/coupons.ts` (pure), `importCoup
   `aria-disabled`. Enter adds, Shift+Enter starts a line, a paste adds one per line. The book's search
   keeps `aria-label="Search recipes"` and now reads "Search N recipes". `tests/addBox.test.ts` reads the
   source, as there is no DOM harness. **Trap:** do not put `disabled` back on the Add button.
+- **Refresh and the search ×** (TEC-273, TEC-274; both in `app/Book.tsx`). **Refresh** sits at the right of the
+  Recipes heading and re-reads `GET /api/recipes` through `readBook` (`lib/bookRead.ts`), the one read
+  the first load, a keep and a remove also use. It is busy ("Refreshing…", disabled, `aria-busy`) and a
+  ref ignores a second tap; the open recipe, the search, the filters and the scroll are untouched, and
+  `onRead` hands the new list to the Menu and Add as it does for any read. **An unread book is never an
+  empty one:** `readBook` returns a failure, never `[]`, for a refused read, a network error or a reply
+  with no `recipes` array; a failed re-read keeps `recipes` and shows "<reason> Showing the list as it
+  was." inline (`role="alert"`) under the heading, and only a failed *first* read shows the old
+  full-panel error. It reloads the list only; it does not run the macros job. The **×** is
+  `ClearSearchButton`, a child of `SearchField` (its slot, unchanged), drawn only while the field has
+  text: 40px, "Clear search", it empties the query and refocuses the input. The input hides WebKit's own
+  cancel button (`[&::-webkit-search-cancel-button]:appearance-none`) so Chrome shows one ×. Tests:
+  `tests/bookRefresh.test.ts` (read with `fetch` injected, static markup, and the wiring read from source,
+  as there is no DOM harness, so the tap and the focus are not run in a browser by any test).
 - **Buttons pop** (TEC-236): `.lift` in `globals.css` is a faint top highlight and an accent-coloured
   drop shadow (`rgb(var(--accent-rgb) / …)`, so green in light and the gold glow in dark), pressed 1px
   on `:active`, none when disabled. It is on the filled accent buttons: Add, + Cart, Add to list, the

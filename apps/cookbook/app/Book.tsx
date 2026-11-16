@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Menu from "./Menu";
 import { AddToListCard, ORIGIN_LABELS, RecipeOpen } from "./RecipeDetail";
 import { Stars } from "./Meta";
@@ -13,6 +13,7 @@ import EditRecipe from "./EditRecipe";
 import { BookFilters } from "./Tuning";
 import { FIELD_CONTROL, SearchField } from "./SearchField";
 import { sortRecipes } from "@/lib/recipeSort";
+import { readBook } from "@/lib/bookRead";
 import { NO_FILTER, cuisinesIn, filterActive, matchesFilter, type BookFilter } from "@/lib/tuning";
 
 /**
@@ -39,6 +40,10 @@ export default function Book({
   // Only for the read itself. Everything else reports through a toast; a book
   // that could not be read is a state, and it stays on screen while it is true.
   const [readError, setReadError] = useState<string | null>(null);
+  // A Refresh is running (TEC-273). The ref is the second-tap guard, the state is what shows it.
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshingRef = useRef(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
   const [filter, setFilter] = useState<BookFilter>(NO_FILTER);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -62,18 +67,30 @@ export default function Book({
   }
 
   const load = useCallback(async () => {
-    try {
-      const response = await fetch("/api/recipes", { cache: "no-store" });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Couldn't read the book.");
-      setRecipes(body.recipes as Recipe[]);
+    const read = await readBook();
+    if (read.ok) {
+      setRecipes(read.recipes);
       setReadError(null);
-    } catch (e) {
-      // Deliberately leaves `recipes` null rather than setting it to []. An
-      // unread book and an empty book must not render the same.
-      setReadError(e instanceof Error ? e.message : "Couldn't read the book.");
+    } else {
+      // Deliberately leaves `recipes` as it is (null before the first read)
+      // rather than setting it to []. An unread book and an empty book must not
+      // render the same, and a failed re-read keeps the list on screen.
+      setReadError(read.error);
     }
   }, []);
+
+  /** The Refresh button (TEC-273): the same read, on demand; one at a time. */
+  async function refresh() {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      refreshingRef.current = false;
+      setRefreshing(false);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -216,25 +233,44 @@ export default function Book({
       {/* The new look (TEC-135, the owner's mockup): a heading with the count,
           a full-width search, the filters, then cards. Behaviour unchanged. */}
       <section id="book" className="flex scroll-mt-4 flex-col gap-2">
-        <div className="flex flex-col gap-1 px-2">
-          <h2 className="text-xl font-bold">Recipes</h2>
-          {recipes !== null ? (
-            <p className="text-[13px] text-ink-soft">
-              {recipes.length} recipe{recipes.length === 1 ? "" : "s"} · per serving
-            </p>
-          ) : null}
+        <div className="flex items-start justify-between gap-2 px-2">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h2 className="text-xl font-bold">Recipes</h2>
+            {recipes !== null ? (
+              <p className="text-[13px] text-ink-soft">
+                {recipes.length} recipe{recipes.length === 1 ? "" : "s"} · per serving
+              </p>
+            ) : null}
+          </div>
+          <RefreshButton refreshing={refreshing} onRefresh={() => void refresh()} />
         </div>
+        {recipes !== null && readError ? (
+          // A failed re-read: the list below stays, and this says so (TEC-273).
+          <p role="alert" className="px-2 text-sm text-danger">
+            {readError} Showing the list as it was.
+          </p>
+        ) : null}
         {recipes !== null && recipes.length > 0 ? (
           // One rounded field with the magnifier inside (TEC-236).
           <SearchField icon="search">
             <input
+              ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               type="search"
               placeholder={`Search ${recipes.length} recipe${recipes.length === 1 ? "" : "s"}`}
               aria-label="Search recipes"
-              className={`${FIELD_CONTROL} pr-3`}
+              // The × beside it is the one clear button; Chrome's own is hidden (TEC-274).
+              className={`${FIELD_CONTROL} pr-3 [&::-webkit-search-cancel-button]:appearance-none`}
             />
+            {query ? (
+              <ClearSearchButton
+                onClear={() => {
+                  setQuery("");
+                  searchRef.current?.focus();
+                }}
+              />
+            ) : null}
           </SearchField>
         ) : null}
         {recipes !== null && recipes.length > 0 ? (
@@ -282,6 +318,37 @@ export default function Book({
       </section>
       </div>
     </div>
+  );
+}
+
+/** Refresh (TEC-273): re-reads the list; busy and inert while it runs. */
+export function RefreshButton({ refreshing, onRefresh }: { refreshing: boolean; onRefresh: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onRefresh}
+      disabled={refreshing}
+      aria-busy={refreshing}
+      className="min-h-10 shrink-0 whitespace-nowrap rounded-lg border border-line px-3 text-sm font-semibold text-ink disabled:opacity-50"
+    >
+      {refreshing ? "Refreshing…" : "Refresh"}
+    </button>
+  );
+}
+
+/** The × at the right end of the search field (TEC-274): 40px to tap, named for a screen reader. */
+export function ClearSearchButton({ onClear }: { onClear: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClear}
+      aria-label="Clear search"
+      className="flex size-10 shrink-0 items-center justify-center rounded-full text-ink-soft hover:text-ink"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6 6 18" />
+      </svg>
+    </button>
   );
 }
 
