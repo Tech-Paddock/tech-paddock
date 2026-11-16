@@ -4,9 +4,10 @@ What is true now, and the traps. Branch and pull request state is never written 
 
 ## State
 
-- **Shape:** one TD at a time + builders (started by the owner's `/build`) + Deployment (on `/deploy`) + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Linear
-  labels: one of the `type` group (Feature, Enhancement, Bug, Owner task), `app:<folder>`; the
-  parking lot is the `Parked` label. The `owner:` labels and `Phone check` retired (TEC-238).
+- **Shape:** one TD at a time + builders (started by the owner's `/build`) + Deployment (on `/deploy`) + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Issues
+  live in GitHub, [techissues](https://github.com/Tech-Paddock/techissues/issues) (private); labels:
+  one type (Feature, Enhancement, Bug, Owner task), `app:<folder>`, one `status:`; the parking lot is
+  the `Parked` label. Linear is a read-only archive since 2026-11-16; the guard refuses its writes. The `owner:` labels and `Phone check` retired (TEC-238).
 - **Every app is on Next 16 with `proxy.ts`,** one gate copy.
 - **Without a session, the gate lets through** the login page, its endpoint, its icons and Next's
   `/_next/` assets, and `/api/cron/prices` with `Authorization: Bearer <CRON_SECRET>` (TEC-132,
@@ -15,7 +16,9 @@ What is true now, and the traps. Branch and pull request state is never written 
   (TEC-57, owner-approved); the route is stamped from `packages/shared` and returns only the commit.
 - **`apps/showcase` is yours to scaffold when the owner wants it** (TEC-99). The owner cleared reading
   `Tech-Paddock/teamusauploader` on 2026-10-18; the demo uses fake data and a neutral name.
-- **Linear writes don't prompt.** Deletes, label retirement and diff tools still ask.
+- **GitHub issue writes don't prompt** (`issue_write`, `sub_issue_write`, `add_issue_comment` are
+  allowed in `settings.json`). The PC may name the GitHub server differently from the cloud's
+  `github`; if issue writes prompt there, that name is missing from the allowlist.
 - **Health prices recipe lines from Cookbook's `GET /api/servings`**, forwarding only
   `paddock_session`. A `SESSION_SECRET` mismatch between `tp-health` and `tp-cookbook` reads as
   "Couldn't reach the Cookbook", not a login bug.
@@ -69,11 +72,15 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **The firewall cannot be read or written through the API** (`Seawall Config not found`).
 - **Runtime logs hold no request lines.** To see whether a feature ran, count rows with
   `execute_sql`: counts and sources only, never content.
-- **Linear's pull request automations are off** (every row No action, owner, 2026-10-26). A pull
-  request still links its issue, but only Deployment and the TD set statuses.
+- **A pull request closes its issue only with the full reference:** `Fixes
+  Tech-Paddock/techissues#n` in the body. A bare `#n` points at tech-paddock's own numbering.
+  Deployment and the TD still set `status:` labels by hand.
+- **Imported issues keep their Linear text.** Their Agent notes are `+++` blocks that GitHub shows
+  open; the guard still counts them as folded. Their links to `linear.app` point at the archive.
+- **A brief that names a pull request as `#n` reads as an issue to the guard** (`issuesIn`). Under a
+  `/build #12`, write "pull request 423", not "#423", or the start asks.
 - **The auto-mode classifier can refuse work under `.claude/`.** It clears once the owner's own
   words name the change. Never route around it or probe the guard by editing it live.
-- **A Linear patch matches stored text.** Copy the anchor from `get_issue`, tags and all.
 - **Remote branches are not deleted or renamed from here.** On the PC only the guard stops it
   (TEC-221); `gh` would otherwise succeed with the owner's login. Merged branches auto-delete; the
   owner deletes stale ones.

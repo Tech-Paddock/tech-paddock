@@ -22,18 +22,18 @@ not restated here.
 
 ## Starting the builder
 
-The owner starts it with `/build TEC-n` (`.claude/skills/build/SKILL.md`); you write the brief and
+The owner starts it with `/build #n` (`.claude/skills/build/SKILL.md`); you write the brief and
 start it from `.claude/agents/builder/preset.md`. **Never start it any other way,** even after the
-owner's go on a proposal: say the work is ready for `/build TEC-n` and stop. The preset pins model,
+owner's go on a proposal: say the work is ready for `/build #n` and stop. The preset pins model,
 effort and worktree; changing them is the owner's call.
 
-- **The first message is the brief:** "app: X", the Linear issue, the owner's words where they
+- **The first message is the brief:** "app: X", the issue, the owner's words where they
   matter, and where to stop. The builder asks you; you ask the owner.
 - **How the work splits is yours:** each builder gets its own files and its own branch, and most
   issues need one. The skill holds the rest (migration first, one slice owns the shared files, no
   stacking).
 - **Their reports reach the owner through you,** as one. The slice that owns `NOTES.md` writes it.
-- **It ends when your session does.** Only its pushed branch, its notes and Linear survive.
+- **It ends when your session does.** Only its pushed branch, its notes and the issues survive.
 
 ## Deploying
 
@@ -44,7 +44,7 @@ reason to deploy. If you cannot tell execution from structure, treat it as struc
 
 **One Deployment at a time, across every session** (the skill's lock). Recommend a fresh TD session
 for the deploy when your context is large or builders are still running; it picks the work up from
-branches and Linear, and deploys every ready branch whichever session cut it (TEC-237).
+branches and the issues, and deploys every ready branch whichever session cut it (TEC-237).
 
 **A plan run** (`/execute-plan`, the owner's only) runs the builds and deploys `/summarize-plan`
 showed, in order, on one approval; its skill says where it stops.
@@ -93,7 +93,7 @@ how a demo renders it are convention, guarded only here. A demo that needs state
 - **Verify from the code, not a summary of it.**
 - **Put decisions to the owner as multiple choice** (`AskUserQuestion`): two to four options,
   recommendation first and marked, each with its consequence.
-- **A command for the owner stands alone.** Anything the owner should type (`/build TEC-n`,
+- **A command for the owner stands alone.** Anything the owner should type (`/build #n`,
   `/execute-plan cookbook`, a one-word reply) ends the message in its own fenced code block holding
   only that line, one block per command, never inside a sentence. On a phone a code block has a
   copy button; inline code does not (owner, 2026-11-02: "the skills are difficult to copy on my
@@ -103,14 +103,15 @@ how a demo renders it are convention, guarded only here. A demo that needs state
 - **Work for the owner is an owner task,** never a step to find in a long issue (the `owner-task`
   skill). No check after live by default: file one only when the owner asks or the change cannot
   be tested signed out (`CLAUDE.md`).
-- **Linear matches the repo.** At kickoff, fix any issue whose status the repo contradicts: work
-  merged with no steps left is Done; a pushed branch awaiting merge is In Review; an assignee on
-  anything but an owner task is removed. Linear writes need no approval; report only what you could not settle.
+- **The issues match the repo.** At kickoff, fix any issue whose status the repo contradicts: work
+  merged with no steps left is closed as completed; a pushed branch awaiting merge is
+  `status:in-review`; an assignee on anything but an owner task is removed. Issue writes need no
+  approval; report only what you could not settle. Linear is a read-only archive.
 
 ## Limits
 
 - **You are a session, not a service.** Nothing watches after the window closes.
-  `subscribe_pr_activity` dies with the session; a scheduled check-in only wakes one. Linear and
+  `subscribe_pr_activity` dies with the session; a scheduled check-in only wakes one. The issues and
   `NOTES.md` are your memory.
 - **No ruleset tool.** Branch protection is the owner's; you can only verify its effect.
 - **No Vercel writes.** You read; every write is the owner's.
@@ -137,8 +138,8 @@ cross-owner additions.
 ## Guardrails
 
 - **You write every `RULES.md`; builders only propose.** Name each change in its pull request and
-  Linear issue; the owner vetoes at `/deploy`. One that loosens auth, Showcase, secrets or personal
+  issue; the owner vetoes at `/deploy`. One that loosens auth, Showcase, secrets or personal
   data goes to the owner first (`CLAUDE.md`). Domain content comes from the work (notes,
-  pull requests, Linear). Say so if you rewrite a trap you have not hit.
+  pull requests, issues). Say so if you rewrite a trap you have not hit.
 - **Never rewrite a live branch you did not cut.** Land the work on your own branch.
 - **Your own structural change still goes to the owner** when it is on the approval list.

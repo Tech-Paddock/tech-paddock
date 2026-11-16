@@ -14,7 +14,7 @@ import { copyFileSync, mkdtempSync, readFileSync, symlinkSync, mkdirSync, writeF
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { decide, lex, nextSteps, planGate, promptGate, stripSql, targetsMain } from "./decide.mjs";
+import { decide, issuesIn, lex, nextSteps, planGate, promptGate, stripSql, targetsMain } from "./decide.mjs";
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HOOKS, "..", "..");
@@ -408,13 +408,12 @@ test("a pull request from a shell is Deployment's too", () => {
   }
 });
 
-test("Linear's diff tools act on the pull request, so they are Deployment's", () => {
-  for (const t of ["merge_diff", "update_diff", "submit_diff_review", "save_diff_comment", "resolve_diff_thread"]) {
-    assert.equal(verdict(decide({ tool_name: `mcp__Linear__${t}`, tool_input: {}, ...HELPER })), "deny", t);
-    assert.equal(mcp(`mcp__Linear__${t}`, {}), "deny", t);
-    assert.equal(verdict(decide({ tool_name: `mcp__Linear__${t}`, tool_input: {}, ...DEPLOY })), "allow", t); // settings.json still asks the owner
+test("Linear is a read-only archive: reads go ahead, every write is refused", () => {
+  for (const t of ["save_issue", "create_issue", "save_comment", "save_project", "create_issue_label", "merge_diff", "update_diff", "submit_diff_review", "save_diff_comment", "resolve_diff_thread", "delete_comment", "some_future_tool"]) {
+    for (const who of [MAIN, HELPER, DEPLOY]) assert.equal(verdict(decide({ tool_name: `mcp__Linear__${t}`, tool_input: {}, ...who })), "deny", t);
+    assert.equal(mcp(`mcp__claude_ai_Linear__${t}`, {}), "deny", t);
   }
-  for (const t of ["get_diff", "list_diffs", "get_diff_threads"]) assert.equal(mcp(`mcp__Linear__${t}`, {}), "allow", t);
+  for (const t of ["get_issue", "list_issues", "list_comments", "search_documentation", "get_diff", "list_diffs", "extract_images"]) assert.equal(mcp(`mcp__Linear__${t}`, {}), "allow", t);
 });
 
 test("Supabase: reads and apply_migration go ahead; the rest waits for the owner", () => {
@@ -451,83 +450,90 @@ test("Vercel: reads go ahead; changes and credentials wait for the owner", () =>
   assert.equal(mcp("mcp__Vercel__filter_project_envs", { decrypt: "true" }), "ask");
 });
 
-test("Linear: an issue has one type, at most one app, and ends with Next steps that name who acts", () => {
+const ISSUES = { owner: "Tech-Paddock", repo: "techissues" };
+
+test("Issues live in the private techissues repo, never the public tech-paddock", () => {
+  const good = "What and why.\n\n## Next steps\n\n1. **TD:** build it.\n";
+  const write = (where, extra = {}) => mcp("mcp__github__issue_write", { method: "create", title: "t", labels: ["Feature"], body: good, ...where, ...extra });
+  assert.equal(write(ISSUES), "allow");
+  assert.equal(write({ owner: "tech-paddock", repo: "TechIssues" }), "allow"); // case does not matter
+  assert.equal(write({ owner: "Tech-Paddock", repo: "tech-paddock" }), "deny");
+  assert.equal(write({}), "deny");
+  assert.equal(mcp("mcp__github__sub_issue_write", { ...ISSUES, method: "add", issue_number: 1, sub_issue_id: 2 }), "allow");
+  assert.equal(mcp("mcp__github__sub_issue_write", { owner: "Tech-Paddock", repo: "tech-paddock", method: "add", issue_number: 1, sub_issue_id: 2 }), "deny");
+  // A pull request's conversation uses the issue-comment tools, so comments go anywhere.
+  assert.equal(mcp("mcp__github__add_issue_comment", { owner: "Tech-Paddock", repo: "tech-paddock", issue_number: 1, body: "x" }), "allow");
+  for (const t of ["issue_read", "list_issues", "search_issues"]) assert.equal(mcp(`mcp__github__${t}`, { owner: "Tech-Paddock", repo: "tech-paddock" }), "allow", t);
+});
+
+test("Issues: one type, at most one app and one status, and Next steps that name who acts", () => {
   const good = "What and why.\n\n## Next steps\n\n1. **Owner:** decide.\n2. **TD:** build it.\n   * a detail\n3. **Done:** checked.\n";
-  const save = (input) => mcp("mcp__Linear__save_issue", input);
-  const create = (extra) => save({ team: "TEC", title: "t", labels: ["Feature", "app:coffee"], description: good, ...extra });
+  const write = (input) => mcp("mcp__github__issue_write", { ...ISSUES, ...input });
+  const create = (extra) => write({ method: "create", title: "t", labels: ["Feature", "app:coffee", "status:todo"], body: good, ...extra });
   assert.equal(create({}), "allow");
-  assert.equal(create({ labels: ["Bug", "app:health", "Parked"] }), "allow");
+  assert.equal(create({ labels: ["Bug", "app:health", "Parked", "status:backlog"] }), "allow");
   assert.equal(create({ labels: ["enhancement"] }), "allow"); // a platform issue has no app; case does not matter
   assert.equal(create({ labels: ["app:coffee"] }), "deny"); // no type
+  assert.equal(create({ labels: undefined }), "deny");
   assert.equal(create({ labels: ["Feature", "Bug", "app:coffee"] }), "deny");
   assert.equal(create({ labels: ["Feature", "app:coffee", "app:health"] }), "deny");
+  assert.equal(create({ labels: ["Feature", "status:todo", "status:in-progress"] }), "deny");
   assert.equal(create({ labels: ["Feature", "owner:TD"] }), "deny"); // TEC-238: owner labels are retired
   assert.equal(create({ labels: ["Improvement"] }), "deny"); // renamed Enhancement
   assert.equal(create({ labels: ["1f4adc9b-38dc-4f83-9c67-6cdfaae4d47a", "Feature"] }), "deny");
-  assert.equal(create({ description: undefined }), "deny");
-  assert.equal(create({ description: "No section at all." }), "deny");
-  assert.equal(create({ description: "## Next steps\n\n1. **TD:** x\n\n## Notes\n\nlater" }), "deny");
-  assert.equal(create({ description: "## Next steps\n\nJust prose, no steps." }), "deny");
-  assert.equal(create({ description: "## Next steps\n\n1. **TD:** x\n2. Verify it in the logs." }), "deny");
-  assert.equal(create({ description: "## Next steps\n\n1. The technical director builds it." }), "allow");
-  assert.equal(create({ description: "## Next steps\n\n1. **Builder:** build it on a fresh branch." }), "allow");
-  assert.equal(create({ description: "## Next steps\n\n1. **Deployment:** take it to merge." }), "allow");
-  assert.equal(create({ description: "## Next steps\n\n1. **Nobody:** nothing until it is un-parked." }), "allow");
-  assert.equal(create({ description: "```\n## Next steps\n1. TD: x\n```\n" }), "deny");
-  assert.equal(create({ description: "## Next steps\n\n1. Check /api/health answers." }), "deny");
+  assert.equal(create({ body: undefined }), "deny");
+  assert.equal(create({ body: "No section at all." }), "deny");
+  assert.equal(create({ body: "## Next steps\n\n1. **TD:** x\n\n## Notes\n\nlater" }), "deny");
+  assert.equal(create({ body: "## Next steps\n\nJust prose, no steps." }), "deny");
+  assert.equal(create({ body: "## Next steps\n\n1. **TD:** x\n2. Verify it in the logs." }), "deny");
+  assert.equal(create({ body: "## Next steps\n\n1. The technical director builds it." }), "allow");
+  assert.equal(create({ body: "## Next steps\n\n1. **Builder:** build it on a fresh branch." }), "allow");
+  assert.equal(create({ body: "## Next steps\n\n1. **Deployment:** take it to merge." }), "allow");
+  assert.equal(create({ body: "## Next steps\n\n1. **Nobody:** nothing until it is un-parked." }), "allow");
+  assert.equal(create({ body: "```\n## Next steps\n1. TD: x\n```\n" }), "deny");
+  assert.equal(create({ body: "## Next steps\n\n1. Check /api/health answers." }), "deny");
+  assert.equal(create({ assignees: ["someone"] }), "deny"); // only an owner task is assigned
 
-  assert.equal(save({ id: "TEC-1", state: "Done" }), "allow");
-  assert.equal(save({ id: "TEC-1", addLabels: ["Parked"] }), "allow");
-  assert.equal(save({ id: "TEC-1", removeLabels: ["owner:TD"] }), "allow"); // the migration off owner labels
-  assert.equal(save({ id: "TEC-1", removeLabels: ["owner:TD"], addLabels: ["Feature"] }), "allow");
-  assert.equal(save({ id: "TEC-1", addLabels: ["owner:Owner"] }), "deny");
-  assert.equal(save({ id: "TEC-1", removeLabels: ["Feature"], addLabels: ["Bug"] }), "allow");
-  assert.equal(save({ id: "TEC-1", removeLabels: ["Feature"] }), "deny");
-  assert.equal(save({ id: "TEC-1", addLabels: ["Feature", "Bug"] }), "deny");
-  assert.equal(save({ id: "TEC-1", removeLabels: ["agent:TD"], addLabels: ["app:coffee"] }), "allow"); // the relabel
-  assert.equal(save({ id: "TEC-1", addLabels: ["app:coffee", "app:health"] }), "deny");
-  assert.equal(save({ id: "TEC-1", labels: ["Bug"] }), "allow");
-  assert.equal(save({ id: "TEC-1", labels: ["app:coffee"] }), "deny");
-  assert.equal(save({ id: "TEC-1", description: good }), "allow");
-  assert.equal(save({ id: "TEC-1", description: "Rewritten, and the steps are gone." }), "deny");
-  assert.equal(save({ id: "TEC-1", patch: [{ op: "replace", old_string: "old", new_string: "new" }] }), "allow");
-  assert.equal(save({ id: "TEC-1", patch: [{ op: "replace", old_string: "## Next steps\n\n1. x", new_string: "" }] }), "deny");
-  assert.equal(save({ id: "TEC-1", patch: [{ op: "replace_range", from: "## Next steps", to: "3.", new_string: "## Next steps\n\n1. **TD:** y\n" }] }), "allow");
-  assert.equal(save({ id: "TEC-1", patch: [{ op: "append", text: "\n\n## Notes\n\nx" }] }), "deny");
-  assert.equal(save({ id: "TEC-1", patch: [{ op: "insert_before", anchor: "## Next steps", text: "## Notes\n\nx\n\n" }] }), "allow");
-  assert.equal(mcp("mcp__Linear__list_issues", {}), "allow");
-  assert.equal(mcp("mcp__Linear__save_comment", { body: "x" }), "allow");
+  const update = (extra) => write({ method: "update", issue_number: 7, ...extra });
+  assert.equal(update({ state: "closed", state_reason: "completed" }), "allow");
+  assert.equal(update({ labels: ["Bug", "status:in-review"] }), "allow"); // on GitHub, labels is the whole new set
+  assert.equal(update({ labels: ["app:coffee"] }), "deny");
+  assert.equal(update({ labels: ["Feature", "Bug"] }), "deny");
+  assert.equal(update({ body: good }), "allow");
+  assert.equal(update({ body: "Rewritten, and the steps are gone." }), "deny");
+  assert.equal(update({ labels: ["Feature"], assignees: ["someone"] }), "deny");
+  assert.equal(update({ assignees: [] }), "allow"); // unassigning is always fine
 });
 
 /* TEC-238: what the owner reads is short. "It's too much to sort through a 2k word ticket." */
-test("Linear: an issue shows at most 300 words; the Agent notes fold away the rest", () => {
-  const save = (input) => mcp("mcp__Linear__save_issue", input);
+test("Issues: a body shows at most 300 words; the collapsed Agent notes fold away the rest", () => {
   const steps = "\n\n## Next steps\n\n1. **TD:** build it.\n";
   const long = Array(320).fill("word").join(" ");
-  const create = (description) => save({ team: "TEC", title: "t", labels: ["Feature"], description });
+  const create = (body) => mcp("mcp__github__issue_write", { ...ISSUES, method: "create", title: "t", labels: ["Feature"], body });
   assert.equal(create(`Short summary.${steps}`), "allow");
   assert.equal(create(`${long}${steps}`), "deny");
-  assert.equal(create(`Short summary.\n\n+++ Agent notes\n\n${long}\n\n+++${steps}`), "allow");
-  assert.equal(create(`Short summary.\n\n>>> Agent notes\n\n${long}\n\n>>>${steps}`), "allow"); // as Linear stores it
-  assert.equal(create(`Short summary.\n\n+++ Agent notes\n\n${long}${steps}`), "deny"); // never closed, so it shows
-  assert.equal(save({ id: "TEC-1", description: `${long}${steps}` }), "deny");
+  assert.equal(create(`Short summary.\n\n<details>\n<summary>Agent notes</summary>\n\n${long}\n\n</details>${steps}`), "allow");
+  assert.equal(create(`Short summary.\n\n+++ Agent notes\n\n${long}\n\n+++${steps}`), "allow"); // as imported from Linear
+  assert.equal(create(`Short summary.\n\n<details>\n<summary>Agent notes</summary>\n\n${long}${steps}`), "deny"); // never closed, so it shows
+  assert.equal(mcp("mcp__github__issue_write", { ...ISSUES, method: "update", issue_number: 1, body: `${long}${steps}` }), "deny");
 });
 
-test("Linear: an owner task is short, opens with the issue it is for, and has Steps and Done when", () => {
-  const save = (input) => mcp("mcp__Linear__save_issue", input);
-  const task = "For TEC-240 — Cookbook grocery rows show the exact product.\nNeeded: confirm the List popup on your phone.\n\n## Steps\n1. Open https://cookbook.techpaddock.io/list\n2. Tap a row, then Pick product\n\n## Test\n- [ ] The popup lists that item's products\n\nDone when: the box passes. If not, comment what you saw.";
-  const create = (extra) => save({ team: "TEC", title: "Test: grocery picklist", labels: ["Owner task", "app:cookbook"], description: task, blocks: ["TEC-240"], ...extra });
+test("Issues: an owner task is short, opens with the issue it is for, has Steps and Done when, and is the one assigned", () => {
+  const task = "For #240 — Cookbook grocery rows show the exact product.\nNeeded: confirm the List popup on your phone.\n\n## Steps\n1. Open https://cookbook.techpaddock.io/list\n2. Tap a row, then Pick product\n\n## Test\n- [ ] The popup lists that item's products\n\nDone when: the box passes. If not, comment what you saw.";
+  const write = (input) => mcp("mcp__github__issue_write", { ...ISSUES, ...input });
+  const create = (extra) => write({ method: "create", title: "Test: grocery picklist", labels: ["Owner task", "app:cookbook", "status:todo"], assignees: ["the-owner"], body: task, ...extra });
   assert.equal(create({}), "allow"); // no Next steps: the task is the step
-  assert.equal(create({ description: task.replace("For TEC-240", "For [TEC-240](https://linear.app/x/issue/TEC-240)") }), "allow");
-  assert.equal(create({ description: task.replace("For TEC-240 — ", "") }), "deny");
-  assert.equal(create({ description: task.replace("## Steps", "## How") }), "deny");
-  assert.equal(create({ description: task.replace("Done when: the box passes. ", "") }), "deny");
-  assert.equal(create({ description: `${task}\n\n${Array(150).fill("detail").join(" ")}` }), "deny");
+  assert.equal(create({ body: task.replace("For #240", "For TEC-240") }), "allow"); // an issue imported from Linear
+  assert.equal(create({ body: task.replace("For #240", "For [#240](https://github.com/Tech-Paddock/techissues/issues/240)") }), "allow");
+  assert.equal(create({ body: task.replace("For #240 — ", "") }), "deny");
+  assert.equal(create({ body: task.replace("## Steps", "## How") }), "deny");
+  assert.equal(create({ body: task.replace("Done when: the box passes. ", "") }), "deny");
+  assert.equal(create({ body: `${task}\n\n${Array(150).fill("detail").join(" ")}` }), "deny");
   assert.equal(create({ labels: ["Owner task", "Bug"] }), "deny");
   // An update is read as an owner task by its labels, or by its shape when they are not in the call.
-  assert.equal(save({ id: "TEC-241", description: task }), "allow");
-  assert.equal(save({ id: "TEC-241", labels: ["Owner task"], description: task.replace("## Steps", "## How") }), "deny");
-  assert.equal(save({ id: "TEC-241", removeLabels: ["Feature"], addLabels: ["Owner task"], description: task }), "allow");
+  assert.equal(write({ method: "update", issue_number: 241, body: task }), "allow");
+  assert.equal(write({ method: "update", issue_number: 241, labels: ["Owner task"], body: task.replace("## Steps", "## How") }), "deny");
+  assert.equal(write({ method: "update", issue_number: 241, labels: ["Owner task"], assignees: ["the-owner"], body: task }), "allow");
 });
 
 test("helpers", () => {
@@ -620,6 +626,9 @@ test("/build and /deploy: the prompt hook records the owner's command, and nothi
     record: { command: "/build", issues: ["TEC-5", "TEC-6"], session_id: "s1", at: "2026-11-08T15:00:00.000Z" },
   });
   assert.deepEqual(promptGate({ prompt: "/build", session_id: "s1" }, at).record.issues, []);
+  // GitHub issues are #n; one imported from Linear still answers to its TEC-n.
+  assert.deepEqual(promptGate({ prompt: "/build #12 #13 TEC-276", session_id: "s1" }, at).record.issues, ["#12", "#13", "TEC-276"]);
+  assert.deepEqual(issuesIn("Issue #12 (TEC-276); see Tech-Paddock/techissues#9, a&#39;s, x#4."), ["#12", "TEC-276"]);
   assert.deepEqual(promptGate({ prompt: " /Deploy ", session_id: "s1" }, at), {
     file: "deploy-approved.json",
     record: { command: "/deploy", session_id: "s1", at: "2026-11-08T15:00:00.000Z" },
@@ -682,21 +691,22 @@ function run(command, input, { env = {}, shell = "/bin/sh" } = {}) {
 }
 
 test("settings.json sends each tool to the guard it needs, and no other", () => {
-  for (const t of ["Bash", "Agent", "Task", "mcp__github__create_pull_request", "mcp__github__merge_pull_request", "mcp__github__enable_pr_auto_merge", "mcp__github__disable_pr_auto_merge", "mcp__github__pull_request_review_write", "mcp__github__add_comment_to_pending_review", "mcp__github__add_reply_to_pull_request_comment", "mcp__github__request_copilot_review", "mcp__github__resolve_review_thread", "mcp__github__unresolve_review_thread", "mcp__github__push_files", "mcp__github__create_or_update_file", "mcp__github__delete_file", "mcp__github__update_pull_request_branch", "mcp__Supabase__execute_sql", "mcp__Supabase__create_project", "mcp__Vercel__create_project_env", "mcp__Linear__save_issue", "mcp__Linear__merge_diff", "mcp__Linear__update_diff", "mcp__Linear__submit_diff_review", "mcp__Linear__save_diff_comment", "mcp__Linear__resolve_diff_thread"]) {
+  for (const t of ["Bash", "Agent", "Task", "mcp__github__create_pull_request", "mcp__github__merge_pull_request", "mcp__github__enable_pr_auto_merge", "mcp__github__disable_pr_auto_merge", "mcp__github__pull_request_review_write", "mcp__github__add_comment_to_pending_review", "mcp__github__add_reply_to_pull_request_comment", "mcp__github__request_copilot_review", "mcp__github__resolve_review_thread", "mcp__github__unresolve_review_thread", "mcp__github__push_files", "mcp__github__create_or_update_file", "mcp__github__delete_file", "mcp__github__update_pull_request_branch", "mcp__Supabase__execute_sql", "mcp__Supabase__create_project", "mcp__Vercel__create_project_env", "mcp__github__issue_write", "mcp__github__sub_issue_write", "mcp__Linear__save_issue", "mcp__Linear__save_comment", "mcp__claude_ai_Linear__save_project", "mcp__Linear__merge_diff", "mcp__Linear__update_diff", "mcp__Linear__submit_diff_review", "mcp__Linear__save_diff_comment", "mcp__Linear__resolve_diff_thread"]) {
     assert.ok(hookFor(t), `${t} has no hook`);
   }
   for (const t of ["Edit", "Write", "MultiEdit", "NotebookEdit"]) assert.ok(hookFor(t), `${t} has no hook`);
-  for (const t of ["Read", "Glob", "mcp__github__get_me", "mcp__github__list_branches", "mcp__Linear__list_issues", "mcp__Linear__save_comment", "mcp__Notion__notion-search"]) {
+  for (const t of ["Read", "Glob", "mcp__github__get_me", "mcp__github__list_branches", "mcp__github__issue_read", "mcp__github__list_issues", "mcp__github__add_issue_comment", "mcp__Linear__list_issues", "mcp__claude_ai_Linear__get_issue", "mcp__Notion__notion-search"]) {
     assert.equal(hookFor(t), undefined, `${t} should not be guarded`);
   }
 });
 
-/* Linear edits need no click: an issue write is cheap to undo and the guard
-   checks its shape. The allow list is exactly Linear plus a few read-only reads and checks the owner chose
-   (TEC-253, superseding TEC-43's Linear-only list); anything else added here fails this test. It never
-   outranks the ask list: deleting, retiring a label, and the diff tools (merge_diff merges a GitHub pull
-   request, outside the guard's merge hold) still wait for his click. TEC-43. */
-test("settings.json lets Linear through without a click, except what cannot be undone", () => {
+/* Issue edits need no click: an issue write is cheap to undo and the guard
+   checks its shape and its repo. The allow list is exactly Linear's reads (it is
+   an archive; the guard refuses its writes), the GitHub issue tools, and a few
+   read-only reads and checks the owner chose (TEC-253, superseding TEC-43's
+   Linear-only list); anything else added here fails this test. It never
+   outranks the ask list. TEC-43. */
+test("settings.json lets issue work through without a click, except what cannot be undone", () => {
   const { allow = [], ask = [], deny = [] } = settings.permissions ?? {};
   assert.deepEqual(
     allow,
@@ -704,6 +714,11 @@ test("settings.json lets Linear through without a click, except what cannot be u
       "mcp__Linear",
       "mcp__claude_ai_Linear__get_issue",
       "mcp__claude_ai_Linear__list_issues",
+      "mcp__github__issue_read",
+      "mcp__github__list_issues",
+      "mcp__github__issue_write",
+      "mcp__github__add_issue_comment",
+      "mcp__github__sub_issue_write",
       "mcp__claude_ai_Vercel__list_deployments",
       "mcp__claude_ai_Linear",
       "mcp__claude_ai_Vercel__get_deployment",
@@ -735,7 +750,7 @@ test("settings.json lets Linear through without a click, except what cannot be u
       "Bash(node scripts/drift-check.mjs)",
       "Bash(npx tsc --noEmit)",
     ],
-    "allow is Linear plus the owner's read-only list (TEC-253, widened for the PC), nothing more"
+    "allow is Linear, the GitHub issue tools and the owner's read-only list (TEC-253, widened for the PC), nothing more"
   );
   // On the PC the gh token, ssh keys and git credentials sit on disk; the guard
   // stops a shell from printing them, and these stop the file-read tool.
@@ -747,9 +762,10 @@ test("settings.json lets Linear through without a click, except what cannot be u
     }
   }
   for (const rule of ask) assert.match(rule, /^mcp__(claude_ai_)?Linear__\w+$/, `${rule} names one Linear tool`);
-  // The guard still sees Linear issue writes, whatever the allow rule says.
+  // The guard still sees every Linear write and every GitHub issue write, whatever the allow rule says.
   assert.ok(hookFor("mcp__Linear__save_issue"));
   assert.ok(hookFor("mcp__claude_ai_Linear__save_issue"));
+  assert.ok(hookFor("mcp__github__issue_write"));
 });
 
 test("end to end: the real commands deny, ask and allow", () => {

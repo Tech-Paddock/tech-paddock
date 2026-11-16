@@ -62,7 +62,7 @@ export function decide(input) {
   if (server.includes("github")) return github(name, args, deploy);
   if (server.includes("supabase")) return supabase(name, args);
   if (server.includes("vercel")) return vercel(name, args);
-  if (server.includes("linear")) return linear(name, args, deploy);
+  if (server.includes("linear")) return linear(name);
   return null;
 }
 
@@ -132,7 +132,9 @@ const readJson = (path) => {
   }
 };
 const normCommand = (s) => String(s ?? "").trim().replace(/\s+/g, " ").toLowerCase();
-export const issuesIn = (s) => [...new Set(String(s ?? "").toUpperCase().match(/\bTEC-\d+\b/g) ?? [])];
+/* An issue is named `#n` (GitHub, Tech-Paddock/techissues) or, for one imported
+   from Linear, by the `TEC-n` its title still carries. */
+export const issuesIn = (s) => [...new Set(String(s ?? "").toUpperCase().match(/\bTEC-\d+\b|(?<![\w/&#])#\d+\b/g) ?? [])];
 
 export function planGate(input, now = Date.now()) {
   const prompt = String(input?.prompt ?? "");
@@ -876,6 +878,7 @@ const PR_WRITES = new Set([
 export const isPrWrite = (name) => PR_WRITES.has(name) || (/pull_request/.test(name) && !PR_READS.has(name));
 
 function github(name, a, deploy = false) {
+  if (ISSUE_TOOLS.has(name)) return issues(name, a);
   if (isPrWrite(name) && !deploy) return deny(`\`${name}\` writes to a pull request. ${MAIN_ONLY}`);
   if (API_COMMITS.has(name)) {
     const branch = String(a.branch ?? "");
@@ -941,20 +944,30 @@ function vercel(name, a) {
 }
 
 /* ------------------------------------------------------------------------- */
-/* Linear                                                                    */
+/* Issues: GitHub, in the private repo Tech-Paddock/techissues               */
 /* ------------------------------------------------------------------------- */
 
+/* Issues moved off Linear on 2026-11-16 (its free plan was full) to GitHub
+   Issues in a private repo. `tech-paddock` is public, so an issue there would
+   publish whatever it says: issue writes go to `techissues` and nowhere else.
+   Linear stays as a read-only archive. */
+export const ISSUES_OWNER = "tech-paddock";
+export const ISSUES_REPO = "techissues";
+/* Comments are left out: a pull request's conversation is commented through the
+   same issue-comment tools, in tech-paddock. */
+const ISSUE_TOOLS = new Set(["issue_write", "create_issue", "update_issue", "sub_issue_write"]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /* Exactly one type label, passed by name: what the issue is (TEC-238).
    `Owner task` is the owner's own work: short, assigned to the owner, and
    linked to the issue it is for. The rest are the agents'. At most one `app:`
-   label (TEC-115). The `owner:` labels retired with TEC-238: an owner task
-   says who acts, so a label saying it again only went stale. */
+   label (TEC-115) and at most one `status:` label. The `owner:` labels retired
+   with TEC-238: an owner task says who acts, so a label saying it again only
+   went stale. */
 export const TYPES = ["Feature", "Enhancement", "Bug", "Owner task"];
 const OWNER_TASK = "owner task";
 const isType = (l) => TYPES.some((t) => t.toLowerCase() === l.trim().toLowerCase());
 const isTask = (l) => l.trim().toLowerCase() === OWNER_TASK;
-const OPTIONAL_KINDS = ["app:"];
+const OPTIONAL_KINDS = ["app:", "status:"];
 const RETIRED = /^owner:/i;
 /* Who can act on a step: the roster by name, and the words for everyone or
    no one. Names are case-sensitive so a path does not count as an actor. */
@@ -968,28 +981,29 @@ const DONE = /^(~~|\*\*Done\b|Done\b)/;
 export const TASK_WORDS = 150;
 export const ISSUE_WORDS = 300;
 const RULE =
-  "Every issue carries one type label (Feature, Enhancement, Bug or Owner task) and at most one `app:` label, passed by name. An owner task opens with `For TEC-n — what it is`, has a `## Steps` section and a `Done when:` line, in 150 words or fewer. Any other issue shows at most 300 words outside its collapsed `+++ Agent notes` section and ends with a `## Next steps` section of numbered steps, each naming who acts, such as `1. **TD:** …` (CLAUDE.md).";
+  "Every issue carries one type label (Feature, Enhancement, Bug or Owner task), at most one `app:` and at most one `status:` label. An owner task opens with `For #n — what it is`, has a `## Steps` section and a `Done when:` line, in 150 words or fewer, and is the only issue with an assignee. Any other issue shows at most 300 words outside its collapsed `<details><summary>Agent notes</summary>` section and ends with a `## Next steps` section of numbered steps, each naming who acts, such as `1. **TD:** …` (CLAUDE.md).";
 
 const listOf = (v) => (Array.isArray(v) ? v.map(String) : typeof v === "string" ? [v] : []);
 const wordCount = (s) => (String(s).match(/\S+/g) ?? []).length;
 
-/** A body less its collapsed sections: `+++ Title` to a bare `+++`, which Linear stores as `>>>`. */
+/** A body less its collapsed sections: `<details>` … `</details>`, or the `+++ Title` … `+++` that Linear used (stored as `>>>`). */
 export function visible(body) {
   return String(body ?? "")
     .replace(/\r\n/g, "\n")
+    .replace(/<details\b[\s\S]*?<\/details>/gi, "")
     .replace(/^(\+\+\+|>>>)[^\n]*\n[\s\S]*?^(\+\+\+|>>>)[ \t]*$/gm, "");
 }
 
 const firstLine = (body) => String(body ?? "").replace(/\r\n/g, "\n").split("\n").find((l) => l.trim()) ?? "";
-const OPENS_FOR = /^\W*For\W+\[?TEC-\d+/i;
-/** Read as an owner task when the labels are not in the call: it opens with `For TEC-n` and has no Next steps. */
+const OPENS_FOR = /^\W*For\W+\[?(TEC-\d+|#\d+)/i;
+/** Read as an owner task when the labels are not in the call: it opens with `For #n` and has no Next steps. */
 const readsAsTask = (body) => OPENS_FOR.test(firstLine(body)) && !/^ {0,3}#{1,6}\s+\**next steps/im.test(String(body));
 
 /** What is wrong with an owner task's body: an empty list when nothing. */
 export function ownerTask(body) {
   const b = String(body ?? "").replace(/\r\n/g, "\n");
   const problems = [];
-  if (!OPENS_FOR.test(firstLine(b))) problems.push("an owner task opens with `For TEC-n — what it is`, the issue it is for");
+  if (!OPENS_FOR.test(firstLine(b))) problems.push("an owner task opens with `For #n — what it is`, the issue it is for");
   if (!/^ {0,3}#{1,6}\s+\**Steps\b/im.test(b) || !/^ {0,2}\d+[.)]\s+\S/m.test(b)) {
     problems.push("an owner task has a `## Steps` section of numbered steps");
   }
@@ -1002,71 +1016,56 @@ export function ownerTask(body) {
 /** What is wrong with any other issue's body: its length, then its Next steps. */
 export function issueBody(body) {
   const n = wordCount(visible(body));
-  const problems = n > ISSUE_WORDS ? [`${n} words show outside the collapsed Agent notes, over ${ISSUE_WORDS}: move the detail into \`+++ Agent notes\``] : [];
+  const problems = n > ISSUE_WORDS ? [`${n} words show outside the collapsed Agent notes, over ${ISSUE_WORDS}: move the detail into \`<details><summary>Agent notes</summary>\``] : [];
   return [...problems, ...nextSteps(body)];
 }
 
-/* Linear's diff tools act on the GitHub pull request behind a diff: merging one
-   merges the pull request. They are Deployment's like every other pull request
-   write, and settings.json still asks the owner for them on top. */
-const LINEAR_PR_WRITES = new Set(["merge_diff", "update_diff", "submit_diff_review", "save_diff_comment", "resolve_diff_thread"]);
-
-function linear(name, a, deploy = false) {
-  if (LINEAR_PR_WRITES.has(name)) return deploy ? null : deny(`\`${name}\` acts on the GitHub pull request behind a Linear diff. ${MAIN_ONLY}`);
-  if (!["save_issue", "create_issue", "update_issue"].includes(name)) return null;
-  const creating = name === "create_issue" || (name === "save_issue" && !a.id);
+/** An issue tool: only in techissues, and an issue write must keep the issue rules. */
+function issues(name, a) {
+  const where = `${String(a.owner ?? "").toLowerCase()}/${String(a.repo ?? "").toLowerCase()}`;
+  if (where !== `${ISSUES_OWNER}/${ISSUES_REPO}`) {
+    return deny(`Issues live in the private repo Tech-Paddock/${ISSUES_REPO}, not \`${a.owner ?? "?"}/${a.repo ?? "?"}\`: tech-paddock is public, so an issue there publishes what it says. Pass \`owner: "Tech-Paddock", repo: "${ISSUES_REPO}"\`.`);
+  }
+  if (!["issue_write", "create_issue", "update_issue"].includes(name)) return null;
+  const creating = name === "create_issue" || (name === "issue_write" && a.method === "create");
   const problems = [];
 
-  const labelSet = (labels, where) => {
+  const labelSet = (labels, at) => {
+    if (labels.some((l) => UUID.test(l))) problems.push("a label is passed by ID, which this check cannot read");
+    if (labels.some((l) => RETIRED.test(l))) problems.push("`owner:` labels are retired (TEC-238): an owner task, assigned to the owner, says who acts");
     const types = labels.filter(isType);
-    if (types.length !== 1) problems.push(`${where} ${types.length ? `${types.length} type labels` : "no type label"}`);
+    if (types.length !== 1) problems.push(`${at} ${types.length ? `${types.length} type labels` : "no type label"}`);
     for (const k of OPTIONAL_KINDS) {
       const n = labels.filter((l) => l.toLowerCase().startsWith(k)).length;
-      if (n > 1) problems.push(`${where} ${n} \`${k}\` labels`);
+      if (n > 1) problems.push(`${at} ${n} \`${k}\` labels`);
     }
-  };
-  const noRetired = (labels) => {
-    if (labels.some((l) => RETIRED.test(l))) problems.push("`owner:` labels are retired (TEC-238): an owner task, assigned to the owner, says who acts");
-  };
-  const byName = (labels) => {
-    if (labels.some((l) => UUID.test(l))) problems.push("a label is passed by ID, which this check cannot read");
   };
   const checkBody = (body, task) => problems.push(...(task ? ownerTask(body) : issueBody(body)));
 
-  if (creating) {
-    const labels = [...listOf(a.labels), ...listOf(a.addLabels), ...listOf(a.labelIds)];
-    byName(labels);
-    noRetired(labels);
-    labelSet(labels, "it has");
-    if (typeof a.description !== "string" || !a.description.trim()) problems.push("it has no description");
-    else checkBody(a.description, labels.some(isTask));
-  } else {
-    let task = null; // not known from the call
-    if (a.labels !== undefined || a.labelIds !== undefined) {
-      const labels = [...listOf(a.labels), ...listOf(a.labelIds)];
-      byName(labels);
-      noRetired(labels);
-      labelSet(labels, "the new label set has");
-      task = labels.some(isTask);
-    }
-    const added = listOf(a.addLabels);
-    const removed = listOf(a.removeLabels);
-    byName([...added, ...removed]);
-    noRetired(added);
-    for (const k of OPTIONAL_KINDS) {
-      if (added.filter((l) => l.toLowerCase().startsWith(k)).length > 1) problems.push(`it adds more than one \`${k}\` label`);
-    }
-    const typesIn = added.filter(isType);
-    const typesOut = removed.filter(isType);
-    if (typesIn.length > 1) problems.push(`it adds ${typesIn.length} type labels`);
-    if (typesOut.length && !typesIn.length) problems.push(`it removes \`${typesOut[0]}\` without adding another type label`);
-    if (typesIn.length === 1) task = isTask(typesIn[0]);
-    if (typeof a.description === "string") checkBody(a.description, task ?? readsAsTask(a.description));
-    if (Array.isArray(a.patch) && !task) problems.push(...patchProblems(a.patch));
+  // On GitHub, `labels` replaces the whole set, so an update that passes it is read like a create.
+  let task = null; // not known from the call
+  if (creating || a.labels !== undefined) {
+    const labels = listOf(a.labels);
+    labelSet(labels, creating ? "it has" : "the new label set has");
+    task = labels.some(isTask);
   }
+  if (creating && (typeof a.body !== "string" || !a.body.trim())) problems.push("it has no body");
+  else if (typeof a.body === "string") checkBody(a.body, task ?? readsAsTask(a.body));
+  if (listOf(a.assignees).length && task === false) problems.push("only an owner task has an assignee: nothing else is assigned to the owner");
 
   if (!problems.length) return null;
-  return deny(`This Linear ${creating ? "issue" : "update"} breaks the issue rules: ${problems.join("; ")}. ${RULE}`);
+  return deny(`This issue ${creating ? "" : "update "}breaks the issue rules: ${problems.join("; ")}. ${RULE}`);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Linear: a read-only archive since the move to GitHub Issues               */
+/* ------------------------------------------------------------------------- */
+
+const LINEAR_READ = /^(get|list|search|extract)_/;
+
+function linear(name) {
+  if (LINEAR_READ.test(name)) return null;
+  return deny(`Linear is a read-only archive (2026-11-16). Issues live in GitHub, the private repo Tech-Paddock/${ISSUES_REPO}: file or change the issue there with \`issue_write\`. \`${name}\` would write to Linear.`);
 }
 
 /** What is wrong with a body's Next steps section: an empty list when nothing. */
@@ -1104,23 +1103,4 @@ export function nextSteps(body) {
     return [`step ${nameless.join(", ")} of Next steps does not name who acts (start it with the actor: Owner, TD, Builder or Deployment)`];
   }
   return [];
-}
-
-/* A patch changes text the hook cannot see, so only what the patch itself
-   shows is checked: that it does not take the heading out, and that it does
-   not append a section after it. */
-function patchProblems(ops) {
-  const problems = [];
-  const mentions = (s) => /next steps/i.test(String(s ?? ""));
-  const heading = (s) => /(^|\n) {0,3}#{1,2}\s+\S/.test(String(s ?? ""));
-  for (const op of ops) {
-    const removes =
-      (op?.op === "replace" && mentions(op.old_string) && !mentions(op.new_string)) ||
-      (op?.op === "replace_range" && mentions(op.from) && !mentions(op.new_string));
-    if (removes) problems.push("a patch removes the Next steps heading");
-    if (op?.op === "append" && heading(op.text) && !mentions(op.text)) {
-      problems.push("a patch appends a section after Next steps (insert it before `## Next steps` instead)");
-    }
-  }
-  return problems;
 }

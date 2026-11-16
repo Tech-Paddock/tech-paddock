@@ -1,6 +1,6 @@
 ---
 name: build
-description: Build what this chat has readied, or one issue. The owner types /build for every issue this chat has readied, or /build TEC-n for that one; the TD shows the plan, then briefs the builders. The TD never starts a builder any other way.
+description: Build what this chat has readied, or one issue. The owner types /build for every issue this chat has readied, or /build #n for that one; the TD shows the plan, then briefs the builders. The TD never starts a builder any other way.
 disable-model-invocation: true
 ---
 
@@ -12,7 +12,7 @@ for a bare `/build`) without a click. Nothing else starts a builder. **It stops 
 never start Deployment from here; the report ends with `/deploy`.
 
 1. **What to build.**
-   - **`/build TEC-n`:** that issue. No such issue, or one with no `app:` label: ask the owner
+   - **`/build #n`** (or an imported issue's `TEC-n`)**:** that issue. No such issue, or one with no `app:` label: ask the owner
      which issue and app, and stop.
    - **`/build` alone:** every issue this chat filed or readied that is Todo and waits only on a
      build, like `/status-check` with no argument covering everything. None: say so and stop.

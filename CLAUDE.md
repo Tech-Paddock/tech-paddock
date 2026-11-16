@@ -5,8 +5,8 @@ deployed on its own. Simplicity beats multi-team defaults. This file binds every
 
 ## Start of every session
 
-1. Check your open Linear issues (team TEC). Lead your first message with only what waits on the
-   owner; if nothing does, say so in a line.
+1. Check your open issues in [techissues](https://github.com/Tech-Paddock/techissues/issues). Lead
+   your first message with only what waits on the owner; if nothing does, say so in a line.
 2. Read your area's `RULES.md` (what must hold, and why) and `NOTES.md` (what is true now, and its
    traps; never a to-do). TD: `.claude/agents/td/`. Deployment: `.claude/agents/deployment/`.
    Builder: `apps/<app>/`.
@@ -16,7 +16,7 @@ deployed on its own. Simplicity beats multi-team defaults. This file binds every
 | Role | Does |
 |---|---|
 | **Owner** | Directs. Approves what has no undo. |
-| **Technical director (TD)** | Architects: Linear queue, design, app surface, Postgres design, cross-schema contracts, shared auth plumbing, `apps/showcase`. Briefs the builder and Deployment. Never merges. |
+| **Technical director (TD)** | Architects: issue queue, design, app surface, Postgres design, cross-schema contracts, shared auth plumbing, `apps/showcase`. Briefs the builder and Deployment. Never merges. |
 | **Builder** | Helpers started only on the owner's `/build` or a step of `/execute-plan`, each on its own branch; how the work splits is the TD's call. Builds, commits, pushes, reports, stops. |
 | **Deployment** | One helper, started by the TD when the owner runs `/deploy` or a step of `/execute-plan`. Checks for unfinished work; if clean, merges each ready branch through the `merge` skill and confirms it is live. |
 
@@ -24,14 +24,14 @@ Only Deployment writes to a pull request. The TD does not build app features, ex
 `apps/showcase` and touch-ups (a wrong doc, a missing config line).
 
 **Owner commands:** `/kickoff [brief]` starts a TD session; `/build` builds every issue this chat
-has readied, `/build TEC-n` that one, to a plan the TD shows first, and stops before deploy;
+has readied, `/build #n` that one, to a plan the TD shows first, and stops before deploy;
 `/status-check [app | session]` reports branches, unfinished work, blockers and hot topics;
 `/deploy` deploys what is ready, or hands it to the deploy already running;
 `/summarize-plan [app]` lists the builds and deploys ahead and the command that runs them; `/execute-plan …` runs exactly that plan, step by step; `/closeout` says whether a chat
 is safe to archive; `/retro` looks back and records one lesson; `/skill-check` lists every skill.
 
 **Propose before branching:** the job, what comes first, what it contradicts. No branch until the
-owner says go. "Backlog" means a Linear issue in Backlog, not a build.
+owner says go. "Backlog" means an issue labelled `status:backlog`, not a build.
 
 **One theme.** Build with existing tokens. A new pattern is copied locally and named in the pull
 request. Site or app shell is the TD's call; each app's `RULES.md` states its surface and its
@@ -44,7 +44,7 @@ If one of these looks necessary, the change or the rule is wrong; raise it befor
 - Push to `main`.
 - Commit personal information or secrets: names, employers, schools, addresses, contact details,
   resume content (in a `.docx`, also `.rels` hyperlinks and `docProps/` authors), or anything read
-  from Linear user records.
+  from a user record (GitHub, or the Linear archive).
 - Pass a check by weakening it: no skipped test, loosened assertion, repaired migration history or
   empty commit. Fix the code or the check, and say which.
 - Apply a schema change without its migration file in the same pull request.
@@ -92,27 +92,33 @@ go, go fully and do not reopen it.
 - **One session per working directory.** The builder uses its own worktree.
 - **Check a red status against `main` first.** A red check on `main` too is not the branch's.
 
-## Linear, team TEC
+## Issues: GitHub, `Tech-Paddock/techissues`
+
+Issues live in the private repo [techissues](https://github.com/Tech-Paddock/techissues/issues),
+never in public `tech-paddock`. Linear is a read-only archive (2026-11-16); an issue imported from
+it keeps `TEC-n` at the start of its title and answers to it.
 
 - **One issue per request,** with one type label (Feature, Enhancement, Bug or Owner task) plus
   `app:<app>` where one applies. It opens with what, why and done when, and shows at most 300 words;
-  detail for agents goes in a collapsed `+++ Agent notes` section. The body ends with numbered
-  **Next steps**, each naming who acts: Owner, TD, Builder or Deployment. The guard refuses an
-  issue without them.
+  detail for agents goes in a collapsed `<details><summary>Agent notes</summary>` section. The body
+  ends with numbered **Next steps**, each naming who acts: Owner, TD, Builder or Deployment. The
+  guard refuses an issue without them.
 - **The owner's work is an owner task** (the `owner-task` skill): its own issue, assigned to the
-  owner, opening `For TEC-n`, with Steps and Done when in 150 words. It blocks its issue when work
+  owner, opening `For #n`, with Steps and Done when in 150 words. It blocks its issue when work
   waits on it, and is only related when it is a check after live. Nothing else is assigned to the
   owner. A failed check is the owner's comment; the TD files a Bug sub-issue.
-- **Epics are Linear Projects; sub-issues are slices,** one per builder or deployable part.
-- **Status:** Backlog (blocked, or parked with the `Parked` label) · Todo (ready) · In Progress
-  (work committed) · In Review (pushed, awaiting merge) · Done (every Next step done; reopen a
-  merge-closed issue if steps remain).
+- **Epics are parent issues; sub-issues are slices,** one per builder or deployable part. Blocking
+  is a `Blocked by #n` line in the body.
+- **Status is a label:** `status:backlog` (blocked, or parked with `Parked`) · `status:todo` (ready)
+  · `status:in-progress` (work committed) · `status:in-review` (pushed, awaiting merge). Done is
+  closed as completed (every Next step done; reopen one closed too early); dropped is closed as not
+  planned. A pull request in `tech-paddock` closes its issue with `Fixes Tech-Paddock/techissues#n`.
 - **Live closes an issue.** A check after live is a related owner task, filed only when the owner
   asks for one or the change cannot be tested signed out; it never holds the issue open.
 - **Open every message to the owner with a `---` line.**
-- **Anything the owner should open outside the chat is a clickable link:** an app, a Linear issue,
-  a pull request, a dashboard page. Never a bare name, subdomain or path. Linear issues carry the
-  same links (an app's issue links its live URL).
+- **Anything the owner should open outside the chat is a clickable link:** an app, an issue,
+  a pull request, a dashboard page. Never a bare name, subdomain or path. Issues carry the same
+  links (an app's issue links its live URL).
 
 ## Shared foundation
 
@@ -169,7 +175,7 @@ are the owner's.
    edits from any helper but a builder; holds starting Deployment or a builder, the TD's own
    app-code edits, Vercel writes, and Supabase writes other than `apply_migration`, for the owner (the
    owner's typed `/build`, `/deploy` or `/execute-plan` is that approval: its starts need no click);
-   refuses a Linear issue without labels or Next steps.
+   refuses an issue outside `techissues` or without labels or Next steps, and any Linear write.
    `guard.test.mjs` proves each in CI.
 3. **CI `gate`:** every app typechecks, tests and builds, and `drift` passes
    (`node scripts/drift-check.mjs`): stamped copies, gate file per Next major, empty showcase, CI

@@ -1,6 +1,6 @@
 # Cookbook — rules
 
-Adds to `CLAUDE.md`. State and traps: `NOTES.md`. Open work: Linear, `app:cookbook`; cross-app
+Adds to `CLAUDE.md`. State and traps: `NOTES.md`. Open work: [techissues](https://github.com/Tech-Paddock/techissues/issues), `app:cookbook`; cross-app
 work is sequenced by the technical director.
 
 ## Settled

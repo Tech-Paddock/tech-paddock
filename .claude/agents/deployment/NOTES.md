@@ -21,6 +21,6 @@
 - **Smoke runs on each production deployment** (`.github/workflows/smoke.yml`). Read its run for the
   merge commit with `actions_list` before calling a deploy live; `gh run view --log` is refused
   through the proxy, so read the jobs list instead.
-- **Unassign a Linear issue with JSON `null`.** The strings `"null"`, `""` and `"none"` are refused.
+- **Unassign an issue with `assignees: []`.** Linear is a read-only archive; the guard refuses its writes.
 - **Your worktree refuses a `gh` command it cannot read,** such as one with a long `--jq` filter.
   Run it plainly, or use the GitHub MCP reads.

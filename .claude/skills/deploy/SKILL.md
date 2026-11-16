@@ -22,7 +22,7 @@ changes.
 
 Full history first: if `git rev-parse --is-shallow-repository` says `true` (a cloud clone), run `git fetch --unshallow` (it adds history
 and changes nothing else). Then `git fetch`, and every remote branch not on `main`
-(`git branch -r --no-merged origin/main`), whichever session cut it. For each: its Linear issue (from its commits), the session that cut it
+(`git branch -r --no-merged origin/main`), whichever session cut it. For each: its issue (from its commits), the session that cut it
 (the `Claude-Session` trailer, read with `get_session`), and `gate` on its head.
 
 Every ready branch deploys, whichever session cut it (TEC-237, superseding TEC-173). Name the
@@ -56,7 +56,7 @@ If you cannot tell whether a branch is finished, it is not ready; say what you w
 
 **No lock:** start Deployment (`subagent_type: deployment`) now, with the ready branches as its
 brief: for each, its name, the request line (`Requested on YYYY-MM-DD — "…"`, the owner's words),
-the Linear issue, the blast radius, the Deployment section and the merge order (migrations first,
+the issue, the blast radius, the Deployment section and the merge order (migrations first,
 slices of one issue together). Add the other three lists so its report carries them. Nothing ready:
 still start it, so the check runs.
 

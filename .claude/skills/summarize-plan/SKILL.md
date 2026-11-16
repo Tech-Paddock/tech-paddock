@@ -5,15 +5,15 @@ description: Summarize the work ahead — every build and deploy in order, what 
 
 # Summarize plan
 
-Read-only, but for one file: no branch, commit, push, pull request, or Linear, Vercel or Supabase
+Read-only, but for one file: no branch, commit, push, pull request, or issue, Vercel or Supabase
 write. The plan starts from this chat's tickets; an app folder under `apps/` as the argument
 narrows it to that app. The owner typing the command it ends with is the plan's only gate (TEC-237).
 
 ## Gather
 
-1. **This chat's tickets:** every open TEC issue filed or readied in this chat, with its "Order"
+1. **This chat's tickets:** every open issue filed or readied in this chat, with its "Order"
    section and any migration it adds.
-2. **Related open tickets:** open TEC issues tied to those: a blocks, blocked-by or related link,
+2. **Related open tickets:** open issues tied to those: a blocks, blocked-by or related link,
    named in an "Order" section, or the same app and the same files. Propose each for the plan with
    one line of why; the plan and its command include them unless the owner says otherwise (then
    summarize again).
@@ -37,19 +37,19 @@ share files or `NOTES.md`. Each build is followed by its deploy before anything 
 ---
 Plan · <scope> · YYYY-MM-DD HH:MM
 
-1. Build TEC-n (app): what changes. Migration: name | none. Waits on: …
+1. Build #n (app): what changes. Migration: name | none. Waits on: …
    Blast radius: apps, shared files, schema.
-2. Deploy TEC-n: what goes live, what it waits on.
+2. Deploy #n: what goes live, what it waits on.
 …
 
 Proposed to include
-- TEC-n: why it belongs with this build
+- #n: why it belongs with this build
 
 Critical, not in this plan
-- TEC-n: what it blocks, and who clears it
+- #n: what it blocks, and who clears it
 
 Not in this plan
-- TEC-n: why (waits on the owner, parked)
+- #n: why (waits on the owner, parked)
 
 Run it:
 ```
@@ -62,7 +62,7 @@ command.
 line, so one tap copies it on a phone.
 
 **Record it** in `.claude/state/plan.json`, overwriting any earlier one:
-`{"command": "/execute-plan lando", "issues": ["TEC-176", "TEC-177"], "at": "<ISO time>"}`. This is
+`{"command": "/execute-plan lando", "issues": ["#12", "TEC-177"], "at": "<ISO time>"}`. This is
 how `/execute-plan` knows the owner typed the plan shown here. The prompt hook blocks any other
 command and answers with this one. `.claude/state/` is gitignored.
 

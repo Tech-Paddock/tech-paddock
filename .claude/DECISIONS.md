@@ -6,9 +6,13 @@ would get something wrong without it: the rule, one line of why. App rules live 
 
 ## Settled
 
+- **Issues live in GitHub, the private repo Tech-Paddock/techissues** (owner, 2026-11-16). Linear's
+  free plan filled and refused new issues. A self-hosted tracker (Pit Wall as its own app) was
+  designed and dropped for this: free, unlimited, agents already hold the tools. Not `tech-paddock`
+  itself: it is public, and an issue publishes what it says. Linear stays a read-only archive.
 - **Three roles: the TD architects, the builder builds, Deployment deploys** (2026-10-20, superseding
   TEC-115's "the TD merges"). Only Deployment writes to a pull request, and only on `/deploy`.
-- **Only the owner starts the builder,** with `/build TEC-n` (2026-10-26, TEC-145). The typed
+- **Only the owner starts the builder,** with `/build #n` (2026-10-26, TEC-145). The typed
   command is the one approval: the prompt hook records it and the guard starts its builders without
   a click (2026-11-08, TEC-237, superseding TEC-156's click on every start). `/build` stops before
   deploy. The TD writes the brief; a go on a proposal is not a start.
@@ -29,7 +33,7 @@ would get something wrong without it: the rule, one line of why. App rules live 
 - **The owner's work is an owner task, and owner tickets are short** (2026-11-08, TEC-238): a
   150-word issue assigned to the owner that blocks the one it is for. A ⭐ step inside a 2,000-word
   issue was hard to find and track; the `owner:` label repeated it and went stale. Issues show 300
-  words, the rest folded into Agent notes. The owner's Linear account is read at run time, never
+  words, the rest folded into Agent notes. The owner's GitHub login is read at run time, never
   committed.
 - **The TD's own docs changes share one branch per chat** (2026-10-26, TEC-154): seven doc branches
   cost seven merge-main-and-wait cycles under "branches up to date".
@@ -57,8 +61,8 @@ would get something wrong without it: the rule, one line of why. App rules live 
 - **The owner runs every `DROP` or `DELETE` in the SQL Editor** (2026-11-02, superseding
   2026-10-24's "agents apply migrations"). Through the connector they time out every time; only
   what has failed is on the list (`supabase/README.md`).
-- **The project allowlist is Linear plus a short read-only list** (owner, 2026-11-09, TEC-253,
-  superseding TEC-43's Linear-only list). `guard.test.mjs` pins the exact list, so any addition is
+- **The project allowlist is Linear's reads, the GitHub issue tools, and a short read-only list**
+  (owner, 2026-11-09, TEC-253, superseding TEC-43's Linear-only list; issue tools 2026-11-16). `guard.test.mjs` pins the exact list, so any addition is
   a deliberate change to that test. No interpreter, package runner or write ever goes on it.
 
 ## Mistakes

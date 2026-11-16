@@ -1,6 +1,6 @@
 # Resume — notes
 
-Current state and traps. Rules are in `RULES.md`; open work is in Linear under `app:resume`.
+Current state and traps. Rules are in `RULES.md`; open work is in [techissues](https://github.com/Tech-Paddock/techissues/issues) under `app:resume`.
 
 ## State
 

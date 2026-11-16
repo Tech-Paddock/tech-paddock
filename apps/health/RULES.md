@@ -1,6 +1,6 @@
 # Health — rules
 
-`NOTES.md` is the app's state and traps. The reasoning behind these rules is the Linear document
+`NOTES.md` is the app's state and traps. The reasoning behind these rules is the document in the Linear archive,
 "Health — plan" (team TEC, https://linear.app/tech-paddock/document/health-plan-c504dc02830d). Read
 it before designing or changing a feature. Where the two disagree, this file wins.
 
