@@ -29,7 +29,8 @@ What is true now, and the traps. Branch and pull request state is never written 
   branch but `claude/…` (tags only as `refs/tags/…`), `gh repo` / `secret` / `variable` / `release`
   writes, any `gh api` write (a field without `-X GET` is a POST), and printing the GitHub token
   (`gh auth token`, `gh/hosts.yml`). On the owner's PC `gh` and `git push` use a fine-grained token
-  for this repo only (contents and pull requests read-write; TEC-271, 2026-11-10), so the guard is
+  for this repo and `paddock-issues` only (contents and pull requests read-write here, issues
+  read-write there; TEC-271, renewed 2026-11-16), so the guard is
   the stop inside the repo and the token outside it. It expires after 90 days: a push failing with
   401 is that, and renewing it is an owner task. `gh api` still reports the owner's own repo role
   (`admin: true`), not the token's.
