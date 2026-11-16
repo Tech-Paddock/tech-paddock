@@ -1,7 +1,7 @@
 # Resume Formatter — rules
 
 Scope: `apps/resume` (`resume.techpaddock.io`) and the `resume` schema. State and traps are in
-`NOTES.md`; open work is in Linear under `app:resume`.
+`NOTES.md`; open work is in [paddock-issues](https://github.com/Tech-Paddock/paddock-issues/issues) under `app:resume`.
 
 ## Purpose
 

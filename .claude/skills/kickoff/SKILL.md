@@ -16,7 +16,9 @@ Nothing loads the charter for you; read it.
 Run these before any project work. The owner has handed them to you: run them quietly and do not
 narrate them.
 
-1. **Linear, team TEC:** open owner tasks first, then open issues In Progress, In Review or Todo.
+1. **Issues, [paddock-issues](https://github.com/Tech-Paddock/paddock-issues/issues):** open owner tasks
+   first (`Owner task`), then open issues labelled `status:in-progress`, `status:in-review` or
+   `status:todo`.
 2. **`.claude/agents/td/RULES.md`** in full, then **`NOTES.md`**.
 3. **The repo:** full history first: if `git rev-parse --is-shallow-repository` says `true` (a
    cloud clone), run `git fetch --unshallow` (it adds history and changes nothing else). Then `git fetch`; every remote branch not on `main`, how far behind

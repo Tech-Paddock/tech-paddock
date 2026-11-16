@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Status check
 
-Read-only: no branch, commit, push, pull request or Linear, Vercel or Supabase write.
+Read-only: no branch, commit, push, pull request, or issue, Vercel or Supabase write.
 
 ## Scope
 
@@ -28,23 +28,23 @@ Anything else: name the app folders and stop.
    `.claude/worktrees/agent-*`; running agents (`ListAgents`); sessions (`list_sessions`, mine)
    with work in flight or an unanswered question.
 3. **Waiting on you:** open owner tasks (type `Owner task`), each with the issue it blocks or is
-   for. **Blocking:** issues Backlog for being blocked by anything else.
-4. **Hot topics:** CI and `drift` on `main`; issues In Progress or In Review; anything updated in
+   for. **Blocking:** issues labelled `status:backlog` with a `Blocked by` line.
+4. **Hot topics:** CI and `drift` on `main`; issues labelled `status:in-progress` or `status:in-review`; anything updated in
    the last 24 hours; any production deployment not `READY`.
 5. **This chat:** what archiving it would lose. Blockers: a running subagent; uncommitted or
    unpushed work it made; a pull request it is subscribed to or a check-in it scheduled; a
    question to the owner it is waiting on; a decision or request reached here that is in no
-   commit, `NOTES.md` or Linear issue.
+   commit, `NOTES.md` or issue.
 
 **App scope adds:**
 
-6. **High priority:** open `app:<app>` issues at Urgent or High.
+6. **High priority:** open `app:<app>` issues labelled `priority:high`.
 7. **Pending migrations:** files under `supabase/migrations/` for the app's schema, on `main` or on
    its branches, whose version `list_migrations` does not show. Name each by its name.
 8. **Open Next steps:** every unfinished step across the app's open issues, grouped by who acts.
 
 **Session scope** reads this conversation, not the project: pull requests merged and branches
-pushed; Linear issues opened, moved or edited; Supabase or Vercel writes and SQL handed to the
+pushed; issues opened, moved or edited; Supabase or Vercel writes and SQL handed to the
 owner, and whether each landed; subagents started and whether they reported; owner steps it is
 waiting on. Then item 5.
 
@@ -59,10 +59,10 @@ and **Waiting**.
 Status · YYYY-MM-DD HH:MM
 
 Waiting on you
-- TEC-m: the task's title → blocks TEC-n  |  for TEC-n (after live)
+- #m: the task's title → blocks #n  |  for #n (after live)
 
 Blocking
-- TEC-n: what it waits on
+- #n: what it waits on
 
 Uncommitted / unpushed
 - who (app), where: what
@@ -71,7 +71,7 @@ Open branches
 - branch: n behind main, pull request or none
 
 Hot topics
-- main CI: … · drift: … · TEC-n in progress (title)
+- main CI: … · drift: … · #n in progress (title)
 
 ### Ready to Archive  |  ### Do Not Archive
 - what was checked  |  what is lost, and what clears it
@@ -84,13 +84,13 @@ Status · cookbook · YYYY-MM-DD HH:MM
 Blocking · Uncommitted / unpushed · Open branches · Hot topics  (as above, this app only)
 
 High priority
-- TEC-n (Urgent|High): title, status
+- #n: title, status
 
 Pending migrations
 - migration_name: on main | on branch, not applied
 
 Open Next steps
-- Owner: TEC-n step n — what
+- Owner: #n step n — what
 - TD: …  ·  Builder: …  ·  Deployment: …
 
 ### Ready to Archive  |  ### Do Not Archive
@@ -102,17 +102,17 @@ Open Next steps
 Status · session · YYYY-MM-DD HH:MM
 
 Done here
-- merged #n (TEC-n) · pushed branch · filed TEC-n · ran SQL: what, confirmed
+- merged PR #n (issue #m) · pushed branch · filed #m · ran SQL: what, confirmed
 
 Waiting
-- TEC-m owner task: title  ·  subagent: what, still running
+- #m owner task: title  ·  subagent: what, still running
 
 ### Ready to Archive  |  ### Do Not Archive
 - …
 ```
 
-A command the owner should type next (`/build TEC-n`, `/deploy`) goes after the report, in its own
+A command the owner should type next (`/build #n`, `/deploy`) goes after the report, in its own
 fenced code block holding only that line.
 
-A decision that lives only in this chat is fixed by writing it down (a Linear issue or
+A decision that lives only in this chat is fixed by writing it down (an issue or
 `NOTES.md`), not by keeping the chat. Issues, pull requests and apps are links.

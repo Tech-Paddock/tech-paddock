@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Skill check
 
-The owner's only. Read-only: no branch, commit or Linear write.
+The owner's only. Read-only: no branch, commit or issue write.
 
 1. Run `node .claude/skills/skill-check/list.mjs`. It reads every `.claude/skills/*/SKILL.md` now,
    so the list is never typed by hand.

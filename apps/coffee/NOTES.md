@@ -1,6 +1,6 @@
 # Coffee — notes
 
-What is true now and its traps. Rules are in `RULES.md`; open work is in Linear under `app:coffee`.
+What is true now and its traps. Rules are in `RULES.md`; open work is in [paddock-issues](https://github.com/Tech-Paddock/paddock-issues/issues) under `app:coffee`.
 
 ## Current state
 
