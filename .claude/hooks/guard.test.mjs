@@ -450,13 +450,13 @@ test("Vercel: reads go ahead; changes and credentials wait for the owner", () =>
   assert.equal(mcp("mcp__Vercel__filter_project_envs", { decrypt: "true" }), "ask");
 });
 
-const ISSUES = { owner: "Tech-Paddock", repo: "techissues" };
+const ISSUES = { owner: "Tech-Paddock", repo: "paddock-issues" };
 
-test("Issues live in the private techissues repo, never the public tech-paddock", () => {
+test("Issues live in the private paddock-issues repo, never the public tech-paddock", () => {
   const good = "What and why.\n\n## Next steps\n\n1. **TD:** build it.\n";
   const write = (where, extra = {}) => mcp("mcp__github__issue_write", { method: "create", title: "t", labels: ["Feature"], body: good, ...where, ...extra });
   assert.equal(write(ISSUES), "allow");
-  assert.equal(write({ owner: "tech-paddock", repo: "TechIssues" }), "allow"); // case does not matter
+  assert.equal(write({ owner: "tech-paddock", repo: "Paddock-Issues" }), "allow"); // case does not matter
   assert.equal(write({ owner: "Tech-Paddock", repo: "tech-paddock" }), "deny");
   assert.equal(write({}), "deny");
   assert.equal(mcp("mcp__github__sub_issue_write", { ...ISSUES, method: "add", issue_number: 1, sub_issue_id: 2 }), "allow");
@@ -524,7 +524,7 @@ test("Issues: an owner task is short, opens with the issue it is for, has Steps 
   const create = (extra) => write({ method: "create", title: "Test: grocery picklist", labels: ["Owner task", "app:cookbook", "status:todo"], assignees: ["the-owner"], body: task, ...extra });
   assert.equal(create({}), "allow"); // no Next steps: the task is the step
   assert.equal(create({ body: task.replace("For #240", "For TEC-240") }), "allow"); // an issue imported from Linear
-  assert.equal(create({ body: task.replace("For #240", "For [#240](https://github.com/Tech-Paddock/techissues/issues/240)") }), "allow");
+  assert.equal(create({ body: task.replace("For #240", "For [#240](https://github.com/Tech-Paddock/paddock-issues/issues/240)") }), "allow");
   assert.equal(create({ body: task.replace("For #240 — ", "") }), "deny");
   assert.equal(create({ body: task.replace("## Steps", "## How") }), "deny");
   assert.equal(create({ body: task.replace("Done when: the box passes. ", "") }), "deny");
@@ -628,7 +628,7 @@ test("/build and /deploy: the prompt hook records the owner's command, and nothi
   assert.deepEqual(promptGate({ prompt: "/build", session_id: "s1" }, at).record.issues, []);
   // GitHub issues are #n; one imported from Linear still answers to its TEC-n.
   assert.deepEqual(promptGate({ prompt: "/build #12 #13 TEC-276", session_id: "s1" }, at).record.issues, ["#12", "#13", "TEC-276"]);
-  assert.deepEqual(issuesIn("Issue #12 (TEC-276); see Tech-Paddock/techissues#9, a&#39;s, x#4."), ["#12", "TEC-276"]);
+  assert.deepEqual(issuesIn("Issue #12 (TEC-276); see Tech-Paddock/paddock-issues#9, a&#39;s, x#4."), ["#12", "TEC-276"]);
   assert.deepEqual(promptGate({ prompt: " /Deploy ", session_id: "s1" }, at), {
     file: "deploy-approved.json",
     record: { command: "/deploy", session_id: "s1", at: "2026-11-08T15:00:00.000Z" },

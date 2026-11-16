@@ -1002,7 +1002,7 @@
 - **A link to an issue outside the read reads "re: earlier issue".** The read is the last 30 days
   plus every void, so a vet visit that links to an issue older than that cannot name it. A correction
   of that old issue is read (it carries the old time and `voids`), but not the issue itself. Whether
-  to show the name is open in techissues, TEC-148.
+  to show the name is open in paddock-issues, TEC-148.
 - **Photos are never replaced or deleted** (RULES.md, Never 6): the event holds paths only, and an
   entry never changes, so no code path removes an object. Anything that would (a cleanup of
   unreferenced photos) must first check every event, voided ones included, since a voided entry

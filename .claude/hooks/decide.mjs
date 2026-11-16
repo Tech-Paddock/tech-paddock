@@ -132,7 +132,7 @@ const readJson = (path) => {
   }
 };
 const normCommand = (s) => String(s ?? "").trim().replace(/\s+/g, " ").toLowerCase();
-/* An issue is named `#n` (GitHub, Tech-Paddock/techissues) or, for one imported
+/* An issue is named `#n` (GitHub, Tech-Paddock/paddock-issues) or, for one imported
    from Linear, by the `TEC-n` its title still carries. */
 export const issuesIn = (s) => [...new Set(String(s ?? "").toUpperCase().match(/\bTEC-\d+\b|(?<![\w/&#])#\d+\b/g) ?? [])];
 
@@ -944,15 +944,15 @@ function vercel(name, a) {
 }
 
 /* ------------------------------------------------------------------------- */
-/* Issues: GitHub, in the private repo Tech-Paddock/techissues               */
+/* Issues: GitHub, in the private repo Tech-Paddock/paddock-issues               */
 /* ------------------------------------------------------------------------- */
 
 /* Issues moved off Linear on 2026-11-16 (its free plan was full) to GitHub
    Issues in a private repo. `tech-paddock` is public, so an issue there would
-   publish whatever it says: issue writes go to `techissues` and nowhere else.
+   publish whatever it says: issue writes go to `paddock-issues` and nowhere else.
    Linear stays as a read-only archive. */
 export const ISSUES_OWNER = "tech-paddock";
-export const ISSUES_REPO = "techissues";
+export const ISSUES_REPO = "paddock-issues";
 /* Comments are left out: a pull request's conversation is commented through the
    same issue-comment tools, in tech-paddock. */
 const ISSUE_TOOLS = new Set(["issue_write", "create_issue", "update_issue", "sub_issue_write"]);
@@ -1020,7 +1020,7 @@ export function issueBody(body) {
   return [...problems, ...nextSteps(body)];
 }
 
-/** An issue tool: only in techissues, and an issue write must keep the issue rules. */
+/** An issue tool: only in paddock-issues, and an issue write must keep the issue rules. */
 function issues(name, a) {
   const where = `${String(a.owner ?? "").toLowerCase()}/${String(a.repo ?? "").toLowerCase()}`;
   if (where !== `${ISSUES_OWNER}/${ISSUES_REPO}`) {

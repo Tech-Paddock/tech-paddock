@@ -5,7 +5,7 @@ deployed on its own. Simplicity beats multi-team defaults. This file binds every
 
 ## Start of every session
 
-1. Check your open issues in [techissues](https://github.com/Tech-Paddock/techissues/issues). Lead
+1. Check your open issues in [paddock-issues](https://github.com/Tech-Paddock/paddock-issues/issues). Lead
    your first message with only what waits on the owner; if nothing does, say so in a line.
 2. Read your area's `RULES.md` (what must hold, and why) and `NOTES.md` (what is true now, and its
    traps; never a to-do). TD: `.claude/agents/td/`. Deployment: `.claude/agents/deployment/`.
@@ -92,9 +92,9 @@ go, go fully and do not reopen it.
 - **One session per working directory.** The builder uses its own worktree.
 - **Check a red status against `main` first.** A red check on `main` too is not the branch's.
 
-## Issues: GitHub, `Tech-Paddock/techissues`
+## Issues: GitHub, `Tech-Paddock/paddock-issues`
 
-Issues live in the private repo [techissues](https://github.com/Tech-Paddock/techissues/issues),
+Issues live in the private repo [paddock-issues](https://github.com/Tech-Paddock/paddock-issues/issues),
 never in public `tech-paddock`. Linear is a read-only archive (2026-11-16); an issue imported from
 it keeps `TEC-n` at the start of its title and answers to it.
 
@@ -112,7 +112,7 @@ it keeps `TEC-n` at the start of its title and answers to it.
 - **Status is a label:** `status:backlog` (blocked, or parked with `Parked`) · `status:todo` (ready)
   · `status:in-progress` (work committed) · `status:in-review` (pushed, awaiting merge). Done is
   closed as completed (every Next step done; reopen one closed too early); dropped is closed as not
-  planned. A pull request in `tech-paddock` closes its issue with `Fixes Tech-Paddock/techissues#n`.
+  planned. A pull request in `tech-paddock` closes its issue with `Fixes Tech-Paddock/paddock-issues#n`.
 - **Live closes an issue.** A check after live is a related owner task, filed only when the owner
   asks for one or the change cannot be tested signed out; it never holds the issue open.
 - **Open every message to the owner with a `---` line.**
@@ -175,7 +175,7 @@ are the owner's.
    edits from any helper but a builder; holds starting Deployment or a builder, the TD's own
    app-code edits, Vercel writes, and Supabase writes other than `apply_migration`, for the owner (the
    owner's typed `/build`, `/deploy` or `/execute-plan` is that approval: its starts need no click);
-   refuses an issue outside `techissues` or without labels or Next steps, and any Linear write.
+   refuses an issue outside `paddock-issues` or without labels or Next steps, and any Linear write.
    `guard.test.mjs` proves each in CI.
 3. **CI `gate`:** every app typechecks, tests and builds, and `drift` passes
    (`node scripts/drift-check.mjs`): stamped copies, gate file per Next major, empty showcase, CI

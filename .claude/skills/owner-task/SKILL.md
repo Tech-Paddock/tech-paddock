@@ -1,6 +1,6 @@
 ---
 name: owner-task
-description: File work for the owner as its own short issue in Tech-Paddock/techissues, assigned to the owner, that blocks the issue it is for (or, for a check after live, is related to it). Use whenever something waits on the owner — an approval, a decision, a manual step, a test — instead of a step inside a long issue.
+description: File work for the owner as its own short issue in Tech-Paddock/paddock-issues, assigned to the owner, that blocks the issue it is for (or, for a check after live, is related to it). Use whenever something waits on the owner — an approval, a decision, a manual step, a test — instead of a step inside a long issue.
 ---
 
 # Owner task
@@ -26,7 +26,7 @@ Before filing, look for an open owner task for the same issue and thing; update 
   `Approve: Vercel firewall rule for tp-lando`.
 - **Labels:** `Owner task`, `status:todo`, plus the issue's `app:` label.
 - **Assignee:** the owner. Read the owner's GitHub login at run time with
-  `list_repository_collaborators` on `techissues` (the admin, not the agent account `get_me` returns).
+  `list_repository_collaborators` on `paddock-issues` (the admin, not the agent account `get_me` returns).
   Never write the owner's name or login into the repo.
 - **Body**, 150 words or fewer, nothing a builder knows that the owner does not
   need:

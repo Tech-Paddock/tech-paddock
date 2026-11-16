@@ -686,7 +686,7 @@ for (const app of PUBLIC_APPS) {
 
 /* 7 ── Structures that were retired, staying retired. */
 add("worklogs stay retired", existsSync(R(".claude/worklogs")) ? "fail" : "ok",
-  existsSync(R(".claude/worklogs")) ? ".claude/worklogs/ is back — state lives in each area's NOTES.md, open items in GitHub Issues (Tech-Paddock/techissues)" : "absent");
+  existsSync(R(".claude/worklogs")) ? ".claude/worklogs/ is back — state lives in each area's NOTES.md, open items in GitHub Issues (Tech-Paddock/paddock-issues)" : "absent");
 add("KICKOFF.md stays retired", existsSync(R(".claude/agents/KICKOFF.md")) ? "fail" : "ok",
   existsSync(R(".claude/agents/KICKOFF.md")) ? ".claude/agents/KICKOFF.md is back — the TD starts from the kickoff skill, the builder from its preset (TEC-108)" : "absent; kickoff and closeout are skills");
 /* One builder replaced the per-app agents (TEC-115). A HANDOFF.md coming back
@@ -703,7 +703,7 @@ add("KICKOFF.md stays retired", existsSync(R(".claude/agents/KICKOFF.md")) ? "fa
     handoffs.length ? `${handoffs.join(", ")} is back — state lives in each area's NOTES.md (TEC-115)` : "absent; NOTES.md per area");
 }
 add("ledger stays retired", existsSync(R(".claude/OPEN-ITEMS.md")) ? "fail" : "ok",
-  existsSync(R(".claude/OPEN-ITEMS.md")) ? ".claude/OPEN-ITEMS.md is back — open items live in GitHub Issues (Tech-Paddock/techissues)" : "absent; open items are in GitHub Issues");
+  existsSync(R(".claude/OPEN-ITEMS.md")) ? ".claude/OPEN-ITEMS.md is back — open items live in GitHub Issues (Tech-Paddock/paddock-issues)" : "absent; open items are in GitHub Issues");
 
 /* 8 ── Prose that should be computed. Not a failure — a count in a document is
    not wrong the day it is written. It is wrong later, which is why it is a

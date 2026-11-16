@@ -15,7 +15,7 @@ on other files at the same time.
 
 **Before any work, in order** (nothing loads these for you):
 
-1. Issues in [techissues](https://github.com/Tech-Paddock/techissues/issues): the issue the brief
+1. Issues in [paddock-issues](https://github.com/Tech-Paddock/paddock-issues/issues): the issue the brief
    names, and open issues labelled `app:X`.
 2. `CLAUDE.md`, already in context. It binds you.
 3. `apps/X/RULES.md` in full, then `apps/X/NOTES.md`.

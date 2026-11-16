@@ -16,7 +16,7 @@ Nothing loads the charter for you; read it.
 Run these before any project work. The owner has handed them to you: run them quietly and do not
 narrate them.
 
-1. **Issues, [techissues](https://github.com/Tech-Paddock/techissues/issues):** open owner tasks
+1. **Issues, [paddock-issues](https://github.com/Tech-Paddock/paddock-issues/issues):** open owner tasks
    first (`Owner task`), then open issues labelled `status:in-progress`, `status:in-review` or
    `status:todo`.
 2. **`.claude/agents/td/RULES.md`** in full, then **`NOTES.md`**.

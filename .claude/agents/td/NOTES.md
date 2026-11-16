@@ -5,7 +5,7 @@ What is true now, and the traps. Branch and pull request state is never written 
 ## State
 
 - **Shape:** one TD at a time + builders (started by the owner's `/build`) + Deployment (on `/deploy`) + CI. Each app's `RULES.md` and `NOTES.md` sit in its folder. Issues
-  live in GitHub, [techissues](https://github.com/Tech-Paddock/techissues/issues) (private); labels:
+  live in GitHub, [paddock-issues](https://github.com/Tech-Paddock/paddock-issues/issues) (private); labels:
   one type (Feature, Enhancement, Bug, Owner task), `app:<folder>`, one `status:`; the parking lot is
   the `Parked` label. Linear is a read-only archive since 2026-11-16; the guard refuses its writes. The `owner:` labels and `Phone check` retired (TEC-238).
 - **Every app is on Next 16 with `proxy.ts`,** one gate copy.
@@ -73,7 +73,7 @@ What is true now, and the traps. Branch and pull request state is never written 
 - **Runtime logs hold no request lines.** To see whether a feature ran, count rows with
   `execute_sql`: counts and sources only, never content.
 - **A pull request closes its issue only with the full reference:** `Fixes
-  Tech-Paddock/techissues#n` in the body. A bare `#n` points at tech-paddock's own numbering.
+  Tech-Paddock/paddock-issues#n` in the body. A bare `#n` points at tech-paddock's own numbering.
   Deployment and the TD still set `status:` labels by hand.
 - **Imported issues keep their Linear text.** Their Agent notes are `+++` blocks that GitHub shows
   open; the guard still counts them as folded. Their links to `linear.app` point at the archive.

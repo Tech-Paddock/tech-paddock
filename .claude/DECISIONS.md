@@ -6,7 +6,7 @@ would get something wrong without it: the rule, one line of why. App rules live 
 
 ## Settled
 
-- **Issues live in GitHub, the private repo Tech-Paddock/techissues** (owner, 2026-11-16). Linear's
+- **Issues live in GitHub, the private repo Tech-Paddock/paddock-issues** (owner, 2026-11-16). Linear's
   free plan filled and refused new issues. A self-hosted tracker (Pit Wall as its own app) was
   designed and dropped for this: free, unlimited, agents already hold the tools. Not `tech-paddock`
   itself: it is public, and an issue publishes what it says. Linear stays a read-only archive.

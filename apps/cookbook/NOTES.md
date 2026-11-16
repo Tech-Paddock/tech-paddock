@@ -1,6 +1,6 @@
 # Cookbook — notes
 
-What is true now, and its traps. Rules are in `RULES.md`; open work is in [techissues](https://github.com/Tech-Paddock/techissues/issues), `app:cookbook`.
+What is true now, and its traps. Rules are in `RULES.md`; open work is in [paddock-issues](https://github.com/Tech-Paddock/paddock-issues/issues), `app:cookbook`.
 
 ## Shape
 
