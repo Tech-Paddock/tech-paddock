@@ -9,8 +9,8 @@
 - It is neither site nor app, and there is one. A tool that seems to need a hub is a site whose
   index does too much.
 - The Garage is a tab beside the Pit Wall; `/admin` redirects to it.
-- It holds no database credential: no Supabase dependency, no schema read. Its keys are
-  `LINEAR_API_KEY` (the Pit Wall) and `GITHUB_TOKEN` (deployment state).
+- It holds no database credential: no Supabase dependency, no schema read. Its one key is
+  `GITHUB_TOKEN` (open issues in paddock-issues for the Pit Wall, and deployment state).
 - `VERCEL_TOKEN` and `INTERNAL_API_SECRET` are not read; The Garage warns while either is set.
 - It knows tools through `TOOLS` in `lib/platform.ts`, whose array order is the sidebar order;
   changing that order is the owner's call. Adding a tool also touches `PRESENTATION` in
@@ -49,8 +49,8 @@ What home's own code enforces. The shared auth plumbing and its rules are in `CL
 - **Headers:** the shared set (`packages/shared/next.config.mjs`) is CSP `frame-ancestors`,
   `nosniff` and `Referrer-Policy`.
 - **The Garage** reports whether a variable is set, never its value (`lib/diagnostics.ts`).
-- **The Pit Wall** never writes to Linear, and reads only an issue's assignee id, never a Linear
-  user record (`lib/linear.ts`).
+- **The Pit Wall** never writes to paddock-issues, and reads only whether an issue has an assignee, never a GitHub
+  user record (`lib/issues.ts`).
 
 ## The theme
 

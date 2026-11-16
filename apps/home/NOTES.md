@@ -6,8 +6,11 @@
   server `fetch` is `no-store` in a `force-dynamic` page.
 - Tabs: the Pit Wall at `/` (id `board`) and The Garage at `/?tab=garage`; `/admin` redirects
   there. Each loads in its own Suspense boundary; `?app=` renders a tool's frame and loads neither.
-- Pit Wall: open Linear issues, team TEC (`lib/linear.ts`). *By status* puts assigned, unparked
-  issues in a *Waiting on you* band, then In Progress, In Review, Todo, with the rest folded. *By
+- Pit Wall: open issues in `Tech-Paddock/paddock-issues` (`lib/issues.ts`, GitHub REST, `GITHUB_TOKEN`).
+  Status is the `status:` label; parked is `Parked`; app is `app:`; labels match without regard to
+  case. An imported title's `TEC-n:` is the card's id, else `#n`. Only `priority:high` shows a
+  priority. *By status* puts unparked `Owner task` issues with an assignee in a *Waiting on you* band,
+  then In Progress, In Review, Todo, with the rest folded. *By
   app* follows the roster, Platform last (`lib/pitgroups.ts`); `?group=app` keeps it.
 - The Garage: one stoplight row per item — green, amber (could not test), red, grey (parked). Each
   failure is a sentence plus its raw code (`lib/diagnostics.ts`). Rules drift is baked at build by
@@ -38,8 +41,12 @@
 - `scripts/gate-file.test.mjs` builds its base-copy fixture from home's `proxy.ts`.
 - `vercel.json`'s `ignoreCommand` always builds production, which keeps Rules drift current. Do not
   narrow it: a `.claude`-only change must rebuild home.
-- The Linear query asks for `assignee { id }` only; user records carry a real name and email. The
-  owner is the only assignee, so "assigned" is enough.
+- `lib/issues.ts` tests only whether `assignee` is present and never keeps it; a GitHub user
+  record carries a login and more. The owner is the only assignee, so "assigned" is enough.
+- `GITHUB_TOKEN` also needs *Issues: read* on paddock-issues, and that repository must be granted to
+  the token. Without it the Pit Wall shows a sentence (a 401/403 names the permission; a 404 means
+  the repository is not granted), never an empty board. The issues API lists pull requests too;
+  they are skipped. `LINEAR_API_KEY` is no longer read.
 - `nextStep` treats "done", "skipped", ✅ or a strikethrough as finished; any other format shows as
   open.
 - GitHub sees only git-triggered deploys, so a dashboard rollback is invisible to Deploy errors;

@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { loadPitWall } from "@/lib/linear";
+import { loadPitWall } from "@/lib/issues";
 import { groupingFrom, type Grouping } from "@/lib/pitgroups";
 import { APPS, selectedIndexFrom } from "../apps";
 import Garage from "../Garage";
@@ -12,7 +12,7 @@ import PitWall from "../PitWall";
  *
  * Data is fetched on the server so it arrives with the page, but **only what the
  * current view shows, and never before the view itself**: a framed tool needs
- * none of it, the Pit Wall needs Linear, The Garage its probes. Each load sits
+ * none of it, the Pit Wall needs GitHub, The Garage its probes. Each load sits
  * in its own Suspense boundary, so the tab strip is on screen at once and one
  * slow source holds up only its own panel.
  */
@@ -43,7 +43,7 @@ export default async function HomePage(props: { searchParams: Promise<Params> })
           <Garage />
         </Suspense>
       ) : (
-        <Suspense fallback={<Waiting on="Linear" />}>
+        <Suspense fallback={<Waiting on="GitHub" />}>
           <PitWallLoaded group={groupingFrom(one(searchParams, "group"))} />
         </Suspense>
       )}

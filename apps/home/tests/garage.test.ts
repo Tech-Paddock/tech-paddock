@@ -59,11 +59,11 @@ describe("environment errors", () => {
   it("tags a missing variable with what it breaks", () => {
     const errors = envErrors({ ...allSet, GITHUB_TOKEN: undefined });
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toMatchObject({ name: "GITHUB_TOKEN", affects: "The Garage" });
+    expect(errors[0]).toMatchObject({ name: "GITHUB_TOKEN", affects: "The Garage and Pit Wall" });
   });
 
-  it("tags a missing Linear key with the Pit Wall", () => {
-    expect(envErrors({ ...allSet, LINEAR_API_KEY: undefined })[0]).toMatchObject({ affects: "Pit Wall" });
+  it("no longer reads or lists the Linear key", () => {
+    expect(HOME_ENV.map((e) => e.name)).not.toContain("LINEAR_API_KEY");
   });
 
   it("reports a retired credential still set", () => {
