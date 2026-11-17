@@ -14,7 +14,7 @@ apps/<app>/  → one tool  → its subdomain
 
 The subdomain table in [CLAUDE.md](./CLAUDE.md) maps each one. The hub, `apps/home` at
 `techpaddock.io`, frames each tool and shows what is live. It holds no database credential; its
-only tokens are for Linear (the Pit Wall, until it reads GitHub Issues) and GitHub deployment state (The Garage).
+only tokens are GitHub's: open issues from `paddock-issues` (the Pit Wall) and deployment state (The Garage).
 
 There is no root `package.json`; work inside an app (`cd apps/<app> && npm install`). Each app's
 `.env.example` lists its variables and how to generate them.
