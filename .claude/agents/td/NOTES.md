@@ -22,6 +22,10 @@ What is true now, and the traps. Branch and pull request state is never written 
   read (`--body`, `--body-file`, or `--body-file -` with a heredoc; never `$( … )`), and the label
   and Next-steps checks. `gh issue delete` and `transfer` are the owner's. In the cloud the
   `mcp__github__` issue tools are allowed and checked the same way.
+- **Issues are off on the public `tech-paddock`** (owner, 2026-11-16). Pull request comments and
+  checks still work there; its two old closed issues are hidden, not deleted. Every issue lives in
+  `paddock-issues`, and the guard and the token both stop a write anywhere else. An `app:` label is
+  created there by hand when an app gets its first issue (`app:health` was missing until #58).
 - **Health prices recipe lines from Cookbook's `GET /api/servings`**, forwarding only
   `paddock_session`. A `SESSION_SECRET` mismatch between `tp-health` and `tp-cookbook` reads as
   "Couldn't reach the Cookbook", not a login bug.
