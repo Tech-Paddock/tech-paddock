@@ -246,7 +246,7 @@
     is in words for screen readers, placed right after the title: a span placed after a long note would widen the page.
   * **A future When** (`isFutureWhen`, or `isFutureDay` for a weight, which is a day): the form says "Future: saves as upcoming",
     shows a **Repeat** (every N weeks, months or years; only then), hides Box 3 (the attachments stay, TEC-203), and Save reads
-    "Save as upcoming". Save posts an upcoming item through `onUpcoming` (awaited: a refusal stays on the form) and writes no journal
+    "Save plan". Save posts an upcoming item through `onUpcoming` (awaited: a refusal stays on the form) and writes no journal
     entry. The item's kind comes from the form (`futureKind`): a Vet visit is `vet`, a Medication `medication`, everything else
     `other`; its title is the form's name (`futureTitle`: "Potty", "Training", "Medical issue", "Vet visit · Check-up",
     "Name · 5 mg"), which is how Done finds the form again. A saved entry cannot be moved to the future (the form says so, and
@@ -297,7 +297,7 @@
   **Trap:** Tailwind emits `.w-full` after `.w-[..]` and `.w-auto`, so a `w-full` inside the shared class beats every narrow width
   (it made Dose cover the Medication pick). `tests/fieldwidths.test.ts` holds it.
 - **Health** (TEC-137, reworked by TEC-139, **Medication added by TEC-199**): a sixth form, kind `health`, with a Type of **Vet
-  visit**, **Medical issue** or **Medication**. A vet visit and an issue have **one plain full-width `<select>`** of high-level picks
+  visit**, **Medical issue** or **Medication**. A vet visit and an issue have **one plain half-width `<select>`** (`inputHalf`, TEC-255) of high-level picks
   (styled like Other dogs'), a required **Note** ("What happened?"), up to `MAX_PHOTOS` (6) photos, and the usual When and Logging
   as. Vet visit: Check-up, Vaccines, Sick or injured, Procedure (spay/neuter, dental), Follow-up, Other (`VET_REASONS`). Medical
   issue: Stomach & appetite, Skin, ears & eyes, Limping or injury, Breathing or cough, Energy or behaviour, Other (`ISSUE_PICKS`,
@@ -419,7 +419,7 @@
   with the ink text unchanged. Contrast, checked against the mcl39 tokens: each edge at least 4.4:1
   on both the surface and the paper in light and dark; ink on a tint at least 11:1.
   **The food clock is the last meal** (`sinceLast`): a treat no longer resets it (before TEC-142 a
-  treat did). The pill's face is **"Meals: N · X cups"** (TEC-194, below; `CLOCK_LABELS` still says Meal for the others' titles); the Food form keeps
+  treat did). The pill's face is **"Meals: N"** (TEC-252; it carried " · X cups" from TEC-194; `CLOCK_LABELS` still says Meal for the others' titles); the Food form keeps
   their name because they log treats too.
 - **The pills open a quick log** (TEC-181, TEC-186; TEC-199 made them display-only, TEC-202 put them back): `Pill` in
   `Journal.tsx` is a `button` once `clocks` is set, else a `div`; the title ends "tap to log". Fun's own Pee and Poop buttons
@@ -446,7 +446,7 @@
   "Meals: N · X cups" for the phone's day (`localMidnight(now)` to the next midnight, so it rolls at midnight with
   `now`). N is live meals (1 each) plus snuffle mats (0.5 each, TEC-197), written in halves with a ½ glyph, never a decimal
   ("Meals: 2½", "Meals: ½", `formatMealCount`); voids out, treats never, any unit, Misc included. Only this N halves:
-  time since last meal, meal gaps, quick-log prefill and the remembered amount still treat a snuffle mat as a meal. X sums only meals whose snapshot unit
+  time since last meal, meal gaps and quick-log prefill still treat a snuffle mat as a meal. X sums only meals whose snapshot unit
   is `cup` (a snuffle mat's usually is) with an amount, rounded to the nearest 1/8 with a floor of 1/8, written as a mixed
   fraction ("⅞ cup", "1⅛ cups", "2 cups"; singular at 1 or less, judged on the rounded value). No cup amount
   today: "Meals: N" (and "Meals: 0"). Before the journal loads it reads "Meals". Only the label changed: tap-to-log
@@ -568,9 +568,9 @@
   still accepts any amount above 0). The What select and the amount sit in a grid with `items-start`, so What
   keeps a normal input height beside the scroller.
 - **Food amount, for meals and snuffle mats, is a Servings picklist in halves** (TEC-257; it was a ⅛ cup scroller, TEC-136):
-  a plain `<select id="f-amount">` labelled Servings, `input` at a fixed `w-[96px]`, offering ½, 1, 1½, 2, 2½, 3, 3½, 4
-  (`SERVING_OPTIONS` in `lib/foods.ts`), no "—". A new meal opens on this phone's last meal amount when it is on
-  the list, else 1 (`servingAmount`). An amount a correction opened on that is not a half (an old ⅜ cup) is slotted into
+  a plain `<select id="f-amount">` labelled Servings, `input` at a fixed `w-[64px]`, offering ½, 1, 1½, 2, 2½, 3, 3½, 4
+  (`SERVING_OPTIONS` in `lib/foods.ts`), no "—". A new meal opens on 1 and a snuffle mat on ½ (`defaultAmount` in
+  `lib/defaults.ts`; the last amount is no longer remembered, TEC-263). An amount a correction opened on that is not a half (an old ⅜ cup) is slotted into
   the list (`servingOptions`), so an untouched correction keeps it. **A new meal or snuffle mat stores `unit: "serving"`**
   (`foodSnapshot`, whatever the food's own unit; `SERVING_UNIT`), so the feed, Calendar and Analytics read "1 1/2 servings"
   through `unitLabel`; **old meals keep `cup` and read cups, never converted**. A treat keeps its own whole-number count
@@ -585,7 +585,7 @@
   **meal list** (`listOf("snuffle")` is `meal`, so `picklist`, `findFood`, `defaultFood` and "Add a food…" all use the meal
   list, and an added food is a meal food: `lando.foods.type` stays meal|treat) and takes the meal amount default. It counts
   as a meal everywhere meal-based (`isMealType` in `lib/foods.ts`: the Meal pill's N and cups, time since last meal,
-  meal-to-pee/poop gaps, the food-against-weight chart, the remembered meal item and amount); on the
+  meal-to-pee/poop gaps, the food-against-weight chart, the remembered meal item); on the
   per-day counts and timeline it is a meal mark. The feed row is titled "Snuffle mat". A new meal-based check uses
   `isMealType`, never `type === "meal"`. The TEC-193 item `snuffle-mat` is **retired** (kept, still resolves; entries
   logged with it are `type: meal` and still read and correct). Awkward by design: a snuffle mat's item is the kibble in it, so calories follow the item,
@@ -633,8 +633,8 @@
 - **Training's commands** (TEC-193, laid out by TEC-199): a native multi-select over `COMMANDS` (a phone shows a checklist) in a half-width
   box beside Other dogs, with "Picked: Sit, Down" under the row once something is picked. The picks are stored exactly as before,
   filtered to the list's order (`parseDetails`).
-- **Patch notes** (TEC-182 as "What's new", renamed TEC-199; plain text since TEC-186; `app/WhatsNew.tsx`): the third tab, after
-  Analytics. **No cards.** Per day, a line "Oct 27 | a short summary of the day" (bold), then that day's entries as "•" bullets.
+- **Patch notes** (TEC-182 as "What's new", renamed TEC-199; plain text since TEC-186; `app/WhatsNew.tsx`): the fifth tab, after
+  Analytics (Log, Calendar, Notes, Analytics, Patch notes). **No cards.** Per day, a line "Oct 27 | a short summary of the day" (bold), then that day's entries as "•" bullets.
   It shows the newest `DAYS_SHOWN` (7) **whole days** (`shownDays`), newest first, never a day cut short. Data
   is in `lib/releases.ts`: `RELEASES` (a date `YYYY-MM-DD`, the day it went live, and one plain sentence a
   non-technical reader follows, newest first) and `DAY_SUMMARIES` (one line per date, keyed by it; a test
@@ -642,7 +642,7 @@
   fetch, no model. Older entries stay in the file; it is append-only like the journal.
 - **Analytics** (`app/Analytics.tsx`, rebuilt by TEC-143; all aggregation is pure, in
   `lib/analytics.ts`, tested in `tests/timeline.test.ts`; no model call, no data change). The last 14
-  local days, six cards,
+  local days, seven cards (Medication by reason is the seventh, TEC-233),
   **except Day by day, which shows the last 5** (`TIMELINE_DAYS`, TEC-153, next to `ANALYTICS_DAYS`;
   `dayTimeline` builds its marks and counts from it, so the two always cover the same days; the
   owner's "for scatter plot only go back 5 days"). Time between pees, meal to poop, food against weight
@@ -819,9 +819,9 @@
   meal as the last meal. The inline treat row lists added treats but has no "Add a food…".
   There is no way in the app to retire or rename an added food yet; `retired` is set by SQL.
 - **Defaults per phone** (`lib/defaults.ts`, `localStorage`): `lando.person` (asked once on a
-  phone's first open, "Whose phone is this?"), `lando.defaults` (last meal item, last weight unit,
-  last meal amount). A meal opens on the last meal item and amount saved from this phone, or Misc
-  on its first. A treat always opens on Misc and an amount of 1 (TEC-129); the last treat is no
+  phone's first open, "Whose phone is this?"), `lando.defaults` (last meal item, last weight unit;
+  `mealAmount` is no longer written or read, TEC-263). A meal opens on the last meal item saved from this phone,
+  or Misc on its first, and on 1 serving. A treat always opens on Misc and an amount of 1 (TEC-129); the last treat is no
   longer written, and a `treat` key left on an older phone is ignored. Only new entries are
   remembered, never corrections; exercise to a 15-minute walk outside, no dogs picked, no treats; potty to pee outside,
   leashed; "when" to the moment Save is pressed unless it was changed (a weight: today at noon).
@@ -855,10 +855,9 @@
 - **Growth chart** (`app/GrowthChart.tsx`): live weights in the newest weight's unit, y axis from
   zero, tap for the nearest point, a table underneath; `since` limits it to a window. Shown in
   Analytics only.
-- **Person boxes fit a name** (TEC-129): "Logging as" in every form (it was labelled Human until TEC-199) and on Log take an inline
-  width from `nameBoxWidth` (`lib/names.ts`): the longest `display_name` in `ch`, at least 6
-  (the "Nobody" option) and at most 14, plus one `ch` and room for the padding and arrow. Past
-  14 characters the closed box truncates; the open list shows the name whole. The empty options
+- **Person boxes fit a name** (TEC-129): "Logging as" in every form (it was labelled Human until TEC-199) and on Log have fixed widths: on Log
+  `WHO_WIDTH` (`w-[140px]`, `app/LogForm.tsx`), in a form `inputFull` in its half-row (`nameBoxWidth` and
+  `lib/names.ts` are gone). A long name truncates in the closed box; the open list shows it whole. The empty options
   read "Nobody" (Human) and "Who?" (Logging as) so they fit.
 - **Chart colours** are `--lando-series-1..3` in `app/globals.css`, read from the theme's tone and
   ink tokens; series 2 is burnt orange in light and peach in dark, where the accent is papaya.

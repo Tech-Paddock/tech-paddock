@@ -67,8 +67,8 @@ section and closing comment before changing anything in this file.
   model.
 - A recipe must not take a name that already means something else in this app's data.
 - An open recipe is **tabs Ingredients · Steps · Macros**, the rating beside its one title, **Add
-  to list** by day, Edit and Remove; no helpings estimator, and no keywords shown anywhere (TEC-183; the
-  fields stay stored and editable). **Cookbook does not log what was eaten** (owner, 2026-10-26): Health does, from `GET /api/servings` under the
+  to list** by day, Edit and Remove; no helpings estimator, and no keyword shown but the meal
+  (TEC-183, TEC-205; the fields stay stored and editable). **Cookbook does not log what was eaten** (owner, 2026-10-26): Health does, from `GET /api/servings` under the
   contract below. Removing a recipe leaves anything Health logged untouched.
 - **The servings dial scales a view, never the recipe** (TEC-235). It scales the leading number of
   each ingredient line, shown as kitchen fractions; nothing is stored or sent, and a line with no
