@@ -531,6 +531,94 @@ function ghCommand(args) {
   return null;
 }
 
+/* `gh issue` from a shell: the same rules as the issue tools (below). The
+   owner's PC has no GitHub MCP server, so every issue write there is a `gh
+   issue` command, and without this the rules held only by convention. A write
+   names `-R Tech-Paddock/paddock-issues` (or an issue URL there): without it gh
+   writes to the checkout's own repo, the public tech-paddock. Deleting or
+   transferring an issue is the owner's. */
+const GH_ISSUE_READS = new Set(["list", "view", "status"]);
+const GH_ISSUE_OWNER = new Set(["delete", "transfer"]);
+const ISSUE_URL = /^(?:https?:\/\/)?(?:www\.)?github\.com\/([^/\s]+)\/([^/\s]+)\/issues\/\d+/i;
+
+/** A `gh issue` write's flags: each flag's values, in order, and its positional words. */
+function ghFlags(args, from) {
+  const flags = new Map();
+  const words = [];
+  const add = (k, v) => flags.set(k, [...(flags.get(k) ?? []), v]);
+  for (let i = from; i < args.length; i++) {
+    const w = args[i];
+    const eq = w.match(/^(--[\w-]+)=([\s\S]*)$/);
+    if (eq) add(eq[1], eq[2]);
+    else if (/^-(R|t|b|F|l|a|m|p|T|c|r)$|^--(repo|title|body|body-file|label|add-label|remove-label|assignee|add-assignee|remove-assignee|milestone|project|template|comment|reason|hostname)$/.test(w)) add(w, String(args[++i] ?? ""));
+    else if (w.startsWith("-")) add(w, "");
+    else words.push(w);
+  }
+  return { get: (...ks) => ks.flatMap((k) => flags.get(k) ?? []), has: (...ks) => ks.some((k) => flags.has(k)), words };
+}
+
+function ghIssue(args, dir, heredocs) {
+  const at = args.indexOf("issue");
+  const [group, sub] = ghWords(args);
+  if (group !== "issue" || at < 0 || GH_ISSUE_READS.has(sub)) return null;
+  if (GH_ISSUE_OWNER.has(sub)) return deny(`\`gh issue ${sub}\` cannot be undone, and a transfer can move an issue into the public repo. ${GH_OWNER}`);
+
+  const f = ghFlags(args, at + 2);
+  const before = ghFlags(args.slice(0, at), 1); // `gh -R o/r issue …`
+  const repos = [...before.get("-R", "--repo"), ...f.get("-R", "--repo")];
+  for (const w of f.words) {
+    const m = w.match(ISSUE_URL);
+    if (m) repos.push(`${m[1]}/${m[2]}`);
+  }
+  const where = (r) => r.replace(/^(?:https?:\/\/)?(?:www\.)?github\.com\//i, "").replace(/\.git$/, "").toLowerCase();
+  if (!repos.length || repos.some((r) => where(r) !== `${ISSUES_OWNER}/${ISSUES_REPO}`)) {
+    return deny(`\`gh issue ${sub}\` writes to ${repos.length ? `\`${repos.join("`, `")}\`` : "this checkout's repo, the public tech-paddock"}. Issues live in the private repo Tech-Paddock/${ISSUES_REPO}: add \`-R Tech-Paddock/${ISSUES_REPO}\`.`);
+  }
+  if (sub !== "create" && sub !== "edit") return null;
+
+  let body;
+  const files = f.get("-F", "--body-file");
+  const inline = f.get("-b", "--body");
+  if (files.length) {
+    const p = files.at(-1);
+    if (p === "-") body = heredocs.length ? heredocs.join("\n") : null;
+    else {
+      const path = under(dir, p);
+      try {
+        body = path ? readFileSync(path, "utf8") : null;
+      } catch {
+        body = null;
+      }
+    }
+    if (body === null) return deny(`The guard cannot read the body of this \`gh issue ${sub}\`, so it cannot check the issue rules. Write the body to a file and pass \`--body-file <path>\`.`);
+  } else if (inline.length) body = inline.at(-1);
+  if (body !== undefined && body.includes(SUB)) {
+    return deny(`The body of this \`gh issue ${sub}\` is built at run time, so the guard cannot check the issue rules. Write it to a file and pass \`--body-file <path>\`.`);
+  }
+  if (sub === "create" && (body === undefined || f.has("-e", "--editor", "-w", "--web", "-T", "--template", "--recover"))) {
+    return deny(`\`gh issue create\` needs its body in the command (\`--body\` or \`--body-file\`) so the guard can check the issue rules.`);
+  }
+
+  const split = (vs) => vs.flatMap((v) => v.split(",")).map((l) => l.trim()).filter(Boolean);
+  const a = { owner: ISSUES_OWNER, repo: ISSUES_REPO };
+  if (body !== undefined) a.body = body;
+  if (sub === "create") {
+    a.method = "create";
+    a.labels = split(f.get("-l", "--label"));
+    a.assignees = split(f.get("-a", "--assignee"));
+    return issues("issue_write", a);
+  }
+  // An edit adds labels to a set the guard cannot see: check what it adds.
+  a.method = "update";
+  const added = split(f.get("--add-label"));
+  const problems = [];
+  if (added.some((l) => RETIRED.test(l))) problems.push("`owner:` labels are retired (TEC-238): an owner task, assigned to the owner, says who acts");
+  if (added.filter(isType).length > 1) problems.push("it adds more than one type label");
+  for (const k of OPTIONAL_KINDS) if (added.filter((l) => l.toLowerCase().startsWith(k)).length > 1) problems.push(`it adds more than one \`${k}\` label`);
+  if (problems.length) return deny(`This issue update breaks the issue rules: ${problems.join("; ")}. ${RULE}`);
+  return issues("issue_write", a);
+}
+
 /** The plain-text file the owner's GitHub token is stored in on WSL. */
 const isTokenFile = (w) => /(^|\/)gh\/hosts\.ya?ml$/.test(w);
 const PRINTS_ONLY = new Set(["echo", "printf"]);
@@ -582,7 +670,7 @@ function bash(command, cwd, depth = 0, deploy = false) {
     // GitHub tools, from a shell. Reading (`gh pr view`, `list`, `diff`) is anyone's.
     if (!PRINTS_ONLY.has(cmd) && args.slice(1).some(isTokenFile)) return deny(TOKEN);
     if (cmd === "gh") {
-      const d = ghCommand(args);
+      const d = ghCommand(args) ?? ghIssue(args, dir, seg.heredocs);
       if (d) return d;
     }
     if (!deploy && cmd === "gh") {

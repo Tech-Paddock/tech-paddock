@@ -403,7 +403,7 @@ test("a pull request from a shell is Deployment's too", () => {
     assert.equal(sh(c, MAIN), "deny", c);
     assert.equal(sh(c, DEPLOY), "allow", c);
   }
-  for (const c of ["gh pr view 3", "gh pr list", "gh pr diff 3", "gh pr checks 3", "gh issue create -t x", "echo 'gh pr create'"]) {
+  for (const c of ["gh pr view 3", "gh pr list", "gh pr diff 3", "gh pr checks 3", "gh issue list", "echo 'gh pr create'"]) {
     assert.equal(sh(c), "allow", c);
   }
 });
@@ -701,26 +701,21 @@ test("settings.json sends each tool to the guard it needs, and no other", () => 
 });
 
 /* Issue edits need no click: an issue write is cheap to undo and the guard
-   checks its shape and its repo. The allow list is exactly Linear's reads (it is
-   an archive; the guard refuses its writes), the GitHub issue tools, and a few
-   read-only reads and checks the owner chose (TEC-253, superseding TEC-43's
-   Linear-only list); anything else added here fails this test. It never
-   outranks the ask list. TEC-43. */
+   checks its shape and its repo. The allow list is exactly the GitHub issue
+   tools, and a few read-only reads and checks the owner chose (TEC-253,
+   superseding TEC-43's Linear-only list; Linear's reads left with its connector
+   on 2026-11-16); anything else added here fails this test. TEC-43. */
 test("settings.json lets issue work through without a click, except what cannot be undone", () => {
   const { allow = [], ask = [], deny = [] } = settings.permissions ?? {};
   assert.deepEqual(
     allow,
     [
-      "mcp__Linear",
-      "mcp__claude_ai_Linear__get_issue",
-      "mcp__claude_ai_Linear__list_issues",
       "mcp__github__issue_read",
       "mcp__github__list_issues",
       "mcp__github__issue_write",
       "mcp__github__add_issue_comment",
       "mcp__github__sub_issue_write",
       "mcp__claude_ai_Vercel__list_deployments",
-      "mcp__claude_ai_Linear",
       "mcp__claude_ai_Vercel__get_deployment",
       "mcp__claude_ai_Vercel__list_projects",
       "mcp__claude_ai_Vercel__get_project",
@@ -743,6 +738,8 @@ test("settings.json lets issue work through without a click, except what cannot 
       "Bash(git worktree list)",
       "Bash(git branch -r)",
       "Bash(node --test *)",
+      "Bash(gh issue view *)",
+      "Bash(gh issue list *)",
       "Bash(gh pr view *)",
       "Bash(gh pr list *)",
       "Bash(gh pr checks *)",
@@ -750,18 +747,13 @@ test("settings.json lets issue work through without a click, except what cannot 
       "Bash(node scripts/drift-check.mjs)",
       "Bash(npx tsc --noEmit)",
     ],
-    "allow is Linear, the GitHub issue tools and the owner's read-only list (TEC-253, widened for the PC), nothing more"
+    "allow is the GitHub issue tools and the owner's read-only list (TEC-253, widened for the PC), nothing more"
   );
   // On the PC the gh token, ssh keys and git credentials sit on disk; the guard
   // stops a shell from printing them, and these stop the file-read tool.
   assert.deepEqual(deny, ["Read(~/.config/gh/**)", "Read(~/.ssh/**)", "Read(~/.git-credentials)"]);
-  // The cloud named the Linear server `Linear`; the PC names it `claude_ai_Linear`.
-  for (const server of ["Linear", "claude_ai_Linear"]) {
-    for (const t of ["delete_attachment", "delete_comment", "delete_diff_comment", "delete_status_update", "retire_issue_label", "retire_project_label", "merge_diff", "update_diff", "submit_diff_review"]) {
-      assert.ok(ask.includes(`mcp__${server}__${t}`), `mcp__${server}__${t} must still ask`);
-    }
-  }
-  for (const rule of ask) assert.match(rule, /^mcp__(claude_ai_)?Linear__\w+$/, `${rule} names one Linear tool`);
+  // Linear's connector is gone (2026-11-16): nothing asks, and the guard refuses every Linear write should it come back.
+  assert.deepEqual(ask, []);
   // The guard still sees every Linear write and every GitHub issue write, whatever the allow rule says.
   assert.ok(hookFor("mcp__Linear__save_issue"));
   assert.ok(hookFor("mcp__claude_ai_Linear__save_issue"));
@@ -859,4 +851,59 @@ test("end to end: it fails closed", () => {
   mkdirSync(join(broken, ".claude", "hooks"), { recursive: true });
   copyFileSync(join(HOOKS, "guard.mjs"), join(broken, ".claude", "hooks", "guard.mjs"));
   assert.equal(run(mcpHook, merge, { env: { CLAUDE_PROJECT_DIR: broken } }).status, 2);
+});
+
+/* The owner's PC has no GitHub MCP server: issue writes there are `gh issue`
+   commands, and they keep the same rules as the issue tools. */
+test("gh issue: writes go to paddock-issues only and keep the issue rules, for every role", () => {
+  const sh = (command, who = {}) => verdict(decide({ tool_name: "Bash", tool_input: { command }, cwd: FEATURE, ...who }));
+  const R = "-R Tech-Paddock/paddock-issues";
+  const steps = "Short summary.\n\n## Next steps\n\n1. **TD:** design it.\n";
+  const dir = mkdtempSync(join(tmpdir(), "guard-issue-"));
+  const good = join(dir, "good.md");
+  const bad = join(dir, "bad.md");
+  writeFileSync(good, steps);
+  writeFileSync(bad, "No steps at all.");
+
+  // Reads go ahead anywhere.
+  for (const c of ["gh issue list", "gh issue view 3", `gh issue view 3 ${R}`, "gh issue status"]) assert.equal(sh(c), "allow", c);
+
+  // A write needs the private repo, named or in the issue URL.
+  for (const who of [MAIN, HELPER, DEPLOY]) {
+    for (const c of ["gh issue close 3", "gh issue comment 3 -b x", "gh issue close 3 -R Tech-Paddock/tech-paddock", `gh issue create ${R.replace("paddock-issues", "tech-paddock")} -t x -l Bug -b '${steps}'`, "bash -c 'gh issue reopen 3'"]) {
+      assert.equal(sh(c, who), "deny", `${c} ${JSON.stringify(who)}`);
+    }
+  }
+  for (const c of [`gh issue close 3 ${R} --reason completed --comment done`, `gh ${R} issue comment 3 -b x`, "gh issue close https://github.com/Tech-Paddock/paddock-issues/issues/3", `gh issue reopen 3 --repo=tech-paddock/paddock-issues`]) {
+    assert.equal(sh(c), "allow", c);
+  }
+  assert.equal(sh("gh issue close https://github.com/Tech-Paddock/tech-paddock/issues/3"), "deny");
+  assert.equal(sh(`gh issue delete 3 ${R} --yes`), "deny");
+  assert.equal(sh(`gh issue transfer 3 Tech-Paddock/tech-paddock ${R}`), "deny");
+
+  // create: labels and body as the issue tools check them.
+  assert.equal(sh(`gh issue create ${R} -t x -l Feature -l status:todo --body-file ${good}`), "allow");
+  assert.equal(sh(`gh issue create ${R} -t x --label Feature,app:coffee -b '${steps}'`), "allow");
+  assert.equal(sh(`gh issue create ${R} -t x -b '${steps}'`), "deny"); // no type label
+  assert.equal(sh(`gh issue create ${R} -t x -l Feature,Bug -b '${steps}'`), "deny");
+  assert.equal(sh(`gh issue create ${R} -t x -l Feature --body-file ${bad}`), "deny"); // no Next steps
+  assert.equal(sh(`gh issue create ${R} -t x -l Feature -a the-owner -b '${steps}'`), "deny"); // only an owner task is assigned
+  assert.equal(sh(`gh issue create ${R} -t x -l Feature --body-file - <<'EOF'\n${steps}EOF`), "allow");
+  assert.equal(sh(`gh issue create ${R} -t x -l Feature --body-file - <<'EOF'\nNo steps.\nEOF`), "deny");
+  assert.equal(sh(`gh issue create ${R} -t x -l Feature -b "$(cat notes.md)"`), "deny"); // built at run time
+  assert.equal(sh(`gh issue create ${R} -t x -l Feature --body-file ${join(dir, "missing.md")}`), "deny");
+  assert.equal(sh(`gh issue create ${R} -t x -l Feature`), "deny"); // no body: gh would prompt or open an editor
+  assert.equal(sh(`gh issue create ${R} -t x -l Feature --web`), "deny");
+  const task = "For #40 — the tablet's model.\n\n## Steps\n1. Open Settings → About.\n\nDone when: the model is in a comment.";
+  writeFileSync(join(dir, "task.md"), task);
+  assert.equal(sh(`gh issue create ${R} -t x -l 'Owner task' -a the-owner --body-file ${join(dir, "task.md")}`), "allow");
+
+  // edit: a new body is checked; added labels are checked as far as the call shows.
+  assert.equal(sh(`gh issue edit 3 ${R} --add-label status:in-review --remove-label status:todo`), "allow");
+  assert.equal(sh(`gh issue edit 3 ${R} --remove-assignee the-owner`), "allow");
+  assert.equal(sh(`gh issue edit 3 ${R} --add-label owner:td`), "deny");
+  assert.equal(sh(`gh issue edit 3 ${R} --add-label Feature,Bug`), "deny");
+  assert.equal(sh(`gh issue edit 3 ${R} --add-label status:todo --add-label status:in-review`), "deny");
+  assert.equal(sh(`gh issue edit 3 ${R} --body-file ${good}`), "allow");
+  assert.equal(sh(`gh issue edit 3 ${R} --body-file ${bad}`), "deny");
 });

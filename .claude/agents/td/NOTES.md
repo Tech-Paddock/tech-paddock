@@ -16,9 +16,12 @@ What is true now, and the traps. Branch and pull request state is never written 
   (TEC-57, owner-approved); the route is stamped from `packages/shared` and returns only the commit.
 - **`apps/showcase` is yours to scaffold when the owner wants it** (TEC-99). The owner cleared reading
   `Tech-Paddock/teamusauploader` on 2026-10-18; the demo uses fake data and a neutral name.
-- **GitHub issue writes don't prompt** (`issue_write`, `sub_issue_write`, `add_issue_comment` are
-  allowed in `settings.json`). The PC may name the GitHub server differently from the cloud's
-  `github`; if issue writes prompt there, that name is missing from the allowlist.
+- **The PC has no GitHub MCP server:** issues there are `gh issue` commands. Reads need no click;
+  writes ask outside auto mode. The guard holds `gh issue` writes to the same rules as the issue
+  tools: `-R Tech-Paddock/paddock-issues` (or an issue URL there) on every write, a body it can
+  read (`--body`, `--body-file`, or `--body-file -` with a heredoc; never `$( … )`), and the label
+  and Next-steps checks. `gh issue delete` and `transfer` are the owner's. In the cloud the
+  `mcp__github__` issue tools are allowed and checked the same way.
 - **Health prices recipe lines from Cookbook's `GET /api/servings`**, forwarding only
   `paddock_session`. A `SESSION_SECRET` mismatch between `tp-health` and `tp-cookbook` reads as
   "Couldn't reach the Cookbook", not a login bug.
