@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { WEEKDAY_LETTERS } from "@/lib/days";
 import type { GridList, More as MoreData } from "@/lib/types";
 import { uuid } from "@/lib/uuid";
+import CalendarStatus from "./CalendarStatus";
 import { NotSaved, useOutbox, type Send } from "./outbox";
 import { AddRoutine } from "./Routines";
 
@@ -187,6 +188,7 @@ export default function More() {
             </section>
           </>
         )}
+        <CalendarStatus />
       </div>
     </>
   );
