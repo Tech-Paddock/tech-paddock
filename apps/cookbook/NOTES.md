@@ -609,6 +609,18 @@ Reasoning is in the migration headers.
   list…" until the list is read). The edge: `decide` weighs every saved product, this only the board
   (products with a recent price), so a longer name on an unpriced product cannot outrank a
   shorter one here. The rows also stay in their aisle below.
+- **Opens on Best, with a Bought switch** (paddock-issues#72). The tab's state starts at
+  `OPENING_FILTER` (`lib/dealFilter.ts`: `kind: "best"`); **`NO_FILTER` stays "everything"** (kind
+  all), which the tests use. `DealFilter.bought` is the switch (`app/DealsTab.tsx`, a button above
+  the Colour group, `aria-pressed`, "Bought · last 12 weeks"). The board marks each row
+  `boughtRecently`: **its row `id` is in `purchasesPerProduct(PICK_WEEKS)`** (keyed by the products row `id`) **or its product code is the `upc` of a `kind = 'sent'` `cart_sends` row with `at` in the last `PICK_WEEKS` weeks** (`readSentCodesSince`, `lib/cartSends.ts`; Kroger's product ID and UPC are the same digits). Not `count`, which is all-time. `lib/dealBoard.ts` reads both **inside their own try/catch** (unlike every other
+  read there): a failure of either is null, the board's `purchasesRead: false`, and the tab shows
+  a red line under the switch and `emptyMessage` says "Couldn't read your purchases"; the read that
+  worked still counts. Empty states with Bought on: nothing bought at all, then (after the no-coupons,
+  Best-under-2-nights and colours-not-started reasons, which still come first) "None of your bought
+  items has a coupon this week / is on sale / is a stack / is at its low right now / is green…",
+  else "None of your bought items match". Trap: a coupon with no codes never matches, so it never
+  shows under Coupon + Bought either. `tests/dealBought.test.ts` holds all of it.
 - The tab's rows, chips, colour mark and trend bars are local patterns in `app/DealsTab.tsx`; the
   trend is the last eight weekly means with today as the last bar.
 

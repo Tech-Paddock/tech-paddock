@@ -211,7 +211,12 @@ section and closing comment before changing anything in this file.
   - The thresholds are reviewed in TEC-138.
 - **Deals shows every deal, coloured,** with search, aisle groups, All · On sale · Coupon · Stacks · Best,
   and an Any · Green · Neutral · Red · New filter. Each deal shows its usual price and an 8-week
-  trend.
+  trend. **It opens on Best** (owner, 2026-11-17).
+- **Bought** (owner, 2026-11-17: "I need a filter on coupons for my items"; "last 12 weeks") is a
+  switch, off by default, that limits the board to products bought in the last 12 weeks: in the King
+  Soopers purchase history or sent to the cart (`cart_sends`), both within the picking window, `PICK_WEEKS`. It combines with
+  every other filter, and **a failed purchases read says so**, never "nothing bought". "On my list"
+  is not affected by any filter.
 - **Best** (TEC-196; the owner's pick, 2026-10-29) is tonight's price at, or within 5% of, that
   product's lowest nightly price in the last 12 weeks, and needs at least 2 nights. It is one pure
   function (`lib/bestPrice.ts`) used by Deals and the Grocery list, so they never disagree. Its

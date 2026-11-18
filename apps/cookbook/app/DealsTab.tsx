@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DealBoard, DealRow } from "@/lib/dealRows";
 import { listDeals } from "@/lib/listDeals";
-import { ALL_AISLES, NO_FILTER, emptyMessage, groupByAisle, matchesFilter, shortDay, type DealFilter, type Kind, type LightFilter } from "@/lib/dealFilter";
+import { ALL_AISLES, OPENING_FILTER, emptyMessage, groupByAisle, matchesFilter, shortDay, type DealFilter, type Kind, type LightFilter } from "@/lib/dealFilter";
 
 /**
  * Deals (TEC-132), at `/deals`: every saved product with a recent price,
@@ -135,7 +135,7 @@ function Row({ row, forLines }: { row: DealRow; forLines?: string[] }) {
 export default function DealsTab({ refreshKey = 0, openLines = null }: { refreshKey?: number; openLines?: string[] | null }) {
   const [board, setBoard] = useState<DealBoard | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<DealFilter>(NO_FILTER);
+  const [filter, setFilter] = useState<DealFilter>(OPENING_FILTER);
 
   const load = useCallback(async () => {
     try {
@@ -220,6 +220,19 @@ export default function DealsTab({ refreshKey = 0, openLines = null }: { refresh
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          aria-pressed={filter.bought}
+          onClick={() => set({ bought: !filter.bought })}
+          className={`min-h-11 rounded-xl px-3.5 text-left text-[13px] ${filter.bought ? "bg-accent font-semibold text-accent-ink" : "border border-line bg-surface"}`}
+        >
+          Bought · last 12 weeks
+        </button>
+        {filter.bought && board && !board.purchasesRead ? (
+          <p role="alert" className="px-2 text-xs text-danger">
+            Couldn&rsquo;t read all of your purchases, so Bought may be missing items.
+          </p>
+        ) : null}
         <div role="group" aria-label="Colour" className="grid grid-cols-5 gap-1 rounded-xl bg-raised p-1">
           {LIGHTS.map(([id, label]) => (
             <button

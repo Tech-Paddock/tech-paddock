@@ -64,6 +64,7 @@ describe("Best on the Deals board", () => {
     lastRun: null,
     weeksHeld: 0,
     nightsHeld: 0,
+    purchasesRead: true,
     ...over,
   });
   const best = (qualifies: boolean) => ({ best: { qualifies, low: 2, nights: 3, why: qualifies ? "best" : "above" } }) as Pick<DealRow, "best">;

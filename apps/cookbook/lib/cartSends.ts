@@ -51,3 +51,29 @@ export async function moveSends(from: string[], to: string): Promise<void> {
   const { error } = await getServiceClient().from("cart_sends").update({ item_id: to }).in("item_id", from);
   if (error) throw new LookupError(`Couldn't carry what was sent onto the tidied line: ${error.message}`);
 }
+
+/**
+ * The King Soopers codes sent to the cart since `sinceIso` (kind `sent` only:
+ * a refused or taken-back row is not a purchase). The ledger's `upc` is the
+ * product code (Kroger's product ID and UPC are the same digits), so the Deals
+ * board's Bought matches it to a saved product's code. A failed read throws.
+ */
+export async function readSentCodesSince(sinceIso: string): Promise<Set<string>> {
+  const codes = new Set<string>();
+  const PAGE = 1000;
+  for (let a = 0; ; a += PAGE) {
+    const { data, error } = await getServiceClient()
+      .from("cart_sends")
+      .select("upc")
+      .eq("kind", "sent")
+      .gte("at", sinceIso)
+      .order("at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(a, a + PAGE - 1);
+    if (error) throw new LookupError(`Couldn't read what was sent to the cart: ${error.message}`);
+    const page = (data ?? []) as { upc: string }[];
+    for (const r of page) codes.add(r.upc);
+    if (page.length < PAGE) break;
+  }
+  return codes;
+}
