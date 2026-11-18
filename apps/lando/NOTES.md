@@ -247,11 +247,11 @@
   * **A future When** (`isFutureWhen`, or `isFutureDay` for a weight, which is a day): the form says "Future: saves as upcoming",
     shows a **Repeat** (every N weeks, months or years; only then), hides Box 3 (the attachments stay, TEC-203), and Save reads
     "Save as upcoming". Save posts an upcoming item through `onUpcoming` (awaited: a refusal stays on the form) and writes no journal
-    entry. The item's kind comes from the form (`futureKind`): a Vet visit is `vet`, a Medication `medication`, everything else
+    entry. The item's kind comes from the form (`futureKind`): a Vet visit is `vet`, a Medication `medication`, a Vaccine `vaccine`, everything else
     `other`; its title is the form's name (`futureTitle`: "Potty", "Training", "Medical issue", "Vet visit · Check-up",
     "Name · 5 mg"), which is how Done finds the form again. A saved entry cannot be moved to the future (the form says so, and
     the server refuses a time past a day ahead as before). A When in the same minute as now is not the future.
-  * **Done** (`formForItem`, in `doneUpcoming`): a vet visit or vaccine opens the Vet visit form, a medication the Medication tab,
+  * **Done** (`formForItem`, in `doneUpcoming`): a vet visit opens the Vet visit form, a vaccine plan the Vaccine form (one the Vaccine form made; an older vaccine plan with its own words opens Vet visit), a medication the Medication tab,
     an Other titled with a form's name that form (Medical issue opens Health on Medical issue), prefilled (`donePrefill`: the
     item's day and time **once they have come**, else the form's own "now", so a Done before the day is never a second future
     entry; a vet visit's reason from `visitPrefill` or a form-made title; a medication's pick, dose and unit from its title; the
@@ -260,7 +260,7 @@
     when its title names no listed medication). The form's entry then closes the item: `Journal`'s `visitLinks` maps the saved
     entry's id to the item, and `saveThenClose` posts `done` with `done_event` once it is saved. Closing the form without saving
     never closes the item; a failed save keeps its Retry, which closes the item when it lands. The server still refuses to close
-    a vet or vaccine item without a saved vet visit's id (`applyAction`); medication and Other take any entry.
+    a vet or vaccine item without the saved entry its form makes (`applyAction`, issue #60): the health type `formForItem` gives for that item, so a Vaccine-form plan closes only by a Vaccine entry and any other vet or vaccine plan only by a vet visit; medication and Other take any entry.
   * **A repeat**: the server inserts the next open item at `nextDue` (weeks add 7 days each; months and years land on the same
     day, or the last day of a shorter month, so Jan 31 + 1 month is Feb 28/29), same kind, title, note, time and repeat. If that
     insert fails the item is put back to open so Done can be tried again.
