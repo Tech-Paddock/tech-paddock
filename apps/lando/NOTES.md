@@ -2,9 +2,9 @@
 
 ## State
 
-- v2 on Next.js 16: five tabs under the app bar, **Log**, **Calendar**, **Notes**, **Analytics** and **Patch notes** (TEC-199, Notes TEC-204, Calendar TEC-234; "What's new"
-  renamed in the UI only, the file is still `app/WhatsNew.tsx` and the data `lib/releases.ts`; the Upcoming tab is gone),
-  sticky, five equal columns in 13px bold with `whitespace-nowrap` (at four columns 15px fit; at 390px "Patch notes" wrapped to two lines at 16px; **the five-column fit at 390px was not seen on a phone**),
+- v2 on Next.js 16: four tabs under the app bar, **Log**, **Notes**, **Analytics** and **Patch notes** (TEC-199, Notes TEC-204; "What's new"
+  renamed in the UI only, the file is still `app/WhatsNew.tsx` and the data `lib/releases.ts`; the Upcoming tab is gone, and so is the Calendar tab, #67:
+  the household calendar is Outlook now, see **Outlook calendar** below), sticky, four equal columns in 13px bold with `whitespace-nowrap`,
   opening on Log (RULES.md holds the owner's override of the one-screen rule).
 - **Profile** (TEC-260; the owner: "Rather than Lando put the icon for the app. clicking that brings up his profile", microchip and insurance "yes", the vaccine list
   "leave them for now"). **No sixth tab:** the app bar's "Lando" is the app's own `icon.svg` in `app/ProfileButton.tsx` (a 44px button named "Profile"; the
@@ -37,13 +37,13 @@
     then the offer **Plan the next dose** (ticked, a day in the shared date box and "Usually 3–4 weeks on. You can change the date.") on a new entry
     only; a note is optional (like a medication's); Related note only (no Related issue). The dose opens on one more than the live entries of that
     vaccine already logged (`earlierDoses`) until it is touched. A future When on it is a plan (title `Vaccine · DHPP · dose 2`), with no further offer.
-  * **Next dose** (suggestions only; the plan's date is editable in the form and later in the Calendar): DHPP and Leptospirosis 3 weeks on while under
+  * **Next dose** (suggestions only; the plan's date is editable in the form and later from Upcoming): DHPP and Leptospirosis 3 weeks on while under
     16 weeks old, then 1 year; Rabies 1 year after the first, then 3 years; Bordetella 6 months. Until a birthday is saved in the Profile (TEC-260) the dose number
     stands in: doses 1 and 2 are the puppy series, 3 and later yearly. Once it is saved, `LogForm` passes it to `nextDose` and the age beats the dose number.
   * **The plan** is an ordinary `lando.upcoming` item of kind `vaccine` titled `Vaccine · DHPP · dose 3` (the dose only while the puppy series
     goes on). It is added **after the vaccine is saved** (`planAfter` in `Journal.tsx`, keyed by the vaccine entry's id), so a vaccine that fails
     leaves no plan; the map is in memory, so a reload between a failed save and its Retry drops the offer (the vaccine still saves). If the plan can't be
-    added the toast says the vaccine is saved and to add the dose from the Calendar. Its **Done** opens the Vaccine form on that vaccine and dose
+    added the toast says the vaccine is saved and to add the dose from the form. Its **Done** opens the Vaccine form on that vaccine and dose
     (`formForItem`, `donePrefill`); an older vaccine plan with its own words ("Rabies booster") still opens Vet visit with the reason Vaccines.
   * **Vaccines given on a vet visit**: a toggle chip for each vaccine under the visit's Weight, on a **new** visit only (a correction shows none: correct
     the vaccine entries from the feed). Each pick is its own Vaccine entry at the visit's time and person, saved after the visit (and its weight) through the
@@ -84,27 +84,35 @@
   * **The database**: migration `lando_notes` (a `note` branch in `lando.details_ok`, nothing else). `events_kind_check` was dropped
   in `lando_health_events`, so the function is the only gate on a kind: a kind with no branch is refused. Without the migration a
   note save fails with a 503 and nothing else changes. `tests/details-ok-superset.test.ts` reads `note` as a kind now.
-- **Calendar** (TEC-234, the owner: "Need to see upcoming. Maybe a calendar page", shows "Upcoming + past"): the second tab,
-  `app/Calendar.tsx` over the pure `lib/calendar.ts` (`tests/calendar.test.ts`). **No table and no migration**: it reads what `Journal`
-  already holds, `entries` (live journal entries with notes already out, so a note can never show; `calendarDays` also drops a note and a
-  void if handed one) and `upcoming` (open plans).
-  * **The month**: whole weeks, Sunday first (`monthGrid`), stepped with the arrows or a sideways swipe (`swipeStep`: 50px and mostly
-    horizontal; the grid is `touch-pan-y` so the page still scrolls); a Today button returns from another month. Today is the accent circle
-    on its number (`aria-current="date"`); the chosen day has an ink border and opens on today. Each day button reads aloud as "Nov 8: 1 plan,
-    2 entries" (`dayWords`).
-  * **The dots** (a **local pattern**, `.lando-cal-dot` and `.lando-cal-plan` in `globals.css`, beside the feed colours): a filled dot per
-    kind of entry logged that day, a ring per kind of plan due, both in `--kind` (an inside potty is the accident red); at most `MAX_DOTS`
-    of each style; a plan with no form of its own (an old Other item) wears the soft ink. A legend sits under the grid.
-  * **A chosen day** lists its plans (the Log's `UpcomingList`, unchanged: tap to edit in place, Done opens the form it came from, no
-    Cancel) above its entries (a row like the feed's; a tap opens the entry exactly as the Log does, `setOpen({event})`). Both open the
-    usual sheet, which `Journal` renders for every tab.
-  * **Add a plan** shows on today and later days only (`canPlanOn`). It asks which form (Vet visit, Medication, Medical issue, Training,
-    Food, Fun, Potty, Weight), then opens it with `planDay` on `LogForm`: the When opens on that day at 09:00, or for today on the next whole
-    hour (`plannedWhen`), already touched, so the form reads "Future: saves as upcoming" and Save posts an upcoming item as any future When does.
-  * **Traps**: (1) the past is only what `Journal` loaded: the feed's `HORIZON_DAYS` window, plus every weight; a month before that shows
-    weights only. (2) `/api/upcoming` returns open plans only, so a plan marked done leaves the Calendar (its entry shows on the day it was
-    logged) and a repeating plan shows only its next date. (3) A new reader of `loaded.events` must still read `entries`, not events, or a
-    note leaks in. (4) The tab row is five columns at 13px; a sixth tab will not fit.
+- **Outlook calendar** (issue #67 of epic #65, the owner, 2026-11-17: "rather than hosting a calendar I think I just want … Outlook calendar… straight to our calendar as
+  events same thing with upcoming and recurring tasks"). **Replaces the Calendar tab** (TEC-234; `app/Calendar.tsx`, `lib/calendar.ts` and their test are deleted; `planTone`
+  moved to `lib/future.ts`; the Next 7 days "Calendar" link and the form's `planDay` / "Add a plan" went with it; Upcoming and the feed's Upcoming filter stay).
+  **No table, no migration.** Lando stays the source of truth and sends one way; it never reads Outlook back and never touches the `calendar` schema.
+  * **The contract** is Grid's (`apps/grid/RULES.md`, "Calendar contract"): after a database write succeeds the route sends the matching event with `sendCalendarEvent`
+    from the stamped `lib/calendar-client.ts` (never edit that copy). Everything Lando decides is in `lib/outlook.ts` (pure mapping, tested in `tests/outlook.test.ts`).
+  * **Two calendars, by the contract's `app` slug** (Grid names the calendar from it: `calendarName`, "lando" is **Lando**, "lando-log" is **Lando Log**, made on first
+    use; no Grid change). `app: "lando"` holds plans, `app: "lando-log"` holds logged entries. `source_id` is the row's own id in both (the slugs keep them apart).
+  * **Plans** (`/api/upcoming`, `eventsAfterPlan`): add and edit send an upsert; cancel and Done send a delete; a Done that made the next repeat also sends the
+    next plan. A plan with a time is a timed event (default one hour), one without is all-day. A repeat is one recurring event (`freq` weekly, monthly or yearly,
+    `interval` = `repeat_every`, no `until`), so Outlook shows it going on; the app still holds only the next open row, and Done retires it and starts the next
+    one's own event on its day. Title `Lando: <plan title>` with " · " read as ", " ("Lando: Vet visit, Check-up"). **No notes and no attachments are sent.**
+  * **Log entries** (`/api/events`, `eventsAfterEntry`): a new entry sends an upsert; a correction sends a delete of the entry it voids and the new upsert; a delete
+    sends the delete. **Notes are never sent** (RULES: not in the Log feed), nor are voids as events. Title `Lando: <what>, <details>` from `describe()` (so
+    "Lando: Meal, Kibble, 1 serving"); no person, no note text. Time is **America/Denver wall-clock** from the instant (`Intl`, so daylight time is right), never UTC;
+    the event is as long as an exercise or an outside potty trip says, else `LOG_MINUTES` (15); a weight is all-day.
+  * **A calendar failure never fails a save.** The send runs after the save answers (`pushAfterSave` uses Next's `after`; outside a request, as in a test, it
+    sends and waits), the client never throws, and `pushEvents` and `pushAfterSave` swallow anything else. A failed or dropped send is **not retried by Lando**: Grid
+    keeps an accepted event in its outbox and retries that, but an event Grid never answered is lost until the backfill.
+  * **Backfill** (`GET /api/calendar/backfill`, behind the gate like every route; `maxDuration` 60): sends every open plan and repeat and every live entry of the last
+    30 days (no notes, no corrected or deleted ones), five at a time, and answers `{ok, sent, failed, plans, log}`. Idempotent (one `source_id` is one event), so a
+    second run updates and never doubles; `failed` above zero means run it again once Grid is up. A GET so it can be opened signed in from the address bar; it
+    writes nothing in Lando. Run it **once, after the owner has connected Outlook** (#69), or the events sit in Grid's outbox unsent.
+  * **Traps**: (1) The phone's wall clock is assumed to be Denver for a plan's day and time (they are stored as phone-local strings); a log entry's instant is converted
+    to Denver. (2) A monthly repeat on the 29th to 31st: Outlook's rule and `nextDue` (last day of a short month) can differ on the short months; Lando's own row
+    wins in the app. (3) An edit made in Outlook is not read back and is overwritten by the next send of that `source_id`. (4) Anyone the calendars are shared
+    with sees every title, including a vet visit or a medication's name: keep titles plain, and send nothing from a note. (5) `lib/outlook.ts` imports `after`
+    from `next/server`; a test that calls a route handler gets the wait-and-send path, not `after`. (6) `.lando-cal-plan` in `globals.css` (the ring) is unused now;
+    `.lando-cal-dot` still colours the compact Upcoming row.
 - **Day and Time are pop-ups; Repeat is steady; one set of length chips** (issue #64, the owner's approved demo of 2026-11-17: the scroll wheel "is hard to use… holding the
   scroll wheel selects the page behind it", "No future potties", "recurring checkbox should just be perpetual" [Repeat stays as a tick with every-N-and-unit], "when you're
   logging a time it should always be chips not a number field", "Rather than a 90 min chip just do 60+", "All pages should have the same time chip presets", "Get rid of
@@ -123,8 +131,7 @@
     minutes earlier than what is stored). A stored time keeps its own minute: the Minute list adds it when it is off the step (an older 9:07 entry reads 9:07).
   * **Potty is never in the future** (`noFuture` = Potty without a `plan`; the Note form is `noFuture` too): later days are disabled in the calendar (and it won't page
     past this month), and on today the hours, minutes and PM after now are disabled (`hourDisabled`, `minuteDisabled`, `pmDisabled`); a pick that would land after now becomes
-    now on a step (`clampTo`). **Potty has no Repeat.** The Calendar's Add a plan still lists Potty (`app/Calendar.tsx`, outside the #64 slice): `LogForm` opens a Potty on now
-    there, so it saves an entry, not a plan. An open Potty plan from before is edited on its own day, since it has a `plan`.
+    now on a step (`clampTo`). **Potty has no Repeat.** (The Calendar's Add a plan, which once listed Potty, is gone, #67.) An open Potty plan from before is edited on its own day, since it has a `plan`.
   * **Repeat is always on the form** (`data-section="plan"`, `col-span-2` between the Day/Time row and the Logging as/Save row), except Potty: the tick, "every", the
     number and the unit, the last two dimmed (`disabled`) until it is ticked, so nothing appears or moves when the time turns future. The "Future: saves as upcoming"
     line is gone; Save reads **Save plan** (a plan being edited reads Save changes). **Repeat on a time that is not in the future is refused, not saved**: on Save,
@@ -178,7 +185,7 @@
     `clock12`, `withClock` and `withDay` in `lib/localtime.ts` (12 AM is 00:00, 12 PM is 12:00) and `isFuturePick` in `lib/future.ts`.
   * **Save is its own line below** (`data-section="save"`): one tap saves at the chosen time and nothing opens after it. The row opens on now (a new entry) or on
     the stored time. `whenTouched` stays false until the row is changed: untouched, a new entry saves at the moment of Save and **a correction keeps its stored
-    time to the millisecond** (`treatsWith` matches on it, and `parent_id`, TEC-251, is unchanged); a Done, a plan edit and the Calendar's Add a plan are
+    time to the millisecond** (`treatsWith` matches on it, and `parent_id`, TEC-251, is unchanged); a Done and a plan edit are
     touched from the start, as before. A correction cannot move to the future (the error shows on Save); the Note form's calendar stops at today (`maxDay`) and
     Save refuses a time later today (`noteWhenError`).
   * **A future time** shows the form's `repeatBlock` under the row (`data-section="plan"`) with "Future: saves as upcoming", and Save reads **Save plan**; there is
@@ -190,7 +197,7 @@
     remembered amount; `Journal` no longer writes `mealAmount`, an older phone may still hold one, unread). The Meals pill's repeat of the last meal (`quick.amount`)
     still brings that meal's amount. **Food: Servings is the left box, `w-[64px]` (about its label), and What takes the rest of the row** (`flex-1`; wider than
     half on purpose, a food's name); a treat keeps its Amount box on the right. **Next 7 days is a `Box`** (`Box` takes a `className`) with thinner padding, a short
-    heading row and the Calendar link's 44px hit area kept by a negative margin; the rows are the same.
+    heading row short; the rows are the same (the Calendar link that sat there went with the tab, #67).
 - **Save opens the phone's own picker; compact forms with one field class** (TEC-255, the owner: "Clicking save … should popup the same calander
   date time window as before. NOW goes away.", "all field boxes should be fixed size not dynamic", "Never make fields full with unless there is a
   specific reason. Default max is 1/2 width of section."). Local patterns, no data change and no migration. **It replaces the When step below:
@@ -199,8 +206,8 @@
   * **The When sheet** (TEC-258 replaced TEC-255's `showPicker()` path; `app/WhenPicker.tsx`, `tests/whenstep.test.ts`): Save on `LogForm` and `NoteForm`
     runs the checks that do not depend on the time (an attachment still uploading; an open "Add a medication…" is added first) and calls `WhenAsk`'s
     `ask()`, which **always** opens a small "When?" sheet: the native `datetime-local` (Weight: `date`) and a **Save**. Tapping the field opens the
-    phone's own wheel; the sheet's Save saves. A new entry opens on now; a stored time (a correction, a Done, an open plan, the Calendar's Add a plan
-    with `planDay`) opens on that time. A picked minute equal to this minute is "now" (the moment of the save, `classifyPick`), a stored time handed
+    phone's own wheel; the sheet's Save saves. A new entry opens on now; a stored time (a correction, a Done, an open plan
+    ) opens on that time. A picked minute equal to this minute is "now" (the moment of the save, `classifyPick`), a stored time handed
     back is "keep" (to the millisecond), anything else is "at". A future time still makes a plan (the Repeat step); a correction or a note cannot move
     to the future: the sheet says so and its Save is off (`check`, `noteWhenError`).
   * **The sheet is the only path** (TEC-258): there is no hidden field and no `showPicker()`. The sheet's field and Save were not tried on both phones.
@@ -236,14 +243,14 @@
     **after** the time is chosen, because a future plan skips them; one that fails closes the step and shows on the form (`failOnForm`).
     A failure of the awaited save (an upcoming item, or a correction) leaves the step open on the same choice with the reason in it, so a retry is
     one tap and never asks again; a new entry saves through `onLog` and the sheet closes as ever, with Retry on its pending row.
-  * **A form that opens on a time of its own** (a correction, a Done, a plan being edited, the Calendar's Add a plan with `planDay`) opens the step with
+  * **A form that opens on a time of its own** (a correction, a Done, a plan being edited) opens the step with
     its field on that time and the big button reading **Keep Oct 19 9:05 PM** (a correction, a plan being edited) or **Use Tue 9:00 AM** (a Done, an
     Add a plan), with a small "Now instead" under it. **Keep** leaves `event.at` exactly, to the millisecond, as an untouched When did (so `treatsWith`
     still matches); Now on a new entry is "untouched": the moment of that tap. A correction cannot be moved to the future (the step says so and
     disables its Save). A note's step has no future (`allowFuture={false}`: the field's `max`, and `noteWhenError`) and no Repeat.
   * **The bottom row** (`data-section="save"`): "as [name ▾] [Save potty]" on one line on every form and the Note form, replacing Box 1's Logging as
     (same select, `nameBoxWidth`, `f-who`; labelled "Logging as" for screen readers). The button no longer says "Save as upcoming" after a pick
-    (the form cannot know), only when the form opened on a future time (the Calendar's Add a plan). The section order the tests read is now
+    (the form cannot know). The section order the tests read is now
     `entry, secondary, note, photos, save` (`tests/boxedforms.test.ts`).
   * **Related fields inline**: Training's Related note sits beside Treats after a thin divider (`flex items-end`, no wrap); a vet visit and a medication
     dose show Related issue and Related note in two equal columns (`grid-cols-2`, long names cut by the select), **the dose's Related issue moved out of
@@ -256,10 +263,10 @@
   slightly overcorrected" kept a list rather than one line). Three **local patterns**, no data change and no migration. **Later bullets
   that say Box 3, "Treats and links", Take photo/Attach buttons or the Next 7 days card describe what this replaced.**
   * **The compact Upcoming row** (`UpcomingList` with `compact`, used by the Log's Next 7 days only): a dot in the plan's form colour
-    (`planTone`, the Calendar's `lando-cal-dot`; a plan with no form wears the soft ink), the title, when (`dueText`), a small Done; no card,
+    (`planTone`, now in `lib/future.ts`, and `lando-cal-dot`; a plan with no form wears the soft ink), the title, when (`dueText`), a small Done; no card,
     no detail line, no note (the note stays in the tap's `title`), no repeat text. Overdue time is red (`text-danger`, bold) and in words
-    for screen readers. Tap edits as before. The heading row has a **Calendar** link (`showTab("calendar")`). **The feed's Upcoming
-    filter and the Calendar's day list keep the full rows** (the owner left the filter alone; Calendar was not in the brief).
+    for screen readers. Tap edits as before. (The heading row's Calendar link went with the tab, #67.) **The feed's Upcoming
+    filter keeps the full rows.**
   * **The plain counter** (`TreatCount`): − 0 + with no border or fill, accent ink, buttons 40x44 hit areas. **Box 3 is no longer a box:**
     `data-section="secondary"` is a plain `div` under Box 2 (the section order the tests read is unchanged). Potty: counter, a thin
     vertical divider, then the Medical issue checkbox (text soft until ticked), Related issue under it when ticked; Training and Fun: the

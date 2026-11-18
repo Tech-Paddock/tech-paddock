@@ -13,16 +13,15 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 
 ## Surface: app
 
-- Five tabs, Log, Calendar, Notes, Analytics and Patch notes, opening on Log: the owner's override (2026-10-20,
-  widened 2026-10-27 TEC-182, narrowed 2026-11-01 TEC-199, pills restored 2026-11-02 TEC-202, Notes added 2026-11-02 TEC-204, Calendar added 2026-11-08 TEC-234) of the app surface's one screen and no
+- Four tabs, Log, Notes, Analytics and Patch notes, opening on Log: the owner's override (2026-10-20,
+  widened 2026-10-27 TEC-182, narrowed 2026-11-01 TEC-199, pills restored 2026-11-02 TEC-202, Notes added 2026-11-02 TEC-204; the Calendar tab of 2026-11-08 TEC-234 went 2026-11-17, #67, to Outlook) of the app surface's one screen and no
   tabs. One-handed, thumb-first. Pills open a quick log: Pee and Poop open Potty on that pick, Meals opens Food, Fun opens Fun (TEC-181, TEC-186, restored TEC-202). The Log buttons are Treats, Training, Weight and Health.
 - An app bar over the tabs: theme, logout and the livery badge (Meals today left, TEC-193). Its title
   is the app's own icon, not the word "Lando": a 44px button named Profile that opens Profile in
   place of the tabs, with a Back (owner, TEC-260). Profile shows Basics and Vet from the stored
   details, edited through an Edit form, and Vaccines and Regular medications read from the journal
-  and plans. The tabs stay five.
-- Quiet secondary controls (owner, TEC-250): Next 7 days is one short line per plan with a
-  Calendar link; Treats is a plain counter, and Medical issue is its own checkbox, on Potty only;
+  and plans. The tabs stay four.
+- Quiet secondary controls (owner, TEC-250): Next 7 days is one short line per plan; Treats is a plain counter, and Medical issue is its own checkbox, on Potty only;
   attachments are one small Attach link with thumbnails in a row.
 - Every form's bottom row is When and Logging as, each half the row (owner, TEC-261): a day box and
   one time box, each a scroll column (day; hour, minute and AM/PM) that shows the values either side
@@ -66,8 +65,13 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 - Login is the shared password until per-person logins ship (TEC-118).
 - Notes are a journal kind (`note`) on their own tab, never in the Log feed, the pills or Analytics;
   a note is never dated in the future (TEC-204).
-- The Calendar reads the journal and `lando.upcoming` as they are, with no table of its own; it
-  never shows notes, and offers Add a plan only from today onward (TEC-234).
+- Lando has no calendar of its own (owner, 2026-11-17, #65, #67). Plans, repeats and logged entries go **one way** to the household's Outlook calendars through Grid's
+  calendar contract (`apps/grid/RULES.md`, "Calendar contract"): after a database write succeeds, a server route sends the event with the stamped
+  `lib/calendar-client.ts` (never edited here). Plans and repeats go to the app calendar `lando` ("Lando"; a repeat is one recurring event, Done, an edit or a
+  cancel updates or removes it), logged entries to `lando-log` ("Lando Log"), never notes. Times are America/Denver wall-clock, titles are plain
+  ("Lando: <kind>, <detail>"), and **no notes, attachments or names go in an event**: anyone a calendar is shared with sees all of it. **A calendar failure never
+  fails a save.** Lando never reads Outlook back and never reads or writes the `calendar` schema. `GET /api/calendar/backfill` (behind the gate) re-sends every open
+  plan and the last 30 days of entries, and is idempotent.
 - Related issue (TEC-142, TEC-161, TEC-208): Potty keeps its Medical issue checkbox, the select behind it. A vet
   visit and a medication dose show the select always, opening on None, which saves no `issue`. A medical issue
   links to no other issue.

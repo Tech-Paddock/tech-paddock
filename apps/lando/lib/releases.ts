@@ -25,7 +25,7 @@ export const DAYS_SHOWN = 7;
  * once written, is not rewritten.
  */
 export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
-  "2026-11-17": "Day and Time open as pop-ups, lengths of time are chips, and Repeat stays put.",
+  "2026-11-17": "Day and Time open as pop-ups, lengths of time are chips, Repeat stays put, and plans and entries go to the family calendar.",
   "2026-11-10": "The When row shows that it scrolls.",
   "2026-11-09": "Saving opens your phone's date and time picker, forms are more compact, and adding a medication says so when it can't.",
   "2026-11-08": "Adding a medication works, a medication now carries a reason, there is a Calendar, and saving now asks when.",
@@ -41,6 +41,7 @@ export const DAY_SUMMARIES: Readonly<Record<string, string>> = {
 };
 
 export const RELEASES: readonly Release[] = [
+  { date: "2026-11-17", text: "Plans, repeats and what you log now go straight to the family calendar in Outlook, as events, and a repeat shows as a repeating event. The Calendar tab is gone, because the calendar lives there now." },
   { date: "2026-11-17", text: "Day and Time are two boxes at the bottom of every form, each opening a pop-up window instead of a scroll wheel, so holding or dragging no longer selects the page behind it. Day is a month calendar: tap a day and it closes. Time has Now, 15, 30 and 45 min ago and 1 hr ago, then the hour, the minute and AM or PM as lists, with Cancel and Done. Minutes step by five, and a new entry opens on now rounded down. Logging as moves up beside Save, and Day, Time, Logging as and Save line up in two equal columns. The Yesterday, Today and Tomorrow presets are gone." },
   { date: "2026-11-17", text: "Every length of time is now the same chips on every form: 5, 15, 30, 45 and 60+ min, for Potty's Time outside, Fun's Length and Training's Time, with no number box. Entries saved with another number still show it. On Food, What now comes before Servings." },
   { date: "2026-11-17", text: "Repeat is always on the form, so nothing jumps when you pick a later day. Tick it and set how often, then pick a day or time ahead, and Save reads Save plan; ticked on a time that is now or past, Save asks for a later time instead of saving. A Potty can never be in the future: later days and times are greyed out and Potty has no Repeat. A note's day and time can't be in the future either." },

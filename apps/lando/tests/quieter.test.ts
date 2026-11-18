@@ -67,9 +67,9 @@ describe("where Next 7 days sits on the Log (TEC-255)", () => {
     const src = read("app/Journal.tsx");
     expect(src).toMatch(/<Box section="next-7-days" label="Next 7 days" className="[^"]*!py-0\.5/);
     expect(src).toContain("!gap-0");
-    // The heading row is short, and the Calendar link keeps its 44px hit area through a negative margin.
+    // The heading row is short, and there is no Calendar link: the tab went with the Outlook calendar.
     expect(src).toContain("min-h-[28px]");
-    expect(src).toMatch(/-my-2 min-h-\[44px\][^"]*">\s*Calendar/);
+    expect(src).not.toContain('showTab("calendar")');
     // Same rows, same place: still the compact list.
     expect(src).toContain("<UpcomingList compact items={week}");
   });
@@ -97,10 +97,9 @@ describe("the compact Next 7 days row", () => {
   it("keeps a 44px hit area on the tap and on Done", () => {
     expect(html.match(/min-h-\[44px\]/g)!.length).toBeGreaterThanOrEqual(4);
   });
-  it("the Log uses it with a Calendar link in the heading; the feed's Upcoming filter keeps the full rows (source check)", () => {
+  it("the Log uses it, with no Calendar link; the feed's Upcoming filter keeps the full rows (source check)", () => {
     const journal = read("app/Journal.tsx");
     expect(journal).toContain("<UpcomingList compact items={week}");
-    expect(journal).toContain('onClick={() => showTab("calendar")}');
     expect(journal).toContain("<UpcomingList items={allOpen}");
   });
 });

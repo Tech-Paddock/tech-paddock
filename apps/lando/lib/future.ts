@@ -4,7 +4,7 @@
  * the items due in the coming week (Next 7 days) and the feed's Upcoming filter lists every open one; Done opens
  * the form the item came from. Everything here is pure.
  */
-import { FORM_LABELS, HEALTH_LABELS, VET_REASONS, type FormKind, type HealthType } from "./events";
+import { FORM_LABELS, HEALTH_LABELS, VET_REASONS, type FeedTone, type FormKind, type HealthType } from "./events";
 import { fromLocalInput, toDateInput } from "./localtime";
 import { MED_UNITS, type Medication } from "./medications";
 import { parseVaccinePlanTitle, vaccinePlanTitle } from "./vaccines";
@@ -141,6 +141,11 @@ export function formForItem(item: Pick<Upcoming, "kind" | "title">): { form: For
   if (item.title === HEALTH_LABELS.issue) return { form: "health", healthType: "issue" };
   const form = (["potty", "food", "fun", "training", "weight"] as const).find((f) => FORM_LABELS[f] === item.title);
   return form ? { form, healthType: "vet" } : null;
+}
+
+/** The colour a plan wears: its form's (a vet visit, vaccine and medication are Health), or none for an old plan with its own words. */
+export function planTone(item: Pick<Upcoming, "kind" | "title">): FeedTone | null {
+  return formForItem(item)?.form ?? null;
 }
 
 /** What a form opens with for a Done: the item's day and time, and what its title and note say. */

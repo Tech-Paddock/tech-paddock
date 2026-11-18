@@ -363,16 +363,6 @@ describe("no future potties (#64)", () => {
     expect(document.querySelector('[data-section="plan"]')).toBeNull();
   });
 
-  it("the Calendar's Add a plan opens a Potty on now, not on a later day", () => {
-    clockAt(new Date(2026, 10, 17, 14, 38));
-    const props = open("potty", { planDay: "2026-11-25" });
-    expect(dayBox().textContent).toContain("Today");
-    pickPee();
-    fireEvent.click(saveButton());
-    expect(props.onLog).toHaveBeenCalledTimes(1);
-    expect(props.onUpcoming).not.toHaveBeenCalled();
-  });
-
   it("an open Potty plan from before can still be edited on its own day", () => {
     const plan = {
       id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
@@ -622,17 +612,6 @@ describe("a form that opens on a time of its own (#64)", () => {
     }
     const today = new Date();
     expect(within(dialog()).getByText(today.toLocaleDateString(undefined, { month: "long", year: "numeric" }))).toBeTruthy();
-  });
-
-  it("the Calendar's Add a plan opens on that day, as a plan", async () => {
-    const day = toDateInput(new Date(Date.now() + 3 * 86400_000).toISOString());
-    const props = open("training", { planDay: day });
-    expect(screen.getByRole("button", { name: "Save plan" })).toBeTruthy();
-    expect(screen.getByText("Repeat")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Save plan" }));
-    await waitFor(() => expect(props.onUpcoming).toHaveBeenCalledTimes(1));
-    expect(props.onUpcoming.mock.calls[0][0]).toMatchObject({ due_on: day });
-    expect(props.onLog).not.toHaveBeenCalled();
   });
 });
 
