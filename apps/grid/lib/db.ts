@@ -100,6 +100,35 @@ async function touched(q: PromiseLike<{ data: unknown[] | null; error: Failure }
   if (!data || data.length === 0) throw new NotFound("Not found");
 }
 
+type CalendarTask = { id: string; title: string; due_on: string | null; done_on: string | null };
+
+/** One task as the calendar sees it, or null when it is gone. */
+export async function readTask(id: string, db: Client = getServiceClient()) {
+  const { data, error } = await db.from("tasks").select("id,title,due_on,done_on").eq("id", id).limit(1);
+  check(error);
+  return ((data ?? [])[0] ?? null) as CalendarTask | null;
+}
+
+export async function readRoutineForCalendar(id: string, db: Client = getServiceClient()) {
+  const { data, error } = await db.from("routines").select("id,name,weekdays,archived_at").eq("id", id).limit(1);
+  check(error);
+  return ((data ?? [])[0] ?? null) as { id: string; name: string; weekdays: number[]; archived_at: string | null } | null;
+}
+
+/** What the one-off calendar backfill sends: every live routine and every open dated task. */
+export async function readCalendarSources(db: Client = getServiceClient()) {
+  const [routines, tasks] = await Promise.all([
+    db.from("routines").select("id,name,weekdays").is("archived_at", null).order("created_at").limit(1000),
+    db.from("tasks").select("id,title,due_on,done_on").is("done_on", null).not("due_on", "is", null).order("created_at").limit(1000),
+  ]);
+  check(routines.error);
+  check(tasks.error);
+  return {
+    routines: (routines.data ?? []) as { id: string; name: string; weekdays: number[] }[],
+    tasks: (tasks.data ?? []) as CalendarTask[],
+  };
+}
+
 export async function writeTask(o: TaskOp, db: Client = getServiceClient()) {
   if (o.op === "add") {
     const { error } = await db
