@@ -613,12 +613,10 @@ Reasoning is in the migration headers.
   `OPENING_FILTER` (`lib/dealFilter.ts`: `kind: "best"`); **`NO_FILTER` stays "everything"** (kind
   all), which the tests use. `DealFilter.bought` is the switch (`app/DealsTab.tsx`, a button above
   the Colour group, `aria-pressed`, "Bought · last 12 weeks"). The board marks each row
-  `boughtRecently`: **`p.count > 0` (sent to the cart, all time, as Your brands counts it) or its row
-  `id` is in `purchasesPerProduct(PICK_WEEKS)`**, which is keyed by the products row `id`, not the
-  King Soopers code. `lib/dealBoard.ts` reads it **inside its own try/catch** (unlike every other
-  read there): a failure is `boughtIds: null`, the board's `purchasesRead: false`, and the tab shows
-  a red line under the switch and `emptyMessage` says "Couldn't read your purchases"; cart sends
-  still count. Empty states with Bought on: nothing bought at all, then (after the no-coupons,
+  `boughtRecently`: **its row `id` is in `purchasesPerProduct(PICK_WEEKS)`** (keyed by the products row `id`) **or its product code is the `upc` of a `kind = 'sent'` `cart_sends` row with `at` in the last `PICK_WEEKS` weeks** (`readSentCodesSince`, `lib/cartSends.ts`; Kroger's product ID and UPC are the same digits). Not `count`, which is all-time. `lib/dealBoard.ts` reads both **inside their own try/catch** (unlike every other
+  read there): a failure of either is null, the board's `purchasesRead: false`, and the tab shows
+  a red line under the switch and `emptyMessage` says "Couldn't read your purchases"; the read that
+  worked still counts. Empty states with Bought on: nothing bought at all, then (after the no-coupons,
   Best-under-2-nights and colours-not-started reasons, which still come first) "None of your bought
   items has a coupon this week / is on sale / is a stack / is at its low right now / is green…",
   else "None of your bought items match". Trap: a coupon with no codes never matches, so it never

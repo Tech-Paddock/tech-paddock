@@ -7,6 +7,7 @@ import { addDays, denverDate } from "./priceDates";
 import { buildDealBoard, type DealBoard } from "./dealRows";
 import { HISTORY_WEEKS } from "./stoplight";
 import { PICK_WEEKS, purchasesPerProduct } from "./purchaseStore";
+import { readSentCodesSince } from "./cartSends";
 
 /**
  * The Deals tab's read (TEC-132): the saved products, their latest nightly
@@ -26,6 +27,17 @@ async function boughtIds(now: Date): Promise<Set<string> | null> {
   }
 }
 
+/** The codes sent to the cart in the same `PICK_WEEKS` window (`cart_sends`), or null when that read failed. */
+async function sentCodes(now: Date): Promise<Set<string> | null> {
+  try {
+    const from = new Date(now);
+    from.setUTCDate(from.getUTCDate() - PICK_WEEKS * 7);
+    return await readSentCodesSince(from.toISOString());
+  } catch {
+    return null;
+  }
+}
+
 export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> {
   const asOf = denverDate(now);
   const connection = await readConnectionRow();
@@ -38,7 +50,7 @@ export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> 
     return buildDealBoard({ asOf, store: null, products: [], nights: [], weeks: [], coupons: [], couponsStaged: staged, scan: null });
   }
 
-  const [products, nights, weeks, { coupons, staged }, latest, span, bought] = await Promise.all([
+  const [products, nights, weeks, { coupons, staged }, latest, span, bought, sent] = await Promise.all([
     readProducts(),
     // Twelve weeks of nights, not three: Best compares tonight with the lowest night (TEC-196).
     readNightsSince(store.locationId, addDays(asOf, -7 * HISTORY_WEEKS)),
@@ -47,6 +59,7 @@ export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> 
     readLatestScan(),
     readNightSpan(store.locationId),
     boughtIds(now),
+    sentCodes(now),
   ]);
 
   return buildDealBoard({
@@ -59,6 +72,7 @@ export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> 
     couponsStaged: staged,
     span,
     boughtIds: bought,
+    sentCodes: sent,
     scan: latest
       ? {
           ranOn: denverDate(new Date(latest.ran_at)),

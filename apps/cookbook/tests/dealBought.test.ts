@@ -9,7 +9,7 @@ import type { NightRow } from "@/lib/priceWeeks";
 const AS_OF = "2026-11-17";
 const STORE = { locationId: "01400999", name: "Test Store" };
 const A = "0002222000001"; // bought in the window, on sale, with a coupon
-const B = "0002222000002"; // sent to the cart only, ordinary
+const B = "0002222000002"; // sent to the cart in the window only, ordinary
 const C = "0002222000003"; // never bought, on sale
 
 const saved = (product_id: string, count = 0): SavedProduct =>
@@ -32,13 +32,14 @@ function board(over: Partial<BoardInput> = {}): DealBoard {
   return buildDealBoard({
     asOf: AS_OF,
     store: STORE,
-    products: [saved(A), saved(B, 2), saved(C)],
+    products: [saved(A), saved(B), saved(C)],
     nights: [night(A, AS_OF, 5, 4), night(B, AS_OF, 3, null), night(C, AS_OF, 4, 3)],
     weeks: [],
     coupons: [coupon(A)],
     couponsStaged: true,
     scan: null,
     boughtIds: new Set([`id-${A}`]),
+    sentCodes: new Set([B]),
     ...over,
   });
 }
@@ -61,10 +62,19 @@ describe("which rows are bought", () => {
   it("a purchase of a product the board does not hold changes nothing", () => {
     expect(ids(board({ boughtIds: new Set(["id-other"]) }), { bought: true })).toEqual([B]);
   });
-  it("a failed read is marked on the board, and cart sends still count", () => {
+  it("a failed purchases read is marked on the board, and cart sends still count", () => {
     const b = board({ boughtIds: null });
     expect(b.purchasesRead).toBe(false);
     expect(ids(b, { bought: true })).toEqual([B]);
+  });
+  it("a failed cart read is marked too, and purchases still count", () => {
+    const b = board({ sentCodes: null });
+    expect(b.purchasesRead).toBe(false);
+    expect(ids(b, { bought: true })).toEqual([A]);
+  });
+  it("an all-time cart count alone is not bought: only a send in the window is", () => {
+    const b = board({ products: [saved(A), saved(B, 5), saved(C)], sentCodes: new Set() });
+    expect(ids(b, { bought: true })).toEqual([A]);
   });
 });
 
@@ -87,7 +97,7 @@ describe("Bought combines with every filter", () => {
 });
 
 describe("an empty Bought result says why", () => {
-  const none = board({ boughtIds: new Set(), products: [saved(A), saved(C)], nights: [night(A, AS_OF, 5, 4), night(C, AS_OF, 4, 3)] });
+  const none = board({ boughtIds: new Set(), sentCodes: new Set(), products: [saved(A), saved(C)], nights: [night(A, AS_OF, 5, 4), night(C, AS_OF, 4, 3)] });
   const some = board();
 
   it("a failed purchases read says so, not that nothing was bought", () => {

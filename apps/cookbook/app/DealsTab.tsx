@@ -230,7 +230,7 @@ export default function DealsTab({ refreshKey = 0, openLines = null }: { refresh
         </button>
         {filter.bought && board && !board.purchasesRead ? (
           <p role="alert" className="px-2 text-xs text-danger">
-            Couldn&rsquo;t read your purchases, so Bought shows only what was sent to the cart.
+            Couldn&rsquo;t read all of your purchases, so Bought may be missing items.
           </p>
         ) : null}
         <div role="group" aria-label="Colour" className="grid grid-cols-5 gap-1 rounded-xl bg-raised p-1">

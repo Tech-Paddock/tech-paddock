@@ -46,7 +46,7 @@ export type DealRow = {
   bought: number;
   /**
    * Bought in the last 12 weeks (paddock-issues#72): in the King Soopers purchase
-   * history (`purchasesPerProduct(PICK_WEEKS)`) or sent to the cart (`bought` above 0).
+   * history (`purchasesPerProduct(PICK_WEEKS)`) or sent to the cart in the same 12 weeks (`cart_sends`).
    */
   boughtRecently: boolean;
   /** Today's effective price: the sale if there is one, else the regular. */
@@ -117,6 +117,8 @@ export type BoardInput = {
    * means none, so older callers still compile.
    */
   boughtIds?: Set<string> | null;
+  /** The product codes sent to the cart in the last 12 weeks (`cart_sends`); null when that read failed. */
+  sentCodes?: Set<string> | null;
   /** The nightly check's first and last night at the store (`readNightSpan`); optional so older callers still compile. */
   span?: { first: string; last: string; recordedAt: string | null } | null;
 };
@@ -128,7 +130,7 @@ const weighted = (parts: { value: number; weight: number }[]): number | null => 
 
 export function buildDealBoard(input: BoardInput): DealBoard {
   const { asOf, store, products } = input;
-  const empty: DealBoard = { store: store?.name ?? null, asOf, rows: [], couponsStaged: input.couponsStaged, unpriced: 0, hasNights: false, lastRun: input.span ?? null, weeksHeld: 0, nightsHeld: 0, purchasesRead: input.boughtIds !== null };
+  const empty: DealBoard = { store: store?.name ?? null, asOf, rows: [], couponsStaged: input.couponsStaged, unpriced: 0, hasNights: false, lastRun: input.span ?? null, weeksHeld: 0, nightsHeld: 0, purchasesRead: input.boughtIds !== null && input.sentCodes !== null };
   if (!store) return empty;
 
   const freshFrom = addDays(asOf, -FRESH_NIGHTS);
@@ -204,7 +206,7 @@ export function buildDealBoard(input: BoardInput): DealBoard {
       url: p.url ?? pageFor(p.product_id, p.names[0] ?? ""),
       aisle: aisle ?? NO_AISLE,
       bought: p.count,
-      boughtRecently: p.count > 0 || (input.boughtIds?.has(p.id) ?? false),
+      boughtRecently: (input.boughtIds?.has(p.id) ?? false) || (input.sentCodes?.has(p.product_id) ?? false),
       now,
       usual: Math.round((usual ?? regular ?? now) * 100) / 100,
       onSale,
