@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formForItem } from "@/lib/future";
-import { planTone } from "@/lib/calendar";
+import { formForItem, planTone } from "@/lib/future";
 import { UPCOMING_TONE_WORDS, detailLine, dueText, titleLine, upcomingTone, type Upcoming } from "@/lib/upcoming";
 
 /**

@@ -326,7 +326,7 @@ afterEach(() => {
 });
 
 describe("the app bar and the Profile page", () => {
-  it("shows the app icon as a 44px button named Profile in place of the word, and keeps five tabs", () => {
+  it("shows the app icon as a 44px button named Profile in place of the word, and keeps four tabs", () => {
     wire();
     render(createElement(AppBar));
     const btn = screen.getByRole("button", { name: "Profile" });
@@ -336,7 +336,7 @@ describe("the app bar and the Profile page", () => {
     // The name stays for screen readers only; it is no longer drawn.
     const h1 = screen.getByRole("heading", { level: 1 });
     expect(h1.className).toContain("sr-only");
-    expect(read("app/Journal.tsx").match(/role="tab"/g)).toHaveLength(5);
+    expect(read("app/Journal.tsx").match(/role="tab"/g)).toHaveLength(4);
   });
 
   it("opens Profile on the icon, with Back, and Back returns to the tabs", async () => {
@@ -354,7 +354,7 @@ describe("the app bar and the Profile page", () => {
     fireEvent.click(screen.getByRole("button", { name: /Back/ }));
     expect(screen.queryByRole("heading", { name: "Profile" })).toBeNull();
     expect(screen.getByRole("tablist").hasAttribute("hidden")).toBe(false);
-    expect(screen.getAllByRole("tab")).toHaveLength(5);
+    expect(screen.getAllByRole("tab")).toHaveLength(4);
   });
 
   it("shows each vaccine's status in words as well as its colour, and Plan next adds the plan", async () => {

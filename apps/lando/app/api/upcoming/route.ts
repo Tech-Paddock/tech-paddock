@@ -5,6 +5,7 @@ import { Conflict } from "@/lib/journal";
 import { parseAction } from "@/lib/upcoming";
 import { applyAction, listOpen } from "@/lib/upcoming-db";
 import { signedPhotoUrls } from "@/lib/storage";
+import { eventsAfterPlan, pushAfterSave } from "@/lib/outlook";
 
 export const dynamic = "force-dynamic";
 
@@ -28,12 +29,15 @@ export async function GET() {
  * Add, edit, cancel or mark done (TEC-192). Body: `{ action: "add", item }`, `{ action: "edit", id, item }`,
  * `{ action: "cancel", id }` or `{ action: "done", id, done_on, done_event? }`. Items are plans: edited in
  * place, cancelled and never deleted. A vet visit or vaccine is done only with the id of a saved visit.
- * A done repeating item answers with its next one.
+ * A done repeating item answers with its next one. A saved action then goes to the Outlook calendar (#67); that
+ * never fails the save.
  */
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   try {
-    const result = await applyAction(getServiceClient(), parseAction(body));
+    const action = parseAction(body);
+    const result = await applyAction(getServiceClient(), action);
+    await pushAfterSave(req, () => eventsAfterPlan(action, result));
     return NextResponse.json(result);
   } catch (e) {
     if (e instanceof InvalidEvent) return NextResponse.json({ error: e.message }, { status: 400 });

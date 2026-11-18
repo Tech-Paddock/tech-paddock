@@ -64,7 +64,6 @@ import Analytics from "./Analytics";
 import Notes from "./Notes";
 import NoteForm from "./NoteForm";
 import WhatsNew from "./WhatsNew";
-import Calendar from "./Calendar";
 import UpcomingList from "./UpcomingList";
 import LogForm, { Box, WHO_WIDTH, input, type LogBody, type Person } from "./LogForm";
 import Sheet from "./Sheet";
@@ -88,8 +87,8 @@ type Stored = LogBody & { then?: LogBody[] };
  * (TEC-203); `healthType` is Health's tab on a new entry;
  * `quick` is the pill or Treats button that opened the form (TEC-181, TEC-186).
  */
-type Open = { form: FormKind; event?: JournalEvent; healthType?: HealthType; doneFor?: Upcoming; plan?: Upcoming; planDay?: string; quick?: QuickLog } | null;
-type Tab = "log" | "calendar" | "notes" | "analytics" | "new";
+type Open = { form: FormKind; event?: JournalEvent; healthType?: HealthType; doneFor?: Upcoming; plan?: Upcoming; quick?: QuickLog } | null;
+type Tab = "log" | "notes" | "analytics" | "new";
 
 async function postJson(url: string, body: unknown, method: "POST" | "PATCH" = "POST"): Promise<{ ok: boolean; status: number; data: any }> {
   const res = await fetch(url, {
@@ -138,7 +137,7 @@ function Pill({
 }
 
 /**
- * Five tabs, Log, Calendar, Notes, Analytics and Patch notes, opening on Log (RULES.md, Surface: app, the owner's
+ * Four tabs, Log, Notes, Analytics and Patch notes, opening on Log (RULES.md, Surface: app, the owner's
  * override, 2026-10-20). Log: four since-last pills that each open a quick log (Pee, Poop, Meal, Fun; TEC-181,
  * TEC-186, back in TEC-202), the Next 7 days box, four buttons that open a short form (Treats, Training,
  * Weight, Health), who is logging, and a feed of every loaded day, by when each entry happened, with a filter
@@ -298,7 +297,7 @@ export default function Journal() {
     [loadUpcoming]
   );
 
-  // A vaccine's next dose, planned once the vaccine is saved (TEC-259). It joins Next 7 days and the Calendar; if it can't
+  // A vaccine's next dose, planned once the vaccine is saved (TEC-259). It joins Next 7 days and the Outlook calendar; if it can't
   // be added the vaccine is safe in the journal and the toast says so.
   const planNextDose = useCallback(
     async (item: UpcomingInput) => {
@@ -310,7 +309,7 @@ export default function Journal() {
       } catch {
         // falls through to the toast
       }
-      setToast("Vaccine saved, but its next dose wasn't planned — add it from the Calendar");
+      setToast("Vaccine saved, but its next dose wasn't planned — add it from the form");
       clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setToast(null), 4000);
     },
@@ -726,12 +725,9 @@ export default function Journal() {
         className="sticky z-10 border-b border-line bg-paper"
         style={{ top: "env(safe-area-inset-top, 0px)" }}
       >
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-0.5 px-1.5">
+        <div className="mx-auto grid max-w-md grid-cols-4 gap-0.5 px-1.5">
           <button role="tab" type="button" id="tab-log" aria-selected={tab === "log"} aria-controls="panel-log" onClick={() => showTab("log")} className={tabClass("log")}>
             Log
-          </button>
-          <button role="tab" type="button" id="tab-calendar" aria-selected={tab === "calendar"} aria-controls="panel-calendar" onClick={() => showTab("calendar")} className={tabClass("calendar")}>
-            Calendar
           </button>
           <button role="tab" type="button" id="tab-notes" aria-selected={tab === "notes"} aria-controls="panel-notes" onClick={() => showTab("notes")} className={tabClass("notes")}>
             Notes
@@ -773,24 +769,6 @@ export default function Journal() {
             </button>
           </div>
         )}
-
-        <div id="panel-calendar" role="tabpanel" aria-labelledby="tab-calendar" hidden={tab !== "calendar"}>
-          {tab === "calendar" && (
-            <Calendar
-              entries={entries}
-              upcoming={upcoming}
-              upcomingError={upcomingError}
-              loaded={!!loaded}
-              today={today}
-              describeEntry={(e) => describe(e, dogs, entries, medications)}
-              nameOf={nameOf}
-              onDone={doneUpcoming}
-              onEditPlan={editUpcoming}
-              onOpenEntry={(e) => setOpen({ form: formOf(e) ?? "potty", event: e })}
-              onAddPlan={(day, form, healthType) => setOpen({ form, healthType, planDay: day })}
-            />
-          )}
-        </div>
 
         <div id="panel-notes" role="tabpanel" aria-labelledby="tab-notes" hidden={tab !== "notes"}>
           {tab === "notes" && (
@@ -961,17 +939,13 @@ export default function Journal() {
           {personError && !askWho && <p className="-mt-3 text-sm text-urgent">{personError}</p>}
 
           {/* Next 7 days (TEC-199, compact since TEC-250, below Logging as and above the Feed since TEC-255): open items due in the coming week, overdue too, soonest
-              first, one short line each with a small Done, and a Calendar link in the heading. Absent when nothing
+              first, one short line each with a small Done. Absent when nothing
               is due; the feed's Upcoming filter has the rest. */}
           {week.length > 0 && (
             <Box section="next-7-days" label="Next 7 days" className="-mt-2 !gap-0 !px-2 !py-0.5">
-              {/* Tighter than before (TEC-263): the box's own padding is thin, the heading row is short (the Calendar link keeps
-                  its 44px hit area through a negative margin), and the rows beneath are packed. */}
+              {/* Tighter than before (TEC-263): the box's own padding is thin, the heading row is short, and the rows beneath are packed. */}
               <div className="flex min-h-[28px] items-center justify-between">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-soft">Next 7 days</h2>
-                <button type="button" onClick={() => showTab("calendar")} className="-my-2 min-h-[44px] px-1 text-[13px] font-semibold text-accent underline underline-offset-2">
-                  Calendar
-                </button>
               </div>
               <UpcomingList compact items={week} today={today} onDone={doneUpcoming} onEdit={editUpcoming} />
             </Box>
@@ -1170,14 +1144,13 @@ export default function Journal() {
           onClose={() => setOpen(null)}
         >
           <LogForm
-            key={open.event?.id ?? (open.planDay ? `day-${open.planDay}-${open.form}-${open.healthType ?? ""}` : open.plan ? `plan-${open.plan.id}` : open.doneFor ? `done-${open.doneFor.id}` : open.form)}
+            key={open.event?.id ?? (open.plan ? `plan-${open.plan.id}` : open.doneFor ? `done-${open.doneFor.id}` : open.form)}
             form={open.form}
             healthType={open.healthType}
             quick={open.quick}
             event={open.event}
             done={open.doneFor ? donePrefill(open.doneFor, medications) : undefined}
             plan={open.plan}
-            planDay={open.planDay}
             sessionTreats={(open.form === "training" || open.form === "potty" || open.form === "fun") && open.event && loaded ? treatsWith(entries, open.event) : undefined}
             people={people}
             dogs={dogs}

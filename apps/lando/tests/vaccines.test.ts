@@ -452,9 +452,4 @@ describe("the forms", () => {
     open({ event: visit, events: [visit] });
     expect(screen.queryByRole("group", { name: "Vaccines given" })).toBeNull();
   });
-
-  it("the Calendar's Add a plan offers Vaccine", () => {
-    const src = readFileSync(resolve(__dirname, "../app/Calendar.tsx"), "utf8");
-    expect(src).toContain('healthType: "vaccine"');
-  });
 });

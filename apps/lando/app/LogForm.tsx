@@ -59,7 +59,6 @@ import {
 } from "@/lib/events";
 import { FOOD_UNITS, MISC_ID, servingAmount, servingOptions, servingText, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
 import { MED_REASONS, MED_REASON_IDS, MED_ROUTES, MED_UNITS, NO_REASON, findMedication, medReasonLabel, type MedReason, medPicklist, type MedRoute, type MedUnit, type Medication } from "@/lib/medications";
-import { plannedWhen } from "@/lib/calendar";
 import { donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, isFuturePick, type DonePrefill } from "@/lib/future";
 import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
@@ -109,8 +108,6 @@ type Props = {
    * the item in place. A done or cancelled item is never opened.
    */
   plan?: Upcoming;
-  /** The Calendar's "Add a plan" (TEC-234): a new entry opens on this day (`YYYY-MM-DD`), a later hour, so it saves as a plan. */
-  planDay?: string;
   /** A training, fun or potty being corrected: the treats already logged with it (`treatsWith`), shown, not changed. */
   sessionTreats?: JournalEvent[];
   people: Person[];
@@ -289,7 +286,6 @@ export default function LogForm({
   event,
   done,
   plan,
-  planDay,
   sessionTreats = [],
   people,
   dogs,
@@ -328,11 +324,9 @@ export default function LogForm({
     ? plan
       ? `${prefill.day}T${prefill.time}`
       : doneWhen(prefill, new Date())
-    : !event && planDay
-      ? plannedWhen(planDay, new Date())
-      : null;
+    : null;
   // A new entry opens on now rounded down to five minutes (the minutes step by five). Potty is never in the future, so
-  // even the Calendar's Add a plan, which opens on a later day, opens a Potty on now.
+  // a Potty always opens on now.
   const noFuture = kind === "potty" && !plan;
   const openedWhen = clampTo(prefillWhen ?? (event ? toLocalInput(event.at) : localStep(new Date(openedAt.current))), noFuture ? toLocalInput(openedAt.current) : undefined);
   const [when, setWhen] = useState(openedWhen);
