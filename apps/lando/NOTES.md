@@ -105,7 +105,50 @@
     weights only. (2) `/api/upcoming` returns open plans only, so a plan marked done leaves the Calendar (its entry shows on the day it was
     logged) and a repeating plan shows only its next date. (3) A new reader of `loaded.events` must still read `entries`, not events, or a
     note leaks in. (4) The tab row is five columns at 13px; a sixth tab will not fit.
-- **The When row shows that it scrolls** (TEC-266, the owner: "It's not quite apparent that they scroll", "That's perfect [peek] and nudge. Do the same thing with the day
+- **Day and Time are pop-ups; Repeat is steady; one set of length chips** (issue #64, the owner's approved demo of 2026-11-17: the scroll wheel "is hard to use… holding the
+  scroll wheel selects the page behind it", "No future potties", "recurring checkbox should just be perpetual" [Repeat stays as a tick with every-N-and-unit], "when you're
+  logging a time it should always be chips not a number field", "Rather than a 90 min chip just do 60+", "All pages should have the same time chip presets", "Get rid of
+  today yesterday tomorrow preset", "Move logging as inline with save. Make field boxes same size."). Local patterns, no data change and no migration. **It replaces
+  the TEC-266 and TEC-261 When bullets below where they describe the scroll columns, the transparent date input, the nudge, "Future: saves as upcoming" and a Save
+  that is only as wide as its label; #37's phone check is superseded by this.**
+  * **Two fields, two pop-ups** (`app/WhenField.tsx`, which exports `DayField` and `TimeField`; no default export): each is a 44px box (`input` + `w-full`, `select-none`,
+    a ▾) named "Day: Today" / "Time: 2:35 PM" that opens a dialog drawn into `<body>` (`z-[60]`, above the sheet's `z-50`; `Popup`). **Day** is a month calendar
+    (paging arrows, today ringed, the picked day filled); a tap on a day picks it and closes. **Time** is Now, 15, 30 and 45 min ago and 1 hr ago (`QUICK_AGO`), then
+    Hour, Minute and AM or PM as native `<select>`s (64px, centred), with **Cancel** and **Done**. Weight and the vaccine's Next dose are Day only (`dateOnly`; Next
+    dose is `DayField label="Next dose"`). The pop-up holds **a draft**: nothing is applied until Done (Time) or the tap on a day (Day), so Cancel, Escape and the backdrop
+    leave the row, and its `whenTouched`, exactly as it was. The page's scroll is locked while one is open (`document.body.style.overflow`, restored on close, as `Sheet`
+    does), and Escape is taken at `document` in the capture phase with `stopPropagation`, so it never reaches the sheet's own Escape and closes only the pop-up.
+  * **Minutes step by five** (`MINUTE_STEP` in the new `lib/whenpick.ts`, with every other pure part: the shortcuts, the month grid, the greyed-out rules, `clampTo`).
+    A new entry opens on now **rounded down** (`localStep`); `whenTouched` is still false, so untouched it saves at the real moment of Save (the box can read up to 4
+    minutes earlier than what is stored). A stored time keeps its own minute: the Minute list adds it when it is off the step (an older 9:07 entry reads 9:07).
+  * **Potty is never in the future** (`noFuture` = Potty without a `plan`; the Note form is `noFuture` too): later days are disabled in the calendar (and it won't page
+    past this month), and on today the hours, minutes and PM after now are disabled (`hourDisabled`, `minuteDisabled`, `pmDisabled`); a pick that would land after now becomes
+    now on a step (`clampTo`). **Potty has no Repeat.** The Calendar's Add a plan still lists Potty (`app/Calendar.tsx`, outside the #64 slice): `LogForm` opens a Potty on now
+    there, so it saves an entry, not a plan. An open Potty plan from before is edited on its own day, since it has a `plan`.
+  * **Repeat is always on the form** (`data-section="plan"`, `col-span-2` between the Day/Time row and the Logging as/Save row), except Potty: the tick, "every", the
+    number and the unit, the last two dimmed (`disabled`) until it is ticked, so nothing appears or moves when the time turns future. The "Future: saves as upcoming"
+    line is gone; Save reads **Save plan** (a plan being edited reads Save changes). **Repeat on a time that is not in the future is refused, not saved**: on Save,
+    `failOnForm(REPEAT_NEEDS_FUTURE)` ("Repeat saves a plan, so pick a later day or time, or untick Repeat."), before any entry or plan is written; this includes a correction
+    of a saved entry. Chosen over saving an overdue recurring plan because it creates nothing the person did not see. An open plan being edited keeps its repeat whatever its day.
+  * **The bottom block** (`data-section="when-who"`, `grid grid-cols-2 items-end gap-2`, `LogForm` and `NoteForm`): Day, Time, [Repeat], **Logging as, Save**, all
+    `w-full`, 44px, so the four boxes share two equal columns. Save is now `w-full` (`data-section="save"` is its cell); RULES.md's "only as wide as its label" no longer
+    holds for Save. A Weight has no Time, so its right cell is empty.
+  * **Length of time is chips everywhere** (`app/DurationChips.tsx`, `app/Chip.tsx`): Potty's Time outside, Fun's Length and Training's Time show `OUT_MINUTES_CHIPS`
+    (5, 15, 30, 45, 60), labelled **5 / 15 / 30 / 45 / 60+ min** (`outMinutesLabel`); a chip saves its own number (60+ saves 60); **no number box is left** (`f-mins` is gone).
+    The stored values are unchanged, so no migration: Potty's `minutes` is any whole 1 to 120, an exercise's 1 to 600. `outMinutesChip(m)` is `m` for a chip, **60 for any
+    value of 60 or more** (so a 90 shows 60+ picked), and null between chips (10, 20: no chip picked, the value kept). **Tapping a picked chip is a no-op** on Fun and
+    Training (a length is required, and a 90 is never silently cut to 60), and clears it on Potty (`optional`). Fun and Training open on 15 min as before. The feed reads
+    `outMinutesText` = the chip's face for a chip value ("5 min"… "60+ min") and "N min" otherwise; an exercise row still reads its exact `N min`. `outMinutesAria` is gone.
+  * **Food: What, then Servings** (a treat: What, then Amount), still one row, Servings `w-[64px]`, What `flex-1`. Related fields and everything else on the forms are unchanged.
+  * **Traps**: (1) `LogForm`, `NoteForm` and `VaccineFields` all build their Day and Time from `DayField` and `TimeField`: a new form that wants a When uses them and
+    puts them in the grid above, or its boxes will not line up. (2) The pop-ups are portalled to `<body>`, so a test finds them with `screen`, not inside the form
+    (`tests/whenpop.ts` has `pickDay`, `pickTime`, `setWhen`). (3) `pickDay` pages one month at a time: a test that picks a day decades out is slow. (4) `DayField` reads
+    `new Date()` each render, so a form left open past midnight greys out by the new day on the next render. (5) A disabled `<option>` can still be set by script, so
+    `clampTo` is what keeps a pick from landing after now. (6) `REPEAT_NEEDS_FUTURE` is exported from `LogForm.tsx` for its test.
+  * **Phone only, not proven**: jsdom proves the wiring (the dialog, the taps, the draft and Cancel, Escape, the disabled days and options, the saved times, the chips). It does
+    not prove how the pop-up sits on an iPhone or in Chrome, that the page behind really stays put or unselectable under a held finger, or how each browser draws the native
+    Hour, Minute and AM or PM lists. Those are the owner's check on the live app.
+- **(Superseded by #64 above: the scroll columns, the peek and the nudge are gone.) The When row shows that it scrolls** (TEC-266, the owner: "It's not quite apparent that they scroll", "That's perfect [peek] and nudge. Do the same thing with the day
   field"). A local pattern in `app/WhenField.tsx`, no data change and no migration; **it changes the TEC-261 bullet below where it describes the date box and a 42px row.**
   * **Peek**: every column (`ScrollColumn`) is 42px high (the 44px box inside its border) with **20px rows** and an 11px spacer above and below, so the chosen row sits
     in the middle at 15px and the rows either side show about 11px of themselves at 11px in `text-ink-soft`, under a top-and-bottom fade (`mask-image`). Row height is
@@ -122,7 +165,7 @@
   * **Phone only, not proven**: jsdom proves the wiring (the list, the taps, the scroll-to-pick, the nudge's calls and order, reduced motion, `showPicker`), not that
     scroll-snap settles, that the fade looks right, that the roll is smooth, that a tap after a swipe never opens the calendar, or that the calendar opens from a tap on the
     column. Those were not tried on a phone (TEC-265 is the owner's check).
-- **The When row is back at the bottom; Where is back under What** (TEC-261 and TEC-263, the owner: "I like the original mechanisim. I'd like to move it to the
+- **(Superseded by #64 above for the row itself: Day and Time pop-ups, a Save that fills its half, no "Future" line. Still true: the touched and untouched rules, Retry, Where under What, Servings defaults.) The When row is back at the bottom; Where is back under What** (TEC-261 and TEC-263, the owner: "I like the original mechanisim. I'd like to move it to the
   bottom, next to the logging user. Each takes up 50% of the row. Save below.", "clicking anywhere in the chip opens the calendar. change the time back to the
   small box that you scoll to select hh:mm,am/pm."). Local patterns, no data change and no migration. **It replaces the TEC-255/258 When sheet below:
   `WhenPicker.tsx`, `WhenAsk`, `classifyPick`, `held`, the "Repeat?" step (`repeatStep`) and "Pick another time" are gone; every bullet below that describes
@@ -742,7 +785,7 @@
   Live data at TEC-186: no entry holds leash `pen` or any `spot`. `box` is in `lando.details_ok` through migration
   `lando_box_leash_spot` (both lists widened, `'box'` added; the spot list is written `('box', 'crate', 'pen',
   'loose')` because `tests/details-ok-superset.test.ts` mutates the literal `'crate', 'pen', 'loose')`).
-- **Potty's Time outside** (TEC-176, range chips since TEC-193) shows only while Where is Outside, below Leash:
+- **(The chips are now 5 / 15 / 30 / 45 / 60+ min on every form, #64 above; the stored numbers below are unchanged.) Potty's Time outside** (TEC-176, range chips since TEC-193) shows only while Where is Outside, below Leash:
   **range chips only, no number box**: **≤5**, **5–15**, **15–30**, **30–45**, **45–60** (`OUT_MINUTES_CHIPS`
   5, 15, 30, 45, 60; `outMinutesLabel`; the en dash is the character "–"; screen readers get "5 minutes or
   less", "5 to 15 minutes"…, `outMinutesAria`). **Each chip stores its upper bound in the existing `minutes`**,

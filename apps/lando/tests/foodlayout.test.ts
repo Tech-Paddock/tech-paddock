@@ -61,10 +61,10 @@ describe("Food defaults (TEC-263)", () => {
 });
 
 describe("Food layout (TEC-263)", () => {
-  it("puts Servings left of What on one line, about as wide as its label, with What taking the rest", () => {
+  it("puts What left of Servings on one line, Servings about as wide as its label, with What taking the rest (#64)", () => {
     render(createElement(LogForm, { ...props(), form: "food" } as never));
     const what = screen.getByLabelText("What") as HTMLSelectElement;
-    expect(servings().compareDocumentPosition(what) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(what.compareDocumentPosition(servings()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(servings().parentElement!.parentElement).toBe(what.parentElement!.parentElement);
     expect(servings().className).toContain("w-[64px]");
     expect(what.parentElement!.className).toContain("flex-1");

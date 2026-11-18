@@ -20,6 +20,7 @@ import {
 } from "@/lib/events";
 import { donePrefill, formForItem, futureItem } from "@/lib/future";
 import { nextDose, nextDosePlan, visitVaccineEntries } from "@/lib/vaccine-plan";
+import { dayBox, pickDay } from "./whenpop";
 import { DOSE_MAX, VACCINES, VACCINE_IDS, hasDoses, parseVaccinePlanTitle, suggestedDose, vaccineLabel, vaccinePlanTitle, vaccineText } from "@/lib/vaccines";
 
 // Invented ids. Nothing here is a real record (RULES.md, Never 2).
@@ -379,9 +380,8 @@ describe("the forms", () => {
   it("a day typed in the next dose box is the day planned", () => {
     const p = open({ healthType: "vaccine" });
     fireEvent.change(screen.getByLabelText("Vaccine", { selector: "select" }), { target: { value: "bordetella" } });
-    const boxes = screen.getAllByLabelText("Date") as HTMLInputElement[];
-    expect(boxes).toHaveLength(2); // the next dose's, then the When row's
-    fireEvent.change(boxes[0], { target: { value: "2027-01-15" } });
+    expect(dayBox("Next dose")).toBeTruthy(); // the next dose's Day box, beside the form's own Day
+    pickDay("2027-01-15", "Next dose");
     save();
     const [body, , plans] = p.onLog.mock.calls[0] as [{ id: string }, unknown, Record<string, { due_on: string }>];
     expect(plans[body.id].due_on).toBe("2027-01-15");
@@ -390,13 +390,12 @@ describe("the forms", () => {
   it("a vaccine dated in the future is a plan, not an entry, and offers no further plan", () => {
     const p = open({ healthType: "vaccine" });
     fireEvent.change(screen.getByLabelText("Vaccine", { selector: "select" }), { target: { value: "dhpp" } });
-    const when = screen.getAllByLabelText("Date").at(-1) as HTMLInputElement;
-    fireEvent.change(when, { target: { value: "2099-01-01" } });
+    pickDay("2028-01-01");
     expect(screen.queryByLabelText("Plan the next dose")).toBeNull();
     save();
     expect(p.onLog).not.toHaveBeenCalled();
     expect(p.onUpcoming).toHaveBeenCalledTimes(1);
-    expect(p.onUpcoming.mock.calls[0][0]).toMatchObject({ kind: "vaccine", title: "Vaccine · DHPP · dose 1", due_on: "2099-01-01" });
+    expect(p.onUpcoming.mock.calls[0][0]).toMatchObject({ kind: "vaccine", title: "Vaccine · DHPP · dose 1", due_on: "2028-01-01" });
   });
 
   it("a correction opens on its vaccine and dose and offers no plan", () => {

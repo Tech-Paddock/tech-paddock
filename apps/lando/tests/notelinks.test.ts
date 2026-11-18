@@ -91,7 +91,8 @@ describe("Health's Related issue has no checkbox", () => {
       const html = render("health", { ...extra, events: [A_ISSUE] });
       expect(html).toContain('id="f-issue"');
       expect(html).toContain("Related issue");
-      expect(html).not.toContain('type="checkbox"');
+      // No Related issue checkbox. (The form's Repeat is a checkbox too, and is always there, #64.)
+      expect(html.slice(0, html.indexOf('data-section="when-who"'))).not.toContain('type="checkbox"');
       expect(html).not.toContain("For a medical issue");
       // None first, and nothing selected but None (the static markup marks the chosen option).
       const select = html.slice(html.indexOf('id="f-issue"'), html.indexOf("</select>", html.indexOf('id="f-issue"')));
@@ -162,7 +163,7 @@ describe("the Related note select", () => {
     const box = html.slice(html.indexOf('data-section="secondary"'), html.indexOf('data-section="note"'));
     expect(box.indexOf("Related issue")).toBeGreaterThan(-1);
     expect(box.indexOf("Related issue")).toBeLessThan(box.indexOf("Related note"));
-    expect([...html.matchAll(/data-section="([a-z]+)"/g)].map((m) => m[1])).toEqual(["entry", "secondary", "note", "photos", "save"]);
+    expect([...html.matchAll(/data-section="([a-z]+)"/g)].map((m) => m[1])).toEqual(["entry", "secondary", "note", "photos", "plan", "save"]);
   });
 
   it("opens a correction on the stored pick, and a voided note stays picked in words", () => {

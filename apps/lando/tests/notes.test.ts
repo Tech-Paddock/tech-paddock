@@ -308,9 +308,8 @@ describe("the Note form", () => {
   it("has no Repeat and no future When", () => {
     expect(html).not.toContain("Repeat");
     expect(html).not.toContain("Future");
-    // The calendar stops at today (`maxDay`, the day input's max), and Save refuses a time later today.
-    expect(readFileSync(resolve(__dirname, "../app/NoteForm.tsx"), "utf8")).toContain("maxDay={toDateInput(");
-    expect(readFileSync(resolve(__dirname, "../app/WhenField.tsx"), "utf8")).toContain("max={maxDay}");
+    // The pop-ups grey out later days and times (`noFuture`), and Save refuses a time later today.
+    expect(readFileSync(resolve(__dirname, "../app/NoteForm.tsx"), "utf8")).toContain("noFuture");
     expect(readFileSync(resolve(__dirname, "../app/NoteForm.tsx"), "utf8")).toContain("noteWhenError(new Date(at)");
   });
 

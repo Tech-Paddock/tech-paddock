@@ -110,23 +110,26 @@ export function spotOptions(current: Spot | "" | null | undefined): Opts<Spot> {
 }
 
 /**
- * Time outside is picked from range chips only (TEC-186, ranges TEC-193): up to 5, 5 to 15, 15 to 30, 30 to
- * 45 and 45 to 60 minutes. A chip stores its upper bound in `minutes`, so the stored value is still any
- * whole 1 to OUT_MINUTES_MAX, which the server and database accept: an older entry holding another number
- * (10, 20, 25) keeps it and reads "N min".
+ * Every length of time (Potty's Time outside, Fun's Length, Training's Time) is picked from one set of chips: 5, 15, 30,
+ * 45 and 60+ min. A chip stores its own number in `minutes` (60+ stores 60), so the stored value is still any whole
+ * number the server and database accept (1 to OUT_MINUTES_MAX for Time outside, 1 to 600 for an exercise): an older
+ * entry holding another number (10, 20, 90) keeps it and reads "N min". Before the chips were these, a chip was a
+ * range that saved its upper bound ("5–15" saved 15); the stored numbers are the same, only the words changed.
  */
 export const OUT_MINUTES_CHIPS = [5, 15, 30, 45, 60] as const;
 export const OUT_MINUTES_MAX = 120;
-const OUT_RANGES: Record<number, string> = { 5: "≤5", 15: "5–15", 30: "15–30", 45: "30–45", 60: "45–60" };
-/** A chip's face: "≤5", "5–15"… (the upper bound is what it saves). */
-export const outMinutesLabel = (m: number) => OUT_RANGES[m] ?? String(m);
-/** The feed's words for a stored `minutes`: a range for the five chip values, "N min" for any other. */
-export const outMinutesText = (m: number) => `${outMinutesLabel(m)} min`;
-/** A chip's name for a screen reader. */
-export const outMinutesAria = (m: number) => (m === 5 ? "5 minutes or less" : `${OUT_RANGES[m].replace("–", " to ")} minutes`);
-/** The chip a stored value matches, or null (an older value such as 10 picks no chip). */
-export const outMinutesChip = (m: number | null | undefined): number | null =>
-  m !== null && m !== undefined && (OUT_MINUTES_CHIPS as readonly number[]).includes(m) ? m : null;
+/** The last chip's value: it reads "60+" and stands for an hour or more. */
+const LONGEST_CHIP = 60;
+/** A chip's face, and the feed's words for a stored `minutes`: "5 min", "15 min"… "60+ min" (any other number is "N min"). */
+export const outMinutesLabel = (m: number) => (m === LONGEST_CHIP ? "60+ min" : `${m} min`);
+/** The feed's words for a stored `minutes`. */
+export const outMinutesText = outMinutesLabel;
+/** The chip a stored value matches, or null (an older value such as 10 or 20 picks no chip). 60 or more picks 60+. */
+export const outMinutesChip = (m: number | null | undefined): number | null => {
+  if (m === null || m === undefined) return null;
+  if (m >= LONGEST_CHIP) return LONGEST_CHIP;
+  return (OUT_MINUTES_CHIPS as readonly number[]).includes(m) ? m : null;
+};
 export type PottyDetails = {
   what: PottyWhat;
   where: (typeof WHERE)[number];

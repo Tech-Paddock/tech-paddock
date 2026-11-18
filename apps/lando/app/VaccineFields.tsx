@@ -3,7 +3,7 @@
 import { DOSE_MAX, VACCINES, hasDoses, vaccineLabel } from "@/lib/vaccines";
 import { dayText } from "@/lib/upcoming";
 import { Field, inputFull } from "./LogForm";
-import WhenField from "./WhenField";
+import { DayField } from "./WhenField";
 
 /**
  * The Vaccine type's picks (TEC-259): which vaccine, and its dose number when it has one. The two share the row, each
@@ -106,9 +106,7 @@ export function NextDoseOffer({
       </label>
       {on && day !== undefined && onDay && (
         <div className="grid grid-cols-2 items-end gap-2">
-          <Field label="Next dose">
-            <WhenField value={day} dateOnly onChange={onDay} />
-          </Field>
+          <DayField label="Next dose" value={day} dateOnly onChange={onDay} />
           {text && <p className="pb-2.5 text-[13px] text-ink-soft">Usually {text} on. You can change the date.</p>}
         </div>
       )}

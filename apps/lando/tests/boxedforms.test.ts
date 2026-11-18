@@ -79,9 +79,11 @@ const sections = (html: string) => [...html.matchAll(/data-section="([a-z]+)"/g)
 /* ── One form layout everywhere ─────────────────────────────────────────── */
 
 describe("section order per form", () => {
-  const ORDER = ["entry", "secondary", "note", "photos", "save"];
+  // Potty has no Repeat (it is never in the future); every other form has the plan block, always (#64).
+  const POTTY_ORDER = ["entry", "secondary", "note", "photos", "save"];
+  const ORDER = ["entry", "secondary", "note", "photos", "plan", "save"];
   const cases: [string, FormKind, Record<string, unknown>, string[]][] = [
-    ["Potty", "potty", {}, ORDER],
+    ["Potty", "potty", {}, POTTY_ORDER],
     ["Training", "training", {}, ORDER],
     ["Fun", "fun", {}, ORDER],
     ["Vet visit", "health", { healthType: "vet" }, ORDER],
@@ -89,8 +91,8 @@ describe("section order per form", () => {
     ["Medical issue", "health", { healthType: "issue" }, ORDER],
     ["Medication", "health", { healthType: "medication" }, ORDER],
     // Photos and files are on every form (TEC-203).
-    ["Food", "food", {}, ["entry", "note", "photos", "save"]],
-    ["Weight", "weight", {}, ["entry", "note", "photos", "save"]],
+    ["Food", "food", {}, ["entry", "note", "photos", "plan", "save"]],
+    ["Weight", "weight", {}, ["entry", "note", "photos", "plan", "save"]],
   ];
   for (const [name, form, extra, expected] of cases) {
     it(`${name}: the entry, the secondary row, the note, photos, then the bottom row last`, () => {
@@ -98,15 +100,17 @@ describe("section order per form", () => {
     });
   }
 
-  it("ends in a When and Logging as row, each half the row, with Save on its own line below (TEC-261)", () => {
-    const html = render("potty");
-    const row = html.slice(at(html, 'data-section="when-who"'), at(html, 'data-section="save"'));
+  it("ends in Day, Time, Logging as and Save, two equal columns, with Repeat between the rows (#64)", () => {
+    const html = render("training");
+    const block = html.slice(at(html, 'data-section="when-who"'));
     expect(html).toContain('data-section="when-who" class="grid grid-cols-2');
-    expect(row.indexOf("When")).toBeLessThan(row.indexOf("Logging as"));
-    expect(row).toContain('id="f-who"');
-    // Save is not in the row; it is the only submit button and follows it.
-    expect(row).not.toContain('type="submit"');
-    expect(html.slice(at(html, 'data-section="save"'))).toContain('type="submit"');
+    const order = ["Day", "Time", 'data-section="plan"', "Logging as", 'data-section="save"'].map((n) => block.indexOf(n));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(block).toContain('id="f-who"');
+    // Save is the only submit button and is in the grid, after Logging as.
+    expect(block.slice(0, block.indexOf('data-section="save"'))).not.toContain('type="submit"');
+    expect(block.slice(block.indexOf('data-section="save"'))).toContain('type="submit"');
     expect(html).not.toContain(">Human<");
   });
 
@@ -152,12 +156,12 @@ describe("Potty", () => {
 });
 
 describe("Food", () => {
-  it("has Type (Meal, Snuffle mat, Treat) then Servings and What on one line, Servings first (TEC-263)", () => {
+  it("has Type (Meal, Snuffle mat, Treat) then What and Servings on one line, What first (#64)", () => {
     const html = render("food");
     const entry = html.slice(at(html, 'data-section="entry"'), at(html, 'data-section="note"'));
     for (const t of ["Meal", "Snuffle mat", "Treat"]) expect(entry).toContain(t);
     expect(entry.indexOf("Type")).toBeLessThan(entry.indexOf("What"));
-    expect(entry.indexOf("Servings")).toBeLessThan(entry.indexOf("What"));
+    expect(entry.indexOf("What")).toBeLessThan(entry.indexOf("Servings"));
     // Servings: a select at a fixed width (TEC-257); a treat keeps its own small count box.
     expect(entry).toContain("Servings");
     expect(entry).toContain("<select");
@@ -166,11 +170,12 @@ describe("Food", () => {
 });
 
 describe("Training and Fun", () => {
-  it("Training: Where and Time on one line, then Commands and Other dogs on one line, then the treats count", () => {
+  it("Training: Where, then Time as chips, then Commands and Other dogs on one line, then the treats count", () => {
     const html = render("training");
     const entry = html.slice(at(html, 'data-section="entry"'), at(html, 'data-section="secondary"'));
-    expect(entry.indexOf("Where")).toBeLessThan(entry.indexOf("Time (min)"));
-    expect(entry.indexOf("Time (min)")).toBeLessThan(entry.indexOf("Commands practised"));
+    expect(entry.indexOf("Where")).toBeLessThan(entry.indexOf("Time"));
+    expect(entry.indexOf("Time")).toBeLessThan(entry.indexOf("Commands practised"));
+    expect(entry).not.toContain('type="number"');
     expect(entry.indexOf("Commands practised")).toBeLessThan(entry.indexOf("Other dogs"));
     expect(entry).toContain("grid-cols-2");
     expect(html.slice(at(html, 'data-section="secondary"'), at(html, 'data-section="note"'))).toContain("Treats");
@@ -373,17 +378,19 @@ describe("a future When", () => {
   });
   it("is an upcoming item, not a journal event: the form says so, shows Repeat, and never reaches onLog (source check)", () => {
     const form = readFileSync(resolve(__dirname, "../app/LogForm.tsx"), "utf8");
-    // The notice and the Repeat sit on the form while it is a plan (TEC-255; they were in the When step before).
-    expect(form).toContain("{future && <p");
-    expect(form).toContain("FUTURE_NOTICE");
+    // The Repeat is on the form always, so nothing shifts when the time turns future; Save reads Save plan (#64).
+    expect(form).not.toContain("FUTURE_NOTICE");
     const submit = form.slice(form.indexOf("async function commit("), form.indexOf("async function remove("));
     expect(submit.indexOf("await submitFuture(whenV, dayV)")).toBeGreaterThan(0);
     expect(submit.indexOf("await submitFuture(whenV, dayV)")).toBeLessThan(submit.indexOf("onLog(body, then)"));
     expect(submit.slice(0, submit.indexOf("await submitFuture(whenV, dayV)"))).not.toContain("onLog");
     expect(form).toContain("await onUpcoming(item, plan?.id)");
-    // The Repeat control is inside the planning branch only (a future When, or an open item being edited).
-    expect(form).toMatch(/\{planning && \(\s*<div data-section="plan"/);
+    // The Repeat control is there unless the form can't be in the future (Potty); a ticked Repeat on a time that is not
+    // later is refused before anything is saved.
+    expect(form).toMatch(/\{!noFuture && \(\s*<div data-section="plan"/);
     expect(form).toContain("{repeatBlock}");
+    expect(submit.indexOf("failOnForm(REPEAT_NEEDS_FUTURE)")).toBeGreaterThan(submit.indexOf("await submitFuture(whenV, dayV)"));
+    expect(submit.indexOf("failOnForm(REPEAT_NEEDS_FUTURE)")).toBeLessThan(submit.indexOf("onLog(body, then)"));
   });
   it("a saved entry cannot move to the future, and the server refuses a time past a day ahead", () => {
     const body = { id: "99999999-9999-4999-8999-999999999999", kind: "potty", at: "2026-11-09T12:00:00.000Z", details: { what: "pee", where: "outside" } };

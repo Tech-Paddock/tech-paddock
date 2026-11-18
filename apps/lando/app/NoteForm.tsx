@@ -4,9 +4,10 @@ import { useRef, useState } from "react";
 import { InvalidEvent, NOTE_MAX, eventNames, eventPhotos, parseDetails, type Details, type JournalEvent } from "@/lib/events";
 import { noteText, noteWhenError } from "@/lib/notes";
 import { fromLocalInput, toDateInput, toLocalInput } from "@/lib/localtime";
+import { localStep } from "@/lib/whenpick";
 import PhotoPicker, { usePhotos } from "./Photos";
 import { Box, Field, inputFull, type LogBody, type Person } from "./LogForm";
-import WhenField from "./WhenField";
+import { DayField, TimeField } from "./WhenField";
 
 type Props = {
   /** Set when correcting a note; the form opens on its values. */
@@ -35,7 +36,7 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
   const openedAt = useRef(new Date().toISOString());
   // The When row (TEC-261) opens on now, or on the note's own time. Untouched, a new note is saved at the moment of Save and
   // a correction keeps its time to the millisecond; a failed save keeps whatever the row holds.
-  const [when, setWhen] = useState(toLocalInput(event?.at ?? openedAt.current));
+  const [when, setWhen] = useState(event ? toLocalInput(event.at) : localStep(new Date(openedAt.current)));
   const [whenTouched, setWhenTouched] = useState(false);
   const [retry, setRetry] = useState(false);
   const [personId, setPersonId] = useState(event ? event.person_id ?? "" : phonePerson ?? "");
@@ -143,20 +144,26 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
         </div>
       )}
 
-      {/* The bottom row (TEC-261): When and Logging as, each half the row, as on every form. A note is never in the
-          future, so the calendar stops at today. Save is on its own line below. */}
+      {/* The bottom block, as on every form (the owner, 2026-11-17): Day, Time, Logging as and Save in two equal columns.
+          A note is never in the future, so later days and times are greyed out. */}
       <div data-section="when-who" className="grid grid-cols-2 items-end gap-2">
-        <Field label="When">
-          <WhenField
-            value={when}
-            dateOnly={false}
-            maxDay={toDateInput(new Date().toISOString())}
-            onChange={(v) => {
-              setWhen(v);
-              setWhenTouched(true);
-            }}
-          />
-        </Field>
+        <DayField
+          value={when}
+          dateOnly={false}
+          noFuture
+          onChange={(v) => {
+            setWhen(v);
+            setWhenTouched(true);
+          }}
+        />
+        <TimeField
+          value={when}
+          noFuture
+          onChange={(v) => {
+            setWhen(v);
+            setWhenTouched(true);
+          }}
+        />
         <Field label="Logging as" htmlFor="n-who">
           <select id="n-who" value={personId} onChange={(e) => setPersonId(e.target.value)} className={inputFull}>
             <option value="">Nobody</option>
@@ -167,15 +174,15 @@ export default function NoteForm({ event, people, phonePerson, photoUrls, onPhot
             ))}
           </select>
         </Field>
-      </div>
-      <div data-section="save" className="flex items-center gap-2">
+        <div data-section="save">
         <button
           type="submit"
           disabled={busy || photoBlock}
-          className="h-[44px] min-w-0 shrink-0 whitespace-nowrap rounded-[12px] bg-[var(--tone-2-bg)] px-4 text-[15px] font-bold text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)] disabled:opacity-60"
+          className="h-[44px] w-full min-w-0 whitespace-nowrap rounded-[12px] bg-[var(--tone-2-bg)] px-4 text-[15px] font-bold text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)] disabled:opacity-60"
         >
           {busy ? "Saving…" : photos.working ? "Uploading…" : photos.failed ? "Fix attachment" : retry && error ? "Retry" : editing ? "Save changes" : "Save note"}
         </button>
+        </div>
       </div>
       {editing && (
         <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] self-start font-semibold text-danger disabled:opacity-60">
