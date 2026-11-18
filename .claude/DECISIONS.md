@@ -67,8 +67,9 @@ would get something wrong without it: the rule, one line of why. App rules live 
   a deliberate change to that test. No interpreter, package runner or write ever goes on it.
 - **Apps put dates in one shared Outlook account, techpaddock@outlook.com, a calendar per app**
   (owner, 2026-11-17, #65). No app hosts its own calendar; Pit Row shows these instead (#44). Apps
-  never call Microsoft: they send events to home's calendar route, forwarding only the session, and
-  home alone holds the token, because Microsoft replaces the refresh token on every use. One-way:
+  never call Microsoft: they send events to one calendar route, forwarding only the session, and
+  only its host holds the token, because Microsoft replaces the refresh token on every use. The host
+  is Grid for now, not the hub, which holds no database key; it is built to move (#66). One-way:
   edits made in Outlook are not read back.
 
 ## Mistakes
