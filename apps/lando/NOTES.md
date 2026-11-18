@@ -28,27 +28,38 @@
     vet visit's `givenItems`) and through `visitVaccineEntries`, so the age beats the dose number once a birthday is saved.
   * **The Edit form** is a `Sheet` of two `Box`es (Basics, Vet) on the shared field class; empty boxes clear a detail. **Phone-only, not proven by jsdom:** the icon tap
     on a phone, the 44px targets, the tab bar returning where it was, and the layout.
-- **Vaccines** (TEC-259, the owner: "I want a vaccines section I think in heath. I don't want it to live solely in vet visit"; the list
-  is "fine for now"): Health's fifth type, `vaccine`, stored as a `health` event with `details` `{type: 'vaccine', vaccine, dose?, note_id?, photos?, names?}`
+- **Vaccines** (TEC-259, then **#73**: "remove the vaccine page as an option for health. They will be created silently from vet visits."; the list
+  is "fine for now"). **Since #73 Health's Type row has no Vaccine** (`HEALTH_PICK_TYPES` is `HEALTH_TYPES` without it; `HEALTH_TYPES`, the database check and `describe` keep it,
+  because existing rows use it): a vaccine is recorded only through a vet visit's Vaccines given. The Vaccine form is still there to **correct an existing entry**
+  (the Type row then shows Vaccine, selected) and to **edit an open vaccine plan** in place. Original shape: Health's fifth type, `vaccine`, stored as a `health` event with `details` `{type: 'vaccine', vaccine, dose?, note_id?, photos?, names?}`
   and **no `reasons` key** (as a medication has none). `lib/vaccines.ts` holds the list (`VACCINES`: DHPP, Bordetella, Leptospirosis, Rabies; ids
   `dhpp`, `bordetella`, `leptospirosis`, `rabies`; `VACCINE_RETIRED` is empty) and the dose number (`doses: true` for DHPP and Leptospirosis only, 1 to 6);
   `lib/vaccine-plan.ts` holds the pure next-dose rule (`nextDose`) and the plan it makes (`nextDosePlan`, `visitVaccineEntries`).
-  * **The Vaccine form**: a Vaccine select and a Dose select side by side, each half the row (the Dose box is empty for a vaccine with no number),
-    then the offer **Plan the next dose** (ticked, a day in the shared date box and "Usually 3–4 weeks on. You can change the date.") on a new entry
-    only; a note is optional (like a medication's); Related note only (no Related issue). The dose opens on one more than the live entries of that
-    vaccine already logged (`earlierDoses`) until it is touched. A future When on it is a plan (title `Vaccine · DHPP · dose 2`), with no further offer.
+  * **The Vaccine form** (editing only since #73): a Vaccine select and a Dose select side by side, each half the row (the Dose box is empty for a vaccine with no number);
+    a note is optional; Related note only (no Related issue). **A vaccine is a date, not a date and time** (`dateOnly` is true for a weight **and** a Health vaccine, read from
+    `healthType`, which is why `LogForm` declares `h` and `healthType` before it): Day only, stored at local noon like a weight, so a correction moves the entry to that day's
+    noon. **It has no Repeat** (`repeatAllowed` is false; a plan edited here saves with no repeat), and **no next-dose offer** (that is the vet visit's now). The dose opens on one more than the live
+    entries of that vaccine already logged (`earlierDoses`) until it is touched. An open plan edited here keeps its title (`Vaccine · DHPP · dose 2`).
   * **Next dose** (suggestions only; the plan's date is editable in the form and later from Upcoming): DHPP and Leptospirosis 3 weeks on while under
     16 weeks old, then 1 year; Rabies 1 year after the first, then 3 years; Bordetella 6 months. Until a birthday is saved in the Profile (TEC-260) the dose number
     stands in: doses 1 and 2 are the puppy series, 3 and later yearly. Once it is saved, `LogForm` passes it to `nextDose` and the age beats the dose number.
   * **The plan** is an ordinary `lando.upcoming` item of kind `vaccine` titled `Vaccine · DHPP · dose 3` (the dose only while the puppy series
     goes on). It is added **after the vaccine is saved** (`planAfter` in `Journal.tsx`, keyed by the vaccine entry's id), so a vaccine that fails
     leaves no plan; the map is in memory, so a reload between a failed save and its Retry drops the offer (the vaccine still saves). If the plan can't be
-    added the toast says the vaccine is saved and to add the dose from the form. Its **Done** opens the Vaccine form on that vaccine and dose
-    (`formForItem`, `donePrefill`); an older vaccine plan with its own words ("Rabies booster") still opens Vet visit with the reason Vaccines.
+    added the toast says the vaccine is saved and to add the dose from the form. **Its Done opens a Vet visit with that vaccine ticked** (#73: `doneFormFor`, `plannedVaccine`
+    and `donePrefill` in `lib/future.ts`; the reason opens on Vaccines); an edit of the plan still opens the Vaccine form (`formForItem`). An older vaccine plan with its own words
+    ("Rabies booster") opens Vet visit as before. **The server's Done rule** (`applyAction`, `lib/upcoming-db.ts`): a plan whose title names a vaccine closes only by a vaccine entry
+    of that vaccine, **or by a vet visit with a live vaccine entry of it** (`parent_id` the visit); any other vet or vaccine plan closes only by a vet visit; a repeating one makes
+    its next. **The phone closes it by the vaccine entry, not the visit** (`logNew` in `Journal.tsx` links `visitLinks` to the visit's entry for that vaccine): the visit saves
+    first and its vaccine entries after it, so closing on the visit would reach the server before the entry it checks exists. Unticking the vaccine before saving leaves the plan open.
   * **Vaccines given on a vet visit**: a toggle chip for each vaccine under the visit's Weight, on a **new** visit only (a correction shows none: correct
     the vaccine entries from the feed). Each pick is its own Vaccine entry at the visit's time and person, saved after the visit (and its weight) through the
     usual follow-up rows, **`parent_id` the visit's id** (TEC-251's column; `parseNewEvent` now accepts it on a vaccine, and still refuses it on a vet
-    visit or an issue). Its dose is the one the log implies, and **Plan the next doses** (ticked) plans each, listing the suggested days. The visit's feed
+    visit or an issue). Its dose is the one the log implies, and **Plan the next doses** (ticked) plans each. **The next dose is picked with chips, not a calendar** (#73,
+    `NEXT_STEPS` in `lib/vaccine-plan.ts`): 3–4 weeks, 6 months, 1 year, 3 years under each vaccine given (`NextDoseOffer`, the shared `Chip`), the vaccine's usual gap (`nextDose`'s
+    interval text, through `defaultStepId`) picked first, and the day it makes shown above (`stepDay`, counted from the visit's day). A step picked is passed to
+    `visitVaccineEntries` as `steps`; one not picked keeps the rule's own day, so the plans are what they were. A plan's title keeps the rule's dose number whatever the chip says.
+    Profile's **Plan next** is unchanged (it plans the rule's day). The visit's feed
     line reads "Vaccines · gave DHPP · dose 1, Rabies" (`vaccinesWith` follows the visit's `voids` chain like `treatsWith`); a vaccine logged on its own is never listed there.
   * **The Log** shows a Vaccine entry as "Vaccine  DHPP · dose 2" in Health's colour; it is Health, so it is in the Health pill's filter and nowhere else new.
   * **Database**: migration `lando_vaccines` (a `vaccine` WHEN placed before `medication` in the health branch of `lando.details_ok`, nothing else).
@@ -122,8 +133,7 @@
   * **Two fields, two pop-ups** (`app/WhenField.tsx`, which exports `DayField` and `TimeField`; no default export): each is a 44px box (`input` + `w-full`, `select-none`,
     a ▾) named "Day: Today" / "Time: 2:35 PM" that opens a dialog drawn into `<body>` (`z-[60]`, above the sheet's `z-50`; `Popup`). **Day** is a month calendar
     (paging arrows, today ringed, the picked day filled); a tap on a day picks it and closes. **Time** is Now, 15, 30 and 45 min ago and 1 hr ago (`QUICK_AGO`), then
-    Hour, Minute and AM or PM as native `<select>`s (64px, centred), with **Cancel** and **Done**. Weight and the vaccine's Next dose are Day only (`dateOnly`; Next
-    dose is `DayField label="Next dose"`). The pop-up holds **a draft**: nothing is applied until Done (Time) or the tap on a day (Day), so Cancel, Escape and the backdrop
+    Hour, Minute and AM or PM as **Lando's own compact menus** (#73, below; they were native `<select>`s), with **Cancel** and **Done**. Weight and a Vaccine entry are Day only (`dateOnly`). The pop-up holds **a draft**: nothing is applied until Done (Time) or the tap on a day (Day), so Cancel, Escape and the backdrop
     leave the row, and its `whenTouched`, exactly as it was. The page's scroll is locked while one is open (`document.body.style.overflow`, restored on close, as `Sheet`
     does), and Escape is taken at `document` in the capture phase with `stopPropagation`, so it never reaches the sheet's own Escape and closes only the pop-up.
   * **Minutes step by five** (`MINUTE_STEP` in the new `lib/whenpick.ts`, with every other pure part: the shortcuts, the month grid, the greyed-out rules, `clampTo`).
@@ -132,11 +142,23 @@
   * **Potty is never in the future** (`noFuture` = Potty without a `plan`; the Note form is `noFuture` too): later days are disabled in the calendar (and it won't page
     past this month), and on today the hours, minutes and PM after now are disabled (`hourDisabled`, `minuteDisabled`, `pmDisabled`); a pick that would land after now becomes
     now on a step (`clampTo`). **Potty has no Repeat.** (The Calendar's Add a plan, which once listed Potty, is gone, #67.) An open Potty plan from before is edited on its own day, since it has a `plan`.
-  * **Repeat is always on the form** (`data-section="plan"`, `col-span-2` between the Day/Time row and the Logging as/Save row), except Potty: the tick, "every", the
+  * **The compact time menus** (#73, the owner: "Can we make this smaller" → "Yes compact menu"; `app/CompactMenu.tsx`, a local pattern, no data change): on iPhone the native menu is huge
+    and the page can't size it. Each of Hour, Minute and AM or PM is a 44px `button role="combobox"` (`aria-haspopup="listbox"`, `aria-expanded`) that opens a `ul role="listbox"` of
+    `li role="option"` rows **right under it** (`absolute top-full`, no portal): 44px rows, `max-height` 198px (five rows and a bit of the sixth), `overflow-y-auto`, `overscroll-behavior: contain`,
+    `select-none`, Lando's tokens. The current value is ticked (✓, `aria-selected`) and scrolled to the middle of the list on opening (the list's own `scrollTop`, never `scrollIntoView`, so the page
+    cannot move). Tap picks and closes; **Escape** closes the menu only (`Popup`'s Escape handler returns while a `[role="listbox"]` is open, then the menu's own capture listener
+    closes it, so a second Escape cancels the pop-up) and a `pointerdown` outside closes it; the list takes focus: ArrowUp/Down, Home, End, Enter or Space, Tab closes, ArrowDown on the
+    box opens. A disabled option (after now on a Potty or note) is greyed, struck through, `aria-disabled`, skipped by the arrows and never picked. The options carry their own text, so an
+    off-grid minute (`minuteOptions`) is one more row. The menu is `relative` inside the pop-up panel and floats over the Cancel and Done row below it. A tap outside it that lands on the backdrop closes the menu on
+    `pointerdown` and the pop-up on the click that follows (one tap, both).
+  * **Repeat is always on the form** (`data-section="plan"`, `col-span-2` between the Day/Time row and the Logging as/Save row), except Potty **and a vaccine** (#73): the tick, "every", the
     number and the unit, the last two dimmed (`disabled`) until it is ticked, so nothing appears or moves when the time turns future. The "Future: saves as upcoming"
-    line is gone; Save reads **Save plan** (a plan being edited reads Save changes). **Repeat on a time that is not in the future is refused, not saved**: on Save,
-    `failOnForm(REPEAT_NEEDS_FUTURE)` ("Repeat saves a plan, so pick a later day or time, or untick Repeat."), before any entry or plan is written; this includes a correction
-    of a saved entry. Chosen over saving an overdue recurring plan because it creates nothing the person did not see. An open plan being edited keeps its repeat whatever its day.
+    line is gone; Save reads **Save plan** (a plan being edited reads Save changes). **Repeat on a time that is now or past is never refused** (#73, which replaced #64's refusal,
+    `REPEAT_NEEDS_FUTURE`, now deleted; it is why a vaccine dated Oct 5 would not save): `commit` logs the entry, and the repeat becomes a plan at `firstRepeatAfter` (`lib/future.ts`): the entry's
+    day and time plus the interval, stepped forward until after now. Each step counts from the entry's own day (`nextDue(day, every × k)`), so a month-end repeat does not drift to the 28th; a weight
+    has no time, so its plan is the first day after today. The plan (`buildPlan`, the same words as a future When's) travels as `plans[body.id]` and is **added after the entry saves**, by
+    the same `planAfter` path as a vaccine's next dose (`Journal.tsx`; a failure is the toast "Saved, but the repeat wasn't planned — add it from the form"). On a **correction** the plan rides the third argument of
+    `onChange` and is added after the correction succeeds. The plan does not copy the entry's time: it is the entry's time of day. A plan being edited keeps its repeat whatever its day.
   * **The bottom block** (`data-section="when-who"`, `grid grid-cols-2 items-end gap-2`, `LogForm` and `NoteForm`): Day, Time, [Repeat], **Logging as, Save**, all
     `w-full`, 44px, so the four boxes share two equal columns. Save is now `w-full` (`data-section="save"` is its cell); RULES.md's "only as wide as its label" no longer
     holds for Save. A Weight has no Time, so its right cell is empty.
@@ -150,11 +172,12 @@
   * **Traps**: (1) `LogForm`, `NoteForm` and `VaccineFields` all build their Day and Time from `DayField` and `TimeField`: a new form that wants a When uses them and
     puts them in the grid above, or its boxes will not line up. (2) The pop-ups are portalled to `<body>`, so a test finds them with `screen`, not inside the form
     (`tests/whenpop.ts` has `pickDay`, `pickTime`, `setWhen`). (3) `pickDay` pages one month at a time: a test that picks a day decades out is slow. (4) `DayField` reads
-    `new Date()` each render, so a form left open past midnight greys out by the new day on the next render. (5) A disabled `<option>` can still be set by script, so
-    `clampTo` is what keeps a pick from landing after now. (6) `REPEAT_NEEDS_FUTURE` is exported from `LogForm.tsx` for its test.
+    `new Date()` each render, so a form left open past midnight greys out by the new day on the next render. (5) A disabled option can still be set by script, so
+    `clampTo` is what keeps a pick from landing after now. (6) `tests/whenpop.ts` drives the compact menus (`pickMenu`, `menuOptions`, `openMenu`); a test must not click an open menu's box twice (it toggles). (7) A new
+    menu or field for the Time pop-up goes in `app/CompactMenu.tsx` or `app/fields.tsx`, never in a file that imports `LogForm`: `tests/importcycles.test.ts` (#71) fails any loop, and `next build` is the second check.
   * **Phone only, not proven**: jsdom proves the wiring (the dialog, the taps, the draft and Cancel, Escape, the disabled days and options, the saved times, the chips). It does
-    not prove how the pop-up sits on an iPhone or in Chrome, that the page behind really stays put or unselectable under a held finger, or how each browser draws the native
-    Hour, Minute and AM or PM lists. Those are the owner's check on the live app.
+    not prove how the pop-up sits on an iPhone or in Chrome, that the page behind really stays put or unselectable under a held finger, how big the compact menus look and feel
+    under a thumb, that a menu scrolls inside itself without moving the pop-up or the page, or that the menu stays on screen near the bottom of a short phone. Those are the owner's check on the live app.
 - **(Superseded by #64 above: the scroll columns, the peek and the nudge are gone.) The When row shows that it scrolls** (TEC-266, the owner: "It's not quite apparent that they scroll", "That's perfect [peek] and nudge. Do the same thing with the day
   field"). A local pattern in `app/WhenField.tsx`, no data change and no migration; **it changes the TEC-261 bullet below where it describes the date box and a 42px row.**
   * **Peek**: every column (`ScrollColumn`) is 42px high (the 44px box inside its border) with **20px rows** and an 11px spacer above and below, so the chosen row sits
@@ -335,8 +358,7 @@
   `data-section`): **Box 1** When and Logging as on one line (the form's old "Human" label; When is as wide as its label, "Now" or "Tue 8:00 AM", both boxes exactly 44px tall), with the future line and Repeat under
   them when the When is in the future; **Box 2**, the entry; **Box 3**, the secondary things (Potty: the treat count then
   Medical issue checkbox on one line; Training and Fun: the treat count, and Fun's Pee/Poop buttons; **Health, every type
-  (TEC-208): a vet visit's Related issue, then Related note; Training: Related note after the treat count**; none on Food and Weight); then **Note** (a full-width `<textarea>`, two rows, scrolling past two; required for a vet
-  visit or an issue, optional elsewhere), **Attachments** under it on every form (TEC-203), and Save
+  (TEC-208): a vet visit's Related issue, then Related note; Training: Related note after the treat count**; none on Food and Weight); then **Note** (a full-width `<textarea>`, two rows, scrolling past two; optional on every form since #73), **Attachments** under it on every form (TEC-203), and Save
   last. Per form, Box 2: *Potty* What (Pee, Poop, Both, No potty; **nothing preselected, and a save without one is refused**) ·
   Where with Leash (outside) or Spot (inside) on one line · Time outside (outside). *Food* Type (Meal, Snuffle mat, Treat) · What
   and a small Amount on one line (the scroller is `SCROLLER_WIDTH` 44, it was 88 then 52; the unit is a small word beside it, not in the label; a treat's count box is 52px). *Training* Where and Time on one line ·
@@ -353,7 +375,7 @@
   (it made Dose cover the Medication pick). `tests/fieldwidths.test.ts` holds it.
 - **Health** (TEC-137, reworked by TEC-139, **Medication added by TEC-199**): a sixth form, kind `health`, with a Type of **Vet
   visit**, **Medical issue** or **Medication**. A vet visit and an issue have **one plain half-width `<select>`** (`inputHalf`, TEC-255) of high-level picks
-  (styled like Other dogs'), a required **Note** ("What happened?"), up to `MAX_PHOTOS` (6) photos, and the usual When and Logging
+  (styled like Other dogs'), an optional **Note**, up to `MAX_PHOTOS` (6) photos, and the usual When and Logging
   as. Vet visit: Check-up, Vaccines, Sick or injured, Procedure (spay/neuter, dental), Follow-up, Other (`VET_REASONS`). Medical
   issue: Stomach & appetite, Skin, ears & eyes, Limping or injury, Breathing or cough, Energy or behaviour, Other (`ISSUE_PICKS`,
   both in `lib/events.ts`). A new entry opens on "Pick one…" and Save without a pick says so. Switching the Type keeps the pick
@@ -407,11 +429,8 @@
   reason). `Journal` keeps reasons set this session (`reasonsSet`) and applies them to every read, like `addedMeds`.
   **Deploy order:** `lando_medication_reason` before the code, because the journal read selects `reason` (an unapplied column
   makes every journal load a 503).
-- **The Health note is required** (TEC-139), for a new entry and a correction alike: the phone
-  blocks Save on a blank or whitespace-only note with "Say what happened — the note is required."
-  and the server refuses it too (`parseNewEvent`, so `writeEvent`; a delete is exempt, and no
-  other kind needs a note). An old Health entry saved without one therefore needs a note typed
-  before its correction can save.
+- **The Health note is optional** (#73, the owner: "Note not require[d] for health"; TEC-139 had required it for a vet visit and a medical issue). The phone no longer blocks
+  Save on a blank note and the server no longer refuses one (`parseNewEvent`); the textarea has no `required` and reads "Optional". An old entry saved without a note corrects freely.
 - **Retired Health reasons** (TEC-139): TEC-137's detailed ids (`VET_RETIRED`, `ISSUE_RETIRED`)
   are retired the way the food catalogue retires items: the form does not offer them, but
   `parseDetails` and `lando.details_ok` accept them, the feed labels them (`healthReasonLabel`),

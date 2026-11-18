@@ -11,6 +11,7 @@ import {
   FORM_LABELS,
   FUN_TYPES,
   HEALTH_LABELS,
+  HEALTH_PICK_TYPES,
   HEALTH_TYPES,
   InvalidEvent,
   describe,
@@ -59,11 +60,11 @@ import {
 } from "@/lib/events";
 import { FOOD_UNITS, MISC_ID, servingAmount, servingOptions, servingText, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
 import { MED_REASONS, MED_REASON_IDS, MED_ROUTES, MED_UNITS, NO_REASON, findMedication, medReasonLabel, type MedReason, medPicklist, type MedRoute, type MedUnit, type Medication } from "@/lib/medications";
-import { donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, isFuturePick, type DonePrefill } from "@/lib/future";
+import { donePrefill, doneWhen, firstRepeatAfter, futureItem, isFutureDay, isFutureWhen, isFuturePick, type DonePrefill } from "@/lib/future";
 import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import { VACCINES, hasDoses, suggestedDose } from "@/lib/vaccines";
-import { nextDose, nextDosePlan, visitVaccineEntries } from "@/lib/vaccine-plan";
+import { defaultStepId, nextDose, stepDay, visitVaccineEntries } from "@/lib/vaccine-plan";
 import { Box, Field, WHO_WIDTH, input, inputFull, inputHalf } from "./fields";
 import { NextDoseOffer, VaccinePick, VaccinesGiven } from "./VaccineFields";
 import TreatQty from "./TreatQty";
@@ -148,8 +149,11 @@ type Props = {
    * `plans` (TEC-259) are next doses to plan, each keyed by the id of the entry it follows and added once that is saved.
    */
   onLog: (body: LogBody, then?: LogBody[], plans?: Record<string, UpcomingInput>) => void;
-  /** A correction or a delete: awaited, and its error shown here. `then` are saved once it succeeds. */
-  onChange: (body: Record<string, unknown>, then?: LogBody[]) => Promise<{ error: string | null }>;
+  /**
+   * A correction or a delete: awaited, and its error shown here. `then` are saved once it succeeds; `plans` (#73) are a
+   * Repeat's plan, added once it has (keyed as for `onLog`).
+   */
+  onChange: (body: Record<string, unknown>, then?: LogBody[], plans?: Record<string, UpcomingInput>) => Promise<{ error: string | null }>;
   /** A future When (TEC-199): saves an upcoming item instead of an entry. Awaited, and its error shown here. */
   onUpcoming: (item: UpcomingInput, id?: string) => Promise<{ error: string | null }>;
   /**
@@ -203,9 +207,6 @@ function Seg<T extends string>({
     </div>
   );
 }
-
-/** Repeat saves a plan, and a plan starts at a later time: what Save says when Repeat is ticked on a time that is not. */
-export const REPEAT_NEEDS_FUTURE = "Repeat saves a plan, so pick a later day or time, or untick Repeat.";
 
 /** The What pick's last option: opens the add-a-food form, never a value. */
 const FOOD_ADD = "__add";
@@ -266,8 +267,11 @@ export default function LogForm({
   const kind: Exclude<LogKind, "note"> = kindOfForm(form);
   const editing = !!event;
   const openedAt = useRef(new Date().toISOString());
-  // A weight is a day, not a moment: its When picks a date, stored at local noon.
-  const dateOnly = kind === "weight";
+  // Health (TEC-137): the entry being corrected, and the Type. Read here because a vaccine is a day, like a weight.
+  const h = event?.kind === "health" ? asHealth(event) : null;
+  const [healthType, setHealthType] = useState<HealthType>(h?.type ?? startHealthType ?? "vet");
+  // A weight and a vaccine are a day, not a moment (#73): their When picks a date, stored at local noon.
+  const dateOnly = kind === "weight" || (kind === "health" && healthType === "vaccine");
   // Every form takes photos and files (TEC-137, TEC-139, TEC-142; Food, Weight and any file type TEC-203).
 
   // Common. A Done opens on the item's day and time once they have come; before that it is "now". An edit of an
@@ -365,14 +369,12 @@ export default function LogForm({
   const [unit, setUnit] = useState<Unit>(w?.unit ?? remembered.unit ?? weightUnit);
 
   // Health (TEC-137): a vet visit, a medical issue or a medication dose, photos on all.
-  const h = event?.kind === "health" ? asHealth(event) : null;
   // A vet visit's optional Weight (TEC-151). It opens empty, in this phone's last
   // unit; a correction opens on the weight already saved with the visit, and
   // changing it corrects that entry rather than adding a second.
   const [linked] = useState(() => (event && h?.type === "vet" ? linkedWeight(events, event.id) : null));
   const [visitValue, setVisitValue] = useState(linked ? String(asWeight(linked).value) : "");
   const [visitUnit, setVisitUnit] = useState<Unit>(linked ? asWeight(linked).unit : remembered.unit ?? weightUnit);
-  const [healthType, setHealthType] = useState<HealthType>(h?.type ?? startHealthType ?? "vet");
   // Related issue (TEC-142), on Potty, a vet visit and a medication dose: the id of a medical
   // issue, or none. A correction opens on the stored link and keeps it unless
   // it is changed; `issueChoices` adds it as an option when the list would not.
@@ -406,11 +408,13 @@ export default function LogForm({
   const [vDose, setVDose] = useState(h?.type === "vaccine" ? (h.dose ? String(h.dose) : "") : prefill?.vaccineDose ? String(prefill.vaccineDose) : "");
   const [vDoseTouched, setVDoseTouched] = useState(h?.type === "vaccine" || !!prefill?.vaccineDose);
   // A vet visit's Vaccines given: each is its own Vaccine entry linked to the visit. A new visit only.
-  const [given, setGiven] = useState<string[]>([]);
+  // A Done on a vaccine plan opens the visit with that vaccine already ticked (#73).
+  const [given, setGiven] = useState<string[]>(() => (!event && !plan && prefill?.vaccine ? [prefill.vaccine] : []));
   const givenIds = useRef(new Map<string, string>());
-  // The offer to plan the next dose, ticked unless the person unticks it; and the day, once they change it.
+  // The offer to plan the next doses, ticked unless the person unticks it; and the chip picked for each vaccine (#73),
+  // by vaccine id. A vaccine with none picked keeps the rule's usual gap.
   const [planNext, setPlanNext] = useState(true);
-  const [nextOn, setNextOn] = useState<string | null>(null);
+  const [steps, setSteps] = useState<Record<string, string>>({});
   // "Add a medication…": the inline form under the pick. It never becomes the pick; the new medication does.
   const [addingMed, setAddingMed] = useState(false);
   const [medName, setMedName] = useState("");
@@ -467,6 +471,9 @@ export default function LogForm({
       ? isFutureDay(day, toDateInput(nowDate.toISOString()))
       : isFutureWhen(fromLocalInput(when) ? new Date(fromLocalInput(when)!) : null, nowDate));
   const future = futureWhen && !editing;
+  // Repeat is on every form but Potty (never in the future) and a vaccine (its next dose is the plan), #73.
+  const repeatAllowed = !noFuture && !(kind === "health" && healthType === "vaccine");
+  const repeats = repeatOn && repeatAllowed;
   // Saves an upcoming item: a future When on a new entry, or an open item being edited.
   const planning = !!plan || future;
   // The form opened on a time of its own (a correction, a Done, an open plan, the Calendar's Add a plan): the picker
@@ -475,17 +482,19 @@ export default function LogForm({
 
   // The vaccine's numbers (TEC-259), read each render: the day it is given (the When row's), how many of it are already
   // logged, the dose that opens (one more) until it is touched, and the next dose the rules suggest.
-  const givenOn = /^\d{4}-\d{2}-\d{2}$/.test(when.slice(0, 10)) ? when.slice(0, 10) : toDateInput(openedAt.current);
-  const givenAt = fromLocalInput(when) ?? openedAt.current;
+  // A vaccine's When is a day (#73), so its time is the day's noon.
+  const whenNow = dateOnly ? `${day}T12:00` : when;
+  const givenOn = /^\d{4}-\d{2}-\d{2}$/.test(whenNow.slice(0, 10)) ? whenNow.slice(0, 10) : toDateInput(openedAt.current);
+  const givenAt = fromLocalInput(whenNow) ?? openedAt.current;
   const vEarlier = vaccine ? earlierDoses(events, vaccine, givenAt, event?.id) : 0;
   const vDoseShown = vDoseTouched ? vDose : (suggestedDose(vaccine, vEarlier)?.toString() ?? "");
   const vDoseNum = hasDoses(vaccine) && vDoseShown ? Number(vDoseShown) : null;
-  const suggest = vaccine ? nextDose({ vaccine, givenOn, dose: vDoseNum, earlier: vEarlier, birthOn }) : null;
-  const nextDay = nextOn ?? suggest?.on ?? givenOn;
-  // A vet visit's picks, each with the day its next dose would be planned for.
+  // A vet visit's picks, each with the chip picked for its next dose (the vaccine's usual gap to start) and the day it makes.
   const givenItems = VACCINES.filter((v) => given.includes(v.id)).map((v) => {
     const earlier = earlierDoses(events, v.id, givenAt);
-    return { label: v.label, day: nextDose({ vaccine: v.id, givenOn, dose: suggestedDose(v.id, earlier), earlier, birthOn }).on };
+    const rule = nextDose({ vaccine: v.id, givenOn, dose: suggestedDose(v.id, earlier), earlier, birthOn });
+    const step = steps[v.id] ?? defaultStepId(rule.text);
+    return { id: v.id, label: v.label, step, day: stepDay(givenOn, step) };
   });
 
   /** The When row changed (TEC-261): from now on the time is the person's, not the moment of Save. */
@@ -678,25 +687,29 @@ export default function LogForm({
     }
   }
 
+  /** The upcoming item the form's words make, due on `dayV` at `timeV` (null for a day). Throws `InvalidEvent`. */
+  function buildPlan(dayV: string, timeV: string | null): UpcomingInput {
+    return futureItem({
+      form,
+      healthType,
+      day: dayV,
+      time: timeV,
+      note,
+      repeatEvery: repeats ? Number(repeatEvery) : null,
+      repeatUnit: repeats ? repeatUnit : null,
+      reason: reason === HEALTH_KEPT ? "" : reason,
+      vaccine: healthType === "vaccine" && vaccine ? { id: vaccine, dose: vDoseNum } : null,
+      med: healthType === "medication" ? { name: pickedMed?.name ?? "", dose: Number(dose.replace(",", ".")) || null, unit: medUnit } : null,
+      photos: photos.paths,
+      names: Object.keys(photos.names).length ? photos.names : undefined,
+    });
+  }
+
   /** A future When: the form's words become an upcoming item, saved and awaited (its error stays here). */
   async function submitFuture(whenV: string, dayV: string) {
     let item: UpcomingInput;
     try {
-      const every = repeatOn ? Number(repeatEvery) : null;
-      item = futureItem({
-        form,
-        healthType,
-        day: dateOnly ? dayV : whenV.slice(0, 10),
-        time: dateOnly ? null : whenV.slice(11, 16),
-        note,
-        repeatEvery: every,
-        repeatUnit: repeatOn ? repeatUnit : null,
-        reason: reason === HEALTH_KEPT ? "" : reason,
-        vaccine: healthType === "vaccine" && vaccine ? { id: vaccine, dose: vDoseNum } : null,
-        med: healthType === "medication" ? { name: pickedMed?.name ?? "", dose: Number(dose.replace(",", ".")) || null, unit: medUnit } : null,
-        photos: photos.paths,
-        names: Object.keys(photos.names).length ? photos.names : undefined,
-      });
+      item = buildPlan(dateOnly ? dayV : whenV.slice(0, 10), dateOnly ? null : whenV.slice(11, 16));
     } catch (err) {
       failOnForm(err instanceof InvalidEvent ? err.message : "check the form");
       return;
@@ -757,20 +770,9 @@ export default function LogForm({
       await submitFuture(whenV, dayV);
       return;
     }
-    // Repeat saves a plan that starts at a later time, so it needs one. A time that is now or past is refused, not
-    // quietly saved without the repeat or as an overdue plan (refusing is the behaviour chosen for #64).
-    if (repeatOn && !noFuture) {
-      failOnForm(REPEAT_NEEDS_FUTURE);
-      return;
-    }
     // Potty opens with nothing picked and will not save without a What (TEC-199).
     if (kind === "potty" && !what) {
       failOnForm("Pick what happened — pee, poop, both or no potty.");
-      return;
-    }
-    // The pick is the headline; the note is the story, and it is required for a vet visit or an issue (TEC-139).
-    if (kind === "health" && healthType !== "medication" && healthType !== "vaccine" && !note.trim()) {
-      failOnForm("Say what happened — the note is required.");
       return;
     }
     if (kind === "health" && healthType === "vaccine" && !vaccine) {
@@ -862,13 +864,17 @@ export default function LogForm({
             return fresh;
           },
           planNext,
+          steps,
         });
         then = [...then, ...v.entries];
         if (Object.keys(v.plans).length) plans = v.plans;
       }
-      // A Vaccine entry's offer to plan the next dose, on the day in the box.
-      if (kind === "health" && healthType === "vaccine" && !editing && planNext && suggest) {
-        plans = { [body.id]: nextDosePlan({ vaccine, dose: vDoseNum, series: suggest.series, on: nextDay }) };
+      // A Repeat on a time that is now or past (#73): the entry is logged, and the repeat is a plan at its next date after
+      // now, added once the entry is saved. (A future time never gets here: that is a plan, from `submitFuture`.)
+      if (repeats) {
+        const local = toLocalInput(at);
+        const next = firstRepeatAfter({ day: toDateInput(at), time: dateOnly ? null : local.slice(11, 16), every: Number(repeatEvery), unit: repeatUnit, now: new Date() });
+        plans = { ...plans, [body.id]: buildPlan(next.day, next.time) };
       }
     } catch (err) {
       failOnForm(err instanceof InvalidEvent ? err.message : "check the form");
@@ -880,7 +886,7 @@ export default function LogForm({
       return;
     }
     setBusy(true);
-    const { error } = await onChange({ ...body, voids: event.id }, then);
+    const { error } = await onChange({ ...body, voids: event.id }, then, plans);
     setBusy(false);
     if (error) {
       setError(error);
@@ -904,8 +910,6 @@ export default function LogForm({
   const title =
     form === "fun" ? EXERCISE_LABELS[exType] : form === "health" ? HEALTH_LABELS[healthType] : FORM_LABELS[form];
   const photoBlock = photos.working || photos.failed;
-  // A vet visit and a medical issue need the story; a dose and a vaccine do not (TEC-139, TEC-199, TEC-259).
-  const noteRequired = kind === "health" && healthType !== "medication" && healthType !== "vaccine";
 
   // The medical issue link (TEC-142, TEC-199): None and the recent live medical issues, newest first, by date
   // and pick. Potty puts it behind a checkbox (TEC-161); a vet visit and a medication dose show it all the time
@@ -1006,7 +1010,8 @@ export default function LogForm({
 
   // The Repeat (TEC-199), always on the form and always usable, so the form never shifts when the time moves into the
   // future (the owner, 2026-11-17). Its every-and-unit boxes are there too, dimmed until it is ticked. Potty has none: it is
-  // never in the future. Repeat saves a plan, so it needs a future time (see `commit`).
+  // never in the future. A Repeat on a time that is now or past is never refused (#73): the entry is logged and the repeat is a plan at its next date
+  // after now (see `commit`). A vaccine has none: its next dose is the plan.
   const repeatBlock = (
     <div className="flex flex-wrap items-center gap-x-2">
       <label className="flex min-h-[44px] items-center gap-2">
@@ -1268,7 +1273,7 @@ export default function LogForm({
         {kind === "health" && (
           <>
             <Field label="Type">
-              <Seg name="health-type" label="Type" value={healthType} onChange={pickHealthType} options={HEALTH_TYPES.map((t) => [t, HEALTH_LABELS[t]] as const)} />
+              <Seg name="health-type" label="Type" value={healthType} onChange={pickHealthType} options={(healthType === "vaccine" ? HEALTH_TYPES : HEALTH_PICK_TYPES).map((t) => [t, HEALTH_LABELS[t]] as const)} />
             </Field>
             {(healthType === "vet" || healthType === "issue") && (
               /* One plain select, like Other dogs (TEC-139); the detail goes in the note. */
@@ -1316,15 +1321,14 @@ export default function LogForm({
                     setVDoseTouched(true);
                   }}
                 />
-                {!editing && !planning && (
-                  <NextDoseOffer on={planNext} onOn={setPlanNext} day={nextDay} onDay={setNextOn} text={suggest?.text} />
-                )}
               </>
             )}
             {healthType === "vet" && !editing && !planning && (
               <>
                 <VaccinesGiven given={given} onToggle={(id) => setGiven((g) => (g.includes(id) ? g.filter((x) => x !== id) : [...g, id]))} />
-                {given.length > 0 && <NextDoseOffer on={planNext} onOn={setPlanNext} items={givenItems} />}
+                {given.length > 0 && (
+                  <NextDoseOffer on={planNext} onOn={setPlanNext} items={givenItems} onStep={(id, step) => setSteps((x) => ({ ...x, [id]: step }))} />
+                )}
               </>
             )}
             {healthType === "medication" && (
@@ -1582,9 +1586,7 @@ export default function LogForm({
             onChange={(e) => setNote(e.target.value)}
             rows={2}
             maxLength={500}
-            required={noteRequired}
-            aria-required={noteRequired ? "true" : undefined}
-            placeholder={noteRequired ? "What happened?" : "Optional"}
+            placeholder="Optional"
             className={`${inputFull} block resize-none overflow-y-auto leading-snug`}
           />
         </Field>
@@ -1607,7 +1609,7 @@ export default function LogForm({
       <div data-section="when-who" className="grid grid-cols-2 items-end gap-2">
         <DayField value={dateOnly ? day : when} dateOnly={dateOnly} noFuture={noFuture} onChange={pickWhen} />
         {!dateOnly && <TimeField value={when} noFuture={noFuture} onChange={pickWhen} />}
-        {!noFuture && (
+        {repeatAllowed && (
           <div data-section="plan" className="col-span-2 grid gap-0.5">
             {repeatBlock}
           </div>

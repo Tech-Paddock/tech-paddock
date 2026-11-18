@@ -2,7 +2,7 @@ import type { getServiceClient } from "./supabase";
 import { InvalidEvent } from "./events";
 import { missingPhotos } from "./storage";
 import { Conflict } from "./journal";
-import { formForItem } from "./future";
+import { plannedVaccine } from "./future";
 import { needsVisit, repeatOf, type Upcoming, type UpcomingAction, type UpcomingInput } from "./upcoming";
 
 /**
@@ -96,12 +96,22 @@ export async function applyAction(
     if (!a.done_event) throw new InvalidEvent("a vet visit or vaccine is done by saving the visit");
     const { data, error } = await db.from("events").select("id, kind, details").eq("id", a.done_event).maybeSingle();
     if (error) throw new Error(`couldn't read the visit: ${error.message}`);
-    const e = data as { kind: string; details: { type?: string } } | null;
-    // The entry's health type is the one `formForItem` opens for this item (a Vaccine-form plan: vaccine;
-    // any other vet or vaccine plan: vet), so the phone and the server cannot disagree.
-    const want = formForItem(current)?.healthType ?? "vet";
-    if (!e || e.kind !== "health" || e.details?.type !== want) {
-      throw new InvalidEvent(want === "vaccine" ? "that vaccine isn't saved yet" : "that vet visit isn't saved yet");
+    type Row = { id: string; kind: string; details: { type?: string; vaccine?: string } };
+    const e = data as Row | null;
+    const planned = plannedVaccine(current);
+    if (planned) {
+      // A Vaccine-form plan is closed by what records that vaccine (#73): a vaccine entry of it, or a vet visit that gave
+      // it (a visit's Vaccines given are its own vaccine entries, linked by `parent_id`). Anything else leaves it open.
+      let ok = !!e && e.kind === "health" && e.details?.type === "vaccine" && e.details.vaccine === planned;
+      if (!ok && e && e.kind === "health" && e.details?.type === "vet") {
+        const { data: kids, error: kidsError } = await db.from("events").select("id, kind, details").eq("parent_id", e.id);
+        if (kidsError) throw new Error(`couldn't read the visit: ${kidsError.message}`);
+        ok = ((kids ?? []) as Row[]).some((k) => k.kind === "health" && k.details?.type === "vaccine" && k.details.vaccine === planned);
+      }
+      if (!ok) throw new InvalidEvent("that vaccine isn't saved yet — a vet visit that gave it records it");
+    } else {
+      // Any other vet or vaccine plan (an older "Rabies booster", or a bare "Vaccine") is closed by a vet visit.
+      if (!e || e.kind !== "health" || e.details?.type !== "vet") throw new InvalidEvent("that vet visit isn't saved yet");
     }
   }
   const item = await update({ status: "done", done_on: a.done_on, done_event: a.done_event });

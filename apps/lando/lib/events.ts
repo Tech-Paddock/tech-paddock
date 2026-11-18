@@ -270,6 +270,11 @@ export type WeightDetails = {
  */
 export const HEALTH_TYPES = ["vet", "issue", "medication", "vaccine"] as const;
 export type HealthType = (typeof HEALTH_TYPES)[number];
+/**
+ * The Type picker's choices on a new Health entry (owner, #73): a vaccine is never chosen there, only made by a vet visit's
+ * Vaccines given. `HEALTH_TYPES` keeps it, because existing rows, the database check and `describe` use it.
+ */
+export const HEALTH_PICK_TYPES = HEALTH_TYPES.filter((t) => t !== "vaccine");
 export const HEALTH_LABELS: Record<HealthType, string> = { vet: "Vet visit", issue: "Medical issue", medication: "Medication", vaccine: "Vaccine" };
 
 /**
@@ -1632,10 +1637,7 @@ export function parseNewEvent(body: unknown, now: Date, added: readonly AddedFoo
   if (parent_id && !(kind === "food" || kind === "potty" || kind === "weight" || (kind === "health" && (details as HealthDetails).type === "vaccine"))) {
     throw new InvalidEvent("only a treat, a potty, a weight or a vaccine is made from another entry");
   }
-  // A vet visit or an issue needs the story: the pick is only the headline (TEC-139). A dose or a vaccine does not (TEC-199, TEC-259).
-  if (kind === "health" && !note && (details as HealthDetails).type !== "medication" && (details as HealthDetails).type !== "vaccine") {
-    throw new InvalidEvent("say what happened — the note is required");
-  }
+  // The Health note is optional on every type (owner, #73, lifting TEC-139's rule): the pick is the headline, the note a bonus.
 
   return {
     id: b.id,

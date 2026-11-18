@@ -29,6 +29,7 @@ import {
   pathExt,
   formatAgo,
   isAccident,
+  health as asHealth,
   latestWeight,
   liveEvents,
   pillStatus,
@@ -55,7 +56,7 @@ import {
 } from "@/lib/defaults";
 import { clockTime, localMidnight, shortDate, toDateInput } from "@/lib/localtime";
 import { saveThenClose, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
-import { allUpcoming, donePrefill, formForItem, nextWeek } from "@/lib/future";
+import { allUpcoming, doneFormFor, donePrefill, formForItem, nextWeek, plannedVaccine } from "@/lib/future";
 import type { MedReason, MedUnit, Medication } from "@/lib/medications";
 import { isMealType, type AddedFood, type FoodUnit, type ListType } from "@/lib/foods";
 import { saveThen } from "@/lib/saveOrder";
@@ -298,8 +299,8 @@ export default function Journal() {
     [loadUpcoming]
   );
 
-  // A vaccine's next dose, planned once the vaccine is saved (TEC-259). It joins Next 7 days and the Outlook calendar; if it can't
-  // be added the vaccine is safe in the journal and the toast says so.
+  // A plan added once the entry it follows is saved: a vaccine's next dose (TEC-259) or a Repeat's first date (#73). It joins
+  // Next 7 days and the Outlook calendar; if it can't be added the entry is safe in the journal and the toast says so.
   const planNextDose = useCallback(
     async (item: UpcomingInput) => {
       try {
@@ -310,7 +311,11 @@ export default function Journal() {
       } catch {
         // falls through to the toast
       }
-      setToast("Vaccine saved, but its next dose wasn't planned — add it from the form");
+      setToast(
+        item.kind === "vaccine"
+          ? "Vaccine saved, but its next dose wasn't planned — add it from the form"
+          : "Saved, but the repeat wasn't planned — add it from the form"
+      );
       clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setToast(null), 4000);
     },
@@ -573,7 +578,7 @@ export default function Journal() {
    * today's date, and a repeat brings its next one.
    */
   async function doneUpcoming(item: Upcoming): Promise<{ error: string | null } | void> {
-    const target = formForItem(item);
+    const target = doneFormFor(item);
     if (target) {
       setOpen({ form: target.form, healthType: target.healthType, doneFor: item });
       return;
@@ -616,7 +621,16 @@ export default function Journal() {
 
   function logNew(body: LogBody, then?: LogBody[], plans?: Record<string, UpcomingInput>) {
     // An entry opened from an upcoming item's Done: that item closes when this entry is saved.
-    if (open?.doneFor) visitLinks.current.set(body.id, open.doneFor.id);
+    if (open?.doneFor) {
+      // A Done on a vaccine plan opens a Vet visit with that vaccine ticked (#73): the plan closes when the visit's entry for
+      // that vaccine is saved, so the server can see it. With the vaccine unticked there is none, and the plan stays open.
+      const vaccine = plannedVaccine(open.doneFor);
+      if (!vaccine) visitLinks.current.set(body.id, open.doneFor.id);
+      else {
+        const shot = (then ?? []).find((t) => t.kind === "health" && asHealth(t).type === "vaccine" && asHealth(t).vaccine === vaccine);
+        if (shot) visitLinks.current.set(shot.id, open.doneFor.id);
+      }
+    }
     for (const [id, item] of Object.entries(plans ?? {})) planAfter.current.set(id, item);
     remember([body, ...(then ?? [])]);
     setOpen(null);
@@ -639,7 +653,7 @@ export default function Journal() {
     if (p) void save(p.body, true, p.then);
   }
 
-  async function change(body: Record<string, unknown>, then?: LogBody[]): Promise<{ error: string | null }> {
+  async function change(body: Record<string, unknown>, then?: LogBody[], plans?: Record<string, UpcomingInput>): Promise<{ error: string | null }> {
     try {
       const { ok, status, data } = await postJson("/api/events", body);
       if (!ok) {
@@ -652,6 +666,8 @@ export default function Journal() {
       setNoteOpen(null);
       // Treats added to a corrected training: saved now, each with its own Retry.
       for (const t of then ?? []) void save(t, false);
+      // A Repeat on a corrected entry (#73): its plan, added now that the correction is in.
+      for (const item of Object.values(plans ?? {})) void planNextDose(item);
       const what = wasNote ? "Note" : "Entry";
       say(body.kind === "void" ? `${what} deleted` : `${what} corrected`);
       return { error: null };

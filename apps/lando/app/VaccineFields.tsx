@@ -2,8 +2,9 @@
 
 import { DOSE_MAX, VACCINES, hasDoses, vaccineLabel } from "@/lib/vaccines";
 import { dayText } from "@/lib/upcoming";
+import { NEXT_STEPS } from "@/lib/vaccine-plan";
 import { Field, inputFull } from "./fields";
-import { DayField } from "./WhenField";
+import Chip from "./Chip";
 
 /**
  * The Vaccine type's picks (TEC-259): which vaccine, and its dose number when it has one. The two share the row, each
@@ -77,44 +78,43 @@ export function VaccinesGiven({ given, onToggle }: { given: readonly string[]; o
 }
 
 /**
- * The offer to plan the next dose (TEC-259), under a new Vaccine entry, and under a vet visit that gave vaccines. It
- * is ticked by default; a plan is saved only once the vaccine itself is. A Vaccine entry shows the suggested day in
- * the When row's date box (a day, editable); a visit lists the suggested days, which are edited later in the Calendar.
+ * The offer to plan the next doses (TEC-259), under a vet visit that gave vaccines. It is ticked by default; a plan is saved
+ * only once the vaccine itself is. The next dose is chosen in steps, not on a calendar (owner, #73): for each vaccine given,
+ * chips for how far out (3–4 weeks, 6 months, 1 year, 3 years), the vaccine's usual gap picked to start, and the day it makes.
  */
 export function NextDoseOffer({
   on,
   onOn,
-  day,
-  onDay,
-  text,
   items,
+  onStep,
 }: {
   on: boolean;
   onOn: (v: boolean) => void;
-  /** A single Vaccine entry's suggested day and the words of its interval; the box edits it. */
-  day?: string;
-  onDay?: (v: string) => void;
-  text?: string;
-  /** A visit's vaccines: the label and suggested day of each. */
-  items?: readonly { label: string; day: string }[];
+  /** A visit's vaccines: the id and label of each, the step picked (a `NEXT_STEPS` id) and the day that makes. */
+  items: readonly { id: string; label: string; step: string; day: string }[];
+  onStep: (vaccine: string, step: string) => void;
 }) {
   return (
     <div data-section="next-dose" className="grid gap-0.5">
       <label className="flex min-h-[44px] items-center gap-2 text-[15px] text-ink-soft">
         <input type="checkbox" checked={on} onChange={(e) => onOn(e.target.checked)} className="h-5 w-5 accent-accent" />
-        <span className={on ? "font-semibold text-ink" : ""}>{items ? "Plan the next doses" : "Plan the next dose"}</span>
+        <span className={on ? "font-semibold text-ink" : ""}>Plan the next doses</span>
       </label>
-      {on && day !== undefined && onDay && (
-        <div className="grid grid-cols-2 items-end gap-2">
-          <DayField label="Next dose" value={day} dateOnly onChange={onDay} />
-          {text && <p className="pb-2.5 text-[13px] text-ink-soft">Usually {text} on. You can change the date.</p>}
-        </div>
-      )}
-      {on && items && items.length > 0 && (
-        <p className="text-[13px] text-ink-soft">
-          {items.map((i) => `${i.label} ${dayText(i.day)}`).join(" · ")}. Change a date from the Calendar.
-        </p>
-      )}
+      {on &&
+        items.map((i) => (
+          <div key={i.id} className="grid gap-0">
+            <span className="text-[13px] text-ink-soft">
+              {i.label}: next dose {dayText(i.day)}
+            </span>
+            <div role="group" aria-label={`${i.label} next dose in`} className="flex flex-wrap gap-x-1">
+              {NEXT_STEPS.map((st) => (
+                <Chip key={st.id} pressed={i.step === st.id} onClick={() => onStep(i.id, st.id)}>
+                  {st.label}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        ))}
     </div>
   );
 }
