@@ -24,10 +24,10 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in [paddo
 - **One model, set in `lib/models.ts`** (TEC-133): every call (Ask Claude, link, file, the list's Tidy, the
   house-style restyle, and a resumed `pause_turn`; **no macro estimate**, TEC-223) goes out as `claude-sonnet-5-5` at effort `medium`
   through `requestShape`, with `THINKING_HEADROOM` added to `max_tokens` because thinking counts
-  against it. No picker; the draft and edit routes ignore a `model` an older page sends. A kept
-  recipe keeps the model that estimated it, and `modelLabel` still names Haiku 4.5 and Sonnet 5 for
-  those rows; the save route accepts any model `lib/models.ts` labels, so a draft made before a
-  deploy and kept after it is not refused. `tests/models.test.ts` fails if any other file under
+  against it. No picker; the draft and edit routes ignore a `model` an older page sends. A recipe
+  saved before the save route stopped taking macros keeps the model that estimated it, and `modelLabel`
+  still names Haiku 4.5 and Sonnet 5 for those rows; the save route now ignores `macros`, `source` and
+  `model` in the body and saves them null. `tests/models.test.ts` fails if any other file under
   `app/` or `lib/` names a model id, an effort, a thinking or sampling setting, `tool_choice` or a
   tool version. Tool-less calls send a JSON schema; every call checks `stop_reason`, and a
   `refusal` or `max_tokens` throws a sentence with no retry or fallback.
@@ -399,9 +399,8 @@ Reasoning is in the migration headers.
   at nothing makes its line "no price", never $0. The client keeps the result in `cartCheck` (not
   stored; it is read again on each open, and by `useCart` once on open when connected with a
   store): the live In cart total with the time, and each In cart row's live price.
-  `GET /api/grocery` still adds `used` ({product, size}, from the ledger and Your brands) on In cart
-  items, but **no screen reads it since TEC-211** (the "Used:" line went with Change); dead weight
-  in that route until someone removes it.
+  `GET /api/grocery` adds `used` ({product, size}, from the ledger and Your brands) on In cart
+  items; the list names a live In cart row by it (`app/List.tsx`, TEC-227, below).
 
 - **The live check and the one-line list** (TEC-211; owner, 2026-11-02). `GET /api/kroger/check`
   (`app/api/kroger/check/route.ts`, signed-in only like every `/api` route; the gate is unchanged)
@@ -565,11 +564,11 @@ Reasoning is in the migration headers.
   missed night stays a gap (owner, 2026-10-24). Idempotent (insert ignores a conflict, and a
   rolled week is skipped). It runs even when Kroger failed. The current week is never rolled up. A
   week with no nights makes no row and is looked at again until it ages out of the look-back.
-- **The gate carries the one exception**: `proxy.ts` (every app, byte-identical) lets exactly
+- **The gate's cron exception**: `proxy.ts` (every app, byte-identical) lets
   `/api/cron/prices` through without a session only with the bearer secret, refuses when
   `CRON_SECRET` is unset or under 32 characters, and 401s everything else on that path, a session
-  cookie included. The route checks again (`lib/cronAuth.ts`). `tests/gate.test.ts` is the same file
-  in every app.
+  cookie included. The route checks again (`lib/cronAuth.ts`). Its only other signed-out path is
+  `GET /api/version` (TEC-57). `tests/gate.test.ts` is the same file in every app.
 - **The stoplight** is `stoplight` (`lib/stoplight.ts`), one pure function: today's effective
   price (sale if present, else regular) against the product's last 12 weeks of `price_weeks` at the
   chosen store. Named constants `GREEN_UNDER_MEAN` (0.15), `RED_OVER_MEAN` (0.10), `MIN_WEEKS` (4),

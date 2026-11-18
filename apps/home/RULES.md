@@ -77,5 +77,5 @@ What home's own code enforces. The shared auth plumbing and its rules are in `CL
   polarity can reach.
 - A change to every app's look says so in its pull request.
 - Fix the convention, not the instance.
-- Making every tool installable needs the shared auth plumbing: a web app manifest is fetched
-  without credentials, so each app's gate file must allow it.
+- Making every tool installable needs no gate change: a web app manifest linked with
+  `crossOrigin="use-credentials"` carries the session cookie, as Grid's and Lando's do.

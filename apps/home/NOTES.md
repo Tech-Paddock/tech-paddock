@@ -26,8 +26,8 @@
 - Bar controls, all stamped: `LiveryBadge` on every bar, framed or not; `ThemeControl` and
   `LogoutControl` hidden in a frame.
 - `PARKED` is empty. A parked app would be probed and shown grey.
-- `TOOLS`: resume, coffee, health, cookbook, lando (TEC-119); Lando went last as the neutral
-  choice. The Pit Wall's `ROSTER` is derived from `PROJECTS` plus showcase, so Lando is there with no second list.
+- `TOOLS`: resume, coffee, health, cookbook, lando (TEC-119), grid (#43); Lando went last as the neutral
+  choice, and Grid joined after it. The Pit Wall's `ROSTER` is derived from `PROJECTS` plus showcase, so Lando is there with no second list.
 - Sidebar icons are emoji, except Lando's: `image: "/lando-icon.svg"` in `app/apps.ts`, rendered
   as an `<img class="icon-image">` sized to the emoji box. Every sidebar icon is in full colour
   (owner, 2026-10-21); nothing greys `.icon`. Parked grey is The Garage's stoplight only.

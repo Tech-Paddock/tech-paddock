@@ -58,8 +58,8 @@ there are none, and keep a library of bags bought and brews made.
 
 Display:
 
-- Dropped values are shown beside the kept ones, never silently discarded. Today only their count
-  shows, and Search again discards them; the fix is filed in TEC-167.
+- Dropped values are shown beside the kept ones, each with its reason, never silently discarded
+  (`DroppedValues`, TEC-167). Search again replaces them with the new search's.
 
 ### Recipe printed as an image
 
@@ -69,8 +69,8 @@ Display:
 - The server fetches only the product page the model named and the images in that page's gallery,
   and only on public hosts (`isFetchableUrl` in `lib/recipeImage.ts`). The image's own host is
   vetted as public, not as the roaster's.
-- Every redirect hop must pass the same check. Today `fetch` follows redirects unchecked
-  (`lib/anthropic.ts`); the fix is filed in TEC-167.
+- Every redirect hop must pass the same check: `fetchChecked` in `lib/recipeImage.ts` follows each
+  hop by hand (`redirect: "manual"`) and refuses one that leaves the public web (TEC-167).
 - The copy-out takes only what is printed. It never fills in or infers.
 - The image always renders beside the values it backs. A value with no stored image is dropped.
 - `coffee_specific` needs an image in this coffee's own product gallery. The page's `og:image`,
@@ -190,9 +190,9 @@ When the search finds no recipe, a model generates a suggested one. It never tou
 
 - Images downscale in the browser to 1568px on the long edge at quality 0.85.
 - iOS home-screen install only: `apple-touch-icon` and the `apple-mobile-web-app-*` tags.
-- No web app manifest. It is fetched without credentials, so the gate would redirect it, and
-  allowing it means editing `proxy.ts`, which is not Coffee's to change. Installability for every
-  app belongs to the theme in `apps/home`.
+- No web app manifest yet. A manifest needs no gate change: linked with
+  `crossOrigin="use-credentials"` it carries the session cookie, as Grid's and Lando's do. Installability
+  for every app belongs to the theme in `apps/home`.
 - The icon must load signed out: iOS fetches it without credentials, and a login redirect becomes
   a screenshot icon. It is a static import from `/_next/static`, which the gate's matcher skips.
   Since TEC-27 the gate also passes the exact icon paths, so `app/apple-icon.png` would load too.
@@ -211,5 +211,4 @@ When the search finds no recipe, a model generates a suggested one. It never tou
   recorded response shapes.
 - The search is verified in production with a real bag after merge; previews are skipped by every
   `ignoreCommand`. Passing tests do not show it works.
-- A new guide field gets its test first. Every field in `GUIDE_FIELDS` has one but `grind`, whose
-  test is filed in TEC-167.
+- A new guide field gets its test first. Every field in `GUIDE_FIELDS` has one.

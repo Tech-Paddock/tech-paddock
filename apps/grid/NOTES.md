@@ -2,11 +2,12 @@
 
 ## State
 
-v1, the daily page (#43, TEC-275), on Next.js 16, copied from `apps/lando`. Not yet live: it waits on the
-two migrations, the calendar's two (below) and the owner's outside steps (a Vercel project `tp-grid`, env vars, DNS, the login rate
-limit, the `grid` and `calendar` exposed schemas, a `FORCE_BUILD` rebuild; paddock-issues #55). It is in `TOOLS` in
+v1, the daily page (#43, TEC-275), on Next.js 16, copied from `apps/lando`. Live at
+https://grid.techpaddock.io since the owner's outside steps (paddock-issues #55: the Vercel project `tp-grid`, env
+vars, DNS, the login rate limit, the `grid` exposed schema). The calendar route (#66) also needs `calendar` in the
+exposed schemas and the Microsoft keys in `tp-grid`, then one connect (paddock-issues #69). It is in `TOOLS` in
 `apps/home/lib/platform.ts`, with a 🗓️ icon in the sidebar (`apps/home/app/apps.ts`), so The Garage and Smoke
-probe it, and that probe is red until #55 is done. That is not a regression.
+probe it.
 
 - **Livery `clark`** (Lotus '63, green), the builder's pick: nothing fixes one, and it shares it with Cookbook.
   `lib/livery.ts` is the one line to change. There is no livery badge on the app bar, only the name, theme and logout.

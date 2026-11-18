@@ -121,8 +121,8 @@ Schema `resume`. Columns are in the migrations under `supabase/`; never put a mi
 - These are a lint on the template (`auditAts`), not a constraint on the renderer. A finding on a
   render is a finding about the template: fix it there.
 - Blocking, so the render fails: two or more tables, any header or footer text, a `<w:sdt>`, a
-  text box. Warning only: an image, an unknown heading. Nothing checks the bullet glyph yet; that
-  check is filed in TEC-168.
+  text box. Warning only: an image, an unknown heading. A bullet glyph a parser may misread is a
+  warning too (`oddBulletGlyphs`, TEC-168).
 - The renderer never adds a table, text box, image, or header or footer content, and never
   rewrites the document to clear a finding.
 - A finding must be believable: a false positive teaches the reader to ignore the warning.

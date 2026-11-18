@@ -30,7 +30,7 @@ One person's daily page: today's tasks, routines, a journal, a meditation timer,
 
 ## Calendar contract
 
-Grid hosts the one connection to the household's Outlook account (`techpaddock@outlook.com`) for every app, for now (owner, 2026-11-17, #65, #66). Apps send events; Grid keeps them in the `calendar` schema and pushes them to Microsoft Graph, one Outlook calendar per app. It is built to move: the schema is its own, and the only address apps hold is in the stamped `lib/calendar-client.ts`.
+Grid hosts the one connection to the household's shared Outlook account (its address is in paddock-issues #65, not here) for every app, for now (owner, 2026-11-17, #65, #66). Apps send events; Grid keeps them in the `calendar` schema and pushes them to Microsoft Graph, one Outlook calendar per app. It is built to move: the schema is its own, and the only address apps hold is in the stamped `lib/calendar-client.ts`.
 
 - **Route:** `POST /api/calendar/events`, behind the gate like everything else. Callers forward only `paddock_session` (as Health calls Cookbook), through `sendCalendarEvent` in `lib/calendar-client.ts`, which never throws. No app reads the `calendar` schema or talks to Microsoft.
 - **Body:** `{app, source_id, op: "upsert", title, start, end?, all_day?, recurrence?, notes?}` or `{app, source_id, op: "delete"}`.
