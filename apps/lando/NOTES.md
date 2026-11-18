@@ -1119,3 +1119,9 @@
   `next-env.d.ts`, which is not tracked. Build first on a fresh checkout.
 - `app/icon*.png` is a Next metadata convention; the manifest PNGs are named `manifest-*.png` so
   Next does not treat them as icons.
+- **No import cycles in `app/` or `lib/`** (#71). A cycle between `LogForm`, `WhenField` and `VaccineFields`
+  took the signed-in home page down: #64 added a module-level const in `WhenField` that read `input` from
+  `LogForm` before `LogForm` had evaluated, a `ReferenceError` at module load in the bundle that vitest
+  (which loads each file alone) and `next build` both missed. The shared pieces (`Field`, `Box`, `input`,
+  `inputFull`, `inputHalf`, `WHO_WIDTH`) live in `app/fields.tsx`, which imports nothing from `LogForm`;
+  `LogForm` is for the form only. `tests/importcycles.test.ts` fails on any value-import cycle.

@@ -2,7 +2,7 @@
 
 import { DOSE_MAX, VACCINES, hasDoses, vaccineLabel } from "@/lib/vaccines";
 import { dayText } from "@/lib/upcoming";
-import { Field, inputFull } from "./LogForm";
+import { Field, inputFull } from "./fields";
 import { DayField } from "./WhenField";
 
 /**

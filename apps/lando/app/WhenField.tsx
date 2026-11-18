@@ -15,7 +15,7 @@ import {
   quickValue,
   shiftMonth,
 } from "@/lib/whenpick";
-import { Field, input } from "./LogForm";
+import { Field, input } from "./fields";
 import Chip from "./Chip";
 
 const HOURS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];

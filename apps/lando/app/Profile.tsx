@@ -16,7 +16,7 @@ import {
   type ProfileDetails,
 } from "@/lib/profile";
 import { dayText, dueText, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
-import { Box, Field, inputFull } from "./LogForm";
+import { Box, Field, inputFull } from "./fields";
 import Sheet from "./Sheet";
 import UpcomingList from "./UpcomingList";
 

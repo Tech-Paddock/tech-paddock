@@ -6,7 +6,8 @@ import { noteText, noteWhenError } from "@/lib/notes";
 import { fromLocalInput, toDateInput, toLocalInput } from "@/lib/localtime";
 import { localStep } from "@/lib/whenpick";
 import PhotoPicker, { usePhotos } from "./Photos";
-import { Box, Field, inputFull, type LogBody, type Person } from "./LogForm";
+import { Box, Field, inputFull } from "./fields";
+import type { LogBody, Person } from "./LogForm";
 import { DayField, TimeField } from "./WhenField";
 
 type Props = {
