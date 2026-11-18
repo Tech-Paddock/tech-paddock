@@ -1,7 +1,7 @@
 # Supabase
 
 One project (`qyclakzsupyxgnqfgpiq`, `tech-paddock`) backs every app. Each tool has its own schema —
-`resume`, `coffee`, `health`, `cookbook`, `lando`, `grid` — never `public`. One
+`resume`, `coffee`, `health`, `cookbook`, `lando`, `grid`, `calendar` — never `public`. One
 migration history, here at the repo root.
 
 ## Contracts
@@ -12,6 +12,13 @@ route, and the contract is written in the rules of the app that serves it:
 - **Health → Cookbook:** Health prices recipe lines from Cookbook's `GET /api/servings`,
   forwarding only `paddock_session`. The contract is *Health↔Cookbook contract* in
   `apps/cookbook/RULES.md`.
+- **Every app → the calendar:** an app that wants an event in the household's Outlook sends it to
+  `POST /api/calendar/events`, forwarding only `paddock_session`, through the stamped
+  `lib/calendar-client.ts` (`sendCalendarEvent`; the one place that holds the address). Grid hosts
+  the route and the one Microsoft connection, and owns the `calendar` schema: no app reads or
+  writes `calendar`, and none talks to Microsoft. The contract is *Calendar contract* in
+  `apps/grid/RULES.md`. The schema is its own, not Grid's tables, so the route can move to another
+  app by changing the address in `lib/calendar-client.ts` and pointing that app's client at it.
 
 A new contract, or a write path into another app's data, is the owner's call (CLAUDE.md).
 

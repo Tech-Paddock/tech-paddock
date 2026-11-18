@@ -65,7 +65,7 @@ would get something wrong without it: the rule, one line of why. App rules live 
   2026-11-09, TEC-253, superseding TEC-43's Linear-only list; issue tools 2026-11-16; Linear's
   reads dropped and `gh issue view`/`list` added 2026-11-16). `guard.test.mjs` pins the exact list, so any addition is
   a deliberate change to that test. No interpreter, package runner or write ever goes on it.
-- **Apps put dates in one shared Outlook account, techpaddock@outlook.com, a calendar per app**
+- **Apps put dates in one shared Outlook account, a calendar per app**
   (owner, 2026-11-17, #65). No app hosts its own calendar; Pit Row shows these instead (#44). Apps
   never call Microsoft: they send events to one calendar route, forwarding only the session, and
   only its host holds the token, because Microsoft replaces the refresh token on every use. The host

@@ -4,7 +4,8 @@
 
 v1, the daily page (#43, TEC-275), on Next.js 16, copied from `apps/lando`. Live at
 https://grid.techpaddock.io since the owner's outside steps (paddock-issues #55: the Vercel project `tp-grid`, env
-vars, DNS, the login rate limit, the `grid` exposed schema). It is in `TOOLS` in
+vars, DNS, the login rate limit, the `grid` exposed schema). The calendar route (#66) also needs `calendar` in the
+exposed schemas and the Microsoft keys in `tp-grid`, then one connect (paddock-issues #69). It is in `TOOLS` in
 `apps/home/lib/platform.ts`, with a 🗓️ icon in the sidebar (`apps/home/app/apps.ts`), so The Garage and Smoke
 probe it.
 
@@ -62,6 +63,40 @@ probe it.
   `create_grid_schema` then `grant_grid_schema_usage` (additive). The server uses the service role only;
   `lib/supabase.ts` pins `grid`. `supabase/config.toml` lists `grid`.
 - **No model** (Never 3): nothing imports one and there is no `lib/models.ts`; a test checks.
+- **The household calendar** (#66, epic #65; contract in RULES.md, "Calendar contract"). Grid hosts the one Outlook
+  connection for every app. It is **not Grid's data** and is built to move: schema `calendar` (migrations
+  `create_calendar_schema` then `grant_calendar_schema_usage`), its own client (`lib/calendar/store.ts`, pinned to
+  `calendar`), and the stamped `lib/calendar-client.ts` (`packages/shared`), which holds the one address apps send to.
+  * **Code** (`lib/calendar/`): `validate.ts` (the contract's body), `graph.ts` (mapping to Graph and the few calls, all
+    with an injected `fetch`), `flush.ts` (the outbox push), `store.ts` (the `Store` interface and its Supabase
+    implementation), `expiry.ts` (the secret's date). **Routes** (`app/api/calendar/`): `events` (POST: append, then
+    flush), `connect` and `callback` (the one-time Microsoft sign-in), `status` (GET, for `/more`), `flush` (POST, "Send
+    now"). `app/CalendarStatus.tsx` is the block on `/more`.
+  * **Tables:** `connection` (one row: the refresh token and the flush lock), `calendars` (app to Graph calendar id),
+    `outbox` (append-only; a flush stamps only `sent_at` and `error`), `events` ((app, source_id) to Graph event id).
+    `calendars` is an addition to the issue's three, so a calendar is made once and never found by name.
+  * **The flush** takes a lock on the connection row (Microsoft replaces the refresh token on every use, so two at once
+    would break the connection), refreshes once and saves the new token before anything else, then sends the newest
+    unsent row per (app, source_id): older ones are stamped sent with the note `superseded`, so a bad row never blocks a
+    corrected one. A failure stays unsent with a short `graph <status> <code>` (never Graph's message, which can quote the
+    event) and is retried by the next send or "Send now"; a 429 stops the flush. There is no cron: **a row appended while
+    another flush holds the lock waits for the next send** (the holder reads again before it ends, so it is rare).
+  * **Mapping:** every event is written in Graph's `Mountain Standard Time` (Windows' name for America/Denver, daylight
+    saving included) with the contract's wall-clock times unconverted; all-day is midnight to midnight with Graph's end the
+    day after the last day; a create carries the outbox row id as `transactionId` so a retry after a crash does not double.
+  * **Not proven from here:** nothing has reached Microsoft. Everything above is tested with a fake `fetch`; the first
+    real check is the owner's (#69, then a test event). Graph accepting the Windows zone name and `transactionId` on a
+    personal account is from its documentation, not an observed call.
+  * **The Microsoft client secret expires 2028-11-16** (`SECRET_EXPIRES` in `lib/calendar/expiry.ts`; `/more` warns
+    within 30 days, and Outlook stops syncing the day it passes). To renew: make a new secret in the app registration,
+    set `MS_CLIENT_SECRET` in `tp-grid`, change `SECRET_EXPIRES` to the new date. The refresh token is unaffected. The redirect
+    URI to register is `https://grid.techpaddock.io/api/calendar/callback`.
+  * **Moving it** (to its own app, say): copy `lib/calendar/`, `app/api/calendar/`, `app/CalendarStatus.tsx` and the status
+    block's mount, give the new app the `calendar` client, `MS_CLIENT_ID`/`MS_CLIENT_SECRET` and a registered redirect
+    URI, then change `CALENDAR_BASE_URL` in `packages/shared/lib/calendar-client.ts` and stamp. No schema move and no
+    caller changes. The old routes go last. The Microsoft token is stored in `calendar.connection` as plain text behind
+    RLS, the same trust as the service key; it carries across with the schema.
+  * Grid's own routines reaching the calendar is #68 and Lando's is #67; neither is here.
 
 ## Traps
 
@@ -71,3 +106,4 @@ probe it.
 - **The vitest include is `tests/**/*.test.ts`:** a component test is a `.ts` file using `createElement`, not JSX (as Lando's).
 - **A route file may export only HTTP methods and route config:** the health probes are a plain `const`, not exported (Next fails the build otherwise).
 - **Days are strings.** Never build one with `new Date().toISOString()` (UTC); use `localDay()` in the browser.
+- **The calendar tests run on an in-memory `Store` and a scripted Graph** (`tests/memoryStore.ts`), because Microsoft cannot be reached from CI. The Supabase side of `lib/calendar/store.ts` is covered only by the call-shape tests in `tests/calendar-store.test.ts`.

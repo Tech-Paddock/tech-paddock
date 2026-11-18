@@ -2,6 +2,7 @@ import type { getServiceClient } from "./supabase";
 import { InvalidEvent } from "./events";
 import { missingPhotos } from "./storage";
 import { Conflict } from "./journal";
+import { formForItem } from "./future";
 import { needsVisit, repeatOf, type Upcoming, type UpcomingAction, type UpcomingInput } from "./upcoming";
 
 /**
@@ -96,7 +97,12 @@ export async function applyAction(
     const { data, error } = await db.from("events").select("id, kind, details").eq("id", a.done_event).maybeSingle();
     if (error) throw new Error(`couldn't read the visit: ${error.message}`);
     const e = data as { kind: string; details: { type?: string } } | null;
-    if (!e || e.kind !== "health" || e.details?.type !== "vet") throw new InvalidEvent("that vet visit isn't saved yet");
+    // The entry's health type is the one `formForItem` opens for this item (a Vaccine-form plan: vaccine;
+    // any other vet or vaccine plan: vet), so the phone and the server cannot disagree.
+    const want = formForItem(current)?.healthType ?? "vet";
+    if (!e || e.kind !== "health" || e.details?.type !== want) {
+      throw new InvalidEvent(want === "vaccine" ? "that vaccine isn't saved yet" : "that vet visit isn't saved yet");
+    }
   }
   const item = await update({ status: "done", done_on: a.done_on, done_event: a.done_event });
   const again = repeatOf(current);
