@@ -11,8 +11,9 @@ import LogForm from "@/app/LogForm";
 import type { FormKind, JournalEvent } from "@/lib/events";
 
 const SRC = readFileSync(resolve(__dirname, "../app/LogForm.tsx"), "utf8");
+const FIELDS = readFileSync(resolve(__dirname, "../app/fields.tsx"), "utf8"); // where the field class consts live (#71)
 const classOf = (name: string): string => {
-  const m = SRC.match(new RegExp(`const ${name} =\\s*(?:\`([^\`]*)\`|"([^"]*)")`));
+  const m = FIELDS.match(new RegExp(`const ${name} =\\s*(?:\`([^\`]*)\`|"([^"]*)")`));
   expect(m, `${name} is declared`).not.toBeNull();
   const body = m![1] ?? m![2];
   return body.includes("${input}") ? body.replace("${input}", classOf("input")) : body;
