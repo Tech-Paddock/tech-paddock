@@ -24,18 +24,22 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 - Quiet secondary controls (owner, TEC-250): Next 7 days is one short line per plan with a
   Calendar link; Treats is a plain counter, and Medical issue is its own checkbox, on Potty only;
   attachments are one small Attach link with thumbnails in a row.
-- Every form's bottom row is When and Logging as, each half the row (owner, TEC-261): a day box and
-  one time box, each a scroll column (day; hour, minute and AM/PM) that shows the values either side
-  faintly and rolls once when the form opens, never under reduced motion; a plain tap on the day,
-  without scrolling, opens the calendar for a day further away (owner, TEC-266). Weight is a date only, and a note is never in the future. The row opens on now,
-  or on the entry's own time (a correction, a Done, an Add a plan). Save is on its own line below:
-  one tap saves at that time and nothing opens after it. A future time shows the form's Repeat and
-  "Future: saves as upcoming", and Save reads Save plan. A failed save keeps the chosen time.
+- Every form ends with two rows of two equal columns (owner, #64): Day and Time, then Logging as and
+  Save. Day and Time are boxes that open a pop-up window, never a scroll wheel and never a panel that
+  pushes the form down: Day a month calendar, Time the shortcuts (Now, 15, 30 and 45 min ago, 1 hr
+  ago) then hour, minute and AM/PM picklists. Minutes step by five. Nothing behind a pop-up can be
+  selected while it is open, and Cancel leaves the time as it was. Weight is a date only. The row
+  opens on now rounded down to five minutes, or on the entry's own time (a correction, a Done, an Add
+  a plan). Potty and a note are never in the future. Repeat is always on the form except Potty, so
+  nothing shifts; a future time makes Save read Save plan, and Repeat on a past time is refused with
+  a message. A failed save keeps the chosen time.
 - One field class (owner, TEC-255): every text box, number box and select has the same padding, a
   44px height and a fixed width, never one taken from its content. The default is half its section;
-  a full-width field has a stated reason (the Note). Save is 44px tall and only as wide as its label.
-  On Potty, Where is on its own line under What (TEC-263). On Food, Servings is the left box at about
-  its label's width and What takes the rest of the row, wider than half because it holds a food's name.
+  a full-width field has a stated reason (the Note). Save is 44px tall and fills its column (#64).
+  On Potty, Where is on its own line under What (TEC-263). On Food, What comes first and takes the
+  rest of the row, and Servings follows it at about its label's width (owner, #64).
+- A length of time is always chips, never a number box, and every form has the same set: 5, 15,
+  30, 45 and 60+ minutes (owner, #64), for Potty's Time outside, Fun's Length and Training's Time.
 - Next 7 days sits in a box under the Log tab's Logging as row, above the Feed (TEC-255, TEC-263).
 - On a form, Training's Related note shares a line with Treats; a vet visit's and a medication dose's
   Related issue and Related note sit side by side. The Meals pill shows the count only, never cups
