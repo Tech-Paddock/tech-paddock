@@ -23,6 +23,7 @@ node scripts/stamp-shared.mjs --check  # verify, write nothing
 | `next.config.mjs` | Security headers, including `frame-ancestors`. |
 | `app/ThemeControl.tsx` | Light/dark switch and the message that carries it into the hub's frames. |
 | `app/LogoutControl.tsx` | The header's Log out; reports a failure. |
+| `lib/calendar-client.ts` | The address of the household calendar route and `sendCalendarEvent`, which forwards only the session and never throws. Moving the route later is one line here. Contract: `apps/grid/RULES.md`. |
 
 Each copy lands at the same path under `apps/<app>/`. The login path is stamped because a fix
 applied to some copies of the password gate is a hole that looks closed. The routes that re-export

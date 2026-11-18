@@ -74,6 +74,9 @@ export const MANIFEST = [
   // The commit each deployment is serving (TEC-57): GET /api/version, opened
   // signed-out by the gate for that exact path and method only.
   { from: "app/api/version/route.ts", to: "app/api/version/route.ts" },
+  // The household calendar's caller (calendar schema, #66): the address of the
+  // route that holds the one Outlook connection, and the send that never throws.
+  { from: "lib/calendar-client.ts", to: "lib/calendar-client.ts" },
 ];
 
 export const SHARED_DIR = "packages/shared";
