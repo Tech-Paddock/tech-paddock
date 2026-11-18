@@ -17,10 +17,8 @@ import {
   dogsFromPick,
   kindOfForm,
   dogsPickFor,
-  OUT_MINUTES_CHIPS,
   funPotty,
   leashOptions,
-  outMinutesLabel,
   spotOptions,
   POTTY_WHAT,
   POTTY_WHAT_LABELS,
@@ -42,8 +40,6 @@ import {
   parseNewMedication,
   potty as asPotty,
   inlineTreatEntries,
-  outMinutesAria,
-  outMinutesChip,
   visitWeightPlan,
   earlierDoses,
   weight as asWeight,
@@ -64,7 +60,7 @@ import {
 import { FOOD_UNITS, MISC_ID, servingAmount, servingOptions, servingText, picklist, findFood, treatQtyError, unitLabel, type AddedFood, type FoodType, type FoodUnit, type ListType } from "@/lib/foods";
 import { MED_REASONS, MED_REASON_IDS, MED_ROUTES, MED_UNITS, NO_REASON, findMedication, medReasonLabel, type MedReason, medPicklist, type MedRoute, type MedUnit, type Medication } from "@/lib/medications";
 import { plannedWhen } from "@/lib/calendar";
-import { FUTURE_NOTICE, donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, isFuturePick, type DonePrefill } from "@/lib/future";
+import { donePrefill, doneWhen, futureItem, isFutureDay, isFutureWhen, isFuturePick, type DonePrefill } from "@/lib/future";
 import { REPEAT_MAX, REPEAT_UNITS, type RepeatUnit, type Upcoming, type UpcomingInput } from "@/lib/upcoming";
 import { defaultAmount, defaultFood, type Remembered } from "@/lib/defaults";
 import { VACCINES, hasDoses, suggestedDose } from "@/lib/vaccines";
@@ -73,8 +69,10 @@ import { NextDoseOffer, VaccinePick, VaccinesGiven } from "./VaccineFields";
 import TreatQty from "./TreatQty";
 import TreatCount from "./TreatCount";
 import PhotoPicker, { usePhotos } from "./Photos";
-import WhenField from "./WhenField";
+import { DayField, TimeField } from "./WhenField";
+import DurationChips from "./DurationChips";
 import { clockTime, fromDateInput, fromLocalInput, toDateInput, toLocalInput } from "@/lib/localtime";
+import { clampTo, localStep } from "@/lib/whenpick";
 import { noteChoices, noteLink } from "@/lib/notes";
 
 export type Person = { id: string; display_name: string };
@@ -236,6 +234,9 @@ export function Box({ section, label, children, className = "" }: { section: str
   );
 }
 
+/** Repeat saves a plan, and a plan starts at a later time: what Save says when Repeat is ticked on a time that is not. */
+export const REPEAT_NEEDS_FUTURE = "Repeat saves a plan, so pick a later day or time, or untick Repeat.";
+
 /** The What pick's last option: opens the add-a-food form, never a value. */
 const FOOD_ADD = "__add";
 /** The Medication pick's last option: opens the add-a-medication form, never a value. */
@@ -330,9 +331,13 @@ export default function LogForm({
     : !event && planDay
       ? plannedWhen(planDay, new Date())
       : null;
-  const [when, setWhen] = useState(prefillWhen ?? toLocalInput(event?.at ?? openedAt.current));
-  const [day, setDay] = useState(prefillWhen ? prefillWhen.slice(0, 10) : toDateInput(event?.at ?? openedAt.current));
-  const [whenTouched, setWhenTouched] = useState(!!prefillWhen);
+  // A new entry opens on now rounded down to five minutes (the minutes step by five). Potty is never in the future, so
+  // even the Calendar's Add a plan, which opens on a later day, opens a Potty on now.
+  const noFuture = kind === "potty" && !plan;
+  const openedWhen = clampTo(prefillWhen ?? (event ? toLocalInput(event.at) : localStep(new Date(openedAt.current))), noFuture ? toLocalInput(openedAt.current) : undefined);
+  const [when, setWhen] = useState(openedWhen);
+  const [day, setDay] = useState(openedWhen.slice(0, 10));
+  const [whenTouched, setWhenTouched] = useState(!!prefillWhen && openedWhen === prefillWhen);
   const [personId, setPersonId] = useState(event ? event.person_id ?? "" : phonePerson ?? "");
   const [note, setNote] = useState(event?.note ?? prefill?.note ?? "");
   // A repeat, for a future When only (TEC-199): every N weeks, months or years.
@@ -352,9 +357,9 @@ export default function LogForm({
   // Inside only, nothing picked by default: a new or old inside entry never
   // gets a spot unless one is tapped.
   const [spot, setSpot] = useState<Spot | "">(p?.spot ?? "");
-  // Time outside (TEC-176, range chips since TEC-193): optional, outside only, never remembered. A chip saves
-  // its upper bound. Nothing on a new entry; a correction opens holding the entry's own minutes, which stay
-  // unless a chip is tapped (an older value such as 10 shows no chip picked and saves as it was).
+  // Time outside (TEC-176): optional, outside only, never remembered, picked from the one set of length chips (5, 15,
+  // 30, 45, 60+ min). Nothing on a new entry; a correction opens holding the entry's own minutes, which stay unless a
+  // chip is tapped (an older value such as 10 shows no chip picked and saves as it was).
   const [outMin, setOutMin] = useState<number | null>(p?.minutes ?? null);
 
   // Food
@@ -402,6 +407,8 @@ export default function LogForm({
   const [dogName, setDogName] = useState("");
   const [dogError, setDogError] = useState<string | null>(null);
   const [dogBusy, setDogBusy] = useState(false);
+  // A walk's, a playtime's or a training's length: the same chips as Time outside, opening on 15 min. An older entry's
+  // own minutes (20, 90) stay until a chip is tapped.
   const [minutes, setMinutes] = useState(String(x?.minutes ?? 15));
   const [commands, setCommands] = useState<CommandId[]>(x?.commands ?? []);
 
@@ -803,6 +810,12 @@ export default function LogForm({
       await submitFuture(whenV, dayV);
       return;
     }
+    // Repeat saves a plan that starts at a later time, so it needs one. A time that is now or past is refused, not
+    // quietly saved without the repeat or as an overdue plan (refusing is the behaviour chosen for #64).
+    if (repeatOn && !noFuture) {
+      failOnForm(REPEAT_NEEDS_FUTURE);
+      return;
+    }
     // Potty opens with nothing picked and will not save without a What (TEC-199).
     if (kind === "potty" && !what) {
       failOnForm("Pick what happened — pee, poop, both or no potty.");
@@ -1044,35 +1057,40 @@ export default function LogForm({
     </div>
   );
 
-  // The Repeat of a plan (TEC-199), shown on the form while it is a plan: an open plan being edited, or a form opened on a future time.
+  // The Repeat (TEC-199), always on the form and always usable, so the form never shifts when the time moves into the
+  // future (the owner, 2026-11-17). Its every-and-unit boxes are there too, dimmed until it is ticked. Potty has none: it is
+  // never in the future. Repeat saves a plan, so it needs a future time (see `commit`).
   const repeatBlock = (
     <div className="flex flex-wrap items-center gap-x-2">
       <label className="flex min-h-[44px] items-center gap-2">
         <input type="checkbox" checked={repeatOn} onChange={(e) => setRepeatOn(e.target.checked)} className="h-5 w-5 accent-accent" />
         <span>Repeat</span>
       </label>
-      {repeatOn && (
-        <>
-          <span className="text-ink-soft">every</span>
-          <input
-            aria-label="Repeat every"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={REPEAT_MAX}
-            value={repeatEvery}
-            onChange={(e) => setRepeatEvery(e.target.value)}
-            className={`${input} w-[64px]`}
-          />
-          <select aria-label="Repeat unit" value={repeatUnit} onChange={(e) => setRepeatUnit(e.target.value as RepeatUnit)} className={`${input} w-[96px]`}>
-            {REPEAT_UNITS.map((u) => (
-              <option key={u} value={u}>
-                {Number(repeatEvery) === 1 ? u : `${u}s`}
-              </option>
-            ))}
-          </select>
-        </>
-      )}
+      <span className="text-ink-soft">every</span>
+      <input
+        aria-label="Repeat every"
+        type="number"
+        inputMode="numeric"
+        min={1}
+        max={REPEAT_MAX}
+        value={repeatEvery}
+        disabled={!repeatOn}
+        onChange={(e) => setRepeatEvery(e.target.value)}
+        className={`${input} w-[64px] disabled:opacity-50`}
+      />
+      <select
+        aria-label="Repeat unit"
+        value={repeatUnit}
+        disabled={!repeatOn}
+        onChange={(e) => setRepeatUnit(e.target.value as RepeatUnit)}
+        className={`${input} w-[96px] disabled:opacity-50`}
+      >
+        {REPEAT_UNITS.map((u) => (
+          <option key={u} value={u}>
+            {Number(repeatEvery) === 1 ? u : `${u}s`}
+          </option>
+        ))}
+      </select>
     </div>
   );
 
@@ -1103,23 +1121,7 @@ export default function LogForm({
             )}
             {where === "outside" && (
               <Field label="Time outside">
-                {/* Range chips only (TEC-186, TEC-193): each saves its upper bound ("≤5" saves 5, "5–15" saves 15). */}
-                <div role="group" aria-label="Time outside, minutes" className="flex flex-wrap gap-x-1">
-                  {OUT_MINUTES_CHIPS.map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      aria-pressed={outMinutesChip(outMin) === m}
-                      aria-label={outMinutesAria(m)}
-                      onClick={() => setOutMin(outMinutesChip(outMin) === m ? null : m)}
-                      className="group flex min-h-[44px] items-center whitespace-nowrap focus-visible:outline-none"
-                    >
-                      <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[15px] group-aria-pressed:border-accent group-aria-pressed:bg-accent group-aria-pressed:text-accent-ink group-focus-visible:outline group-focus-visible:outline-[3px] group-focus-visible:outline-offset-2 group-focus-visible:outline-pinstripe">
-                        {outMinutesLabel(m)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+                <DurationChips label="Time outside" value={outMin} optional onPick={setOutMin} />
               </Field>
             )}
           </>
@@ -1130,26 +1132,9 @@ export default function LogForm({
             <Field label="Type">
               <Seg name="type" label="Type" value={foodType} onChange={pickFoodType} options={[["meal", "Meal"], ["snuffle", "Snuffle mat"], ["treat", "Treat"]] as const} />
             </Field>
-            {/* Servings, then What, on one line (TEC-263): the Servings select is only as wide as its label and What takes
+            {/* What, then Servings, on one line (TEC-263, order swapped 2026-11-17): the Servings select is only as wide as its label and What takes
                 the rest of the row. What is wider than half on purpose: it holds a food's name, which half a row clips. */}
             <div className="flex items-start gap-2">
-              {foodType !== "treat" && (
-                <Field label="Servings" htmlFor="f-amount" className="shrink-0">
-                  {/* A fixed width, never one sized to its options (TEC-255): about its "Servings" label. It stores `SERVING_UNIT`. */}
-                  <select
-                    id="f-amount"
-                    value={amount ?? servingAmount(null)}
-                    onChange={(e) => setAmount(Number(e.target.value))}
-                    className={`${input} w-[64px]`}
-                  >
-                    {servingOptions(openedAmount).map((n) => (
-                      <option key={n} value={n}>
-                        {servingText(n)}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              )}
               <Field label="What" htmlFor="f-item" className="flex-1">
                 <select
                   id="f-item"
@@ -1172,6 +1157,23 @@ export default function LogForm({
                   <option value={FOOD_ADD}>Add a food…</option>
                 </select>
               </Field>
+              {foodType !== "treat" && (
+                <Field label="Servings" htmlFor="f-amount" className="shrink-0">
+                  {/* A fixed width, never one sized to its options (TEC-255): about its "Servings" label. It stores `SERVING_UNIT`. */}
+                  <select
+                    id="f-amount"
+                    value={amount ?? servingAmount(null)}
+                    onChange={(e) => setAmount(Number(e.target.value))}
+                    className={`${input} w-[64px]`}
+                  >
+                    {servingOptions(openedAmount).map((n) => (
+                      <option key={n} value={n}>
+                        {servingText(n)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
               {foodType === "treat" && (
                 <Field label="Amount" htmlFor="f-amount" className="shrink-0">
                   {/* Just the box, and the unit as a small word beside it (TEC-202), so the column is no wider than the box. */}
@@ -1254,15 +1256,13 @@ export default function LogForm({
                 <Seg name="type" label="Type" value={exType} onChange={setExType} options={FUN_TYPES.map((t) => [t, EXERCISE_LABELS[t]] as const)} />
               </Field>
             )}
-            {/* Where and Time on one line (Fun calls it Length). */}
-            <div className="flex flex-wrap items-start gap-x-4">
-              <Field label="Where">
-                <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
-              </Field>
-              <Field label={form === "training" ? "Time (min)" : "Length (min)"} htmlFor="f-mins">
-                <input id="f-mins" type="number" inputMode="numeric" min={1} max={600} value={minutes} onChange={(e) => setMinutes(e.target.value)} className={`${input} w-[76px]`} />
-              </Field>
-            </div>
+            <Field label="Where">
+              <Seg name="where" label="Where" value={where} onChange={setWhere} options={WHERE_OPTS} />
+            </Field>
+            {/* Fun calls it Length. Chips, never a number box, the same set as Potty's Time outside. */}
+            <Field label={form === "training" ? "Time" : "Length"}>
+              <DurationChips label={form === "training" ? "Time" : "Length"} value={Number(minutes) || null} onPick={(m) => m && setMinutes(String(m))} />
+            </Field>
             {/* Commands and Other dogs on one line; Fun has Other dogs alone. */}
             {addDogRow || (
               <div className="grid grid-cols-2 items-start gap-2">
@@ -1653,13 +1653,18 @@ export default function LogForm({
         </div>
       )}
 
-      {/* The bottom row (TEC-261, the owner's option A): When and Logging as, each half the row, on every form. A day box
-          that opens the calendar anywhere on it, and one time box whose hour, minute and AM/PM scroll in place; a
-          Weight is a day only. The row opens on now, or on the entry's own time. */}
+      {/* The bottom block (the owner, 2026-11-17): Day, Time, Logging as and Save share two equal columns, so the boxes
+          line up. Day and Time each open a pop-up; Repeat is a line between the two rows, always there (Potty has none:
+          it is never in the future). Save reads Save plan when the time is in the future. One tap saves. A Weight
+          is a day only, so its Time cell is empty. */}
       <div data-section="when-who" className="grid grid-cols-2 items-end gap-2">
-        <Field label="When">
-          <WhenField value={dateOnly ? day : when} dateOnly={dateOnly} onChange={pickWhen} />
-        </Field>
+        <DayField value={dateOnly ? day : when} dateOnly={dateOnly} noFuture={noFuture} onChange={pickWhen} />
+        {!dateOnly && <TimeField value={when} noFuture={noFuture} onChange={pickWhen} />}
+        {!noFuture && (
+          <div data-section="plan" className="col-span-2 grid gap-0.5">
+            {repeatBlock}
+          </div>
+        )}
         <Field label="Logging as" htmlFor="f-who">
           <select id="f-who" value={personId} onChange={(e) => setPersonId(e.target.value)} className={inputFull}>
             <option value="">Nobody</option>
@@ -1670,41 +1675,30 @@ export default function LogForm({
             ))}
           </select>
         </Field>
-      </div>
-
-      {/* A plan's Repeat (TEC-199, back under the When row by TEC-261): an open plan being edited, or any form whose When is
-          in the future (a new entry, or the Calendar's Add a plan), says so and offers it. Save then reads Save plan. */}
-      {planning && (
-        <div data-section="plan" className="grid gap-0.5">
-          {future && <p className="text-[13px] font-semibold text-ink">{FUTURE_NOTICE}</p>}
-          {repeatBlock}
+        <div data-section="save">
+          <button
+            type="submit"
+            disabled={busy || photoBlock}
+            data-autofocus={kind === "weight" && !editing ? undefined : true}
+            className="h-[44px] w-full min-w-0 whitespace-nowrap rounded-[12px] bg-[var(--tone-2-bg)] px-2 text-[15px] font-bold text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)] disabled:opacity-60"
+          >
+            {busy
+              ? "Saving…"
+              : photos.working
+                ? "Uploading…"
+                : photos.failed
+                  ? "Fix attachment"
+                  : retry && error
+                    ? "Retry"
+                    : plan
+                      ? "Save changes"
+                      : future
+                        ? "Save plan"
+                        : editing
+                          ? "Save changes"
+                          : `Save ${title.toLowerCase()}`}
+          </button>
         </div>
-      )}
-
-      {/* Save is on its own line, as tall as the fields and only as wide as its words (TEC-261). One tap saves. */}
-      <div data-section="save" className="flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={busy || photoBlock}
-          data-autofocus={kind === "weight" && !editing ? undefined : true}
-          className="h-[44px] min-w-0 shrink-0 whitespace-nowrap rounded-[12px] bg-[var(--tone-2-bg)] px-4 text-[15px] font-bold text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)] disabled:opacity-60"
-        >
-          {busy
-            ? "Saving…"
-            : photos.working
-              ? "Uploading…"
-              : photos.failed
-                ? "Fix attachment"
-                : retry && error
-                  ? "Retry"
-                  : plan
-                    ? "Save changes"
-                    : future
-                      ? "Save plan"
-                      : editing
-                        ? "Save changes"
-                        : `Save ${title.toLowerCase()}`}
-        </button>
       </div>
       {editing && (
         <button type="button" onClick={remove} disabled={busy} className="min-h-[44px] self-start font-semibold text-danger disabled:opacity-60">

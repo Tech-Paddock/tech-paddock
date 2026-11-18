@@ -1,190 +1,27 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { DATE_ONLY_HOUR, clock12, dateLabel, fromDateInput, localMidnight, toDateInput, withClock, withDay } from "@/lib/localtime";
-import { input } from "./LogForm";
-
-const BOX = 42; // px: the column fills the 44px box inside its 1px border
-const ROW = 20; // px: a short row, so the rows either side peek out above and below the chosen one
-const PAD = (BOX - ROW) / 2; // px of empty space above the first row and below the last, so either end can sit in the middle
-const SETTLE_MS = 90;
-const NUDGE_PX = 16; // how far a column rolls when the form opens
-const NUDGE_STAGGER_MS = 140;
-const NUDGE_START_MS = 280; // after the sheet has risen
-const NUDGE_OUT_MS = 230;
-const NUDGE_BACK_MS = 260;
-const FADE = "linear-gradient(to bottom, transparent 0%, #000 32%, #000 68%, transparent 100%)";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
+import { createPortal } from "react-dom";
+import { clock12, dateLabel, fromDateInput, localMidnight, toDateInput, toLocalInput, withClock, withDay } from "@/lib/localtime";
+import {
+  QUICK_AGO,
+  clampTo,
+  dayDisabled,
+  hourDisabled,
+  minuteDisabled,
+  minuteOptions,
+  monthCells,
+  pmDisabled,
+  quickValue,
+  shiftMonth,
+} from "@/lib/whenpick";
+import { Field, input } from "./LogForm";
+import Chip from "./Chip";
 
 const HOURS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-const MINUTES = Array.from({ length: 60 }, (_, i) => i);
-const PERIODS = ["AM", "PM"];
-/** The day column lists about two weeks back and a month ahead; a tap on it opens the calendar for any other day. */
-const DAYS_BACK = 14;
-const DAYS_AHEAD = 30;
+const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
-type Item = { key: string; text: string };
-
-/**
- * One scroll column of the When row: the chosen row sits in the middle at full size and the rows either side peek
- * out, smaller and in soft ink, fading at the top and bottom edges. A swipe scrolls it, snapping a row at a time.
- * AmountScroller's pattern (a scroll box that settles on a row, one `spinbutton` for keys and screen readers),
- * sized to sit inside the 44px field with no border of its own. Arrow keys step, Page keys jump, Home and End go
- * to either end. When the form opens it rolls a little and settles back, once, after `nudgeAfter` ms (never when
- * motion is reduced). `onTap` is a plain tap, which is not a scroll.
- */
-function ScrollColumn({
-  label,
-  items,
-  index,
-  jump,
-  width,
-  nudgeAfter,
-  onIndex,
-  onTap,
-}: {
-  label: string;
-  items: Item[];
-  index: number;
-  /** How far the Page keys move. */
-  jump: number;
-  /** Fixed px, or omitted to fill the space. */
-  width?: number;
-  /** Milliseconds after opening before this column rolls; omitted for no nudge. */
-  nudgeAfter?: number;
-  onIndex: (i: number) => void;
-  /** A tap that did not scroll (and Enter or Space). */
-  onTap?: () => void;
-}) {
-  const box = useRef<HTMLDivElement>(null);
-  const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const nudge = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const nudging = useRef(false);
-  const indexNow = useRef(index);
-  indexNow.current = index;
-  const count = items.length;
-
-  const stopNudge = () => {
-    nudge.current.forEach(clearTimeout);
-    nudge.current = [];
-    if (!nudging.current) return;
-    nudging.current = false;
-    const el = box.current;
-    if (el) {
-      el.style.scrollSnapType = "";
-      el.scrollTop = indexNow.current * ROW;
-    }
-  };
-
-  // Follow the value when it changes from outside (opening, a key, the other columns).
-  useEffect(() => {
-    const el = box.current;
-    if (el && !nudging.current && Math.round(el.scrollTop / ROW) !== index) el.scrollTop = index * ROW;
-  }, [index, count]);
-  useEffect(() => () => clearTimeout(settle.current), []);
-
-  // The nudge: once, when the form opens. Snap is off while it rolls, and the scroll events it makes are not a pick.
-  useEffect(() => {
-    const el = box.current;
-    if (nudgeAfter === undefined || !el || typeof el.scrollTo !== "function") return;
-    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    const timers = nudge.current;
-    timers.push(
-      setTimeout(() => {
-        const home = indexNow.current * ROW;
-        const dir = indexNow.current >= count - 1 ? -1 : 1;
-        nudging.current = true;
-        el.style.scrollSnapType = "none";
-        el.scrollTo({ top: home + dir * NUDGE_PX, behavior: "smooth" });
-        timers.push(
-          setTimeout(() => {
-            el.scrollTo({ top: home, behavior: "smooth" });
-            timers.push(setTimeout(stopNudge, NUDGE_BACK_MS));
-          }, NUDGE_OUT_MS),
-        );
-      }, nudgeAfter),
-    );
-    return () => {
-      timers.forEach(clearTimeout);
-      nudging.current = false;
-    };
-    // Once per opening: the column mounts with the form.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const clamp = (i: number) => Math.min(count - 1, Math.max(0, i));
-
-  function onScroll() {
-    if (nudging.current) return;
-    clearTimeout(settle.current);
-    settle.current = setTimeout(() => {
-      const el = box.current;
-      if (!el) return;
-      const j = clamp(Math.round(el.scrollTop / ROW));
-      if (j !== index) onIndex(j);
-    }, SETTLE_MS);
-  }
-
-  function onKey(e: React.KeyboardEvent) {
-    stopNudge();
-    if (onTap && (e.key === "Enter" || e.key === " ")) {
-      e.preventDefault();
-      onTap();
-      return;
-    }
-    const step: Record<string, number> = {
-      ArrowUp: -1,
-      ArrowDown: 1,
-      PageUp: -jump,
-      PageDown: jump,
-      Home: -count,
-      End: count,
-    };
-    if (!(e.key in step)) return;
-    e.preventDefault();
-    const j = clamp(index + step[e.key]);
-    if (j !== index) onIndex(j);
-  }
-
-  return (
-    <div
-      ref={box}
-      role="spinbutton"
-      tabIndex={0}
-      aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={count - 1}
-      aria-valuenow={index}
-      aria-valuetext={items[index]?.text}
-      onScroll={onScroll}
-      onKeyDown={onKey}
-      onPointerDown={stopNudge}
-      onWheel={stopNudge}
-      onClick={onTap}
-      style={{ height: BOX, width, WebkitMaskImage: FADE, maskImage: FADE }}
-      className={`${width === undefined ? "min-w-0 flex-1 cursor-pointer" : "shrink-0"} snap-y snap-mandatory overflow-y-scroll overscroll-contain rounded-md outline-none [scrollbar-width:none] focus-visible:bg-raised [&::-webkit-scrollbar]:hidden`}
-    >
-      <div aria-hidden="true" style={{ height: PAD }} />
-      {items.map((it, i) => (
-        <div
-          key={it.key}
-          aria-hidden="true"
-          style={{ height: ROW }}
-          className={`flex snap-center items-center justify-center whitespace-nowrap tabular-nums ${i === index ? "text-[15px]" : "text-[11px] text-ink-soft"}`}
-        >
-          {it.text}
-        </div>
-      ))}
-      <div aria-hidden="true" style={{ height: PAD }} />
-    </div>
-  );
-}
-
-const asItems = (texts: string[]): Item[] => texts.map((t) => ({ key: t, text: t }));
-const HOUR_ITEMS = asItems(HOURS.map(String));
-const MINUTE_ITEMS = asItems(MINUTES.map((m) => String(m).padStart(2, "0")));
-const PERIOD_ITEMS = asItems(PERIODS);
-
-/** "Yesterday", "Today", "Tomorrow", else the date. */
+/** "Today", "Yesterday", "Tomorrow", else the date: the face of the Day box. */
 function dayText(day: string, now: Date): string {
   const iso = fromDateInput(day);
   if (iso) {
@@ -194,120 +31,282 @@ function dayText(day: string, now: Date): string {
   return dateLabel(day, now);
 }
 
-/** The days the column lists: two weeks back to a month ahead (no later than `maxDay`), plus the chosen day if it lies outside. */
-function dayItems(chosen: string, now: Date, maxDay?: string): Item[] {
-  const days: string[] = [];
-  for (let k = -DAYS_BACK; k <= DAYS_AHEAD; k++) {
-    const day = toDateInput(new Date(now.getFullYear(), now.getMonth(), now.getDate() + k, DATE_ONLY_HOUR).toISOString());
-    if (!maxDay || day <= maxDay) days.push(day);
-  }
-  if (chosen && !days.includes(chosen)) {
-    days.push(chosen);
-    days.sort();
-  }
-  return days.map((d) => ({ key: d, text: dayText(d, now) }));
+/** "2:35 PM": the face of the Time box. */
+function clockText(value: string): string {
+  const c = clock12(value);
+  return `${c.hour}:${String(c.minute).padStart(2, "0")} ${c.pm ? "PM" : "AM"}`;
 }
 
+/** Whether a form that can't be in the future (Potty, a note) holds a time after now: the latest it may hold is now. */
+const maxFor = (noFuture: boolean, now: Date): string | undefined => (noFuture ? toLocalInput(now.toISOString()) : undefined);
 
 /**
- * The When row's field (TEC-261, the owner's option A; TEC-266 made it show it scrolls): a day box and one time box,
- * side by side. Both are scroll columns that peek, and roll a little when the form opens.
- *
- * The day box is a column of Yesterday, Today, Tomorrow and the dates around them; scrolling sets the day. A plain
- * tap on it, without scrolling, opens the calendar for a day further away: a transparent `date` input sits
- * underneath (it holds the value for the calendar and for assistive tech, and is not touchable, so it never blocks
- * a swipe), and `showPicker()` is called on the tap, for the browsers that need it. The time box is drawn like the
- * original 44px field, with the hour, the minute and AM or PM each scrolling in place. A Weight is a day only, so it
- * has no time box. `value` is `YYYY-MM-DD` for a day-only field, else a local date-and-time (`YYYY-MM-DDTHH:mm`);
- * `onChange` hands back the same shape. A local pattern.
+ * A pop-up window over the sheet, not a panel that opens down it (the owner, 2026-11-17): a dimmed backdrop and a
+ * centred panel, drawn into `<body>` above the sheet. Nothing in it scrolls and everything in it is `select-none`, so a
+ * hold or a drag never selects the page behind it. Page scroll is locked while it is open. Escape and a tap on the
+ * backdrop cancel (Escape is kept from the sheet below, which would close the whole form). Focus moves in, and goes back
+ * to the box that opened it. A local pattern.
  */
-export default function WhenField({
+function Popup({
+  title,
+  summary,
+  opener,
+  onCancel,
+  children,
+}: {
+  title: string;
+  summary: string;
+  opener: RefObject<HTMLElement | null>;
+  onCancel: () => void;
+  children: React.ReactNode;
+}) {
+  const panel = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const cancel = useRef(onCancel);
+  cancel.current = onCancel;
+
+  useEffect(() => {
+    const back = opener.current;
+    panel.current?.querySelector<HTMLElement>("button:not([disabled]), select:not([disabled])")?.focus({ preventScroll: true });
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      cancel.current();
+    };
+    document.addEventListener("keydown", key, true);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", key, true);
+      document.body.style.overflow = overflow;
+      back?.focus?.({ preventScroll: true });
+    };
+    // Once per opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-bar/60 p-4" data-backdrop onClick={(e) => e.target === e.currentTarget && onCancel()}>
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="w-full max-w-sm select-none rounded-[18px] border-t-4 border-pinstripe bg-surface p-3 shadow-[0_12px_40px_rgb(0_0_0_/_0.35)]"
+      >
+        <div className="grid gap-2">
+          <header className="flex items-center justify-between gap-3">
+            <h3 id={titleId} className="text-xl font-bold leading-tight">
+              {title}
+            </h3>
+            <span className="text-[15px] tabular-nums text-ink-soft">{summary}</span>
+          </header>
+          {children}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+const cancelButton = "min-h-[44px] rounded-[12px] border border-line bg-surface px-4 text-[15px]";
+
+/** The box a pop-up opens from: the shared field's height and border, its face, and a small arrow. */
+function Trigger({ id, text, label, open, onOpen, btn }: { id: string; text: string; label: string; open: boolean; onOpen: () => void; btn: RefObject<HTMLButtonElement | null> }) {
+  return (
+    <button
+      ref={btn}
+      id={id}
+      type="button"
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-label={`${label}: ${text}`}
+      onClick={onOpen}
+      className={`${input} flex w-full select-none items-center justify-between gap-1 text-left`}
+    >
+      <span className="truncate tabular-nums">{text}</span>
+      <span aria-hidden="true" className="text-ink-soft">
+        ▾
+      </span>
+    </button>
+  );
+}
+
+/**
+ * The Day box (the owner, 2026-11-17, replacing the scroll wheel of TEC-261): it reads the day and opens a month
+ * calendar in a pop-up; a tap on a day picks it and closes. Today is ringed. With `noFuture` (Potty, a note) later days
+ * are greyed out and the calendar will not go to a later month. `value` is a local date-and-time
+ * (`YYYY-MM-DDTHH:mm`), or `YYYY-MM-DD` for a day-only field (a Weight, a next dose); `onChange` hands back the same
+ * shape. Picking a day keeps the clock, and for `noFuture` a time that would then be after now becomes now. A local
+ * pattern.
+ */
+export function DayField({
   value,
   dateOnly,
-  maxDay,
+  noFuture = false,
+  label = "Day",
   onChange,
 }: {
   value: string;
   dateOnly: boolean;
-  /** The last day the calendar offers (a note is never in the future). */
-  maxDay?: string;
+  noFuture?: boolean;
+  label?: string;
   onChange: (value: string) => void;
 }) {
+  const id = useId();
+  const btn = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
   const day = value.slice(0, 10);
-  const c = clock12(value);
-  const hourIndex = HOURS.indexOf(c.hour);
-  const calendar = useRef<HTMLInputElement>(null);
-  const days = dayItems(day, new Date(), maxDay);
-  const dayIndex = Math.max(
-    0,
-    days.findIndex((d) => d.key === day),
-  );
+  const now = new Date();
+  const max = maxFor(noFuture, now);
+  const [shown, setShown] = useState(() => shiftMonth(day, 0));
+  const today = toDateInput(now.toISOString());
 
-  function setDay(d: string) {
-    if (d) onChange(dateOnly ? d : withDay(value, d));
+  function show() {
+    setShown(shiftMonth(/^\d{4}-\d{2}-\d{2}$/.test(day) ? day : today, 0));
+    setOpen(true);
   }
-
-  function openCalendar() {
-    const el = calendar.current;
-    if (!el) return;
-    try {
-      if (el.showPicker) el.showPicker();
-      else el.click();
-    } catch {
-      // Not every browser lets a script open it; the day column still scrolls.
-    }
+  function pick(d: string) {
+    onChange(dateOnly ? d : clampTo(withDay(value, d), max));
+    setOpen(false);
   }
+  const firstOf = (m: { year: number; month: number }) => `${m.year}-${String(m.month + 1).padStart(2, "0")}-01`;
+  const step = (by: number) => setShown((s) => shiftMonth(firstOf(s), by));
+  const nextFirst = firstOf(shiftMonth(firstOf(shown), 1));
 
   return (
-    <div className="flex items-center gap-1">
-      {/* The day box: the shared field's border and height (`input`), its padding moved off so the column can fill it. */}
-      <div className={`${input} relative flex flex-1 items-center overflow-hidden !p-0 focus-within:border-accent`}>
-        <ScrollColumn label="Day" items={days} index={dayIndex} jump={7} nudgeAfter={NUDGE_START_MS} onIndex={(i) => setDay(days[i].key)} onTap={openCalendar} />
-        <input
-          ref={calendar}
-          type="date"
-          aria-label="Date"
-          tabIndex={-1}
-          value={day}
-          max={maxDay}
-          onChange={(e) => setDay(e.target.value)}
-          className="pointer-events-none absolute inset-0 h-full w-full min-w-0 opacity-0"
-        />
-      </div>
-      {!dateOnly && (
-        <div role="group" aria-label="Time" className="flex h-[44px] shrink-0 items-center overflow-hidden rounded-[10px] border border-line bg-surface px-1.5 focus-within:border-accent">
-          <ScrollColumn
-            label="Hour"
-            items={HOUR_ITEMS}
-            index={hourIndex}
-            jump={3}
-            width={22}
-            nudgeAfter={NUDGE_START_MS + NUDGE_STAGGER_MS}
-            onIndex={(i) => onChange(withClock(value, { ...c, hour: HOURS[i] }))}
-          />
-          <span aria-hidden="true" className="shrink-0 text-[15px] text-ink-soft">
-            :
-          </span>
-          <ScrollColumn
-            label="Minute"
-            items={MINUTE_ITEMS}
-            index={c.minute}
-            jump={5}
-            width={24}
-            nudgeAfter={NUDGE_START_MS + 2 * NUDGE_STAGGER_MS}
-            onIndex={(i) => onChange(withClock(value, { ...c, minute: MINUTES[i] }))}
-          />
-          <ScrollColumn
-            label="AM or PM"
-            items={PERIOD_ITEMS}
-            index={c.pm ? 1 : 0}
-            jump={1}
-            width={30}
-            nudgeAfter={NUDGE_START_MS + 3 * NUDGE_STAGGER_MS}
-            onIndex={(i) => onChange(withClock(value, { ...c, pm: i === 1 }))}
-          />
-        </div>
+    <Field label={label} htmlFor={id}>
+      <Trigger id={id} btn={btn} label={label} open={open} onOpen={show} text={dayText(day, now)} />
+      {open && (
+        <Popup title={label} summary={dayText(day, now)} opener={btn} onCancel={() => setOpen(false)}>
+          <div className="flex items-center justify-between">
+            <button type="button" onClick={() => step(-1)} aria-label="Previous month" className="grid h-11 w-11 place-items-center rounded-full bg-raised text-[18px]">
+              ‹
+            </button>
+            <span aria-live="polite" className="text-[15px] font-semibold">
+              {new Date(shown.year, shown.month, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+            </span>
+            <button
+              type="button"
+              onClick={() => step(1)}
+              disabled={dayDisabled(nextFirst, max)}
+              aria-label="Next month"
+              className="grid h-11 w-11 place-items-center rounded-full bg-raised text-[18px] disabled:opacity-30"
+            >
+              ›
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-0.5 text-center">
+            {WEEKDAYS.map((w, i) => (
+              <span key={i} aria-hidden="true" className="text-[11px] uppercase tracking-[0.06em] text-ink-soft">
+                {w}
+              </span>
+            ))}
+            {monthCells(shown.year, shown.month).map((c, i) =>
+              c ? (
+                <button
+                  key={c.day}
+                  type="button"
+                  disabled={dayDisabled(c.day, max)}
+                  aria-pressed={c.day === day}
+                  aria-label={new Date(shown.year, shown.month, c.n).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+                  onClick={() => pick(c.day)}
+                  className={`grid h-11 place-items-center rounded-full text-[15px] tabular-nums disabled:opacity-30 ${
+                    c.day === day ? "bg-accent font-bold text-accent-ink" : c.day === today ? "border border-accent font-bold" : ""
+                  }`}
+                >
+                  {c.n}
+                </button>
+              ) : (
+                <span key={`b${i}`} />
+              )
+            )}
+          </div>
+          <div className="flex justify-end">
+            <button type="button" onClick={() => setOpen(false)} className={cancelButton}>
+              Cancel
+            </button>
+          </div>
+        </Popup>
       )}
-    </div>
+    </Field>
+  );
+}
+
+const picklist = `${input} w-[64px] text-center tabular-nums`;
+
+/**
+ * The Time box: it reads the time and opens a pop-up of Now, 15, 30 and 45 min ago and 1 hr ago, then the hour, the
+ * minute (in five-minute steps) and AM or PM as native picklists, with Cancel and Done. Nothing is applied until Done;
+ * Cancel leaves the time as it was. With `noFuture` (Potty, a note) the hours, minutes and PM after now on today are
+ * greyed out. `value` and `onChange` are a local date-and-time (`YYYY-MM-DDTHH:mm`). A local pattern.
+ */
+export function TimeField({ value, noFuture = false, onChange }: { value: string; noFuture?: boolean; onChange: (value: string) => void }) {
+  const id = useId();
+  const btn = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const now = new Date();
+  const max = maxFor(noFuture, now);
+  const c = clock12(draft);
+
+  function show() {
+    setDraft(value);
+    setOpen(true);
+  }
+  const set = (next: { hour: number; minute: number; pm: boolean }) => setDraft(clampTo(withClock(draft, next), max));
+
+  return (
+    <Field label="Time" htmlFor={id}>
+      <Trigger id={id} btn={btn} label="Time" open={open} onOpen={show} text={clockText(value)} />
+      {open && (
+        <Popup title="Time" summary={`${dayText(draft.slice(0, 10), now)} · ${clockText(draft)}`} opener={btn} onCancel={() => setOpen(false)}>
+          <div role="group" aria-label="How long ago" className="flex flex-wrap gap-x-1">
+            {QUICK_AGO.map(([ago, text]) => (
+              <Chip key={ago} pressed={draft === quickValue(ago, now)} onClick={() => setDraft(quickValue(ago, now))}>
+                {text}
+              </Chip>
+            ))}
+          </div>
+          <div className="flex justify-center gap-1.5">
+            <select aria-label="Hour" value={c.hour} onChange={(e) => set({ ...c, hour: Number(e.target.value) })} className={picklist}>
+              {HOURS.map((h) => (
+                <option key={h} value={h} disabled={hourDisabled(draft, max, h, c.pm)}>
+                  {h}
+                </option>
+              ))}
+            </select>
+            <select aria-label="Minute" value={c.minute} onChange={(e) => set({ ...c, minute: Number(e.target.value) })} className={picklist}>
+              {minuteOptions(c.minute).map((m) => (
+                <option key={m} value={m} disabled={minuteDisabled(draft, max, m) && m !== c.minute}>
+                  :{String(m).padStart(2, "0")}
+                </option>
+              ))}
+            </select>
+            <select aria-label="AM or PM" value={c.pm ? "1" : "0"} onChange={(e) => set({ ...c, pm: e.target.value === "1" })} className={picklist}>
+              <option value="0">AM</option>
+              <option value="1" disabled={pmDisabled(draft, max)}>
+                PM
+              </option>
+            </select>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <button type="button" onClick={() => setOpen(false)} className={cancelButton}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onChange(draft);
+                setOpen(false);
+              }}
+              className="h-[44px] rounded-[12px] bg-[var(--tone-2-bg)] px-5 text-[15px] font-bold text-[var(--tone-2-ink)] shadow-[0_3px_0_var(--tone-2-lip)] active:translate-y-0.5 active:shadow-[0_1px_0_var(--tone-2-lip)]"
+            >
+              Done
+            </button>
+          </div>
+        </Popup>
+      )}
+    </Field>
   );
 }

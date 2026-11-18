@@ -61,9 +61,8 @@ describe("field widths (TEC-202)", () => {
     expect(classes(med, "f-dose")).not.toContain("w-full");
     expect(classes(med, "f-med-unit")).toContain("w-[88px]");
     expect(classes(med, "f-med-unit")).not.toContain("w-full");
-    const training = render("training");
-    expect(classes(training, "f-mins")).toContain("w-[76px]");
-    expect(classes(training, "f-mins")).not.toContain("w-full");
+    // A length of time is chips, never a number box (#64).
+    expect(render("training")).not.toContain('id="f-mins"');
     const weight = render("weight");
     expect(classes(weight, "f-value")).toContain("w-[96px]");
     expect(classes(weight, "f-value")).not.toContain("w-full");
@@ -76,16 +75,16 @@ describe("field widths (TEC-202)", () => {
   });
 
   it("Repeat's number and unit boxes are narrow in the source", () => {
-    expect(SRC).toContain("className={`${input} w-[64px]`}");
+    expect(SRC).toContain("className={`${input} w-[64px] disabled:opacity-50`}");
     expect(SRC).toContain('aria-label="Repeat unit"');
-    expect(SRC).toMatch(/aria-label="Repeat unit"[^\n]*className=\{`\$\{input\} w-\[96px\]`\}/);
+    expect(SRC).toMatch(/aria-label="Repeat unit"[\s\S]*?className=\{`\$\{input\} w-\[96px\] disabled:opacity-50`\}/);
   });
 
   it("no narrow field is built on the full-width class", () => {
     expect(SRC).not.toMatch(/\$\{inputFull\} w-/);
   });
 
-  it("Logging as is a half of the When row, 44px tall, filling its half (TEC-261)", () => {
+  it("Logging as is a half of the bottom block, 44px tall, filling its half (TEC-261, #64)", () => {
     const html = render("potty");
     expect(html).toContain('<div data-section="when-who" class="grid grid-cols-2 items-end gap-2">');
     expect(classes(html, "f-who")).toContain("min-h-[44px]");
@@ -93,12 +92,12 @@ describe("field widths (TEC-202)", () => {
     expect(html).not.toContain('id="f-when"');
   });
 
-  it("Save is on its own line, 44px tall and only as wide as its words, never stretched (TEC-261)", () => {
+  it("Save is 44px tall and fills its half of the bottom block, beside Logging as (#64)", () => {
     const html = render("potty");
     const save = html.match(/<button type="submit"[^>]*>/)![0];
     expect(save).toContain("h-[44px]");
-    expect(save).toContain("shrink-0");
-    expect(save).not.toMatch(/\bflex-1\b|\bw-full\b/);
+    expect(save).toContain("w-full");
+    expect(save).not.toContain("shrink-0");
   });
 });
 
