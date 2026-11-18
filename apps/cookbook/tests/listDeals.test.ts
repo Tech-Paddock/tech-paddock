@@ -21,6 +21,7 @@ function row(productId: string, name: string, names: string[], over: Partial<Dea
     url: `https://example.test/${productId}`,
     aisle: "Pantry",
     bought: 0,
+    boughtRecently: false,
     now: 3,
     usual: 3,
     onSale: false,

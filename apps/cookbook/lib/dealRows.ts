@@ -44,6 +44,11 @@ export type DealRow = {
   aisle: string;
   /** How many times it has gone in the cart (Your brands' count). */
   bought: number;
+  /**
+   * Bought in the last 12 weeks (paddock-issues#72): in the King Soopers purchase
+   * history (`purchasesPerProduct(PICK_WEEKS)`) or sent to the cart (`bought` above 0).
+   */
+  boughtRecently: boolean;
   /** Today's effective price: the sale if there is one, else the regular. */
   now: number;
   /** The regular price over the last twelve weeks, or today's when there is no history. */
@@ -86,6 +91,8 @@ export type DealBoard = {
   weeksHeld: number;
   /** The most priced nights any product has in the last 12 weeks (Best needs `BEST_MIN_NIGHTS`). */
   nightsHeld: number;
+  /** False when the purchases read failed: Bought then says so, never "nothing bought". */
+  purchasesRead: boolean;
 };
 
 export type ScanDeals = {
@@ -104,6 +111,12 @@ export type BoardInput = {
   coupons: Coupon[];
   couponsStaged: boolean;
   scan: ScanDeals | null;
+  /**
+   * The saved products (row `id`) bought in the last 12 weeks, from
+   * `purchasesPerProduct(PICK_WEEKS)`; **null when that read failed**. Omitted
+   * means none, so older callers still compile.
+   */
+  boughtIds?: Set<string> | null;
   /** The nightly check's first and last night at the store (`readNightSpan`); optional so older callers still compile. */
   span?: { first: string; last: string; recordedAt: string | null } | null;
 };
@@ -115,7 +128,7 @@ const weighted = (parts: { value: number; weight: number }[]): number | null => 
 
 export function buildDealBoard(input: BoardInput): DealBoard {
   const { asOf, store, products } = input;
-  const empty: DealBoard = { store: store?.name ?? null, asOf, rows: [], couponsStaged: input.couponsStaged, unpriced: 0, hasNights: false, lastRun: input.span ?? null, weeksHeld: 0, nightsHeld: 0 };
+  const empty: DealBoard = { store: store?.name ?? null, asOf, rows: [], couponsStaged: input.couponsStaged, unpriced: 0, hasNights: false, lastRun: input.span ?? null, weeksHeld: 0, nightsHeld: 0, purchasesRead: input.boughtIds !== null };
   if (!store) return empty;
 
   const freshFrom = addDays(asOf, -FRESH_NIGHTS);
@@ -191,6 +204,7 @@ export function buildDealBoard(input: BoardInput): DealBoard {
       url: p.url ?? pageFor(p.product_id, p.names[0] ?? ""),
       aisle: aisle ?? NO_AISLE,
       bought: p.count,
+      boughtRecently: p.count > 0 || (input.boughtIds?.has(p.id) ?? false),
       now,
       usual: Math.round((usual ?? regular ?? now) * 100) / 100,
       onSale,

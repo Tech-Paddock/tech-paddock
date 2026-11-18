@@ -5,7 +5,7 @@ import { HISTORY_WEEKS, MIN_WEEKS } from "./stoplight";
 
 /**
  * What the Deals tab filters on (TEC-132): search, aisle, All · On sale ·
- * Coupon · Stacks · Best, and Green · Neutral · Red. **Pure and type-only imports**,
+ * Coupon · Stacks · Best, Bought, and Green · Neutral · Red. **Pure and type-only imports**,
  * because the browser runs it (`lib/dealRows.ts` pulls in server code).
  *
  * The colour filter is by light: a product that is **new** (under four weeks
@@ -15,12 +15,19 @@ import { HISTORY_WEEKS, MIN_WEEKS } from "./stoplight";
 export type Kind = "all" | "sale" | "coupon" | "stack" | "best";
 export type LightFilter = "any" | "green" | "neutral" | "red" | "new";
 
-export type DealFilter = { query: string; kind: Kind; aisle: string; light: LightFilter };
+export type DealFilter = { query: string; kind: Kind; aisle: string; light: LightFilter; bought: boolean };
 
 /** The aisle that means every aisle. */
 export const ALL_AISLES = "All";
 
-export const NO_FILTER: DealFilter = { query: "", kind: "all", aisle: ALL_AISLES, light: "any" };
+/** Everything: what the tests and any "clear" mean. */
+export const NO_FILTER: DealFilter = { query: "", kind: "all", aisle: ALL_AISLES, light: "any", bought: false };
+
+/** What the tab opens on (owner, 2026-11-17): Best, Bought off. */
+export const OPENING_FILTER: DealFilter = { ...NO_FILTER, kind: "best" };
+
+/** The weeks Bought looks back; the same window as picking (`PICK_WEEKS`, `lib/purchaseStore.ts`, not imported here: server code). */
+export const BOUGHT_WEEKS = 12;
 
 export function matchesFilter(row: DealRow, f: DealFilter): boolean {
   const q = f.query.trim().toLowerCase();
@@ -30,6 +37,7 @@ export function matchesFilter(row: DealRow, f: DealFilter): boolean {
   if (f.kind === "coupon" && row.coupons.length === 0) return false;
   if (f.kind === "stack" && !row.stacks) return false;
   if (f.kind === "best" && !row.best.qualifies) return false;
+  if (f.bought && !row.boughtRecently) return false;
   if (f.light !== "any" && row.light !== f.light) return false;
   return true;
 }
@@ -87,7 +95,21 @@ export function emptyMessage(board: DealBoard, f: DealFilter): { title: string; 
       ? { title: "No recent prices", body: "None of your saved products has a price from the last few nights.", offerNew: false }
       : { title: "No prices yet", body: "The nightly check runs about 3 a.m. Denver time; the first one fills this in.", offerNew: false };
   }
-  if (f.kind === "best" && f.light === "any") return bestEmpty(board);
+  if (f.bought && !board.purchasesRead) {
+    return {
+      title: "Couldn't read your purchases",
+      body: "Bought needs your King Soopers purchase history and it didn't load, so this can't say what you bought. Reload to try again, or turn Bought off.",
+      offerNew: false,
+    };
+  }
+  if (f.bought && !board.rows.some((r) => r.boughtRecently)) {
+    return {
+      title: `Nothing bought in the last ${BOUGHT_WEEKS} weeks`,
+      body: "None of the products here is in your purchase history or has been sent to the cart in that time. Import purchases on Your brands, or turn Bought off.",
+      offerNew: false,
+    };
+  }
+  if (f.kind === "best" && f.light === "any" && (!f.bought || board.nightsHeld < BEST_MIN_NIGHTS)) return bestEmpty(board);
   if (coloured && board.weeksHeld < MIN_WEEKS) {
     return {
       title: `No ${LIGHT_WORD[f.light]} deals yet`,
@@ -95,6 +117,7 @@ export function emptyMessage(board: DealBoard, f: DealFilter): { title: string; 
       offerNew: true,
     };
   }
+  if (f.bought) return boughtEmpty(f);
   if (coloured) {
     return { title: `Nothing is ${LIGHT_WORD[f.light]} right now`, body: "Try Any, or clear the search and pick All aisles.", offerNew: false };
   }
@@ -105,6 +128,20 @@ export function emptyMessage(board: DealBoard, f: DealFilter): { title: string; 
     return { title: "Nothing is on sale", body: "No saved product was on sale in the latest nightly prices. Try All.", offerNew: false };
   }
   return { title: "No deals match", body: "Clear the search, or pick All aisles.", offerNew: false };
+}
+
+/** Bought is on and combined with another filter that leaves nothing: say which. */
+function boughtEmpty(f: DealFilter): { title: string; body: string; offerNew: boolean } {
+  const what =
+    f.kind === "coupon" ? "has a coupon this week"
+    : f.kind === "stack" ? "is a stack (a sale with a coupon) this week"
+    : f.kind === "sale" ? "is on sale"
+    : f.kind === "best" ? "is at its low right now"
+    : f.light === "new" ? "is new"
+    : f.light !== "any" ? `is ${LIGHT_WORD[f.light]}`
+    : null;
+  if (what) return { title: `None of your bought items ${what}`, body: "Try All, or turn Bought off.", offerNew: false };
+  return { title: "None of your bought items match", body: "Clear the search, pick All aisles, or turn Bought off.", offerNew: false };
 }
 
 /**

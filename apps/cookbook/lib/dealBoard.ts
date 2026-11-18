@@ -6,6 +6,7 @@ import { readLatestScan } from "./dealStore";
 import { addDays, denverDate } from "./priceDates";
 import { buildDealBoard, type DealBoard } from "./dealRows";
 import { HISTORY_WEEKS } from "./stoplight";
+import { PICK_WEEKS, purchasesPerProduct } from "./purchaseStore";
 
 /**
  * The Deals tab's read (TEC-132): the saved products, their latest nightly
@@ -13,8 +14,18 @@ import { HISTORY_WEEKS } from "./stoplight";
  * deal scan, handed to `buildDealBoard` (`lib/dealRows.ts`, pure). **No Kroger
  * call and no model call**: everything shown was recorded by the nightly scan
  * or the existing deal scan. Any failed read throws, so a broken table can
- * never read as "no deals".
+ * never read as "no deals". **The one exception is the purchases read** (the
+ * Bought switch, paddock-issues#72): it must not take the board down, so a
+ * failure is `boughtIds: null` and the board says `purchasesRead: false`.
  */
+async function boughtIds(now: Date): Promise<Set<string> | null> {
+  try {
+    return new Set((await purchasesPerProduct(PICK_WEEKS, now)).keys());
+  } catch {
+    return null;
+  }
+}
+
 export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> {
   const asOf = denverDate(now);
   const connection = await readConnectionRow();
@@ -27,7 +38,7 @@ export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> 
     return buildDealBoard({ asOf, store: null, products: [], nights: [], weeks: [], coupons: [], couponsStaged: staged, scan: null });
   }
 
-  const [products, nights, weeks, { coupons, staged }, latest, span] = await Promise.all([
+  const [products, nights, weeks, { coupons, staged }, latest, span, bought] = await Promise.all([
     readProducts(),
     // Twelve weeks of nights, not three: Best compares tonight with the lowest night (TEC-196).
     readNightsSince(store.locationId, addDays(asOf, -7 * HISTORY_WEEKS)),
@@ -35,6 +46,7 @@ export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> 
     readCoupons(),
     readLatestScan(),
     readNightSpan(store.locationId),
+    boughtIds(now),
   ]);
 
   return buildDealBoard({
@@ -46,6 +58,7 @@ export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> 
     coupons,
     couponsStaged: staged,
     span,
+    boughtIds: bought,
     scan: latest
       ? {
           ranOn: denverDate(new Date(latest.ran_at)),
