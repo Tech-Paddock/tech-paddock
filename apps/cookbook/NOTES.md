@@ -172,7 +172,7 @@ What is true now, and its traps. Rules are in `RULES.md`; open work is in [paddo
 - **Recipe-side wording: "estimate macros", never price** (TEC-207, owner: price lives with the grocery
   list and Deals). Labels, toasts, errors and comments on the recipe side say "estimate" / "macros"
   ("Save and clear macros", `macrosCleared` in the edit route's answer). `tests/recipeSideWords.test.ts` reads the recipe-side files whole and fails on
-  price/pricing/priced/re-price/re-cost/dollar, so a new file on the recipe side is added to its list.
+  price/pricing/priced/re-price/re-cost/dollar. Every file in `app/` and `lib/` sits in its `RECIPE_SIDE` or `NOT_RECIPE_SIDE` list and a test fails on a file in neither, so a new file is placed in one list by hand and cannot be missed.
   Dollar wording on the list and Deals is untouched.
 - **Revert** (`/api/recipes/revert`, on a recipe with `has_original`) puts back `imported_original`'s
   ingredients, method and servings, nulls the macros, source, model and note, and clears

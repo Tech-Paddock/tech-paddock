@@ -42,8 +42,6 @@ describe("the one model (TEC-133)", () => {
     expect(models.modelLabel("claude-sonnet-5")).toBe("Sonnet 5");
     expect(models.modelLabel("claude-haiku-4-5")).toBe("Haiku 4.5");
     expect(models.modelLabel("claude-something-new")).toBe("claude-something-new");
-    expect(models.isRecordedModel("claude-haiku-4-5")).toBe(true);
-    expect(models.isRecordedModel("gpt-whatever")).toBe(false);
   });
 });
 

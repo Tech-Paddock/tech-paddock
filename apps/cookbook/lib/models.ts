@@ -74,12 +74,3 @@ const LABELS: Record<string, string> = {
 export function modelLabel(id: string): string {
   return LABELS[id] ?? id;
 }
-
-/**
- * Is this a model a draft may say estimated it? Today's, or one this app used
- * before TEC-133 — a draft made before a deploy and kept after it still names
- * the model that really estimated it.
- */
-export function isRecordedModel(value: unknown): value is string {
-  return typeof value === "string" && value in LABELS;
-}
