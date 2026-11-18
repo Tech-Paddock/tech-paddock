@@ -96,7 +96,19 @@ probe it.
     URI, then change `CALENDAR_BASE_URL` in `packages/shared/lib/calendar-client.ts` and stamp. No schema move and no
     caller changes. The old routes go last. The Microsoft token is stored in `calendar.connection` as plain text behind
     RLS, the same trust as the service key; it carries across with the schema.
-  * Grid's own routines reaching the calendar is #68 and Lando's is #67; neither is here.
+  * **Grid as a caller (#68).** `lib/calendar-map.ts` maps a routine or task to an event and sends it with the stamped
+    `sendCalendarEvent`. `POST /api/tasks` and `/api/routines` pass an `after` step to `handleWrite` (`lib/api.ts`): it runs
+    once the write succeeded, reads the row back, sends, and any failure is dropped, so a save never fails on the calendar.
+    * Routine: weekly all-day event on its weekdays, **starting on the first of them on or after the Denver day of the send**
+      (Grid keeps no earlier date); retire deletes it; a tick sends nothing. Task: all-day on `due_on`; ticked done,
+      undated or never dated sends a delete (or nothing for a new undated task); unticking sends it again.
+    * **A send that fails is not retried by Grid.** The browser's save already succeeded, so nothing re-sends it; an event
+      Grid accepted is safe in the outbox, but one the call never reached (cookie missing, timeout) is repaired only by
+      the backfill or the next edit of that row.
+    * **Backfill:** `POST /api/backfill/calendar` (behind the gate) sends every live routine and open dated task, sequentially,
+      answering counts only. Safe to run twice. From the signed-in browser's console: `fetch("/api/backfill/calendar", {method: "POST"}).then(r => r.json())`.
+    * The send goes to `CALENDAR_BASE_URL` (Grid itself today) over HTTP with the caller's `paddock_session`, as every app does.
+  * Lando's own events are #67; not here.
 
 ## Traps
 

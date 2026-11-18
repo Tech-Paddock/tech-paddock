@@ -15,7 +15,16 @@ export function failure(e: unknown): NextResponse {
   return NextResponse.json({ error: "Could not save. Try again." }, { status: 500 });
 }
 
-export async function handleWrite<T>(request: Request, parse: (body: unknown) => T, run: (parsed: T) => Promise<void>) {
+/**
+ * `after` runs once the write has succeeded (the household calendar's send) and
+ * can never fail the save: whatever it throws is dropped.
+ */
+export async function handleWrite<T>(
+  request: Request,
+  parse: (body: unknown) => T,
+  run: (parsed: T) => Promise<void>,
+  after?: (parsed: T, request: Request) => Promise<void>,
+) {
   let body: unknown;
   try {
     body = await request.json();
@@ -23,7 +32,15 @@ export async function handleWrite<T>(request: Request, parse: (body: unknown) =>
     return failure(new Invalid("Expected JSON"));
   }
   try {
-    await run(parse(body));
+    const parsed = parse(body);
+    await run(parsed);
+    if (after) {
+      try {
+        await after(parsed, request);
+      } catch {
+        // The write is saved; a calendar that failed waits for the next send or the backfill.
+      }
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     return failure(e);
