@@ -115,6 +115,7 @@ const NOT_RECIPE_SIDE = [
   "lib/brandGroups.ts",
   "lib/brandImport.ts",
   "lib/brands.ts",
+  "lib/calendar-client.ts",
   "lib/cart.ts",
   "lib/cartGuess.ts",
   "lib/cartRefresh.ts",
