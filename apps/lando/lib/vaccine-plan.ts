@@ -5,7 +5,7 @@
  */
 import { earlierDoses, parseDetails, type FollowUp, type JournalEvent } from "./events";
 import { toDateInput } from "./localtime";
-import { daysBetween, isDay, nextDue, parseUpcoming, type UpcomingInput } from "./upcoming";
+import { daysBetween, isDay, nextDue, parseUpcoming, type RepeatUnit, type UpcomingInput } from "./upcoming";
 import { DOSE_MAX, VACCINES, hasDoses, suggestedDose, vaccinePlanTitle } from "./vaccines";
 
 /** The puppy series ends at this age; after it, the next dose is yearly. */
@@ -57,6 +57,26 @@ export function nextDose(x: { vaccine: string; givenOn: string; dose?: number | 
 }
 
 /**
+ * How far out the next dose is, as chips (owner, #73): the next dose is chosen in steps, not on a calendar. The vaccine's
+ * usual gap (`nextDose`'s `text`) is the one picked to start.
+ */
+export const NEXT_STEPS: readonly { id: string; label: string; every: number; unit: RepeatUnit; text: string }[] = [
+  { id: "3w", label: "3–4 weeks", every: 3, unit: "week", text: "3–4 weeks" },
+  { id: "6m", label: "6 months", every: 6, unit: "month", text: "6–12 months" },
+  { id: "1y", label: "1 year", every: 1, unit: "year", text: "1 year" },
+  { id: "3y", label: "3 years", every: 3, unit: "year", text: "3 years" },
+];
+
+/** The step a suggestion starts on: the chip whose words the rule's interval text is. A year when nothing matches. */
+export const defaultStepId = (text: string): string => (NEXT_STEPS.find((s) => s.text === text) ?? NEXT_STEPS[2]).id;
+
+/** The day a step puts the next dose on, counted from the day the dose is given. */
+export function stepDay(givenOn: string, stepId: string): string {
+  const s = NEXT_STEPS.find((x) => x.id === stepId) ?? NEXT_STEPS[2];
+  return nextDue(givenOn, s.every, s.unit);
+}
+
+/**
  * The upcoming plan for a vaccine's next dose, due on `on` (the suggestion or the day the person typed). Its kind is
  * `vaccine` and its title names the vaccine, and the dose number when the next dose continues the puppy series, so a
  * Done opens the Vaccine form on it. `dose` is the dose just given.
@@ -82,6 +102,8 @@ export function visitVaccineEntries(x: {
   birthOn?: string | null;
   idFor: (vaccine: string) => string;
   planNext: boolean;
+  /** The chip picked for a vaccine's next dose (a `NEXT_STEPS` id); one not picked keeps the rule's own suggestion. */
+  steps?: Readonly<Record<string, string>>;
 }): { entries: FollowUp[]; plans: Record<string, UpcomingInput> } {
   const entries: FollowUp[] = [];
   const plans: Record<string, UpcomingInput> = {};
@@ -100,7 +122,8 @@ export function visitVaccineEntries(x: {
     });
     if (x.planNext) {
       const next = nextDose({ vaccine, givenOn: toDateInput(x.at), dose, earlier, birthOn: x.birthOn });
-      plans[id] = nextDosePlan({ vaccine, dose, series: next.series, on: next.on });
+      const step = x.steps?.[vaccine];
+      plans[id] = nextDosePlan({ vaccine, dose, series: next.series, on: step ? stepDay(toDateInput(x.at), step) : next.on });
     }
   }
   return { entries, plans };

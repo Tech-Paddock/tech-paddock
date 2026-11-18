@@ -17,6 +17,7 @@ import {
 } from "@/lib/whenpick";
 import { Field, input } from "./fields";
 import Chip from "./Chip";
+import CompactMenu from "./CompactMenu";
 
 const HOURS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -67,9 +68,11 @@ function Popup({
 
   useEffect(() => {
     const back = opener.current;
-    panel.current?.querySelector<HTMLElement>("button:not([disabled]), select:not([disabled])")?.focus({ preventScroll: true });
+    panel.current?.querySelector<HTMLElement>("button:not([disabled])")?.focus({ preventScroll: true });
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // An open compact menu takes this Escape (it closes itself); the pop-up stays.
+      if (panel.current?.querySelector('[role="listbox"]')) return;
       e.stopPropagation();
       cancel.current();
     };
@@ -233,11 +236,10 @@ export function DayField({
   );
 }
 
-const picklist = `${input} w-[64px] text-center tabular-nums`;
-
 /**
  * The Time box: it reads the time and opens a pop-up of Now, 15, 30 and 45 min ago and 1 hr ago, then the hour, the
- * minute (in five-minute steps) and AM or PM as native picklists, with Cancel and Done. Nothing is applied until Done;
+ * minute (in five-minute steps) and AM or PM as Lando's own compact menus (`CompactMenu`, #73: the iPhone's native menu is
+ * huge), with Cancel and Done. Nothing is applied until Done;
  * Cancel leaves the time as it was. With `noFuture` (Potty, a note) the hours, minutes and PM after now on today are
  * greyed out. `value` and `onChange` are a local date-and-time (`YYYY-MM-DDTHH:mm`). A local pattern.
  */
@@ -269,26 +271,27 @@ export function TimeField({ value, noFuture = false, onChange }: { value: string
             ))}
           </div>
           <div className="flex justify-center gap-1.5">
-            <select aria-label="Hour" value={c.hour} onChange={(e) => set({ ...c, hour: Number(e.target.value) })} className={picklist}>
-              {HOURS.map((h) => (
-                <option key={h} value={h} disabled={hourDisabled(draft, max, h, c.pm)}>
-                  {h}
-                </option>
-              ))}
-            </select>
-            <select aria-label="Minute" value={c.minute} onChange={(e) => set({ ...c, minute: Number(e.target.value) })} className={picklist}>
-              {minuteOptions(c.minute).map((m) => (
-                <option key={m} value={m} disabled={minuteDisabled(draft, max, m) && m !== c.minute}>
-                  :{String(m).padStart(2, "0")}
-                </option>
-              ))}
-            </select>
-            <select aria-label="AM or PM" value={c.pm ? "1" : "0"} onChange={(e) => set({ ...c, pm: e.target.value === "1" })} className={picklist}>
-              <option value="0">AM</option>
-              <option value="1" disabled={pmDisabled(draft, max)}>
-                PM
-              </option>
-            </select>
+            <CompactMenu
+              label="Hour"
+              value={c.hour}
+              onChange={(hour) => set({ ...c, hour })}
+              options={HOURS.map((h) => ({ value: h, text: String(h), disabled: hourDisabled(draft, max, h, c.pm) }))}
+            />
+            <CompactMenu
+              label="Minute"
+              value={c.minute}
+              onChange={(minute) => set({ ...c, minute })}
+              options={minuteOptions(c.minute).map((m) => ({ value: m, text: `:${String(m).padStart(2, "0")}`, disabled: minuteDisabled(draft, max, m) && m !== c.minute }))}
+            />
+            <CompactMenu
+              label="AM or PM"
+              value={c.pm ? "PM" : "AM"}
+              onChange={(v) => set({ ...c, pm: v === "PM" })}
+              options={[
+                { value: "AM", text: "AM" },
+                { value: "PM", text: "PM", disabled: pmDisabled(draft, max) },
+              ]}
+            />
           </div>
           <div className="flex items-center justify-end gap-2">
             <button type="button" onClick={() => setOpen(false)} className={cancelButton}>

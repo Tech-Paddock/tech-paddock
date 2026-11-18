@@ -1,17 +1,17 @@
 // @vitest-environment jsdom
 // #64 (after TEC-261): the form's bottom block is Day, Time, Logging as and Save in two equal columns. Day and Time are
-// boxes that open a pop-up window (a month calendar; Now / minutes-ago chips with hour, minute and AM/PM picklists), the
+// boxes that open a pop-up window (a month calendar; Now / minutes-ago chips with hour, minute and AM/PM compact menus), the
 // scroll wheel is gone, minutes step by five, Repeat is always on the form, and Potty (and a note) can't be in the
-// future. Rendered in a DOM so the taps are real. jsdom cannot prove how a phone draws the pop-up or opens its native
-// picklists: those are phone checks.
+// future. Rendered in a DOM so the taps are real. jsdom cannot prove how a phone draws the pop-up or its compact menus
+// (their size, the scroll inside them): those are phone checks.
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import LogForm, { REPEAT_NEEDS_FUTURE } from "@/app/LogForm";
+import LogForm from "@/app/LogForm";
 import NoteForm from "@/app/NoteForm";
 import type { FormKind, JournalEvent } from "@/lib/events";
 import { clock12, toDateInput, toLocalInput, withClock, withDay } from "@/lib/localtime";
-import { dayBox, dialog, noDialog, pickDay, pickTime, setWhen, timeBox } from "./whenpop";
+import { dayBox, dialog, menuBox, menuOptions, noDialog, openMenu, pickDay, pickMenu, pickTime, setWhen, timeBox } from "./whenpop";
 
 // Invented ids. Nothing here is a real record (RULES.md, Never 2).
 const PERSON = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -217,9 +217,9 @@ describe("the Time pop-up (#64)", () => {
     const pop = within(dialog());
     const chips = within(pop.getByRole("group", { name: "How long ago" })).getAllByRole("button");
     expect(chips.map((c) => c.textContent)).toEqual(["Now", "15 min ago", "30 min ago", "45 min ago", "1 hr ago"]);
-    expect(pop.getByLabelText("Hour").tagName).toBe("SELECT");
-    expect(pop.getByLabelText("Minute").tagName).toBe("SELECT");
-    expect(pop.getByLabelText("AM or PM").tagName).toBe("SELECT");
+    // Lando's own compact menus, not native selects (#73).
+    for (const name of ["Hour", "Minute", "AM or PM"]) expect(pop.getByRole("combobox", { name }).tagName).toBe("BUTTON");
+    expect(dialog().querySelector("select")).toBeNull();
     expect(pop.getByRole("button", { name: "Cancel" })).toBeTruthy();
     expect(pop.getByRole("button", { name: "Done" })).toBeTruthy();
     expect(dialog().className).toContain("select-none");
@@ -229,8 +229,7 @@ describe("the Time pop-up (#64)", () => {
     clockAt(new Date(2026, 10, 17, 14, 38));
     open("food");
     fireEvent.click(timeBox());
-    const opts = Array.from((within(dialog()).getByLabelText("Minute") as HTMLSelectElement).options).map((o) => o.textContent);
-    expect(opts).toEqual([":00", ":05", ":10", ":15", ":20", ":25", ":30", ":35", ":40", ":45", ":50", ":55"]);
+    expect(menuOptions("Minute").texts).toEqual([":00", ":05", ":10", ":15", ":20", ":25", ":30", ":35", ":40", ":45", ":50", ":55"]);
   });
 
   it("a shortcut sets the time and Done keeps it: 45 min ago logs at 1:50 PM", () => {
@@ -277,7 +276,7 @@ describe("the Time pop-up (#64)", () => {
     noDialog();
     expect(timeBox().textContent).toContain("2:35 PM");
     fireEvent.click(timeBox());
-    fireEvent.change(within(dialog()).getByLabelText("Hour"), { target: { value: "3" } });
+    pickMenu("Hour", "3");
     fireEvent.keyDown(document.body, { key: "Escape" });
     noDialog();
     expect(timeBox().textContent).toContain("2:35 PM");
@@ -291,10 +290,10 @@ describe("the Time pop-up (#64)", () => {
     const props = open("potty", { event: stored(new Date(2026, 9, 19, 21, 7, 9).toISOString()) });
     expect(timeBox().textContent).toContain("9:07 PM");
     fireEvent.click(timeBox());
-    const opts = Array.from((within(dialog()).getByLabelText("Minute") as HTMLSelectElement).options).map((o) => o.textContent);
-    expect(opts).toContain(":07");
-    expect(opts).toHaveLength(13);
-    expect((within(dialog()).getByLabelText("Minute") as HTMLSelectElement).value).toBe("7");
+    const minutes = menuOptions("Minute");
+    expect(minutes.texts).toContain(":07");
+    expect(minutes.texts).toHaveLength(13);
+    expect(minutes.ticked).toEqual([":07"]);
     expect(props.onChange).not.toHaveBeenCalled();
   });
 });
@@ -318,25 +317,24 @@ describe("no future potties (#64)", () => {
     open("potty");
     fireEvent.click(timeBox());
     const pop = within(dialog());
-    const hour = pop.getByLabelText("Hour") as HTMLSelectElement;
-    const off = (sel: HTMLSelectElement) => Array.from(sel.options).filter((o) => o.disabled).map((o) => o.textContent);
-    expect(off(hour)).toEqual(["3", "4", "5", "6", "7", "8", "9", "10", "11"]); // 3 PM and on
-    fireEvent.change(hour, { target: { value: "2" } });
-    expect(off(pop.getByLabelText("Minute") as HTMLSelectElement)).toEqual([":40", ":45", ":50", ":55"]);
-    expect(off(pop.getByLabelText("AM or PM") as HTMLSelectElement)).toEqual([]);
+    expect(menuOptions("Hour").disabled).toEqual(["3", "4", "5", "6", "7", "8", "9", "10", "11"]); // 3 PM and on
+    pickMenu("Hour", "2");
+    expect(menuOptions("Minute").disabled).toEqual([":40", ":45", ":50", ":55"]);
+    fireEvent.keyDown(document.body, { key: "Escape" }); // closes the menu, not the pop-up
+    expect(menuOptions("AM or PM").disabled).toEqual([]);
+    fireEvent.keyDown(document.body, { key: "Escape" });
     // Another day back: nothing is greyed out.
     fireEvent.click(pop.getByRole("button", { name: "Cancel" }));
     pickDay("2026-11-16");
     fireEvent.click(timeBox());
-    expect(off(within(dialog()).getByLabelText("Hour") as HTMLSelectElement)).toEqual([]);
+    expect(menuOptions("Hour").disabled).toEqual([]);
   });
 
   it("PM is greyed out before noon", () => {
     clockAt(new Date(2026, 10, 17, 9, 12));
     open("potty");
     fireEvent.click(timeBox());
-    const ap = within(dialog()).getByLabelText("AM or PM") as HTMLSelectElement;
-    expect(Array.from(ap.options).filter((o) => o.disabled).map((o) => o.textContent)).toEqual(["PM"]);
+    expect(menuOptions("AM or PM").disabled).toEqual(["PM"]);
   });
 
   it("an hour that would put the minutes past now brings them back to now", () => {
@@ -431,35 +429,51 @@ describe("Repeat is always on the form (#64)", () => {
     expect(props.onLog).not.toHaveBeenCalled();
   });
 
-  it("ticked on a time that is now or past is refused with a clear message, and nothing is saved", () => {
+  it("ticked on a time that is now logs the entry and plans the repeat at its next date, on every form but Potty", () => {
     clockAt(new Date(2026, 10, 17, 14, 38));
     for (const [form, extra] of forms) {
       cleanup();
       const props = open(form, extra);
       if (form === "weight") fireEvent.change(screen.getByLabelText(/Weight/, { selector: "input" }), { target: { value: "7.3" } });
-      if (form === "health") fireEvent.change(screen.getByPlaceholderText("What happened?"), { target: { value: "Invented words" } });
+      if (form === "health") fireEvent.change(screen.getByLabelText("Why"), { target: { value: "checkup" } });
       fireEvent.click(screen.getByLabelText("Repeat"));
       fireEvent.click(saveButton());
-      expect(screen.getByRole("alert").textContent, form).toBe(REPEAT_NEEDS_FUTURE);
-      expect(props.onLog, form).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alert"), form).toBeNull();
       expect(props.onUpcoming, form).not.toHaveBeenCalled();
-      // Unticking it saves the entry as usual.
-      fireEvent.click(screen.getByLabelText("Repeat"));
-      fireEvent.click(saveButton());
-      // (A vet visit has its own required pick, which is not Repeat's business.)
-      if (form === "health") expect(screen.getByRole("alert").textContent).toMatch(/why you went to the vet/);
-      else expect(props.onLog, form).toHaveBeenCalledTimes(1);
+      expect(props.onLog, form).toHaveBeenCalledTimes(1);
+      const [body, , plans] = props.onLog.mock.calls[0] as unknown as [{ id: string; at: string }, unknown, Record<string, { due_on: string; due_time: string | null; repeat_every: number; repeat_unit: string }>];
+      // One week on from today (Repeat's default): the entry's day plus 7, at the moment of Save (a weight has no time).
+      expect(plans[body.id], form).toMatchObject({ due_on: "2026-11-24", due_time: form === "weight" ? null : "14:38", repeat_every: 1, repeat_unit: "week" });
     }
   });
 
-  it("ticked on a past time is refused too", () => {
+  it("ticked on a past time logs there, and the plan is the first date after now (daily-style steps roll forward)", () => {
     clockAt(new Date(2026, 10, 17, 14, 38));
     const props = open("training");
-    pickDay("2026-11-10");
+    pickDay("2026-10-05");
+    pickTime(9, 30, false);
     fireEvent.click(screen.getByLabelText("Repeat"));
     fireEvent.click(saveButton());
-    expect(screen.getByRole("alert").textContent).toBe(REPEAT_NEEDS_FUTURE);
-    expect(props.onLog).not.toHaveBeenCalled();
+    const [body, , plans] = props.onLog.mock.calls[0] as unknown as [{ id: string; at: string }, unknown, Record<string, { due_on: string; due_time: string }>];
+    expect(toLocalInput(body.at)).toBe("2026-10-05T09:30");
+    // Oct 5 + 1 week steps to Nov 23 (Nov 16 at 9:30 AM is already past).
+    expect(plans[body.id]).toMatchObject({ due_on: "2026-11-23", due_time: "09:30", repeat_every: 1, repeat_unit: "week" });
+  });
+
+  it("a past monthly and a past yearly repeat roll forward the same way", () => {
+    clockAt(new Date(2026, 10, 17, 14, 38));
+    for (const [unit, due] of [["month", "2026-11-30"], ["year", "2027-08-31"]] as const) {
+      cleanup();
+      const props = open("training");
+      pickDay("2026-08-31");
+      pickTime(9, 30, false);
+      fireEvent.click(screen.getByLabelText("Repeat"));
+      fireEvent.change(screen.getByLabelText("Repeat unit"), { target: { value: unit } });
+      fireEvent.click(saveButton());
+      const [body, , plans] = props.onLog.mock.calls[0] as unknown as [{ id: string }, unknown, Record<string, { due_on: string }>];
+      // Aug 31 + 3 months is Nov 30 (Sep 30 and Oct 31 are past; a short month is clamped, never carried over).
+      expect(plans[body.id].due_on, unit).toBe(due);
+    }
   });
 
   it("an open plan keeps its repeat when edited, even on a day that has passed", async () => {
@@ -649,8 +663,7 @@ describe("the Note form's Day and Time (#64)", () => {
     expect((within(dialog()).getByRole("button", { name: /November 18/ }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(within(dialog()).getByRole("button", { name: "Cancel" }));
     fireEvent.click(timeBox());
-    const hour = within(dialog()).getByLabelText("Hour") as HTMLSelectElement;
-    expect(Array.from(hour.options).filter((o) => o.disabled)).toHaveLength(9);
+    expect(menuOptions("Hour").disabled).toHaveLength(9);
   });
 
   it("logs a past time picked in the pop-ups", () => {

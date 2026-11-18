@@ -449,7 +449,7 @@ describe("lib/storage", () => {
   });
 });
 
-/* ── TEC-139: one pick, a required note, old entries kept ────────────────── */
+/* ── TEC-139: one pick, old entries kept (the note became optional, #73) ─────── */
 
 describe("the Health pick", () => {
   it("opens a new entry on nothing, an entry with one offered reason on it", () => {
@@ -474,13 +474,14 @@ describe("the Health pick", () => {
   });
 });
 
-describe("the Health note is required", () => {
+describe("the Health note is optional (#73, lifting TEC-139's rule)", () => {
   const now = new Date("2026-10-25T12:00:00Z");
   const base = { id: ID, kind: "health", details: { type: "vet", reasons: ["checkup"] } };
 
-  it("refuses a missing, empty or whitespace-only note", () => {
+  it("takes a missing, empty or whitespace-only note on a vet visit and a medical issue, saving none", () => {
     for (const note of [undefined, null, "", "   ", "\n\t "]) {
-      expect(() => parseNewEvent({ ...base, note }, now)).toThrow(/note is required/);
+      expect(parseNewEvent({ ...base, note }, now).note).toBeNull();
+      expect(parseNewEvent({ ...base, details: { type: "issue", reasons: ["other"] }, note }, now).note).toBeNull();
     }
   });
 
@@ -488,8 +489,8 @@ describe("the Health note is required", () => {
     expect(parseNewEvent({ ...base, note: "  Shots, he was brave " }, now).note).toBe("Shots, he was brave");
   });
 
-  it("applies to a correction as well, but not to a delete", () => {
-    expect(() => parseNewEvent({ ...base, id: ID2, voids: ID }, now)).toThrow(/note is required/);
+  it("applies to a correction and a delete as well", () => {
+    expect(parseNewEvent({ ...base, id: ID2, voids: ID }, now).note).toBeNull();
     expect(parseNewEvent({ id: ID2, kind: "void", voids: ID }, now).note).toBeNull();
   });
 
@@ -497,10 +498,10 @@ describe("the Health note is required", () => {
     expect(parseNewEvent({ id: ID, kind: "weight", details: { value: 7, unit: "lb" } }, now).note).toBeNull();
   });
 
-  it("is refused by the write path, with nothing saved", async () => {
+  it("is saved by the write path with no note", async () => {
     const { db, events } = fakeDb([]);
-    await expect(writeEvent(db, { ...base, note: " " })).rejects.toThrow(/note is required/);
-    expect(events).toHaveLength(0);
+    await writeEvent(db, { ...base, note: " " });
+    expect(events).toHaveLength(1);
   });
 });
 
@@ -537,7 +538,9 @@ describe("writeEvent — one reason on a new entry, old ones kept on a correctio
       voids: null,
     });
     await expect(writeEvent(db, entry(["vaccines", "dental"], { id: ID2, voids: ID }))).rejects.toThrow(/pick one/);
-    await expect(writeEvent(db, entry(["checkup", "vaccines"], { id: ID2, voids: ID, note: "" }))).rejects.toThrow(/note is required/);
+    await expect(writeEvent(db, entry(["checkup", "vaccines"], { id: ID2, voids: ID, note: "" }))).resolves.toBeTruthy();
+    // (That correction is in; the next one voids the original again, so the original is what is kept below.)
+    events.splice(events.findIndex((e) => e.id === ID2), 1);
     const kept = await writeEvent(db, entry(["vaccines", "checkup"], { id: ID2, voids: ID }));
     expect(kept.id).toBe(ID2);
     expect(liveEvents(events as JournalEvent[]).map((e) => e.id)).toEqual([ID2]);

@@ -13,6 +13,7 @@ import {
   TITLE_MAX,
   daysBetween,
   isDay,
+  nextDue,
   openItems,
   parseUpcoming,
   visitPrefill,
@@ -143,6 +144,23 @@ export function formForItem(item: Pick<Upcoming, "kind" | "title">): { form: For
   return form ? { form, healthType: "vet" } : null;
 }
 
+/**
+ * The vaccine a plan's title names, or null: only a plan the Vaccine form made ("Vaccine · DHPP · dose 2") names one, an older
+ * "Rabies booster" does not. A Done on it opens a Vet visit with that vaccine ticked (#73), and the server closes it by a visit that gave it.
+ */
+export function plannedVaccine(item: Pick<Upcoming, "kind" | "title">): string | null {
+  return item.kind === "vaccine" ? (parseVaccinePlanTitle(item.title)?.vaccine ?? null) : null;
+}
+
+/**
+ * The form a Done opens: `formForItem`, except a vaccine plan opens Vet visit (#73): vaccines are recorded only through a
+ * visit's Vaccines given. Editing a plan in place still opens the form it was made from.
+ */
+export function doneFormFor(item: Pick<Upcoming, "kind" | "title">): { form: FormKind; healthType: HealthType } | null {
+  const target = formForItem(item);
+  return target && target.healthType === "vaccine" ? { form: "health", healthType: "vet" } : target;
+}
+
 /** The colour a plan wears: its form's (a vet visit, vaccine and medication are Health), or none for an old plan with its own words. */
 export function planTone(item: Pick<Upcoming, "kind" | "title">): FeedTone | null {
   return formForItem(item)?.form ?? null;
@@ -213,4 +231,26 @@ export function donePrefill(
 export function doneWhen(p: Pick<DonePrefill, "day" | "time">, now: Date): string | null {
   const when = new Date(`${p.day}T${p.time}`);
   return Number.isNaN(when.getTime()) || when.getTime() > now.getTime() ? null : `${p.day}T${p.time}`;
+}
+
+/**
+ * A Repeat ticked on a time that is now or past (#73): the entry is logged, and the repeat becomes a plan whose first date
+ * is the next one after `now`. That is the entry's day and time plus the interval, stepped forward until it is in the
+ * future. Each step counts from the entry's own day (never from the previous step), so a month-end repeat does not drift
+ * to the 28th. A weight has no time, so its plan is the first day after today. `now` is the phone's clock.
+ */
+export function firstRepeatAfter(x: {
+  day: string;
+  time: string | null;
+  every: number;
+  unit: RepeatUnit;
+  now: Date;
+}): { day: string; time: string | null } {
+  if (!isDay(x.day)) throw new Error("day must be a day");
+  const today = toDateInput(x.now.toISOString());
+  for (let k = 1; k <= 5000; k++) {
+    const day = nextDue(x.day, x.every * k, x.unit);
+    if (x.time === null ? day > today : new Date(`${day}T${x.time}`).getTime() > x.now.getTime()) return { day, time: x.time };
+  }
+  throw new Error("that repeat never reaches the future");
 }

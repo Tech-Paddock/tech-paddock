@@ -26,14 +26,39 @@ export function pickDay(iso: string, name = "Day") {
   fireEvent.click(pop.getByRole("button", { name: dayName(y, m - 1, d) }));
 }
 
-/** Opens the Time box, sets hour, minute and AM or PM in its picklists and taps Done. */
+/** The compact menu's box (Hour, Minute, AM or PM) inside the Time pop-up. */
+export const menuBox = (name: string) => within(dialog()).getByRole("combobox", { name });
+/** An option's words, without its tick. */
+export const optionText = (o: HTMLElement) => o.querySelector("span")!.textContent!;
+/** Opens a compact menu (one already open stays open) and returns its listbox. */
+export function openMenu(name: string): HTMLElement {
+  if (menuBox(name).getAttribute("aria-expanded") !== "true") fireEvent.click(menuBox(name));
+  return within(dialog()).getByRole("listbox", { name });
+}
+/** The options of a compact menu, opened: their words, which one is ticked, and which are greyed out. */
+export function menuOptions(name: string) {
+  const rows = within(openMenu(name)).getAllByRole("option");
+  return {
+    rows,
+    texts: rows.map(optionText),
+    ticked: rows.filter((r) => r.getAttribute("aria-selected") === "true").map(optionText),
+    disabled: rows.filter((r) => r.getAttribute("aria-disabled") === "true").map(optionText),
+  };
+}
+/** Opens a compact menu and taps the option with these words, which picks it and closes the menu. */
+export function pickMenu(name: string, text: string) {
+  const row = within(openMenu(name)).getAllByRole("option").find((r) => optionText(r) === text);
+  if (!row) throw new Error(`no option ${text} in ${name}`);
+  fireEvent.click(row);
+}
+
+/** Opens the Time box, sets hour, minute and AM or PM from its compact menus and taps Done. */
 export function pickTime(hour: number, minute: number, pm: boolean) {
   fireEvent.click(timeBox());
-  const pop = within(dialog());
-  fireEvent.change(pop.getByLabelText("Hour"), { target: { value: String(hour) } });
-  fireEvent.change(pop.getByLabelText("Minute"), { target: { value: String(minute) } });
-  fireEvent.change(pop.getByLabelText("AM or PM"), { target: { value: pm ? "1" : "0" } });
-  fireEvent.click(pop.getByRole("button", { name: "Done" }));
+  pickMenu("Hour", String(hour));
+  pickMenu("Minute", `:${String(minute).padStart(2, "0")}`);
+  pickMenu("AM or PM", pm ? "PM" : "AM");
+  fireEvent.click(within(dialog()).getByRole("button", { name: "Done" }));
 }
 
 /** Sets the whole row to a local date-and-time (`YYYY-MM-DDTHH:mm`): the day, then the time. */

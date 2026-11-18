@@ -251,7 +251,8 @@ describe("the birth date reaches the vaccine suggestions", () => {
 
   it("LogForm passes the stored birth date to nextDose at both of its calls, and Journal hands it down", () => {
     const form = read("app/LogForm.tsx");
-    expect(form.match(/nextDose\(\{[^}]*birthOn \}\)/g)).toHaveLength(2);
+    // (The Vaccine form's own suggestion is gone, #73: only a vet visit's Vaccines given plan the next dose.)
+    expect(form.match(/nextDose\(\{[^}]*birthOn \}\)/g)).toHaveLength(1);
     expect(form).toMatch(/birthOn: birthOn,?|birthOn,\n\s+idFor/);
     expect(read("app/Journal.tsx")).toContain("birthOn={profileData?.details.birth_on ?? null}");
   });

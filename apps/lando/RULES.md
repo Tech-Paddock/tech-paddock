@@ -26,12 +26,15 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 - Every form ends with two rows of two equal columns (owner, #64): Day and Time, then Logging as and
   Save. Day and Time are boxes that open a pop-up window, never a scroll wheel and never a panel that
   pushes the form down: Day a month calendar, Time the shortcuts (Now, 15, 30 and 45 min ago, 1 hr
-  ago) then hour, minute and AM/PM picklists. Minutes step by five. Nothing behind a pop-up can be
-  selected while it is open, and Cancel leaves the time as it was. Weight is a date only. The row
+  ago) then hour, minute and AM/PM as Lando's own compact menus (owner, #73), never the phone's native
+  menu: a 44px box that opens a short list right under it, about five rows tall, scrolling inside itself and
+  never the page, the current value ticked, a tap picks, Escape or a tap outside closes. Minutes step by five. Nothing behind a pop-up can be
+  selected while it is open, and Cancel leaves the time as it was. Weight and a vaccine are a date only. The row
   opens on now rounded down to five minutes, or on the entry's own time (a correction, a Done, an Add
-  a plan). Potty and a note are never in the future. Repeat is always on the form except Potty, so
-  nothing shifts; a future time makes Save read Save plan, and Repeat on a past time is refused with
-  a message. A failed save keeps the chosen time.
+  a plan). Potty and a note are never in the future. Repeat is always on the form except Potty and a vaccine, so
+  nothing shifts; a future time makes Save read Save plan, and Repeat on a past or present time never
+  refuses (owner, #73, replacing #64's refusal): the entry is logged, and the repeat becomes a plan at its
+  next date after now. A failed save keeps the chosen time.
 - One field class (owner, TEC-255): every text box, number box and select has the same padding, a
   44px height and a fixed width, never one taken from its content. The default is half its section;
   a full-width field has a stated reason (the Note). Save is 44px tall and fills its column (#64).
@@ -85,8 +88,11 @@ A puppy journal: log what Lando did, when, and who saw it; show what's due next.
 - Vaccines (owner, TEC-259): a vaccine is a Health entry, `type: vaccine`, from a fixed list (DHPP,
   Bordetella, Leptospirosis, Rabies) that widens only when the owner asks; `lando.details_ok` holds the
   same list. Vaccines given on a vet visit are separate Vaccine entries linked to the visit by
-  `parent_id`, never fields inside the visit. Saving a vaccine offers its next dose as an upcoming plan
-  on a suggested date from one pure lib, and the date stays editable.
+  `parent_id`, never fields inside the visit. **Health's Type row never offers Vaccine** (owner, #73): a vaccine is
+  recorded only through a vet visit's Vaccines given, and an existing entry stays editable. A vet visit
+  that gave vaccines offers each one's next dose as an upcoming plan, chosen with chips (3–4 weeks, 6 months,
+  1 year, 3 years) with the vaccine's usual gap picked first, from one pure lib. A Done on a vaccine plan opens a Vet
+  visit with that vaccine ticked, and saving it closes the plan. The Health note is optional on every Health form (owner, #73, lifting TEC-139's rule).
 - Livery: McLaren '25 (`mcl39`), the theme's own; changed only in the theme.
 - Every change a user would notice adds one plain-language entry to the release notes
   (`lib/releases.ts`, newest first, append-only) on the same branch: no issue numbers, file names,

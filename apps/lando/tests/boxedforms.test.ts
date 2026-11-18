@@ -293,10 +293,10 @@ describe("Medication", () => {
     const photo = "health/66666666-6666-4666-8666-666666666666.jpg";
     expect(parseDetails("health", { ...dose, issue: ISSUE_ID, photos: [photo] }, [], MEDS)).toMatchObject({ issue: ISSUE_ID, photos: [photo] });
   });
-  it("needs no note and no reason; a vet visit still needs its note", () => {
+  it("needs no note and no reason, and neither does a vet visit now (#73)", () => {
     const body = { id: "77777777-7777-4777-8777-777777777777", kind: "health", at: AT, details: dose };
     expect(parseNewEvent(body, new Date(AT), [], MEDS).note).toBeNull();
-    expect(() => parseNewEvent({ ...body, details: { type: "vet", reasons: ["checkup"] } }, new Date(AT))).toThrow(/note is required/);
+    expect(parseNewEvent({ ...body, details: { type: "vet", reasons: ["checkup"] } }, new Date(AT)).note).toBeNull();
     expect(() => checkHealthReasons({ details: parseDetails("health", dose, [], MEDS) }, null)).not.toThrow();
   });
   it("reads in the feed as the medication, the dose and how it was given", () => {
@@ -385,12 +385,13 @@ describe("a future When", () => {
     expect(submit.indexOf("await submitFuture(whenV, dayV)")).toBeLessThan(submit.indexOf("onLog(body, then)"));
     expect(submit.slice(0, submit.indexOf("await submitFuture(whenV, dayV)"))).not.toContain("onLog");
     expect(form).toContain("await onUpcoming(item, plan?.id)");
-    // The Repeat control is there unless the form can't be in the future (Potty); a ticked Repeat on a time that is not
-    // later is refused before anything is saved.
-    expect(form).toMatch(/\{!noFuture && \(\s*<div data-section="plan"/);
+    // The Repeat control is there unless the form can't be in the future (Potty) or is a vaccine; a Repeat ticked on a time
+    // that is now or past never refuses (#73): the entry is logged and the plan follows it.
+    expect(form).toMatch(/\{repeatAllowed && \(\s*<div data-section="plan"/);
     expect(form).toContain("{repeatBlock}");
-    expect(submit.indexOf("failOnForm(REPEAT_NEEDS_FUTURE)")).toBeGreaterThan(submit.indexOf("await submitFuture(whenV, dayV)"));
-    expect(submit.indexOf("failOnForm(REPEAT_NEEDS_FUTURE)")).toBeLessThan(submit.indexOf("onLog(body, then)"));
+    expect(form).not.toContain("REPEAT_NEEDS_FUTURE");
+    expect(submit).toContain("firstRepeatAfter(");
+    expect(submit.indexOf("firstRepeatAfter(")).toBeLessThan(submit.indexOf("onLog(body, then, plans)"));
   });
   it("a saved entry cannot move to the future, and the server refuses a time past a day ahead", () => {
     const body = { id: "99999999-9999-4999-8999-999999999999", kind: "potty", at: "2026-11-09T12:00:00.000Z", details: { what: "pee", where: "outside" } };
@@ -479,7 +480,10 @@ describe("Done opens the matching form, prefilled", () => {
   });
   it("closing is wired for any form: the entry saved from a Done closes its item (source check)", () => {
     const journal = readFileSync(resolve(__dirname, "../app/Journal.tsx"), "utf8");
-    expect(journal).toContain("if (open?.doneFor) visitLinks.current.set(body.id, open.doneFor.id)");
+    expect(journal).toContain("if (!vaccine) visitLinks.current.set(body.id, open.doneFor.id)");
+    // A vaccine plan's Done opens a Vet visit (#73), closed by the visit's entry for that vaccine.
+    expect(journal).toContain("const target = doneFormFor(item)");
+    expect(journal).toContain("visitLinks.current.set(shot.id, open.doneFor.id)");
     expect(journal).toContain("saveThenClose(saveOne, (v) => closeUpcoming(itemId, v), b)");
     expect(journal).toContain("setOpen({ form: target.form, healthType: target.healthType, doneFor: item })");
   });

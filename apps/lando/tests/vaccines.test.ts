@@ -18,9 +18,9 @@ import {
   HEALTH_TYPES,
   type JournalEvent,
 } from "@/lib/events";
-import { donePrefill, formForItem, futureItem } from "@/lib/future";
+import { doneFormFor, donePrefill, formForItem, futureItem, plannedVaccine } from "@/lib/future";
 import { nextDose, nextDosePlan, visitVaccineEntries } from "@/lib/vaccine-plan";
-import { dayBox, pickDay } from "./whenpop";
+import { pickDay } from "./whenpop";
 import { DOSE_MAX, VACCINES, VACCINE_IDS, hasDoses, parseVaccinePlanTitle, suggestedDose, vaccineLabel, vaccinePlanTitle, vaccineText } from "@/lib/vaccines";
 
 // Invented ids. Nothing here is a real record (RULES.md, Never 2).
@@ -320,18 +320,53 @@ describe("the forms", () => {
   };
   const save = () => fireEvent.click(screen.getByRole("button", { name: /^Save/ }));
 
-  it("Health's Type row offers Vaccine, and the Vaccine form is a vaccine pick and a dose pick, each half the row", () => {
-    open({ healthType: "vaccine" });
-    expect(screen.getByRole("radio", { name: "Vaccine" })).toBeTruthy();
+  const saved = (vaccine: string, dose?: number) =>
+    ev("health", "2026-11-01T15:00:00.000Z", { type: "vaccine", vaccine, ...(dose ? { dose } : {}) }, { id: SHOT });
+
+  it("Health's Type row offers no Vaccine on a new entry (#73): only Vet visit, Medical issue and Medication", () => {
+    open({});
+    const types = [...document.querySelectorAll<HTMLInputElement>('input[name="health-type"]')];
+    expect(types.map((r) => r.labels?.[0]?.textContent)).toEqual(["Vet visit", "Medical issue", "Medication"]);
+    expect(screen.queryByRole("radio", { name: "Vaccine" })).toBeNull();
+    // The list itself is unchanged: existing rows, the database check and `describe` still use it.
+    expect(HEALTH_TYPES).toContain("vaccine");
+  });
+
+  it("an existing vaccine entry still opens on the Vaccine form: a vaccine pick and a dose pick, each half the row", () => {
+    const e = saved("dhpp", 2);
+    open({ event: e, events: [e] });
+    expect((screen.getByRole("radio", { name: "Vaccine" }) as HTMLInputElement).checked).toBe(true);
     const pick = screen.getByLabelText("Vaccine", { selector: "select" }) as HTMLSelectElement;
     expect([...pick.options].map((o) => o.textContent)).toEqual(["Pick one…", "DHPP", "Bordetella", "Leptospirosis", "Rabies"]);
     expect(pick.className).toContain("w-full");
-    // The dose box appears for a vaccine with a number, and not for one without.
-    expect(screen.queryByLabelText("Dose")).toBeNull();
+    expect((screen.getByLabelText("Dose") as HTMLSelectElement).value).toBe("2");
+    // No dose box for a vaccine with no number.
     fireEvent.change(pick, { target: { value: "rabies" } });
     expect(screen.queryByLabelText("Dose")).toBeNull();
-    fireEvent.change(pick, { target: { value: "dhpp" } });
-    expect((screen.getByLabelText("Dose") as HTMLSelectElement).value).toBe("1");
+  });
+
+  it("a vaccine is a date, not a date and time, and has no Repeat and no next-dose offer (#73)", () => {
+    const e = saved("rabies");
+    open({ event: e, events: [e] });
+    expect(screen.getByRole("button", { name: /^Day:/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Time:/ })).toBeNull();
+    expect(screen.queryByText("Repeat")).toBeNull();
+    expect(screen.queryByLabelText("Plan the next dose")).toBeNull();
+    expect(screen.queryByLabelText("Plan the next doses")).toBeNull();
+  });
+
+  it("correcting a vaccine on a past day saves it at that day's noon, with no Repeat and no plan", () => {
+    const e = saved("rabies");
+    const p = open({ event: e, events: [e] });
+    pickDay("2026-10-05");
+    fireEvent.click(screen.getByRole("button", { name: /^Save changes/ }));
+    expect(p.onChange).toHaveBeenCalledTimes(1);
+    const [body, then, plans] = p.onChange.mock.calls[0] as [{ at: string; voids: string; details: unknown }, unknown, unknown];
+    expect(body).toMatchObject({ voids: SHOT, details: { type: "vaccine", vaccine: "rabies" } });
+    expect(new Date(body.at).getHours()).toBe(12);
+    expect(new Date(body.at).getDate()).toBe(5);
+    expect(then).toEqual([]);
+    expect(plans).toBeUndefined();
   });
 
   it("the dose opens on one more than those logged, until it is touched", () => {
@@ -351,66 +386,77 @@ describe("the forms", () => {
     expect(p.onLog).not.toHaveBeenCalled();
   });
 
-  it("Save logs the vaccine and offers the next dose as a plan, on the suggested day", () => {
-    const p = open({ healthType: "vaccine" });
-    fireEvent.change(screen.getByLabelText("Vaccine", { selector: "select" }), { target: { value: "rabies" } });
-    // The offer is ticked, shows the suggested day in the When row's date box, and says the interval.
-    expect((screen.getByLabelText("Plan the next dose") as HTMLInputElement).checked).toBe(true);
-    expect(screen.getByText(/Usually 1 year on/)).toBeTruthy();
-    save();
-    expect(p.onLog).toHaveBeenCalledTimes(1);
-    const [body, then, plans] = p.onLog.mock.calls[0] as [{ id: string; kind: string; details: unknown; note: string | null; parent_id?: string }, unknown[], Record<string, { kind: string; title: string; due_on: string }>];
-    expect(body).toMatchObject({ kind: "health", details: { type: "vaccine", vaccine: "rabies" }, note: null });
-    expect(body.parent_id).toBeUndefined();
-    expect(then).toEqual([]);
-    const plan = plans[body.id];
-    expect(plan).toMatchObject({ kind: "vaccine", title: "Vaccine · Rabies" });
-    expect(plan.due_on).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(plan.due_on > new Date().toISOString().slice(0, 10)).toBe(true);
-  });
-
-  it("unticking the offer logs the vaccine with no plan", () => {
-    const p = open({ healthType: "vaccine" });
-    fireEvent.change(screen.getByLabelText("Vaccine", { selector: "select" }), { target: { value: "bordetella" } });
-    fireEvent.click(screen.getByLabelText("Plan the next dose"));
-    save();
-    expect(p.onLog.mock.calls[0]).toHaveLength(2);
-  });
-
-  it("a day typed in the next dose box is the day planned", () => {
-    const p = open({ healthType: "vaccine" });
-    fireEvent.change(screen.getByLabelText("Vaccine", { selector: "select" }), { target: { value: "bordetella" } });
-    expect(dayBox("Next dose")).toBeTruthy(); // the next dose's Day box, beside the form's own Day
-    pickDay("2027-01-15", "Next dose");
-    save();
-    const [body, , plans] = p.onLog.mock.calls[0] as [{ id: string }, unknown, Record<string, { due_on: string }>];
-    expect(plans[body.id].due_on).toBe("2027-01-15");
-  });
-
-  it("a vaccine dated in the future is a plan, not an entry, and offers no further plan", () => {
-    const p = open({ healthType: "vaccine" });
-    fireEvent.change(screen.getByLabelText("Vaccine", { selector: "select" }), { target: { value: "dhpp" } });
+  it("an open Vaccine plan is edited in place on a day, and a day ahead stays a plan", async () => {
+    const plan = { id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", kind: "vaccine", title: "Vaccine · DHPP · dose 2", due_on: "2027-01-01", due_time: null, note: null, repeat_every: null, repeat_unit: null, status: "open", done_on: null, done_event: null, created_at: "x", updated_at: "x" };
+    const p = open({ healthType: "vaccine", plan });
+    expect(screen.queryByRole("button", { name: /^Time:/ })).toBeNull();
+    expect(screen.queryByText("Repeat")).toBeNull();
     pickDay("2028-01-01");
-    expect(screen.queryByLabelText("Plan the next dose")).toBeNull();
     save();
+    await vi.waitFor(() => expect(p.onUpcoming).toHaveBeenCalledTimes(1));
     expect(p.onLog).not.toHaveBeenCalled();
-    expect(p.onUpcoming).toHaveBeenCalledTimes(1);
-    expect(p.onUpcoming.mock.calls[0][0]).toMatchObject({ kind: "vaccine", title: "Vaccine · DHPP · dose 1", due_on: "2028-01-01" });
+    expect(p.onUpcoming.mock.calls[0][0]).toMatchObject({ kind: "vaccine", title: "Vaccine · DHPP · dose 2", due_on: "2028-01-01", due_time: null, repeat_every: null });
   });
 
-  it("a correction opens on its vaccine and dose and offers no plan", () => {
-    const e = ev("health", "2026-11-01T15:00:00.000Z", { type: "vaccine", vaccine: "leptospirosis", dose: 2 });
-    open({ event: e, events: [e] });
-    expect((screen.getByLabelText("Vaccine", { selector: "select" }) as HTMLSelectElement).value).toBe("leptospirosis");
-    expect((screen.getByLabelText("Dose") as HTMLSelectElement).value).toBe("2");
-    expect(screen.queryByLabelText("Plan the next dose")).toBeNull();
+  it("a Done on a planned dose opens a Vet visit with that vaccine ticked, and the offer for its next dose (#73)", () => {
+    const item = { kind: "vaccine" as const, title: "Vaccine · DHPP · dose 3", note: null, due_on: "2026-11-05", due_time: null };
+    expect(doneFormFor(item)).toEqual({ form: "health", healthType: "vet" });
+    expect(formForItem(item)).toEqual({ form: "health", healthType: "vaccine" }); // an edit still opens the Vaccine form
+    expect(plannedVaccine(item)).toBe("dhpp");
+    expect(plannedVaccine({ kind: "vaccine" as const, title: "Rabies booster" })).toBeNull();
+    const done = donePrefill(item);
+    const p = open({ healthType: "vet", done });
+    expect(screen.queryByLabelText("Vaccine", { selector: "select" })).toBeNull();
+    expect(screen.getByRole("button", { name: "DHPP" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Rabies" }).getAttribute("aria-pressed")).toBe("false");
+    expect((screen.getByLabelText("Why") as HTMLSelectElement).value).toBe("vaccines");
+    fireEvent.click(screen.getByRole("button", { name: /^Save/ }));
+    const [visit, then] = p.onLog.mock.calls[0] as [{ id: string }, { parent_id: string; details: { vaccine: string } }[]];
+    expect(then).toHaveLength(1);
+    expect(then[0]).toMatchObject({ parent_id: visit.id, details: { type: "vaccine", vaccine: "dhpp" } });
   });
 
-  it("a Done on a planned dose opens the Vaccine form on its vaccine and dose", () => {
-    const done = donePrefill({ kind: "vaccine", title: "Vaccine · DHPP · dose 3", note: null, due_on: "2026-11-05", due_time: null });
-    open({ healthType: "vaccine", done });
-    expect((screen.getByLabelText("Vaccine", { selector: "select" }) as HTMLSelectElement).value).toBe("dhpp");
-    expect((screen.getByLabelText("Dose") as HTMLSelectElement).value).toBe("3");
+  it("the next doses are chosen in steps: 3–4 weeks, 6 months, 1 year, 3 years, with the vaccine's usual gap picked first", () => {
+    const p = open({ healthType: "vet" });
+    fireEvent.change(screen.getByLabelText("Why"), { target: { value: "vaccines" } });
+    for (const v of ["DHPP", "Bordetella", "Rabies"]) fireEvent.click(screen.getByRole("button", { name: v }));
+    const row = (v: string) => screen.getByRole("group", { name: `${v} next dose in` });
+    const labels = (v: string) => [...row(v).querySelectorAll("button")].map((b) => b.textContent);
+    const picked = (v: string) => [...row(v).querySelectorAll("button")].filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent);
+    expect(labels("DHPP")).toEqual(["3–4 weeks", "6 months", "1 year", "3 years"]);
+    expect(picked("DHPP")).toEqual(["3–4 weeks"]);
+    expect(picked("Bordetella")).toEqual(["6 months"]);
+    expect(picked("Rabies")).toEqual(["1 year"]);
+    // There is no calendar for the next dose.
+    expect(screen.queryByRole("button", { name: /^Next dose:/ })).toBeNull();
+    fireEvent.click([...row("Rabies").querySelectorAll("button")].find((b) => b.textContent === "3 years")!);
+    expect(picked("Rabies")).toEqual(["3 years"]);
+    fireEvent.click([...row("DHPP").querySelectorAll("button")].find((b) => b.textContent === "1 year")!);
+    fireEvent.click(screen.getByRole("button", { name: /^Save/ }));
+    const [visit, then, plans] = p.onLog.mock.calls[0] as [{ at: string }, { id: string; details: { vaccine: string } }[], Record<string, { title: string; due_on: string }>];
+    const day = (id: string) => plans[then.find((t) => t.details.vaccine === id)!.id].due_on;
+    const given = new Date(visit.at);
+    const plus = (years: number, months = 0) => {
+      const d = new Date(given);
+      d.setFullYear(d.getFullYear() + years, d.getMonth() + months);
+      return d;
+    };
+    const local = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    expect(day("rabies").slice(0, 4)).toBe(String(given.getFullYear() + 3));
+    expect(day("dhpp").slice(0, 4)).toBe(String(given.getFullYear() + 1));
+    expect(day("dhpp")).toBe(local(plus(1)));
+    // The step a person picked keeps the rule's dose number and title; only the day moved.
+    expect(plans[then.find((t) => t.details.vaccine === "dhpp")!.id].title).toBe("Vaccine · DHPP · dose 2");
+  });
+
+  it("a vet visit saves with no note (#73)", () => {
+    const p = open({ healthType: "vet" });
+    fireEvent.change(screen.getByLabelText("Why"), { target: { value: "checkup" } });
+    expect(screen.getByLabelText("Note").hasAttribute("required")).toBe(false);
+    save();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(p.onLog).toHaveBeenCalledTimes(1);
+    expect(p.onLog.mock.calls[0][0]).toMatchObject({ note: null });
   });
 
   it("a vet visit has Vaccines given; each pick is its own linked entry, saved after the visit, with its plan", () => {

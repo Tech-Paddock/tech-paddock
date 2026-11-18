@@ -393,7 +393,7 @@ describe("the screen keeps a visit's weight with its row (source checks; there i
     expect(form).toContain('kind === "health" && healthType === "vet"');
     expect(form).toContain("visitWeightPlan({");
     expect(form).toContain("onLog(body, then)");
-    expect(form).toContain("onChange({ ...body, voids: event.id }, then)");
+    expect(form).toContain("onChange({ ...body, voids: event.id }, then, plans)");
   });
 
   it("the field opens empty in the phone's last unit on a new visit", () => {
