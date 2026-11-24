@@ -666,14 +666,29 @@ describe("the Note form's Day and Time (#64)", () => {
     expect(menuOptions("Hour").disabled).toHaveLength(9);
   });
 
-  it("logs a past time picked in the pop-ups", () => {
-    const props = noteProps();
-    render(createElement(NoteForm, props));
-    write();
-    const earlier = hoursFromNow(-5);
-    setWhen(earlier);
-    fireEvent.click(screen.getByRole("button", { name: "Save note" }));
-    const [body] = props.onLog.mock.calls[0] as unknown as [{ at: string }];
-    expect(toLocalInput(body.at)).toBe(earlier);
+  // The clock is frozen (never the real one): the pop-ups grey out hours after now, so a test that reads the real clock
+  // passes or fails by the hour it runs at. These instants are Denver wall-clock times on 2026-11-24 (MST, UTC-7), so the
+  // run covers the small hours, a time just past midnight (5 hours back lands on yesterday), noon, the afternoon and the
+  // last minutes of the day; the suite runs under TZ=UTC and TZ=America/Denver, which puts the process zone on both sides.
+  it.each([
+    ["00:20", "2026-11-24T07:20:00Z"],
+    ["03:07", "2026-11-24T10:07:00Z"],
+    ["09:08", "2026-11-24T16:08:00Z"],
+    ["12:03", "2026-11-24T19:03:00Z"],
+    ["16:09", "2026-11-24T23:09:00Z"],
+    ["23:58", "2026-11-25T06:58:00Z"],
+  ])("logs a past time picked in the pop-ups, at %s Denver", (_label, instant) => {
+    clockAt(new Date(instant));
+    for (const back of [-5, -30]) {
+      const props = noteProps();
+      render(createElement(NoteForm, props));
+      write();
+      const earlier = hoursFromNow(back);
+      setWhen(earlier);
+      fireEvent.click(screen.getByRole("button", { name: "Save note" }));
+      const [body] = props.onLog.mock.calls[0] as unknown as [{ at: string }];
+      expect(toLocalInput(body.at)).toBe(earlier);
+      cleanup();
+    }
   });
 });
