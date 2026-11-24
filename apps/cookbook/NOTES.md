@@ -555,6 +555,46 @@ Reasoning is in the migration headers.
   Kroger does not return, or returns with no price, gets **no row** (a gap, counted in the body).
   A Kroger failure writes nothing and answers 502, so Vercel shows the run failed. The body is the
   night, the store's name, counts and the weeks rolled up; no token or secret.
+- **The scan covers everything bought** (paddock-issues#77; owner, 2026-11-24: "widen to every item in
+  the database we use to store purchased items"). Besides every saved code, each night looks up the
+  **distinct product codes in `cookbook.purchases`, all time, that are not saved** (`readBoughtItems`,
+  `lib/purchaseStore.ts`), into the same `price_nights` and `price_weeks`: no new table, no migration,
+  no model, the same app token and `productsByIds`. **A purchase line with no `upc` is skipped, never
+  guessed** (`canonicalCode`, `lib/purchases.ts`: leading zeros dropped, then zero-padded to Kroger's
+  13 digits, so one product is one code; all zeros is no code). A bought code that equals a saved
+  one (leading zeros ignored, `codeKey`) is that saved product and gets no second row. **Order and
+  failure:** saved products are looked up in full first, exactly as before (a Kroger failure there
+  still fails the run); the bought half runs after the saved rows are written, fifty a request, four
+  requests at a time, and **never fails the run**: a refused batch is counted `failed` and those codes
+  get no row that night; an unreadable purchases table is `bought.read: false`. The body gains
+  `bought: { read, codes, nights, scanned, written, alreadyRecorded, notReturned, noPrice, failed }`;
+  the saved fields are unchanged. The first nights' body says how many codes there are (`bought.codes`);
+  at the start, on 2026-11-24, the distinct bought codes were a small fraction of one night's budget.
+- **The rotation** (`lib/scanRotation.ts`, pure): one night looks up at most `NIGHT_CODE_BUDGET` (1000)
+  codes, about twenty requests, well inside `maxDuration` 60 and Kroger's daily allowance. Saved
+  products come first; the bought-but-unsaved codes get what is left, never fewer than
+  `MIN_BOUGHT_SLICE` (100). When they fit, **every one is looked up every night**. When they do not,
+  `nights = ceil(unsaved / room)` and the codes, sorted, are dealt out round-robin: **the code at
+  position `i` is looked up on the nights where `dayNumber(night) % nights === i % nights`**, so each is
+  looked up once every `nights` nights and none is dropped. Today `nights` is 1. **Trap:** when `nights`
+  grows, a code's night moves and it can wait up to the longer of the two lengths once. A bought product
+  therefore has fewer nightly rows than a saved one when `nights` is above 1, so its 12-week mean and
+  its Best need more calendar time to fill; the weekly roll-up is unchanged and counts the nights it has.
+- **Bought products on the board** (`lib/dealRows.ts`, `lib/dealBoard.ts`): `readDealBoard` reads
+  every bought code with its **most recent purchase line's name and size** (`boughtItems`) and
+  `buildDealBoard` adds a row for each that is not saved and has a night. The row takes that name
+  (Kroger's own name is not stored for them), no saved names, a count of 0, the aisle Kroger gave, and
+  goes through the same `productSignal` as a saved product, so search, aisle groups, All / On sale /
+  Coupon / Stacks / Best, the colours and the list's shade rule apply unchanged. Its page link is built
+  from the name and code. **A code Kroger stops returning has no new night and ages out quietly**: no row,
+  and it is not counted as unpriced (that count is saved products only). **Its night counts as today's
+  price for `max(FRESH_NIGHTS, nights)` nights**, so a rotation longer than three nights does not make
+  a row blink; a saved product's three are unchanged. **Bought** reads the product's last purchase line
+  (inside `PICK_WEEKS`) or a cart send. A failed purchases read is `purchasesRead: false` and the board
+  shows the saved products only. Trap: **On my list** can also find these rows, by a line's words in
+  the name, when no saved name matched. The grocery list's shades read saved products only and do not
+  change. Tests: `tests/priceRun.test.ts` (the bought half), `tests/scanRotation.test.ts`,
+  `tests/dealBoughtProducts.test.ts`.
 - **Rerun the same night is a no-op**: the first reading stands, and the body says
   `alreadyRecorded`. A missed night is never backfilled.
 - **Roll-up** (`rollUpWeek`): every run rolls up each finished Monday-to-Sunday week, looking back

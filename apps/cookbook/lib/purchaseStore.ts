@@ -1,7 +1,7 @@
 import { getServiceClient } from "./supabase";
 import { LookupError } from "./errors";
 import { readProducts } from "./productStore";
-import { matcher, parsePurchases, summary, tally, toRows, type Bought, type ImportResult } from "./purchases";
+import { boughtItems, matcher, parsePurchases, summary, tally, toRows, type Bought, type BoughtItem, type ImportResult } from "./purchases";
 
 /**
  * `cookbook.purchases` (TEC-213; reasoning in the `cookbook_purchases`
@@ -61,6 +61,30 @@ export async function purchasesPerProduct(weeks: number, now: Date = new Date())
     if (page.length < PAGE) break;
   }
   return tally(rows, weeks, today);
+}
+
+/**
+ * Every distinct product code ever bought, all time, each named by its most
+ * recent purchase line (paddock-issues#77). Matched or not: this reads the
+ * lines' own `upc`, so a bought product that is not saved is in it. Lines with
+ * no code are not (never guessed). Read-only, paged.
+ */
+export async function readBoughtItems(): Promise<BoughtItem[]> {
+  const rows: { upc: string | null; description: string; size: string | null; ordered_on: string }[] = [];
+  for (let a = 0; ; a += PAGE) {
+    const { data, error } = await getServiceClient()
+      .from("purchases")
+      .select("upc, description, size, ordered_on")
+      .not("upc", "is", null)
+      .order("ordered_on", { ascending: false })
+      .order("id", { ascending: true })
+      .range(a, a + PAGE - 1);
+    if (error) throw new LookupError(`Couldn't read the purchases: ${error.message}`);
+    const page = (data ?? []) as typeof rows;
+    rows.push(...page);
+    if (page.length < PAGE) break;
+  }
+  return boughtItems(rows);
 }
 
 /** The weeks of purchases that pick a product (TEC-214; `RULES.md`, *Send to cart*). */
