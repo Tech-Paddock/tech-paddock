@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Pit Row">
+  <!-- Pit Row: three rows, a circle and a line each, the first ticked, on the
+       clark bar colour #0A1A11 (lib/theme.css). Plain shapes drawn by hand; no
+       brand mark, no text. favicon.ico, apple-touch-icon.png and the manifest
+       PNGs are rendered from this file. -->
+  <rect width="512" height="512" rx="96" fill="#0A1A11"/>
+  <circle cx="148" cy="152" r="42" fill="#3FBF7F"/>
+  <path d="M128 152 l14 15 l28 -32" fill="none" stroke="#0A1A11" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="148" cy="256" r="42" fill="none" stroke="#F1F6F2" stroke-width="14"/>
+  <circle cx="148" cy="360" r="42" fill="none" stroke="#F1F6F2" stroke-width="14"/>
+  <g stroke="#F1F6F2" stroke-width="20" stroke-linecap="round">
+    <line x1="228" y1="152" x2="420" y2="152"/>
+    <line x1="228" y1="256" x2="420" y2="256"/>
+    <line x1="228" y1="360" x2="380" y2="360"/>
+  </g>
+</svg>
