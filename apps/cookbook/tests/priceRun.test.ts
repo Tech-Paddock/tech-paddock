@@ -38,7 +38,7 @@ function product(id: string, over: Partial<Product> = {}): Product {
   };
 }
 
-function world(opts: { codes?: string[]; store?: { locationId: string; name: string } | null; now?: Date; shelf?: (id: string) => Product | null } = {}) {
+function world(opts: { codes?: string[]; bought?: string[] | "unreadable"; store?: { locationId: string; name: string } | null; now?: Date; shelf?: (id: string) => Product | null } = {}) {
   const nights = new Map<string, NightRow>();
   const weeks = new Map<string, WeekRow>();
   const codes = opts.codes ?? [code(1), code(2)];
@@ -50,6 +50,10 @@ function world(opts: { codes?: string[]; store?: { locationId: string; name: str
     now: () => now,
     store: async () => (opts.store === undefined ? { locationId: STORE, name: "Test Store" } : opts.store),
     productCodes: async () => codes,
+    boughtCodes: async () => {
+      if (opts.bought === "unreadable") throw new Error("purchases unreadable");
+      return opts.bought ?? [];
+    },
     appToken: async () => {
       calls.token += 1;
       return "app-token-TEST";
@@ -375,5 +379,85 @@ describe("Kroger's app token and batching (fetch stubbed)", () => {
       ],
     };
     expect(readKrogerProducts(body).map((p) => p.aisle)).toEqual(["Breakfast", null, null]);
+  });
+});
+
+describe("bought products are scanned too (paddock-issues#77)", () => {
+  const bought = (n: number) => code(500 + n);
+
+  it("looks up a bought code that is not saved, and records it in the same table", async () => {
+    const w = world({ codes: [code(1)], bought: [bought(1)], shelf: (id) => product(id, { regular: id === bought(1) ? 7 : 5, promo: id === bought(1) ? 6 : null }) });
+    const report = await recordNight(w.deps);
+
+    expect(report).toMatchObject({ saved: 1, written: 1, bought: { read: true, codes: 1, nights: 1, scanned: 1, written: 1, notReturned: 0, noPrice: 0, failed: 0 } });
+    expect(w.nights.get(`${bought(1)}|${STORE}|2026-10-27`)).toMatchObject({ regular: 7, sale: 6 });
+    expect(w.calls.token).toBe(1);
+  });
+
+  it("a bought code that is saved is one product, however its zeros are written", async () => {
+    const w = world({ codes: [code(1)], bought: [code(1), String(code(1)).replace(/^0+/, "").padStart(14, "0"), bought(2)] });
+    const report = await recordNight(w.deps);
+    expect(report.bought).toMatchObject({ codes: 1, scanned: 1 });
+    expect([...w.nights.keys()].sort()).toEqual([`${code(1)}|${STORE}|2026-10-27`, `${bought(2)}|${STORE}|2026-10-27`]);
+  });
+
+  it("saved products are looked up in full, unchanged, and first", async () => {
+    const w = world({ codes: [code(1), code(2)], bought: [bought(1)] });
+    await recordNight(w.deps);
+    expect(w.calls.byIds[0].ids).toEqual([code(1), code(2)]);
+    expect(w.calls.byIds[1].ids).toEqual([bought(1)]);
+  });
+
+  it("a bought code Kroger does not return, or returns with no price, gets no row", async () => {
+    const w = world({
+      codes: [],
+      bought: [bought(1), bought(2), bought(3)],
+      shelf: (id) => (id === bought(1) ? null : id === bought(2) ? product(id, { regular: null, promo: null, price: null }) : product(id)),
+    });
+    const report = await recordNight(w.deps);
+    expect(report.bought).toMatchObject({ scanned: 3, written: 1, notReturned: 1, noPrice: 1 });
+    expect([...w.nights.keys()]).toEqual([`${bought(3)}|${STORE}|2026-10-27`]);
+  });
+
+  it("with only bought products and no saved ones it still scans them", async () => {
+    const w = world({ codes: [], bought: [bought(1)] });
+    expect(await recordNight(w.deps)).toMatchObject({ saved: 0, written: 0, bought: { written: 1 } });
+  });
+
+  it("a refused batch of bought codes never costs a saved product its night", async () => {
+    const w = world({ codes: [code(1)], bought: [bought(1), bought(2)] });
+    const real = w.deps.byIds;
+    w.deps.byIds = async (token, ids, location) => {
+      if (ids.includes(bought(1))) throw new UpstreamError("Kroger's product lookup failed (HTTP 503).");
+      return real(token, ids, location);
+    };
+    const report = await recordNight(w.deps);
+    expect(report).toMatchObject({ saved: 1, written: 1, bought: { scanned: 2, written: 0, failed: 2 } });
+    expect([...w.nights.keys()]).toEqual([`${code(1)}|${STORE}|2026-10-27`]);
+  });
+
+  it("an unreadable purchases table says so and still records the saved products", async () => {
+    const w = world({ codes: [code(1)], bought: "unreadable" });
+    const report = await recordNight(w.deps);
+    expect(report).toMatchObject({ written: 1, bought: { read: false, scanned: 0 } });
+  });
+
+  it("when they do not all fit one night, each night takes one fixed slice and none is dropped", async () => {
+    const all = Array.from({ length: 2500 }, (_, i) => bought(i));
+    const seen = new Map<string, number>();
+    const w = world({ codes: [code(1)], bought: all });
+    // 2500 bought codes with 1 saved: room for 999 a night, so a pass is three nights.
+    for (const d of ["2026-10-27", "2026-10-28", "2026-10-29"]) {
+      w.setNow(new Date(`${d}T09:00:00Z`));
+      const report = await recordNight(w.deps);
+      expect(report.bought).toMatchObject({ codes: 2500, nights: 3 });
+      expect(report.bought.scanned).toBeLessThanOrEqual(1000);
+    }
+    for (const k of w.nights.keys()) {
+      const id = k.split("|")[0];
+      seen.set(id, (seen.get(id) ?? 0) + 1);
+    }
+    expect(all.every((c) => seen.get(c) === 1)).toBe(true);
+    expect(seen.get(code(1))).toBe(3);
   });
 });

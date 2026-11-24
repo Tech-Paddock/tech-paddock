@@ -7,6 +7,8 @@ import { couponsByProduct, productSignal, type Shade } from "./dealSignal";
 import type { NightRow, WeekRow } from "./priceWeeks";
 import { weeksInWindow, type Light } from "./stoplight";
 import type { SavedProduct } from "./brands";
+import { codeKey } from "./purchases";
+import { rotationNights } from "./scanRotation";
 
 /**
  * What the Deals tab shows (TEC-132), built from rows already read: **pure**,
@@ -95,6 +97,13 @@ export type DealBoard = {
   purchasesRead: boolean;
 };
 
+/**
+ * A product found only in the purchase history (paddock-issues#77): its code,
+ * the name and size from its **most recent purchase line**, and whether that
+ * line is inside the Bought window (`PICK_WEEKS`).
+ */
+export type BoughtProduct = { code: string; description: string; size: string | null; recent: boolean };
+
 export type ScanDeals = {
   /** The Denver date the scan ran. */
   ranOn: string;
@@ -117,6 +126,13 @@ export type BoardInput = {
    * means none, so older callers still compile.
    */
   boughtIds?: Set<string> | null;
+  /**
+   * Every distinct product code ever bought (`readBoughtItems`). Those that are
+   * not saved are rows too, named by their last purchase line, once the nightly
+   * scan has priced them; one Kroger stops returning ages out quietly. Null
+   * when that read failed (Bought then says so); omitted means none.
+   */
+  boughtProducts?: BoughtProduct[] | null;
   /** The product codes sent to the cart in the last 12 weeks (`cart_sends`); null when that read failed. */
   sentCodes?: Set<string> | null;
   /** The nightly check's first and last night at the store (`readNightSpan`); optional so older callers still compile. */
@@ -130,13 +146,21 @@ const weighted = (parts: { value: number; weight: number }[]): number | null => 
 
 export function buildDealBoard(input: BoardInput): DealBoard {
   const { asOf, store, products } = input;
-  const empty: DealBoard = { store: store?.name ?? null, asOf, rows: [], couponsStaged: input.couponsStaged, unpriced: 0, hasNights: false, lastRun: input.span ?? null, weeksHeld: 0, nightsHeld: 0, purchasesRead: input.boughtIds !== null && input.sentCodes !== null };
+  const empty: DealBoard = { store: store?.name ?? null, asOf, rows: [], couponsStaged: input.couponsStaged, unpriced: 0, hasNights: false, lastRun: input.span ?? null, weeksHeld: 0, nightsHeld: 0, purchasesRead: input.boughtIds !== null && input.sentCodes !== null && input.boughtProducts !== null };
   if (!store) return empty;
 
   const freshFrom = addDays(asOf, -FRESH_NIGHTS);
+
+  // Bought-but-unsaved products (paddock-issues#77): a code that matches a saved
+  // product (leading zeros ignored) is that product, never a second row.
+  const savedKeys = new Set(products.map((p) => codeKey(p.product_id)));
+  const unsavedBought = [...new Map((input.boughtProducts ?? []).filter((b) => !savedKeys.has(codeKey(b.code))).map((b) => [b.code, b] as const)).values()];
+  // The scan may look at them once every few nights (`lib/scanRotation.ts`), so a night that old is still their latest price.
+  const boughtFreshFrom = addDays(asOf, -Math.max(FRESH_NIGHTS, rotationNights(products.length, unsavedBought.length)));
+
   const latest = new Map<string, NightRow>();
   for (const n of input.nights) {
-    if (n.location_id !== store.locationId || n.night < freshFrom || n.night > asOf) continue;
+    if (n.location_id !== store.locationId || n.night < (boughtFreshFrom < freshFrom ? boughtFreshFrom : freshFrom) || n.night > asOf) continue;
     const seen = latest.get(n.product_id);
     if (!seen || n.night > seen.night) latest.set(n.product_id, n);
   }
@@ -161,9 +185,22 @@ export function buildDealBoard(input: BoardInput): DealBoard {
 
   const rows: DealRow[] = [];
   let unpriced = 0;
-  for (const p of products) {
-    const night = latest.get(p.product_id);
-    const deal = scanned.get(p.product_id);
+  type Entry = {
+    p: Pick<SavedProduct, "product_id" | "names" | "count" | "description" | "size" | "size_first" | "url"> & { id?: string };
+    /** A product found only in the purchase history. */
+    unsaved: BoughtProduct | null;
+  };
+  const entries: Entry[] = [
+    ...products.map((p): Entry => ({ p, unsaved: null })),
+    ...unsavedBought.map((b): Entry => ({ p: { product_id: b.code, names: [], count: 0, description: b.description, size: b.size, size_first: null, url: null }, unsaved: b })),
+  ];
+  for (const { p, unsaved } of entries) {
+    let night = latest.get(p.product_id);
+    // A saved product's night must be as fresh as ever (three nights); only a bought one may be older.
+    if (night && !unsaved && night.night < freshFrom) night = undefined;
+    // A bought product Kroger stopped returning, or never priced, has no night: it drops out without a word.
+    if (unsaved && !night) continue;
+    const deal = unsaved ? undefined : scanned.get(p.product_id);
     let regular: number | null;
     let sale: number | null;
     let inStock: boolean | null;
@@ -191,7 +228,7 @@ export function buildDealBoard(input: BoardInput): DealBoard {
     // **The one function a list line asks too** (TEC-196), so the two agree.
     const signal = productSignal({ regular, sale, coupons: coupons.length, weeks: history, nights: nightsBy.get(p.product_id) ?? [], asOf });
     if (signal === null) {
-      unpriced += 1;
+      if (!unsaved) unpriced += 1;
       continue;
     }
     const { now, verdict, onSale } = signal;
@@ -203,10 +240,10 @@ export function buildDealBoard(input: BoardInput): DealBoard {
       name: p.description ?? p.names[0] ?? p.product_id,
       names: p.names,
       size: p.size ?? p.size_first,
-      url: p.url ?? pageFor(p.product_id, p.names[0] ?? ""),
+      url: p.url ?? pageFor(p.product_id, p.names[0] ?? p.description ?? ""),
       aisle: aisle ?? NO_AISLE,
       bought: p.count,
-      boughtRecently: (input.boughtIds?.has(p.id) ?? false) || (input.sentCodes?.has(p.product_id) ?? false),
+      boughtRecently: (unsaved?.recent ?? (p.id !== undefined && (input.boughtIds?.has(p.id) ?? false))) || (input.sentCodes?.has(p.product_id) ?? false),
       now,
       usual: Math.round((usual ?? regular ?? now) * 100) / 100,
       onSale,

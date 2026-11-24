@@ -4,7 +4,8 @@ import { runPriceNight } from "@/lib/priceRun";
 import { errorResponse } from "@/lib/respond";
 
 export const dynamic = "force-dynamic";
-// A few hundred products is a handful of Kroger requests; this is headroom.
+// A night looks up at most NIGHT_CODE_BUDGET codes (`lib/scanRotation.ts`): about twenty Kroger
+// requests, four at a time for the bought half. This is headroom, and the budget is why it holds.
 export const maxDuration = 60;
 
 /**

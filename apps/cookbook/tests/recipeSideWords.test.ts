@@ -179,6 +179,7 @@ const NOT_RECIPE_SIDE = [
   "lib/reroll.ts",
   "lib/respond.ts",
   "lib/safe-redirect.ts",
+  "lib/scanRotation.ts",
   "lib/sizeDrift.ts",
   "lib/sizeFit.ts",
   "lib/stoplight.ts",

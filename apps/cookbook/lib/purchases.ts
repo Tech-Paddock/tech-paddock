@@ -103,6 +103,41 @@ export function mergeLines(lines: PurchaseLine[]): PurchaseLine[] {
   return [...out.values()];
 }
 
+/**
+ * A purchase's code as Kroger's product ID, or null (paddock-issues#77). Leading
+ * zeros are ignored, as everywhere else a purchase code is read, and the digits
+ * are zero-padded to Kroger's 13 so the same product is always one code. An
+ * all-zero code is not a code, and a line with no code is never guessed.
+ */
+export function canonicalCode(upc: string | null | undefined): string | null {
+  if (!upc) return null;
+  const digits = upc.replace(/^0+/, "");
+  if (!/^\d+$/.test(digits) || digits.length > 14) return null;
+  return digits.length <= 13 ? digits.padStart(13, "0") : digits;
+}
+
+/** A code with its leading zeros dropped: two codes are one product when this matches. */
+export const codeKey = (code: string): string => code.replace(/^0+/, "");
+
+export type BoughtItem = { code: string; description: string; size: string | null; last_ordered_on: string };
+
+/**
+ * One item per distinct product code in the purchase lines, named by the code's
+ * **most recent** line (the latest `ordered_on`; on a tie the line seen first).
+ * Lines without a usable code are skipped. Sorted by code.
+ */
+export function boughtItems(rows: { upc: string | null; description: string; size: string | null; ordered_on: string }[]): BoughtItem[] {
+  const out = new Map<string, BoughtItem>();
+  for (const r of rows) {
+    const code = canonicalCode(r.upc);
+    if (!code) continue;
+    const seen = out.get(code);
+    if (seen && seen.last_ordered_on >= r.ordered_on) continue;
+    out.set(code, { code, description: r.description, size: r.size, last_ordered_on: r.ordered_on });
+  }
+  return [...out.values()].sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+}
+
 export type Matcher = (l: Pick<PurchaseLine, "upc" | "description">) => string | null;
 
 /**

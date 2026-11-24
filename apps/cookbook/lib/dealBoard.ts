@@ -6,7 +6,8 @@ import { readLatestScan } from "./dealStore";
 import { addDays, denverDate } from "./priceDates";
 import { buildDealBoard, type DealBoard } from "./dealRows";
 import { HISTORY_WEEKS } from "./stoplight";
-import { PICK_WEEKS, purchasesPerProduct } from "./purchaseStore";
+import { PICK_WEEKS, purchasesPerProduct, readBoughtItems } from "./purchaseStore";
+import type { BoughtProduct } from "./dealRows";
 import { readSentCodesSince } from "./cartSends";
 
 /**
@@ -38,6 +39,23 @@ async function sentCodes(now: Date): Promise<Set<string> | null> {
   }
 }
 
+/**
+ * Every product code ever bought, named by its last purchase line, each marked
+ * recent when that line is inside the `PICK_WEEKS` window (paddock-issues#77);
+ * null when the read failed, so it says so rather than showing fewer products.
+ * `buildDealBoard` drops the ones that are saved.
+ */
+async function boughtProducts(now: Date): Promise<BoughtProduct[] | null> {
+  try {
+    const from = new Date(now);
+    from.setUTCDate(from.getUTCDate() - PICK_WEEKS * 7);
+    const since = from.toISOString().slice(0, 10);
+    return (await readBoughtItems()).map((b) => ({ code: b.code, description: b.description, size: b.size, recent: b.last_ordered_on >= since }));
+  } catch {
+    return null;
+  }
+}
+
 export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> {
   const asOf = denverDate(now);
   const connection = await readConnectionRow();
@@ -50,7 +68,7 @@ export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> 
     return buildDealBoard({ asOf, store: null, products: [], nights: [], weeks: [], coupons: [], couponsStaged: staged, scan: null });
   }
 
-  const [products, nights, weeks, { coupons, staged }, latest, span, bought, sent] = await Promise.all([
+  const [products, nights, weeks, { coupons, staged }, latest, span, bought, sent, boughtAll] = await Promise.all([
     readProducts(),
     // Twelve weeks of nights, not three: Best compares tonight with the lowest night (TEC-196).
     readNightsSince(store.locationId, addDays(asOf, -7 * HISTORY_WEEKS)),
@@ -60,6 +78,7 @@ export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> 
     readNightSpan(store.locationId),
     boughtIds(now),
     sentCodes(now),
+    boughtProducts(now),
   ]);
 
   return buildDealBoard({
@@ -73,6 +92,7 @@ export async function readDealBoard(now: Date = new Date()): Promise<DealBoard> 
     span,
     boughtIds: bought,
     sentCodes: sent,
+    boughtProducts: boughtAll,
     scan: latest
       ? {
           ranOn: denverDate(new Date(latest.ran_at)),
