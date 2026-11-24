@@ -109,6 +109,22 @@ probe it.
       answering counts only. Safe to run twice. From the signed-in browser's console: `fetch("/api/backfill/calendar", {method: "POST"}).then(r => r.json())`.
     * The send goes to `CALENDAR_BASE_URL` (Grid itself today) over HTTP with the caller's `paddock_session`, as every app does.
   * Lando's own events are #67; not here.
+  * **The week read (#74):** `GET /api/calendar/week?start=` (`app/api/calendar/week/route.ts`, `lib/calendar/week.ts`;
+    contract in RULES.md) for Pit Row. It lists the account's calendars (`GET /me/calendars`) and reads each one's
+    `calendarView` (`/me/calendars/{id}/calendarView`; `/me/calendarView` alone would be the default calendar only), with
+    `Prefer: outlook.timezone="Mountain Standard Time"` so Graph answers in Denver wall-clock, and `$select` of the title and
+    times only. The UTC window is the week padded a day each side, then trimmed by wall-clock in code, so no time zone
+    arithmetic is done here. Cancelled occurrences are dropped; paging follows `@odata.nextLink` (Graph's host only, 20 pages).
+    * **It does write once:** Microsoft replaces the refresh token on every use, so the route refreshes under the flush's
+      lock and saves the new token (`saveRefreshToken`), like the flush. Nothing else is stored; no cache. While a flush
+      holds the lock the read answers `503 outlook busy` rather than refresh twice.
+    * **All-day** events take the date part of Graph's start and end as given (a floating date, never converted) and subtract
+      a day from the exclusive end. **A timed event whose zone is not Denver is a 502**, not a silently shifted time.
+    * **Not proven from here (fake `fetch` only):** that Graph honours the `Prefer` header on `calendarView` with a personal
+      account and answers `Mountain Standard Time` (or `America/Denver`), and what an all-day start looks like once converted.
+      The first real call is the owner's, after Pit Row ships; if it 502s with `graph 200 bad_time_zone`, read the zone it sends.
+      The shared birthday and holiday calendars, if the account has them, are read too ("every calendar"); a calendar Graph
+      refuses fails the whole week (502) rather than dropping out.
 
 ## Traps
 
