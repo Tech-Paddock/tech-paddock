@@ -52,12 +52,17 @@ export function pickMenu(name: string, text: string) {
   fireEvent.click(row);
 }
 
-/** Opens the Time box, sets hour, minute and AM or PM from its compact menus and taps Done. */
+/**
+ * Opens the Time box, sets AM or PM, hour and minute from its compact menus and taps Done. AM or PM goes first, as a
+ * person has to: on a day with a no-future rule the hours after now are greyed out, so with the box on PM at 4 PM an
+ * 11 can only be reached from AM. Picking the hour first taps a greyed-out row and the form clamps it to now, which made
+ * a past-time test pass or fail by the hour it ran at (#75).
+ */
 export function pickTime(hour: number, minute: number, pm: boolean) {
   fireEvent.click(timeBox());
+  pickMenu("AM or PM", pm ? "PM" : "AM");
   pickMenu("Hour", String(hour));
   pickMenu("Minute", `:${String(minute).padStart(2, "0")}`);
-  pickMenu("AM or PM", pm ? "PM" : "AM");
   fireEvent.click(within(dialog()).getByRole("button", { name: "Done" }));
 }
 
