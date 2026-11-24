@@ -204,3 +204,53 @@ export async function deleteEvent(f: FetchLike, accessToken: string, eventId: st
   if (res.status === 404) return;
   if (!res.ok) throw await failure(res);
 }
+
+export type GraphCalendar = { id: string; name: string };
+/** One event as the week read needs it: Graph's own fields, untouched. */
+export type GraphView = {
+  subject: string | null;
+  isAllDay: boolean;
+  isCancelled: boolean;
+  start: { dateTime: string; timeZone: string };
+  end: { dateTime: string; timeZone: string };
+};
+
+/** Follows `@odata.nextLink` to the end. A link is only ever followed on Graph's own host. */
+async function pages<T>(f: FetchLike, accessToken: string, first: string, extra: Record<string, string> = {}): Promise<T[]> {
+  const out: T[] = [];
+  let url: string | undefined = first;
+  for (let i = 0; url && i < 20; i++) {
+    if (!url.startsWith(`${GRAPH}/`)) throw new GraphError(200, "bad_next_link");
+    const res = await call(f, url, { method: "GET", headers: { ...authed(accessToken), ...extra } });
+    if (!res.ok) throw await failure(res);
+    let j: { value?: unknown; "@odata.nextLink"?: unknown };
+    try {
+      j = await res.json();
+    } catch {
+      throw new GraphError(res.status, "bad_response");
+    }
+    if (!Array.isArray(j.value)) throw new GraphError(res.status, "bad_response");
+    out.push(...(j.value as T[]));
+    url = typeof j["@odata.nextLink"] === "string" ? j["@odata.nextLink"] : undefined;
+  }
+  if (url) throw new GraphError(200, "too_many_pages");
+  return out;
+}
+
+/** Every calendar on the account (the default one, the ones apps made, shared and birthday ones). Read only. */
+export async function listCalendars(f: FetchLike, accessToken: string): Promise<GraphCalendar[]> {
+  const rows = await pages<{ id?: unknown; name?: unknown }>(f, accessToken, `${GRAPH}/me/calendars?$select=id,name&$top=100`);
+  return rows.flatMap((r) => (typeof r.id === "string" && r.id ? [{ id: r.id, name: typeof r.name === "string" ? r.name : "" }] : []));
+}
+
+/**
+ * One calendar's `calendarView` for a UTC window: Graph expands repeats into their
+ * occurrences. `Prefer: outlook.timezone` asks for Denver wall-clock back. Only the
+ * fields the week needs are asked for, so no notes, attendees or places leave Microsoft.
+ */
+export async function calendarView(f: FetchLike, accessToken: string, calendarId: string, fromUtc: string, toUtc: string): Promise<GraphView[]> {
+  const q = new URLSearchParams({ startDateTime: fromUtc, endDateTime: toUtc, $select: "subject,start,end,isAllDay,isCancelled", $top: "100" });
+  return pages<GraphView>(f, accessToken, `${GRAPH}/me/calendars/${encodeURIComponent(calendarId)}/calendarView?${q}`, {
+    prefer: `outlook.timezone="${DENVER}"`,
+  });
+}

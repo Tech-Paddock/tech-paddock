@@ -19,6 +19,8 @@ route, and the contract is written in the rules of the app that serves it:
   writes `calendar`, and none talks to Microsoft. The contract is *Calendar contract* in
   `apps/grid/RULES.md`. The schema is its own, not Grid's tables, so the route can move to another
   app by changing the address in `lib/calendar-client.ts` and pointing that app's client at it.
+  The read side is `GET /api/calendar/week?start=YYYY-MM-DD` (the week's events from every calendar
+  on the account, titles only, Denver wall-clock, from Graph, never cached), for Pit Row's week view.
 
 A new contract, or a write path into another app's data, is the owner's call (CLAUDE.md).
 
