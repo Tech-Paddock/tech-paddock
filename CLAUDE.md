@@ -163,6 +163,7 @@ Registrar.
 | `cookbook.techpaddock.io` | Cookbook | `tp-cookbook` |
 | `lando.techpaddock.io` | Lando | `tp-lando` |
 | `grid.techpaddock.io` | Grid | `tp-grid` |
+| `pitrow.techpaddock.io` | Pit Row | `tp-pitrow` |
 
 A new app needs no CI change; the matrix derives from `apps/`. Its Vercel project and DNS record
 are the owner's.

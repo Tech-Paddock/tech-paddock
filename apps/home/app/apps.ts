@@ -28,6 +28,7 @@ const PRESENTATION: Record<ToolSlug, Presentation> = {
   cookbook: { icon: "📖" },
   lando: { image: "/lando-icon.svg" },
   grid: { icon: "🗓️" },
+  pitrow: { icon: "🧹" },
 };
 
 export const APPS = TOOLS.map((tool) => ({

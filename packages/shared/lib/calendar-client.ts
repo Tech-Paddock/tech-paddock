@@ -20,6 +20,11 @@ import { COOKIES } from "./auth";
  *
  * Times are Denver wall-clock, never UTC: "YYYY-MM-DDTHH:mm" for a timed event,
  * "YYYY-MM-DD" for an all-day one (`all_day: true`, `end` the last day, inclusive).
+ *
+ * `fetchCalendarWeek` is the read side (#44, Pit Row): Grid's
+ * `GET /api/calendar/week?start=YYYY-MM-DD`, under the same three rules, tested
+ * in apps/pitrow/tests/calendar-week.test.ts. It answers a failure as a failure
+ * with a reason, never as an empty week.
  */
 
 /** Where the calendar route is hosted today. The only line to change when it moves. */
@@ -92,5 +97,86 @@ export async function sendCalendarEvent(
     return { ok: response.status === 200 };
   } catch {
     return { ok: false };
+  }
+}
+
+export const CALENDAR_WEEK_PATH = "/api/calendar/week";
+
+/** One event of the week, as Grid's read route answers it. Times are Denver wall-clock. */
+export type CalendarWeekEvent = {
+  /** The Outlook calendar it sits in ("Pit Row", "Lando", a household one). */
+  calendar: string;
+  title: string;
+  /** "YYYY-MM-DDTHH:mm" for a timed event, "YYYY-MM-DD" for an all-day one. */
+  start: string;
+  /** Same shape as `start`; for an all-day event, the last day, inclusive. */
+  end: string;
+  all_day: boolean;
+};
+
+/**
+ * Why a week could not be read. `not_connected`: Outlook is not connected (503).
+ * `microsoft`: Microsoft failed (502). `bad_start`: Grid refused the date (400).
+ * `signed_out`: no session, or Grid sent us to sign in. `unavailable`: anything
+ * else (a dead network, a timeout, another status, an answer that is not the contract).
+ */
+export type CalendarWeekError = "not_connected" | "microsoft" | "bad_start" | "signed_out" | "unavailable";
+
+export type CalendarWeekResult = { ok: true; events: CalendarWeekEvent[] } | { ok: false; error: CalendarWeekError };
+
+const DAY_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_OR_MINUTE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/;
+
+function eventsOf(body: unknown): CalendarWeekEvent[] | null {
+  if (typeof body !== "object" || body === null) return null;
+  const b = body as { ok?: unknown; events?: unknown };
+  if (b.ok !== true || !Array.isArray(b.events)) return null;
+  const out: CalendarWeekEvent[] = [];
+  for (const e of b.events) {
+    if (typeof e !== "object" || e === null) return null;
+    const { calendar, title, start, end, all_day } = e as Record<string, unknown>;
+    if (typeof calendar !== "string" || typeof title !== "string" || typeof all_day !== "boolean") return null;
+    if (typeof start !== "string" || typeof end !== "string" || !DAY_OR_MINUTE.test(start) || !DAY_OR_MINUTE.test(end)) return null;
+    // An answer that disagrees with itself is not trusted: an all-day event is a bare day.
+    if (all_day !== (start.length === 10)) return null;
+    out.push({ calendar, title, start, end, all_day });
+  }
+  return out;
+}
+
+/**
+ * The household's events for the seven days from `start` ("YYYY-MM-DD"),
+ * forwarding the caller's session. Resolves `{ ok: true, events }` only for a 200
+ * that matches the contract; every other outcome is `{ ok: false, error }`, so a
+ * failed read can never pass for an empty week. Never throws.
+ */
+export async function fetchCalendarWeek(
+  request: { headers: { get(name: string): string | null } },
+  start: string,
+  options: { baseUrl?: string; fetchImpl?: FetchLike; timeoutMs?: number } = {},
+): Promise<CalendarWeekResult> {
+  try {
+    if (!DAY_ONLY.test(start)) return { ok: false, error: "bad_start" };
+    const session = sessionOf(request);
+    if (!session) return { ok: false, error: "signed_out" };
+    const doFetch = options.fetchImpl ?? ((u: string, i: RequestInit) => fetch(u, i));
+    const response = await doFetch(`${options.baseUrl ?? CALENDAR_BASE_URL}${CALENDAR_WEEK_PATH}?start=${encodeURIComponent(start)}`, {
+      method: "GET",
+      headers: { cookie: `${COOKIES.SESSION}=${session}`, accept: "application/json" },
+      redirect: "manual",
+      cache: "no-store",
+      signal: AbortSignal.timeout(options.timeoutMs ?? CALENDAR_TIMEOUT_MS),
+    });
+    if (response.status === 503) return { ok: false, error: "not_connected" };
+    if (response.status === 502) return { ok: false, error: "microsoft" };
+    if (response.status === 400) return { ok: false, error: "bad_start" };
+    if (response.status === 401 || response.status === 403 || (response.status >= 300 && response.status < 400)) {
+      return { ok: false, error: "signed_out" };
+    }
+    if (response.status !== 200) return { ok: false, error: "unavailable" };
+    const events = eventsOf(await response.json());
+    return events ? { ok: true, events } : { ok: false, error: "unavailable" };
+  } catch {
+    return { ok: false, error: "unavailable" };
   }
 }
